@@ -1,0 +1,272 @@
+# FibreFlow Module Index
+# Quick reference for all 34 modules
+# Detailed profiles in individual .md files
+
+version: 1
+last_updated: "2026-01-09"
+total_modules: 34
+
+# Module Categories
+categories:
+  core:
+    description: "Core business functionality"
+    modules: [projects, clients, sow, installations, workflow, tasks, ticketing]
+
+  procurement:
+    description: "Procurement and inventory management"
+    modules: [procurement, assets, suppliers]
+
+  monitoring:
+    description: "QA and progress monitoring"
+    modules: [wa-monitor, foto-review, dr-photo-review, rag, daily-progress]
+
+  reporting:
+    description: "Analytics and reporting"
+    modules: [analytics, kpi-dashboard, kpis, reports]
+
+  operations:
+    description: "Field operations and integrations"
+    modules: [field-app, qfield-sync, barcode-scanner, nokia-equipment, onemap]
+
+  communication:
+    description: "Communication and collaboration"
+    modules: [communications, meetings, livekit]
+
+  admin:
+    description: "Administration and settings"
+    modules: [admin, settings, staff, onboarding, dashboard, action-items]
+
+  other:
+    description: "Specialized modules"
+    modules: [contractor-documents-report]
+
+# Quick Reference (populated by analysis)
+modules:
+  action-items:
+    category: admin
+    purpose: "Track and manage action items across projects"
+    complexity: low
+    profile: action-items.md
+
+  admin:
+    category: admin
+    purpose: "System administration and user management"
+    complexity: medium
+    profile: admin.md
+
+  analytics:
+    category: reporting
+    purpose: "Data analytics and visualization"
+    complexity: medium
+    profile: analytics.md
+
+  assets:
+    category: procurement
+    purpose: "Asset and inventory management"
+    complexity: high
+    profile: assets.md
+
+  barcode-scanner:
+    category: operations
+    purpose: "Barcode scanning for equipment tracking"
+    complexity: low
+    profile: barcode-scanner.md
+
+  clients:
+    category: core
+    purpose: "Client/customer management"
+    complexity: medium
+    profile: clients.md
+
+  communications:
+    category: communication
+    purpose: "Email and notification management"
+    complexity: medium
+    profile: communications.md
+
+  contractor-documents-report:
+    category: other
+    purpose: "Contractor document compliance reporting"
+    complexity: low
+    profile: contractor-documents-report.md
+
+  daily-progress:
+    category: monitoring
+    purpose: "Daily progress tracking and reporting"
+    complexity: medium
+    profile: daily-progress.md
+
+  dashboard:
+    category: admin
+    purpose: "Main dashboard with KPIs and overview"
+    complexity: medium
+    profile: dashboard.md
+
+  dr-photo-review:
+    category: monitoring
+    purpose: "Drop photo review workflow"
+    complexity: medium
+    profile: dr-photo-review.md
+
+  field-app:
+    category: operations
+    purpose: "Mobile field application support"
+    complexity: medium
+    profile: field-app.md
+
+  foto-review:
+    category: monitoring
+    purpose: "AI-powered photo review for QA"
+    complexity: high
+    profile: foto-review.md
+
+  installations:
+    category: core
+    purpose: "Installation tracking and management"
+    complexity: high
+    profile: installations.md
+
+  kpi-dashboard:
+    category: reporting
+    purpose: "KPI visualization dashboard"
+    complexity: medium
+    profile: kpi-dashboard.md
+
+  kpis:
+    category: reporting
+    purpose: "KPI definitions and calculations"
+    complexity: medium
+    profile: kpis.md
+
+  livekit:
+    category: communication
+    purpose: "Real-time video/audio communication"
+    complexity: high
+    profile: livekit.md
+
+  meetings:
+    category: communication
+    purpose: "Meeting scheduling and management"
+    complexity: low
+    profile: meetings.md
+
+  nokia-equipment:
+    category: operations
+    purpose: "Nokia equipment integration"
+    complexity: medium
+    profile: nokia-equipment.md
+
+  onboarding:
+    category: admin
+    purpose: "Contractor onboarding workflow"
+    complexity: high
+    profile: onboarding.md
+
+  onemap:
+    category: operations
+    purpose: "OneMap GIS integration"
+    complexity: high
+    profile: onemap.md
+
+  procurement:
+    category: procurement
+    purpose: "Procurement workflow (RFQ, BOQ, PO)"
+    complexity: high
+    profile: procurement.md
+
+  projects:
+    category: core
+    purpose: "Project management and configuration"
+    complexity: high
+    profile: projects.md
+
+  qfield-sync:
+    category: operations
+    purpose: "QField/QFieldCloud GIS sync"
+    complexity: high
+    profile: qfield-sync.md
+
+  rag:
+    category: monitoring
+    purpose: "Contractor health RAG status"
+    complexity: medium
+    profile: rag.md
+
+  reports:
+    category: reporting
+    purpose: "Report generation and export"
+    complexity: medium
+    profile: reports.md
+
+  settings:
+    category: admin
+    purpose: "Application settings management"
+    complexity: low
+    profile: settings.md
+
+  sow:
+    category: core
+    purpose: "Statement of Work data import/management"
+    complexity: high
+    profile: sow.md
+
+  staff:
+    category: admin
+    purpose: "Staff management and assignments"
+    complexity: medium
+    profile: staff.md
+
+  suppliers:
+    category: procurement
+    purpose: "Supplier management"
+    complexity: medium
+    profile: suppliers.md
+
+  tasks:
+    category: core
+    purpose: "Task management and assignments"
+    complexity: medium
+    profile: tasks.md
+
+  ticketing:
+    category: core
+    purpose: "Support ticketing system"
+    complexity: high
+    profile: ticketing.md
+
+  wa-monitor:
+    category: monitoring
+    purpose: "WhatsApp QA monitoring (isolated)"
+    complexity: high
+    profile: wa-monitor.md
+
+  workflow:
+    category: core
+    purpose: "Workflow engine and state management"
+    complexity: high
+    profile: workflow.md
+
+# Database Tables by Module (quick lookup)
+database_mapping:
+  drops: [sow, wa-monitor]
+  qa_photo_reviews: [wa-monitor, dr-photo-review]
+  foto_ai_reviews: [foto-review]
+  projects: [projects, sow, installations]
+  contractors: [onboarding, rag, staff]
+  installations: [installations, workflow]
+  assets: [assets, procurement]
+  rfq: [procurement]
+  boq: [procurement]
+  tickets: [ticketing]
+
+# Isolation Status
+isolation:
+  fully_isolated:
+    - wa-monitor  # Zero external FF dependencies
+  mostly_isolated:
+    - foto-review
+    - ticketing
+  tightly_coupled:
+    - workflow
+    - installations
+    - projects
