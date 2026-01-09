@@ -1,18 +1,17 @@
 /**
  * Supplier Compliance Core Service
  * Main orchestration for compliance management
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
+ * TODO: Create /api/suppliers endpoints for full functionality
  */
 
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { ComplianceStatus, SupplierDocument, DocumentVerificationResult } from './types';
 import { DocumentManager } from './documentManager';
 import { ComplianceCalculator } from './complianceCalculator';
 import { RequirementsManager } from './requirementsManager';
 import { ComplianceReportGenerator } from './reportGenerator';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class ComplianceCore {
   /**
@@ -23,8 +22,6 @@ export class ComplianceCore {
     complianceUpdates: Partial<ComplianceStatus>
   ): Promise<void> {
     try {
-      const supplierRef = doc(db, COLLECTION_NAME, supplierId);
-      
       // Calculate compliance score
       const updatedCompliance = {
         ...complianceUpdates,
@@ -32,11 +29,18 @@ export class ComplianceCore {
         complianceScore: ComplianceCalculator.calculateComplianceScore(complianceUpdates)
       };
 
-      await updateDoc(supplierRef, {
-        complianceStatus: updatedCompliance,
-        updatedAt: new Date()
+      const response = await fetch(`/api/suppliers/${supplierId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          complianceStatus: updatedCompliance,
+          updatedAt: new Date()
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to update compliance');
+      }
     } catch (error) {
       log.error('Error updating compliance:', { data: error }, 'core');
       throw new Error(`Failed to update compliance: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -98,7 +102,7 @@ export class ComplianceCore {
       // Get current supplier data
       const supplierCrudService = await import('../supplier.crud');
       const supplier = await supplierCrudService.SupplierCrudService.getById(supplierId);
-      
+
       if (!supplier) {
         throw new Error('Supplier not found');
       }

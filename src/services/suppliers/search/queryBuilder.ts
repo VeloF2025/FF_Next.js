@@ -1,49 +1,36 @@
 /**
  * Supplier Search Query Builder
- * Firebase query construction for supplier searches
+ * Query construction for supplier searches
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  getDocs
-} from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { Supplier, SupplierStatus } from '@/types/supplier/base.types';
+import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SupplierQueryBuilder {
   /**
    * Get base supplier dataset with basic filters
    */
-  static async getBaseSupplierSet(filters: any): Promise<Supplier[]> {
+  static async getBaseSupplierSet(filters: Record<string, unknown>): Promise<Supplier[]> {
     try {
-      const queryFilters: any[] = [];
-      
+      // Get all suppliers through the CRUD service
+      let suppliers = await SupplierCrudService.getAll();
+
       // Apply status filter
       if (filters.status) {
         if (Array.isArray(filters.status)) {
-          queryFilters.push(where('status', 'in', filters.status));
+          suppliers = suppliers.filter(s => (filters.status as string[]).includes(s.status));
         } else {
-          queryFilters.push(where('status', '==', filters.status));
+          suppliers = suppliers.filter(s => s.status === filters.status);
         }
       } else {
         // Default to active suppliers only
-        queryFilters.push(where('status', '==', SupplierStatus.ACTIVE));
+        suppliers = suppliers.filter(s => s.status === SupplierStatus.ACTIVE);
       }
-      
-      const q = query(collection(db, COLLECTION_NAME), ...queryFilters);
-      const snapshot = await getDocs(q);
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+
+      return suppliers;
     } catch (error) {
       log.error('Error getting base supplier set:', { data: error }, 'queryBuilder');
       throw new Error(`Failed to get suppliers: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -59,31 +46,35 @@ export class SupplierQueryBuilder {
     limit?: number;
   }): Promise<Supplier[]> {
     try {
-      const filters: any[] = [
-        where('categories', 'array-contains', category)
-      ];
+      let suppliers = await SupplierCrudService.getAll();
 
+      // Filter by category
+      suppliers = suppliers.filter(s =>
+        s.categories && s.categories.includes(category)
+      );
+
+      // Filter by status
       if (!options?.includeInactive) {
-        filters.push(where('status', '==', SupplierStatus.ACTIVE));
+        suppliers = suppliers.filter(s => s.status === SupplierStatus.ACTIVE);
       }
 
-      let q = query(collection(db, COLLECTION_NAME), ...filters);
-
+      // Sort
       if (options?.sortByRating) {
-        q = query(q, orderBy('rating.overall', 'desc'));
+        suppliers.sort((a, b) => {
+          const aRating = (a.rating as { overall?: number })?.overall || 0;
+          const bRating = (b.rating as { overall?: number })?.overall || 0;
+          return bRating - aRating;
+        });
       } else {
-        q = query(q, orderBy('companyName'));
+        suppliers.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
       }
 
+      // Apply limit
       if (options?.limit) {
-        q = query(q, limit(options.limit));
+        suppliers = suppliers.slice(0, options.limit);
       }
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+
+      return suppliers;
     } catch (error) {
       log.error(`Error querying suppliers by category ${category}:`, { data: error }, 'queryBuilder');
       throw new Error(`Failed to query suppliers by category: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -99,31 +90,41 @@ export class SupplierQueryBuilder {
     limit?: number;
   }): Promise<Supplier[]> {
     try {
-      let q = query(
-        collection(db, COLLECTION_NAME),
-        where('isPreferred', '==', true),
-        where('status', '==', SupplierStatus.ACTIVE)
+      let suppliers = await SupplierCrudService.getAll();
+
+      // Filter preferred and active
+      suppliers = suppliers.filter(s =>
+        s.isPreferred === true && s.status === SupplierStatus.ACTIVE
       );
 
+      // Filter by category if specified
       if (options?.category) {
-        q = query(q, where('categories', 'array-contains', options.category));
+        suppliers = suppliers.filter(s =>
+          s.categories && s.categories.includes(options.category!)
+        );
       }
 
+      // Sort
       if (options?.sortByPerformance) {
-        q = query(q, orderBy('performance.overallScore', 'desc'));
+        suppliers.sort((a, b) => {
+          const aScore = (a.performance as { overallScore?: number })?.overallScore || 0;
+          const bScore = (b.performance as { overallScore?: number })?.overallScore || 0;
+          return bScore - aScore;
+        });
       } else {
-        q = query(q, orderBy('rating.overall', 'desc'));
+        suppliers.sort((a, b) => {
+          const aRating = (a.rating as { overall?: number })?.overall || 0;
+          const bRating = (b.rating as { overall?: number })?.overall || 0;
+          return bRating - aRating;
+        });
       }
 
+      // Apply limit
       if (options?.limit) {
-        q = query(q, limit(options.limit));
+        suppliers = suppliers.slice(0, options.limit);
       }
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+
+      return suppliers;
     } catch (error) {
       log.error('Error querying preferred suppliers:', { data: error }, 'queryBuilder');
       throw new Error(`Failed to query preferred suppliers: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -139,19 +140,23 @@ export class SupplierQueryBuilder {
         return [];
       }
 
-      // Get all active suppliers first (since Firestore doesn't support full-text search)
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', SupplierStatus.ACTIVE),
-        orderBy('companyName'),
-        limit(maxResults * 2) // Get more to account for filtering
+      let suppliers = await SupplierCrudService.getAll();
+
+      // Filter by active status
+      suppliers = suppliers.filter(s => s.status === SupplierStatus.ACTIVE);
+
+      // Filter by name (client-side text search)
+      const term = searchTerm.toLowerCase();
+      suppliers = suppliers.filter(s =>
+        (s.companyName || '').toLowerCase().includes(term) ||
+        (s.name || '').toLowerCase().includes(term)
       );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+
+      // Sort by name
+      suppliers.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+
+      // Apply limit
+      return suppliers.slice(0, maxResults);
     } catch (error) {
       log.error('Error querying suppliers by name:', { data: error }, 'queryBuilder');
       throw new Error(`Failed to query suppliers by name: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -163,18 +168,20 @@ export class SupplierQueryBuilder {
    */
   static async getTopRatedSuppliers(limitCount: number): Promise<Supplier[]> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', SupplierStatus.ACTIVE),
-        orderBy('rating.overall', 'desc'),
-        limit(limitCount)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+      let suppliers = await SupplierCrudService.getAll();
+
+      // Filter by active status
+      suppliers = suppliers.filter(s => s.status === SupplierStatus.ACTIVE);
+
+      // Sort by rating
+      suppliers.sort((a, b) => {
+        const aRating = (a.rating as { overall?: number })?.overall || 0;
+        const bRating = (b.rating as { overall?: number })?.overall || 0;
+        return bRating - aRating;
+      });
+
+      // Apply limit
+      return suppliers.slice(0, limitCount);
     } catch (error) {
       log.error('Error getting top rated suppliers:', { data: error }, 'queryBuilder');
       throw new Error(`Failed to get top rated suppliers: ${error instanceof Error ? error.message : 'Unknown error'}`);

@@ -1,9 +1,9 @@
 import { Package, Wrench, BarChart3, Upload, Download, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 
 export function NokiaEquipmentDashboard() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('inventory');
 
   const tabs = [
@@ -19,7 +19,7 @@ export function NokiaEquipmentDashboard() {
       description: 'Browse Nokia equipment catalog',
       icon: Package,
       color: 'bg-blue-500',
-      onClick: () => navigate('/app/nokia-equipment/catalog'),
+      onClick: () => router.push('/nokia-equipment/catalog'),
     },
     {
       title: 'Inventory Status',
@@ -27,35 +27,35 @@ export function NokiaEquipmentDashboard() {
       icon: BarChart3,
       color: 'bg-green-500',
       stats: { total: 245, available: 180, deployed: 65 },
-      onClick: () => navigate('/app/nokia-equipment/inventory'),
+      onClick: () => router.push('/nokia-equipment/inventory'),
     },
     {
       title: 'Installations',
       description: 'Track equipment installations',
       icon: Wrench,
       color: 'bg-purple-500',
-      onClick: () => navigate('/app/nokia-equipment/installations'),
+      onClick: () => router.push('/nokia-equipment/installations'),
     },
     {
       title: 'Maintenance',
       description: 'Schedule and track maintenance',
       icon: AlertTriangle,
       color: 'bg-orange-500',
-      onClick: () => navigate('/app/nokia-equipment/maintenance'),
+      onClick: () => router.push('/nokia-equipment/maintenance'),
     },
     {
       title: 'Import Data',
       description: 'Import equipment data',
       icon: Upload,
       color: 'bg-indigo-500',
-      onClick: () => navigate('/app/nokia-equipment/import'),
+      onClick: () => router.push('/nokia-equipment/import'),
     },
     {
       title: 'Reports',
       description: 'Generate equipment reports',
       icon: Download,
       color: 'bg-pink-500',
-      onClick: () => navigate('/app/nokia-equipment/reports'),
+      onClick: () => router.push('/nokia-equipment/reports'),
     },
   ];
 

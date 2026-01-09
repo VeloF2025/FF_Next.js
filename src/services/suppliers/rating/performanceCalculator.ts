@@ -1,22 +1,21 @@
 /**
  * Supplier Performance Calculator
  * Calculate comprehensive supplier performance metrics
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { SupplierPerformance, PerformancePeriod } from '@/types/supplier/base.types';
 import { PerformanceTrendPoint } from './types';
+import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SupplierPerformanceCalculator {
   /**
    * Calculate comprehensive supplier performance metrics
    */
   static async calculatePerformance(
-    supplierId: string, 
+    supplierId: string,
     period: PerformancePeriod
   ): Promise<SupplierPerformance> {
     try {
@@ -26,16 +25,16 @@ export class SupplierPerformanceCalculator {
       // - Quality inspections
       // - Invoice payments
       // - Communication logs
-      
+
       const performance = await this.generatePerformanceMetrics(supplierId, period);
-      
+
       // Update supplier with latest performance data
-      await updateDoc(doc(db, COLLECTION_NAME, supplierId), {
+      await SupplierCrudService.update(supplierId, {
         performance: performance,
-        lastPerformanceUpdate: Timestamp.now(),
-        updatedAt: Timestamp.now()
-      });
-      
+        lastPerformanceUpdate: new Date(),
+        updatedAt: new Date()
+      } as never);
+
       return performance;
     } catch (error) {
       log.error(`Error calculating supplier performance for ${supplierId}:`, { data: error }, 'performanceCalculator');
@@ -55,11 +54,11 @@ export class SupplierPerformanceCalculator {
       // For now, return mock trend data
       const trends = [];
       const currentDate = new Date();
-      
+
       for (let i = months - 1; i >= 0; i--) {
         const periodDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
         const periodName = periodDate.toISOString().substring(0, 7); // YYYY-MM format
-        
+
         trends.push({
           period: periodName,
           overallScore: Math.round(85 + Math.random() * 15), // 85-100
@@ -69,7 +68,7 @@ export class SupplierPerformanceCalculator {
           serviceScore: Math.round(85 + Math.random() * 15)  // 85-100
         });
       }
-      
+
       return trends;
     } catch (error) {
       log.error(`Error getting performance trends for ${supplierId}:`, { data: error }, 'performanceCalculator');
@@ -86,7 +85,7 @@ export class SupplierPerformanceCalculator {
   ): Promise<SupplierPerformance> {
     // This would typically aggregate real data from multiple sources
     // For now, generate realistic mock data
-    
+
     const baseScore = 85 + Math.random() * 15; // 85-100 base score
     const variance = 10; // ±10 point variance for different metrics
 
@@ -97,7 +96,7 @@ export class SupplierPerformanceCalculator {
       priceScore: Math.round(Math.max(60, Math.min(100, baseScore + (Math.random() - 0.5) * variance * 2))),
       serviceScore: Math.round(Math.max(70, Math.min(100, baseScore + (Math.random() - 0.5) * variance))),
       complianceScore: Math.round(Math.max(90, Math.min(100, baseScore + Math.random() * 5))),
-      
+
       metrics: {
         totalOrders: Math.floor(5 + Math.random() * 20),
         completedOrders: Math.floor(4 + Math.random() * 18),
@@ -108,7 +107,7 @@ export class SupplierPerformanceCalculator {
         averageLeadTime: Math.floor(3 + Math.random() * 10),
         averageResponseTime: Math.floor(1 + Math.random() * 8)
       },
-      
+
       issues: [],
       evaluationPeriod: period,
       lastEvaluationDate: new Date(),
@@ -126,16 +125,16 @@ export class SupplierPerformanceCalculator {
     averageLeadTime: number;
   }): number {
     if (metrics.totalOrders === 0) return 0;
-    
+
     const onTimeRate = (metrics.onTimeDeliveries / metrics.totalOrders) * 100;
     const lateRate = (metrics.lateDeliveries / metrics.totalOrders) * 100;
-    
+
     // Base score from on-time delivery rate
     let score = onTimeRate;
-    
+
     // Penalty for late deliveries
     score -= lateRate * 0.5;
-    
+
     // Bonus/penalty for lead time (assuming target is 7 days)
     const targetLeadTime = 7;
     if (metrics.averageLeadTime < targetLeadTime) {
@@ -143,7 +142,7 @@ export class SupplierPerformanceCalculator {
     } else {
       score -= (metrics.averageLeadTime - targetLeadTime) * 1; // Penalty for slow delivery
     }
-    
+
     return Math.max(0, Math.min(100, Math.round(score)));
   }
 
@@ -156,15 +155,15 @@ export class SupplierPerformanceCalculator {
     returnedItems: number;
   }): number {
     if (metrics.totalOrders === 0) return 100; // Perfect score if no orders
-    
+
     const defectRate = (metrics.defectiveItems / metrics.totalOrders) * 100;
     const returnRate = (metrics.returnedItems / metrics.totalOrders) * 100;
-    
+
     // Start with perfect score and subtract penalties
     let score = 100;
     score -= defectRate * 2; // Heavy penalty for defects
     score -= returnRate * 3; // Heavier penalty for returns
-    
+
     return Math.max(0, Math.round(score));
   }
 
@@ -176,7 +175,7 @@ export class SupplierPerformanceCalculator {
   }): number {
     // Target response time is 24 hours (1 day)
     const targetResponseTime = 1;
-    
+
     if (metrics.averageResponseTime <= targetResponseTime) {
       return 100;
     } else if (metrics.averageResponseTime <= 3) {
@@ -217,7 +216,7 @@ export class SupplierPerformanceCalculator {
 
     const finalWeights = { ...defaultWeights, ...weights };
 
-    const weightedScore = 
+    const weightedScore =
       deliveryScore * finalWeights.delivery! +
       qualityScore * finalWeights.quality! +
       priceScore * finalWeights.price! +

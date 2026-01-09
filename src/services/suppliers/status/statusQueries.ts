@@ -1,19 +1,18 @@
 /**
  * Supplier Status - Query Operations
  * Handles status-based queries and data retrieval
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { query, collection, where, getDocs } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { log } from '@/lib/logger';
-import { 
-  SupplierStatus, 
-  Supplier, 
-  StatusSummary, 
-  StatusHistoryEntry 
+import { SupplierCrudService } from '../supplier.crud';
+import {
+  SupplierStatus,
+  Supplier,
+  StatusSummary,
+  StatusHistoryEntry
 } from './types';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class StatusQueries {
   /**
@@ -21,16 +20,8 @@ export class StatusQueries {
    */
   static async getByStatus(status: SupplierStatus): Promise<Supplier[]> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', status)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+      const suppliers = await SupplierCrudService.getAll();
+      return suppliers.filter(s => s.status === status) as unknown as Supplier[];
     } catch (error) {
       log.error(`Error fetching suppliers by status ${status}:`, { data: error }, 'statusQueries');
       throw new Error(`Failed to fetch suppliers by status: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -70,17 +61,10 @@ export class StatusQueries {
    */
   static async getPreferredSuppliers(): Promise<Supplier[]> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('isPreferred', '==', true),
-        where('status', '==', SupplierStatus.ACTIVE)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+      const suppliers = await SupplierCrudService.getAll();
+      return suppliers.filter(s =>
+        s.isPreferred === true && s.status === SupplierStatus.ACTIVE
+      ) as unknown as Supplier[];
     } catch (error) {
       log.error('Error fetching preferred suppliers:', { data: error }, 'statusQueries');
       throw new Error(`Failed to fetch preferred suppliers: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -92,6 +76,8 @@ export class StatusQueries {
    */
   static async getStatusSummary(): Promise<StatusSummary> {
     try {
+      const suppliers = await SupplierCrudService.getAll();
+
       const summary: StatusSummary = {
         [SupplierStatus.PENDING]: 0,
         [SupplierStatus.ACTIVE]: 0,
@@ -101,10 +87,12 @@ export class StatusQueries {
         [SupplierStatus.ARCHIVED]: 0
       };
 
-      // Get counts for each status
-      for (const status of Object.values(SupplierStatus)) {
-        const count = await this.getStatusCount(status);
-        summary[status] = count;
+      // Count suppliers by status
+      for (const supplier of suppliers) {
+        const status = supplier.status as SupplierStatus;
+        if (status in summary) {
+          summary[status]++;
+        }
       }
 
       return summary;
@@ -115,28 +103,13 @@ export class StatusQueries {
   }
 
   /**
-   * Get count of suppliers by status
-   */
-  private static async getStatusCount(status: SupplierStatus): Promise<number> {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('status', '==', status)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.size;
-  }
-
-  /**
    * Get status transition history for a supplier
    */
   static async getStatusHistory(supplierId: string): Promise<StatusHistoryEntry[]> {
     try {
       // In a real implementation, this would query a status history table
-      // For now, return mock data based on current supplier state
-      
-      // This would typically be stored in a separate 'supplier_status_history' collection
-      // Each status change would create a new record with timestamp, old/new status, reason, etc.
-      
+      // For now, return empty array - status history is not stored
+      log.info(`Getting status history for supplier ${supplierId}`, {}, 'statusQueries');
       return [];
     } catch (error) {
       log.error(`Error fetching status history for ${supplierId}:`, { data: error }, 'statusQueries');
@@ -153,27 +126,21 @@ export class StatusQueries {
     isActive?: boolean;
   }): Promise<Supplier[]> {
     try {
-      const collectionRef = collection(db, COLLECTION_NAME);
-      const constraints = [];
+      let suppliers = await SupplierCrudService.getAll();
 
       if (conditions.status) {
-        constraints.push(where('status', '==', conditions.status));
+        suppliers = suppliers.filter(s => s.status === conditions.status);
       }
 
       if (conditions.isPreferred !== undefined) {
-        constraints.push(where('isPreferred', '==', conditions.isPreferred));
+        suppliers = suppliers.filter(s => s.isPreferred === conditions.isPreferred);
       }
 
       if (conditions.isActive !== undefined) {
-        constraints.push(where('isActive', '==', conditions.isActive));
+        suppliers = suppliers.filter(s => s.isActive === conditions.isActive);
       }
 
-      const q = constraints.length > 0 ? query(collectionRef, ...constraints) : collectionRef;
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
+      return suppliers as unknown as Supplier[];
     } catch (error) {
       log.error('Error fetching suppliers with conditions:', { data: error }, 'statusQueries');
       throw new Error(`Failed to fetch suppliers: ${error instanceof Error ? error.message : 'Unknown error'}`);

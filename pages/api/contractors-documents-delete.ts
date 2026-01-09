@@ -1,13 +1,12 @@
 /**
  * Contractors Documents Delete API - Flat Endpoint
  * POST /api/contractors-documents-delete
- * Deletes document from Firebase Storage AND database
+ * Deletes document from local storage AND database
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { storage } from '@/config/firebase';
-import { ref, deleteObject } from 'firebase/storage';
+import { localFileStorage } from '@/services/localFileStorage';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -33,13 +32,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    // Delete from Firebase Storage
+    // Delete from local storage
     try {
-      const storageRef = ref(storage, document.file_path);
-      await deleteObject(storageRef);
-    } catch (firebaseError) {
-      console.error('Firebase delete error:', firebaseError);
-      // Continue even if Firebase delete fails (file might already be gone)
+      if (document.file_path) {
+        await localFileStorage.deleteFile(document.file_path);
+      }
+    } catch (storageError) {
+      console.error('Local storage delete error:', storageError);
+      // Continue even if file delete fails (file might already be gone)
     }
 
     // Delete from database
@@ -50,11 +50,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: 'Document deleted successfully'
     });
 
-  } catch (error: any) {
-    console.error('Error deleting document:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error deleting document:', errorMessage);
     return res.status(500).json({
       error: 'Failed to delete document',
-      message: error.message
+      message: errorMessage
     });
   }
 }

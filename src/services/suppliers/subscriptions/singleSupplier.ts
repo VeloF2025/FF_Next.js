@@ -1,60 +1,53 @@
 /**
  * Single Supplier Subscription Service
- * Handle real-time subscriptions for individual suppliers
+ * Handle subscriptions for individual suppliers
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
+ * Real-time subscriptions are converted to one-time fetches with no-op unsubscribe.
  */
 
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { Supplier } from '@/types/supplier/base.types';
 import { SupplierCallback, SubscriptionOptions } from './types';
+import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SingleSupplierSubscription {
   /**
    * Subscribe to a single supplier's changes
+   * NOTE: This is now a one-time fetch, not a real-time subscription
    */
   static subscribeToSupplier(
     supplierId: string,
     callback: SupplierCallback,
     options?: SubscriptionOptions
   ): () => void {
-    try {
-      const docRef = doc(db, COLLECTION_NAME, supplierId);
-      
-      const unsubscribe = onSnapshot(
-        docRef,
-        {
-          includeMetadataChanges: options?.includeMetadata || false
-        },
-        (snapshot) => {
-          if (snapshot.exists()) {
-            const supplier: Supplier = {
-              id: snapshot.id,
-              ...snapshot.data()
-            } as Supplier;
-            
-            callback(supplier);
-          } else {
-            // Supplier was deleted
-            options?.onError?.(new Error(`Supplier ${supplierId} no longer exists`));
-          }
-        },
-        (error) => {
-          log.error(`Error subscribing to supplier ${supplierId}:`, { data: error }, 'singleSupplier');
-          options?.onError?.(error);
-        }
-      );
+    // Perform initial fetch
+    this.fetchSupplier(supplierId, callback, options);
 
-      return unsubscribe;
+    // Return no-op unsubscribe function
+    return () => {};
+  }
+
+  /**
+   * Fetch a single supplier
+   */
+  private static async fetchSupplier(
+    supplierId: string,
+    callback: SupplierCallback,
+    options?: SubscriptionOptions
+  ): Promise<void> {
+    try {
+      const supplier = await SupplierCrudService.getById(supplierId);
+
+      if (supplier) {
+        callback(supplier as Supplier);
+      } else {
+        options?.onError?.(new Error(`Supplier ${supplierId} not found`));
+      }
     } catch (error) {
-      log.error(`Error setting up supplier subscription for ${supplierId}:`, { data: error }, 'singleSupplier');
+      log.error(`Error fetching supplier ${supplierId}:`, { data: error }, 'singleSupplier');
       const errorObj = error instanceof Error ? error : new Error('Unknown error');
       options?.onError?.(errorObj);
-      
-      // Return no-op unsubscribe function
-      return () => {};
     }
   }
 }

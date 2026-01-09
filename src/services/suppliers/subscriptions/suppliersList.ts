@@ -1,77 +1,76 @@
 /**
  * Suppliers List Subscription Service
- * Handle real-time subscriptions for supplier collections with filtering
+ * Handle subscriptions for supplier collections with filtering
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
+ * Real-time subscriptions are converted to one-time fetches with no-op unsubscribe.
  */
 
-import { query, collection, onSnapshot, orderBy, where, limit } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { Supplier, SupplierStatus } from '@/types/supplier/base.types';
 import { SuppliersCallback, SupplierSubscriptionFilter, SubscriptionOptions } from './types';
+import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SuppliersListSubscription {
   /**
    * Subscribe to all suppliers with optional filtering
+   * NOTE: This is now a one-time fetch, not a real-time subscription
    */
   static subscribeToSuppliers(
     callback: SuppliersCallback,
     filter?: SupplierSubscriptionFilter,
     options?: SubscriptionOptions
   ): () => void {
+    // Perform initial fetch
+    this.fetchSuppliers(callback, filter, options);
+
+    // Return no-op unsubscribe function
+    return () => {};
+  }
+
+  /**
+   * Fetch suppliers with filters
+   */
+  private static async fetchSuppliers(
+    callback: SuppliersCallback,
+    filter?: SupplierSubscriptionFilter,
+    options?: SubscriptionOptions
+  ): Promise<void> {
     try {
-      let q = query(collection(db, COLLECTION_NAME));
+      let suppliers = await SupplierCrudService.getAll();
 
       // Apply filters
       if (filter?.status) {
-        q = query(q, where('status', '==', filter.status));
+        suppliers = suppliers.filter(s => s.status === filter.status);
       }
       if (filter?.isPreferred !== undefined) {
-        q = query(q, where('isPreferred', '==', filter.isPreferred));
+        suppliers = suppliers.filter(s => s.isPreferred === filter.isPreferred);
       }
       if (filter?.category) {
-        q = query(q, where('categories', 'array-contains', filter.category));
+        suppliers = suppliers.filter(s =>
+          s.categories && s.categories.includes(filter.category!)
+        );
       }
 
-      // Add ordering and limit
-      q = query(q, orderBy('companyName', 'asc'));
+      // Sort by company name
+      suppliers.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+
+      // Apply limit
       if (filter?.limit) {
-        q = query(q, limit(filter.limit));
+        suppliers = suppliers.slice(0, filter.limit);
       }
-      
-      const unsubscribe = onSnapshot(
-        q,
-        {
-          includeMetadataChanges: options?.includeMetadata || false
-        },
-        (snapshot) => {
-          const suppliers = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as Supplier));
-          
-          callback(suppliers);
-        },
-        (error) => {
-          log.error('Error subscribing to suppliers:', { data: error }, 'suppliersList');
-          options?.onError?.(error);
-        }
-      );
 
-      return unsubscribe;
+      callback(suppliers);
     } catch (error) {
-      log.error('Error setting up suppliers subscription:', { data: error }, 'suppliersList');
+      log.error('Error fetching suppliers:', { data: error }, 'suppliersList');
       const errorObj = error instanceof Error ? error : new Error('Unknown error');
       options?.onError?.(errorObj);
-      
-      // Return no-op unsubscribe function
-      return () => {};
     }
   }
 
   /**
    * Subscribe to preferred suppliers only
+   * NOTE: This is now a one-time fetch
    */
   static subscribeToPreferredSuppliers(
     callback: SuppliersCallback,
@@ -79,9 +78,9 @@ export class SuppliersListSubscription {
   ): () => void {
     return this.subscribeToSuppliers(
       callback,
-      { 
-        status: SupplierStatus.ACTIVE, 
-        isPreferred: true 
+      {
+        status: SupplierStatus.ACTIVE,
+        isPreferred: true
       },
       options
     );
@@ -89,6 +88,7 @@ export class SuppliersListSubscription {
 
   /**
    * Subscribe to suppliers by category
+   * NOTE: This is now a one-time fetch
    */
   static subscribeToCategorySuppliers(
     category: string,
@@ -97,9 +97,9 @@ export class SuppliersListSubscription {
   ): () => void {
     return this.subscribeToSuppliers(
       callback,
-      { 
+      {
         status: SupplierStatus.ACTIVE,
-        category 
+        category
       },
       options
     );
@@ -107,6 +107,7 @@ export class SuppliersListSubscription {
 
   /**
    * Subscribe to suppliers pending approval
+   * NOTE: This is now a one-time fetch
    */
   static subscribeToPendingSuppliers(
     callback: SuppliersCallback,
