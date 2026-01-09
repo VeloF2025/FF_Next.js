@@ -6,7 +6,6 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuth } from '@clerk/nextjs/server';
 import { phaseOperations, stepOperations, taskOperations } from '@/services/projects/phases/neonPhaseService';
 import { log } from '@/lib/logger';
 
@@ -16,7 +15,6 @@ export default async function handler(
 ) {
   try {
     // Authenticate user with Clerk
-    const { userId } = getAuth(req);
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

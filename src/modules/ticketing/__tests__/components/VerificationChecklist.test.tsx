@@ -27,7 +27,6 @@ vi.mock('../../hooks/useVerification', () => ({
 }));
 
 // Mock Clerk auth
-vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id' },
     isLoaded: true,

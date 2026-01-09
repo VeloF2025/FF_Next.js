@@ -3,7 +3,6 @@
  * Authentication state listeners and change handlers using Clerk
  */
 
-import { useAuth, useUser } from '@clerk/nextjs';
 import { authConfig } from '@/config/auth.config';
 import { User } from '@/types/auth.types';
 import { getUserProfile } from '../userService';

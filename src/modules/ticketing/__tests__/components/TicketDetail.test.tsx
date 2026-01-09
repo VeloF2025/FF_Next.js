@@ -15,7 +15,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ClerkProvider } from '@clerk/nextjs';
 import { TicketDetail } from '../../components/TicketDetail/TicketDetail';
 import type { Ticket } from '../../types/ticket';
 
@@ -23,8 +22,6 @@ import type { Ticket } from '../../types/ticket';
 global.fetch = vi.fn();
 
 // Mock Clerk
-vi.mock('@clerk/nextjs', async () => {
-  const actual = await vi.importActual('@clerk/nextjs');
   return {
     ...actual,
     useUser: () => ({

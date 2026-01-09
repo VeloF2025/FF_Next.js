@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-// import { getAuth } from '@clerk/nextjs/server';
 import { getAuth } from '../../../../../lib/auth-mock';
 
 /**

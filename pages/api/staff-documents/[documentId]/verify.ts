@@ -8,7 +8,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
-import { getAuth } from '@clerk/nextjs/server';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentVerifyAPI');
@@ -36,7 +35,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get the current user for verifier ID
     // In production, this would come from Clerk auth
-    const { userId } = getAuth(req);
 
     // Find staff member by clerk ID if available
     let verifierId: string | null = null;

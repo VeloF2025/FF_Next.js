@@ -22,7 +22,6 @@ import { ReadinessBlocker } from '../../components/QAReadiness/ReadinessBlocker'
 import type { QAReadinessCheck as QAReadinessCheckType, QAReadinessFailedCheck } from '../../types/verification';
 
 // Mock Clerk auth
-vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id' },
     isLoaded: true,

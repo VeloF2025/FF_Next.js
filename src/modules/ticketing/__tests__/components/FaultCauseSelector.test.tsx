@@ -22,7 +22,6 @@ import { FaultCause } from '../../types/ticket';
 import { FAULT_CAUSE_OPTIONS } from '../../constants/faultCauses';
 
 // Mock Clerk auth
-vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id' },
     isLoaded: true,

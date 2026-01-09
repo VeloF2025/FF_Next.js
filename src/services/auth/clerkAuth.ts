@@ -1,4 +1,3 @@
-import { useAuth as useClerkAuth, useUser, SignIn, SignUp } from '@clerk/nextjs';
 
 export interface User {
   id: string;

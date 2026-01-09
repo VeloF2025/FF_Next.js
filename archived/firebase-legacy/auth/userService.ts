@@ -1,4 +1,3 @@
-import { useAuth, useUser } from '@clerk/nextjs';
 import {
   doc,
   getDoc,

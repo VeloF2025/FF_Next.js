@@ -10,7 +10,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
-import { auth } from '@clerk/nextjs/server';
 
 const logger = createLogger('ticket-note-api');
 const sql = neon(process.env.DATABASE_URL!);

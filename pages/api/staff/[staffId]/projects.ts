@@ -8,7 +8,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
-import { getAuth } from '@clerk/nextjs/server';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffProjectsAPI');
@@ -84,7 +83,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // Get the current user for assigned_by
-      const { userId } = getAuth(req);
       let assignedBy: string | null = null;
       if (userId) {
         const [staffMember] = await sql`

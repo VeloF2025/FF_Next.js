@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // TODO: Re-enable Clerk middleware when ready for production
-// import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 // Simple edge-compatible logging
 function edgeLog(level: string, message: string, data?: any) {
