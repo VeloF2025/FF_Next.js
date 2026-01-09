@@ -56,45 +56,40 @@ export async function lookupDR(drNumber: string): Promise<DRLookupResult> {
 
     logger.info('Looking up DR number in SOW module', { drNumber: trimmedDR });
 
-    // Query drops table for DR details
+    // Query onemap.drops table for DR details (with project join)
     const drData = await queryOne<{
-      drop_number: string;
+      dr_number: string;
       pole_number: string | null;
       project_id: string | null;
-      pon_no: number | null;
-      zone_no: number | null;
+      pon_code: string | null;
+      zone_code: string | null;
       address: string | null;
       latitude: number | null;
       longitude: number | null;
-      municipality: string | null;
-      cable_type: string | null;
-      cable_length: string | null;
-      status: string | null;
-      created_date: Date | null;
-      created_by: string | null;
+      current_status: string | null;
+      project_name: string | null;
+      project_code: string | null;
     }>(
       `SELECT
-        drop_number,
-        pole_number,
-        project_id,
-        pon_no,
-        zone_no,
-        address,
-        latitude,
-        longitude,
-        municipality,
-        cable_type,
-        cable_length,
-        status,
-        created_date,
-        created_by
-      FROM drops
-      WHERE drop_number = $1`,
+        d.dr_number,
+        d.pole_number,
+        d.project_id::text as project_id,
+        d.pon_code,
+        d.zone_code,
+        NULLIF(d.address, 'NULL') as address,
+        d.latitude::float as latitude,
+        d.longitude::float as longitude,
+        d.current_status,
+        p.project_name,
+        p.project_code
+      FROM onemap.drops d
+      LEFT JOIN onemap.projects p ON d.project_id = p.id
+      WHERE UPPER(d.dr_number) = UPPER($1)`,
       [trimmedDR]
     );
 
     // Check if DR was found
-    if (!drData || !drData.drop_number) {
+    if (!drData || !drData.dr_number) {
       logger.warn('DR number not found', { drNumber: trimmedDR });
       return {
         success: false,
@@ -103,66 +98,33 @@ export async function lookupDR(drNumber: string): Promise<DRLookupResult> {
       };
     }
 
-    // Initialize result data with DR information
+    // Parse zone and pon codes to numbers
+    const zoneNumber = drData.zone_code ? parseInt(drData.zone_code, 10) : null;
+    const ponNumber = drData.pon_code ? parseInt(drData.pon_code, 10) : null;
+
+    // Initialize result data with DR information (project already joined)
     const resultData: DRLookupData = {
-      dr_number: drData.drop_number,
+      dr_number: drData.dr_number,
       pole_number: drData.pole_number,
-      pon_number: drData.pon_no,
-      zone_number: drData.zone_no,
+      pon_number: isNaN(ponNumber as number) ? null : ponNumber,
+      zone_number: isNaN(zoneNumber as number) ? null : zoneNumber,
       project_id: drData.project_id,
-      project_name: null,
-      project_code: null,
+      project_name: drData.project_name,
+      project_code: drData.project_code,
       address: drData.address,
       latitude: drData.latitude,
       longitude: drData.longitude,
-      municipality: drData.municipality,
-      cable_type: drData.cable_type,
-      cable_length: drData.cable_length,
-      status: drData.status
+      municipality: null, // Not in onemap schema
+      cable_type: null,   // Not in onemap schema
+      cable_length: null, // Not in onemap schema
+      status: drData.current_status
     };
 
-    // If project_id exists, lookup project details
-    if (drData.project_id) {
-      try {
-        const projectData = await queryOne<{
-          id: string;
-          name: string;
-          code: string;
-          status: string;
-        }>(
-          `SELECT
-            id,
-            name,
-            code,
-            status
-          FROM projects
-          WHERE id = $1`,
-          [drData.project_id]
-        );
-
-        if (projectData) {
-          resultData.project_name = projectData.name;
-          resultData.project_code = projectData.code;
-          logger.debug('Project details found for DR', {
-            drNumber: trimmedDR,
-            projectName: projectData.name
-          });
-        } else {
-          logger.warn('Project not found for DR', {
-            drNumber: trimmedDR,
-            projectId: drData.project_id
-          });
-        }
-      } catch (projectError) {
-        // Log error but don't fail the entire lookup
-        logger.error('Error looking up project details', {
-          error: projectError,
-          drNumber: trimmedDR,
-          projectId: drData.project_id
-        });
-        // Continue with DR data even if project lookup fails
-      }
-    }
+    logger.debug('DR lookup successful', {
+      drNumber: trimmedDR,
+      projectCode: drData.project_code,
+      projectName: drData.project_name
+    });
 
     // Cache the result
     drCache.set(trimmedDR, resultData);
