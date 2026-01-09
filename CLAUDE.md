@@ -329,3 +329,97 @@ After changes, update `docs/page-logs/{page-name}.md` with:
 4. Document changes in page logs
 5. Use antihall validator for code verification
 6. Prefer editing existing files over creating new ones
+
+## GitHub Workflow
+
+### Branch Naming
+- `feature/<name>` - New features
+- `fix/<name>` - Bug fixes
+- `refactor/<name>` - Code improvements
+
+### PR Standards
+- Title: Conventional commits (feat:, fix:, refactor:)
+- Description: What, Why, How
+- Always link related issues
+- Request review from team member
+
+### Slash Commands
+| Command | Description |
+|---------|-------------|
+| `/pr` | Create PR with FF standards |
+| `/review <num>` | Review PR thoroughly |
+| `/sync` | Morning status check |
+| `/tdd spec <name>` | Create test specification |
+| `/tdd validate` | Check TDD compliance |
+
+### CLI Shortcuts (source scripts/gh-workflows.sh)
+| Command | Description |
+|---------|-------------|
+| `ff-sync` | Morning status check |
+| `ff-pr` | Create PR |
+| `ff-review 123` | Quick review |
+| `ff-merge 123` | Approve and merge |
+| `ff-team` | See Louis's PRs |
+| `ff-feature <name>` | Create feature branch |
+| `ff-tdd-check` | Validate TDD compliance |
+
+## TDD Enforcement
+
+### Principle
+> "No feature code without test specification first"
+
+### Workflow: Spec → Test → Code
+1. **Spec**: Create requirement document or GitHub issue
+2. **Test Spec**: Create `tests/specs/<feature>.spec.md`
+3. **Tests**: Generate failing tests from spec
+4. **Implement**: Write code to make tests pass
+5. **Refactor**: Improve code, keep tests green
+
+### Test Structure
+```
+tests/
+├── specs/              # Test specifications (BEFORE code)
+│   └── _TEMPLATE.spec.md
+├── unit/               # Unit tests
+│   └── modules/<module>/
+├── integration/        # Integration tests
+│   └── api/
+└── e2e/                # End-to-end tests
+```
+
+### TDD Commands
+```bash
+/tdd spec "feature-name"     # Create test spec from requirements
+/tdd generate specs/x.md     # Generate test skeletons
+/tdd validate                # Check compliance before PR
+/tdd implement specs/x.md    # Full RED-GREEN-REFACTOR cycle
+```
+
+### Enforcement Levels
+1. **Reminder**: Hook shows warning when editing src/ without tests
+2. **PR Check**: CI validates test coverage
+3. **Review**: `/review` checks for TDD compliance
+
+### Exceptions (mark in commit)
+```
+fix: critical hotfix
+[TDD-EXEMPT: Hotfix - tests to follow in #123]
+```
+
+## Protocols (PAI Integration)
+
+### Zero Tolerance Quality
+- No `console.log` - use `log` from `@/lib/logger`
+- No empty catch blocks
+- 100% type coverage
+- Max 300 lines per file
+
+### NLNH (No Lies, No Hallucinations)
+- Say "I don't know" when uncertain
+- Use confidence levels: HIGH/MEDIUM/LOW
+- Mark code status: `// WORKING:`, `// PARTIAL:`, `// UNTESTED:`
+
+### DGTS (Don't Game The System)
+- No fake tests (`expect(true).toBe(true)`)
+- No mocked implementations pretending to be real
+- Tests must actually test behavior
