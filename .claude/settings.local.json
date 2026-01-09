@@ -5,10 +5,76 @@
       "Bash(SSH_AUTH_SOCK=\"\" sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no root@72.60.17.245 \"psql ''postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'' -c \"\"SELECT drop_number FROM qa_photo_reviews WHERE drop_number IN (''DR1854650'', ''DR1854713'', ''DR1854832'', ''DR1854833'');\"\"\")",
       "Bash(npm run lint:*)",
       "Bash(npm run type-check:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh auth status:*)",
+      "Bash(chmod:*)",
+      "Bash(git add:*)",
+      "Bash(.claude/commands/pr.md )",
+      "Bash(.claude/commands/review.md )",
+      "Bash(.claude/commands/sync.md )",
+      "Bash(.claude/commands/tdd.md )",
+      "Bash(.claude/expertise.yaml )",
+      "Bash(.claude/hooks/ )",
+      "Bash(.claude/memories/ )",
+      "Bash(.claude/protocols/ )",
+      "Bash(.claude/settings.json )",
+      "Bash(.claude/settings.local.json )",
+      "Bash(.claude/skills/ )",
+      "Bash(.github/workflows/claude-pr-assistant.yml )",
+      "Bash(.mcp.json )",
+      "Bash(scripts/gh-workflows.sh:*)",
+      "Bash(tests/specs/ )",
+      "Bash(CLAUDE.md )",
+      "Bash(docs/GITHUB-WORKFLOW-PLAN.md)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx ts-node .claude/hooks/expert-load.ts 2>&1 || true",
+            "timeout": 10,
+            "statusMessage": "Loading FF expertise..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then npx ts-node .claude/hooks/pre-commit.ts; fi",
+            "timeout": 120,
+            "statusMessage": "Running pre-commit validation..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx ts-node .claude/hooks/token-tracker.ts 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Tracking tokens..."
+          }
+        ]
+      }
+    ]
   }
 }

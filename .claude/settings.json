@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run start:*)",
+      "Bash(npx:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh issue:*)",
+      "Bash(gh run:*)",
+      "Bash(gh repo:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx ts-node .claude/hooks/expert-load.ts 2>&1 || true",
+            "timeout": 10,
+            "statusMessage": "Loading FF expertise..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then npx ts-node .claude/hooks/pre-commit.ts 2>&1 || true; fi",
+            "timeout": 120,
+            "statusMessage": "Running pre-commit validation..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q '/src/modules/'; then TOOL_INPUT=\"$TOOL_INPUT\" npx ts-node .claude/hooks/tdd-reminder.ts 2>&1 || true; fi",
+            "timeout": 5,
+            "statusMessage": "Checking TDD compliance..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q '/src/modules/'; then TOOL_INPUT=\"$TOOL_INPUT\" npx ts-node .claude/hooks/tdd-reminder.ts 2>&1 || true; fi",
+            "timeout": 5,
+            "statusMessage": "Checking TDD compliance..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx ts-node .claude/hooks/token-tracker.ts 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Tracking tokens..."
+          }
+        ]
+      }
+    ]
+  }
+}
