@@ -1,104 +1,106 @@
 /**
  * Specialized Supplier Subscriptions
- * Handle specific real-time subscriptions for ratings and compliance
+ * Handle specific subscriptions for ratings and compliance
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
+ * Real-time subscriptions are converted to one-time fetches with no-op unsubscribe.
  */
 
-import { query, collection, onSnapshot, orderBy, where, limit } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { SupplierStatus } from '@/types/supplier/base.types';
 import { SubscriptionOptions, SupplierRatingData, SupplierComplianceData } from './types';
+import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SpecializedSubscriptions {
   /**
    * Subscribe to supplier rating changes
+   * NOTE: This is now a one-time fetch, not a real-time subscription
    */
   static subscribeToSupplierRatings(
     callback: (suppliers: SupplierRatingData[]) => void,
     options?: SubscriptionOptions
   ): () => void {
-    try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', SupplierStatus.ACTIVE),
-        orderBy('rating.overall', 'desc'),
-        limit(50) // Limit to top 50 rated suppliers
-      );
-      
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const supplierRatings = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              rating: data.rating,
-              companyName: data.companyName || data.name || 'Unknown'
-            };
-          });
-          
-          callback(supplierRatings);
-        },
-        (error) => {
-          log.error('Error subscribing to supplier ratings:', { data: error }, 'specializedSubscriptions');
-          options?.onError?.(error);
-        }
-      );
+    // Perform initial fetch
+    this.fetchSupplierRatings(callback, options);
 
-      return unsubscribe;
+    // Return no-op unsubscribe function
+    return () => {};
+  }
+
+  /**
+   * Fetch supplier ratings
+   */
+  private static async fetchSupplierRatings(
+    callback: (suppliers: SupplierRatingData[]) => void,
+    options?: SubscriptionOptions
+  ): Promise<void> {
+    try {
+      const suppliers = await SupplierCrudService.getAll();
+
+      // Filter active suppliers and map to rating data
+      const supplierRatings = suppliers
+        .filter(s => s.status === SupplierStatus.ACTIVE)
+        .map(supplier => ({
+          id: supplier.id,
+          rating: supplier.rating,
+          companyName: supplier.companyName || supplier.name || 'Unknown'
+        }))
+        .sort((a, b) => {
+          const aRating = (a.rating as { overall?: number })?.overall || 0;
+          const bRating = (b.rating as { overall?: number })?.overall || 0;
+          return bRating - aRating;
+        })
+        .slice(0, 50); // Limit to top 50 rated suppliers
+
+      callback(supplierRatings);
     } catch (error) {
-      log.error('Error setting up supplier ratings subscription:', { data: error }, 'specializedSubscriptions');
+      log.error('Error fetching supplier ratings:', { data: error }, 'specializedSubscriptions');
       const errorObj = error instanceof Error ? error : new Error('Unknown error');
       options?.onError?.(errorObj);
-      
-      return () => {};
     }
   }
 
   /**
    * Subscribe to compliance status changes
+   * NOTE: This is now a one-time fetch, not a real-time subscription
    */
   static subscribeToComplianceStatus(
     callback: (suppliers: SupplierComplianceData[]) => void,
     options?: SubscriptionOptions
   ): () => void {
-    try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', 'in', [SupplierStatus.ACTIVE, SupplierStatus.PENDING]),
-        orderBy('companyName')
-      );
-      
-      const unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const complianceData = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              companyName: data.companyName || data.name || 'Unknown',
-              complianceStatus: data.complianceStatus || {},
-              status: data.status as SupplierStatus
-            };
-          });
-          
-          callback(complianceData);
-        },
-        (error) => {
-          log.error('Error subscribing to compliance status:', { data: error }, 'specializedSubscriptions');
-          options?.onError?.(error);
-        }
-      );
+    // Perform initial fetch
+    this.fetchComplianceStatus(callback, options);
 
-      return unsubscribe;
+    // Return no-op unsubscribe function
+    return () => {};
+  }
+
+  /**
+   * Fetch compliance status data
+   */
+  private static async fetchComplianceStatus(
+    callback: (suppliers: SupplierComplianceData[]) => void,
+    options?: SubscriptionOptions
+  ): Promise<void> {
+    try {
+      const suppliers = await SupplierCrudService.getAll();
+
+      // Filter and map to compliance data
+      const complianceData = suppliers
+        .filter(s => s.status === SupplierStatus.ACTIVE || s.status === SupplierStatus.PENDING)
+        .map(supplier => ({
+          id: supplier.id,
+          companyName: supplier.companyName || supplier.name || 'Unknown',
+          complianceStatus: (supplier as { complianceStatus?: Record<string, unknown> }).complianceStatus || {},
+          status: supplier.status as SupplierStatus
+        }))
+        .sort((a, b) => a.companyName.localeCompare(b.companyName));
+
+      callback(complianceData);
     } catch (error) {
-      log.error('Error setting up compliance status subscription:', { data: error }, 'specializedSubscriptions');
+      log.error('Error fetching compliance status:', { data: error }, 'specializedSubscriptions');
       const errorObj = error instanceof Error ? error : new Error('Unknown error');
       options?.onError?.(errorObj);
-      
-      return () => {};
     }
   }
 }

@@ -21,7 +21,6 @@ import {
 } from './StaffFormSections';
 import { ExitEmployeeModal, ExitFormData } from './ExitEmployeeModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Timestamp } from 'firebase/firestore';
 import { log } from '@/lib/logger';
 
 export function StaffForm() {
@@ -61,8 +60,9 @@ export function StaffForm() {
 
   useEffect(() => {
     if (staff && isEditing) {
-      const startDate = staff.startDate instanceof Timestamp 
-        ? new Date(staff.startDate.seconds * 1000)
+      // Handle date conversion - could be Date, string, or object with seconds (Firebase Timestamp format)
+      const startDate = typeof staff.startDate === 'object' && staff.startDate !== null && 'seconds' in staff.startDate
+        ? new Date((staff.startDate as { seconds: number }).seconds * 1000)
         : new Date(staff.startDate);
 
       const formUpdate: Partial<StaffFormData> = {

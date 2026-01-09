@@ -4,7 +4,6 @@
  */
 
 import { StaffMember, StaffDropdownOption, StaffSummary } from '@/types/staff.types';
-import { Timestamp } from 'firebase/firestore';
 
 const API_BASE = '/api';
 
@@ -47,6 +46,35 @@ interface DbStaff {
   updated_at?: string;
 }
 
+/**
+ * Simple timestamp-like object for compatibility with existing code
+ */
+interface TimestampLike {
+  seconds: number;
+  nanoseconds: number;
+  toDate(): Date;
+}
+
+/**
+ * Create a timestamp-like object from a date
+ */
+function createTimestamp(date: Date): TimestampLike {
+  const seconds = Math.floor(date.getTime() / 1000);
+  const nanoseconds = (date.getTime() % 1000) * 1000000;
+  return {
+    seconds,
+    nanoseconds,
+    toDate: () => date,
+  };
+}
+
+/**
+ * Create a timestamp-like object for the current time
+ */
+function timestampNow(): TimestampLike {
+  return createTimestamp(new Date());
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
@@ -58,11 +86,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 /**
- * Convert ISO date string to Timestamp
+ * Convert ISO date string to TimestampLike
  */
-function toTimestamp(dateStr?: string): Timestamp {
-  if (!dateStr) return Timestamp.now();
-  return Timestamp.fromDate(new Date(dateStr));
+function toTimestamp(dateStr?: string): TimestampLike {
+  if (!dateStr) return timestampNow();
+  return createTimestamp(new Date(dateStr));
 }
 
 /**
@@ -80,12 +108,12 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     city: dbStaff.city || '',
     province: dbStaff.state || '',
     postalCode: dbStaff.postal_code || '',
-    department: (dbStaff.department || 'Operations') as any,
+    department: (dbStaff.department || 'Operations') as StaffMember['department'],
     position: dbStaff.position || '',
-    level: dbStaff.level as any,
-    status: (dbStaff.status || 'active') as any,
-    skills: (dbStaff.skills || []) as any[],
-    certifications: (dbStaff.certifications || []) as any[],
+    level: dbStaff.level as StaffMember['level'],
+    status: (dbStaff.status || 'active') as StaffMember['status'],
+    skills: (dbStaff.skills || []) as StaffMember['skills'],
+    certifications: (dbStaff.certifications || []) as StaffMember['certifications'],
     notes: dbStaff.notes,
     reportsTo: dbStaff.reports_to,
     currentProjectCount: dbStaff.project_count || 0,
@@ -98,7 +126,7 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     // Required fields with defaults
     experienceYears: dbStaff.experience_years || 0,
     specializations: [],
-    contractType: (dbStaff.contract_type || 'permanent') as any,
+    contractType: (dbStaff.contract_type || 'permanent') as StaffMember['contractType'],
     workingHours: dbStaff.working_hours || '08:00-17:00',
     availableWeekends: dbStaff.available_weekends || false,
     availableNights: dbStaff.available_nights || false,
@@ -126,9 +154,9 @@ function toDateString(value: unknown): string | undefined {
   if (!value) return undefined;
   if (typeof value === 'string') return value;
   if (value instanceof Date) return value.toISOString();
-  // Handle Timestamp from Firebase
+  // Handle TimestampLike object
   if (typeof value === 'object' && value !== null && 'toDate' in value) {
-    return (value as Timestamp).toDate().toISOString();
+    return (value as TimestampLike).toDate().toISOString();
   }
   return undefined;
 }
@@ -172,13 +200,13 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
 }
 
 export const staffApiService = {
-  async getAll(filter?: any): Promise<StaffMember[]> {
+  async getAll(filter?: Record<string, unknown>): Promise<StaffMember[]> {
     const params = new URLSearchParams();
     if (filter) {
-      if (filter.search || filter.searchTerm) params.append('search', filter.search || filter.searchTerm);
-      if (filter.department) params.append('department', filter.department);
-      if (filter.status) params.append('status', filter.status);
-      if (filter.position) params.append('position', filter.position);
+      if (filter.search || filter.searchTerm) params.append('search', String(filter.search || filter.searchTerm));
+      if (filter.department) params.append('department', String(filter.department));
+      if (filter.status) params.append('status', String(filter.status));
+      if (filter.position) params.append('position', String(filter.position));
     }
     const queryString = params.toString() ? `?${params.toString()}` : '';
     const response = await fetch(`${API_BASE}/staff${queryString}`);
@@ -231,7 +259,7 @@ export const staffApiService = {
         name: s.name,
         email: s.email,
         position: s.position as string,
-        department: s.department as any,
+        department: s.department,
         status: s.status,
         currentProjectCount: s.currentProjectCount,
         maxProjectCount: s.maxProjectCount,
@@ -274,8 +302,8 @@ export const staffApiService = {
     // Aggregate skills
     const skillCounts: Record<string, number> = {};
     staff.forEach(s => {
-      (s.skills || []).forEach((skill: any) => {
-        const skillName = typeof skill === 'string' ? skill : skill.name || 'Unknown';
+      (s.skills || []).forEach((skill: unknown) => {
+        const skillName = typeof skill === 'string' ? skill : (skill as { name?: string })?.name || 'Unknown';
         skillCounts[skillName] = (skillCounts[skillName] || 0) + 1;
       });
     });

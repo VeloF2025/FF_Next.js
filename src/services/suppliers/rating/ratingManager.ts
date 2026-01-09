@@ -1,49 +1,47 @@
 /**
  * Supplier Rating Manager
  * Handle supplier rating updates and calculations
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { SupplierRating } from '@/types/supplier/base.types';
 import { RatingUpdateData } from './types';
 import { SupplierCrudService } from '../supplier.crud';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SupplierRatingManager {
   /**
    * Update supplier rating with automatic overall calculation
    */
   static async updateRating(
-    id: string, 
+    id: string,
     rating: RatingUpdateData,
     reviewerId?: string
   ): Promise<void> {
     try {
       const supplier = await SupplierCrudService.getById(id);
-      
+
       const currentRating = this.normalizeRating(supplier.rating);
       const updatedRating = {
         ...currentRating,
         ...rating,
-        lastReviewDate: Timestamp.now(),
+        lastReviewDate: new Date(),
         lastReviewedBy: reviewerId || 'current-user-id'
       };
-      
+
       // Calculate overall rating from individual components
       updatedRating.overall = this.calculateOverallRating(updatedRating);
-      
+
       // Update total reviews count if this is a new review
       if (rating.quality || rating.delivery || rating.pricing || rating.communication) {
         updatedRating.totalReviews = (updatedRating.totalReviews || 0) + 1;
       }
-      
-      await updateDoc(doc(db, COLLECTION_NAME, id), {
+
+      await SupplierCrudService.update(id, {
         rating: updatedRating,
-        updatedAt: Timestamp.now()
-      });
+        updatedAt: new Date()
+      } as never);
     } catch (error) {
       log.error(`Error updating supplier rating for ${id}:`, { data: error }, 'ratingManager');
       throw new Error(`Failed to update supplier rating: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -53,7 +51,7 @@ export class SupplierRatingManager {
   /**
    * Normalize rating data to handle legacy formats
    */
-  static normalizeRating(rating: any): SupplierRating {
+  static normalizeRating(rating: unknown): SupplierRating {
     if (typeof rating === 'number') {
       return {
         supplierId: '',
@@ -66,20 +64,21 @@ export class SupplierRatingManager {
       };
     }
 
+    const ratingObj = rating as Record<string, unknown> || {};
     return {
-      supplierId: rating.supplierId || '',
-      userId: rating.userId || '',
-      userName: rating.userName || '',
-      rating: rating.rating || 0,
-      date: rating.date || new Date(),
-      overall: rating.overall || 0,
+      supplierId: (ratingObj.supplierId as string) || '',
+      userId: (ratingObj.userId as string) || '',
+      userName: (ratingObj.userName as string) || '',
+      rating: (ratingObj.rating as number) || 0,
+      date: (ratingObj.date as Date) || new Date(),
+      overall: (ratingObj.overall as number) || 0,
       totalReviews: 0,
       quality: 0,
       delivery: 0,
       pricing: 0,
       communication: 0,
       flexibility: 0,
-      ...rating
+      ...ratingObj
     };
   }
 
@@ -94,12 +93,12 @@ export class SupplierRatingManager {
       rating.communication,
       rating.flexibility
     ].filter(r => r && r > 0);
-    
+
     if (ratingValues.length === 0) {
       return rating.overall || 0;
     }
 
-    return Math.round(ratingValues.filter(v => v != null).reduce((a, b) => a + b, 0) / ratingValues.length);
+    return Math.round(ratingValues.filter(v => v != null).reduce((a, b) => a + (b || 0), 0) / ratingValues.length);
   }
 
   /**
@@ -153,8 +152,8 @@ export class SupplierRatingManager {
     const ratingFields = ['overall', 'quality', 'delivery', 'pricing', 'communication', 'flexibility'];
 
     ratingFields.forEach(field => {
-      const value = (rating as any)[field];
-      if (value !== undefined && (typeof value !== 'number' || value < 0 || value > 100)) {
+      const value = (rating as Record<string, unknown>)[field];
+      if (value !== undefined && (typeof value !== 'number' || (value as number) < 0 || (value as number) > 100)) {
         errors.push(`${field} must be a number between 0 and 100`);
       }
     });
@@ -211,7 +210,7 @@ export class SupplierRatingManager {
   } {
     const improvementNeeded = Math.max(0, targetRating - currentRating);
     const improvementPercentage = currentRating > 0 ? (improvementNeeded / currentRating) * 100 : 0;
-    
+
     let category = 'none';
     if (improvementNeeded > 20) category = 'major';
     else if (improvementNeeded > 10) category = 'moderate';

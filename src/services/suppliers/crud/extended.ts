@@ -1,22 +1,13 @@
 /**
  * Supplier Extended Operations
  * Advanced operations like soft delete, statistics, validation
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { 
-  collection, 
-  getDocs, 
-  query,
-  where,
-  Timestamp
-} from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { SupplierStatus } from '@/types/supplier/base.types';
 import { SupplierBaseCrud } from './base';
-import { SupplierSoftDeleteData } from './types';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 /**
  * Extended supplier operations
@@ -27,19 +18,19 @@ export class SupplierExtendedOperations {
    */
   static async softDelete(id: string, reason?: string): Promise<void> {
     try {
-      const updateData: SupplierSoftDeleteData = {
+      const updateData: Record<string, unknown> = {
         status: SupplierStatus.INACTIVE,
         isActive: false,
-        updatedAt: Timestamp.now(),
+        updatedAt: new Date().toISOString(),
         lastModifiedBy: 'current-user-id' // TODO: Get from auth context
       };
 
       if (reason) {
         updateData.inactiveReason = reason;
-        updateData.inactivatedAt = Timestamp.now();
+        updateData.inactivatedAt = new Date().toISOString();
       }
 
-      await SupplierBaseCrud.update(id, updateData as any);
+      await SupplierBaseCrud.update(id, updateData as never);
     } catch (error) {
       log.error(`Error soft deleting supplier ${id}:`, { data: error }, 'extended');
       throw error;
@@ -51,13 +42,8 @@ export class SupplierExtendedOperations {
    */
   static async getActiveCount(): Promise<number> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', SupplierStatus.ACTIVE)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.size;
+      const suppliers = await SupplierBaseCrud.getAll({ status: SupplierStatus.ACTIVE });
+      return suppliers.length;
     } catch (error) {
       log.error('Error getting active supplier count:', { data: error }, 'extended');
       return 0;
@@ -69,13 +55,8 @@ export class SupplierExtendedOperations {
    */
   static async getCountByStatus(status: SupplierStatus): Promise<number> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', status)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.size;
+      const suppliers = await SupplierBaseCrud.getAll({ status });
+      return suppliers.length;
     } catch (error) {
       log.error(`Error getting supplier count for status ${status}:`, { data: error }, 'extended');
       return 0;
@@ -87,19 +68,13 @@ export class SupplierExtendedOperations {
    */
   static async isCodeUnique(code: string, excludeId?: string): Promise<boolean> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('code', '==', code)
-      );
-      
-      const snapshot = await getDocs(q);
-      
-      // If excluding an ID (for updates), make sure it's not the same supplier
-      if (excludeId) {
-        return snapshot.docs.every(doc => doc.id !== excludeId);
-      }
-      
-      return snapshot.empty;
+      const suppliers = await SupplierBaseCrud.getAll();
+      const existingSupplier = suppliers.find(s => s.code === code);
+
+      if (!existingSupplier) return true;
+      if (excludeId && existingSupplier.id === excludeId) return true;
+
+      return false;
     } catch (error) {
       log.error('Error checking code uniqueness:', { data: error }, 'extended');
       return false;
@@ -111,19 +86,13 @@ export class SupplierExtendedOperations {
    */
   static async isEmailUnique(email: string, excludeId?: string): Promise<boolean> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('email', '==', email)
-      );
-      
-      const snapshot = await getDocs(q);
-      
-      // If excluding an ID (for updates), make sure it's not the same supplier
-      if (excludeId) {
-        return snapshot.docs.every(doc => doc.id !== excludeId);
-      }
-      
-      return snapshot.empty;
+      const suppliers = await SupplierBaseCrud.getAll();
+      const existingSupplier = suppliers.find(s => s.email === email);
+
+      if (!existingSupplier) return true;
+      if (excludeId && existingSupplier.id === excludeId) return true;
+
+      return false;
     } catch (error) {
       log.error('Error checking email uniqueness:', { data: error }, 'extended');
       return false;
@@ -131,17 +100,12 @@ export class SupplierExtendedOperations {
   }
 
   /**
-   * Get preferred suppliers
+   * Get preferred suppliers count
    */
   static async getPreferred(): Promise<number> {
     try {
-      const q = query(
-        collection(db, COLLECTION_NAME),
-        where('isPreferred', '==', true)
-      );
-      
-      const snapshot = await getDocs(q);
-      return snapshot.size;
+      const suppliers = await SupplierBaseCrud.getAll({ isPreferred: true });
+      return suppliers.length;
     } catch (error) {
       log.error('Error getting preferred supplier count:', { data: error }, 'extended');
       return 0;
@@ -156,7 +120,7 @@ export class SupplierExtendedOperations {
       const updateData = {
         status: SupplierStatus.ACTIVE,
         isActive: true,
-        updatedAt: Timestamp.now(),
+        updatedAt: new Date().toISOString(),
         lastModifiedBy: 'current-user-id', // TODO: Get from auth context
         inactiveReason: null,
         inactivatedAt: null

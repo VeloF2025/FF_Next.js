@@ -1,103 +1,56 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  writeBatch 
-} from 'firebase/firestore';
-import { db } from '@/config/firebase';
 
+/**
+ * SOW Service Hook
+ *
+ * NOTE: Firebase Firestore has been removed. SOW data is now stored in Neon PostgreSQL.
+ * The save/get/delete operations should be performed through the API endpoints:
+ * - POST /api/sow/poles, /api/sow/drops, /api/sow/fibre
+ * - GET /api/sow/project?projectId=xxx
+ */
 export function useSOWService() {
   const queryClient = useQueryClient();
 
-  const saveSOWData = async (projectId: string, type: string, data: any[]) => {
-    const batch = writeBatch(db);
-    
-    // Save to project-specific SOW collection
-    const sowRef = doc(db, 'projects', projectId, 'sow', type);
-    batch.set(sowRef, {
-      type,
-      data,
-      uploadedAt: new Date(),
-      itemCount: data.length,
+  const saveSOWData = async (projectId: string, type: string, data: unknown[]) => {
+    // SOW data should be saved via API endpoints
+    // Use the import scripts in /scripts/sow-import/ or API endpoints
+    const response = await fetch(`/api/sow/${type}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, data }),
     });
 
-    // Also save individual items for easier querying
-    if (type === 'poles') {
-      data.forEach(pole => {
-        const poleRef = doc(db, 'projects', projectId, 'poles', pole.pole_number);
-        batch.set(poleRef, {
-          ...pole,
-          projectId,
-          createdAt: new Date(),
-        });
-      });
-    } else if (type === 'drops') {
-      data.forEach(drop => {
-        const dropRef = doc(db, 'projects', projectId, 'drops', drop.drop_number);
-        batch.set(dropRef, {
-          ...drop,
-          projectId,
-          createdAt: new Date(),
-        });
-      });
-    } else if (type === 'fibre') {
-      data.forEach(segment => {
-        const segmentRef = doc(db, 'projects', projectId, 'fibre', segment.segment_id);
-        batch.set(segmentRef, {
-          ...segment,
-          projectId,
-          createdAt: new Date(),
-        });
-      });
+    if (!response.ok) {
+      throw new Error(`Failed to save SOW ${type} data`);
     }
 
-    await batch.commit();
-    
     // Invalidate related queries
     queryClient.invalidateQueries({ queryKey: ['sow', projectId] });
     queryClient.invalidateQueries({ queryKey: ['project', projectId] });
   };
 
   const getSOWData = async (projectId: string, type?: string) => {
-    if (type) {
-      const sowRef = doc(db, 'projects', projectId, 'sow', type);
-      const snapshot = await getDoc(sowRef);
-      return snapshot.exists() ? snapshot.data() : null;
-    } else {
-      const sowCollection = collection(db, 'projects', projectId, 'sow');
-      const snapshot = await getDocs(sowCollection);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const endpoint = type
+      ? `/api/sow/${type}?projectId=${projectId}`
+      : `/api/sow/project?projectId=${projectId}`;
+
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error('Failed to fetch SOW data');
     }
+    const result = await response.json();
+    return result.success ? result.data : null;
   };
 
   const deleteSOWData = async (projectId: string, type: string) => {
-    const batch = writeBatch(db);
-    
-    // Delete from SOW collection
-    const sowRef = doc(db, 'projects', projectId, 'sow', type);
-    batch.delete(sowRef);
+    const response = await fetch(`/api/sow/${type}?projectId=${projectId}`, {
+      method: 'DELETE',
+    });
 
-    // Delete individual items
-    let collectionName = '';
-    if (type === 'poles') collectionName = 'poles';
-    else if (type === 'drops') collectionName = 'drops';
-    else if (type === 'fibre') collectionName = 'fibre';
-
-    if (collectionName) {
-      const itemsCollection = collection(db, 'projects', projectId, collectionName);
-      const snapshot = await getDocs(itemsCollection);
-      snapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
+    if (!response.ok) {
+      throw new Error(`Failed to delete SOW ${type} data`);
     }
 
-    await batch.commit();
-    
     // Invalidate related queries
     queryClient.invalidateQueries({ queryKey: ['sow', projectId] });
     queryClient.invalidateQueries({ queryKey: ['project', projectId] });

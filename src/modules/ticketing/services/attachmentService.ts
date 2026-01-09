@@ -1,13 +1,12 @@
 /**
  * Attachment Service
- * 🟢 WORKING: Production-ready attachment service with Firebase Storage integration
+ * 🟢 WORKING: Production-ready attachment service with local file storage
  *
- * Handles file uploads to Firebase Storage and attachment record management.
+ * Handles file uploads to local storage and attachment record management.
  * Supports photo evidence for verification steps and general document uploads.
  */
 
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '@/config/firebase';
+import { localFileStorage } from '@/services/localFileStorage';
 import { query, queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
 import {
@@ -142,21 +141,26 @@ export async function uploadAttachment(
 
     // Sanitize filename
     const sanitizedFileName = sanitizeFileName(request.filename);
-    const timestamp = Date.now();
-    const fileName = `${timestamp}_${sanitizedFileName}`;
 
-    // Create storage path: tickets/{ticket_id}/{timestamp}_{filename}
-    const storagePath = `tickets/${request.ticket_id}/${fileName}`;
-    const storageRef = ref(storage, storagePath);
+    // Create storage path for ticketing attachments
+    const uploadPath = localFileStorage.getTicketAttachmentPath(request.ticket_id);
 
-    // Upload to Firebase Storage
+    // Get file buffer from File object
+    const file = request.file as File;
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Upload to local storage
     let uploadResult;
     try {
-      uploadResult = await uploadBytes(storageRef, request.file as any, {
-        contentType: (request.file as File).type
-      });
+      uploadResult = await localFileStorage.uploadFile(
+        buffer,
+        uploadPath,
+        request.filename,
+        file.type
+      );
     } catch (error) {
-      logger.error('Firebase Storage upload failed', {
+      logger.error('Local storage upload failed', {
         error,
         ticket_id: request.ticket_id,
         filename: request.filename
@@ -164,8 +168,10 @@ export async function uploadAttachment(
       throw new Error('Failed to upload file to storage');
     }
 
-    // Get download URL
-    const downloadURL = await getDownloadURL(uploadResult.ref);
+    // Generate file URL
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const downloadURL = `${baseUrl}/api/uploads/${uploadResult.path}`;
+    const storagePath = uploadResult.path;
 
     // Determine file type
     const fileType = getFileTypeFromMimeType((request.file as File).type);
@@ -448,16 +454,15 @@ export async function deleteAttachment(attachmentId: string): Promise<void> {
       throw new Error('Attachment not found');
     }
 
-    // Delete from Firebase Storage
+    // Delete from local storage
     try {
-      const storageRef = ref(storage, attachment.storage_path);
-      await deleteObject(storageRef);
-      logger.debug('Deleted file from Firebase Storage', {
+      await localFileStorage.deleteFile(attachment.storage_path);
+      logger.debug('Deleted file from local storage', {
         storage_path: attachment.storage_path
       });
     } catch (error) {
       // Log warning but continue - file might already be deleted
-      logger.warn('Failed to delete file from Storage (continuing with DB deletion)', {
+      logger.warn('Failed to delete file from storage (continuing with DB deletion)', {
         error,
         storage_path: attachment.storage_path
       });

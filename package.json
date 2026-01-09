@@ -85,8 +85,6 @@
     "date-fns": "^2.30.0",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
-    "firebase": "^12.1.0",
-    "firebase-admin": "^13.5.0",
     "formidable": "^3.5.4",
     "framer-motion": "^12.23.12",
     "glob": "^11.0.3",

@@ -1,17 +1,15 @@
 /**
  * Supplier Rating Service
  * Handles top-rated suppliers and supplier comparisons
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { query, collection, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { Supplier } from '@/types/supplier/base.types';
 import { SupplierComparison } from './types';
 import { SupplierCrudService } from '../supplier.crud';
 import { SupplierRatingManager } from './ratingManager';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class SupplierRatingService {
   /**
@@ -22,21 +20,17 @@ export class SupplierRatingService {
     category?: string
   ): Promise<Supplier[]> {
     try {
-      let q = query(
-        collection(db, COLLECTION_NAME),
-        where('status', '==', 'active'),
-        orderBy('rating.overall', 'desc')
-      );
+      let suppliers = await SupplierCrudService.getAll();
 
+      // Filter by status
+      suppliers = suppliers.filter(s => s.status === 'active');
+
+      // Filter by category if specified
       if (category) {
-        q = query(q, where('categories', 'array-contains', category));
+        suppliers = suppliers.filter(s =>
+          s.categories && s.categories.includes(category)
+        );
       }
-
-      const snapshot = await getDocs(q);
-      const suppliers = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Supplier));
 
       // Filter suppliers with reviews and sort by rating
       return suppliers
@@ -68,7 +62,7 @@ export class SupplierRatingService {
       for (const id of supplierIds) {
         const supplier = await SupplierCrudService.getById(id);
         const ratings = SupplierRatingManager.normalizeRating(supplier.rating);
-        
+
         comparisons.push({
           supplier,
           ratings,
@@ -93,7 +87,7 @@ export class SupplierRatingService {
   ): Promise<Supplier[]> {
     try {
       const suppliers = await SupplierCrudService.getAll();
-      
+
       return suppliers
         .filter(supplier => {
           const rating = SupplierRatingManager.normalizeRating(supplier.rating);
@@ -118,7 +112,7 @@ export class SupplierRatingService {
   static async getMostReviewedSuppliers(limit: number = 10): Promise<Supplier[]> {
     try {
       const suppliers = await SupplierCrudService.getAll();
-      
+
       return suppliers
         .filter(supplier => {
           const rating = SupplierRatingManager.normalizeRating(supplier.rating);
@@ -148,7 +142,7 @@ export class SupplierRatingService {
       // For now, return most recently updated suppliers
       const suppliers = await SupplierCrudService.getAll();
       const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      
+
       return suppliers
         .filter(supplier => {
           const updatedAt = supplier.updatedAt;

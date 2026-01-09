@@ -1,14 +1,13 @@
 /**
  * Supplier Document Management
  * Handle document upload, verification, and lifecycle
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
+ * TODO: Create /api/suppliers endpoints for full functionality
  */
 
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { SupplierDocument, DocumentVerificationResult } from './types';
 import { log } from '@/lib/logger';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class DocumentManager {
   /**
@@ -26,12 +25,16 @@ export class DocumentManager {
         verified: false
       };
 
-      const supplierRef = doc(db, COLLECTION_NAME, supplierId);
-      await updateDoc(supplierRef, {
-        documents: arrayUnion(newDocument),
-        updatedAt: new Date()
-      });
+      // Get current supplier and update documents
+      const supplierCrudService = await import('../supplier.crud');
+      const supplier = await supplierCrudService.SupplierCrudService.getById(supplierId);
 
+      if (!supplier) {
+        throw new Error('Supplier not found');
+      }
+
+      const documents = [...(supplier.documents || []), newDocument];
+      await supplierCrudService.SupplierCrudService.update(supplierId, { documents } as never);
     } catch (error) {
       log.error('Error adding document:', { data: error }, 'documentManager');
       throw new Error(`Failed to add document: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -43,25 +46,16 @@ export class DocumentManager {
    */
   static async removeDocument(supplierId: string, documentId: string): Promise<void> {
     try {
-      // First, get the current documents to find the one to remove
+      // Get the current documents
       const supplierCrudService = await import('../supplier.crud');
       const supplier = await supplierCrudService.SupplierCrudService.getById(supplierId);
-      
+
       if (!supplier || !supplier.documents) {
         throw new Error('Supplier or documents not found');
       }
 
-      const documentToRemove = supplier.documents.find(doc => doc.id === documentId);
-      if (!documentToRemove) {
-        throw new Error('Document not found');
-      }
-
-      const supplierRef = doc(db, COLLECTION_NAME, supplierId);
-      await updateDoc(supplierRef, {
-        documents: arrayRemove(documentToRemove),
-        updatedAt: new Date()
-      });
-
+      const documents = supplier.documents.filter(doc => doc.id !== documentId);
+      await supplierCrudService.SupplierCrudService.update(supplierId, { documents } as never);
     } catch (error) {
       log.error('Error removing document:', { data: error }, 'documentManager');
       throw new Error(`Failed to remove document: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -81,7 +75,7 @@ export class DocumentManager {
       // Get current supplier data
       const supplierCrudService = await import('../supplier.crud');
       const supplier = await supplierCrudService.SupplierCrudService.getById(supplierId);
-      
+
       if (!supplier || !supplier.documents) {
         throw new Error('Supplier or documents not found');
       }
@@ -99,11 +93,7 @@ export class DocumentManager {
         return doc;
       });
 
-      const supplierRef = doc(db, COLLECTION_NAME, supplierId);
-      await updateDoc(supplierRef, {
-        documents: documents,
-        updatedAt: new Date()
-      });
+      await supplierCrudService.SupplierCrudService.update(supplierId, { documents } as never);
 
       const result: DocumentVerificationResult = {
         success: !issues || issues.length === 0,
@@ -181,7 +171,7 @@ export class DocumentManager {
 
     const providedTypes = new Set(documents.map(doc => doc.type.toString()));
     const completedRequired = requiredTypes.filter(type => providedTypes.has(type));
-    
+
     return Math.round((completedRequired.length / requiredTypes.length) * 100);
   }
 }

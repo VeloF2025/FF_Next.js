@@ -1,7 +1,7 @@
 /**
  * Staff Documents Upload API
  * POST /api/staff-documents-upload
- * Handles file upload to Firebase Storage + metadata to Neon
+ * Handles file upload to local storage + metadata to Neon
  *
  * Protected by Arcjet:
  * - Bot detection
@@ -13,7 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import formidable from 'formidable';
 import fs from 'fs';
-import { getAdminStorage } from '@/config/firebase-admin';
+import { localFileStorage } from '@/services/localFileStorage';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import type { DocumentType } from '@/types/staff-document.types';
@@ -49,8 +49,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   let tempFilePath: string | null = null;
-  let uploadedToFirebase = false;
-  let firebaseFilePath: string | null = null;
+  let uploadedToStorage = false;
+  let storagePath: string | null = null;
 
   try {
     // Parse multipart form data
@@ -114,39 +114,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Upload to Firebase Storage using Admin SDK
-    const timestamp = Date.now();
-    const sanitizedFileName = sanitizeFileName(file.originalFilename || 'document');
-    const fileName = `${timestamp}_${sanitizedFileName}`;
-    const storagePath = `staff-documents/${staffId}/${documentType}/${fileName}`;
-    firebaseFilePath = storagePath;
-
     // Read file buffer
     const fileBuffer = await fs.promises.readFile(file.filepath);
 
-    // Get Admin Storage bucket
-    const bucket = getAdminStorage();
-    const fileRef = bucket.file(storagePath);
+    // Upload to local storage
+    const uploadPath = localFileStorage.getStaffDocumentPath(staffId, documentType);
+    const uploadResult = await localFileStorage.uploadFile(
+      fileBuffer,
+      uploadPath,
+      file.originalFilename || 'document',
+      file.mimetype || 'application/octet-stream'
+    );
 
-    // Upload to Firebase using Admin SDK
-    await fileRef.save(fileBuffer, {
-      contentType: file.mimetype || 'application/octet-stream',
-      metadata: {
-        metadata: {
-          staffId: staffId,
-          documentType: documentType,
-          originalName: file.originalFilename || 'document',
-        },
-      },
-    });
+    uploadedToStorage = true;
+    storagePath = uploadResult.path;
 
-    uploadedToFirebase = true;
-
-    // Make file publicly readable
-    await fileRef.makePublic();
-
-    // Get download URL
-    const fileUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    // Generate file URL (use API endpoint for serving files)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+    const fileUrl = `${baseUrl}/api/uploads/${uploadResult.path}`;
 
     // Save metadata to Neon
     const [document] = await sql`
@@ -199,15 +184,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Staff document upload error', { error: errorMessage });
 
-    // Cleanup: Remove uploaded file from Firebase if DB insert failed
-    if (uploadedToFirebase && firebaseFilePath) {
+    // Cleanup: Remove uploaded file from local storage if DB insert failed
+    if (uploadedToStorage && storagePath) {
       try {
-        const bucket = getAdminStorage();
-        await bucket.file(firebaseFilePath).delete();
-        logger.info('Cleaned up Firebase file after error', { path: firebaseFilePath });
+        await localFileStorage.deleteFile(storagePath);
+        logger.info('Cleaned up local file after error', { path: storagePath });
       } catch (cleanupError: unknown) {
         const cleanupMsg = cleanupError instanceof Error ? cleanupError.message : 'Unknown';
-        logger.error('Failed to cleanup Firebase file', { error: cleanupMsg });
+        logger.error('Failed to cleanup local file', { error: cleanupMsg });
       }
     }
 

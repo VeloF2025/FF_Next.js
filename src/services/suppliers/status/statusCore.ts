@@ -1,29 +1,28 @@
 /**
  * Supplier Status - Core Status Operations
  * Handles fundamental status update operations
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 import { log } from '@/lib/logger';
-import { 
-  SupplierStatus, 
-  StatusUpdateData 
+import { SupplierCrudService } from '../supplier.crud';
+import {
+  SupplierStatus,
+  StatusUpdateData
 } from './types';
-
-const COLLECTION_NAME = 'suppliers';
 
 export class StatusCore {
   /**
    * Update supplier status with reason tracking
    */
   static async updateStatus(
-    id: string, 
+    id: string,
     { status, reason, userId }: StatusUpdateData
   ): Promise<void> {
     try {
       const updateData = this.buildStatusUpdateData(status, reason, userId);
-      await updateDoc(doc(db, COLLECTION_NAME, id), updateData);
+      await SupplierCrudService.update(id, updateData);
     } catch (error) {
       log.error(`Error updating supplier status for ${id}:`, { data: error }, 'statusCore');
       throw new Error(`Failed to update supplier status: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -34,13 +33,13 @@ export class StatusCore {
    * Build status update data based on status type
    */
   private static buildStatusUpdateData(
-    status: SupplierStatus, 
-    reason?: string, 
+    status: SupplierStatus,
+    reason?: string,
     userId?: string
-  ): Record<string, any> {
-    const baseData: Record<string, any> = {
+  ): Record<string, unknown> {
+    const baseData: Record<string, unknown> = {
       status,
-      updatedAt: Timestamp.now(),
+      updatedAt: new Date().toISOString(),
       lastModifiedBy: userId || 'current-user-id' // TODO: Get from auth context
     };
 
@@ -48,16 +47,16 @@ export class StatusCore {
     switch (status) {
       case SupplierStatus.BLACKLISTED:
         return this.buildBlacklistData(baseData, reason, userId);
-      
+
       case SupplierStatus.INACTIVE:
         return this.buildInactiveData(baseData, reason);
-      
+
       case SupplierStatus.ACTIVE:
         return this.buildActiveData(baseData, userId);
-      
+
       case SupplierStatus.PENDING:
         return this.buildPendingData(baseData);
-      
+
       default:
         return baseData;
     }
@@ -67,18 +66,18 @@ export class StatusCore {
    * Build blacklist-specific update data
    */
   private static buildBlacklistData(
-    baseData: Record<string, any>, 
-    reason?: string, 
+    baseData: Record<string, unknown>,
+    reason?: string,
     userId?: string
-  ): Record<string, any> {
-    const data: Record<string, any> = { ...baseData, isActive: false };
-    
+  ): Record<string, unknown> {
+    const data: Record<string, unknown> = { ...baseData, isActive: false };
+
     if (reason) {
       data.blacklistReason = reason;
-      data.blacklistedAt = Timestamp.now();
+      data.blacklistedAt = new Date().toISOString();
       data.blacklistedBy = userId || 'current-user-id';
     }
-    
+
     return data;
   }
 
@@ -86,16 +85,16 @@ export class StatusCore {
    * Build inactive-specific update data
    */
   private static buildInactiveData(
-    baseData: Record<string, any>, 
+    baseData: Record<string, unknown>,
     reason?: string
-  ): Record<string, any> {
-    const data: Record<string, any> = { ...baseData, isActive: false };
-    
+  ): Record<string, unknown> {
+    const data: Record<string, unknown> = { ...baseData, isActive: false };
+
     if (reason) {
       data.inactiveReason = reason;
-      data.inactivatedAt = Timestamp.now();
+      data.inactivatedAt = new Date().toISOString();
     }
-    
+
     return data;
   }
 
@@ -103,13 +102,13 @@ export class StatusCore {
    * Build active-specific update data
    */
   private static buildActiveData(
-    baseData: Record<string, any>, 
+    baseData: Record<string, unknown>,
     userId?: string
-  ): Record<string, any> {
+  ): Record<string, unknown> {
     return {
       ...baseData,
       isActive: true,
-      activatedAt: Timestamp.now(),
+      activatedAt: new Date().toISOString(),
       activatedBy: userId || 'current-user-id',
       // Clear blacklist/inactive reasons if reactivating
       blacklistReason: null,
@@ -121,12 +120,12 @@ export class StatusCore {
    * Build pending-specific update data
    */
   private static buildPendingData(
-    baseData: Record<string, any>
-  ): Record<string, any> {
+    baseData: Record<string, unknown>
+  ): Record<string, unknown> {
     return {
       ...baseData,
       isActive: false,
-      pendingSince: Timestamp.now()
+      pendingSince: new Date().toISOString()
     };
   }
 
@@ -134,13 +133,13 @@ export class StatusCore {
    * Set supplier as preferred or remove preference
    */
   static async setPreferred(
-    id: string, 
+    id: string,
     isPreferred: boolean,
     userId?: string
   ): Promise<void> {
     try {
       const updateData = this.buildPreferenceUpdateData(isPreferred, userId);
-      await updateDoc(doc(db, COLLECTION_NAME, id), updateData);
+      await SupplierCrudService.update(id, updateData);
     } catch (error) {
       log.error(`Error updating supplier preference for ${id}:`, { data: error }, 'statusCore');
       throw new Error(`Failed to update supplier preference: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -151,17 +150,17 @@ export class StatusCore {
    * Build preference update data
    */
   private static buildPreferenceUpdateData(
-    isPreferred: boolean, 
+    isPreferred: boolean,
     userId?: string
-  ): Record<string, any> {
-    const updateData: Record<string, any> = {
+  ): Record<string, unknown> {
+    const updateData: Record<string, unknown> = {
       isPreferred,
-      updatedAt: Timestamp.now(),
+      updatedAt: new Date().toISOString(),
       lastModifiedBy: userId || 'current-user-id'
     };
 
     if (isPreferred) {
-      updateData.preferredSince = Timestamp.now();
+      updateData.preferredSince = new Date().toISOString();
       updateData.preferredBy = userId || 'current-user-id';
     } else {
       updateData.preferredSince = null;

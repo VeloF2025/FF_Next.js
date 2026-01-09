@@ -7,7 +7,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { getAdminStorage } from '@/config/firebase-admin';
+import { localFileStorage } from '@/services/localFileStorage';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 
@@ -97,21 +97,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(404).json({ error: 'Document not found' });
       }
 
-      // Delete from Firebase Storage
+      // Delete from local storage
       if (document.file_url) {
         try {
-          const bucket = getAdminStorage();
-          // Extract path from URL
+          // Extract path from URL (format: /api/uploads/staff-documents/...)
           const url = document.file_url as string;
           const pathMatch = url.match(/staff-documents\/.*$/);
           if (pathMatch) {
-            await bucket.file(pathMatch[0]).delete();
-            logger.info('Deleted file from Firebase', { path: pathMatch[0] });
+            await localFileStorage.deleteFile(pathMatch[0]);
+            logger.info('Deleted file from local storage', { path: pathMatch[0] });
           }
-        } catch (firebaseError: unknown) {
-          // Log but don't fail if Firebase delete fails
-          const fbErrorMsg = firebaseError instanceof Error ? firebaseError.message : 'Unknown';
-          logger.warn('Failed to delete file from Firebase', { error: fbErrorMsg });
+        } catch (storageError: unknown) {
+          // Log but don't fail if storage delete fails
+          const errorMsg = storageError instanceof Error ? storageError.message : 'Unknown';
+          logger.warn('Failed to delete file from local storage', { error: errorMsg });
         }
       }
 
