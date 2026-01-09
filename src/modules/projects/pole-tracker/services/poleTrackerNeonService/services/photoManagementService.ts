@@ -1,61 +1,70 @@
-import { neonService } from '@/services/neonService';
-import { storage } from '@/config/firebase';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+/**
+ * Photo Management Service
+ * Handles pole photo uploads via local storage API
+ *
+ * NOTE: Firebase Storage has been removed. This service now uses local file storage.
+ */
+
 import type { PhotoType } from '../types/pole.types';
-import { POLE_QUERIES } from '../queries/poleQueries';
 import { log } from '@/lib/logger';
 
 export class PhotoManagementService {
   /**
-   * Upload photo to Firebase Storage and update pole record
+   * Upload photo to local storage via API and update pole record
    */
   async uploadPolePhoto(
-    poleId: number, 
+    poleId: number,
     photoType: PhotoType,
-    file: File
+    file: File,
+    projectId?: string
   ): Promise<string> {
-    // Upload to Firebase Storage
-    const fileName = `poles/${poleId}/${photoType}_${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, fileName);
-    
-    const snapshot = await uploadBytes(storageRef, file);
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    
-    // Update pole record with photo URL
-    const columnName = `photo_${photoType}`;
-    const query = POLE_QUERIES.updatePolePhoto.replace('{columnName}', columnName);
-    
-    const result = await neonService.execute(query, [downloadURL, poleId]);
-    
-    if (!result.success) {
-      // Clean up uploaded file if database update fails
-      await deleteObject(storageRef);
-      throw new Error(result.error || 'Failed to update photo URL');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('poleId', poleId.toString());
+    formData.append('photoType', photoType);
+    if (projectId) {
+      formData.append('projectId', projectId);
     }
-    
-    return downloadURL;
+
+    const response = await fetch('/api/pole-photos-upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to upload photo');
+    }
+
+    return result.url;
   }
 
   /**
-   * Delete photo from Firebase Storage and database
+   * Delete photo from local storage and database
    */
-  async deletePolePhoto(poleId: number, photoType: PhotoType, photoUrl: string): Promise<void> {
-    try {
-      // Delete from Firebase Storage
-      const storageRef = ref(storage, photoUrl);
-      await deleteObject(storageRef);
-    } catch (error) {
-      log.warn('Failed to delete photo from storage:', { data: error }, 'photoManagementService');
-    }
+  async deletePolePhoto(
+    poleId: number,
+    photoType: PhotoType,
+    photoUrl: string
+  ): Promise<void> {
+    const response = await fetch('/api/pole-photos-delete', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        poleId,
+        photoType,
+        photoUrl,
+      }),
+    });
 
-    // Remove URL from database
-    const columnName = `photo_${photoType}`;
-    const query = POLE_QUERIES.updatePolePhoto.replace('{columnName}', columnName);
-    
-    const result = await neonService.execute(query, [null, poleId]);
-    
+    const result = await response.json();
+
     if (!result.success) {
-      throw new Error(result.error || 'Failed to remove photo URL from database');
+      log.warn('Failed to delete photo:', { data: result.error }, 'photoManagementService');
+      throw new Error(result.error || 'Failed to delete photo');
     }
   }
 }

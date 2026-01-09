@@ -1,36 +1,60 @@
 /**
  * Pole Photos Management Service
- * Handles photo uploads and management for poles
+ * Handles photo management for poles
+ *
+ * NOTE: Firebase Firestore has been removed. This service now uses API endpoints.
  */
 
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/config/firebase';
-import { PolePhotos, POLE_COLLECTION } from './types';
+import { PolePhotos } from './types';
+import { log } from '@/lib/logger';
 
 export class PolePhotosService {
   /**
-   * Update pole photos
+   * Update pole photos via API
    */
   static async updatePhotos(
     id: string,
     photos: Partial<PolePhotos>
   ): Promise<void> {
-    const poleRef = doc(db, POLE_COLLECTION, id);
-    const existingDoc = await getDoc(poleRef);
-    
-    if (!existingDoc.exists()) {
-      throw new Error('Pole not found');
+    // Update each photo type via API
+    for (const [photoType, photoUrl] of Object.entries(photos)) {
+      if (photoUrl !== undefined) {
+        try {
+          const response = await fetch('/api/pole-photos-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              poleId: id,
+              photoType: this.mapPhotoTypeToColumn(photoType as keyof PolePhotos),
+              photoUrl,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to update photo');
+          }
+        } catch (error) {
+          log.error(`Error updating photo ${photoType}:`, { data: error }, 'polePhotos');
+          throw error;
+        }
+      }
     }
+  }
 
-    const existingPhotos = existingDoc.data()?.photos || {};
-
-    await updateDoc(poleRef, {
-      photos: {
-        ...existingPhotos,
-        ...photos
-      },
-      'metadata.updatedAt': serverTimestamp()
-    });
+  /**
+   * Map photo type to database column name
+   */
+  private static mapPhotoTypeToColumn(photoType: keyof PolePhotos): string {
+    const mapping: Record<keyof PolePhotos, string> = {
+      beforeInstallation: 'before',
+      duringInstallation: 'during',
+      afterInstallation: 'after',
+      poleLabel: 'label',
+      cableRouting: 'cable_routing',
+      qualityCheck: 'quality_check',
+    };
+    return mapping[photoType] || photoType;
   }
 
   /**
@@ -51,20 +75,49 @@ export class PolePhotosService {
     id: string,
     photoType: keyof PolePhotos
   ): Promise<void> {
-    await this.updatePhotos(id, { [photoType]: null });
+    try {
+      const response = await fetch('/api/pole-photos-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poleId: id,
+          photoType: this.mapPhotoTypeToColumn(photoType),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete photo');
+      }
+    } catch (error) {
+      log.error(`Error removing photo ${photoType}:`, { data: error }, 'polePhotos');
+      throw error;
+    }
   }
 
   /**
    * Get all photos for a pole
+   * Note: This would typically fetch from the poles API
    */
   static async getPhotos(id: string): Promise<PolePhotos> {
-    const docSnap = await getDoc(doc(db, POLE_COLLECTION, id));
-    
-    if (!docSnap.exists()) {
-      throw new Error('Pole not found');
+    try {
+      const response = await fetch(`/api/poles/${id}`);
+      if (!response.ok) {
+        throw new Error('Pole not found');
+      }
+      const pole = await response.json();
+      return {
+        beforeInstallation: pole.photo_before || null,
+        duringInstallation: pole.photo_during || null,
+        afterInstallation: pole.photo_after || null,
+        poleLabel: pole.photo_label || null,
+        cableRouting: pole.photo_cable_routing || null,
+        qualityCheck: pole.photo_quality_check || null,
+      };
+    } catch (error) {
+      log.error(`Error fetching photos for pole ${id}:`, { data: error }, 'polePhotos');
+      return this.getEmptyPhotos();
     }
-
-    return docSnap.data().photos || this.getEmptyPhotos();
   }
 
   /**

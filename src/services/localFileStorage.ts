@@ -218,6 +218,10 @@ export class LocalFileStorageService {
   static getProfilePicturePath(userId: string): string {
     return `profile-pictures/${userId}`;
   }
+
+  static getPolePhotoPath(projectId: string, poleId: number | string): string {
+    return `poles/${projectId}/${poleId}`;
+  }
 }
 
 // Export singleton instance methods for convenience
