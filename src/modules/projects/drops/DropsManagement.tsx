@@ -49,7 +49,7 @@ export function DropsManagement() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <DropsHeader stats={allDropsStats} />
       <DropsStatsCards stats={stats} allDropsStats={allDropsStats} />
       <DropsFilters filters={filters} onFiltersChange={handleFiltersChange} />

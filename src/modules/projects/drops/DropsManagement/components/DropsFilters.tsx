@@ -9,7 +9,7 @@ interface DropsFiltersProps {
 
 export function DropsFilters({ filters, onFiltersChange }: DropsFiltersProps) {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-4">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[var(--ff-text-tertiary)]" />
