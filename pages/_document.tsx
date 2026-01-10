@@ -13,9 +13,9 @@ export default function Document() {
         {/* Support dark mode for native form controls (select dropdowns, date pickers) */}
         <meta name="color-scheme" content="light dark" />
 
-        {/* Meta tags for SEO and responsiveness */}
+        {/* Meta tags for SEO */}
         <meta name="description" content="FibreFlow - Fiber Network Project Management" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Note: viewport meta is set in _app.tsx via next/head */}
         <link rel="icon" href="/icon.png" />
         <link rel="apple-touch-icon" href="/icon.png" />
 

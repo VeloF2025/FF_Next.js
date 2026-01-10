@@ -6,8 +6,6 @@ export const authConfig = {
     return this.isDevelopment && this.devModeEnabled;
   },
 
-  clerkPublishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-  
   devUser: {
     id: 'dev-user-001',
     email: 'dev@fibreflow.local',

@@ -7,10 +7,16 @@
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
 import { staffService } from '@/services/staffService';
-import { neon } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 
-// Initialize SQL client for deprecated methods
-const sql = neon(process.env.DATABASE_URL || '');
+// Lazy initialize SQL client for deprecated methods (prevents SSR/client mismatch)
+let _sql: NeonQueryFunction<false, false> | null = null;
+const getSql = () => {
+  if (!_sql && typeof window === 'undefined' && process.env.DATABASE_URL) {
+    _sql = neon(process.env.DATABASE_URL);
+  }
+  return _sql;
+};
 
 // Type definitions for deprecated query services
 const staffQueryService = {
@@ -213,12 +219,15 @@ export class DashboardStatsService {
     try {
       // Try to get infrastructure data from Neon database
       // If tables don't exist, return 0s
+      const sql = getSql();
+      if (!sql) return { poles: 0, drops: 0, fiber: 0 };
+
       const result = await sql`
-        SELECT 
+        SELECT
           COALESCE(SUM(CASE WHEN type = 'pole' THEN quantity ELSE 0 END), 0) as poles,
           COALESCE(SUM(CASE WHEN type = 'drop' THEN quantity ELSE 0 END), 0) as drops,
           COALESCE(SUM(CASE WHEN type = 'fiber' THEN length ELSE 0 END), 0) as fiber
-        FROM infrastructure_installations 
+        FROM infrastructure_installations
         WHERE status = 'completed'
       `.catch(() => [{ poles: 0, drops: 0, fiber: 0 }]);
 
@@ -246,12 +255,22 @@ export class DashboardStatsService {
     try {
       // Try to get procurement data from Neon database
       // If tables don't exist, return 0s
+      const sql = getSql();
+      if (!sql) return {
+        boqsActive: 0,
+        rfqsActive: 0,
+        suppliersActive: 0,
+        contractorsActive: 0,
+        contractorsPending: 0,
+        reportsGenerated: 0,
+      };
+
       const [boqResult, rfqResult, supplierResult, contractorResult] = await Promise.all([
         sql`SELECT COUNT(*) as count FROM boqs WHERE status = 'active'`.catch(() => [{ count: 0 }]),
         sql`SELECT COUNT(*) as count FROM rfqs WHERE status = 'active'`.catch(() => [{ count: 0 }]),
         sql`SELECT COUNT(*) as count FROM suppliers WHERE status = 'active'`.catch(() => [{ count: 0 }]),
         sql`
-          SELECT 
+          SELECT
             COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
             COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
           FROM contractors

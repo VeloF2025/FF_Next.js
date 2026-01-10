@@ -1,9 +1,9 @@
 /**
  * User State Management
- * User state and profile management methods using Clerk
+ * User state and profile management methods (mock implementation)
  */
 
-import { clerkAuth } from '../clerkAuth';
+import { clerkAuth } from '../mockAuth';
 import { authConfig } from '@/config/auth.config';
 import { User } from '@/types/auth.types';
 import { getUserProfile, getUserFromFirestore } from '../userService';

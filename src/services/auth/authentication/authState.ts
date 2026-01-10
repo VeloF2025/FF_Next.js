@@ -1,6 +1,6 @@
 /**
  * Authentication State
- * Authentication state listeners and change handlers using Clerk
+ * Authentication state listeners and change handlers (mock implementation)
  */
 
 import { authConfig } from '@/config/auth.config';
