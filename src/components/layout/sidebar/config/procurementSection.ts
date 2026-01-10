@@ -5,6 +5,7 @@
 import {
   ShoppingCart,
   Truck,
+  Package,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -23,6 +24,13 @@ export const procurementSection: NavSection = {
       icon: Truck,
       label: 'Suppliers Portal',
       shortLabel: 'Supply',
+      permissions: []
+    },
+    {
+      to: '/procurement/field-stock',
+      icon: Package,
+      label: 'Field Stock Control',
+      shortLabel: 'Stock',
       permissions: []
     },
   ]
