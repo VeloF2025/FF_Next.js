@@ -178,14 +178,14 @@ export default function FieldAppPage({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading field app data...</div>
+      <div className="min-h-screen bg-[var(--ff-bg-tertiary)] flex items-center justify-center">
+        <div className="text-[var(--ff-text-secondary)]">Loading field app data...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
       <DashboardHeader 
         title="Field App Portal"
         onRefresh={handleRefresh}
@@ -216,35 +216,35 @@ export default function FieldAppPage({
           />
 
           {/* Today's Stats */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Today's Progress</h3>
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">Today's Progress</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Completed</span>
+                <span className="text-[var(--ff-text-secondary)]">Completed</span>
                 <span className="font-semibold text-green-600">{stats.completed}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">In Progress</span>
+                <span className="text-[var(--ff-text-secondary)]">In Progress</span>
                 <span className="font-semibold text-blue-600">{stats.inProgress}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Pending</span>
-                <span className="font-semibold text-gray-600">{stats.pending}</span>
+                <span className="text-[var(--ff-text-secondary)]">Pending</span>
+                <span className="font-semibold text-[var(--ff-text-secondary)]">{stats.pending}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow mb-6">
+          <div className="border-b border-[var(--ff-border-light)]">
             <nav className="flex -mb-px">
               <button
                 onClick={() => setActiveTab('tasks')}
                 className={`px-6 py-3 font-medium text-sm ${
                   activeTab === 'tasks'
                     ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 Tasks ({tasks.length})
@@ -254,7 +254,7 @@ export default function FieldAppPage({
                 className={`px-6 py-3 font-medium text-sm ${
                   activeTab === 'technicians'
                     ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 Technicians ({technicians.length})
@@ -264,7 +264,7 @@ export default function FieldAppPage({
                 className={`px-6 py-3 font-medium text-sm ${
                   activeTab === 'overview'
                     ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 Overview
@@ -286,7 +286,7 @@ export default function FieldAppPage({
                 />
               ))}
               {tasks.length === 0 && (
-                <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-8 text-center text-[var(--ff-text-secondary)]">
                   No tasks assigned
                 </div>
               )}
@@ -303,7 +303,7 @@ export default function FieldAppPage({
                 />
               ))}
               {technicians.length === 0 && (
-                <div className="col-span-full bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                <div className="col-span-full bg-[var(--ff-bg-secondary)] rounded-lg shadow p-8 text-center text-[var(--ff-text-secondary)]">
                   No technicians available
                 </div>
               )}
@@ -311,50 +311,50 @@ export default function FieldAppPage({
           )}
 
           {activeTab === 'overview' && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Field Operations Overview</h3>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">Field Operations Overview</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Task Distribution</h4>
+                  <h4 className="font-medium text-[var(--ff-text-primary)] mb-2">Task Distribution</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Installation</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Installation</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                         {tasks.filter(t => t.type === 'installation').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Maintenance</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Maintenance</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                         {tasks.filter(t => t.type === 'maintenance').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Inspection</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Inspection</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                         {tasks.filter(t => t.type === 'inspection').length}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-2">Technician Status</h4>
+                  <h4 className="font-medium text-[var(--ff-text-primary)] mb-2">Technician Status</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Available</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Available</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                         {technicians.filter(t => t.status === 'available').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">On Task</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">On Task</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                         {technicians.filter(t => t.status === 'on_task').length}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">On Break</span>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">On Break</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                         {technicians.filter(t => t.status === 'on_break').length}
                       </span>
                     </div>

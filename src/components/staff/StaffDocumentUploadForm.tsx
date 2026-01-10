@@ -193,13 +193,13 @@ export function StaffDocumentUploadForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Upload Staff Document</h2>
+        <div className="flex items-center justify-between p-6 border-b border-[var(--ff-border-light)]">
+          <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Upload Staff Document</h2>
           <button
             onClick={onCancel}
-            className="p-1 text-gray-400 hover:text-gray-600"
+            className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
             disabled={isSubmitting}
           >
             <X className="h-5 w-5" />
@@ -210,16 +210,16 @@ export function StaffDocumentUploadForm({
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Error Banner */}
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-900">Upload Failed</p>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
+                <p className="text-sm font-medium text-red-400">Upload Failed</p>
+                <p className="text-sm text-red-400/80 mt-1">{error}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setError(null)}
-                className="text-red-600 hover:text-red-800"
+                className="text-red-400 hover:text-red-300"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -228,8 +228,8 @@ export function StaffDocumentUploadForm({
 
           {/* File Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              File * <span className="text-gray-500 font-normal">(PDF, JPG, PNG, Word, Excel - Max 10MB)</span>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+              File * <span className="text-[var(--ff-text-secondary)] font-normal">(PDF, JPG, PNG, Word, Excel - Max 10MB)</span>
             </label>
             <div className="relative">
               <input
@@ -244,26 +244,26 @@ export function StaffDocumentUploadForm({
                 htmlFor="staff-file-upload"
                 className={`flex items-center justify-center gap-3 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
                   file
-                    ? 'border-blue-300 bg-blue-50'
-                    : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
+                    ? 'border-blue-400/50 bg-blue-500/10'
+                    : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] hover:border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
                 } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {file ? (
                   <>
-                    <FileText className="h-8 w-8 text-blue-600" />
+                    <FileText className="h-8 w-8 text-blue-400" />
                     <div className="text-center">
-                      <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-sm font-medium text-[var(--ff-text-primary)]">{file.name}</p>
+                      <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
                         {(file.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <Upload className="h-8 w-8 text-gray-400" />
+                    <Upload className="h-8 w-8 text-[var(--ff-text-secondary)]" />
                     <div className="text-center">
-                      <p className="text-sm font-medium text-gray-700">Click to upload</p>
-                      <p className="text-xs text-gray-500 mt-1">or drag and drop</p>
+                      <p className="text-sm font-medium text-[var(--ff-text-primary)]">Click to upload</p>
+                      <p className="text-xs text-[var(--ff-text-secondary)] mt-1">or drag and drop</p>
                     </div>
                   </>
                 )}
@@ -276,7 +276,7 @@ export function StaffDocumentUploadForm({
                 <img
                   src={filePreview}
                   alt="Preview"
-                  className="max-h-48 rounded-lg border border-gray-200 mx-auto"
+                  className="max-h-48 rounded-lg border border-[var(--ff-border-light)] mx-auto"
                 />
               </div>
             )}
@@ -284,11 +284,11 @@ export function StaffDocumentUploadForm({
             {/* Upload Progress */}
             {isSubmitting && uploadProgress > 0 && (
               <div className="mt-4">
-                <div className="flex items-center justify-between text-sm text-gray-700 mb-2">
+                <div className="flex items-center justify-between text-sm text-[var(--ff-text-primary)] mb-2">
                   <span>Uploading...</span>
                   <span className="font-medium">{uploadProgress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-blue-600 h-2 transition-all duration-300 ease-out"
                     style={{ width: `${uploadProgress}%` }}
@@ -300,11 +300,11 @@ export function StaffDocumentUploadForm({
 
           {/* Document Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Document Type *</label>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">Document Type *</label>
             <select
               value={formData.documentType}
               onChange={(e) => setFormData({ ...formData, documentType: e.target.value as DocumentType })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
               disabled={isSubmitting}
             >
@@ -328,12 +328,12 @@ export function StaffDocumentUploadForm({
 
           {/* Document Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Document Name *</label>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">Document Name *</label>
             <input
               type="text"
               value={formData.documentName}
               onChange={(e) => setFormData({ ...formData, documentName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., SA ID Card, Driving License"
               required
               disabled={isSubmitting}
@@ -342,12 +342,12 @@ export function StaffDocumentUploadForm({
 
           {/* Document Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Document/ID Number</label>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">Document/ID Number</label>
             <input
               type="text"
               value={formData.documentNumber}
               onChange={(e) => setFormData({ ...formData, documentNumber: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., 9012345678012"
               disabled={isSubmitting}
             />
@@ -355,12 +355,12 @@ export function StaffDocumentUploadForm({
 
           {/* Issuing Authority */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Issuing Authority</label>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">Issuing Authority</label>
             <input
               type="text"
               value={formData.issuingAuthority}
               onChange={(e) => setFormData({ ...formData, issuingAuthority: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., Department of Home Affairs"
               disabled={isSubmitting}
             />
@@ -369,25 +369,25 @@ export function StaffDocumentUploadForm({
           {/* Dates */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Issue Date</label>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">Issue Date</label>
               <input
                 type="date"
                 value={formData.issuedDate}
                 onChange={(e) => setFormData({ ...formData, issuedDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isSubmitting}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Expiry Date {requiresExpiry && '*'}
               </label>
               <input
                 type="date"
                 value={formData.expiryDate}
                 onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  requiresExpiry ? 'border-amber-300' : 'border-gray-300'
+                className={`w-full px-3 py-2 border rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  requiresExpiry ? 'border-amber-400/50' : 'border-[var(--ff-border-light)]'
                 }`}
                 required={requiresExpiry}
                 disabled={isSubmitting}
@@ -396,11 +396,11 @@ export function StaffDocumentUploadForm({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--ff-border-light)]">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
               disabled={isSubmitting}
             >
               Cancel

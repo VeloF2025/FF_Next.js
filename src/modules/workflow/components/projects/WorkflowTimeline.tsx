@@ -154,11 +154,11 @@ export function WorkflowTimeline({
   if (!timelineData || workflows.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 p-8">
-        <Calendar className="w-12 h-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+        <Calendar className="w-12 h-12 text-[var(--ff-text-tertiary)] mb-4" />
+        <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">
           No Timeline Data
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 text-center">
+        <p className="text-[var(--ff-text-secondary)] text-center">
           Select workflows to view their timeline visualization
         </p>
       </div>
@@ -169,32 +169,32 @@ export function WorkflowTimeline({
   const totalWidth = timelineData.totalDays * timelineData.dayWidth;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
       {/* Timeline Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
         <div className="flex items-center space-x-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
             Project Timeline
           </h3>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-[var(--ff-text-secondary)]">
             {workflows.length} workflow{workflows.length !== 1 ? 's' : ''}
           </span>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setZoomLevel(Math.max(0.5, zoomLevel - 0.5))}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+            className="p-2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)] rounded"
             title="Zoom Out"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm text-gray-600 dark:text-gray-400 min-w-12 text-center">
+          <span className="text-sm text-[var(--ff-text-secondary)] min-w-12 text-center">
             {Math.round(zoomLevel * 100)}%
           </span>
           <button
             onClick={() => setZoomLevel(Math.min(3, zoomLevel + 0.5))}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+            className="p-2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)] rounded"
             title="Zoom In"
           >
             <ChevronRight className="w-4 h-4" />
@@ -205,8 +205,8 @@ export function WorkflowTimeline({
       {/* Timeline Content */}
       <div className="relative overflow-x-auto">
         {/* Time Headers */}
-        <div 
-          className="flex items-end border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 h-12 px-4"
+        <div
+          className="flex items-end border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] h-12 px-4"
           style={{ minWidth: Math.max(totalWidth + 300, 800) }}
         >
           <div className="w-64 flex-shrink-0" /> {/* Spacer for workflow names */}
@@ -218,11 +218,11 @@ export function WorkflowTimeline({
                 style={{ left: header.position }}
               >
                 <div className={`text-xs font-medium ${
-                  header.isToday ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
+                  header.isToday ? 'text-red-600 dark:text-red-400' : 'text-[var(--ff-text-secondary)]'
                 }`}>
-                  {header.date.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric' 
+                  {header.date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
                   })}
                 </div>
               </div>
@@ -243,27 +243,27 @@ export function WorkflowTimeline({
           {workflows.map((workflow) => (
             <div
               key={workflow.id}
-              className={`flex border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+              className={`flex border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)] ${
                 selectedWorkflowId === workflow.id ? 'bg-blue-50 dark:bg-blue-900/10' : ''
               }`}
               onClick={() => onWorkflowSelect?.(workflow.id)}
             >
               {/* Workflow Info */}
-              <div className="w-64 flex-shrink-0 p-4 border-r border-gray-200 dark:border-gray-700">
+              <div className="w-64 flex-shrink-0 p-4 border-r border-[var(--ff-border-light)]">
                 <div className="flex items-center space-x-2 mb-1">
                   <div className={`w-3 h-3 rounded-full ${
                     workflow.status === 'active' ? 'bg-green-500' :
                     workflow.status === 'completed' ? 'bg-blue-500' :
-                    workflow.status === 'paused' ? 'bg-yellow-500' : 'bg-gray-400'
+                    workflow.status === 'paused' ? 'bg-yellow-500' : 'bg-[var(--ff-text-tertiary)]'
                   }`} />
-                  <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm truncate">
+                  <h4 className="font-medium text-[var(--ff-text-primary)] text-sm truncate">
                     {workflow.name}
                   </h4>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <p className="text-xs text-[var(--ff-text-secondary)] truncate">
                   {workflow.project?.name}
                 </p>
-                <div className="flex items-center space-x-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex items-center space-x-2 mt-2 text-xs text-[var(--ff-text-tertiary)]">
                   <Clock className="w-3 h-3" />
                   <span>{Math.round(workflow.progressPercentage || 0)}%</span>
                 </div>
@@ -293,8 +293,8 @@ export function WorkflowTimeline({
                       >
                         <div className={`w-full h-full rounded ${barData.color} relative overflow-hidden`}>
                           {status === 'active' && (
-                            <div 
-                              className="absolute inset-0 bg-white dark:bg-gray-900 opacity-30"
+                            <div
+                              className="absolute inset-0 bg-[var(--ff-bg-secondary)] opacity-30"
                               style={{
                                 width: `${100 - (workflow.progressPercentage || 0)}%`,
                                 right: 0
@@ -331,27 +331,27 @@ export function WorkflowTimeline({
 
       {/* Timeline Legend */}
       {!compact && (
-        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 bg-[var(--ff-bg-tertiary)] border-t border-[var(--ff-border-light)]">
           <div className="flex items-center space-x-6 text-sm">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-500 rounded" />
-              <span className="text-gray-600 dark:text-gray-400">Active</span>
+              <span className="text-[var(--ff-text-secondary)]">Active</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-blue-500 rounded" />
-              <span className="text-gray-600 dark:text-gray-400">Completed</span>
+              <span className="text-[var(--ff-text-secondary)]">Completed</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-yellow-500 rounded" />
-              <span className="text-gray-600 dark:text-gray-400">Paused</span>
+              <span className="text-[var(--ff-text-secondary)]">Paused</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-gray-400 rounded" />
-              <span className="text-gray-600 dark:text-gray-400">Pending</span>
+              <div className="w-3 h-3 bg-[var(--ff-text-tertiary)] rounded" />
+              <span className="text-[var(--ff-text-secondary)]">Pending</span>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+
+          <div className="flex items-center space-x-2 text-sm text-[var(--ff-text-secondary)]">
             <div className="w-0.5 h-4 bg-red-500" />
             <span>Today</span>
           </div>

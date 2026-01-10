@@ -106,12 +106,12 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 space-y-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Sparkles className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <Sparkles className="w-6 h-6 text-purple-400" />
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
             AI Evaluation & Feedback
           </h3>
         </div>
@@ -119,7 +119,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
         <button
           onClick={handleEvaluate}
           disabled={isEvaluating}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-[var(--ff-bg-tertiary)] text-white rounded-lg font-medium transition-colors"
         >
           {isEvaluating ? (
             <>
@@ -137,12 +137,12 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">Error</p>
-              <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+              <p className="text-sm font-medium text-red-400">Error</p>
+              <p className="text-sm text-red-300 mt-1">{error}</p>
             </div>
           </div>
         </div>
@@ -152,26 +152,26 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
       {evaluation && (
         <div className="space-y-4">
           {/* Overall Status */}
-          <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
+          <div className="flex items-center justify-between p-4 rounded-lg bg-[var(--ff-bg-tertiary)]">
             <div className="flex items-center gap-3">
               {evaluation.overall_status === 'PASS' ? (
-                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+                <CheckCircle className="w-8 h-8 text-green-400" />
               ) : (
-                <XCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+                <XCircle className="w-8 h-8 text-red-400" />
               )}
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
                   {evaluation.overall_score}%
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-[var(--ff-text-secondary)]">
                   {evaluation.passed_steps} of {evaluation.total_steps} steps passed
                 </p>
               </div>
             </div>
             <div className={`px-4 py-2 rounded-full font-semibold text-sm ${
               evaluation.overall_status === 'PASS'
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                ? 'bg-green-500/20 text-green-400'
+                : 'bg-red-500/20 text-red-400'
             }`}>
               {evaluation.overall_status}
             </div>
@@ -180,7 +180,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
           {/* Step Results */}
           {evaluation.step_results && evaluation.step_results.length > 0 && (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <p className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
                 Step-by-step Results:
               </p>
               {evaluation.step_results.map((step: any, index: number) => {
@@ -193,34 +193,34 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
                     key={index}
                     className={`p-3 rounded-lg border ${
                       isPassed
-                        ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
-                        : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
+                        ? 'border-green-500/30 bg-green-500/20'
+                        : 'border-red-500/30 bg-red-500/20'
                     }`}
                   >
                     <div className="flex items-start gap-2">
                       {isPassed ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium ${
                           isPassed
-                            ? 'text-green-800 dark:text-green-200'
-                            : 'text-red-800 dark:text-red-200'
+                            ? 'text-green-400'
+                            : 'text-red-400'
                         }`}>
                           {stepName}
                         </p>
                         {comment && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                             {comment}
                           </p>
                         )}
                       </div>
                       <span className={`text-xs font-semibold ${
                         isPassed
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-red-600 dark:text-red-400'
+                          ? 'text-green-400'
+                          : 'text-red-400'
                       }`}>
                         {step.score ? `${Math.round(step.score * 10)}%` : ''}
                       </span>
@@ -237,12 +237,12 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
       {evaluation && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-sm font-medium text-[var(--ff-text-secondary)]">
               WhatsApp Feedback Message
             </label>
             <button
               onClick={() => generateFeedbackMessage(evaluation)}
-              className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+              className="text-xs text-purple-400 hover:underline"
             >
               Regenerate
             </button>
@@ -252,14 +252,14 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
             value={feedbackMessage}
             onChange={(e) => setFeedbackMessage(e.target.value)}
             rows={8}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
             placeholder="Edit feedback message before sending..."
           />
 
           <button
             onClick={handleSendFeedback}
             disabled={sending || !feedbackMessage.trim()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-[var(--ff-bg-tertiary)] text-white rounded-lg font-medium transition-colors"
           >
             {sending ? (
               <>
@@ -278,7 +278,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
 
       {/* Instructions (shown when no evaluation yet) */}
       {!evaluation && !isEvaluating && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+        <div className="text-center py-8 text-[var(--ff-text-secondary)]">
           <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p className="text-sm">
             Click "Run AI Evaluation" to analyze this DR's photos

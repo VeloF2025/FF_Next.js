@@ -27,7 +27,7 @@ export function RegistrationFields({
       {/* Name fields */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="firstName" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
             First Name
           </label>
           <input
@@ -38,12 +38,12 @@ export function RegistrationFields({
             required
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="First name"
           />
         </div>
         <div>
-          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="lastName" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
             Last Name
           </label>
           <input
@@ -54,7 +54,7 @@ export function RegistrationFields({
             required
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Last name"
           />
         </div>
@@ -62,12 +62,12 @@ export function RegistrationFields({
 
       {/* Email field */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="email" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
           Email address
         </label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Mail className="h-5 w-5 text-gray-400" />
+            <Mail className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
           </div>
           <input
             id="email"
@@ -77,7 +77,7 @@ export function RegistrationFields({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full pl-10 pr-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter your email"
           />
         </div>
@@ -85,12 +85,12 @@ export function RegistrationFields({
 
       {/* Password field */}
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="password" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
           Password
         </label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
+            <Lock className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
           </div>
           <input
             id="password"
@@ -100,7 +100,7 @@ export function RegistrationFields({
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full pl-10 pr-10 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter your password"
             minLength={6}
           />
@@ -110,9 +110,9 @@ export function RegistrationFields({
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
           >
             {showPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <EyeOff className="h-5 w-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]" />
             ) : (
-              <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <Eye className="h-5 w-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]" />
             )}
           </button>
         </div>
@@ -120,12 +120,12 @@ export function RegistrationFields({
 
       {/* Confirm password field */}
       <div>
-        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="confirmPassword" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
           Confirm Password
         </label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
+            <Lock className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
           </div>
           <input
             id="confirmPassword"
@@ -135,7 +135,7 @@ export function RegistrationFields({
             required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full pl-10 pr-10 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Confirm your password"
             minLength={6}
           />
@@ -145,9 +145,9 @@ export function RegistrationFields({
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
           >
             {showConfirmPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <EyeOff className="h-5 w-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]" />
             ) : (
-              <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <Eye className="h-5 w-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]" />
             )}
           </button>
         </div>

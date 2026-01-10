@@ -55,13 +55,13 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500/20 text-green-400';
       case 'MAPPING_REVIEW':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-500/20 text-yellow-400';
       case 'DRAFT':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]';
     }
   };
 
@@ -71,13 +71,13 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Bill of Quantities</h1>
-            <p className="text-gray-600 mt-1">Upload, map, and manage project BOQs</p>
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Bill of Quantities</h1>
+            <p className="text-[var(--ff-text-secondary)] mt-1">Upload, map, and manage project BOQs</p>
           </div>
           <div className="flex space-x-3">
             <Link
               to="/app/procurement/boq/upload"
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-[var(--ff-border-light)] rounded-md shadow-sm text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)]"
             >
               <Upload className="h-4 w-4 mr-2" />
               Upload BOQ
@@ -94,7 +94,7 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="bg-[var(--ff-bg-secondary)] overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -102,15 +102,15 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Total BOQs</dt>
-                    <dd className="text-lg font-semibold text-gray-900">12</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)] truncate">Total BOQs</dt>
+                    <dd className="text-lg font-semibold text-[var(--ff-text-primary)]">12</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
-          
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+
+          <div className="bg-[var(--ff-bg-secondary)] overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -118,15 +118,15 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Approved</dt>
-                    <dd className="text-lg font-semibold text-gray-900">8</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)] truncate">Approved</dt>
+                    <dd className="text-lg font-semibold text-[var(--ff-text-primary)]">8</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
-          
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+
+          <div className="bg-[var(--ff-bg-secondary)] overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -134,15 +134,15 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Under Review</dt>
-                    <dd className="text-lg font-semibold text-gray-900">3</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)] truncate">Under Review</dt>
+                    <dd className="text-lg font-semibold text-[var(--ff-text-primary)]">3</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
-          
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+
+          <div className="bg-[var(--ff-bg-secondary)] overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -150,8 +150,8 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Exceptions</dt>
-                    <dd className="text-lg font-semibold text-gray-900">142</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)] truncate">Exceptions</dt>
+                    <dd className="text-lg font-semibold text-[var(--ff-text-primary)]">142</dd>
                   </dl>
                 </div>
               </div>
@@ -160,62 +160,62 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
+        <div className="bg-[var(--ff-bg-secondary)] shadow rounded-lg">
+          <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">BOQ List</h3>
+              <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">BOQ List</h3>
               <div className="flex space-x-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
                   <input
                     type="text"
                     placeholder="Search BOQs..."
-                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
                   />
                 </div>
-                <button className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <button className="inline-flex items-center px-3 py-2 border border-[var(--ff-border-light)] rounded-md text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)]">
                   <Filter className="h-4 w-4 mr-2" />
                   Filter
                 </button>
               </div>
             </div>
           </div>
-          
+
           {/* BOQ Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+              <thead className="bg-[var(--ff-bg-tertiary)]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                     BOQ Name
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                     Project
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                     Items / Mapped
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                     Uploaded
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
                 {mockBOQs.map((boq) => (
-                  <tr key={boq.id} className="hover:bg-gray-50">
+                  <tr key={boq.id} className="hover:bg-[var(--ff-bg-hover)]">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{boq.name}</div>
-                        <div className="text-sm text-gray-500">Version {boq.version}</div>
+                        <div className="text-sm font-medium text-[var(--ff-text-primary)]">{boq.name}</div>
+                        <div className="text-sm text-[var(--ff-text-secondary)]">Version {boq.version}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]">
                       {boq.project}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -223,17 +223,17 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                         {boq.status.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]">
                       <div className="flex items-center">
                         <span>{boq.mappedItems}/{boq.items}</span>
                         {boq.exceptions > 0 && (
-                          <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400">
                             {boq.exceptions} exceptions
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                       {boq.uploadedAt}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -268,16 +268,16 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
         </div>
 
         {/* Implementation Notice */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
           <div className="flex">
             <div className="flex-shrink-0">
               <FileText className="h-5 w-5 text-blue-400" />
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
+              <h3 className="text-sm font-medium text-blue-400">
                 BOQ Management Ready
               </h3>
-              <div className="mt-2 text-sm text-blue-700">
+              <div className="mt-2 text-sm text-blue-300">
                 <p>
                   BOQ structure and navigation are complete. Next phase will implement:
                   Excel upload, catalog mapping, exception handling, and approval workflows.

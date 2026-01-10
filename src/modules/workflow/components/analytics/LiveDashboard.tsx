@@ -255,17 +255,17 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'project_started':
-        return <Play className="w-4 h-4 text-green-600" />;
+        return <Play className="w-4 h-4 text-green-600 dark:text-green-400" />;
       case 'project_completed':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />;
       case 'phase_completed':
-        return <CheckCircle className="w-4 h-4 text-blue-600" />;
+        return <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
       case 'bottleneck_detected':
-        return <AlertTriangle className="w-4 h-4 text-red-600" />;
+        return <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />;
       case 'milestone_reached':
-        return <Zap className="w-4 h-4 text-purple-600" />;
+        return <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />;
       default:
-        return <Activity className="w-4 h-4 text-gray-600" />;
+        return <Activity className="w-4 h-4 text-[var(--ff-text-secondary)]" />;
     }
   };
 
@@ -281,8 +281,8 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
   if (!analytics) {
     return (
       <div className="text-center py-8">
-        <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600 dark:text-gray-400">
+        <Activity className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+        <p className="text-[var(--ff-text-secondary)]">
           Live dashboard requires analytics data
         </p>
       </div>
@@ -304,7 +304,7 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
             {connectionStatus === 'connected' ? <Wifi className="w-3 h-3" /> : <Signal className="w-3 h-3" />}
             {connectionStatus === 'connected' ? 'Live' : connectionStatus === 'connecting' ? 'Connecting' : 'Offline'}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-[var(--ff-text-tertiary)]">
             Last updated: {lastUpdate ? formatTimeAgo(lastUpdate) : 'Loading...'}
           </div>
         </div>
@@ -336,21 +336,21 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
           <Card key={metric.id}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-[var(--ff-text-secondary)]">
                   {metric.name}
                 </p>
                 {getMetricTrendIcon(metric.trend, metric.status)}
               </div>
               <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {typeof metric.value === 'number' && metric.value % 1 !== 0 
-                    ? metric.value.toFixed(1) 
+                <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+                  {typeof metric.value === 'number' && metric.value % 1 !== 0
+                    ? metric.value.toFixed(1)
                     : Math.round(metric.value)
                   }
-                  <span className="text-sm text-gray-500">{metric.unit}</span>
+                  <span className="text-sm text-[var(--ff-text-tertiary)]">{metric.unit}</span>
                 </p>
                 {metric.value !== metric.previousValue && (
-                  <Badge 
+                  <Badge
                     variant={metric.trend === 'up' ? 'default' : metric.trend === 'down' ? 'secondary' : 'outline'}
                     className="text-xs"
                   >
@@ -359,7 +359,7 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                 Updated {formatTimeAgo(metric.lastUpdated)}
               </p>
             </CardContent>
@@ -379,7 +379,7 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
           </CardHeader>
           <CardContent>
             {alerts.filter(a => !a.acknowledged).length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-[var(--ff-text-tertiary)]">
                 <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No active alerts</p>
               </div>
@@ -389,19 +389,19 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
                   .filter(alert => !alert.acknowledged)
                   .slice(0, 5)
                   .map((alert) => (
-                    <div 
+                    <div
                       key={alert.id}
-                      className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                      className="flex items-start gap-3 p-3 bg-[var(--ff-bg-tertiary)] rounded-lg"
                     >
                       {getAlertIcon(alert.type)}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                        <p className="font-medium text-sm text-[var(--ff-text-primary)]">
                           {alert.title}
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
                           {alert.message}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                           {formatTimeAgo(alert.timestamp)}
                         </p>
                       </div>
@@ -431,19 +431,19 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
           <CardContent>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {activityFeed.slice(0, 8).map((activity) => (
-                <div 
+                <div
                   key={activity.id}
-                  className="flex items-start gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded"
+                  className="flex items-start gap-3 p-2 hover:bg-[var(--ff-bg-hover)] rounded"
                 >
                   {getActivityIcon(activity.type)}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                    <p className="font-medium text-sm text-[var(--ff-text-primary)]">
                       {activity.title}
                     </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <p className="text-xs text-[var(--ff-text-secondary)]">
                       {activity.description}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                       {formatTimeAgo(activity.timestamp)}
                     </p>
                   </div>
@@ -465,18 +465,18 @@ export function LiveDashboard({ analytics, onRefresh, refreshing = false }: Live
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-green-600">98.5%</p>
-              <p className="text-sm text-gray-600">System Uptime</p>
+              <p className="text-3xl font-bold text-green-600 dark:text-green-400">98.5%</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">System Uptime</p>
               <Progress value={98.5} className="mt-2 h-2" />
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-blue-600">45ms</p>
-              <p className="text-sm text-gray-600">Avg Response Time</p>
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">45ms</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Avg Response Time</p>
               <Progress value={85} className="mt-2 h-2" />
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-purple-600">{analytics.templateUsage.length}</p>
-              <p className="text-sm text-gray-600">Active Templates</p>
+              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{analytics.templateUsage.length}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Active Templates</p>
               <Progress value={100} className="mt-2 h-2" />
             </div>
           </div>

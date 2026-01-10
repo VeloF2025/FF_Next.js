@@ -17,24 +17,24 @@ export function StaffSettings() {
   } = useStaffSettings();
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-[var(--ff-bg-tertiary)] min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Staff Organization Settings</h1>
-          <p className="text-gray-600 mt-2">Manage positions, departments, and reporting structure</p>
+          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Staff Organization Settings</h1>
+          <p className="text-[var(--ff-text-secondary)] mt-2">Manage positions, departments, and reporting structure</p>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="border-b border-gray-200">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow">
+          <div className="border-b border-[var(--ff-border-light)]">
             <nav className="flex -mb-px">
               <button
                 onClick={() => setActiveTab('positions')}
                 className={`px-6 py-3 text-sm font-medium ${
                   activeTab === 'positions'
                     ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 <Users className="w-4 h-4 inline-block mr-2" />
@@ -45,7 +45,7 @@ export function StaffSettings() {
                 className={`px-6 py-3 text-sm font-medium ${
                   activeTab === 'departments'
                     ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 <Building className="w-4 h-4 inline-block mr-2" />
@@ -56,7 +56,7 @@ export function StaffSettings() {
                 className={`px-6 py-3 text-sm font-medium ${
                   activeTab === 'hierarchy'
                     ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 <GitBranch className="w-4 h-4 inline-block mr-2" />
@@ -67,7 +67,7 @@ export function StaffSettings() {
 
           <div className="p-6">
             {activeTab === 'positions' && (
-              <PositionsTab 
+              <PositionsTab
                 positions={positions}
                 onAdd={() => setShowAddModal(true)}
                 onEdit={setEditingItem}
@@ -75,9 +75,9 @@ export function StaffSettings() {
                 onInitialize={initializePositions}
               />
             )}
-            
+
             {activeTab === 'departments' && (
-              <DepartmentsTab 
+              <DepartmentsTab
                 departments={departments}
                 onAdd={() => setShowAddModal(true)}
                 onEdit={setEditingItem}
@@ -85,7 +85,7 @@ export function StaffSettings() {
                 onInitialize={initializeDepartments}
               />
             )}
-            
+
             {activeTab === 'hierarchy' && (
               <HierarchyTab />
             )}

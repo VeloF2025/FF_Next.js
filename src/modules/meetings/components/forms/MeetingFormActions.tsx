@@ -11,11 +11,11 @@ interface MeetingFormActionsProps {
 
 export function MeetingFormActions({ isEditing, onCancel }: MeetingFormActionsProps) {
   return (
-    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+    <div className="flex justify-end space-x-3 pt-4 border-t border-[var(--ff-border-light)]">
       <button
         type="button"
         onClick={onCancel}
-        className="px-4 py-2 text-gray-600 hover:text-gray-800"
+        className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
       >
         Cancel
       </button>

@@ -111,21 +111,21 @@ export const ImportWizard: React.FC = () => {
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+    <div className="max-w-2xl mx-auto p-6 bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">OneMap Data Import</h2>
-        <p className="text-gray-600">Upload and import Lawley property data</p>
+        <h2 className="text-2xl font-bold text-[var(--ff-text-primary)] mb-2">OneMap Data Import</h2>
+        <p className="text-[var(--ff-text-secondary)]">Upload and import Lawley property data</p>
       </div>
 
       {/* Step 1: File Selection */}
       {currentStep === 'select' && (
         <div className="space-y-4">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <div className="border-2 border-dashed border-[var(--ff-border-light)] rounded-lg p-8 text-center">
+            <Upload className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)] mb-4" />
             <div className="space-y-2">
               <label htmlFor="file-upload" className="cursor-pointer">
-                <span className="text-lg font-medium text-gray-900">Choose Excel file</span>
-                <span className="text-gray-500 block">or drag and drop</span>
+                <span className="text-lg font-medium text-[var(--ff-text-primary)]">Choose Excel file</span>
+                <span className="text-[var(--ff-text-secondary)] block">or drag and drop</span>
               </label>
               <input
                 id="file-upload"
@@ -136,7 +136,7 @@ export const ImportWizard: React.FC = () => {
               />
             </div>
           </div>
-          <div className="text-sm text-gray-500 text-center">
+          <div className="text-sm text-[var(--ff-text-secondary)] text-center">
             Supports Excel files (.xlsx, .xls) up to 100MB
           </div>
         </div>
@@ -149,8 +149,8 @@ export const ImportWizard: React.FC = () => {
             <Clock className="h-5 w-5 text-blue-500 animate-spin" />
             <span className="text-lg font-medium">Analyzing file...</span>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <p className="text-blue-800">Please wait while we analyze your file characteristics.</p>
+          <div className="bg-blue-500/20 p-4 rounded-lg">
+            <p className="text-blue-400">Please wait while we analyze your file characteristics.</p>
           </div>
         </div>
       )}
@@ -158,8 +158,8 @@ export const ImportWizard: React.FC = () => {
       {/* Step 3: Import Confirmation */}
       {currentStep === 'confirm' && analysis && (
         <div className="space-y-6">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-medium text-gray-900 mb-3">File Analysis Results</h3>
+          <div className="bg-[var(--ff-bg-tertiary)] p-4 rounded-lg">
+            <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">File Analysis Results</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="font-medium">Records:</span> {analysis.recordCount.toLocaleString()}
@@ -171,23 +171,23 @@ export const ImportWizard: React.FC = () => {
           </div>
 
           <div className={`p-4 rounded-lg ${
-            analysis.recommendedMethod === 'UI' ? 'bg-green-50 border-green-200' :
-            analysis.recommendedMethod === 'CLI' ? 'bg-orange-50 border-orange-200' :
-            'bg-blue-50 border-blue-200'
+            analysis.recommendedMethod === 'UI' ? 'bg-green-500/20 border-green-500/30' :
+            analysis.recommendedMethod === 'CLI' ? 'bg-orange-500/20 border-orange-500/30' :
+            'bg-blue-500/20 border-blue-500/30'
           }`}>
             <div className="flex items-start space-x-3">
-              {analysis.recommendedMethod === 'UI' && <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />}
-              {analysis.recommendedMethod === 'CLI' && <Zap className="h-5 w-5 text-orange-500 mt-0.5" />}
-              {analysis.recommendedMethod === 'HYBRID' && <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />}
-              
+              {analysis.recommendedMethod === 'UI' && <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />}
+              {analysis.recommendedMethod === 'CLI' && <Zap className="h-5 w-5 text-orange-400 mt-0.5" />}
+              {analysis.recommendedMethod === 'HYBRID' && <AlertCircle className="h-5 w-5 text-blue-400 mt-0.5" />}
+
               <div>
-                <h4 className="font-medium text-gray-900">
-                  Recommended: {analysis.recommendedMethod === 'UI' ? 'UI Import' : 
-                               analysis.recommendedMethod === 'CLI' ? 'CLI Import' : 
+                <h4 className="font-medium text-[var(--ff-text-primary)]">
+                  Recommended: {analysis.recommendedMethod === 'UI' ? 'UI Import' :
+                               analysis.recommendedMethod === 'CLI' ? 'CLI Import' :
                                'Flexible (UI or CLI)'}
                 </h4>
-                <p className="text-sm text-gray-600 mt-1">{analysis.reason}</p>
-                <p className="text-sm text-gray-600">Estimated time: {analysis.estimatedTime}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{analysis.reason}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Estimated time: {analysis.estimatedTime}</p>
               </div>
             </div>
           </div>
@@ -207,7 +207,7 @@ export const ImportWizard: React.FC = () => {
                 console.log('CLI Command: node scripts/conservative-lawley-import.js');
                 alert('Run this command in terminal: node scripts/conservative-lawley-import.js');
               }}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               Use CLI Import
             </button>
@@ -222,8 +222,8 @@ export const ImportWizard: React.FC = () => {
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
             <span className="text-lg font-medium">Importing data...</span>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <p className="text-blue-800">
+          <div className="bg-blue-500/20 p-4 rounded-lg">
+            <p className="text-blue-400">
               Processing {analysis?.recordCount.toLocaleString()} records. This may take a few minutes.
             </p>
           </div>
@@ -234,21 +234,21 @@ export const ImportWizard: React.FC = () => {
       {currentStep === 'complete' && importResult && (
         <div className="space-y-6">
           <div className={`p-4 rounded-lg ${
-            importResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+            importResult.success ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'
           }`}>
             <div className="flex items-start space-x-3">
               {importResult.success ? (
-                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                <CheckCircle className="h-5 w-5 text-green-400 mt-0.5" />
               ) : (
-                <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5" />
               )}
-              
+
               <div>
-                <h4 className="font-medium text-gray-900">
+                <h4 className="font-medium text-[var(--ff-text-primary)]">
                   {importResult.success ? 'Import Successful!' : 'Import Issues'}
                 </h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  {importResult.success 
+                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+                  {importResult.success
                     ? `Successfully imported ${importResult.recordsProcessed.toLocaleString()} records`
                     : 'Some issues occurred during import'
                   }
@@ -258,9 +258,9 @@ export const ImportWizard: React.FC = () => {
           </div>
 
           {importResult.errors.length > 0 && (
-            <div className="bg-red-50 p-4 rounded-lg">
-              <h5 className="font-medium text-red-900 mb-2">Errors:</h5>
-              <ul className="text-sm text-red-800 space-y-1">
+            <div className="bg-red-500/20 p-4 rounded-lg">
+              <h5 className="font-medium text-red-400 mb-2">Errors:</h5>
+              <ul className="text-sm text-red-400 space-y-1">
                 {importResult.errors.map((error, i) => (
                   <li key={i}>• {error}</li>
                 ))}
@@ -269,9 +269,9 @@ export const ImportWizard: React.FC = () => {
           )}
 
           {importResult.warnings.length > 0 && (
-            <div className="bg-yellow-50 p-4 rounded-lg">
-              <h5 className="font-medium text-yellow-900 mb-2">Warnings:</h5>
-              <ul className="text-sm text-yellow-800 space-y-1">
+            <div className="bg-yellow-500/20 p-4 rounded-lg">
+              <h5 className="font-medium text-yellow-400 mb-2">Warnings:</h5>
+              <ul className="text-sm text-yellow-400 space-y-1">
                 {importResult.warnings.map((warning, i) => (
                   <li key={i}>• {warning}</li>
                 ))}
@@ -282,13 +282,13 @@ export const ImportWizard: React.FC = () => {
           <div className="flex space-x-3">
             <button
               onClick={resetWizard}
-              className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+              className="flex-1 bg-[var(--ff-text-secondary)] text-white px-4 py-2 rounded-lg hover:opacity-80 transition-colors"
             >
               Import Another File
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               View Dashboard
             </button>

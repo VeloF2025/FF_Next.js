@@ -41,129 +41,129 @@ export function AllProjectsOverview({
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-2">
-          <BarChart3 className="h-6 w-6 text-blue-600" />
-          <h1 className="text-2xl font-bold text-gray-900">All Projects Overview</h1>
+          <BarChart3 className="h-6 w-6 text-blue-400" />
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">All Projects Overview</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-[var(--ff-text-secondary)]">
           Organization-wide procurement insights across {aggregateMetrics.totalProjects} active projects
         </p>
       </div>
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Building2 className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Building2 className="h-5 w-5 text-blue-400" />
             </div>
-            <span className="text-sm font-medium text-gray-600">Total Projects</span>
+            <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Total Projects</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{aggregateMetrics.totalProjects}</div>
+          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">{aggregateMetrics.totalProjects}</div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <DollarSign className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <DollarSign className="h-5 w-5 text-green-400" />
             </div>
-            <span className="text-sm font-medium text-gray-600">Total BOQ Value</span>
+            <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Total BOQ Value</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">
+          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
             R {aggregateMetrics.totalBOQValue.toLocaleString()}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
+            <div className="p-2 bg-purple-500/20 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-purple-400" />
             </div>
-            <span className="text-sm font-medium text-gray-600">Avg Cost Savings</span>
+            <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Avg Cost Savings</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{aggregateMetrics.averageCostSavings}%</div>
+          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">{aggregateMetrics.averageCostSavings}%</div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Clock className="h-5 w-5 text-orange-600" />
+            <div className="p-2 bg-orange-500/20 rounded-lg">
+              <Clock className="h-5 w-5 text-orange-400" />
             </div>
-            <span className="text-sm font-medium text-gray-600">Avg Cycle Time</span>
+            <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Avg Cycle Time</span>
           </div>
-          <div className="text-2xl font-bold text-gray-900">{aggregateMetrics.averageCycleDays} days</div>
+          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">{aggregateMetrics.averageCycleDays} days</div>
         </div>
       </div>
 
       {/* Secondary Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Active Operations</h3>
-            <Package className="h-5 w-5 text-gray-500" />
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Active Operations</h3>
+            <Package className="h-5 w-5 text-[var(--ff-text-secondary)]" />
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Active RFQs</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Active RFQs</span>
               <span className="font-semibold">{aggregateMetrics.totalActiveRFQs}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Purchase Orders</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Purchase Orders</span>
               <span className="font-semibold">{aggregateMetrics.totalPurchaseOrders}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Stock Items</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Stock Items</span>
               <span className="font-semibold">{aggregateMetrics.totalStockItems.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Supplier Performance</h3>
-            <Users className="h-5 w-5 text-gray-500" />
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Supplier Performance</h3>
+            <Users className="h-5 w-5 text-[var(--ff-text-secondary)]" />
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Total Suppliers</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Total Suppliers</span>
               <span className="font-semibold">{aggregateMetrics.totalSuppliers}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Average OTIF</span>
-              <span className="font-semibold text-green-600">{aggregateMetrics.averageSupplierOTIF}%</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Average OTIF</span>
+              <span className="font-semibold text-green-400">{aggregateMetrics.averageSupplierOTIF}%</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Performance Issues</span>
-              <span className="font-semibold text-red-600">2</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Performance Issues</span>
+              <span className="font-semibold text-red-400">2</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Alerts & Actions</h3>
-            <AlertTriangle className="h-5 w-5 text-gray-500" />
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Alerts & Actions</h3>
+            <AlertTriangle className="h-5 w-5 text-[var(--ff-text-secondary)]" />
           </div>
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Critical Alerts</span>
-              <span className="font-semibold text-red-600">{aggregateMetrics.criticalAlerts}</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Critical Alerts</span>
+              <span className="font-semibold text-red-400">{aggregateMetrics.criticalAlerts}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Pending Approvals</span>
-              <span className="font-semibold text-yellow-600">{aggregateMetrics.pendingApprovals}</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Pending Approvals</span>
+              <span className="font-semibold text-yellow-400">{aggregateMetrics.pendingApprovals}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-600">Completed Today</span>
-              <span className="font-semibold text-green-600">24</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">Completed Today</span>
+              <span className="font-semibold text-green-400">24</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Project Summaries */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 mb-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Project Summaries</h2>
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Project Summaries</h2>
           <Button
             variant="outline"
             onClick={() => navigate('/app/projects')}
@@ -171,73 +171,73 @@ export function AllProjectsOverview({
             View All Projects
           </Button>
         </div>
-        
+
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+            <thead className="bg-[var(--ff-bg-tertiary)]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   Project
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   BOQ Value
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   Active RFQs
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   Completion
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   Last Activity
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
               {projectSummaries.map((project) => (
-                <tr key={project.id} className="hover:bg-gray-50">
+                <tr key={project.id} className="hover:bg-[var(--ff-bg-hover)]">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                      <div className="text-sm text-gray-500">{project.code}</div>
+                      <div className="text-sm font-medium text-[var(--ff-text-primary)]">{project.name}</div>
+                      <div className="text-sm text-[var(--ff-text-secondary)]">{project.code}</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]">
                     R {project.boqValue.toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]">
                     {project.activeRFQs}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
+                      <div className="flex-1 bg-[var(--ff-bg-tertiary)] rounded-full h-2 mr-2">
+                        <div
+                          className="bg-blue-400 h-2 rounded-full"
                           style={{ width: `${project.completionPercentage}%` }}
                         />
                       </div>
-                      <span className="text-sm text-gray-600">{project.completionPercentage}%</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">{project.completionPercentage}%</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      project.status === 'active' ? 'bg-green-100 text-green-800' :
-                      project.status === 'on-hold' ? 'bg-yellow-100 text-yellow-800' :
-                      project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
+                      project.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                      project.status === 'on-hold' ? 'bg-yellow-500/20 text-yellow-400' :
+                      project.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]'
                     }`}>
                       {project.status}
                     </span>
                     {project.alertCount > 0 && (
-                      <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                      <span className="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400">
                         {project.alertCount} alerts
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                     {project.lastActivity}
                   </td>
                 </tr>
@@ -248,8 +248,8 @@ export function AllProjectsOverview({
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Organization-Wide Actions</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Organization-Wide Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Button
             variant="outline"

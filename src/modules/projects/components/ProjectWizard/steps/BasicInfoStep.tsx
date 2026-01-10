@@ -26,7 +26,7 @@ export function BasicInfoStep({ form, clients, isClientsLoading }: BasicInfoStep
       />
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
           Project Location *
         </label>
         <div className="space-y-4">

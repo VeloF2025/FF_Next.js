@@ -56,24 +56,24 @@ export function StandardSearchFilter({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4 bg-white p-4 rounded-lg border border-gray-200">
+      <div className="flex items-center gap-4 bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <form onSubmit={handleSearch} className="flex-1 max-w-md">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] h-4 w-4" />
             <input
               type="text"
               placeholder={placeholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </form>
-        
+
         {showFilters && (
           <button
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors relative"
+            className="flex items-center gap-2 px-4 py-2 text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors relative"
           >
             <Filter className="h-4 w-4" />
             Filters
@@ -87,30 +87,30 @@ export function StandardSearchFilter({
       </div>
 
       {showFilterPanel && filterOptions.length > 0 && (
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
+        <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-900">Filter Options</h3>
+            <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">Filter Options</h3>
             <button
               onClick={clearFilters}
-              className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
               <X className="h-3 w-3" />
               Clear all
             </button>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filterOptions.map((filter) => (
               <div key={filter.value} className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)]">
                   {filter.label}
                 </label>
-                
+
                 {filter.type === 'select' && (
                   <select
                     value={activeFilters[filter.value] || ''}
                     onChange={(e) => handleFilterChange(filter.value, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="">All</option>
                     {filter.options?.map((option) => (
@@ -120,16 +120,16 @@ export function StandardSearchFilter({
                     ))}
                   </select>
                 )}
-                
+
                 {filter.type === 'date' && (
                   <input
                     type="date"
                     value={activeFilters[filter.value] || ''}
                     onChange={(e) => handleFilterChange(filter.value, e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 )}
-                
+
                 {filter.type === 'checkbox' && (
                   <div className="space-y-2">
                     {filter.options?.map((option) => (
@@ -144,9 +144,9 @@ export function StandardSearchFilter({
                               : current.filter((v: string) => v !== option.value);
                             handleFilterChange(filter.value, newValue);
                           }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-sm text-gray-700">{option.label}</span>
+                        <span className="text-sm text-[var(--ff-text-secondary)]">{option.label}</span>
                       </label>
                     ))}
                   </div>

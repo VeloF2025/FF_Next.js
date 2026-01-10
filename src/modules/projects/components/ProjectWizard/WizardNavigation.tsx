@@ -19,18 +19,18 @@ export function WizardNavigation({
   isLastStep
 }: WizardNavigationProps) {
   return (
-    <div className="flex justify-between items-center pt-6 border-t border-gray-200">
+    <div className="flex justify-between items-center pt-6 border-t border-[var(--ff-border-light)]">
       <button
         type="button"
         onClick={onPrevious}
         disabled={currentStep === 0}
-        className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <ArrowLeft size={16} className="mr-2" />
         Previous
       </button>
 
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-[var(--ff-text-secondary)]">
         Step {currentStep + 1} of {wizardSteps.length}
       </div>
 

@@ -306,16 +306,16 @@ export function WaMonitorDashboard() {
       {/* Summary Cards - Now showing filtered totals */}
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
+              <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
                 Total Drops
               </Typography>
-              <Typography variant="h4" component="div">
+              <Typography variant="h4" component="div" sx={{ color: 'var(--ff-text-primary)' }}>
                 {calculatedSummary.total}
               </Typography>
               {(filters.dateFrom || filters.dateTo) && (
-                <Typography variant="caption" color="textSecondary">
+                <Typography variant="caption" sx={{ color: 'var(--ff-text-secondary)' }}>
                   {filters.dateFrom && filters.dateTo
                     ? `${new Date(filters.dateFrom).toLocaleDateString()} - ${new Date(filters.dateTo).toLocaleDateString()}`
                     : filters.dateFrom
@@ -327,9 +327,9 @@ export function WaMonitorDashboard() {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
+              <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
                 Incomplete
               </Typography>
               <Typography variant="h4" component="div" color="error">
@@ -339,9 +339,9 @@ export function WaMonitorDashboard() {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
+              <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
                 Complete
               </Typography>
               <Typography variant="h4" component="div" color="success.main">
@@ -351,12 +351,12 @@ export function WaMonitorDashboard() {
           </Card>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
             <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
+              <Typography sx={{ color: 'var(--ff-text-secondary)' }} gutterBottom variant="body2">
                 Total Feedback
               </Typography>
-              <Typography variant="h4" component="div">
+              <Typography variant="h4" component="div" sx={{ color: 'var(--ff-text-primary)' }}>
                 {calculatedSummary.totalFeedback}
               </Typography>
             </CardContent>
@@ -366,16 +366,16 @@ export function WaMonitorDashboard() {
 
       {/* Daily Drops Per Project */}
       {dailyDrops && dailyDrops.drops.length > 0 && (
-        <Card>
+        <Card sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}>
           <CardContent>
             <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
               <Box display="flex" alignItems="center" gap={1}>
                 <Calendar size={20} />
-                <Typography variant="h6" component="h2">
+                <Typography variant="h6" component="h2" sx={{ color: 'var(--ff-text-primary)' }}>
                   Today's Submissions ({dailyDrops.date})
                 </Typography>
               </Box>
-              <Typography variant="caption" color="textSecondary">
+              <Typography variant="caption" sx={{ color: 'var(--ff-text-secondary)' }}>
                 Auto-syncs to SharePoint daily at 8pm SAST
               </Typography>
             </Box>
@@ -385,35 +385,35 @@ export function WaMonitorDashboard() {
               <Typography variant="body2" sx={{ mb: 1 }}>
                 <strong>Accurate Daily Counts:</strong> Shows submissions by actual WhatsApp message date, not database processing time.
               </Typography>
-              <Typography variant="caption" color="textSecondary">
+              <Typography variant="caption" sx={{ color: 'var(--ff-text-secondary)' }}>
                 Note: Historical batch processing (e.g., old messages processed today) are excluded from today's count.
                 Only drops submitted via WhatsApp <strong>today</strong> are shown. Previous issue where 27 historical drops
                 inflated the count has been resolved (Nov 6, 2025).
               </Typography>
             </Alert>
 
-            <TableContainer component={Paper} variant="outlined">
+            <TableContainer component={Paper} variant="outlined" sx={{ bgcolor: 'var(--ff-bg-tertiary)' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell><strong>Project</strong></TableCell>
-                    <TableCell align="right"><strong>Drops Submitted</strong></TableCell>
+                    <TableCell sx={{ color: 'var(--ff-text-primary)', borderColor: 'var(--ff-border-light)' }}><strong>Project</strong></TableCell>
+                    <TableCell align="right" sx={{ color: 'var(--ff-text-primary)', borderColor: 'var(--ff-border-light)' }}><strong>Drops Submitted</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {dailyDrops.drops.map((item) => (
                     <TableRow key={item.project}>
-                      <TableCell>{item.project}</TableCell>
-                      <TableCell align="right">
+                      <TableCell sx={{ color: 'var(--ff-text-primary)', borderColor: 'var(--ff-border-light)' }}>{item.project}</TableCell>
+                      <TableCell align="right" sx={{ borderColor: 'var(--ff-border-light)' }}>
                         <Typography variant="h6" color="primary">
                           {item.count}
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                    <TableCell><strong>Total</strong></TableCell>
-                    <TableCell align="right">
+                  <TableRow sx={{ backgroundColor: 'var(--ff-bg-hover)' }}>
+                    <TableCell sx={{ color: 'var(--ff-text-primary)', borderColor: 'var(--ff-border-light)' }}><strong>Total</strong></TableCell>
+                    <TableCell align="right" sx={{ borderColor: 'var(--ff-border-light)' }}>
                       <Typography variant="h6" color="primary">
                         <strong>{dailyDrops.total}</strong>
                       </Typography>
@@ -450,17 +450,17 @@ export function WaMonitorDashboard() {
           <CircularProgress />
         </Box>
       ) : drops.length === 0 ? (
-        <Card>
+        <Card sx={{ bgcolor: 'var(--ff-bg-secondary)' }}>
           <CardContent>
-            <Typography variant="body1" color="textSecondary" textAlign="center">
+            <Typography variant="body1" sx={{ color: 'var(--ff-text-secondary)' }} textAlign="center">
               No drops to review
             </Typography>
           </CardContent>
         </Card>
       ) : filteredDrops.length === 0 ? (
-        <Card>
+        <Card sx={{ bgcolor: 'var(--ff-bg-secondary)' }}>
           <CardContent>
-            <Typography variant="body1" color="textSecondary" textAlign="center">
+            <Typography variant="body1" sx={{ color: 'var(--ff-text-secondary)' }} textAlign="center">
               No drops match your filters. Try adjusting your search or filter criteria.
             </Typography>
           </CardContent>

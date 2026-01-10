@@ -149,18 +149,18 @@ export function ClientForm() {
       <div className="mb-6">
         <button
           onClick={() => router.push('/app/clients')}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+          className="inline-flex items-center text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
           Back to Client List
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
+        <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
           <div className="flex items-center gap-3">
             <Building className="w-6 h-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">
               {isEditing ? 'Edit Client' : 'Add New Client'}
             </h1>
           </div>
@@ -194,7 +194,7 @@ export function ClientForm() {
 
           {/* Service Types */}
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Service Types</h2>
+            <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Service Types</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {Object.values(ServiceType).map(service => (
                 <label key={service} className="flex items-center gap-2">
@@ -202,9 +202,9 @@ export function ClientForm() {
                     type="checkbox"
                     checked={formData.serviceTypes.includes(service)}
                     onChange={() => toggleServiceType(service)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">
                     {service.toUpperCase()}
                   </span>
                 </label>
@@ -214,10 +214,10 @@ export function ClientForm() {
 
           {/* Additional Information */}
           <div>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h2>
+            <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Additional Information</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Tags (comma-separated)
                 </label>
                 <input
@@ -225,42 +225,42 @@ export function ClientForm() {
                   value={formData.tags.join(', ')}
                   onChange={(e) => handleTagsChange(e.target.value)}
                   placeholder="e.g., premium, long-term, high-volume"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Special Requirements
                 </label>
                 <textarea
                   value={formData.specialRequirements}
                   onChange={(e) => handleInputChange('specialRequirements', e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Notes
                 </label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
                 />
               </div>
             </div>
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-[var(--ff-border-light)]">
             <button
               type="button"
               onClick={() => router.push('/app/clients')}
-              className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="px-6 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Cancel
             </button>

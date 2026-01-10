@@ -46,7 +46,7 @@ export function TabsList({ className, children }: TabsListProps) {
   return (
     <div
       className={clsx(
-        'inline-flex h-10 items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 p-1 text-gray-500 dark:text-gray-400',
+        'inline-flex h-10 items-center justify-center rounded-md bg-[var(--ff-bg-tertiary)] p-1 text-[var(--ff-text-secondary)]',
         className
       )}
       role="tablist"
@@ -79,8 +79,8 @@ export function TabsTrigger({ value, className, children, disabled = false }: Ta
       className={clsx(
         'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
         isActive
-          ? 'bg-white dark:bg-gray-950 text-gray-950 dark:text-gray-50 shadow-sm'
-          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100',
+          ? 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] shadow-sm'
+          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]',
         className
       )}
       onClick={() => onValueChange(value)}

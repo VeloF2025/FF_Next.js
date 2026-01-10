@@ -24,20 +24,20 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
   };
 
   const getStatusColor = (status: 'PASS' | 'FAIL') => {
-    return status === 'PASS' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
+    return status === 'PASS' ? 'text-green-400 bg-green-500/20' : 'text-red-400 bg-red-500/20';
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600';
-    if (score >= 6) return 'text-yellow-600';
-    return 'text-red-600';
+    if (score >= 8) return 'text-green-400';
+    if (score >= 6) return 'text-yellow-400';
+    return 'text-red-400';
   };
 
   const getStatusIcon = (status: 'PASS' | 'FAIL') => {
     return status === 'PASS' ? (
-      <CheckCircle className="w-8 h-8 text-green-600" />
+      <CheckCircle className="w-8 h-8 text-green-400" />
     ) : (
-      <XCircle className="w-8 h-8 text-red-600" />
+      <XCircle className="w-8 h-8 text-red-400" />
     );
   };
 
@@ -59,7 +59,7 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
           {/* Overall Status */}
           <div className="flex items-center justify-between p-4 rounded-lg border-2 border-white/20 bg-white/5" role="region" aria-label="Evaluation summary">
             <div>
-              <p className="text-sm text-gray-300" id="status-label">Overall Status</p>
+              <p className="text-sm text-[var(--ff-text-tertiary)]" id="status-label">Overall Status</p>
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(
@@ -75,7 +75,7 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
 
             {/* Score */}
             <div className="text-right">
-              <p className="text-sm text-gray-300" id="score-label">Score</p>
+              <p className="text-sm text-[var(--ff-text-tertiary)]" id="score-label">Score</p>
               <p className={`text-3xl font-bold ${getScoreColor(evaluation.average_score)}`} aria-labelledby="score-label">
                 {evaluation.average_score.toFixed(1)}/10
               </p>
@@ -85,12 +85,12 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
           {/* Step Counts */}
           <div className="grid grid-cols-2 gap-4" role="region" aria-label="Step results">
             <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-              <p className="text-sm text-gray-300" id="steps-passed-label">Steps Passed</p>
-              <p className="text-2xl font-bold text-green-600" aria-labelledby="steps-passed-label">{evaluation.passed_steps}</p>
+              <p className="text-sm text-[var(--ff-text-tertiary)]" id="steps-passed-label">Steps Passed</p>
+              <p className="text-2xl font-bold text-green-400" aria-labelledby="steps-passed-label">{evaluation.passed_steps}</p>
             </div>
             <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-              <p className="text-sm text-gray-300" id="steps-failed-label">Steps Failed</p>
-              <p className="text-2xl font-bold text-red-600" aria-labelledby="steps-failed-label">
+              <p className="text-sm text-[var(--ff-text-tertiary)]" id="steps-failed-label">Steps Failed</p>
+              <p className="text-2xl font-bold text-red-400" aria-labelledby="steps-failed-label">
                 {evaluation.total_steps - evaluation.passed_steps}
               </p>
             </div>
@@ -98,7 +98,7 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
 
           {/* Progress Bar */}
           <div className="space-y-2" role="region" aria-label="Evaluation progress">
-            <div className="flex justify-between text-sm text-gray-300">
+            <div className="flex justify-between text-sm text-[var(--ff-text-tertiary)]">
               <span id="progress-label">Progress</span>
               <span aria-labelledby="progress-label">
                 {evaluation.passed_steps}/{evaluation.total_steps} steps
@@ -164,8 +164,8 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
         <div className="space-y-4">
           <div className="text-center py-8" role="status">
             <Sparkles className="w-12 h-12 text-blue-400 mx-auto mb-3" aria-hidden="true" />
-            <p className="text-gray-200 mb-2">No evaluation yet</p>
-            <p className="text-sm text-gray-400">Run AI evaluation to see results</p>
+            <p className="text-[var(--ff-text-primary)] mb-2">No evaluation yet</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Run AI evaluation to see results</p>
           </div>
 
           <VelocityButton

@@ -57,8 +57,8 @@ export function SOWListPage() {
         <div className="flex items-center">
           <FileSpreadsheet className="h-8 w-8 text-blue-600 mr-3" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">SOW Documents</h1>
-            <p className="text-gray-600">Manage Statement of Work documents</p>
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">SOW Documents</h1>
+            <p className="text-[var(--ff-text-secondary)]">Manage Statement of Work documents</p>
           </div>
         </div>
         <button
@@ -85,15 +85,15 @@ export function SOWListPage() {
 
       {/* Table */}
       {filteredDocuments.length === 0 ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center">
-          <FileSpreadsheet className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No SOW documents found</p>
-          <p className="text-sm text-gray-400 mt-2">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-8 text-center">
+          <FileSpreadsheet className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+          <p className="text-[var(--ff-text-secondary)]">No SOW documents found</p>
+          <p className="text-sm text-[var(--ff-text-tertiary)] mt-2">
             Try adjusting your filters or upload a new document
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow">
           <SOWListTable
             documents={filteredDocuments}
             onView={handleViewDocument}

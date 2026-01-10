@@ -34,10 +34,10 @@ const statusIcons = {
 };
 
 const statusColors = {
-  active: 'text-green-600',
-  inactive: 'text-gray-600',
-  pending: 'text-yellow-600',
-  suspended: 'text-red-600'
+  active: 'text-green-400',
+  inactive: 'text-gray-400',
+  pending: 'text-yellow-400',
+  suspended: 'text-red-400'
 };
 
 export function SupplierFilter() {
@@ -148,18 +148,18 @@ export function SupplierFilter() {
     filters.complianceRange[1] < 100;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
       {/* Main Filter Bar */}
       <div className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 flex-1">
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search suppliers..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={filters.search}
                 onChange={(e) => updateFilter('search', e.target.value)}
               />
@@ -172,9 +172,9 @@ export function SupplierFilter() {
                   onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
                   className={cn(
                     "flex items-center space-x-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors",
-                    selectedSupplier 
-                      ? "bg-blue-50 border-blue-200 text-blue-900"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    selectedSupplier
+                      ? "bg-blue-500/20 border-blue-500/30 text-blue-400"
+                      : "border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]"
                   )}
                 >
                   <Building2 className="h-4 w-4" />
@@ -185,19 +185,19 @@ export function SupplierFilter() {
                 </button>
 
                 {showSupplierDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-80 bg-white border border-gray-200 rounded-md shadow-lg z-20">
-                    <div className="p-2 border-b">
+                  <div className="absolute top-full left-0 mt-1 w-80 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md shadow-lg z-20">
+                    <div className="p-2 border-b border-[var(--ff-border-light)]">
                       <input
                         type="text"
                         placeholder="Search suppliers..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md text-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                         value={filters.search}
                         onChange={(e) => updateFilter('search', e.target.value)}
                       />
                     </div>
                     <div className="max-h-64 overflow-y-auto">
                       {filteredSuppliers.length === 0 ? (
-                        <div className="p-4 text-center text-gray-500 text-sm">
+                        <div className="p-4 text-center text-[var(--ff-text-secondary)] text-sm">
                           No suppliers found
                         </div>
                       ) : (
@@ -207,14 +207,14 @@ export function SupplierFilter() {
                               setSupplier(undefined);
                               setShowSupplierDropdown(false);
                             }}
-                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-3"
+                            className="w-full text-left px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-3"
                           >
-                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                              <Building2 className="w-4 h-4 text-gray-400" />
+                            <div className="w-8 h-8 bg-[var(--ff-bg-tertiary)] rounded-lg flex items-center justify-center">
+                              <Building2 className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                             </div>
                             <div>
-                              <div className="font-medium">All Suppliers</div>
-                              <div className="text-xs text-gray-500">View all supplier data</div>
+                              <div className="font-medium text-[var(--ff-text-primary)]">All Suppliers</div>
+                              <div className="text-xs text-[var(--ff-text-secondary)]">View all supplier data</div>
                             </div>
                           </button>
                           {filteredSuppliers.map(supplier => {
@@ -227,24 +227,24 @@ export function SupplierFilter() {
                                   setShowSupplierDropdown(false);
                                 }}
                                 className={cn(
-                                  "w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3",
-                                  selectedSupplier?.id === supplier.id && "bg-blue-50"
+                                  "w-full text-left px-3 py-2 text-sm hover:bg-[var(--ff-bg-hover)] flex items-center space-x-3",
+                                  selectedSupplier?.id === supplier.id && "bg-blue-500/20"
                                 )}
                               >
-                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                  <Building2 className="w-4 h-4 text-blue-600" />
+                                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                  <Building2 className="w-4 h-4 text-blue-400" />
                                 </div>
                                 <div className="flex-1">
-                                  <div className="font-medium text-gray-900">
+                                  <div className="font-medium text-[var(--ff-text-primary)]">
                                     {supplier.name}
                                   </div>
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-[var(--ff-text-secondary)]">
                                     {supplier.code} • {supplier.category}
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                                  <span className="text-xs font-medium">
+                                  <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                                  <span className="text-xs font-medium text-[var(--ff-text-primary)]">
                                     {supplier.rating}
                                   </span>
                                   <StatusIcon className={cn("w-3 h-3", statusColors[supplier.status])} />
@@ -268,14 +268,14 @@ export function SupplierFilter() {
               className={cn(
                 "flex items-center space-x-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors",
                 showFilters || hasActiveFilters
-                  ? "bg-blue-50 border-blue-200 text-blue-900"
-                  : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                  ? "bg-blue-500/20 border-blue-500/30 text-blue-400"
+                  : "border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]"
               )}
             >
               <Filter className="h-4 w-4" />
               <span>Filters</span>
               {hasActiveFilters && (
-                <span className="bg-blue-600 text-white text-xs rounded-full px-2 py-0.5">
+                <span className="bg-blue-500/20 text-blue-400 text-xs rounded-full px-2 py-0.5">
                   Active
                 </span>
               )}
@@ -284,7 +284,7 @@ export function SupplierFilter() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
+                className="flex items-center space-x-1 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
               >
                 <X className="h-4 w-4" />
                 <span>Clear</span>
@@ -296,11 +296,11 @@ export function SupplierFilter() {
 
       {/* Expanded Filters */}
       {showFilters && (
-        <div className="border-t bg-gray-50 p-4">
+        <div className="border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Status Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Status
               </label>
               <div className="space-y-2">
@@ -312,10 +312,10 @@ export function SupplierFilter() {
                         type="checkbox"
                         checked={filters.status.includes(status)}
                         onChange={() => toggleArrayFilter('status', status)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500"
                       />
                       <StatusIcon className={cn("h-4 w-4", statusColors[status])} />
-                      <span className="text-sm text-gray-700 capitalize">
+                      <span className="text-sm text-[var(--ff-text-secondary)] capitalize">
                         {status}
                       </span>
                     </label>
@@ -326,7 +326,7 @@ export function SupplierFilter() {
 
             {/* Category Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Category
               </label>
               <div className="space-y-2">
@@ -336,9 +336,9 @@ export function SupplierFilter() {
                       type="checkbox"
                       checked={filters.category.includes(category)}
                       onChange={() => toggleArrayFilter('category', category)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500"
                     />
-                    <span className="text-sm text-gray-700">{category}</span>
+                    <span className="text-sm text-[var(--ff-text-secondary)]">{category}</span>
                   </label>
                 ))}
               </div>
@@ -346,7 +346,7 @@ export function SupplierFilter() {
 
             {/* Location Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Location
               </label>
               <div className="space-y-2">
@@ -356,10 +356,10 @@ export function SupplierFilter() {
                       type="checkbox"
                       checked={filters.location.includes(location)}
                       onChange={() => toggleArrayFilter('location', location)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500"
                     />
-                    <MapPin className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{location}</span>
+                    <MapPin className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                    <span className="text-sm text-[var(--ff-text-secondary)]">{location}</span>
                   </label>
                 ))}
               </div>
@@ -368,7 +368,7 @@ export function SupplierFilter() {
             {/* Rating and Compliance Ranges */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                   Minimum Rating: {filters.ratingRange[0]}
                 </label>
                 <input
@@ -383,7 +383,7 @@ export function SupplierFilter() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                   Minimum Compliance: {filters.complianceRange[0]}%
                 </label>
                 <input
@@ -400,8 +400,8 @@ export function SupplierFilter() {
           </div>
 
           {/* Results Summary */}
-          <div className="mt-4 pt-4 border-t">
-            <p className="text-sm text-gray-600">
+          <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
+            <p className="text-sm text-[var(--ff-text-secondary)]">
               Showing {filteredSuppliers.length} of {suppliers.length} suppliers
               {hasActiveFilters && ' (filtered)'}
             </p>

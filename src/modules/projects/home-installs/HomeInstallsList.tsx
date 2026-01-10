@@ -109,16 +109,16 @@ export function HomeInstallsList() {
       />
 
       {/* Summary Stats */}
-      <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-4">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-4">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-neutral-600">
+          <span className="text-sm text-[var(--ff-text-secondary)]">
             Showing {filteredInstalls.length} of {installs.length} installations
           </span>
           <div className="flex gap-4 text-sm">
-            <span className="text-neutral-600">
+            <span className="text-[var(--ff-text-secondary)]">
               Scheduled: {filteredInstalls.filter(i => i.status === 'scheduled').length}
             </span>
-            <span className="text-neutral-600">
+            <span className="text-[var(--ff-text-secondary)]">
               In Progress: {filteredInstalls.filter(i => i.status === 'in_progress').length}
             </span>
             <span className="text-success-600">

@@ -56,7 +56,7 @@ const LazyLegend = createLazyChartComponent('Legend');
 const ChartLoader = () => (
   <div className="flex items-center justify-center h-64 w-full">
     <LucideLoader2 className="h-8 w-8 animate-spin text-blue-500" />
-    <span className="ml-2 text-gray-600">Loading chart...</span>
+    <span className="ml-2 text-[var(--ff-text-secondary)]">Loading chart...</span>
   </div>
 );
 

@@ -17,10 +17,10 @@ export function GoogleSignInSection({ onClick, loading, rememberMe }: GoogleSign
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
+          <div className="w-full border-t border-[var(--ff-border-light)]" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-gray-50 text-gray-500">Or continue with email</span>
+          <span className="px-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]">Or continue with email</span>
         </div>
       </div>
     </>

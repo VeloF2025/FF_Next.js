@@ -89,15 +89,15 @@ export default function RFQList({
   const getStatusColor = (status: RFQ['status']) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500/20 text-green-400';
       case 'draft':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-500/20 text-yellow-400';
       case 'closed':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-500/20 text-gray-400';
       case 'expired':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-500/20 text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-500/20 text-gray-400';
     }
   };
 
@@ -118,7 +118,7 @@ export default function RFQList({
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading RFQs...</span>
+        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading RFQs...</span>
       </div>
     );
   }
@@ -128,10 +128,10 @@ export default function RFQList({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-medium text-gray-900">
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">
             Request for Quotations ({rfqs.length})
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--ff-text-secondary)]">
             Manage and track your RFQ requests
           </p>
         </div>
@@ -148,12 +148,12 @@ export default function RFQList({
 
       {/* RFQ List */}
       {rfqs.length > 0 ? (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="divide-y divide-gray-200">
+        <div className="bg-[var(--ff-bg-secondary)] shadow rounded-lg overflow-hidden">
+          <div className="divide-y divide-[var(--ff-border-light)]">
             {rfqs.map(rfq => (
               <div
                 key={rfq.id}
-                className={`p-6 hover:bg-gray-50 cursor-pointer transition-colors ${
+                className={`p-6 hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors ${
                   selectedRFQId === rfq.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                 }`}
                 onClick={() => handleRFQClick(rfq)}
@@ -161,7 +161,7 @@ export default function RFQList({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
-                      <h3 className="text-lg font-medium text-gray-900">
+                      <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
                         {rfq.title}
                       </h3>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(rfq.status)}`}>
@@ -169,11 +169,11 @@ export default function RFQList({
                       </span>
                     </div>
                     {rfq.description && (
-                      <p className="mt-2 text-sm text-gray-600">
+                      <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">
                         {rfq.description}
                       </p>
                     )}
-                    <div className="mt-3 flex items-center space-x-6 text-sm text-gray-500">
+                    <div className="mt-3 flex items-center space-x-6 text-sm text-[var(--ff-text-tertiary)]">
                       <span>Created: {formatDate(rfq.createdAt)}</span>
                       {rfq.dueDate && (
                         <span>Due: {formatDate(rfq.dueDate)}</span>
@@ -189,7 +189,7 @@ export default function RFQList({
                           e.stopPropagation();
                           onEdit(rfq.id);
                         }}
-                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                        className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded-md hover:bg-[var(--ff-bg-hover)]"
                       >
                         Edit
                       </button>
@@ -202,10 +202,10 @@ export default function RFQList({
         </div>
       ) : (
         /* Empty State */
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <FileText className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No RFQs Found</h3>
-          <p className="mt-2 text-sm text-gray-500">
+        <div className="text-center py-12 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+          <FileText className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)]" />
+          <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">No RFQs Found</h3>
+          <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">
             No RFQs have been created for this project yet.
           </p>
           {onCreateRFQ && (

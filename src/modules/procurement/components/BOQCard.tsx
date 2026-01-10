@@ -30,22 +30,22 @@ export function BOQCard({ boq }: BOQCardProps) {
   const getStatusColor = () => {
     switch (boq.status) {
       case BOQStatus.APPROVED:
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500/20 text-green-400';
       case BOQStatus.MAPPING_REVIEW:
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-500/20 text-yellow-400';
       case BOQStatus.DRAFT:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]';
       case BOQStatus.ARCHIVED:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]';
     }
   };
 
   return (
     <div
       onClick={handleClick}
-      className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
+      className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)] hover:shadow-lg transition-shadow cursor-pointer"
     >
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
@@ -55,50 +55,50 @@ export function BOQCard({ boq }: BOQCardProps) {
               {boq.status}
             </span>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">{boq.title}</h3>
-          <p className="text-sm text-gray-500">v{boq.version}</p>
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{boq.title}</h3>
+          <p className="text-sm text-[var(--ff-text-secondary)]">v{boq.version}</p>
         </div>
         <button
           onClick={(e) => {
             e.stopPropagation();
             // TODO: Show dropdown menu
           }}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
         >
-          <MoreVertical className="h-4 w-4 text-gray-400" />
+          <MoreVertical className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
         </button>
       </div>
 
       <div className="space-y-2 mb-4">
-        <div className="flex items-center text-sm text-gray-600">
-          <FileText className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <FileText className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>Project ID: {boq.projectId}</span>
         </div>
-        <div className="flex items-center text-sm text-gray-600">
-          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <Calendar className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>Created {format(boq.createdAt, 'MMM dd, yyyy')}</span>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-4">
+      <div className="border-t border-[var(--ff-border-light)] pt-4">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-xs text-gray-500">Total Amount</p>
-            <p className="text-lg font-bold text-gray-900 flex items-center">
+            <p className="text-xs text-[var(--ff-text-secondary)]">Total Amount</p>
+            <p className="text-lg font-bold text-[var(--ff-text-primary)] flex items-center">
               <DollarSign className="h-4 w-4 mr-1" />
               {boq.currency} {boq.totalEstimatedValue?.toLocaleString() || '0'}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-500">{boq.itemCount} items</p>
-            <p className="text-xs text-gray-500">Status: {boq.status}</p>
+            <p className="text-xs text-[var(--ff-text-secondary)]">{boq.itemCount} items</p>
+            <p className="text-xs text-[var(--ff-text-secondary)]">Status: {boq.status}</p>
           </div>
         </div>
       </div>
 
       {boq.approvedBy && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <p className="text-xs text-gray-500">
+        <div className="mt-3 pt-3 border-t border-[var(--ff-border-light)]">
+          <p className="text-xs text-[var(--ff-text-secondary)]">
             Approved by {boq.approvedBy} on{' '}
             {boq.approvedAt && format(boq.approvedAt, 'MMM dd, yyyy')}
           </p>

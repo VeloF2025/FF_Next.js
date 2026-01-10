@@ -32,24 +32,24 @@ export function TrackerFilters({
   phases
 }: TrackerFiltersProps) {
   return (
-    <div className="bg-white p-4 rounded-lg border space-y-4">
+    <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)] space-y-4">
       <div className="flex gap-4 flex-wrap">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] w-4 h-4" />
             <input
               type="text"
               placeholder="Search by ID or location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             />
           </div>
         </div>
         <select
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value as any)}
-          className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
         >
           <option value="all">All Types</option>
           <option value="pole">Poles</option>
@@ -59,7 +59,7 @@ export function TrackerFilters({
         <select
           value={selectedPhase}
           onChange={(e) => setSelectedPhase(e.target.value)}
-          className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
         >
           <option value="all">All Phases</option>
           {phases.map(phase => (
@@ -69,7 +69,7 @@ export function TrackerFilters({
         <select
           value={selectedStatus}
           onChange={(e) => setSelectedStatus(e.target.value)}
-          className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
         >
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
@@ -84,7 +84,7 @@ export function TrackerFilters({
             setSortBy(field);
             setSortOrder(order);
           }}
-          className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
         >
           <option value="identifier-asc">ID (A-Z)</option>
           <option value="identifier-desc">ID (Z-A)</option>

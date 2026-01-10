@@ -40,20 +40,20 @@ export function PoleCaptureMobile({ projectId, onSave, onCancel }: PoleCaptureMo
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-20">
+    <div className="min-h-screen bg-[var(--ff-bg-tertiary)] pb-20">
       <PoleFormHeader onCancel={onCancel} />
 
       <div className="p-4 space-y-4">
         {/* Pole Number */}
-        <div className="bg-white rounded-lg p-4 border border-neutral-200">
-          <label className="block text-sm font-medium text-neutral-700 mb-2">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
             Pole Number *
           </label>
           <input
             type="text"
             value={formData.poleNumber}
             onChange={(e) => setFormData(prev => ({ ...prev, poleNumber: e.target.value }))}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             placeholder="Enter pole number"
           />
         </div>
@@ -76,14 +76,14 @@ export function PoleCaptureMobile({ projectId, onSave, onCancel }: PoleCaptureMo
         />
 
         {/* Notes */}
-        <div className="bg-white rounded-lg p-4 border border-neutral-200">
-          <label className="block text-sm font-medium text-neutral-700 mb-2">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
             Notes
           </label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             rows={3}
             placeholder="Additional notes..."
           />
@@ -101,7 +101,7 @@ export function PoleCaptureMobile({ projectId, onSave, onCancel }: PoleCaptureMo
       />
 
       {/* Fixed bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 p-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-[var(--ff-bg-secondary)] border-t border-[var(--ff-border-light)] p-4">
         <button
           onClick={handleSubmit}
           disabled={!allRequiredComplete}
@@ -109,7 +109,7 @@ export function PoleCaptureMobile({ projectId, onSave, onCancel }: PoleCaptureMo
             'w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2',
             allRequiredComplete
               ? 'bg-primary-600 text-white'
-              : 'bg-neutral-200 text-neutral-400'
+              : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]'
           )}
         >
           <Save className="h-5 w-5" />

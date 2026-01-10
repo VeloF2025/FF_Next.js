@@ -36,61 +36,61 @@ export function ProjectSummaryCards({ summary, projects = [] }: ProjectSummaryCa
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Total Projects</p>
-            <p className="text-2xl font-bold text-gray-900">{calculatedSummary.totalProjects}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Total Projects</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{calculatedSummary.totalProjects}</p>
           </div>
           <FolderOpen className="h-8 w-8 text-blue-500" />
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Active Projects</p>
-            <p className="text-2xl font-bold text-gray-900">{calculatedSummary.activeProjects}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Active Projects</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{calculatedSummary.activeProjects}</p>
           </div>
           <TrendingUp className="h-8 w-8 text-green-500" />
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Completed</p>
-            <p className="text-2xl font-bold text-gray-900">{calculatedSummary.completedProjects}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Completed</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{calculatedSummary.completedProjects}</p>
           </div>
           <CheckCircle className="h-8 w-8 text-blue-500" />
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">On Hold</p>
-            <p className="text-2xl font-bold text-gray-900">{calculatedSummary.onHoldProjects}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">On Hold</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{calculatedSummary.onHoldProjects}</p>
           </div>
           <Clock className="h-8 w-8 text-yellow-500" />
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Total Budget</p>
-            <p className="text-xl font-bold text-gray-900">{formatCurrency(calculatedSummary.totalBudget)}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Total Budget</p>
+            <p className="text-xl font-bold text-[var(--ff-text-primary)]">{formatCurrency(calculatedSummary.totalBudget)}</p>
           </div>
           <DollarSign className="h-8 w-8 text-purple-500" />
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">High Priority</p>
-            <p className="text-2xl font-bold text-gray-900">{calculatedSummary.highPriorityProjects}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">High Priority</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{calculatedSummary.highPriorityProjects}</p>
           </div>
           <AlertCircle className="h-8 w-8 text-red-500" />
         </div>

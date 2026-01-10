@@ -39,7 +39,7 @@ export function NotificationsDropdown({
               <div
                 key={notification.id}
                 className={`px-4 py-3 border-l-4 hover:bg-[var(--ff-surface-secondary)] ${
-                  notification.unread ? 'border-l-primary-500 bg-primary-50' : 'border-l-transparent'
+                  notification.unread ? 'border-l-blue-500 bg-blue-500/10' : 'border-l-transparent'
                 }`}
               >
                 <p className="text-sm font-medium text-[var(--ff-text-primary)]">{notification.title}</p>

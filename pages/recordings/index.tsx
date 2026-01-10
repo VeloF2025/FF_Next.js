@@ -118,20 +118,20 @@ export default function RecordingsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-6 py-4">
+            <header className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-6 py-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link
                             href="/meetings"
-                            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                            className="flex items-center gap-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                         >
                             <ChevronLeft className="w-5 h-5" />
                             Back to Meetings
                         </Link>
-                        <div className="h-6 w-px bg-gray-300" />
-                        <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                        <div className="h-6 w-px bg-[var(--ff-border-light)]" />
+                        <h1 className="text-xl font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
                             <Video className="w-6 h-6 text-blue-600" />
                             Recordings
                         </h1>
@@ -139,7 +139,7 @@ export default function RecordingsPage() {
                     <button
                         onClick={fetchRecordings}
                         disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] rounded-lg text-[var(--ff-text-primary)] transition-colors"
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                         Refresh
@@ -150,7 +150,7 @@ export default function RecordingsPage() {
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Error State */}
                 {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+                    <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6">
                         {error}
                     </div>
                 )}
@@ -164,10 +164,10 @@ export default function RecordingsPage() {
 
                 {/* Empty State */}
                 {!loading && recordings.length === 0 && (
-                    <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-                        <Video className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No recordings yet</h3>
-                        <p className="text-gray-500 mb-4">Start a meeting and click "Start Recording" to create your first recording.</p>
+                    <div className="text-center py-12 bg-[var(--ff-bg-secondary)] rounded-xl border border-[var(--ff-border-light)]">
+                        <Video className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No recordings yet</h3>
+                        <p className="text-[var(--ff-text-secondary)] mb-4">Start a meeting and click "Start Recording" to create your first recording.</p>
                         <Link
                             href="/meetings"
                             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -183,7 +183,7 @@ export default function RecordingsPage() {
                         {recordings.map((recording) => (
                             <div
                                 key={recording.id}
-                                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+                                className="bg-[var(--ff-bg-secondary)] rounded-xl border border-[var(--ff-border-light)] overflow-hidden hover:shadow-lg transition-shadow"
                             >
                                 {/* Video Preview */}
                                 <div
@@ -209,10 +209,10 @@ export default function RecordingsPage() {
 
                                 {/* Info */}
                                 <div className="p-4">
-                                    <h3 className="font-medium text-gray-900 truncate mb-2">
+                                    <h3 className="font-medium text-[var(--ff-text-primary)] truncate mb-2">
                                         {recording.roomName}
                                     </h3>
-                                    <div className="flex flex-wrap gap-3 text-sm text-gray-500 mb-4">
+                                    <div className="flex flex-wrap gap-3 text-sm text-[var(--ff-text-secondary)] mb-4">
                                         <span className="flex items-center gap-1">
                                             <Calendar className="w-4 h-4" />
                                             {formatDate(recording.createdAt)}
@@ -234,7 +234,7 @@ export default function RecordingsPage() {
                                         </button>
                                         <button
                                             onClick={() => handleDownload(recording)}
-                                            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
                                             title="Download"
                                         >
                                             <Download className="w-4 h-4" />
@@ -242,7 +242,7 @@ export default function RecordingsPage() {
                                         <button
                                             onClick={() => handleDelete(recording)}
                                             disabled={deleting === recording.id}
-                                            className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                                            className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
                                             title="Delete"
                                         >
                                             {deleting === recording.id ? (
@@ -265,25 +265,25 @@ export default function RecordingsPage() {
                         onClick={() => setSelectedRecording(null)}
                     >
                         <div
-                            className="bg-white rounded-xl overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col"
+                            className="bg-[var(--ff-bg-secondary)] rounded-xl overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Modal Header */}
-                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-                                <h3 className="font-medium text-gray-900">
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)]">
+                                <h3 className="font-medium text-[var(--ff-text-primary)]">
                                     {selectedRecording.roomName}
                                 </h3>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => handleDownload(selectedRecording)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors text-sm"
                                     >
                                         <Download className="w-4 h-4" />
                                         Download
                                     </button>
                                     <button
                                         onClick={() => setSelectedRecording(null)}
-                                        className="p-1.5 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                                        className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>
@@ -302,7 +302,7 @@ export default function RecordingsPage() {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
+                            <div className="px-4 py-3 border-t border-[var(--ff-border-light)] flex items-center justify-between text-sm text-[var(--ff-text-secondary)]">
                                 <span className="flex items-center gap-1">
                                     <Calendar className="w-4 h-4" />
                                     {formatDate(selectedRecording.createdAt)}

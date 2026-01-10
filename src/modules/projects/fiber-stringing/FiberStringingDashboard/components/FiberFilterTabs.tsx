@@ -9,7 +9,7 @@ interface FiberFilterTabsProps {
 
 export function FiberFilterTabs({ filter, onFilterChange, sections }: FiberFilterTabsProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-1">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-1">
       <div className="flex space-x-1">
         {(['all', 'in_progress', 'completed', 'issues'] as const).map(status => (
           <button
@@ -18,8 +18,8 @@ export function FiberFilterTabs({ filter, onFilterChange, sections }: FiberFilte
             className={cn(
               'flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
               filter === status
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                ? 'bg-primary-500/20 text-primary-400'
+                : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
             )}
           >
             {status === 'all' ? 'All Sections' : 

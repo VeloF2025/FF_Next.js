@@ -11,11 +11,11 @@ export function DashboardHeader({ lastSyncTime, onSync, syncing }: DashboardHead
     <div className="flex items-center justify-between">
       <div>
         <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-        <p className="text-gray-600">Insights from Neon analytical database</p>
+        <p className="text-[var(--ff-text-secondary)]">Insights from Neon analytical database</p>
       </div>
       <div className="flex items-center space-x-4">
         {lastSyncTime && (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--ff-text-tertiary)]">
             Last sync: {lastSyncTime.toLocaleTimeString()}
           </span>
         )}

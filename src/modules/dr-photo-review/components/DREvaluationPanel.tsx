@@ -24,13 +24,13 @@ export function DREvaluationPanel({
     error,
 }: DREvaluationPanelProps) {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md overflow-hidden">
             {/* Header */}
-            <div className="p-4 border-b bg-gray-50 dark:bg-gray-700 dark:border-gray-600">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <div className="p-4 border-b bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                     AI Evaluation
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
                     Powered by dr-verifier VLM model
                 </p>
             </div>
@@ -42,7 +42,7 @@ export function DREvaluationPanel({
                     onClick={onEvaluate}
                     disabled={isEvaluating}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${isEvaluating
-                            ? 'bg-gray-400 cursor-not-allowed'
+                            ? 'bg-[var(--ff-bg-tertiary)] cursor-not-allowed'
                             : 'bg-blue-600 hover:bg-blue-700 text-white'
                         }`}
                 >
@@ -61,8 +61,8 @@ export function DREvaluationPanel({
 
                 {/* Error Message */}
                 {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                    <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+                        <div className="flex items-center gap-2 text-red-400">
                             <AlertTriangle className="w-5 h-5" />
                             <p className="text-sm font-medium">{error}</p>
                         </div>
@@ -75,66 +75,66 @@ export function DREvaluationPanel({
                         {/* Overall Score */}
                         <div
                             className={`p-4 rounded-lg ${evaluation.overall_pass
-                                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                                    ? 'bg-green-500/20 border border-green-500/30'
+                                    : 'bg-red-500/20 border border-red-500/30'
                                 }`}
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     {evaluation.overall_pass ? (
-                                        <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                        <CheckCircle className="w-6 h-6 text-green-400" />
                                     ) : (
-                                        <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                                        <XCircle className="w-6 h-6 text-red-400" />
                                     )}
                                     <span
                                         className={`text-lg font-semibold ${evaluation.overall_pass
-                                                ? 'text-green-700 dark:text-green-400'
-                                                : 'text-red-700 dark:text-red-400'
+                                                ? 'text-green-400'
+                                                : 'text-red-400'
                                             }`}
                                     >
                                         {evaluation.overall_pass ? 'PASSED' : 'FAILED'}
                                     </span>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
                                         {evaluation.overall_score.toFixed(1)}/10
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Overall Score</p>
+                                    <p className="text-xs text-[var(--ff-text-tertiary)]">Overall Score</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Summary */}
                         {evaluation.summary && (
-                            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                                <p className="text-sm text-gray-700 dark:text-gray-300">{evaluation.summary}</p>
+                            <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                                <p className="text-sm text-[var(--ff-text-secondary)]">{evaluation.summary}</p>
                             </div>
                         )}
 
                         {/* Step Results */}
                         {evaluation.evaluations && evaluation.evaluations.length > 0 && (
                             <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <h4 className="text-sm font-medium text-[var(--ff-text-secondary)]">
                                     Step Results
                                 </h4>
-                                <div className="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                <div className="divide-y divide-[var(--ff-border-light)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
                                     {evaluation.evaluations.map((stepEval) => (
                                         <div
                                             key={stepEval.step_number}
-                                            className="flex items-center justify-between p-3 bg-white dark:bg-gray-800"
+                                            className="flex items-center justify-between p-3 bg-[var(--ff-bg-secondary)]"
                                         >
                                             <div className="flex items-center gap-2">
                                                 {stepEval.pass ? (
-                                                    <CheckCircle className="w-4 h-4 text-green-500" />
+                                                    <CheckCircle className="w-4 h-4 text-green-400" />
                                                 ) : (
-                                                    <XCircle className="w-4 h-4 text-red-500" />
+                                                    <XCircle className="w-4 h-4 text-red-400" />
                                                 )}
-                                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                                <span className="text-sm text-[var(--ff-text-secondary)]">
                                                     Step {stepEval.step_number}
                                                 </span>
                                             </div>
                                             <span
-                                                className={`text-sm font-medium ${stepEval.pass ? 'text-green-600' : 'text-red-600'
+                                                className={`text-sm font-medium ${stepEval.pass ? 'text-green-400' : 'text-red-400'
                                                     }`}
                                             >
                                                 {stepEval.score}/10
@@ -147,7 +147,7 @@ export function DREvaluationPanel({
 
                         {/* Timestamp */}
                         {evaluation.evaluated_at && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 text-right">
+                            <p className="text-xs text-[var(--ff-text-tertiary)] text-right">
                                 Evaluated: {new Date(evaluation.evaluated_at).toLocaleString()}
                             </p>
                         )}

@@ -33,16 +33,16 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
 
   const getStatusBadge = (status: string) => {
     const statusConfig: any = {
-      PLANNING: 'bg-blue-100 text-blue-800',
-      IN_PROGRESS: 'bg-green-100 text-green-800',
-      ON_HOLD: 'bg-yellow-100 text-yellow-800',
-      COMPLETED: 'bg-gray-100 text-gray-800',
-      CANCELLED: 'bg-red-100 text-red-800',
+      PLANNING: 'bg-blue-500/20 text-blue-400',
+      IN_PROGRESS: 'bg-green-500/20 text-green-400',
+      ON_HOLD: 'bg-yellow-500/20 text-yellow-400',
+      COMPLETED: 'bg-gray-500/20 text-gray-400',
+      CANCELLED: 'bg-red-500/20 text-red-400',
     };
-    
+
     const displayStatus = status?.replace('_', ' ');
     return (
-      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusConfig[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusConfig[status] || 'bg-gray-500/20 text-gray-400'}`}>
         {displayStatus}
       </span>
     );
@@ -50,60 +50,60 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
 
   const getPriorityBadge = (priority: string) => {
     const priorityConfig: any = {
-      LOW: 'bg-gray-100 text-gray-800',
-      MEDIUM: 'bg-yellow-100 text-yellow-800',
-      HIGH: 'bg-orange-100 text-orange-800',
-      CRITICAL: 'bg-red-100 text-red-800',
+      LOW: 'bg-gray-500/20 text-gray-400',
+      MEDIUM: 'bg-yellow-500/20 text-yellow-400',
+      HIGH: 'bg-orange-500/20 text-orange-400',
+      CRITICAL: 'bg-red-500/20 text-red-400',
     };
-    
+
     return (
-      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${priorityConfig[priority] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${priorityConfig[priority] || 'bg-gray-500/20 text-gray-400'}`}>
         {priority?.toLowerCase()}
       </span>
     );
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+          <thead className="bg-[var(--ff-bg-tertiary)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Project
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Client
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Location
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Priority
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Duration
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Budget
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
             {isLoading && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   Loading projects...
                 </td>
               </tr>
             )}
-            
+
             {error && (
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-red-600">
@@ -111,31 +111,31 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                 </td>
               </tr>
             )}
-            
+
             {projects && projects.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   No projects found
                 </td>
               </tr>
             )}
-            
+
             {projects?.map((project) => (
               <tr
                 key={project.id}
-                className="hover:bg-gray-50"
+                className="hover:bg-[var(--ff-bg-hover)]"
               >
                 <td className="px-4 py-4 whitespace-nowrap">
                   <div>
-                    <div className="text-sm font-medium text-gray-900">{project.name}</div>
-                    <div className="text-sm text-gray-500">{project.project_code || project.code || `PRJ-${project.id.slice(0, 6)}`}</div>
+                    <div className="text-sm font-medium text-[var(--ff-text-primary)]">{project.name}</div>
+                    <div className="text-sm text-[var(--ff-text-secondary)]">{project.project_code || project.code || `PRJ-${project.id.slice(0, 6)}`}</div>
                   </div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{project.client_name || 'N/A'}</div>
+                  <div className="text-sm text-[var(--ff-text-primary)]">{project.client_name || 'N/A'}</div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
+                  <div className="text-sm text-[var(--ff-text-primary)]">
                     {project.city ? `${project.city}, ${project.state}` : project.location || 'N/A'}
                   </div>
                 </td>
@@ -146,12 +146,12 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                   {getPriorityBadge(project.priority)}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
+                  <div className="text-sm text-[var(--ff-text-primary)]">
                     {formatDate(project.start_date)} - {formatDate(project.end_date)}
                   </div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-[var(--ff-text-primary)]">
                     {formatCurrency(Number(project.budget_allocated || project.budget))}
                   </div>
                 </td>
@@ -159,14 +159,14 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                   <div className="flex items-center justify-end space-x-2">
                     <button
                       onClick={() => router.push(`/projects/${project.id}`)}
-                      className="text-blue-600 hover:text-blue-900"
+                      className="text-blue-500 hover:text-blue-600"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => router.push(`/projects/${project.id}/edit`)}
-                      className="text-yellow-600 hover:text-yellow-900"
+                      className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                       title="Edit"
                     >
                       <Edit className="h-4 w-4" />
@@ -174,7 +174,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                     {onDelete && (
                       <button
                         onClick={() => onDelete(project.id)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-500 hover:text-red-600"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />

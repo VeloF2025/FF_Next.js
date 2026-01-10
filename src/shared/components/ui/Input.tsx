@@ -13,10 +13,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         className={clsx(
           'px-3 py-2 border rounded-lg text-sm transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-offset-2',
+          'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]',
+          'focus:outline-none focus:ring-2 focus:ring-blue-500',
           error
-            ? 'border-red-300 focus:ring-red-500'
-            : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500',
+            ? 'border-red-400 focus:ring-red-500'
+            : 'border-[var(--ff-border-light)] focus:border-blue-500',
           fullWidth && 'w-full',
           className
         )}

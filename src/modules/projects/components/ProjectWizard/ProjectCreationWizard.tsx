@@ -167,17 +167,17 @@ export function ProjectCreationWizard() {
   if (showSuccess) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-white shadow-lg rounded-lg p-8 text-center">
+        <div className="bg-[var(--ff-bg-secondary)] shadow-lg rounded-lg p-8 text-center">
           <div className="flex justify-center mb-4">
             <CheckCircle className="h-16 w-16 text-green-500" />
           </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+
+          <h2 className="text-2xl font-bold text-[var(--ff-text-primary)] mb-2">
             Project Created Successfully!
           </h2>
-          
-          <p className="text-gray-600 mb-8">
-            Your project has been created. You can now import the Statement of Work (SOW) 
+
+          <p className="text-[var(--ff-text-secondary)] mb-8">
+            Your project has been created. You can now import the Statement of Work (SOW)
             to populate project specifications.
           </p>
           
@@ -192,24 +192,24 @@ export function ProjectCreationWizard() {
             
             <Link
               href={`/projects/${createdProjectId}`}
-              className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-blue-600 bg-white border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-blue-600 bg-[var(--ff-bg-secondary)] border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <Folder className="h-5 w-5 mr-2" />
               View Project Details
             </Link>
-            
+
             <button
               onClick={() => router.push('/projects')}
-              className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             >
               Go to Projects List
               <ArrowRight className="h-5 w-5 ml-2" />
             </button>
           </div>
-          
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Tip:</strong> Importing SOW data will automatically create poles, drops, 
+
+          <div className="mt-8 p-4 bg-blue-500/20 rounded-lg border border-blue-500/30">
+            <p className="text-sm text-blue-400">
+              <strong>Tip:</strong> Importing SOW data will automatically create poles, drops,
               and fiber specifications for your project, saving you time on manual data entry.
             </p>
           </div>
@@ -221,10 +221,10 @@ export function ProjectCreationWizard() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <WizardHeader currentStep={currentStep} />
-      
-      <form className="bg-white shadow-lg rounded-lg p-6">
+
+      <form className="bg-[var(--ff-bg-secondary)] shadow-lg rounded-lg p-6">
         {renderStepContent()}
-        
+
         <WizardNavigation
           currentStep={currentStep}
           onPrevious={handlePrevious}

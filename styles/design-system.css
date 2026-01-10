@@ -126,15 +126,18 @@
    DARK THEME VARIABLES
    ================================ */
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+html.dark,
+.dark {
   --ff-bg-primary: #0f172a;
   --ff-bg-secondary: #1e293b;
   --ff-bg-tertiary: #334155;
   --ff-bg-sidebar: #0f172a;
   --ff-bg-card: #1e293b;
+  --ff-bg-hover: #475569;
 
   --ff-text-primary: #f1f5f9;
-  --ff-text-secondary: #cbd5e1;
+  --ff-text-secondary: #e2e8f0;
   --ff-text-tertiary: #94a3b8;
 
   --ff-border-light: #334155;

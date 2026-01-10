@@ -79,12 +79,12 @@ export function EnhancedKPIDashboard() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Enhanced KPIs Dashboard</h1>
-        <p className="text-gray-600 mt-1">Monitor and analyze key performance indicators</p>
+        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Enhanced KPIs Dashboard</h1>
+        <p className="text-[var(--ff-text-secondary)] mt-1">Monitor and analyze key performance indicators</p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-[var(--ff-border-light)] mb-6">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => (
             <button
@@ -94,7 +94,7 @@ export function EnhancedKPIDashboard() {
                 py-2 px-1 border-b-2 font-medium text-sm transition-colors
                 ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                 }
               `}
             >
@@ -107,23 +107,23 @@ export function EnhancedKPIDashboard() {
       {/* KPI Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {kpiMetrics.map((metric) => (
-          <div key={metric.name} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div key={metric.name} className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-4">
             <div className="flex justify-between items-start mb-2">
-              <p className="text-sm text-gray-600">{metric.name}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">{metric.name}</p>
               <span className={`text-xs font-semibold ${getStatusColor(metric.status)}`}>
                 {metric.status.toUpperCase()}
               </span>
             </div>
             <div className="flex items-end justify-between">
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
                 {metric.value}{metric.unit}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--ff-text-secondary)]">
                 Target: {metric.target}{metric.unit}
               </p>
             </div>
-            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-              <div 
+            <div className="mt-2 w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
+              <div
                 className={`h-2 rounded-full ${
                   metric.status === 'good' ? 'bg-green-500' :
                   metric.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
@@ -141,17 +141,17 @@ export function EnhancedKPIDashboard() {
           <div
             key={card.title}
             onClick={card.onClick}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+            className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-start space-x-4">
               <div className={`${card.color} p-3 rounded-lg`}>
                 <card.icon className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">
                   {card.title}
                 </h3>
-                <p className="text-sm text-gray-600">{card.description}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">{card.description}</p>
               </div>
             </div>
           </div>

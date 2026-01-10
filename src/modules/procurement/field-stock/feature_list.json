@@ -1,0 +1,442 @@
+{
+  "project": "FibreFlow",
+  "source_spec": "docs/PRDs/PRD-027-field-stock-control.md",
+  "generated_at": "2026-01-10T12:00:00Z",
+  "total_features": 21,
+  "features": [
+    {
+      "id": "fs-001",
+      "phase": 1,
+      "name": "Database Schema - Core Tables",
+      "description": "Create SQL migration for stock_locations, stock_items, stock_serials, stock_quants tables",
+      "files": [
+        "scripts/migrations/027_field_stock_core.sql"
+      ],
+      "tests": [],
+      "status": "pending",
+      "acceptance_criteria": [
+        "stock_locations table with location_type enum",
+        "stock_items table with category and tracking_type enums",
+        "stock_serials table with status enum and drop linking",
+        "stock_quants table with unique constraint"
+      ]
+    },
+    {
+      "id": "fs-002",
+      "phase": 1,
+      "name": "Database Schema - Transaction Tables",
+      "description": "Create SQL migration for stock_pickings, stock_picking_lines, stock_consumptions tables",
+      "files": [
+        "scripts/migrations/028_field_stock_transactions.sql"
+      ],
+      "tests": [],
+      "status": "pending",
+      "acceptance_criteria": [
+        "stock_pickings with picking_type enum and signature fields",
+        "stock_picking_lines with serial_ids array",
+        "stock_consumptions linking to drops"
+      ]
+    },
+    {
+      "id": "fs-003",
+      "phase": 1,
+      "name": "Database Schema - Returns & Accountability",
+      "description": "Create SQL migration for stock_returns, stock_return_lines, contractor_stock_accountability",
+      "files": [
+        "scripts/migrations/029_field_stock_returns.sql"
+      ],
+      "tests": [],
+      "status": "pending",
+      "acceptance_criteria": [
+        "stock_returns with status enum",
+        "stock_return_lines with condition and disposition",
+        "contractor_stock_accountability with blocking fields"
+      ]
+    },
+    {
+      "id": "fs-004",
+      "phase": 1,
+      "name": "Database Schema - Drops Table Modifications",
+      "description": "Add ont_serial, mini_ups_serial columns to drops table",
+      "files": [
+        "scripts/migrations/030_drops_stock_columns.sql"
+      ],
+      "tests": [],
+      "status": "pending",
+      "acceptance_criteria": [
+        "drops.ont_serial VARCHAR(100)",
+        "drops.mini_ups_serial VARCHAR(100)",
+        "drops.materials_issued BOOLEAN",
+        "drops.materials_verified BOOLEAN"
+      ]
+    },
+    {
+      "id": "fs-005",
+      "phase": 1,
+      "name": "TypeScript Types",
+      "description": "Define all TypeScript interfaces for field stock module",
+      "files": [
+        "src/modules/procurement/field-stock/types/index.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/types.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "StockLocation interface with all fields",
+        "StockItem interface with category enum",
+        "StockSerial interface with status enum",
+        "StockPicking interface with signature fields",
+        "StockConsumption interface with drop linking",
+        "ContractorAccountability interface"
+      ]
+    },
+    {
+      "id": "fs-006",
+      "phase": 2,
+      "name": "Location Service",
+      "description": "CRUD service for stock locations",
+      "files": [
+        "src/modules/procurement/field-stock/services/locationService.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/locationService.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "getLocations with filters",
+        "getLocationById",
+        "createLocation",
+        "updateLocation",
+        "deleteLocation",
+        "getTechnicianLocations"
+      ]
+    },
+    {
+      "id": "fs-007",
+      "phase": 2,
+      "name": "Location API Routes",
+      "description": "REST API endpoints for locations",
+      "files": [
+        "pages/api/procurement/field-stock/locations/index.ts",
+        "pages/api/procurement/field-stock/locations/[id].ts",
+        "pages/api/procurement/field-stock/locations/technicians.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/api/locations.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "GET /locations returns list",
+        "POST /locations creates location",
+        "GET /locations/:id returns single",
+        "PUT /locations/:id updates",
+        "DELETE /locations/:id deletes",
+        "GET /locations/technicians returns tech vans"
+      ]
+    },
+    {
+      "id": "fs-008",
+      "phase": 2,
+      "name": "Location UI Components",
+      "description": "React components for location management",
+      "files": [
+        "src/modules/procurement/field-stock/components/locations/LocationList.tsx",
+        "src/modules/procurement/field-stock/components/locations/LocationForm.tsx",
+        "src/modules/procurement/field-stock/components/locations/TechnicianVanStockCard.tsx",
+        "src/modules/procurement/field-stock/hooks/useLocations.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/components/LocationList.test.tsx"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "LocationList with search and filter",
+        "LocationForm for create/edit",
+        "TechnicianVanStockCard shows van inventory",
+        "useLocations hook with CRUD operations"
+      ]
+    },
+    {
+      "id": "fs-009",
+      "phase": 3,
+      "name": "Stock Items Service",
+      "description": "CRUD service for stock items",
+      "files": [
+        "src/modules/procurement/field-stock/services/itemService.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/itemService.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "getItems with category filter",
+        "getItemById",
+        "createItem",
+        "updateItem",
+        "getItemsByTrackingType"
+      ]
+    },
+    {
+      "id": "fs-010",
+      "phase": 3,
+      "name": "Serial Service",
+      "description": "Service for serial number management",
+      "files": [
+        "src/modules/procurement/field-stock/services/serialService.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/serialService.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "getSerials with status filter",
+        "getSerialByNumber",
+        "registerSerial",
+        "updateSerialStatus",
+        "getAvailableSerials",
+        "getSerialsByLocation"
+      ]
+    },
+    {
+      "id": "fs-011",
+      "phase": 3,
+      "name": "Items & Serials API Routes",
+      "description": "REST API endpoints for items and serials",
+      "files": [
+        "pages/api/procurement/field-stock/items/index.ts",
+        "pages/api/procurement/field-stock/items/[id].ts",
+        "pages/api/procurement/field-stock/serials/index.ts",
+        "pages/api/procurement/field-stock/serials/[serialNumber].ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/api/items.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "Items CRUD endpoints",
+        "Serials CRUD endpoints",
+        "GET /serials/available returns available"
+      ]
+    },
+    {
+      "id": "fs-012",
+      "phase": 3,
+      "name": "Items & Serials UI Components",
+      "description": "React components for items and serial management",
+      "files": [
+        "src/modules/procurement/field-stock/components/items/StockItemList.tsx",
+        "src/modules/procurement/field-stock/components/items/SerialNumberList.tsx",
+        "src/modules/procurement/field-stock/components/items/SerialScanner.tsx",
+        "src/modules/procurement/field-stock/hooks/useSerials.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/components/SerialScanner.test.tsx"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "StockItemList with category tabs",
+        "SerialNumberList with status badges",
+        "SerialScanner with camera integration",
+        "useSerials hook"
+      ]
+    },
+    {
+      "id": "fs-013",
+      "phase": 4,
+      "name": "Picking Service",
+      "description": "Service for stock pickings (issues, receipts, transfers)",
+      "files": [
+        "src/modules/procurement/field-stock/services/pickingService.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/pickingService.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "createPicking with lines",
+        "confirmPicking",
+        "processPicking with stock movements",
+        "cancelPicking",
+        "checkContractorBlocked (SOP 4.4)"
+      ]
+    },
+    {
+      "id": "fs-014",
+      "phase": 4,
+      "name": "Pickings API Routes",
+      "description": "REST API endpoints for pickings",
+      "files": [
+        "pages/api/procurement/field-stock/pickings/index.ts",
+        "pages/api/procurement/field-stock/pickings/[id].ts",
+        "pages/api/procurement/field-stock/pickings/[id]/confirm.ts",
+        "pages/api/procurement/field-stock/pickings/[id]/process.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/api/pickings.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "Pickings CRUD endpoints",
+        "Confirm endpoint updates status",
+        "Process endpoint moves stock",
+        "Blocking check on issue creation"
+      ]
+    },
+    {
+      "id": "fs-015",
+      "phase": 4,
+      "name": "Pickings UI Components",
+      "description": "React components for picking management with signature",
+      "files": [
+        "src/modules/procurement/field-stock/components/pickings/PickingList.tsx",
+        "src/modules/procurement/field-stock/components/pickings/CreateIssueModal.tsx",
+        "src/modules/procurement/field-stock/components/pickings/SerialSelector.tsx",
+        "src/modules/procurement/field-stock/components/pickings/DigitalAllocationForm.tsx",
+        "src/modules/procurement/field-stock/components/pickings/SignatureCapture.tsx",
+        "src/modules/procurement/field-stock/hooks/usePickings.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/components/SignatureCapture.test.tsx"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "PickingList with status filter",
+        "CreateIssueModal with serial selection",
+        "DigitalAllocationForm replaces paper form",
+        "SignatureCapture with touch/stylus support"
+      ]
+    },
+    {
+      "id": "fs-016",
+      "phase": 5,
+      "name": "Consumption Service",
+      "description": "Service for recording material consumption on jobs",
+      "files": [
+        "src/modules/procurement/field-stock/services/consumptionService.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/consumptionService.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "recordConsumption links serial to drop",
+        "validateSerialForConsumption",
+        "getConsumptionsByDrop",
+        "getConsumptionsByTechnician",
+        "updateDropWithSerials"
+      ]
+    },
+    {
+      "id": "fs-017",
+      "phase": 5,
+      "name": "Consumptions API Routes",
+      "description": "REST API endpoints for consumptions",
+      "files": [
+        "pages/api/procurement/field-stock/consumptions/index.ts",
+        "pages/api/procurement/field-stock/consumptions/drop/[dropId].ts",
+        "pages/api/procurement/field-stock/consumptions/technician/[technicianId].ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/api/consumptions.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "POST /consumptions records consumption",
+        "GET /consumptions/drop/:id returns drop materials",
+        "Validates serial ownership"
+      ]
+    },
+    {
+      "id": "fs-018",
+      "phase": 5,
+      "name": "Consumption UI Components (Mobile)",
+      "description": "Mobile-optimized components for field consumption recording",
+      "files": [
+        "src/modules/procurement/field-stock/components/consumption/ConsumptionRecorder.tsx",
+        "src/modules/procurement/field-stock/components/consumption/DropMaterialsPanel.tsx",
+        "src/modules/procurement/field-stock/components/consumption/SerialConsumptionForm.tsx",
+        "src/modules/procurement/field-stock/components/consumption/BarcodeScanner.tsx",
+        "src/modules/procurement/field-stock/hooks/useConsumptions.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/components/ConsumptionRecorder.test.tsx"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "ConsumptionRecorder mobile-optimized",
+        "BarcodeScanner with camera",
+        "Large touch targets",
+        "Drop selection from job list"
+      ]
+    },
+    {
+      "id": "fs-019",
+      "phase": 6,
+      "name": "Returns & Reconciliation Service",
+      "description": "Service for returns workflow and stock reconciliation",
+      "files": [
+        "src/modules/procurement/field-stock/services/returnService.ts",
+        "src/modules/procurement/field-stock/services/accountabilityService.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/returnService.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "createReturn with lines",
+        "inspectReturn",
+        "acceptReturn and restock",
+        "reconcileContractor calculates unaccounted",
+        "blockContractor (SOP 4.4)"
+      ]
+    },
+    {
+      "id": "fs-020",
+      "phase": 6,
+      "name": "Returns & Accountability API Routes",
+      "description": "REST API endpoints for returns and contractor accountability",
+      "files": [
+        "pages/api/procurement/field-stock/returns/index.ts",
+        "pages/api/procurement/field-stock/returns/[id]/inspect.ts",
+        "pages/api/procurement/field-stock/contractors/index.ts",
+        "pages/api/procurement/field-stock/contractors/[contractorId]/block.ts",
+        "pages/api/procurement/field-stock/contractors/[contractorId]/reconcile.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/api/returns.test.ts"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "Returns CRUD with inspection",
+        "Contractor block/unblock endpoints",
+        "Reconciliation endpoint"
+      ]
+    },
+    {
+      "id": "fs-021",
+      "phase": 7,
+      "name": "Dashboard & Reports",
+      "description": "Field stock dashboard and accountability reports",
+      "files": [
+        "src/modules/procurement/field-stock/components/dashboard/FieldStockDashboard.tsx",
+        "src/modules/procurement/field-stock/components/accountability/ContractorAccountabilityList.tsx",
+        "src/modules/procurement/field-stock/components/accountability/UnaccountedStockAlert.tsx",
+        "src/modules/procurement/field-stock/components/dashboard/StockAlerts.tsx",
+        "pages/api/procurement/field-stock/dashboard.ts",
+        "pages/api/procurement/field-stock/reports/accountability.ts"
+      ],
+      "tests": [
+        "src/modules/procurement/field-stock/__tests__/components/FieldStockDashboard.test.tsx"
+      ],
+      "status": "pending",
+      "acceptance_criteria": [
+        "Dashboard with stock overview",
+        "Technician accountability cards",
+        "Contractor liability report",
+        "Unaccounted stock alerts",
+        "Serial audit trail"
+      ]
+    }
+  ]
+}

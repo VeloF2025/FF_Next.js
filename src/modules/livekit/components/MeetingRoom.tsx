@@ -129,7 +129,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
     };
 
     return (
-        <div className="h-screen w-full bg-gray-900">
+        <div className="h-screen w-full bg-[var(--ff-bg-primary)]">
             <LiveKitRoom
                 token={token}
                 serverUrl={serverUrl}
@@ -141,7 +141,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
                 {/* Main video area */}
                 <div className="flex flex-col h-full">
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+                    <div className="flex items-center justify-between px-4 py-2 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
                         <div className="flex items-center gap-3">
                             <h2 className="text-white font-semibold">{roomName}</h2>
                             {isRecording && (
@@ -165,7 +165,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
                                 onClick={handleCopyLink}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${copied
                                         ? 'bg-green-600 text-white'
-                                        : 'bg-gray-700 hover:bg-gray-600 text-white'
+                                        : 'bg-[var(--ff-bg-hover)] hover:bg-[var(--ff-bg-tertiary)] text-white'
                                     }`}
                             >
                                 {copied ? (
@@ -185,7 +185,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
                                 onClick={isRecording ? handleStopRecording : handleStartRecording}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isRecording
                                     ? 'bg-red-600 hover:bg-red-700 text-white'
-                                    : 'bg-gray-700 hover:bg-gray-600 text-white'
+                                    : 'bg-[var(--ff-bg-hover)] hover:bg-[var(--ff-bg-tertiary)] text-white'
                                     }`}
                             >
                                 {isRecording ? (
@@ -224,15 +224,15 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
             {/* Invite Modal (fallback for browsers without Web Share API) */}
             {showInviteModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Invite to Meeting</h3>
-                        <p className="text-gray-600 mb-4">Share this link with others to invite them to the meeting:</p>
+                    <div className="bg-[var(--ff-bg-secondary)] rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+                        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Invite to Meeting</h3>
+                        <p className="text-[var(--ff-text-secondary)] mb-4">Share this link with others to invite them to the meeting:</p>
                         <div className="flex items-center gap-2 mb-4">
                             <input
                                 type="text"
                                 readOnly
                                 value={getMeetingUrl()}
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50"
+                                className="flex-1 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
                             />
                             <button
                                 onClick={handleCopyLink}
@@ -246,7 +246,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
                         </div>
                         <button
                             onClick={() => setShowInviteModal(false)}
-                            className="w-full py-2 text-gray-600 hover:text-gray-800 text-sm"
+                            className="w-full py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] text-sm"
                         >
                             Close
                         </button>
@@ -262,7 +262,7 @@ function ParticipantCount() {
     const participants = useParticipants();
 
     return (
-        <div className="flex items-center gap-1 text-gray-400 text-sm">
+        <div className="flex items-center gap-1 text-[var(--ff-text-tertiary)] text-sm">
             <Users className="w-4 h-4" />
             <span>{participants.length}</span>
         </div>

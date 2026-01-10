@@ -31,7 +31,7 @@ export function SOWTabs({
   ];
 
   return (
-    <div className="border-b border-gray-200">
+    <div className="border-b border-[var(--ff-border-light)]">
       <nav className="-mb-px flex space-x-8 px-6">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -43,7 +43,7 @@ export function SOWTabs({
                 "py-2 px-1 border-b-2 font-medium text-sm flex items-center transition-colors",
                 activeTab === tab.id
                   ? "border-primary-500 text-primary-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  : "border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]"
               )}
             >
               <Icon className="h-4 w-4 mr-2" />

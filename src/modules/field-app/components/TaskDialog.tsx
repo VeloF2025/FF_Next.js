@@ -67,12 +67,12 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Task Details</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Task Details</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-md"
+            className="p-2 hover:bg-[var(--ff-bg-hover)] rounded-md"
           >
             <X className="w-5 h-5" />
           </button>
@@ -81,16 +81,16 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
         <div className="p-6 space-y-6">
           {/* Task Header */}
           <div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">
               {task.title}
             </h3>
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <div className="flex items-center space-x-4 text-sm text-[var(--ff-text-secondary)]">
               <span className={cn(
                 "px-2 py-1 rounded-full text-xs font-medium",
-                task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                task.status === 'failed' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'
+                task.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                task.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
+                task.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
               )}>
                 {task.status.replace('_', ' ')}
               </span>
@@ -100,8 +100,8 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
           </div>
 
           {/* Customer Info */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+          <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
+            <h4 className="font-medium text-[var(--ff-text-primary)] mb-3 flex items-center">
               <User className="w-4 h-4 mr-2" />
               Customer Information
             </h4>
@@ -126,14 +126,14 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
           </div>
 
           {/* Task Details */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+          <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
+            <h4 className="font-medium text-[var(--ff-text-primary)] mb-3 flex items-center">
               <FileText className="w-4 h-4 mr-2" />
               Task Details
             </h4>
             <div className="space-y-2 text-sm">
               <div>
-                <span className="font-medium">Type:</span> 
+                <span className="font-medium">Type:</span>
                 <span className="capitalize ml-2">{task.type}</span>
               </div>
               <div>
@@ -145,44 +145,44 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
               {task.notes && (
                 <div>
                   <span className="font-medium">Notes:</span>
-                  <p className="mt-1 text-gray-600">{task.notes}</p>
+                  <p className="mt-1 text-[var(--ff-text-secondary)]">{task.notes}</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Action Notes */}
-          <div className="border rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">Add Notes</h4>
+          <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
+            <h4 className="font-medium text-[var(--ff-text-primary)] mb-3">Add Notes</h4>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Add task notes or observations..."
             />
           </div>
 
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]">
               <Camera className="w-5 h-5 mr-2" />
               Take Photo
             </button>
-            <button className="flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]">
               <Phone className="w-5 h-5 mr-2" />
               Call Customer
             </button>
           </div>
 
           {/* Status Actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between pt-4 border-t border-[var(--ff-border-light)]">
             <div className="flex space-x-2">
               {getStatusButtons()}
             </div>
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
+              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
             >
               Cancel
             </button>

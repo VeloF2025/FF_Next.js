@@ -176,35 +176,35 @@ export function HomeInstallsDashboard() {
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Home Installations</h1>
-        <p className="text-gray-600">Manage and track home fiber installations</p>
+        <h1 className="text-3xl font-bold text-[var(--ff-text-primary)] mb-2">Home Installations</h1>
+        <p className="text-[var(--ff-text-secondary)]">Manage and track home fiber installations</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {statsCards.map((stat, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div key={index} className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6">
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-lg ${stat.bgColor}`}>
                 <stat.icon className={`w-6 h-6 ${stat.color}`} />
               </div>
-              <span className="text-3xl font-bold text-gray-900">{stat.value}</span>
+              <span className="text-3xl font-bold text-[var(--ff-text-primary)]">{stat.value}</span>
             </div>
-            <p className="text-sm text-gray-600">{stat.label}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">{stat.label}</p>
           </div>
         ))}
       </div>
 
       {/* Performance Metrics */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 mb-8">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Performance Metrics</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {performanceMetrics.map((metric, index) => (
             <div key={index} className="flex items-center space-x-3">
-              <metric.icon className="w-5 h-5 text-gray-400" />
+              <metric.icon className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
               <div>
-                <p className="text-sm text-gray-600">{metric.label}</p>
-                <p className="text-xl font-semibold text-gray-900">{metric.value}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">{metric.label}</p>
+                <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{metric.value}</p>
               </div>
             </div>
           ))}
@@ -217,15 +217,15 @@ export function HomeInstallsDashboard() {
           <button
             key={index}
             onClick={() => router.push(card.path)}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow text-left"
+            className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md transition-shadow text-left"
           >
             <div className="flex items-start space-x-4">
               <div className={`p-3 rounded-lg ${card.color} bg-opacity-10`}>
                 <card.icon className={`w-6 h-6 text-white ${card.color}`} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">{card.title}</h3>
-                <p className="text-sm text-gray-600">{card.description}</p>
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">{card.title}</h3>
+                <p className="text-sm text-[var(--ff-text-secondary)]">{card.description}</p>
               </div>
             </div>
           </button>
@@ -233,26 +233,26 @@ export function HomeInstallsDashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Installations</h2>
+      <div className="mt-8 bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Recent Installations</h2>
         <div className="space-y-3">
           {[
             { address: '123 Main St', status: 'completed', team: 'Team A', time: '2 hours ago' },
             { address: '456 Oak Ave', status: 'in_progress', team: 'Team B', time: '30 minutes ago' },
             { address: '789 Pine Rd', status: 'scheduled', team: 'Team C', time: 'In 1 hour' }
           ].map((install, index) => (
-            <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+            <div key={index} className="flex items-center justify-between py-3 border-b border-[var(--ff-border-light)] last:border-0">
               <div className="flex items-center space-x-3">
-                <Home className="w-5 h-5 text-gray-400" />
+                <Home className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
                 <div>
-                  <p className="font-medium text-gray-900">{install.address}</p>
-                  <p className="text-sm text-gray-600">{install.team} • {install.time}</p>
+                  <p className="font-medium text-[var(--ff-text-primary)]">{install.address}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{install.team} • {install.time}</p>
                 </div>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                install.status === 'completed' ? 'bg-green-100 text-green-800' :
-                install.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                'bg-gray-100 text-gray-800'
+                install.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                install.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
+                'bg-gray-500/20 text-gray-400'
               }`}>
                 {install.status.replace('_', ' ')}
               </span>

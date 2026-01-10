@@ -105,11 +105,11 @@ export function SOWColumnMapper({ file, onMapped, onError }: SOWColumnMapperProp
     return (
       <div className="flex flex-col items-center justify-center py-8">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Mapping Columns</h3>
-        <p className="text-gray-600 text-center">
+        <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">Mapping Columns</h3>
+        <p className="text-[var(--ff-text-secondary)] text-center">
           Automatically mapping column names to match database requirements...
         </p>
-        <div className="mt-4 text-sm text-gray-500">
+        <div className="mt-4 text-sm text-[var(--ff-text-tertiary)]">
           File: {file.name}
         </div>
       </div>
@@ -138,8 +138,8 @@ export function SOWColumnMapper({ file, onMapped, onError }: SOWColumnMapperProp
     return (
       <div className="flex flex-col items-center justify-center py-8">
         <CheckCircle className="h-8 w-8 text-green-600 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Columns Mapped Successfully</h3>
-        <p className="text-gray-600 text-center mb-4">
+        <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">Columns Mapped Successfully</h3>
+        <p className="text-[var(--ff-text-secondary)] text-center mb-4">
           Column names have been standardized for database import
         </p>
 
@@ -157,7 +157,7 @@ export function SOWColumnMapper({ file, onMapped, onError }: SOWColumnMapperProp
           </div>
         )}
 
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-[var(--ff-text-tertiary)]">
           Ready to proceed with import
         </div>
       </div>

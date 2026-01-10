@@ -55,28 +55,28 @@ export function OfflineStatus({
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="space-y-1">
             <div className="flex justify-between">
-              <span className="text-gray-600">Tasks:</span>
+              <span className="text-[var(--ff-text-secondary)]">Tasks:</span>
               <span className="font-medium">{offlineData.tasks}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Photos:</span>
+              <span className="text-[var(--ff-text-secondary)]">Photos:</span>
               <span className="font-medium">{offlineData.photos}</span>
             </div>
           </div>
           <div className="space-y-1">
             <div className="flex justify-between">
-              <span className="text-gray-600">Forms:</span>
+              <span className="text-[var(--ff-text-secondary)]">Forms:</span>
               <span className="font-medium">{offlineData.forms}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Size:</span>
+              <span className="text-[var(--ff-text-secondary)]">Size:</span>
               <span className="font-medium">{offlineData.dataSize}</span>
             </div>
           </div>
         </div>
       )}
 
-      <div className="mt-2 text-xs text-gray-500">
+      <div className="mt-2 text-xs text-[var(--ff-text-tertiary)]">
         Last sync: {offlineData.lastSync}
       </div>
     </div>

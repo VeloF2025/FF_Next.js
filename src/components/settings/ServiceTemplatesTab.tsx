@@ -202,7 +202,7 @@ export function ServiceTemplatesTab({
     return (
       <div className="service-template-node">
         {/* Main node */}
-        <div className={`flex items-center justify-between p-3 border border-gray-200 rounded-lg mb-2 hover:bg-gray-50 ${indentClass}`}>
+        <div className={`flex items-center justify-between p-3 border border-[var(--ff-border-light)] rounded-lg mb-2 hover:bg-[var(--ff-bg-hover)] ${indentClass}`}>
           <div className="flex items-center space-x-3 flex-1">
             {/* Expand/collapse button */}
             {hasChildren ? (
@@ -316,14 +316,14 @@ export function ServiceTemplatesTab({
   return (
     <div className="service-templates-tab">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold flex items-center">
               <FileText className="w-5 h-5 mr-2" />
               Service Templates
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
               Manage hierarchical service templates for contractor rate cards
             </p>
           </div>
@@ -338,7 +338,7 @@ export function ServiceTemplatesTab({
 
         {/* Error display */}
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center">
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-400 rounded-lg text-red-400 flex items-center">
             <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
             {error}
             <button
@@ -354,13 +354,13 @@ export function ServiceTemplatesTab({
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Search */}
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] w-4 h-4" />
             <input
               type="text"
               placeholder="Search templates by name, description, or code..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 

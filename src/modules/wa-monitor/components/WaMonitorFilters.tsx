@@ -88,8 +88,20 @@ export function WaMonitorFilters({ onFilterChange, totalCount, filteredCount, av
 
   const hasActiveFilters = status !== 'all' || searchTerm !== '' || resubmitted !== 'all' || project !== 'all' || dateFrom !== '' || dateTo !== '';
 
+  // Common dark mode styles for MUI inputs
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      bgcolor: 'var(--ff-bg-tertiary)',
+      color: 'var(--ff-text-primary)',
+      '& fieldset': { borderColor: 'var(--ff-border-light)' },
+      '&:hover fieldset': { borderColor: 'var(--ff-border-medium)' },
+    },
+    '& .MuiInputLabel-root': { color: 'var(--ff-text-secondary)' },
+    '& .MuiInputAdornment-root': { color: 'var(--ff-text-secondary)' },
+  };
+
   return (
-    <Card sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3, bgcolor: 'var(--ff-bg-secondary)' }}>
       <CardContent>
         <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
           {/* Search by Drop Number */}
@@ -98,7 +110,7 @@ export function WaMonitorFilters({ onFilterChange, totalCount, filteredCount, av
             placeholder="Search drop number..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            sx={{ minWidth: 250 }}
+            sx={{ minWidth: 250, ...inputSx }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -115,7 +127,7 @@ export function WaMonitorFilters({ onFilterChange, totalCount, filteredCount, av
             label="From Date"
             value={dateFrom}
             onChange={(e) => handleDateFromChange(e.target.value)}
-            sx={{ minWidth: 180 }}
+            sx={{ minWidth: 180, ...inputSx }}
             InputLabelProps={{
               shrink: true,
             }}
@@ -128,14 +140,14 @@ export function WaMonitorFilters({ onFilterChange, totalCount, filteredCount, av
             label="To Date"
             value={dateTo}
             onChange={(e) => handleDateToChange(e.target.value)}
-            sx={{ minWidth: 180 }}
+            sx={{ minWidth: 180, ...inputSx }}
             InputLabelProps={{
               shrink: true,
             }}
           />
 
           {/* Filter by Status */}
-          <FormControl size="small" sx={{ minWidth: 180 }}>
+          <FormControl size="small" sx={{ minWidth: 180, ...inputSx }}>
             <InputLabel>Status</InputLabel>
             <Select
               value={status}
@@ -149,7 +161,7 @@ export function WaMonitorFilters({ onFilterChange, totalCount, filteredCount, av
           </FormControl>
 
           {/* Filter by Resubmitted */}
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ minWidth: 200, ...inputSx }}>
             <InputLabel>Resubmission</InputLabel>
             <Select
               value={resubmitted}
@@ -163,7 +175,7 @@ export function WaMonitorFilters({ onFilterChange, totalCount, filteredCount, av
           </FormControl>
 
           {/* Filter by Project */}
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" sx={{ minWidth: 200, ...inputSx }}>
             <InputLabel>Project</InputLabel>
             <Select
               value={project}

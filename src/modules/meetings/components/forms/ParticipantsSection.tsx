@@ -21,7 +21,7 @@ export function ParticipantsSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[var(--ff-text-primary)]">
           Participants
         </label>
         <button
@@ -39,13 +39,13 @@ export function ParticipantsSection({
             <input
               value={participant}
               onChange={(e) => onUpdateParticipant(index, e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Participant name or email"
             />
             <button
               type="button"
               onClick={() => onRemoveParticipant(index)}
-              className="p-2 text-gray-400 hover:text-red-600"
+              className="p-2 text-[var(--ff-text-tertiary)] hover:text-red-600"
             >
               <Trash2 className="w-4 h-4" />
             </button>

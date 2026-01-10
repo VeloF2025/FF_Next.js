@@ -71,6 +71,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
     quotes: {},
     'purchase-orders': {},
     stock: {},
+    'field-stock': {},
     suppliers: {},
     reports: {}
   });
@@ -169,6 +170,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
         quotes: { count: 1, type: 'success' },
         'purchase-orders': { count: 4, type: 'info' },
         stock: { count: 5, type: 'error' },
+        'field-stock': {},
         suppliers: { count: 12, type: 'info' },
         reports: {}
       });
@@ -291,6 +293,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
         quotes: {},
         'purchase-orders': {},
         stock: {},
+        'field-stock': {},
         suppliers: {},
         reports: {}
       });
@@ -312,17 +315,17 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
 
   return (
     <ProcurementPortalProvider value={portalContext}>
-      <div className="flex flex-col h-full bg-gray-50">
+      <div className="flex flex-col h-full bg-[var(--ff-bg-tertiary)]">
         {/* Portal Header */}
-        <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] shadow-sm">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Procurement Portal</h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  {viewMode === 'all' 
-                    ? 'Integrated view across all projects' 
-                    : selectedProject 
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement Portal</h1>
+                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+                  {viewMode === 'all'
+                    ? 'Integrated view across all projects'
+                    : selectedProject
                     ? `Managing ${selectedProject.name} (${selectedProject.code})`
                     : 'Select a project or view all projects'
                   }
@@ -398,7 +401,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4" />
-                <p className="text-gray-500">Loading procurement data...</p>
+                <p className="text-[var(--ff-text-secondary)]">Loading procurement data...</p>
               </div>
             </div>
           ) : (

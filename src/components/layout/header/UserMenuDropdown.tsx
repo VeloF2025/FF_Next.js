@@ -71,7 +71,7 @@ export function UserMenuDropdown({
           <div className="px-4 py-3 border-b border-[var(--ff-border-secondary)]">
             <p className="font-medium text-[var(--ff-text-primary)]">{getUserName()}</p>
             <p className="text-sm text-[var(--ff-text-tertiary)]">{(user || currentUser)?.email}</p>
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary-100 text-primary-800 mt-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400 mt-2">
               <Shield className="h-3 w-3 mr-1" />
               {getUserRole()}
             </span>
@@ -108,7 +108,7 @@ export function UserMenuDropdown({
           
           <button
             onClick={onLogout}
-            className="flex items-center px-4 py-2 text-sm text-error-600 hover:bg-error-50 w-full text-left"
+            className="flex items-center px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 w-full text-left"
           >
             <LogOut className="h-4 w-4 mr-3" />
             Sign Out

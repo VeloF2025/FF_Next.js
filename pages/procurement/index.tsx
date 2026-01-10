@@ -4,6 +4,7 @@ import type { GetServerSideProps } from 'next';
 import type { Project } from '../../src/types/project.types';
 import { ProjectType, ProjectStatus, Priority } from '../../src/types/project.types';
 import { AlertCircle } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { ProcurementTabs } from '../../src/modules/procurement/components/ProcurementTabs';
 import { ProjectFilter } from '../../src/modules/procurement/components/ProjectFilter';
 import { ProcurementPortalProvider } from '../../src/modules/procurement/context/ProcurementPortalProvider';
@@ -42,6 +43,7 @@ export default function ProcurementPage({
     quotes: {},
     'purchase-orders': {},
     stock: {},
+    'field-stock': {},
     suppliers: {},
     reports: {}
   });
@@ -152,47 +154,49 @@ export default function ProcurementPage({
   };
 
   return (
-    <ProcurementPortalProvider value={contextValue}>
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-8">
-            {/* Page Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900">Procurement Portal</h1>
-              <p className="mt-2 text-gray-600">
-                Manage procurement across all projects
-              </p>
-            </div>
+    <AppLayout>
+      <ProcurementPortalProvider value={contextValue}>
+        <div className="min-h-screen bg-[var(--ff-bg-primary)]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="py-8">
+              {/* Page Header */}
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Procurement Portal</h1>
+                <p className="mt-2 text-[var(--ff-text-secondary)]">
+                  Manage procurement across all projects
+                </p>
+              </div>
 
-            {/* Project Filter */}
-            <div className="mb-6">
-              <ProjectFilter
-                selectedProject={selectedProject}
-                onProjectChange={handleProjectChange}
-                viewMode={viewMode}
-                onViewModeChange={handleViewModeChange}
-              />
-            </div>
+              {/* Project Filter */}
+              <div className="mb-6">
+                <ProjectFilter
+                  selectedProject={selectedProject}
+                  onProjectChange={handleProjectChange}
+                  viewMode={viewMode}
+                  onViewModeChange={handleViewModeChange}
+                />
+              </div>
 
-            {/* Error State */}
-            {error && (
-              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex">
-                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-red-800">Error</h3>
-                    <div className="mt-1 text-sm text-red-700">{error}</div>
+              {/* Error State */}
+              {error && (
+                <div className="mb-6 bg-red-500/20 border border-red-500/30 rounded-lg p-4">
+                  <div className="flex">
+                    <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 mr-3" />
+                    <div>
+                      <h3 className="text-sm font-medium text-red-400">Error</h3>
+                      <div className="mt-1 text-sm text-red-400">{error}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Main Content */}
-            <ProcurementTabs />
+              {/* Main Content */}
+              <ProcurementTabs />
+            </div>
           </div>
         </div>
-      </div>
-    </ProcurementPortalProvider>
+      </ProcurementPortalProvider>
+    </AppLayout>
   );
 }
 

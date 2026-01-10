@@ -59,13 +59,13 @@ export function VFLogoUpload() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
       <h3 className="text-lg font-semibold mb-4">Application Logo</h3>
-      
+
       <div className="space-y-4">
         <div className="flex items-center space-x-4">
           <div className="flex-shrink-0">
-            <div className="w-20 h-20 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
+            <div className="w-20 h-20 rounded-lg bg-[var(--ff-bg-tertiary)] flex items-center justify-center overflow-hidden">
               {currentLogo ? (
                 <img 
                   src={currentLogo} 
@@ -83,10 +83,10 @@ export function VFLogoUpload() {
           </div>
           
           <div className="flex-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-2">
               Upload a custom logo for the application. Recommended size: 200x200px
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500">
+            <p className="text-xs text-[var(--ff-text-tertiary)]">
               Supported formats: PNG, JPG, SVG (Max 5MB)
             </p>
           </div>
@@ -131,7 +131,7 @@ export function VFLogoUpload() {
         </div>
 
         {currentLogo && (
-          <div className="flex items-center text-green-600 dark:text-green-400">
+          <div className="flex items-center text-green-400">
             <Check className="w-4 h-4 mr-2" />
             <span className="text-sm">Custom logo is active</span>
           </div>

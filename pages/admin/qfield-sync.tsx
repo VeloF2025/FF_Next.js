@@ -264,12 +264,12 @@ export default function QFieldSyncPage() {
         <title>QField OES Sync v5 | FibreFlow</title>
       </Head>
 
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="min-h-screen bg-[var(--ff-bg-tertiary)] p-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">QField OES Sync v5</h1>
-            <p className="mt-2 text-gray-600">
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">QField OES Sync v5</h1>
+            <p className="mt-2 text-[var(--ff-text-secondary)]">
               Upload daily OES reports and sync to QFieldCloud automatically
             </p>
           </div>
@@ -279,14 +279,14 @@ export default function QFieldSyncPage() {
             {/* Left Column - Project, Upload & Sync */}
             <div className="lg:col-span-1 space-y-6">
               {/* Project Selection Card */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">🎯 QFieldCloud Project</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">🎯 QFieldCloud Project</h2>
 
                 {/* Project Dropdown */}
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg mb-2"
+                  className="w-full p-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg mb-2"
                   disabled={loadingProjects}
                 >
                   <option value="">
@@ -298,7 +298,7 @@ export default function QFieldSyncPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="text-xs text-[var(--ff-text-tertiary)] mb-3">
                   {projects.length} projects available
                 </p>
 
@@ -307,7 +307,7 @@ export default function QFieldSyncPage() {
                   <button
                     onClick={loadProjects}
                     disabled={loadingProjects}
-                    className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 disabled:bg-gray-300"
+                    className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     🔄 Refresh
                   </button>
@@ -321,26 +321,26 @@ export default function QFieldSyncPage() {
 
                 {/* Create Project Form */}
                 {showCreateForm && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="mt-4 p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
                     <input
                       type="text"
                       placeholder="Project Name (e.g., OES_2025_01)"
                       value={newProjectName}
                       onChange={(e) => setNewProjectName(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded mb-2 text-sm"
+                      className="w-full p-2 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded mb-2 text-sm"
                     />
                     <input
                       type="text"
                       placeholder="Description (optional)"
                       value={newProjectDesc}
                       onChange={(e) => setNewProjectDesc(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded mb-3 text-sm"
+                      className="w-full p-2 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded mb-3 text-sm"
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={handleCreateProject}
                         disabled={creatingProject}
-                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 disabled:bg-gray-300"
+                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {creatingProject ? 'Creating...' : 'Create'}
                       </button>
@@ -350,7 +350,7 @@ export default function QFieldSyncPage() {
                           setNewProjectName('');
                           setNewProjectDesc('');
                         }}
-                        className="flex-1 bg-gray-300 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-400"
+                        className="flex-1 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] px-3 py-2 rounded text-sm hover:bg-[var(--ff-bg-hover)] border border-[var(--ff-border-light)]"
                       >
                         Cancel
                       </button>
@@ -360,15 +360,15 @@ export default function QFieldSyncPage() {
               </div>
 
               {/* File Upload Card */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">📂 Upload OES Report</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">📂 Upload OES Report</h2>
 
                 {/* Drag & Drop Area */}
                 <div
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition"
+                  className="border-2 border-dashed border-[var(--ff-border-light)] rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition"
                 >
                   <input
                     ref={fileInputRef}
@@ -380,17 +380,17 @@ export default function QFieldSyncPage() {
 
                   {file ? (
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-sm font-medium text-[var(--ff-text-primary)]">{file.name}</p>
+                      <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                         {(file.size / 1024).toFixed(2)} KB
                       </p>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-[var(--ff-text-secondary)]">
                         Click or drag file here
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                         Excel (.xlsx, .xls) or CSV
                       </p>
                     </div>
@@ -401,25 +401,25 @@ export default function QFieldSyncPage() {
                 <button
                   onClick={handleUpload}
                   disabled={!file || uploading}
-                  className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
+                  className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {uploading ? 'Uploading...' : 'Upload to VPS'}
                 </button>
 
                 {/* Upload Success */}
                 {uploadSuccess && (
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-800">✅ File uploaded successfully</p>
+                  <div className="mt-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg">
+                    <p className="text-sm text-green-400">✅ File uploaded successfully</p>
                   </div>
                 )}
               </div>
 
               {/* Sync Control Card */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold mb-4">🚀 Run Sync</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">🚀 Run Sync</h2>
 
                 {lastSync && (
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
                     Last sync: {new Date(lastSync).toLocaleString()}
                   </p>
                 )}
@@ -427,13 +427,13 @@ export default function QFieldSyncPage() {
                 <button
                   onClick={handleSync}
                   disabled={syncing || !selectedProjectId}
-                  className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-medium"
+                  className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
                 >
                   {syncing ? '⏳ Syncing...' : '🚀 Run OES Sync Now'}
                 </button>
 
                 {syncing && (
-                  <p className="text-xs text-gray-500 mt-2 text-center">
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-2 text-center">
                     This may take 2-3 minutes...
                   </p>
                 )}
@@ -447,34 +447,34 @@ export default function QFieldSyncPage() {
 
               {/* Stats Card */}
               {stats && (
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-lg font-semibold mb-4">📊 Summary</h2>
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+                  <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">📊 Summary</h2>
 
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Extracted:</span>
-                      <span className="text-sm font-medium">{stats.extracted.toLocaleString()}</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Extracted:</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">{stats.extracted.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Matched:</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Matched:</span>
                       <span className="text-sm font-medium text-green-600">
                         {stats.matched.toLocaleString()}
                       </span>
                     </div>
                     {stats.matched > 0 && stats.extracted > 0 && (
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Match Rate:</span>
-                        <span className="text-sm font-medium">
+                        <span className="text-sm text-[var(--ff-text-secondary)]">Match Rate:</span>
+                        <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                           {((stats.matched / stats.extracted) * 100).toFixed(1)}%
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Warnings:</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Warnings:</span>
                       <span className="text-sm font-medium text-yellow-600">{stats.warnings}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Errors:</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Errors:</span>
                       <span className="text-sm font-medium text-red-600">{stats.errors}</span>
                     </div>
                   </div>
@@ -484,13 +484,13 @@ export default function QFieldSyncPage() {
 
             {/* Right Column - Logs */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow">
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow">
                 {/* Log Header */}
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">📜 Live Logs</h2>
+                <div className="p-4 border-b border-[var(--ff-border-light)] flex justify-between items-center">
+                  <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">📜 Live Logs</h2>
                   <button
                     onClick={handleClearLogs}
-                    className="text-sm text-gray-600 hover:text-gray-900"
+                    className="text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                   >
                     Clear
                   </button>
@@ -536,8 +536,8 @@ export default function QFieldSyncPage() {
 
                 {/* Error Alert */}
                 {error && (
-                  <div className="p-4 bg-red-50 border-t border-red-200">
-                    <p className="text-sm text-red-800">❌ {error}</p>
+                  <div className="p-4 bg-red-500/20 border-t border-red-500/50">
+                    <p className="text-sm text-red-400">❌ {error}</p>
                   </div>
                 )}
               </div>

@@ -37,14 +37,14 @@ interface RecentTicketsProps {
  */
 function getStatusBadgeStyle(status: string): string {
   const statusColors: Record<string, string> = {
-    open: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30',
-    assigned: 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
-    in_progress: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30',
-    pending_qa: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30',
-    qa_review: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30',
-    qa_approved: 'bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30',
-    closed: 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/30',
-    cancelled: 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30',
+    open: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    assigned: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    in_progress: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    pending_qa: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    qa_review: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    qa_approved: 'bg-green-500/20 text-green-400 border-green-500/30',
+    closed: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    cancelled: 'bg-red-500/20 text-red-400 border-red-500/30',
   };
 
   return statusColors[status] || 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)]';
@@ -55,11 +55,11 @@ function getStatusBadgeStyle(status: string): string {
  */
 function getPriorityBadgeStyle(priority: string): string {
   const priorityColors: Record<string, string> = {
-    low: 'text-gray-500 dark:text-gray-400',
-    normal: 'text-blue-500 dark:text-blue-400',
-    high: 'text-orange-500 dark:text-orange-400',
-    urgent: 'text-red-500 dark:text-red-400',
-    critical: 'text-red-600 dark:text-red-500 font-bold',
+    low: 'text-gray-400',
+    normal: 'text-blue-400',
+    high: 'text-orange-400',
+    urgent: 'text-red-400',
+    critical: 'text-red-500 font-bold',
   };
 
   return priorityColors[priority] || 'text-[var(--ff-text-secondary)]';
@@ -109,14 +109,14 @@ export function RecentTickets({
           <li key={ticket.id} role="listitem">
             <a
               href={`/ticketing/tickets/${ticket.id}`}
-              className="block bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-4 hover:bg-[var(--ff-bg-primary)] transition-colors"
+              className="block bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-4 hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
             <div className="flex items-start justify-between gap-3">
               {/* Left side: Ticket info */}
               <div className="flex-1 min-w-0">
                 {/* Ticket UID and Priority */}
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-mono text-sm font-medium text-blue-500 dark:text-blue-400">
+                  <span className="font-mono text-sm font-medium text-blue-400">
                     {ticket.ticket_uid}
                   </span>
                   <span className={cn('text-xs font-medium', getPriorityBadgeStyle(ticket.priority))}>

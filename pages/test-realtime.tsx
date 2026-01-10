@@ -137,14 +137,14 @@ export default function TestRealtimePage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Real-time WebSocket Test</h1>
-      
+      <h1 className="text-3xl font-bold mb-6 text-[var(--ff-text-primary)]">Real-time WebSocket Test</h1>
+
       {/* Connection Status */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Connection Status</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 mb-6 border border-[var(--ff-border-light)]">
+        <h2 className="text-xl font-semibold mb-4 text-[var(--ff-text-primary)]">Connection Status</h2>
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+          <span className="text-[var(--ff-text-primary)]">{isConnected ? 'Connected' : 'Disconnected'}</span>
         </div>
         {!isConnected && (
           <button
@@ -157,8 +157,8 @@ export default function TestRealtimePage() {
       </div>
 
       {/* Subscriptions */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Subscriptions</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 mb-6 border border-[var(--ff-border-light)]">
+        <h2 className="text-xl font-semibold mb-4 text-[var(--ff-text-primary)]">Subscriptions</h2>
         <div className="flex gap-4 mb-4">
           <button
             onClick={subscribeToProjects}
@@ -182,23 +182,23 @@ export default function TestRealtimePage() {
             Subscribe to Staff
           </button>
         </div>
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-[var(--ff-text-secondary)]">
           Active subscriptions: {subscriptions.join(', ') || 'None'}
         </div>
       </div>
 
       {/* Test Actions */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Test Actions</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 mb-6 border border-[var(--ff-border-light)]">
+        <h2 className="text-xl font-semibold mb-4 text-[var(--ff-text-primary)]">Test Actions</h2>
         <div className="space-y-4">
           <div className="flex gap-4 items-end">
             <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Project Name</label>
+              <label className="block text-sm font-medium mb-1 text-[var(--ff-text-primary)]">Project Name</label>
               <input
                 type="text"
                 value={testData.projectName}
                 onChange={(e) => setTestData(prev => ({ ...prev, projectName: e.target.value }))}
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
               />
             </div>
             <button
@@ -209,15 +209,15 @@ export default function TestRealtimePage() {
               Create Test Project
             </button>
           </div>
-          
+
           <div className="flex gap-4 items-end">
             <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Client Name</label>
+              <label className="block text-sm font-medium mb-1 text-[var(--ff-text-primary)]">Client Name</label>
               <input
                 type="text"
                 value={testData.clientName}
                 onChange={(e) => setTestData(prev => ({ ...prev, clientName: e.target.value }))}
-                className="w-full px-3 py-2 border rounded"
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
               />
             </div>
             <button
@@ -232,37 +232,37 @@ export default function TestRealtimePage() {
       </div>
 
       {/* Events Log */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Events Log</h2>
+          <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Events Log</h2>
           <button
             onClick={clearEvents}
-            className="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300"
+            className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded hover:bg-[var(--ff-bg-hover)]"
           >
             Clear
           </button>
         </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {events.length === 0 ? (
-            <p className="text-gray-500">No events received yet</p>
+            <p className="text-[var(--ff-text-secondary)]">No events received yet</p>
           ) : (
             events.map((event, index) => (
-              <div key={index} className="p-3 bg-gray-50 rounded text-sm">
+              <div key={index} className="p-3 bg-[var(--ff-bg-tertiary)] rounded text-sm border border-[var(--ff-border-light)]">
                 <div className="flex justify-between mb-1">
-                  <span className="font-medium">
+                  <span className="font-medium text-[var(--ff-text-primary)]">
                     {event.entityType} - {event.type}
                   </span>
-                  <span className="text-gray-500">
+                  <span className="text-[var(--ff-text-secondary)]">
                     {new Date(event.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
-                <div className="text-gray-600">
+                <div className="text-[var(--ff-text-secondary)]">
                   ID: {event.entityId}
                 </div>
                 {event.data && (
                   <details className="mt-2">
                     <summary className="cursor-pointer text-blue-600">View Data</summary>
-                    <pre className="mt-2 p-2 bg-white rounded text-xs overflow-x-auto">
+                    <pre className="mt-2 p-2 bg-[var(--ff-bg-secondary)] rounded text-xs overflow-x-auto text-[var(--ff-text-primary)]">
                       {JSON.stringify(event.data, null, 2)}
                     </pre>
                   </details>

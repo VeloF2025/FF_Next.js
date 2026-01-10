@@ -28,10 +28,10 @@ export function MeetingsSidebar({ upcomingMeetings, meetings }: MeetingsSidebarP
             </h3>
             <div className="space-y-3">
               {upcomingMeetings.map((meeting) => (
-                <div key={meeting.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={meeting.id} className="flex items-center justify-between p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
                   <div>
-                    <p className="font-medium text-sm">{meeting.title}</p>
-                    <p className="text-xs text-gray-600">{meeting.time} • {meeting.participants} participants</p>
+                    <p className="font-medium text-sm text-[var(--ff-text-primary)]">{meeting.title}</p>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">{meeting.time} • {meeting.participants} participants</p>
                   </div>
                   <span className={`px-2 py-1 text-xs rounded-full ${getMeetingTypeColor(meeting.type)}`}>
                     {meeting.type}
@@ -51,12 +51,12 @@ export function MeetingsSidebar({ upcomingMeetings, meetings }: MeetingsSidebarP
             <div className="space-y-3">
               {recentActionItems.map((item) => (
                 <div key={item.id} className="border-l-2 border-blue-500 pl-3">
-                  <p className="text-sm font-medium">{item.task}</p>
+                  <p className="text-sm font-medium text-[var(--ff-text-primary)]">{item.task}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <User className="w-3 h-3 text-gray-400" />
-                    <span className="text-xs text-gray-600">{item.assignee}</span>
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-600">Due {item.dueDate.toLocaleDateString()}</span>
+                    <User className="w-3 h-3 text-[var(--ff-text-tertiary)]" />
+                    <span className="text-xs text-[var(--ff-text-secondary)]">{item.assignee}</span>
+                    <span className="text-xs text-[var(--ff-text-tertiary)]">•</span>
+                    <span className="text-xs text-[var(--ff-text-secondary)]">Due {item.dueDate.toLocaleDateString()}</span>
                   </div>
                 </div>
               ))}

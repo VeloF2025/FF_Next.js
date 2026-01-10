@@ -88,8 +88,8 @@ export function FieldAppPortal() {
   const stats = getTodayStats();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardHeader 
+    <div className="min-h-screen bg-[var(--ff-bg-primary)]">
+      <DashboardHeader
         title="Field App Portal"
         onRefresh={handleRefresh}
         onExport={handleExport}
@@ -104,23 +104,23 @@ export function FieldAppPortal() {
             onSync={syncOfflineData}
             isSyncing={syncInProgress}
           />
-          
+
           <DeviceStatus {...mockDeviceStatus} />
-          
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <h3 className="font-medium text-gray-900 mb-4">Today's Progress</h3>
+
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+            <h3 className="font-medium text-[var(--ff-text-primary)] mb-4">Today's Progress</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Completed</span>
-                <span className="text-sm font-semibold text-green-600">{stats.completed}</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">Completed</span>
+                <span className="text-sm font-semibold text-green-400">{stats.completed}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">In Progress</span>
-                <span className="text-sm font-semibold text-blue-600">{stats.inProgress}</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">In Progress</span>
+                <span className="text-sm font-semibold text-blue-400">{stats.inProgress}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Pending</span>
-                <span className="text-sm font-semibold text-gray-600">{stats.pending}</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">Pending</span>
+                <span className="text-sm font-semibold text-[var(--ff-text-secondary)]">{stats.pending}</span>
               </div>
             </div>
           </div>
@@ -128,7 +128,7 @@ export function FieldAppPortal() {
 
         {/* Tab Navigation */}
         <div className="mb-6">
-          <div className="border-b border-gray-200">
+          <div className="border-b border-[var(--ff-border-light)]">
             <nav className="-mb-px flex space-x-8">
               {[
                 { key: 'tasks', label: 'Field Tasks', count: tasks.length },
@@ -140,13 +140,13 @@ export function FieldAppPortal() {
                   onClick={() => setActiveTab(tab.key as typeof activeTab)}
                   className={`py-2 px-1 border-b-2 font-medium text-sm ${
                     activeTab === tab.key
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)] hover:border-[var(--ff-border-light)]'
                   }`}
                 >
                   {tab.label}
                   {tab.count !== undefined && (
-                    <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2.5 rounded-full text-xs">
+                    <span className="ml-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] py-0.5 px-2.5 rounded-full text-xs">
                       {tab.count}
                     </span>
                   )}
@@ -184,24 +184,24 @@ export function FieldAppPortal() {
 
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Task Distribution</h3>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+                <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Task Distribution</h3>
                 <div className="space-y-4">
                   {['installation', 'maintenance', 'inspection', 'repair'].map((type) => {
                     const count = tasks.filter(t => t.type === type).length;
                     const percentage = tasks.length ? (count / tasks.length) * 100 : 0;
-                    
+
                     return (
                       <div key={type}>
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-gray-700 capitalize">
+                          <span className="text-sm font-medium text-[var(--ff-text-secondary)] capitalize">
                             {type}
                           </span>
-                          <span className="text-sm text-gray-600">{count}</span>
+                          <span className="text-sm text-[var(--ff-text-secondary)]">{count}</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
                           <div
-                            className="bg-blue-600 h-2 rounded-full"
+                            className="bg-blue-500 h-2 rounded-full"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
@@ -211,27 +211,27 @@ export function FieldAppPortal() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Priority Breakdown</h3>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+                <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Priority Breakdown</h3>
                 <div className="space-y-4">
                   {['urgent', 'high', 'medium', 'low'].map((priority) => {
                     const count = tasks.filter(t => t.priority === priority).length;
                     const color = {
-                      urgent: 'bg-red-600',
-                      high: 'bg-orange-600',
-                      medium: 'bg-yellow-600',
-                      low: 'bg-green-600'
+                      urgent: 'bg-red-500',
+                      high: 'bg-orange-500',
+                      medium: 'bg-yellow-500',
+                      low: 'bg-green-500'
                     }[priority];
-                    
+
                     return (
                       <div key={priority} className="flex items-center justify-between">
                         <div className="flex items-center">
                           <div className={`w-3 h-3 rounded-full ${color} mr-3`} />
-                          <span className="text-sm font-medium text-gray-700 capitalize">
+                          <span className="text-sm font-medium text-[var(--ff-text-secondary)] capitalize">
                             {priority}
                           </span>
                         </div>
-                        <span className="text-sm text-gray-600">{count}</span>
+                        <span className="text-sm text-[var(--ff-text-secondary)]">{count}</span>
                       </div>
                     );
                   })}

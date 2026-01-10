@@ -133,31 +133,31 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   const statusConfig = {
     connected: {
       icon: Wifi,
-      color: 'text-green-500',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200',
+      color: 'text-green-400',
+      bgColor: 'bg-green-500/20',
+      borderColor: 'border-green-500/30',
       label: 'Connected'
     },
     disconnected: {
       icon: WifiOff,
-      color: 'text-red-500',
-      bgColor: 'bg-red-50',
-      borderColor: 'border-red-200',
+      color: 'text-red-400',
+      bgColor: 'bg-red-500/20',
+      borderColor: 'border-red-500/30',
       label: 'Disconnected'
     },
     connecting: {
       icon: RefreshCw,
-      color: 'text-yellow-500',
-      bgColor: 'bg-yellow-50',
-      borderColor: 'border-yellow-200',
+      color: 'text-yellow-400',
+      bgColor: 'bg-yellow-500/20',
+      borderColor: 'border-yellow-500/30',
       label: 'Connecting...',
       animate: true
     },
     error: {
       icon: AlertCircle,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200',
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/20',
+      borderColor: 'border-orange-500/30',
       label: 'Connection Error'
     }
   };
@@ -198,7 +198,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           </span>
           
           {showDetails && (
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="text-xs text-[var(--ff-text-secondary)] mt-0.5">
               {connectionMode && (
                 <span className="capitalize">{connectionMode}</span>
               )}
@@ -221,7 +221,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
                 socketIOAdapter.connect();
               }
             }}
-            className="ml-2 text-xs text-blue-500 hover:text-blue-600 underline"
+            className="ml-2 text-xs text-blue-400 hover:text-blue-500 underline"
           >
             Reconnect
           </button>

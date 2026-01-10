@@ -43,22 +43,22 @@ export function RagDashboard() {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-3 text-gray-600">Loading RAG status...</span>
+        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading RAG status...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 text-red-700">
+      <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
+        <div className="flex items-center gap-2 text-red-400">
           <AlertCircle className="h-5 w-5" />
           <span className="font-medium">Error loading RAG dashboard</span>
         </div>
-        <p className="text-sm text-red-600 mt-2">{error}</p>
+        <p className="text-sm text-red-400 mt-2">{error}</p>
         <button
           onClick={loadRagData}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
+          className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 text-sm"
         >
           <RefreshCw className="h-4 w-4" />
           Retry
@@ -82,13 +82,13 @@ export function RagDashboard() {
 
       {/* Filter Buttons */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm font-medium text-gray-700">Filter:</span>
+        <span className="text-sm font-medium text-[var(--ff-text-primary)]">Filter:</span>
         <button
           onClick={() => setFilter('all')}
           className={`px-3 py-1 text-sm rounded ${
             filter === 'all'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
           }`}
         >
           All ({contractors.length})
@@ -98,7 +98,7 @@ export function RagDashboard() {
           className={`px-3 py-1 text-sm rounded ${
             filter === 'red'
               ? 'bg-red-600 text-white'
-              : 'bg-red-100 text-red-700 hover:bg-red-200'
+              : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
           }`}
         >
           🔴 Red ({summary.red})
@@ -108,7 +108,7 @@ export function RagDashboard() {
           className={`px-3 py-1 text-sm rounded ${
             filter === 'amber'
               ? 'bg-yellow-600 text-white'
-              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+              : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
           }`}
         >
           🟡 Amber ({summary.amber})
@@ -118,7 +118,7 @@ export function RagDashboard() {
           className={`px-3 py-1 text-sm rounded ${
             filter === 'green'
               ? 'bg-green-600 text-white'
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
+              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
           }`}
         >
           🟢 Green ({summary.green})
@@ -126,43 +126,43 @@ export function RagDashboard() {
       </div>
 
       {/* Contractors Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                 Contractor
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                 Overall
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                 {RAG_CATEGORY_CONFIG.financial.icon} Financial
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                 {RAG_CATEGORY_CONFIG.compliance.icon} Compliance
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                 {RAG_CATEGORY_CONFIG.performance.icon} Performance
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                 {RAG_CATEGORY_CONFIG.safety.icon} Safety
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-[var(--ff-border-light)]">
             {filteredContractors.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">
                   No contractors found with {filter} status
                 </td>
               </tr>
             ) : (
               filteredContractors.map((contractor: any) => (
-                <tr key={contractor.contractorId} className="hover:bg-gray-50">
+                <tr key={contractor.contractorId} className="hover:bg-[var(--ff-bg-hover)]">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{contractor.companyName || 'Unknown'}</div>
-                    <div className="text-xs text-gray-500">ID: {contractor.contractorId.substring(0, 8)}...</div>
+                    <div className="font-medium text-[var(--ff-text-primary)]">{contractor.companyName || 'Unknown'}</div>
+                    <div className="text-xs text-[var(--ff-text-tertiary)]">ID: {contractor.contractorId.substring(0, 8)}...</div>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <RagStatusBadge status={contractor.overall} />

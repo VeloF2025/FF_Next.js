@@ -1,8 +1,11 @@
 // Check if we're in Edge Runtime (middleware)
 const isEdgeRuntime = typeof globalThis.EdgeRuntime !== 'undefined';
 
+// Check if we're in browser
+const isBrowser = typeof window !== 'undefined';
+
 // Conditionally import based on runtime
-const pino = !isEdgeRuntime ? require('pino') : null;
+const pino = !isEdgeRuntime && !isBrowser ? require('pino') : null;
 type Logger = any;
 
 // Sensitive field patterns to redact
@@ -45,24 +48,44 @@ const getLogLevel = (): string => {
 // Determine if we're in production
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Create a browser/edge-safe mock logger
+const createMockLogger = () => {
+  const noop = () => {};
+  const mockLog = (level: string) => (...args: unknown[]) => {
+    if (isBrowser && !isProduction) {
+      // eslint-disable-next-line no-console
+      console[level === 'fatal' ? 'error' : level]?.(...args) || console.log(...args);
+    }
+  };
+  return {
+    info: mockLog('info'),
+    error: mockLog('error'),
+    warn: mockLog('warn'),
+    debug: mockLog('debug'),
+    trace: noop,
+    fatal: mockLog('fatal'),
+    child: () => createMockLogger(),
+  };
+};
+
 // Create the base logger with simplified config
-const baseLogger = pino({
+const baseLogger = pino ? pino({
   level: getLogLevel(),
-  
+
   // Format for better readability (both dev and prod for now)
   formatters: {
     level: (label) => {
       return { level: label };
     },
     bindings: (bindings) => {
-      return { 
+      return {
         pid: bindings.pid,
         host: bindings.hostname,
         env: process.env.NODE_ENV || 'development'
       };
     }
   },
-  
+
   // Redaction configuration
   redact: {
     paths: REDACTED_FIELDS.flatMap(field => [
@@ -76,16 +99,16 @@ const baseLogger = pino({
     ]),
     censor: '[REDACTED]'
   },
-  
+
   // Timestamp configuration
   timestamp: pino.stdTimeFunctions.isoTime,
-  
+
   // Message key
   messageKey: 'msg',
-  
+
   // Error key
   errorKey: 'error',
-  
+
   // Pretty print in development for better readability (server-side only)
   ...((!isProduction && typeof process !== 'undefined' && process.stdout?.isTTY) ? {
     transport: {
@@ -98,7 +121,7 @@ const baseLogger = pino({
       }
     }
   } : {})
-});
+}) : createMockLogger();
 
 // Create child loggers for different modules
 export const createLogger = (module: string): Logger => {

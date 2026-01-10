@@ -77,7 +77,7 @@ export function WaMonitorGrid({ drops, loading = false }: WaMonitorGridProps) {
             {formatRelativeTime(params.value)}
           </span>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-[var(--ff-text-tertiary)]">-</span>
         )
       ),
     },

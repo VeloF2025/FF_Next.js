@@ -31,7 +31,7 @@ export function EnhancedSOWDisplay({ projectId, projectName = 'Project' }: Enhan
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600">Loading SOW data...</span>
+        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading SOW data...</span>
       </div>
     );
   }
@@ -44,10 +44,10 @@ export function EnhancedSOWDisplay({ projectId, projectName = 'Project' }: Enhan
   // Show upload wizard if requested
   if (showUploadWizard) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6">
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Import SOW Data</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Import SOW Data</h2>
+          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
             Upload Excel files containing poles, drops, and fibre scope data
           </p>
         </div>
@@ -61,10 +61,10 @@ export function EnhancedSOWDisplay({ projectId, projectName = 'Project' }: Enhan
           }}
         />
         
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-[var(--ff-border-light)]">
           <button
             onClick={() => setShowUploadWizard(false)}
-            className="text-sm text-gray-600 hover:text-gray-700"
+            className="text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
           >
             Cancel and go back
           </button>
@@ -74,7 +74,7 @@ export function EnhancedSOWDisplay({ projectId, projectName = 'Project' }: Enhan
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
       {/* Header */}
       <SOWHeader 
         hasData={hasData}

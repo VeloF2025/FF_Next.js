@@ -36,17 +36,17 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
   const getStatusColor = () => {
     switch (supplier.status) {
       case SupplierStatus.ACTIVE:
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-500/20 text-green-400';
       case SupplierStatus.INACTIVE:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-500/20 text-gray-400';
       case SupplierStatus.PENDING:
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-500/20 text-yellow-400';
       case SupplierStatus.SUSPENDED:
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-500/20 text-orange-400';
       case SupplierStatus.BLACKLISTED:
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-500/20 text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-500/20 text-gray-400';
     }
   };
 
@@ -66,11 +66,11 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
             className={`h-3 w-3 ${
               star <= Math.round(rating)
                 ? 'text-yellow-400 fill-current'
-                : 'text-gray-300'
+                : 'text-[var(--ff-text-tertiary)]'
             }`}
           />
         ))}
-        <span className="text-xs text-gray-500 ml-1">
+        <span className="text-xs text-[var(--ff-text-secondary)] ml-1">
           ({totalReviews})
         </span>
       </div>
@@ -80,7 +80,7 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
   return (
     <div
       onClick={handleClick}
-      className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
+      className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)] hover:shadow-lg transition-shadow cursor-pointer"
     >
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
@@ -91,42 +91,42 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
               {supplier.status}
             </span>
             {supplier.isPreferred && (
-              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex items-center gap-1">
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400 flex items-center gap-1">
                 <Star className="h-3 w-3" />
                 Preferred
               </span>
             )}
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">{supplier.companyName || supplier.name}</h3>
-          <p className="text-sm text-gray-500">Reg: {supplier.registrationNo || supplier.registrationNumber}</p>
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{supplier.companyName || supplier.name}</h3>
+          <p className="text-sm text-[var(--ff-text-secondary)]">Reg: {supplier.registrationNo || supplier.registrationNumber}</p>
         </div>
         <button
           onClick={(e) => {
             e.stopPropagation();
             // TODO: Show dropdown menu
           }}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
         >
-          <MoreVertical className="h-4 w-4 text-gray-400" />
+          <MoreVertical className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
         </button>
       </div>
 
       {/* Contact Info */}
       <div className="space-y-2 mb-4">
-        <div className="flex items-center text-sm text-gray-600">
-          <Building2 className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <Building2 className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>{supplier.businessType}</span>
         </div>
-        <div className="flex items-center text-sm text-gray-600">
-          <Mail className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <Mail className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span className="truncate">{supplier.primaryContact?.email || supplier.email}</span>
         </div>
-        <div className="flex items-center text-sm text-gray-600">
-          <Phone className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <Phone className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>{supplier.primaryContact?.phone || supplier.phone}</span>
         </div>
-        <div className="flex items-center text-sm text-gray-600">
-          <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <MapPin className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>{supplier.addresses?.physical?.city || 'N/A'}, {supplier.addresses?.physical?.state || 'N/A'}</span>
         </div>
       </div>
@@ -137,13 +137,13 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
           {supplier.categories.slice(0, 3).map((category) => (
             <span
               key={category}
-              className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded"
+              className="px-2 py-1 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] text-xs rounded"
             >
               {category.replace(/_/g, ' ')}
             </span>
           ))}
           {supplier.categories.length > 3 && (
-            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+            <span className="px-2 py-1 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] text-xs rounded">
               +{supplier.categories.length - 3} more
             </span>
           )}
@@ -151,39 +151,39 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
       </div>
 
       {/* Performance */}
-      <div className="border-t border-gray-200 pt-4">
+      <div className="border-t border-[var(--ff-border-light)] pt-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-gray-500">Rating</p>
+            <p className="text-xs text-[var(--ff-text-secondary)]">Rating</p>
             {renderRating()}
           </div>
           <div>
-            <p className="text-xs text-gray-500">Performance</p>
+            <p className="text-xs text-[var(--ff-text-secondary)]">Performance</p>
             <div className="flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              <span className="text-sm font-medium text-gray-900">
+              <TrendingUp className="h-3 w-3 text-green-400" />
+              <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                 {supplier.performance?.overallScore || 0}%
               </span>
             </div>
           </div>
         </div>
-        
+
         {/* Compliance Status */}
         <div className="mt-3 flex items-center gap-2">
           {supplier.complianceStatus?.taxCompliant && (
-            <span className="text-xs text-green-600 flex items-center gap-1">
+            <span className="text-xs text-green-400 flex items-center gap-1">
               <CheckCircle className="h-3 w-3" />
               Tax
             </span>
           )}
           {supplier.complianceStatus?.isoCompliant && (
-            <span className="text-xs text-green-600 flex items-center gap-1">
+            <span className="text-xs text-green-400 flex items-center gap-1">
               <CheckCircle className="h-3 w-3" />
               ISO
             </span>
           )}
           {supplier.complianceStatus?.beeLevel && (
-            <span className="text-xs text-blue-600">
+            <span className="text-xs text-blue-400">
               BBBEE L{supplier.complianceStatus.beeLevel}
             </span>
           )}
@@ -192,7 +192,7 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
 
       {/* Active Indicators */}
       {(supplier.performance?.metrics?.totalOrders) && (
-        <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between text-xs text-gray-500">
+        <div className="mt-3 pt-3 border-t border-[var(--ff-border-light)] flex justify-between text-xs text-[var(--ff-text-secondary)]">
           <span>{supplier.performance.metrics.totalOrders} total orders</span>
           {supplier.performance.metrics.completedOrders > 0 && (
             <span>{supplier.performance.metrics.completedOrders} completed</span>

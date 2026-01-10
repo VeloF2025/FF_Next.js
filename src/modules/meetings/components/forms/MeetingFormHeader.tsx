@@ -12,11 +12,11 @@ interface MeetingFormHeaderProps {
 
 export function MeetingFormHeader({ isEditing, onClose }: MeetingFormHeaderProps) {
   return (
-    <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-      <h2 className="text-lg font-semibold text-gray-900">
+    <div className="sticky top-0 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] p-4 flex items-center justify-between">
+      <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
         {isEditing ? 'Edit Meeting' : 'New Meeting'}
       </h2>
-      <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-md">
+      <button onClick={onClose} className="p-2 hover:bg-[var(--ff-bg-hover)] rounded-md">
         <X className="w-5 h-5" />
       </button>
     </div>

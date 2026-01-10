@@ -56,10 +56,10 @@ export function PositionsTab({ positions, onAdd, onEdit, onDelete, onInitialize 
         const levelNum = parseInt(level.replace('Level ', ''));
         return (
           <div key={level} className="mb-6">
-            <h3 className="text-lg font-medium text-gray-700 mb-3">
+            <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-3">
               {levelNames[levelNum]} ({level})
             </h3>
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {levelPositions.map((position) => (
                   <PositionCard
@@ -86,23 +86,23 @@ interface PositionCardProps {
 
 function PositionCard({ position, onEdit, onDelete }: PositionCardProps) {
   return (
-    <div className="bg-white rounded-lg p-3 border border-gray-200 flex justify-between items-center">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-3 border border-[var(--ff-border-light)] flex justify-between items-center">
       <div>
-        <span className="font-medium text-gray-900">{position.name}</span>
+        <span className="font-medium text-[var(--ff-text-primary)]">{position.name}</span>
         {position.department && (
-          <span className="text-sm text-gray-500 ml-2">({position.department})</span>
+          <span className="text-sm text-[var(--ff-text-secondary)] ml-2">({position.department})</span>
         )}
       </div>
       <div className="flex space-x-1">
         <button
           onClick={() => onEdit(position)}
-          className="p-1 text-gray-400 hover:text-blue-600"
+          className="p-1 text-[var(--ff-text-tertiary)] hover:text-blue-600"
         >
           <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(position.id)}
-          className="p-1 text-gray-400 hover:text-red-600"
+          className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-600"
         >
           <Trash2 className="w-4 h-4" />
         </button>

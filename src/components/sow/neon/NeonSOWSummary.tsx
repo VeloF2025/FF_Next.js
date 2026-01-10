@@ -50,21 +50,21 @@ export function NeonSOWSummary({ summary, neonHealth }: NeonSOWSummaryProps) {
       </div>
 
       {/* Data Source Info */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h4 className="font-medium text-gray-900 mb-3">Data Source</h4>
+      <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+        <h4 className="font-medium text-[var(--ff-text-primary)] mb-3">Data Source</h4>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-600">Database:</span>
+            <span className="text-[var(--ff-text-secondary)]">Database:</span>
             <span className="ml-2 font-medium">Neon PostgreSQL</span>
           </div>
           <div>
-            <span className="text-gray-600">Tables:</span>
+            <span className="text-[var(--ff-text-secondary)]">Tables:</span>
             <span className="ml-2 font-medium">
               {neonHealth?.availableTables?.join(', ') || 'Unknown'}
             </span>
           </div>
           <div>
-            <span className="text-gray-600">Status:</span>
+            <span className="text-[var(--ff-text-secondary)]">Status:</span>
             <span className={`ml-2 font-medium ${
               neonHealth?.connected ? 'text-green-600' : 'text-red-600'
             }`}>
@@ -72,7 +72,7 @@ export function NeonSOWSummary({ summary, neonHealth }: NeonSOWSummaryProps) {
             </span>
           </div>
           <div>
-            <span className="text-gray-600">Version:</span>
+            <span className="text-[var(--ff-text-secondary)]">Version:</span>
             <span className="ml-2 font-medium text-xs">
               {neonHealth?.info?.version?.split(' ').slice(0, 2).join(' ') || 'Unknown'}
             </span>

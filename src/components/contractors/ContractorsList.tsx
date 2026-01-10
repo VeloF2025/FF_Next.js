@@ -85,13 +85,13 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 max-w-md">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
             <input
               type="text"
               placeholder="Search contractors..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -106,61 +106,61 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
       </div>
 
       {/* Contractors count */}
-      <div className="text-sm text-gray-600">
+      <div className="text-sm text-[var(--ff-text-secondary)]">
         Showing {filteredContractors.length} of {contractors.length} contractors
       </div>
 
       {/* Contractors table */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
                 Company
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
                 Contact
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
                 Compliance
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-primary)] uppercase">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-[var(--ff-border-light)]">
             {filteredContractors.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   No contractors found
                 </td>
               </tr>
             ) : (
               filteredContractors.map((contractor) => (
-                <tr key={contractor.id} className="hover:bg-gray-50">
+                <tr key={contractor.id} className="hover:bg-[var(--ff-bg-hover)]">
                   <td className="px-4 py-3">
                     <div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-[var(--ff-text-primary)]">
                         {contractor.companyName}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-[var(--ff-text-secondary)]">
                         {contractor.registrationNumber}
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <div>
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-[var(--ff-text-primary)]">
                         {contractor.contactPerson}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-[var(--ff-text-secondary)]">
                         {contractor.email}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-[var(--ff-text-secondary)]">
                         {contractor.phone}
                       </div>
                     </div>
@@ -169,12 +169,12 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         getStatusColor(contractor.status) === 'green'
-                          ? 'bg-green-100 text-green-800'
+                          ? 'bg-green-500/20 text-green-400'
                           : getStatusColor(contractor.status) === 'yellow'
-                          ? 'bg-yellow-100 text-yellow-800'
+                          ? 'bg-yellow-500/20 text-yellow-400'
                           : getStatusColor(contractor.status) === 'red'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-blue-100 text-blue-800'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-blue-500/20 text-blue-400'
                       }`}
                     >
                       {contractor.status.replace('_', ' ').toUpperCase()}
@@ -184,12 +184,12 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         getComplianceColor(contractor.complianceStatus) === 'green'
-                          ? 'bg-green-100 text-green-800'
+                          ? 'bg-green-500/20 text-green-400'
                           : getComplianceColor(contractor.complianceStatus) === 'yellow'
-                          ? 'bg-yellow-100 text-yellow-800'
+                          ? 'bg-yellow-500/20 text-yellow-400'
                           : getComplianceColor(contractor.complianceStatus) === 'red'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-blue-100 text-blue-800'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-blue-500/20 text-blue-400'
                       }`}
                     >
                       {contractor.complianceStatus.replace('_', ' ').toUpperCase()}

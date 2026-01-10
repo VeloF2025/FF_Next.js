@@ -83,7 +83,7 @@ const PurchaseOrdersPage: React.FC = () => {
       key: 'poNumber',
       header: 'PO Number',
       render: (po: POListItem) => (
-        <div className="font-medium text-blue-600 hover:text-blue-800">
+        <div className="font-medium text-blue-400 hover:text-blue-300">
           {po.poNumber}
         </div>
       )
@@ -93,8 +93,8 @@ const PurchaseOrdersPage: React.FC = () => {
       header: 'Title',
       render: (po: POListItem) => (
         <div>
-          <div className="font-medium text-gray-900">{po.title}</div>
-          <div className="text-sm text-gray-500">{po.supplier.name}</div>
+          <div className="font-medium text-[var(--ff-text-primary)]">{po.title}</div>
+          <div className="text-sm text-[var(--ff-text-secondary)]">{po.supplier.name}</div>
         </div>
       )
     },
@@ -117,7 +117,7 @@ const PurchaseOrdersPage: React.FC = () => {
             <Truck className="h-3 w-3" />
             <StatusBadge status={po.deliveryStatus} />
           </div>
-          <div className="text-gray-500 mt-1">
+          <div className="text-[var(--ff-text-secondary)] mt-1">
             {formatDate(po.expectedDeliveryDate)}
           </div>
         </div>
@@ -131,7 +131,7 @@ const PurchaseOrdersPage: React.FC = () => {
           <div className="font-medium">
             {formatCurrency(po.totalAmount, po.currency)}
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-[var(--ff-text-secondary)]">
             {po.itemCount} items
           </div>
         </div>
@@ -143,26 +143,26 @@ const PurchaseOrdersPage: React.FC = () => {
       render: (po: POListItem) => {
         const deliveredPct = po.itemCount > 0 ? (po.deliveredItemCount / po.itemCount) * 100 : 0;
         const invoicedPct = po.itemCount > 0 ? (po.invoicedItemCount / po.itemCount) * 100 : 0;
-        
+
         return (
           <div className="space-y-1">
             <div className="flex items-center space-x-1 text-xs">
-              <div className="w-12 bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-green-600 h-2 rounded-full" 
+              <div className="w-12 bg-[var(--ff-bg-tertiary)] rounded-full h-2">
+                <div
+                  className="bg-green-400 h-2 rounded-full"
                   style={{ width: `${deliveredPct}%` }}
                 />
               </div>
-              <span className="text-gray-600">{Math.round(deliveredPct)}%</span>
+              <span className="text-[var(--ff-text-secondary)]">{Math.round(deliveredPct)}%</span>
             </div>
             <div className="flex items-center space-x-1 text-xs">
-              <div className="w-12 bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full" 
+              <div className="w-12 bg-[var(--ff-bg-tertiary)] rounded-full h-2">
+                <div
+                  className="bg-blue-400 h-2 rounded-full"
                   style={{ width: `${invoicedPct}%` }}
                 />
               </div>
-              <span className="text-gray-600">{Math.round(invoicedPct)}%</span>
+              <span className="text-[var(--ff-text-secondary)]">{Math.round(invoicedPct)}%</span>
             </div>
           </div>
         );
@@ -178,8 +178,8 @@ const PurchaseOrdersPage: React.FC = () => {
       value: stats.total.toString(),
       trend: { value: 0, isPositive: true },
       icon: FileText,
-      iconColor: 'text-blue-600',
-      iconBgColor: 'bg-blue-100'
+      iconColor: 'text-blue-400',
+      iconBgColor: 'bg-blue-500/20'
     },
     {
       title: 'Total Value',
@@ -187,8 +187,8 @@ const PurchaseOrdersPage: React.FC = () => {
       value: formatCurrency(stats.totalValue),
       trend: { value: 0, isPositive: true },
       icon: DollarSign,
-      iconColor: 'text-green-600',
-      iconBgColor: 'bg-green-100'
+      iconColor: 'text-green-400',
+      iconBgColor: 'bg-green-500/20'
     },
     {
       title: 'On-Time Delivery',
@@ -196,8 +196,8 @@ const PurchaseOrdersPage: React.FC = () => {
       value: `${stats.onTimeDeliveries}/${stats.onTimeDeliveries + stats.lateDeliveries}`,
       trend: { value: 0, isPositive: true },
       icon: TrendingUp,
-      iconColor: 'text-purple-600',
-      iconBgColor: 'bg-purple-100'
+      iconColor: 'text-purple-400',
+      iconBgColor: 'bg-purple-500/20'
     },
     {
       title: 'Avg Processing Time',
@@ -205,8 +205,8 @@ const PurchaseOrdersPage: React.FC = () => {
       value: `${stats.averageProcessingDays} days`,
       trend: { value: 0, isPositive: true },
       icon: Clock,
-      iconColor: 'text-gray-600',
-      iconBgColor: 'bg-gray-100'
+      iconColor: 'text-[var(--ff-text-secondary)]',
+      iconBgColor: 'bg-[var(--ff-bg-tertiary)]'
     }
   ] : [];
   

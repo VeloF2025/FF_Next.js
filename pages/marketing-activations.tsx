@@ -97,10 +97,10 @@ export default function MarketingActivationsPage() {
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)] mb-2">
               Marketing Activations
             </h1>
-            <p className="text-gray-600">
+            <p className="text-[var(--ff-text-secondary)]">
               Track drop number submissions from marketing team
             </p>
           </div>
@@ -108,20 +108,20 @@ export default function MarketingActivationsPage() {
           {/* Date Selector & Export */}
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Select Date
               </label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
               />
             </div>
             <button
               onClick={exportToCSV}
               disabled={!data || data.submissions.length === 0}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-500/50 disabled:cursor-not-allowed"
             >
               Export to CSV
             </button>
@@ -129,7 +129,7 @@ export default function MarketingActivationsPage() {
 
           {/* Error */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400">
               {error}
             </div>
           )}
@@ -137,7 +137,7 @@ export default function MarketingActivationsPage() {
           {/* Loading */}
           {loading && !data && (
             <div className="flex items-center justify-center py-12">
-              <div className="text-gray-600">Loading...</div>
+              <div className="text-[var(--ff-text-secondary)]">Loading...</div>
             </div>
           )}
 
@@ -146,31 +146,31 @@ export default function MarketingActivationsPage() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 {/* Total */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-600 mb-2">
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
+                  <div className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
                     Total Submissions
                   </div>
-                  <div className="text-3xl font-bold text-gray-900">
+                  <div className="text-3xl font-bold text-[var(--ff-text-primary)]">
                     {data.stats.total}
                   </div>
                 </div>
 
                 {/* Valid */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-600 mb-2">
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
+                  <div className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
                     Valid Drops
                   </div>
-                  <div className="text-3xl font-bold text-green-600">
+                  <div className="text-3xl font-bold text-green-400">
                     {data.stats.valid}
                   </div>
                 </div>
 
                 {/* Invalid */}
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="text-sm font-medium text-gray-600 mb-2">
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
+                  <div className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
                     Invalid Drops
                   </div>
-                  <div className="text-3xl font-bold text-red-600">
+                  <div className="text-3xl font-bold text-red-400">
                     {data.stats.invalid}
                   </div>
                 </div>
@@ -178,66 +178,66 @@ export default function MarketingActivationsPage() {
 
               {/* Submissions Table */}
               {data.submissions.length > 0 ? (
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow overflow-hidden border border-[var(--ff-border-light)]">
+                  <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+                    <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                       Recent Submissions ({data.submissions.length})
                     </h2>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+                      <thead className="bg-[var(--ff-bg-tertiary)]">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                             Drop Number
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                             Submitted At
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                             Submitted By
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                             GPS Location
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                             Status
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
                         {data.submissions.map((sub, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[var(--ff-text-primary)]">
                               {sub.dropNumber}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                               {new Date(sub.submittedAt).toLocaleString()}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                               {sub.userName || sub.submittedBy || '-'}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                               {sub.latitude && sub.longitude ? (
                                 <a
                                   href={`https://www.google.com/maps?q=${sub.latitude},${sub.longitude}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                                  className="text-blue-600 hover:text-blue-400 hover:underline"
                                   title={`${sub.latitude}, ${sub.longitude}`}
                                 >
                                   📍 View Map
                                 </a>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-[var(--ff-text-tertiary)]">-</span>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                   sub.isValid
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-500/20 text-green-400'
+                                    : 'bg-red-500/20 text-red-400'
                                 }`}
                               >
                                 {sub.isValid ? '✅ Valid' : '❌ Invalid'}
@@ -250,8 +250,8 @@ export default function MarketingActivationsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-lg shadow p-12 text-center">
-                  <div className="text-gray-500">
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-12 text-center border border-[var(--ff-border-light)]">
+                  <div className="text-[var(--ff-text-secondary)]">
                     No submissions for {selectedDate}
                   </div>
                 </div>
@@ -260,7 +260,7 @@ export default function MarketingActivationsPage() {
           )}
 
           {/* Auto-refresh indicator */}
-          <div className="mt-4 text-center text-sm text-gray-500">
+          <div className="mt-4 text-center text-sm text-[var(--ff-text-tertiary)]">
             Auto-refreshing every 30 seconds
           </div>
         </div>

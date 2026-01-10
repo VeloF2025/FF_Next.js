@@ -24,13 +24,13 @@ export function ConnectionStatus({
   const getStatusColor = () => {
     switch (status) {
       case 'connected':
-        return 'text-green-600 bg-green-100';
+        return 'text-green-600 bg-green-500/20';
       case 'disconnected':
-        return 'text-gray-600 bg-gray-100';
+        return 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)]';
       case 'error':
-        return 'text-red-600 bg-red-100';
+        return 'text-red-600 bg-red-500/20';
       default:
-        return 'text-gray-600 bg-gray-100';
+        return 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)]';
     }
   };
 
@@ -50,25 +50,25 @@ export function ConnectionStatus({
   const StatusIcon = getStatusIcon();
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
       <div className="flex items-start justify-between">
         <div className="flex items-center">
           <div className={`p-3 rounded-lg ${getStatusColor()}`}>
             <Icon className="h-6 w-6" />
           </div>
           <div className="ml-4">
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <p className="text-sm text-gray-600">{url}</p>
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{title}</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)]">{url}</p>
           </div>
         </div>
         <div className="flex items-center">
-          <StatusIcon className={`h-5 w-5 ${status === 'connected' ? 'text-green-600' : status === 'error' ? 'text-red-600' : 'text-gray-400'}`} />
-          <span className={`ml-2 text-sm font-medium ${status === 'connected' ? 'text-green-600' : status === 'error' ? 'text-red-600' : 'text-gray-600'}`}>
+          <StatusIcon className={`h-5 w-5 ${status === 'connected' ? 'text-green-600' : status === 'error' ? 'text-red-600' : 'text-[var(--ff-text-tertiary)]'}`} />
+          <span className={`ml-2 text-sm font-medium ${status === 'connected' ? 'text-green-600' : status === 'error' ? 'text-red-600' : 'text-[var(--ff-text-secondary)]'}`}>
             {status === 'connected' ? 'Connected' : status === 'error' ? 'Error' : 'Disconnected'}
           </span>
         </div>
       </div>
-      <div className="mt-4 text-xs text-gray-500">
+      <div className="mt-4 text-xs text-[var(--ff-text-tertiary)]">
         Last checked: {new Date(lastCheck).toLocaleTimeString()}
       </div>
     </div>

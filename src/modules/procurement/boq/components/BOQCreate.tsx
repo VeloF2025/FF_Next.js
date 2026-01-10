@@ -18,9 +18,9 @@ export function BOQCreate({ projectId: _projectId, onSave: _onSave, onCancel: _o
     <ProcurementErrorBoundary level="component">
       <div className="p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Create Bill of Quantities</h1>
-          
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] mb-6">Create Bill of Quantities</h1>
+
+          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
                 <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
@@ -28,8 +28,8 @@ export function BOQCreate({ projectId: _projectId, onSave: _onSave, onCancel: _o
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">Component Ready for Implementation</h3>
-                <div className="mt-2 text-sm text-yellow-700">
+                <h3 className="text-sm font-medium text-yellow-400">Component Ready for Implementation</h3>
+                <div className="mt-2 text-sm text-yellow-300">
                   <p>BOQCreate component placeholder. Will implement complete form following FibreFlow Universal Module Structure with all BOQ fields defined in the spec.</p>
                 </div>
               </div>

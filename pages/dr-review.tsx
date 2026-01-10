@@ -99,17 +99,17 @@ function DRReviewPage() {
                 <meta name="description" content="AI-powered fiber installation photo evaluation" />
             </Head>
 
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
                 {/* Header */}
-                <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <header className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-6 py-4">
                     <div className="max-w-[1800px] mx-auto flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <Camera className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                            <Camera className="w-8 h-8 text-blue-600" />
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">
                                     DR Photo Review
                                 </h1>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                <p className="text-sm text-[var(--ff-text-secondary)]">
                                     AI-powered fiber installation verification
                                 </p>
                             </div>
@@ -136,10 +136,10 @@ function DRReviewPage() {
 
                             {/* Center - Photo Gallery */}
                             <section className="lg:col-span-6 h-full overflow-y-auto">
-                                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 h-full">
+                                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 h-full border border-[var(--ff-border-light)]">
                                     {selectedDR ? (
                                         <>
-                                            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                                            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
                                                 Photos - {selectedDR}
                                             </h2>
                                             <DRPhotoGallery
@@ -151,11 +151,11 @@ function DRReviewPage() {
                                     ) : (
                                         <div className="flex items-center justify-center h-full">
                                             <div className="text-center">
-                                                <Camera className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                                                <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                                <Camera className="w-16 h-16 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+                                                <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">
                                                     Select a DR
                                                 </h3>
-                                                <p className="text-gray-500 dark:text-gray-400">
+                                                <p className="text-[var(--ff-text-secondary)]">
                                                     Choose a DR from the list to view photos and run AI evaluation
                                                 </p>
                                             </div>

@@ -64,7 +64,7 @@ export default function BOQViewer({
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading BOQ...</span>
+        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading BOQ...</span>
       </div>
     );
   }
@@ -73,9 +73,9 @@ export default function BOQViewer({
   if (!boqData) {
     return (
       <div className="text-center py-12">
-        <FileText className="mx-auto h-12 w-12 text-gray-400" />
-        <h3 className="mt-4 text-lg font-medium text-gray-900">BOQ Not Found</h3>
-        <p className="mt-2 text-sm text-gray-500">The requested BOQ could not be loaded.</p>
+        <FileText className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)]" />
+        <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">BOQ Not Found</h3>
+        <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">The requested BOQ could not be loaded.</p>
       </div>
     );
   }
@@ -109,7 +109,7 @@ export default function BOQViewer({
 
       {/* Table */}
       {filteredAndSortedItems.length > 0 ? (
-        <div className="bg-white rounded-lg border">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
           <BOQViewerTable
             items={paginatedItems}
             mode={mode}

@@ -214,16 +214,16 @@ export const VirtualizedTable = memo(<T,>({
     
     return (
       <div
-        className={`flex items-center border-b border-gray-200 ${
-          onRowClick ? 'hover:bg-gray-50 cursor-pointer' : ''
+        className={`flex items-center border-b border-[var(--ff-border-light)] ${
+          onRowClick ? 'hover:bg-[var(--ff-bg-hover)] cursor-pointer' : ''
         }`}
         onClick={handleRowClick}
       >
         {columns.map((column, columnIndex) => {
-          const value = column.render 
-            ? column.render(item, index) 
+          const value = column.render
+            ? column.render(item, index)
             : (item as any)[column.key];
-            
+
           return (
             <div
               key={`${column.key}-${columnIndex}`}
@@ -239,13 +239,13 @@ export const VirtualizedTable = memo(<T,>({
   }, [columns, onRowClick]);
 
   return (
-    <div className={`${className} border border-gray-200 rounded-lg overflow-hidden`}>
+    <div className={`${className} border border-[var(--ff-border-light)] rounded-lg overflow-hidden`}>
       {/* Table Header */}
-      <div className="flex bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+      <div className="flex bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)] sticky top-0 z-10">
         {columns.map((column, index) => (
           <div
             key={`header-${column.key}-${index}`}
-            className="px-4 py-3 font-medium text-sm text-gray-900 truncate"
+            className="px-4 py-3 font-medium text-sm text-[var(--ff-text-primary)] truncate"
             style={{ width: column.width || `${100 / columns.length}%` }}
           >
             {column.header}

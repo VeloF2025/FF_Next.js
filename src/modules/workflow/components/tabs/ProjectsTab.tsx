@@ -69,25 +69,25 @@ export function ProjectsTab() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+      <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">
               Project Workflows
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
               Manage workflow assignments and track execution progress
             </p>
           </div>
           <div className="flex items-center space-x-3">
             {/* View Toggle */}
-            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <div className="flex bg-[var(--ff-bg-tertiary)] rounded-lg p-1">
               <button
                 onClick={() => setActiveView('list')}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   activeView === 'list'
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    ? 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 Workflows
@@ -96,8 +96,8 @@ export function ProjectsTab() {
                 onClick={() => setActiveView('analytics')}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center space-x-1 ${
                   activeView === 'analytics'
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    ? 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 <BarChart3 className="w-4 h-4" />
@@ -119,44 +119,44 @@ export function ProjectsTab() {
           <>
             {/* Stats Cards */}
             <div className="grid grid-cols-4 gap-4 mt-6">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
                 <div className="flex items-center">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Workflows</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                    <p className="text-sm text-[var(--ff-text-secondary)]">Total Workflows</p>
+                    <p className="text-2xl font-semibold text-[var(--ff-text-primary)] mt-1">
                       {stats.total}
                     </p>
                   </div>
                   <Calendar className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
                 <div className="flex items-center">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                    <p className="text-sm text-[var(--ff-text-secondary)]">Active</p>
+                    <p className="text-2xl font-semibold text-[var(--ff-text-primary)] mt-1">
                       {stats.active}
                     </p>
                   </div>
                   <Clock className="w-8 h-8 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
                 <div className="flex items-center">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Completed</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                    <p className="text-sm text-[var(--ff-text-secondary)]">Completed</p>
+                    <p className="text-2xl font-semibold text-[var(--ff-text-primary)] mt-1">
                       {stats.completed}
                     </p>
                   </div>
                   <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
                 <div className="flex items-center">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Overdue</p>
-                    <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                    <p className="text-sm text-[var(--ff-text-secondary)]">Overdue</p>
+                    <p className="text-2xl font-semibold text-[var(--ff-text-primary)] mt-1">
                       {stats.overdue}
                     </p>
                   </div>
@@ -168,20 +168,20 @@ export function ProjectsTab() {
             {/* Search and Filters */}
             <div className="flex items-center space-x-4 mt-6">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
                 <input
                   type="text"
                   placeholder="Search workflows or projects..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
               </div>
-              
+
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -193,7 +193,7 @@ export function ProjectsTab() {
               <select
                 value={assigneeFilter}
                 onChange={(e) => setAssigneeFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-green-500 focus:border-transparent"
               >
                 <option value="all">All Assignees</option>
                 <option value="unassigned">Unassigned</option>

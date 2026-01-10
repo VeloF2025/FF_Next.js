@@ -10,15 +10,15 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--ff-bg-secondary)]">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <h1 className="text-4xl font-bold text-[var(--ff-text-primary)] mb-4">
           FibreFlow Next.js
         </h1>
-        <p className="text-gray-600 mb-4">
+        <p className="text-[var(--ff-text-secondary)] mb-4">
           Enterprise fiber network project management
         </p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-[var(--ff-text-tertiary)]">
           Redirecting to dashboard...
         </p>
       </div>

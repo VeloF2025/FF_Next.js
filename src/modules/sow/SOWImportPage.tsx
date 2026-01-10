@@ -90,8 +90,8 @@ export function SOWImportPage() {
 
   // Fallback component if SOWProjectSelector fails
   const FallbackProjectSelector = () => (
-    <div className="text-center p-4 border border-gray-200 rounded-lg">
-      <p className="text-gray-600 mb-2">Unable to load project selector.</p>
+    <div className="text-center p-4 border border-[var(--ff-border-light)] rounded-lg">
+      <p className="text-[var(--ff-text-secondary)] mb-2">Unable to load project selector.</p>
       <button
         onClick={() => router.push('/sow')}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -108,24 +108,24 @@ export function SOWImportPage() {
           log.error('Error in SOW Import Page (project selection)', { error, errorInfo }, 'SOWImportPage');
         }}
       >
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[var(--ff-bg-primary)]">
           <div className="p-6">
             <div className="mb-6">
               <button
                 onClick={() => router.push('/sow')}
-                className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
+                className="inline-flex items-center text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to SOW List
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">Import SOW Data</h1>
-              <p className="text-gray-600 mt-1">Select a project to import scope of work data</p>
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Import SOW Data</h1>
+              <p className="text-[var(--ff-text-secondary)] mt-1">Select a project to import scope of work data</p>
             </div>
 
             <div className="max-w-2xl mx-auto">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-8">
                 {urlValidationError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-lg">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
                         <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -133,18 +133,18 @@ export function SOWImportPage() {
                         </svg>
                       </div>
                       <div className="ml-3">
-                        <p className="text-sm text-red-800">{urlValidationError}</p>
+                        <p className="text-sm text-red-300">{urlValidationError}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
                 <div className="text-center mb-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500/20 rounded-full mb-4">
                     <FileSpreadsheet className="h-8 w-8 text-blue-600" />
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">Select a Project</h2>
-                  <p className="text-gray-600">
+                  <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Select a Project</h2>
+                  <p className="text-[var(--ff-text-secondary)]">
                     Choose the project you want to import SOW data for
                   </p>
                 </div>
@@ -159,7 +159,7 @@ export function SOWImportPage() {
                 )}
 
                 <div className="mt-8 text-center">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-[var(--ff-text-tertiary)]">
                     You can import Excel files containing scope of work details, schedules, and other project data
                   </p>
                 </div>
@@ -177,18 +177,18 @@ export function SOWImportPage() {
         log.error('Error in SOW Import Page (upload wizard)', { error, errorInfo }, 'SOWImportPage');
       }}
     >
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="p-6">
           <div className="mb-6">
             <button
               onClick={handleBack}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
+              className="inline-flex items-center text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">Import SOW Data</h1>
-            <p className="text-gray-600 mt-1">Upload Excel files containing project scope of work data</p>
+            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Import SOW Data</h1>
+            <p className="text-[var(--ff-text-secondary)] mt-1">Upload Excel files containing project scope of work data</p>
           </div>
         </div>
 
@@ -202,11 +202,11 @@ export function SOWImportPage() {
 
         {urlValidationError && (
           <div className="max-w-2xl mx-auto mt-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-6">
               <div className="flex items-center justify-center">
                 <div className="text-center">
-                  <h3 className="text-lg font-medium text-red-800 mb-2">URL Validation Error</h3>
-                  <p className="text-red-600">{urlValidationError}</p>
+                  <h3 className="text-lg font-medium text-red-300 mb-2">URL Validation Error</h3>
+                  <p className="text-red-400">{urlValidationError}</p>
                   <button
                     onClick={() => router.push('/sow/import')}
                     className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"

@@ -95,11 +95,11 @@ export function GlobalSearch() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'project': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400';
-      case 'staff': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
-      case 'client': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400';
-      case 'contractor': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400';
+      case 'project': return 'bg-blue-500/20 text-blue-400';
+      case 'staff': return 'bg-green-500/20 text-green-400';
+      case 'client': return 'bg-purple-500/20 text-purple-400';
+      case 'contractor': return 'bg-orange-500/20 text-orange-400';
+      default: return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]';
     }
   };
 

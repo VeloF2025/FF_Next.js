@@ -53,12 +53,12 @@ const StandardDataTableComponent = <T,>({
       <tr
         key={getRowKey(item)}
         onClick={() => handleRowClick(item)}
-        className={onRowClick ? "hover:bg-gray-50 cursor-pointer transition-colors" : ""}
+        className={onRowClick ? "hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors" : ""}
       >
         {columns.map((column) => (
           <td
             key={column.key}
-            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+            className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]"
           >
             {renderCell(item, column)}
           </td>
@@ -68,15 +68,15 @@ const StandardDataTableComponent = <T,>({
   }, [data, columns, getRowKey, handleRowClick, onRowClick, renderCell]);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className={`bg-gray-50 ${stickyHeader ? 'sticky top-0 z-10' : ''}`}>
+        <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+          <thead className={`bg-[var(--ff-bg-tertiary)] ${stickyHeader ? 'sticky top-0 z-10' : ''}`}>
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  className={`px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider ${
                     column.className || ''
                   }`}
                 >
@@ -85,29 +85,29 @@ const StandardDataTableComponent = <T,>({
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
             {isLoading && (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   <LoadingSpinner className="mx-auto mb-2" />
                   Loading...
                 </td>
               </tr>
             )}
-            
+
             {error && (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-8 text-center text-red-600">
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-red-400">
                   <AlertCircle className="mx-auto mb-2 h-12 w-12" />
                   Error: {error.message}
                 </td>
               </tr>
             )}
-            
+
             {!isLoading && !error && (!data || data.length === 0) && (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
-                  <FileX className="mx-auto mb-2 h-12 w-12 text-gray-300" />
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
+                  <FileX className="mx-auto mb-2 h-12 w-12 text-[var(--ff-text-tertiary)]" />
                   {emptyMessage}
                 </td>
               </tr>
@@ -159,7 +159,7 @@ export function Pagination({
         <button
           key={1}
           onClick={() => onPageChange(1)}
-          className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+          className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]"
         >
           1
         </button>
@@ -177,7 +177,7 @@ export function Pagination({
           className={`px-3 py-1 text-sm border rounded ${
             i === currentPage
               ? 'bg-blue-600 text-white border-blue-600'
-              : 'border-gray-300 hover:bg-gray-50'
+              : 'border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]'
           }`}
         >
           {i}
@@ -187,13 +187,13 @@ export function Pagination({
 
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
-        pages.push(<span key="ellipsis2" className="px-2">...</span>);
+        pages.push(<span key="ellipsis2" className="px-2 text-[var(--ff-text-secondary)]">...</span>);
       }
       pages.push(
         <button
           key={totalPages}
           onClick={() => onPageChange(totalPages)}
-          className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+          className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]"
         >
           {totalPages}
         </button>
@@ -204,30 +204,30 @@ export function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
-      <div className="text-sm text-gray-700">
-        Showing <span className="font-medium">{startItem}</span> to{' '}
-        <span className="font-medium">{endItem}</span> of{' '}
-        <span className="font-medium">{totalItems}</span> results
+    <div className="flex items-center justify-between px-4 py-3 bg-[var(--ff-bg-secondary)] border-t border-[var(--ff-border-light)]">
+      <div className="text-sm text-[var(--ff-text-secondary)]">
+        Showing <span className="font-medium text-[var(--ff-text-primary)]">{startItem}</span> to{' '}
+        <span className="font-medium text-[var(--ff-text-primary)]">{endItem}</span> of{' '}
+        <span className="font-medium text-[var(--ff-text-primary)]">{totalItems}</span> results
       </div>
-      
+
       <div className="flex items-center gap-2">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Previous
         </button>
-        
+
         <div className="flex items-center gap-1">
           {renderPageNumbers()}
         </div>
-        
+
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next
         </button>

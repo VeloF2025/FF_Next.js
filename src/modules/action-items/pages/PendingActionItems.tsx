@@ -36,7 +36,7 @@ export function PendingActionItems() {
       <div className="mb-6">
         <button
           onClick={() => router.push('/action-items')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+          className="flex items-center gap-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
@@ -45,15 +45,15 @@ export function PendingActionItems() {
         <div className="flex items-center gap-3">
           <Clock className="w-8 h-8 text-yellow-500" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Pending Action Items</h1>
-            <p className="text-gray-600 mt-1">Items awaiting completion</p>
+            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Pending Action Items</h1>
+            <p className="text-[var(--ff-text-secondary)] mt-1">Items awaiting completion</p>
           </div>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-        <p className="text-yellow-800">
+      <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-6">
+        <p className="text-yellow-400">
           <span className="font-semibold">{items.length}</span> pending action items
         </p>
       </div>
@@ -61,13 +61,13 @@ export function PendingActionItems() {
       {/* Content */}
       {loading && (
         <div className="text-center py-12">
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-[var(--ff-text-secondary)]">Loading...</p>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-6">
+          <p className="text-red-400">{error}</p>
         </div>
       )}
 

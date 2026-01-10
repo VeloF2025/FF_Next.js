@@ -38,29 +38,29 @@ export function StandardSummaryCards({
     <div className={gridClass}>
       {cards.map((card, index) => {
         const Icon = card.icon;
-        const iconBgColor = card.iconBgColor || 'bg-blue-100';
-        const iconColor = card.iconColor || 'text-blue-600';
-        
+        const iconBgColor = card.iconBgColor || 'bg-blue-500/20';
+        const iconColor = card.iconColor || 'text-blue-400';
+
         return (
-          <div key={index} className="bg-white p-6 rounded-lg border border-gray-200">
+          <div key={index} className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-gray-600">{card.label}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
+                <p className="text-sm text-[var(--ff-text-secondary)]">{card.label}</p>
+                <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">
                   {typeof card.value === 'number' ? card.value.toLocaleString() : card.value}
                 </p>
                 {card.subtitle && (
-                  <p className="text-xs text-gray-500 mt-1">{card.subtitle}</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{card.subtitle}</p>
                 )}
                 {card.trend && (
                   <div className="flex items-center mt-2">
                     <span className={`text-sm font-medium ${
-                      card.trend.isPositive ? 'text-green-600' : 'text-red-600'
+                      card.trend.isPositive ? 'text-green-400' : 'text-red-400'
                     }`}>
                       {card.trend.isPositive ? '↑' : '↓'} {Math.abs(card.trend.value)}{card.trend.label || '%'}
                     </span>
                     {!card.trend.label && (
-                      <span className="text-xs text-gray-500 ml-2">vs last month</span>
+                      <span className="text-xs text-[var(--ff-text-tertiary)] ml-2">vs last month</span>
                     )}
                   </div>
                 )}

@@ -261,23 +261,23 @@ export function ComponentPalette() {
   }, []);
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
+    <div className="h-full flex flex-col bg-[var(--ff-bg-secondary)]">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-[var(--ff-border-light)]">
         <div className="flex items-center space-x-2 mb-3">
           <Layers className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Components</h2>
+          <h2 className="font-semibold text-[var(--ff-text-primary)]">Components</h2>
         </div>
 
         {/* Search */}
         <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
           <input
             type="text"
             placeholder="Search components..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -290,7 +290,7 @@ export function ComponentPalette() {
               className={`px-2 py-1 text-xs rounded-md transition-colors ${
                 selectedCategory === category
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
               }`}
             >
               {category}
@@ -306,13 +306,13 @@ export function ComponentPalette() {
             {/* Category Header */}
             <button
               onClick={() => toggleCategory(category)}
-              className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+              className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               <span>{category}</span>
-              <ChevronDown 
+              <ChevronDown
                 className={`w-4 h-4 transition-transform ${
                   expandedCategories.has(category) ? 'transform rotate-180' : ''
-                }`} 
+                }`}
               />
             </button>
 
@@ -328,7 +328,7 @@ export function ComponentPalette() {
                       draggable
                       onDragStart={(e) => handleDragStart(e, item)}
                       onDoubleClick={() => handleDoubleClick(item)}
-                      className="mx-2 mb-2 p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all bg-white dark:bg-gray-750"
+                      className="mx-2 mb-2 p-3 border border-[var(--ff-border-light)] rounded-lg cursor-grab active:cursor-grabbing hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all bg-[var(--ff-bg-secondary)]"
                       title="Drag to canvas or double-click to add"
                     >
                       <div className="flex items-center space-x-2 mb-2">
@@ -336,13 +336,13 @@ export function ComponentPalette() {
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                          <h3 className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
                             {item.name}
                           </h3>
                         </div>
                       </div>
-                      
-                      <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+
+                      <p className="text-xs text-[var(--ff-text-secondary)] line-clamp-2">
                         {item.description}
                       </p>
                       
@@ -360,7 +360,7 @@ export function ComponentPalette() {
                         
                         {/* Quick stats */}
                         {item.template && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-[var(--ff-text-tertiary)]">
                             {item.type === 'phase' && item.template.estimatedDuration && (
                               <span>{item.template.estimatedDuration}d</span>
                             )}
@@ -383,7 +383,7 @@ export function ComponentPalette() {
 
         {/* Empty State */}
         {filteredItems.length === 0 && (
-          <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+          <div className="p-4 text-center text-[var(--ff-text-tertiary)]">
             <Workflow className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No components found</p>
             {searchTerm && (
@@ -394,8 +394,8 @@ export function ComponentPalette() {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+      <div className="p-4 border-t border-[var(--ff-border-light)]">
+        <div className="text-xs text-[var(--ff-text-tertiary)] space-y-1">
           <div>• Drag items to canvas</div>
           <div>• Double-click to add</div>
           <div>• {filteredItems.length} components available</div>

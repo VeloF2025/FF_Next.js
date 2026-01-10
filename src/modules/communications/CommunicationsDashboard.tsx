@@ -50,7 +50,7 @@ const CommunicationsDashboard: React.FC = () => {
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   selectedTab === index
                     ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                 }`}
               >
                 {tab}

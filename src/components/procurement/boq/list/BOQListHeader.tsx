@@ -26,10 +26,10 @@ export default function BOQListHeader({
   return (
     <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Bill of Quantities</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          {filteredCount === totalBOQs 
-            ? `${totalBOQs} BOQs` 
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Bill of Quantities</h2>
+        <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+          {filteredCount === totalBOQs
+            ? `${totalBOQs} BOQs`
             : `${filteredCount} of ${totalBOQs} BOQs`
           }
         </p>
@@ -39,9 +39,9 @@ export default function BOQListHeader({
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`px-3 py-2 border rounded-md text-sm font-medium flex items-center ${
-            showFilters 
-              ? 'bg-blue-50 border-blue-200 text-blue-700' 
-              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            showFilters
+              ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
+              : 'border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
           }`}
         >
           <Filter className="h-4 w-4 mr-2" />
@@ -50,7 +50,7 @@ export default function BOQListHeader({
 
         <button
           onClick={onRefresh}
-          className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center"
+          className="px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-md text-sm font-medium hover:bg-[var(--ff-bg-hover)] flex items-center"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh

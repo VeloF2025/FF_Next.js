@@ -59,11 +59,11 @@ export default function TasksPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed': return 'bg-green-500/20 text-green-400';
+      case 'in_progress': return 'bg-blue-500/20 text-blue-400';
+      case 'pending': return 'bg-yellow-500/20 text-yellow-400';
+      case 'cancelled': return 'bg-gray-500/20 text-gray-400';
+      default: return 'bg-gray-500/20 text-gray-400';
     }
   };
 
@@ -73,7 +73,7 @@ export default function TasksPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading tasks...</p>
+            <p className="mt-4 text-[var(--ff-text-secondary)]">Loading tasks...</p>
           </div>
         </div>
       </AppLayout>
@@ -86,7 +86,7 @@ export default function TasksPage() {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-            <p className="mt-4 text-red-600">{error}</p>
+            <p className="mt-4 text-red-400">{error}</p>
             <Button onClick={fetchTasks} className="mt-4">
               Retry
             </Button>
@@ -100,7 +100,7 @@ export default function TasksPage() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Field Tasks</h1>
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Field Tasks</h1>
           <Button onClick={fetchTasks}>
             Refresh
           </Button>
@@ -108,10 +108,10 @@ export default function TasksPage() {
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {tasks.map((task) => (
-            <Card key={task.id} className="hover:shadow-lg transition-shadow">
+            <Card key={task.id} className="hover:shadow-lg transition-shadow bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg">{task.title}</CardTitle>
+                  <CardTitle className="text-lg text-[var(--ff-text-primary)]">{task.title}</CardTitle>
                   <Badge className={getPriorityColor(task.priority)}>
                     {task.priority}
                   </Badge>
@@ -122,35 +122,35 @@ export default function TasksPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {task.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2">
+                  <p className="text-sm text-[var(--ff-text-secondary)] line-clamp-2">
                     {task.description}
                   </p>
                 )}
-                
+
                 <div className="space-y-2 text-sm">
                   {task.technicianName && (
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
                       <User className="h-4 w-4" />
                       <span>{task.technicianName}</span>
                     </div>
                   )}
-                  
+
                   {task.scheduledDate && (
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
                       <Calendar className="h-4 w-4" />
                       <span>{new Date(task.scheduledDate).toLocaleDateString()}</span>
                     </div>
                   )}
-                  
+
                   {task.estimatedDuration && (
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
                       <Clock className="h-4 w-4" />
                       <span>{task.estimatedDuration} hours</span>
                     </div>
                   )}
-                  
+
                   {task.location?.address && (
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
                       <MapPin className="h-4 w-4" />
                       <span className="line-clamp-1">{task.location.address}</span>
                     </div>
@@ -163,7 +163,7 @@ export default function TasksPage() {
 
         {tasks.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500">No tasks found</p>
+            <p className="text-[var(--ff-text-secondary)]">No tasks found</p>
           </div>
         )}
       </div>

@@ -156,3 +156,33 @@ None currently.
 ## Context for Next Session
 
 PAI + GitHub + TDD fully integrated. System is ready for use by both Hein and Louis with their preferred methodologies (PAI, BMad, Agent-OS).
+
+---
+
+## Dark Mode Phase 6 (2026-01-10)
+
+### Completed
+- [x] Fixed tailwind.config.mjs (`darkMode: 'class'`)
+- [x] Fixed pages/ directory (11 files)
+- [x] Fixed src/components/ (3 batches)
+- [x] Fixed src/modules/ (5 batches - 34 modules total)
+- [x] wa-monitor stat cards - MUI components updated with CSS variables
+
+### WA Monitor Changes Made
+Files modified for dark mode:
+- `src/modules/wa-monitor/components/WaMonitorDashboard.tsx`
+  - Added `sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}` to all MUI Cards
+  - Fixed Typography colors with CSS variables
+  - Fixed TableContainer and TableRow backgrounds
+- `src/modules/wa-monitor/components/WaMonitorFilters.tsx`
+  - Added `inputSx` styling object for MUI inputs
+
+### ⚠️ LESSON LEARNED (Corrected)
+**Browser automation for screenshots is FINE. DOM manipulation is NOT.**
+- ✅ SAFE: Navigate, screenshot, click theme toggle via UI
+- ❌ UNSAFE: `document.documentElement.classList.add('dark')` or `localStorage.setItem()`
+- DOM manipulation before React hydrates causes hydration errors (#418, #423)
+
+### Status
+- [x] wa-monitor dark mode VERIFIED WORKING (2026-01-10)
+- Stat cards now have dark backgrounds in dark mode

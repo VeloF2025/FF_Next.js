@@ -8,18 +8,18 @@ interface GPSLocationCaptureProps {
 
 export function GPSLocationCapture({ gpsLocation, isCapturingGPS, onCaptureGPS }: GPSLocationCaptureProps) {
   return (
-    <div className="bg-white rounded-lg p-4 border border-neutral-200">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-neutral-700">
+        <label className="text-sm font-medium text-[var(--ff-text-primary)]">
           GPS Location *
         </label>
         {gpsLocation && (
           <CheckCircle className="h-5 w-5 text-success-600" />
         )}
       </div>
-      
+
       {gpsLocation ? (
-        <div className="text-sm text-neutral-600">
+        <div className="text-sm text-[var(--ff-text-secondary)]">
           Lat: {gpsLocation.lat.toFixed(6)}, Lng: {gpsLocation.lng.toFixed(6)}
         </div>
       ) : (

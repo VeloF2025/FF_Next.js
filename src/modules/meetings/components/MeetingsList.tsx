@@ -12,8 +12,8 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
   if (meetings.length === 0) {
     return (
       <div className="ff-card">
-        <div className="p-8 text-center text-gray-500">
-          <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+        <div className="p-8 text-center text-[var(--ff-text-secondary)]">
+          <Calendar className="w-12 h-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
           <p>No meetings found</p>
         </div>
       </div>
@@ -40,8 +40,8 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                     {meeting.status}
                   </span>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+
+                <div className="grid grid-cols-2 gap-4 text-sm text-[var(--ff-text-secondary)] mb-3">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     <span>{meeting.date.toLocaleDateString()}</span>
@@ -70,8 +70,8 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                 </div>
 
                 <div className="mb-3">
-                  <p className="text-sm font-medium text-gray-700 mb-1">Agenda:</p>
-                  <ul className="text-sm text-gray-600 space-y-1">
+                  <p className="text-sm font-medium text-[var(--ff-text-primary)] mb-1">Agenda:</p>
+                  <ul className="text-sm text-[var(--ff-text-secondary)] space-y-1">
                     {meeting.agenda.slice(0, 2).map((item, index) => (
                       <li key={index} className="flex items-start gap-2">
                         <ChevronRight className="w-3 h-3 mt-0.5" />
@@ -79,7 +79,7 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                       </li>
                     ))}
                     {meeting.agenda.length > 2 && (
-                      <li className="text-gray-500 italic">+{meeting.agenda.length - 2} more items</li>
+                      <li className="text-[var(--ff-text-tertiary)] italic">+{meeting.agenda.length - 2} more items</li>
                     )}
                   </ul>
                 </div>
@@ -87,7 +87,7 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                 {meeting.actionItems.length > 0 && (
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-gray-600">
+                    <span className="text-[var(--ff-text-secondary)]">
                       {meeting.actionItems.filter(a => a.completed).length}/{meeting.actionItems.length} action items completed
                     </span>
                   </div>
@@ -97,7 +97,7 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
               <div className="flex gap-2">
                 {meeting.isVirtual && meeting.meetingLink && (
                   <button
-                    className="p-2 hover:bg-gray-100 rounded"
+                    className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       window.open(meeting.meetingLink, '_blank');
@@ -107,16 +107,16 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                   </button>
                 )}
                 <button
-                  className="p-2 hover:bg-gray-100 rounded"
+                  className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
                   onClick={(e) => {
                     e.stopPropagation();
                     onEditMeeting(meeting);
                   }}
                 >
-                  <Edit className="w-4 h-4 text-gray-500" />
+                  <Edit className="w-4 h-4 text-[var(--ff-text-secondary)]" />
                 </button>
                 <button
-                  className="p-2 hover:bg-gray-100 rounded"
+                  className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteMeeting(meeting.id);

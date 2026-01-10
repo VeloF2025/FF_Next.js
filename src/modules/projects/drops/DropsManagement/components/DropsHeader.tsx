@@ -8,11 +8,11 @@ interface DropsHeaderProps {
 
 export function DropsHeader({ stats }: DropsHeaderProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Drops Management</h1>
-          <p className="text-neutral-600 mt-1">Track and manage customer drop installations</p>
+          <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)]">Drops Management</h1>
+          <p className="text-[var(--ff-text-secondary)] mt-1">Track and manage customer drop installations</p>
         </div>
         <div className="flex items-center gap-2">
           <Home className="h-8 w-8 text-primary-600" />
@@ -22,11 +22,11 @@ export function DropsHeader({ stats }: DropsHeaderProps) {
       {/* Progress Overview */}
       <div className="mt-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-neutral-700">Completion Rate</span>
-          <span className="text-sm font-semibold">{stats.completionRate.toFixed(1)}%</span>
+          <span className="text-sm font-medium text-[var(--ff-text-primary)]">Completion Rate</span>
+          <span className="text-sm font-semibold text-[var(--ff-text-primary)]">{stats.completionRate.toFixed(1)}%</span>
         </div>
-        <div className="w-full bg-neutral-200 rounded-full h-3">
-          <div 
+        <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-3">
+          <div
             className="bg-success-600 h-3 rounded-full transition-all"
             style={{ width: `${stats.completionRate}%` }}
           />

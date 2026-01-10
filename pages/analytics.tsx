@@ -17,16 +17,16 @@ function AnalyticsSkeleton() {
     <div className="ff-page-container">
       {/* Header Skeleton */}
       <div className="mb-6">
-        <div className="h-8 bg-gray-200 rounded w-56 mb-2 animate-pulse"></div>
-        <div className="h-4 bg-gray-200 rounded w-72 animate-pulse"></div>
+        <div className="h-8 bg-[var(--ff-bg-tertiary)] rounded w-56 mb-2 animate-pulse"></div>
+        <div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-72 animate-pulse"></div>
       </div>
 
       {/* Filters Bar Skeleton */}
       <div className="ff-card mb-6">
         <div className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="h-8 bg-gray-200 rounded w-32 animate-pulse"></div>
-            <div className="h-8 bg-gray-200 rounded w-32 animate-pulse"></div>
+            <div className="h-8 bg-[var(--ff-bg-tertiary)] rounded w-32 animate-pulse"></div>
+            <div className="h-8 bg-[var(--ff-bg-tertiary)] rounded w-32 animate-pulse"></div>
           </div>
         </div>
       </div>
@@ -35,9 +35,9 @@ function AnalyticsSkeleton() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[...Array(5)].map((_, i) => (
           <div key={i} className="ff-card p-6">
-            <div className="h-4 bg-gray-200 rounded w-20 mb-2 animate-pulse"></div>
-            <div className="h-8 bg-gray-200 rounded w-24 mb-2 animate-pulse"></div>
-            <div className="h-3 bg-gray-200 rounded w-16 animate-pulse"></div>
+            <div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-20 mb-2 animate-pulse"></div>
+            <div className="h-8 bg-[var(--ff-bg-tertiary)] rounded w-24 mb-2 animate-pulse"></div>
+            <div className="h-3 bg-[var(--ff-bg-tertiary)] rounded w-16 animate-pulse"></div>
           </div>
         ))}
       </div>
@@ -45,28 +45,28 @@ function AnalyticsSkeleton() {
       {/* Charts Row Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="ff-card p-6">
-          <div className="h-6 bg-gray-200 rounded w-32 mb-4 animate-pulse"></div>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-            <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+          <div className="h-6 bg-[var(--ff-bg-tertiary)] rounded w-32 mb-4 animate-pulse"></div>
+          <div className="h-64 flex items-center justify-center bg-[var(--ff-bg-tertiary)] rounded">
+            <RefreshCw className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
           </div>
         </div>
         <div className="ff-card p-6">
-          <div className="h-6 bg-gray-200 rounded w-32 mb-4 animate-pulse"></div>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-            <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+          <div className="h-6 bg-[var(--ff-bg-tertiary)] rounded w-32 mb-4 animate-pulse"></div>
+          <div className="h-64 flex items-center justify-center bg-[var(--ff-bg-tertiary)] rounded">
+            <RefreshCw className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
           </div>
         </div>
       </div>
 
       {/* Table Skeleton */}
       <div className="ff-card p-6 mb-6">
-        <div className="h-6 bg-gray-200 rounded w-48 mb-4 animate-pulse"></div>
+        <div className="h-6 bg-[var(--ff-bg-tertiary)] rounded w-48 mb-4 animate-pulse"></div>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center justify-between">
-              <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/5 animate-pulse"></div>
+              <div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-1/3 animate-pulse"></div>
+              <div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-1/4 animate-pulse"></div>
+              <div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-1/5 animate-pulse"></div>
             </div>
           ))}
         </div>

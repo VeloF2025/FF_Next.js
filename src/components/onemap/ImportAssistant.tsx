@@ -163,7 +163,7 @@ export const ImportAssistant: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="max-w-4xl mx-auto bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
       <div className="bg-blue-600 text-white p-4">
         <div className="flex items-center space-x-3">
@@ -182,7 +182,7 @@ export const ImportAssistant: React.FC = () => {
             <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
               message.type === 'user'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-900'
+                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]'
             }`}>
               <div className="flex items-center space-x-2 mb-2">
                 {message.type === 'user' ? (
@@ -218,13 +218,13 @@ export const ImportAssistant: React.FC = () => {
 
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 px-4 py-2 rounded-lg">
+            <div className="bg-[var(--ff-bg-tertiary)] px-4 py-2 rounded-lg">
               <div className="flex items-center space-x-2">
                 <Bot className="h-4 w-4" />
                 <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-[var(--ff-text-tertiary)] rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-[var(--ff-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-[var(--ff-text-tertiary)] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
@@ -235,7 +235,7 @@ export const ImportAssistant: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="border-t p-4">
+      <div className="border-t border-[var(--ff-border-light)] p-4">
         <div className="flex space-x-2">
           <input
             type="text"
@@ -243,7 +243,7 @@ export const ImportAssistant: React.FC = () => {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(inputValue)}
             placeholder="Ask me about OneMap imports..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             disabled={isTyping}
           />
           <button
@@ -259,25 +259,25 @@ export const ImportAssistant: React.FC = () => {
         <div className="flex flex-wrap gap-2 mt-3">
           <button
             onClick={() => handleSendMessage('Analyze my file')}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            className="px-3 py-1 text-xs bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] rounded-full transition-colors"
           >
             📊 Analyze File
           </button>
           <button
             onClick={() => handleSendMessage('Check progress')}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            className="px-3 py-1 text-xs bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] rounded-full transition-colors"
           >
             📈 Check Progress
           </button>
           <button
             onClick={() => handleSendMessage('Verify data')}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            className="px-3 py-1 text-xs bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] rounded-full transition-colors"
           >
             ✅ Verify Data
           </button>
           <button
             onClick={() => handleSendMessage('Help with errors')}
-            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            className="px-3 py-1 text-xs bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] rounded-full transition-colors"
           >
             🚨 Help with Errors
           </button>

@@ -12,12 +12,12 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b flex items-center justify-between">
-          <h2 className="text-xl font-semibold">{meeting.title}</h2>
-          <button 
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-[var(--ff-border-light)] flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">{meeting.title}</h2>
+          <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded"
+            className="p-2 hover:bg-[var(--ff-bg-hover)] rounded"
           >
             <X className="w-5 h-5" />
           </button>
@@ -27,43 +27,43 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
           {/* Meeting Details */}
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
-              <h3 className="font-medium mb-3">Meeting Details</h3>
-              <div className="space-y-2 text-sm">
+              <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Details</h3>
+              <div className="space-y-2 text-sm text-[var(--ff-text-secondary)]">
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <Calendar className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                   <span>{meeting.date.toLocaleDateString()}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gray-400" />
+                  <Clock className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                   <span>{meeting.time} ({meeting.duration})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {meeting.isVirtual ? (
                     <>
-                      <Video className="w-4 h-4 text-gray-400" />
+                      <Video className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                       <a href={meeting.meetingLink} className="text-blue-500 hover:underline">
                         Join Meeting
                       </a>
                     </>
                   ) : (
                     <>
-                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <MapPin className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                       <span>{meeting.location}</span>
                     </>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
+                  <User className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                   <span>Organized by {meeting.organizer}</span>
                 </div>
               </div>
             </div>
 
             <div>
-              <h3 className="font-medium mb-3">Participants ({meeting.participants.length})</h3>
+              <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Participants ({meeting.participants.length})</h3>
               <div className="flex flex-wrap gap-2">
                 {meeting.participants.map((participant, index) => (
-                  <span key={index} className="px-2 py-1 bg-gray-100 rounded text-sm">
+                  <span key={index} className="px-2 py-1 bg-[var(--ff-bg-tertiary)] rounded text-sm text-[var(--ff-text-primary)]">
                     {participant}
                   </span>
                 ))}
@@ -73,11 +73,11 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
 
           {/* Agenda */}
           <div className="mb-6">
-            <h3 className="font-medium mb-3">Agenda</h3>
+            <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Agenda</h3>
             <ol className="space-y-2">
               {meeting.agenda.map((item, index) => (
-                <li key={index} className="flex gap-2 text-sm">
-                  <span className="font-medium">{index + 1}.</span>
+                <li key={index} className="flex gap-2 text-sm text-[var(--ff-text-secondary)]">
+                  <span className="font-medium text-[var(--ff-text-primary)]">{index + 1}.</span>
                   <span>{item}</span>
                 </li>
               ))}
@@ -87,21 +87,21 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
           {/* Action Items */}
           {meeting.actionItems.length > 0 && (
             <div>
-              <h3 className="font-medium mb-3">Action Items</h3>
+              <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Action Items</h3>
               <div className="space-y-2">
                 {meeting.actionItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-[var(--ff-bg-tertiary)] rounded">
                     <div className="flex items-center gap-3">
                       <input type="checkbox" checked={item.completed} readOnly />
                       <div>
-                        <p className="text-sm font-medium">{item.task}</p>
-                        <p className="text-xs text-gray-600">
+                        <p className="text-sm font-medium text-[var(--ff-text-primary)]">{item.task}</p>
+                        <p className="text-xs text-[var(--ff-text-secondary)]">
                           Assigned to {item.assignee} • Due {item.dueDate.toLocaleDateString()}
                         </p>
                       </div>
                     </div>
                     <span className={`px-2 py-1 text-xs rounded-full ${
-                      item.completed ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      item.completed ? 'bg-green-500/20 text-green-400' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
                     }`}>
                       {item.completed ? 'completed' : 'pending'}
                     </span>
@@ -117,18 +117,18 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               {/* Overview */}
               {(meeting as any).summary.overview && (
                 <div>
-                  <h3 className="font-medium mb-3">Meeting Summary</h3>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{(meeting as any).summary.overview}</p>
+                  <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Summary</h3>
+                  <p className="text-sm text-[var(--ff-text-secondary)] whitespace-pre-wrap">{(meeting as any).summary.overview}</p>
                 </div>
               )}
 
               {/* Keywords */}
               {(meeting as any).summary.keywords && Array.isArray((meeting as any).summary.keywords) && (meeting as any).summary.keywords.length > 0 && (
                 <div>
-                  <h3 className="font-medium mb-3">Keywords</h3>
+                  <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Keywords</h3>
                   <div className="flex flex-wrap gap-2">
                     {(meeting as any).summary.keywords.map((keyword: string, index: number) => (
-                      <span key={index} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">
+                      <span key={index} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">
                         {keyword}
                       </span>
                     ))}
@@ -139,11 +139,11 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               {/* Outline */}
               {(meeting as any).summary.outline && Array.isArray((meeting as any).summary.outline) && (meeting as any).summary.outline.length > 0 && (
                 <div>
-                  <h3 className="font-medium mb-3">Detailed Outline</h3>
+                  <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Detailed Outline</h3>
                   <ol className="space-y-2">
                     {(meeting as any).summary.outline.map((item: string, index: number) => (
-                      <li key={index} className="flex gap-2 text-sm text-gray-700">
-                        <span className="font-medium text-gray-500">{index + 1}.</span>
+                      <li key={index} className="flex gap-2 text-sm text-[var(--ff-text-secondary)]">
+                        <span className="font-medium text-[var(--ff-text-tertiary)]">{index + 1}.</span>
                         <span>{item}</span>
                       </li>
                     ))}
@@ -154,9 +154,9 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               {/* Action Items from Fireflies */}
               {(meeting as any).summary.action_items && (
                 <div>
-                  <h3 className="font-medium mb-3">AI-Detected Action Items</h3>
-                  <div className="p-4 bg-amber-50 rounded-lg border-l-4 border-amber-400">
-                    <div className="text-sm text-gray-800 leading-relaxed space-y-2">
+                  <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">AI-Detected Action Items</h3>
+                  <div className="p-4 bg-amber-500/10 rounded-lg border-l-4 border-amber-400">
+                    <div className="text-sm text-[var(--ff-text-primary)] leading-relaxed space-y-2">
                       {(() => {
                         let rawText = Array.isArray((meeting as any).summary.action_items)
                           ? (meeting as any).summary.action_items.join(' ')
@@ -193,7 +193,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
 
               {/* Transcript Link */}
               {meeting.meetingLink && (
-                <div className="p-4 bg-gray-50 rounded border border-gray-200">
+                <div className="p-4 bg-[var(--ff-bg-tertiary)] rounded border border-[var(--ff-border-light)]">
                   <a
                     href={meeting.meetingLink}
                     target="_blank"
@@ -211,13 +211,13 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
           {/* Fallback Notes */}
           {!((meeting as any).summary) && meeting.notes && (
             <div className="mt-6">
-              <h3 className="font-medium mb-3">Meeting Notes</h3>
-              <p className="text-sm text-gray-600">{meeting.notes}</p>
+              <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Notes</h3>
+              <p className="text-sm text-[var(--ff-text-secondary)]">{meeting.notes}</p>
             </div>
           )}
         </div>
 
-        <div className="p-6 border-t flex gap-3 justify-end">
+        <div className="p-6 border-t border-[var(--ff-border-light)] flex gap-3 justify-end">
           <button 
             className="ff-button ff-button-secondary"
             onClick={onClose}

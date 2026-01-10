@@ -31,45 +31,45 @@ export function ConflictResolver({ conflicts, onResolve }: ConflictResolverProps
   };
 
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-amber-500" />
           Unresolved Conflicts ({conflicts.length})
         </h3>
       </div>
 
-      <div className="divide-y divide-gray-200">
+      <div className="divide-y divide-[var(--ff-border-light)]">
         {conflicts.map((conflict) => (
           <div
             key={conflict.id}
-            className={`p-6 cursor-pointer hover:bg-gray-50 transition-colors ${
-              selectedConflict?.id === conflict.id ? 'bg-blue-50' : ''
+            className={`p-6 cursor-pointer hover:bg-[var(--ff-bg-hover)] transition-colors ${
+              selectedConflict?.id === conflict.id ? 'bg-blue-500/20' : ''
             }`}
             onClick={() => setSelectedConflict(conflict)}
           >
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                     Record: {conflict.recordId}
                   </span>
-                  <span className="text-xs text-gray-500">•</span>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-xs text-[var(--ff-text-tertiary)]">•</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">
                     Field: {conflict.field}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mt-3">
-                  <div className="bg-green-50 p-3 rounded-md">
-                    <p className="text-xs font-medium text-green-700 mb-1">QFieldCloud Value:</p>
-                    <p className="text-sm text-gray-900 font-mono">
+                  <div className="bg-green-500/20 p-3 rounded-md">
+                    <p className="text-xs font-medium text-green-400 mb-1">QFieldCloud Value:</p>
+                    <p className="text-sm text-[var(--ff-text-primary)] font-mono">
                       {JSON.stringify(conflict.qfieldValue)}
                     </p>
                   </div>
-                  <div className="bg-blue-50 p-3 rounded-md">
-                    <p className="text-xs font-medium text-blue-700 mb-1">FibreFlow Value:</p>
-                    <p className="text-sm text-gray-900 font-mono">
+                  <div className="bg-blue-500/20 p-3 rounded-md">
+                    <p className="text-xs font-medium text-blue-400 mb-1">FibreFlow Value:</p>
+                    <p className="text-sm text-[var(--ff-text-primary)] font-mono">
                       {JSON.stringify(conflict.fibreflowValue)}
                     </p>
                   </div>
@@ -85,12 +85,12 @@ export function ConflictResolver({ conflicts, onResolve }: ConflictResolverProps
                 )}
               </div>
 
-              <ChevronRight className="h-5 w-5 text-gray-400 ml-4" />
+              <ChevronRight className="h-5 w-5 text-[var(--ff-text-tertiary)] ml-4" />
             </div>
 
             {selectedConflict?.id === conflict.id && !conflict.resolution && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-600 mb-3">Choose resolution:</p>
+              <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-3">Choose resolution:</p>
                 <div className="flex gap-2">
                   <button
                     onClick={(e) => {

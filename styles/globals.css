@@ -84,6 +84,15 @@
     --ff-border-primary: #e5e7eb;
     --ff-border-secondary: #d1d5db;
     --ff-border-subtle: #f3f4f6;
+    --ff-border-light: #e5e7eb;
+    --ff-border-medium: #d1d5db;
+    --ff-border-strong: #9ca3af;
+
+    /* Backgrounds (aliases) */
+    --ff-bg-primary: #ffffff;
+    --ff-bg-secondary: #f9fafb;
+    --ff-bg-tertiary: #f3f4f6;
+    --ff-bg-hover: #f3f4f6;
     
     /* Text */
     --ff-text-primary: #111827;
@@ -154,6 +163,33 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* FibreFlow Dark Mode Variables */
+    --ff-bg-primary: #0f172a;
+    --ff-bg-secondary: #1e293b;
+    --ff-bg-tertiary: #334155;
+    --ff-bg-hover: #334155;
+    --ff-bg-sidebar: #0f172a;
+    --ff-bg-card: #1e293b;
+
+    --ff-surface-primary: #1e293b;
+    --ff-surface-secondary: #334155;
+    --ff-surface-elevated: #1e293b;
+
+    --ff-background-primary: #0f172a;
+    --ff-background-secondary: #1e293b;
+    --ff-background-tertiary: #334155;
+
+    --ff-text-primary: #f1f5f9;
+    --ff-text-secondary: #e2e8f0;
+    --ff-text-tertiary: #94a3b8;
+
+    --ff-border-primary: #334155;
+    --ff-border-secondary: #475569;
+    --ff-border-light: #334155;
+    --ff-border-medium: #475569;
+    --ff-border-strong: #64748b;
+    --ff-border-subtle: #1e293b;
   }
 
   * {

@@ -18,9 +18,9 @@ export function MeetingLocationFields({ register, isVirtual }: MeetingLocationFi
           <input
             {...register('isVirtual')}
             type="checkbox"
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-[var(--ff-border-light)] rounded"
           />
-          <label className="ml-2 block text-sm font-medium text-gray-700">
+          <label className="ml-2 block text-sm font-medium text-[var(--ff-text-primary)]">
             Virtual Meeting
           </label>
         </div>
@@ -28,24 +28,24 @@ export function MeetingLocationFields({ register, isVirtual }: MeetingLocationFi
 
       {isVirtual ? (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
             Meeting Link
           </label>
           <input
             {...register('meetingLink')}
             type="url"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="https://meet.example.com/room"
           />
         </div>
       ) : (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
             Location
           </label>
           <input
             {...register('location')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Meeting location"
           />
         </div>

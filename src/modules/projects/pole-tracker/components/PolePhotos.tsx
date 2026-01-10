@@ -16,7 +16,7 @@ export function PolePhotos({ photos }: PolePhotosProps) {
       {photos.map((photo) => (
         <div key={photo.id} className="ff-photo-card">
           <div className="ff-photo-placeholder">
-            <Camera className="w-12 h-12 text-gray-400" />
+            <Camera className="w-12 h-12 text-[var(--ff-text-tertiary)]" />
           </div>
           <div className="ff-photo-info">
             <h4 className="ff-photo-title">{photo.type.toUpperCase()}</h4>

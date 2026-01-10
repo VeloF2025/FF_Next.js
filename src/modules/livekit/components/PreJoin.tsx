@@ -86,17 +86,17 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-            <div className="bg-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+        <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center p-4">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-2xl p-8 max-w-md w-full shadow-2xl">
                 <h1 className="text-2xl font-bold text-white text-center mb-2">
                     Join Meeting
                 </h1>
-                <p className="text-gray-400 text-center mb-6">
+                <p className="text-[var(--ff-text-tertiary)] text-center mb-6">
                     Room: {roomName}
                 </p>
 
                 {/* Video preview */}
-                <div className="relative aspect-video bg-gray-700 rounded-xl mb-6 overflow-hidden">
+                <div className="relative aspect-video bg-[var(--ff-bg-tertiary)] rounded-xl mb-6 overflow-hidden">
                     {videoStream ? (
                         <video
                             autoPlay
@@ -109,7 +109,7 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
                         />
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <VideoOff className="w-12 h-12 text-gray-500" />
+                            <VideoOff className="w-12 h-12 text-[var(--ff-text-tertiary)]" />
                         </div>
                     )}
 
@@ -118,7 +118,7 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
                         <button
                             onClick={() => setVideoEnabled(!videoEnabled)}
                             className={`p-3 rounded-full transition-colors ${videoEnabled
-                                    ? 'bg-gray-600 hover:bg-gray-500 text-white'
+                                    ? 'bg-[var(--ff-bg-hover)] hover:bg-[var(--ff-bg-tertiary)] text-white'
                                     : 'bg-red-600 hover:bg-red-500 text-white'
                                 }`}
                         >
@@ -127,7 +127,7 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
                         <button
                             onClick={() => setAudioEnabled(!audioEnabled)}
                             className={`p-3 rounded-full transition-colors ${audioEnabled
-                                    ? 'bg-gray-600 hover:bg-gray-500 text-white'
+                                    ? 'bg-[var(--ff-bg-hover)] hover:bg-[var(--ff-bg-tertiary)] text-white'
                                     : 'bg-red-600 hover:bg-red-500 text-white'
                                 }`}
                         >
@@ -138,7 +138,7 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
 
                 {/* Name input */}
                 <div className="mb-6">
-                    <label className="block text-gray-300 text-sm font-medium mb-2">
+                    <label className="block text-[var(--ff-text-secondary)] text-sm font-medium mb-2">
                         Your Name
                     </label>
                     <input
@@ -146,14 +146,14 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Enter your name"
-                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-3 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-white placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                     />
                 </div>
 
                 {/* Error message */}
                 {error && (
-                    <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-red-300 text-sm">
+                    <div className="mb-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm">
                         {error}
                     </div>
                 )}
@@ -162,7 +162,7 @@ export function PreJoin({ roomName, onJoin }: PreJoinProps) {
                 <button
                     onClick={handleJoin}
                     disabled={isLoading}
-                    className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-green-600 hover:bg-green-500 disabled:bg-[var(--ff-bg-tertiary)] disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                     {isLoading ? (
                         <>

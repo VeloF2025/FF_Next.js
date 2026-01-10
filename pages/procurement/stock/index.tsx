@@ -51,12 +51,12 @@ export default function StockPage({ projectId, projectName, initialData = [] }: 
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Stock Management</h1>
+          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Stock Management</h1>
           {projectName && (
-            <p className="mt-2 text-gray-600">Project: {projectName}</p>
+            <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
           )}
         </div>
 
@@ -75,7 +75,7 @@ export default function StockPage({ projectId, projectName, initialData = [] }: 
           </button>
           <button
             onClick={handleViewMovements}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            className="px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-hover)]"
           >
             View Movements
           </button>
@@ -83,7 +83,7 @@ export default function StockPage({ projectId, projectName, initialData = [] }: 
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="text-gray-500">Loading stock data...</div>
+            <div className="text-[var(--ff-text-secondary)]">Loading stock data...</div>
           </div>
         ) : (
           <StockManagement

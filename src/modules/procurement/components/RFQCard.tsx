@@ -34,19 +34,19 @@ export function RFQCard({ rfq }: RFQCardProps) {
   const getStatusColor = () => {
     switch (rfq.status) {
       case RFQStatus.DRAFT:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]';
       case RFQStatus.ISSUED:
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-500/20 text-blue-400';
       case RFQStatus.RESPONSES_RECEIVED:
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-500/20 text-yellow-400';
       case RFQStatus.EVALUATED:
-        return 'bg-indigo-100 text-indigo-800';
+        return 'bg-indigo-500/20 text-indigo-400';
       case RFQStatus.AWARDED:
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-purple-500/20 text-purple-400';
       case RFQStatus.CANCELLED:
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-500/20 text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]';
     }
   };
 
@@ -56,7 +56,7 @@ export function RFQCard({ rfq }: RFQCardProps) {
   return (
     <div
       onClick={handleClick}
-      className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
+      className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)] hover:shadow-lg transition-shadow cursor-pointer"
     >
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
@@ -66,49 +66,49 @@ export function RFQCard({ rfq }: RFQCardProps) {
               {rfq.status}
             </span>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">{rfq.title}</h3>
-          <p className="text-sm text-gray-500">{rfq.rfqNumber}</p>
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{rfq.title}</h3>
+          <p className="text-sm text-[var(--ff-text-secondary)]">{rfq.rfqNumber}</p>
         </div>
         <button
           onClick={(e) => {
             e.stopPropagation();
             // TODO: Show dropdown menu
           }}
-          className="p-1 hover:bg-gray-100 rounded"
+          className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
         >
-          <MoreVertical className="h-4 w-4 text-gray-400" />
+          <MoreVertical className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
         </button>
       </div>
 
       <div className="space-y-2 mb-4">
         {rfq.projectId && (
-          <div className="flex items-center text-sm text-gray-600">
+          <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
             <span className="font-medium mr-2">Project ID:</span>
             <span>{rfq.projectId}</span>
           </div>
         )}
-        <div className="flex items-center text-sm text-gray-600">
-          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <Calendar className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>Deadline: {rfq.responseDeadline ? format(rfq.responseDeadline, 'MMM dd, yyyy') : 'N/A'}</span>
         </div>
-        <div className="flex items-center text-sm text-gray-600">
-          <Users className="h-4 w-4 mr-2 text-gray-400" />
+        <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
+          <Users className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
           <span>{totalInvited} suppliers invited</span>
         </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-4">
+      <div className="border-t border-[var(--ff-border-light)] pt-4">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-xs text-gray-500">Responses</p>
-            <p className="text-lg font-bold text-gray-900">
+            <p className="text-xs text-[var(--ff-text-secondary)]">Responses</p>
+            <p className="text-lg font-bold text-[var(--ff-text-primary)]">
               {respondedCount} / {totalInvited}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-500">{rfq.itemCount} items</p>
+            <p className="text-xs text-[var(--ff-text-secondary)]">{rfq.itemCount} items</p>
             {rfq.responseDeadline && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[var(--ff-text-secondary)]">
                 Response Due: {format(rfq.responseDeadline, 'MMM dd')}
               </p>
             )}
@@ -117,8 +117,8 @@ export function RFQCard({ rfq }: RFQCardProps) {
       </div>
 
       {rfq.awardedTo && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          <p className="text-xs text-green-600 font-medium">
+        <div className="mt-3 pt-3 border-t border-[var(--ff-border-light)]">
+          <p className="text-xs text-green-400 font-medium">
             ✓ Supplier selected
           </p>
         </div>
@@ -127,7 +127,7 @@ export function RFQCard({ rfq }: RFQCardProps) {
       {/* Response progress bar */}
       {rfq.status !== RFQStatus.DRAFT && totalInvited > 0 && (
         <div className="mt-3">
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
             <div
               className="bg-green-500 h-2 rounded-full transition-all"
               style={{ width: `${(respondedCount / totalInvited) * 100}%` }}

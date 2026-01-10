@@ -66,27 +66,27 @@ export function ProjectList() {
       <ProjectSummaryCards projects={projects} />
 
       {/* Search and Filters */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 max-w-md">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] h-4 w-4" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
               />
             </div>
           </form>
-          
+
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
               showFilters || selectedStatus.length > 0 || selectedPriority.length > 0
-                ? 'bg-blue-50 text-blue-700 border-blue-200'
-                : 'text-gray-600 border-gray-300 hover:bg-gray-50'
+                ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                : 'text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -101,10 +101,10 @@ export function ProjectList() {
 
         {/* Filter Options */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Status</h4>
+                <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-2">Status</h4>
                 <div className="space-y-2">
                   {statuses.map((status) => (
                     <label key={status} className="flex items-center">
@@ -118,18 +118,18 @@ export function ProjectList() {
                             setSelectedStatus(selectedStatus.filter(s => s !== status));
                           }
                         }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="ml-2 text-sm text-gray-700">
+                      <span className="ml-2 text-sm text-[var(--ff-text-primary)]">
                         {status.replace('_', ' ')}
                       </span>
                     </label>
                   ))}
                 </div>
               </div>
-              
+
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Priority</h4>
+                <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-2">Priority</h4>
                 <div className="space-y-2">
                   {priorities.map((priority) => (
                     <label key={priority} className="flex items-center">
@@ -143,9 +143,9 @@ export function ProjectList() {
                             setSelectedPriority(selectedPriority.filter(p => p !== priority));
                           }
                         }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="ml-2 text-sm text-gray-700 capitalize">
+                      <span className="ml-2 text-sm text-[var(--ff-text-primary)] capitalize">
                         {priority.toLowerCase()}
                       </span>
                     </label>
@@ -153,7 +153,7 @@ export function ProjectList() {
                 </div>
               </div>
             </div>
-            
+
             {(selectedStatus.length > 0 || selectedPriority.length > 0) && (
               <div className="mt-4 flex justify-end">
                 <button

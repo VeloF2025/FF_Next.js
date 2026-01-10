@@ -61,20 +61,20 @@ export function ProcurementOverview() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Procurement Overview</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement Overview</h1>
+        <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
           Manage inventory, quotes, and purchase orders
         </p>
       </div>
 
       {/* Project Selection Notice */}
       {!selectedProject && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5" />
             <div>
-              <h3 className="font-medium text-yellow-800">Select a Project</h3>
-              <p className="text-sm text-yellow-700 mt-1">
+              <h3 className="font-medium text-yellow-400">Select a Project</h3>
+              <p className="text-sm text-yellow-400/80 mt-1">
                 Choose a project from the dropdown above to access procurement modules and view project-specific data.
               </p>
             </div>

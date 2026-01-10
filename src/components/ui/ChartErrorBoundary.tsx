@@ -48,30 +48,30 @@ export class ChartErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)]">
           <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
             Chart Loading Error
           </h3>
-          <p className="text-gray-600 text-center mb-4 max-w-md">
-            There was an issue loading the chart component. This might be due to a temporary 
+          <p className="text-[var(--ff-text-secondary)] text-center mb-4 max-w-md">
+            There was an issue loading the chart component. This might be due to a temporary
             loading problem with the chart library.
           </p>
-          
+
           {/* Error details for development */}
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <details className="mt-4 w-full">
-              <summary className="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
+              <summary className="cursor-pointer text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]">
                 Error Details (Development)
               </summary>
-              <pre className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border overflow-auto max-h-40">
+              <pre className="mt-2 text-xs text-red-400 bg-red-500/10 p-2 rounded border border-red-500/30 overflow-auto max-h-40">
                 {this.state.error.message}
                 {'\n'}
                 {this.state.error.stack}
               </pre>
             </details>
           )}
-          
+
           <button
             onClick={this.handleRetry}
             className="mt-4 flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"

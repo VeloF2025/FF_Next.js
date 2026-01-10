@@ -28,17 +28,17 @@ export default function BOQViewerHeader({
   return (
     <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">
           {boqData.title || boqData.fileName || 'BOQ Viewer'}
         </h2>
         <div className="flex items-center space-x-4 mt-1">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--ff-text-secondary)]">
             Version {boqData.version}
           </span>
           <span className={getStatusBadge(boqData.status, 'mapping')}>
             {boqData.status.replace('_', ' ').toUpperCase()}
           </span>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-[var(--ff-text-secondary)]">
             {boqData.itemCount} items
           </span>
         </div>
@@ -48,7 +48,7 @@ export default function BOQViewerHeader({
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`px-3 py-2 border rounded-md text-sm font-medium flex items-center ${
-            showFilters ? 'bg-blue-50 border-blue-200 text-blue-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            showFilters ? 'bg-blue-50 border-blue-200 text-blue-700' : 'border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
           }`}
         >
           <Filter className="h-4 w-4 mr-2" />
@@ -57,7 +57,7 @@ export default function BOQViewerHeader({
 
         <button
           onClick={onExport}
-          className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center"
+          className="px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-md text-sm font-medium hover:bg-[var(--ff-bg-hover)] flex items-center"
         >
           <Download className="h-4 w-4 mr-2" />
           Export
@@ -66,9 +66,9 @@ export default function BOQViewerHeader({
         <button
           onClick={() => setMode(mode === 'view' ? 'edit' : 'view')}
           className={`px-3 py-2 rounded-md text-sm font-medium flex items-center ${
-            mode === 'edit' 
-              ? 'bg-blue-600 text-white hover:bg-blue-700' 
-              : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+            mode === 'edit'
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
           }`}
         >
           {mode === 'edit' ? (
@@ -86,7 +86,7 @@ export default function BOQViewerHeader({
 
         <button
           onClick={onRefresh}
-          className="px-3 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50 flex items-center"
+          className="px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-md text-sm font-medium hover:bg-[var(--ff-bg-hover)] flex items-center"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh

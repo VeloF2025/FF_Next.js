@@ -42,10 +42,10 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
 
   const getPriorityBadge = (priority: ActionItem['priority']) => {
     const colors = {
-      urgent: 'bg-red-100 text-red-800',
-      high: 'bg-orange-100 text-orange-800',
-      medium: 'bg-blue-100 text-blue-800',
-      low: 'bg-gray-100 text-gray-800',
+      urgent: 'bg-red-500/20 text-red-400',
+      high: 'bg-orange-500/20 text-orange-400',
+      medium: 'bg-blue-500/20 text-blue-400',
+      low: 'bg-gray-500/20 text-gray-400',
     };
 
     return (
@@ -57,9 +57,9 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
 
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-        <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500 text-lg">No action items found</p>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-12 text-center">
+        <AlertCircle className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+        <p className="text-[var(--ff-text-secondary)] text-lg">No action items found</p>
       </div>
     );
   }
@@ -69,7 +69,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
       {items.map((item) => (
         <div
           key={item.id}
-          className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow ${
+          className={`bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-4 hover:shadow-md transition-shadow ${
             item.status === 'completed' ? 'opacity-60' : ''
           }`}
         >
@@ -87,15 +87,15 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
             <div className="flex-1 min-w-0">
               {/* Description */}
               <p
-                className={`text-gray-900 mb-2 ${
-                  item.status === 'completed' ? 'line-through text-gray-500' : ''
+                className={`text-[var(--ff-text-primary)] mb-2 ${
+                  item.status === 'completed' ? 'line-through text-[var(--ff-text-secondary)]' : ''
                 }`}
               >
                 {item.description}
               </p>
 
               {/* Metadata */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--ff-text-secondary)]">
                 {/* Assignee */}
                 {item.assignee_name && (
                   <div className="flex items-center gap-1">
@@ -114,7 +114,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
 
                 {/* Meeting timestamp */}
                 {item.mentioned_at && (
-                  <span className="text-xs text-gray-500">@ {item.mentioned_at}</span>
+                  <span className="text-xs text-[var(--ff-text-secondary)]">@ {item.mentioned_at}</span>
                 )}
 
                 {/* Priority */}
@@ -125,8 +125,8 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                   <span
                     className={`text-xs ${
                       new Date(item.due_date) < new Date() && item.status !== 'completed'
-                        ? 'text-red-600 font-semibold'
-                        : 'text-gray-500'
+                        ? 'text-red-400 font-semibold'
+                        : 'text-[var(--ff-text-secondary)]'
                     }`}
                   >
                     Due: {new Date(item.due_date).toLocaleDateString()}
@@ -136,7 +136,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
 
               {/* Notes */}
               {item.notes && (
-                <p className="mt-2 text-sm text-gray-600 italic">{item.notes}</p>
+                <p className="mt-2 text-sm text-[var(--ff-text-secondary)] italic">{item.notes}</p>
               )}
 
               {/* Tags */}
@@ -145,7 +145,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                   {item.tags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded"
+                      className="px-2 py-0.5 text-xs bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded"
                     >
                       {tag}
                     </span>
@@ -160,7 +160,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                 href={item.transcript_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-700"
+                className="text-blue-400 hover:text-blue-300"
                 title="View meeting transcript"
               >
                 <ExternalLink className="w-4 h-4" />

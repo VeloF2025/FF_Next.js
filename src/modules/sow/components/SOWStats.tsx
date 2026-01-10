@@ -26,19 +26,19 @@ export function SOWStats({ documents }: SOWStatsProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Total Documents</p>
-            <p className="text-2xl font-semibold text-gray-900">{stats.totalDocuments}</p>
-            <div className="mt-2 text-xs text-gray-500">
-              <span className="text-green-600">{stats.approvedCount} approved</span>
+            <p className="text-sm font-medium text-[var(--ff-text-secondary)]">Total Documents</p>
+            <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">{stats.totalDocuments}</p>
+            <div className="mt-2 text-xs text-[var(--ff-text-secondary)]">
+              <span className="text-green-400">{stats.approvedCount} approved</span>
               {' • '}
-              <span className="text-yellow-600">{stats.pendingCount} pending</span>
+              <span className="text-yellow-400">{stats.pendingCount} pending</span>
               {stats.rejectedCount > 0 && (
                 <>
                   {' • '}
-                  <span className="text-red-600">{stats.rejectedCount} rejected</span>
+                  <span className="text-red-400">{stats.rejectedCount} rejected</span>
                 </>
               )}
             </div>
@@ -47,40 +47,40 @@ export function SOWStats({ documents }: SOWStatsProps) {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Total Poles</p>
-            <p className="text-2xl font-semibold text-gray-900">
+            <p className="text-sm font-medium text-[var(--ff-text-secondary)]">Total Poles</p>
+            <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
               {stats.totalPoles.toLocaleString()}
             </p>
-            <p className="text-xs text-gray-500 mt-2">Across all projects</p>
+            <p className="text-xs text-[var(--ff-text-secondary)] mt-2">Across all projects</p>
           </div>
           <MapPin className="h-12 w-12 text-green-500" />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Total Drops</p>
-            <p className="text-2xl font-semibold text-gray-900">
+            <p className="text-sm font-medium text-[var(--ff-text-secondary)]">Total Drops</p>
+            <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
               {stats.totalDrops.toLocaleString()}
             </p>
-            <p className="text-xs text-gray-500 mt-2">Customer connections</p>
+            <p className="text-xs text-[var(--ff-text-secondary)] mt-2">Customer connections</p>
           </div>
           <Home className="h-12 w-12 text-purple-500" />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">Estimated Value</p>
-            <p className="text-2xl font-semibold text-gray-900">
+            <p className="text-sm font-medium text-[var(--ff-text-secondary)]">Estimated Value</p>
+            <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
               ${(stats.totalEstimatedCost / 1000000).toFixed(1)}M
             </p>
-            <p className="text-xs text-gray-500 mt-2">Total project value</p>
+            <p className="text-xs text-[var(--ff-text-secondary)] mt-2">Total project value</p>
           </div>
           <TrendingUp className="h-12 w-12 text-orange-500" />
         </div>

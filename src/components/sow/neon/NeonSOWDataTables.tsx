@@ -15,24 +15,24 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
   if (data.length === 0) {
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <p className="text-gray-500">No {type} data found</p>
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{title}</h3>
+        <p className="text-[var(--ff-text-secondary)]">No {type} data found</p>
       </div>
     );
   }
 
   const getStatusBadge = (status: string, statusType: 'poles' | 'drops' | 'fibre') => {
-    let colorClass = 'bg-gray-100 text-gray-800';
-    
+    let colorClass = 'bg-gray-500/20 text-gray-400';
+
     if (statusType === 'poles') {
-      if (status === 'approved') colorClass = 'bg-green-100 text-green-800';
-      else if (status === 'pending') colorClass = 'bg-yellow-100 text-yellow-800';
+      if (status === 'approved') colorClass = 'bg-green-500/20 text-green-400';
+      else if (status === 'pending') colorClass = 'bg-yellow-500/20 text-yellow-400';
     } else if (statusType === 'drops') {
-      if (status === 'active') colorClass = 'bg-green-100 text-green-800';
-      else if (status === 'planned') colorClass = 'bg-blue-100 text-blue-800';
+      if (status === 'active') colorClass = 'bg-green-500/20 text-green-400';
+      else if (status === 'planned') colorClass = 'bg-blue-500/20 text-blue-400';
     } else if (statusType === 'fibre') {
-      if (status === 'installed') colorClass = 'bg-green-100 text-green-800';
-      else if (status === 'planned') colorClass = 'bg-blue-100 text-blue-800';
+      if (status === 'installed') colorClass = 'bg-green-500/20 text-green-400';
+      else if (status === 'planned') colorClass = 'bg-blue-500/20 text-blue-400';
     }
 
     return (
@@ -44,27 +44,27 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
 
   const renderPolesTable = () => (
     <table className="w-full text-sm">
-      <thead className="bg-gray-50">
+      <thead className="bg-[var(--ff-bg-tertiary)]">
         <tr>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Pole Number</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Location</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Status</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">GPS</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Pole Number</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Location</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Status</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">GPS</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-200">
+      <tbody className="divide-y divide-[var(--ff-border-light)]">
         {displayData.map((pole: any, index: number) => (
-          <tr key={index} className="hover:bg-gray-50">
-            <td className="px-4 py-2 font-medium text-gray-900">
+          <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
+            <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
               {pole.pole_number || pole.id}
             </td>
-            <td className="px-4 py-2 text-gray-700">
+            <td className="px-4 py-2 text-[var(--ff-text-primary)]">
               {pole.address || 'Not specified'}
             </td>
             <td className="px-4 py-2">
               {getStatusBadge(pole.status, 'poles')}
             </td>
-            <td className="px-4 py-2 text-gray-600">
+            <td className="px-4 py-2 text-[var(--ff-text-secondary)]">
               {pole.latitude && pole.longitude 
                 ? `${Number(pole.latitude).toFixed(6)}, ${Number(pole.longitude).toFixed(6)}`
                 : 'No GPS'
@@ -78,24 +78,24 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
 
   const renderDropsTable = () => (
     <table className="w-full text-sm">
-      <thead className="bg-gray-50">
+      <thead className="bg-[var(--ff-bg-tertiary)]">
         <tr>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Drop Number</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Connected Pole</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Address</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Status</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Drop Number</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Connected Pole</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Address</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Status</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-200">
+      <tbody className="divide-y divide-[var(--ff-border-light)]">
         {displayData.map((drop: any, index: number) => (
-          <tr key={index} className="hover:bg-gray-50">
-            <td className="px-4 py-2 font-medium text-gray-900">
+          <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
+            <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
               {drop.drop_number || drop.id}
             </td>
-            <td className="px-4 py-2 text-gray-700">
+            <td className="px-4 py-2 text-[var(--ff-text-primary)]">
               {drop.pole_number || 'Not assigned'}
             </td>
-            <td className="px-4 py-2 text-gray-700">
+            <td className="px-4 py-2 text-[var(--ff-text-primary)]">
               {drop.address || 'Not specified'}
             </td>
             <td className="px-4 py-2">
@@ -109,27 +109,27 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
 
   const renderFibreTable = () => (
     <table className="w-full text-sm">
-      <thead className="bg-gray-50">
+      <thead className="bg-[var(--ff-bg-tertiary)]">
         <tr>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Segment ID</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">From → To</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Distance</th>
-          <th className="px-4 py-2 text-left font-medium text-gray-900">Status</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Segment ID</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">From → To</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Distance</th>
+          <th className="px-4 py-2 text-left font-medium text-[var(--ff-text-primary)]">Status</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-200">
+      <tbody className="divide-y divide-[var(--ff-border-light)]">
         {displayData.map((segment: any, index: number) => (
-          <tr key={index} className="hover:bg-gray-50">
-            <td className="px-4 py-2 font-medium text-gray-900">
+          <tr key={index} className="hover:bg-[var(--ff-bg-hover)]">
+            <td className="px-4 py-2 font-medium text-[var(--ff-text-primary)]">
               {segment.segment_id || segment.id}
             </td>
-            <td className="px-4 py-2 text-gray-700">
-              {segment.from_point && segment.to_point 
+            <td className="px-4 py-2 text-[var(--ff-text-primary)]">
+              {segment.from_point && segment.to_point
                 ? `${segment.from_point} → ${segment.to_point}`
                 : 'Not specified'
               }
             </td>
-            <td className="px-4 py-2 text-gray-700">
+            <td className="px-4 py-2 text-[var(--ff-text-primary)]">
               {segment.distance ? `${segment.distance}m` : 'Unknown'}
             </td>
             <td className="px-4 py-2">
@@ -156,11 +156,11 @@ export function NeonSOWDataTables({ data, type, title }: NeonSOWDataTablesProps)
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+      <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{title}</h3>
       <div className="overflow-x-auto">
         {renderTable()}
         {data.length > maxItems && (
-          <div className="text-center py-4 text-gray-500 text-sm">
+          <div className="text-center py-4 text-[var(--ff-text-secondary)] text-sm">
             Showing first {maxItems} of {data.length} {type}
           </div>
         )}

@@ -18,8 +18,8 @@ export function DashboardCharts({ projectTrends, kpiDashboard }: DashboardCharts
           {projectTrends.length === 0 ? (
             <div className="flex items-center justify-center h-[300px]">
               <div className="text-center">
-                <p className="text-gray-500">No trend data available</p>
-                <p className="text-sm text-gray-400">Project trends will display here once data is available</p>
+                <p className="text-[var(--ff-text-tertiary)]">No trend data available</p>
+                <p className="text-sm text-[var(--ff-text-tertiary)]">Project trends will display here once data is available</p>
               </div>
             </div>
           ) : (
@@ -56,8 +56,8 @@ export function DashboardCharts({ projectTrends, kpiDashboard }: DashboardCharts
           {kpiDashboard.length === 0 ? (
             <div className="flex items-center justify-center h-[300px]">
               <div className="text-center">
-                <p className="text-gray-500">No KPI data available</p>
-                <p className="text-sm text-gray-400">KPI metrics will display here once data is available</p>
+                <p className="text-[var(--ff-text-tertiary)]">No KPI data available</p>
+                <p className="text-sm text-[var(--ff-text-tertiary)]">KPI metrics will display here once data is available</p>
               </div>
             </div>
           ) : (

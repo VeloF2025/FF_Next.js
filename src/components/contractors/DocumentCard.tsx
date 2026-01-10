@@ -50,16 +50,16 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
   const getStatusColor = () => {
     const colorMap = STATUS_COLORS[document.status];
     switch (colorMap) {
-      case 'green': return 'bg-green-100 text-green-800';
-      case 'yellow': return 'bg-yellow-100 text-yellow-800';
-      case 'red': return 'bg-red-100 text-red-800';
-      case 'gray': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'green': return 'bg-green-500/20 text-green-400';
+      case 'yellow': return 'bg-yellow-500/20 text-yellow-400';
+      case 'red': return 'bg-red-500/20 text-red-400';
+      case 'gray': return 'bg-gray-500/20 text-gray-400';
+      default: return 'bg-gray-500/20 text-gray-400';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow p-4">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] hover:shadow-md transition-shadow p-4">
       <div className="flex items-start gap-4">
         {/* Icon */}
         <div className="flex-shrink-0">
@@ -81,8 +81,8 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
           {/* Header */}
           <div className="flex items-start justify-between gap-4 mb-2">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900">{document.documentName}</h3>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <h3 className="font-semibold text-[var(--ff-text-primary)]">{document.documentName}</h3>
+              <p className="text-sm text-[var(--ff-text-secondary)] mt-0.5">
                 {DOCUMENT_TYPE_LABELS[document.documentType]}
               </p>
             </div>
@@ -94,7 +94,7 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
           </div>
 
           {/* Details */}
-          <div className="space-y-1 text-sm text-gray-600 mb-3">
+          <div className="space-y-1 text-sm text-[var(--ff-text-secondary)] mb-3">
             {document.documentNumber && (
               <div>
                 <span className="font-medium">Number:</span> {document.documentNumber}
@@ -118,7 +118,7 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
               </div>
             )}
 
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-[var(--ff-text-tertiary)]">
               Uploaded {new Date(document.createdAt).toLocaleDateString()} • {
                 document.fileSize
                   ? `${(document.fileSize / 1024 / 1024).toFixed(2)} MB`
@@ -176,13 +176,13 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
 
           {/* Notes */}
           {document.notes && (
-            <div className="text-xs text-gray-600 italic border-l-2 border-gray-300 pl-2 mb-3">
+            <div className="text-xs text-[var(--ff-text-secondary)] italic border-l-2 border-[var(--ff-border-light)] pl-2 mb-3">
               {document.notes}
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-2 pt-2 border-t border-[var(--ff-border-light)]">
             {/* Download */}
             <button
               onClick={handleDownload}
@@ -198,7 +198,7 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
               href={document.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 rounded transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] rounded transition-colors"
               title="View in new tab"
             >
               <ExternalLink className="h-4 w-4" />

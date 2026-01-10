@@ -13,21 +13,21 @@ interface TaskCardProps {
 export function TaskCard({ task, onSelect }: TaskCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'text-green-600 bg-green-100';
-      case 'in_progress': return 'text-blue-600 bg-blue-100';
-      case 'pending': return 'text-gray-600 bg-gray-100';
-      case 'failed': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'completed': return 'text-green-400 bg-green-500/20';
+      case 'in_progress': return 'text-blue-400 bg-blue-500/20';
+      case 'pending': return 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)]';
+      case 'failed': return 'text-red-400 bg-red-500/20';
+      default: return 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)]';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'text-red-600';
-      case 'high': return 'text-orange-600';
-      case 'medium': return 'text-yellow-600';
-      case 'low': return 'text-green-600';
-      default: return 'text-gray-600';
+      case 'urgent': return 'text-red-400';
+      case 'high': return 'text-orange-400';
+      case 'medium': return 'text-yellow-400';
+      case 'low': return 'text-green-400';
+      default: return 'text-[var(--ff-text-secondary)]';
     }
   };
 
@@ -44,8 +44,8 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
   return (
     <div
       className={cn(
-        "bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow",
-        task.offline && "border-orange-300 bg-orange-50"
+        "bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 cursor-pointer hover:shadow-md transition-shadow",
+        task.offline && "border-orange-300 bg-orange-500/10"
       )}
       onClick={() => onSelect(task)}
     >
@@ -56,24 +56,24 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
             {task.status.replace('_', ' ')}
           </span>
         </div>
-        <ChevronRight className="w-5 h-5 text-gray-400" />
+        <ChevronRight className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
       </div>
 
-      <h3 className="font-medium text-gray-900 mb-1">{task.title}</h3>
-      <p className="text-sm text-gray-600 mb-2">{task.customer}</p>
+      <h3 className="font-medium text-[var(--ff-text-primary)] mb-1">{task.title}</h3>
+      <p className="text-sm text-[var(--ff-text-secondary)] mb-2">{task.customer}</p>
 
-      <div className="flex items-center text-xs text-gray-500 mb-2">
+      <div className="flex items-center text-xs text-[var(--ff-text-tertiary)] mb-2">
         <MapPin className="w-3 h-3 mr-1" />
         {task.address}
       </div>
 
       <div className="flex items-center justify-between text-xs">
-        <span className="text-gray-500">
+        <span className="text-[var(--ff-text-tertiary)]">
           {task.scheduledTime} ({task.estimatedDuration})
         </span>
         <div className="flex items-center space-x-2">
           {task.attachments > 0 && (
-            <div className="flex items-center text-gray-500">
+            <div className="flex items-center text-[var(--ff-text-tertiary)]">
               <Paperclip className="w-3 h-3 mr-1" />
               {task.attachments}
             </div>
@@ -85,7 +85,7 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
       </div>
 
       {task.offline && (
-        <div className="mt-2 text-xs text-orange-600 font-medium">
+        <div className="mt-2 text-xs text-orange-400 font-medium">
           Offline Mode
         </div>
       )}

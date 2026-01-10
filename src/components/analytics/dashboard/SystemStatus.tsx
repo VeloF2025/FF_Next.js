@@ -22,7 +22,7 @@ export function SystemStatus({ lastSyncTime }: SystemStatusProps) {
             <span>Neon (Analytics)</span>
           </div>
           {lastSyncTime && (
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-[var(--ff-text-secondary)]">
               Last synced: {lastSyncTime.toLocaleString()}
             </span>
           )}

@@ -33,8 +33,8 @@ export default function ActionItemsSubPage() {
     return (
       <AppLayout>
         <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-900">Page Not Found</h1>
-          <p className="text-gray-600 mt-2">The action items page you're looking for doesn't exist.</p>
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Page Not Found</h1>
+          <p className="text-[var(--ff-text-secondary)] mt-2">The action items page you&apos;re looking for doesn&apos;t exist.</p>
         </div>
       </AppLayout>
     );

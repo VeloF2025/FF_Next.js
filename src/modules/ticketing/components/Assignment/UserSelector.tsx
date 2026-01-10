@@ -109,36 +109,36 @@ export function UserSelector({
         disabled={disabled}
         className={cn(
           'w-full flex items-center justify-between gap-2 px-3 rounded-lg border transition-all duration-200',
-          'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white',
+          'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]',
           'hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
           'disabled:opacity-50 disabled:cursor-not-allowed',
-          error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600',
+          error ? 'border-red-500' : 'border-[var(--ff-border-light)]',
           compact ? 'h-9 text-sm' : 'h-10'
         )}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <User className={cn('flex-shrink-0 text-gray-500 dark:text-gray-400', compact ? 'w-4 h-4' : 'w-5 h-5')} />
+          <User className={cn('flex-shrink-0 text-[var(--ff-text-tertiary)]', compact ? 'w-4 h-4' : 'w-5 h-5')} />
           {selectedUser ? (
             <span className="truncate">{selectedUser.name}</span>
           ) : (
-            <span className="text-gray-500 dark:text-gray-400 truncate">{placeholder}</span>
+            <span className="text-[var(--ff-text-tertiary)] truncate">{placeholder}</span>
           )}
         </div>
 
         <div className="flex items-center gap-1">
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-500 dark:text-gray-400" />}
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-[var(--ff-text-tertiary)]" />}
           {showClear && selectedUser && !disabled && (
             <button
               type="button"
               onClick={handleClear}
-              className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+              className="p-0.5 hover:bg-[var(--ff-bg-hover)] rounded transition-colors"
             >
-              <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <X className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
             </button>
           )}
           <ChevronDown
             className={cn(
-              'w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform',
+              'w-4 h-4 text-[var(--ff-text-tertiary)] transition-transform',
               isOpen && 'rotate-180'
             )}
           />
@@ -152,11 +152,11 @@ export function UserSelector({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden">
+        <div className="absolute z-50 w-full mt-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl overflow-hidden">
           {/* Search Input */}
-          <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-2 border-b border-[var(--ff-border-light)]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
               <input
                 ref={inputRef}
                 type="text"
@@ -164,8 +164,8 @@ export function UserSelector({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search users..."
                 className={cn(
-                  'w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md',
-                  'text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400',
+                  'w-full pl-9 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md',
+                  'text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]',
                   'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 )}
               />
@@ -176,14 +176,14 @@ export function UserSelector({
           <div className="max-h-60 overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 animate-spin text-gray-500 dark:text-gray-400" />
+                <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
               </div>
             ) : isError ? (
-              <div className="px-3 py-4 text-sm text-red-500 text-center">
+              <div className="px-3 py-4 text-sm text-red-400 text-center">
                 Failed to load users
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+              <div className="px-3 py-4 text-sm text-[var(--ff-text-secondary)] text-center">
                 {searchQuery ? 'No users found' : 'No users available'}
               </div>
             ) : (
@@ -194,26 +194,26 @@ export function UserSelector({
                   onClick={() => handleSelect(user)}
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700',
-                    user.id === value && 'bg-blue-50 dark:bg-blue-900/30'
+                    'hover:bg-[var(--ff-bg-hover)]',
+                    user.id === value && 'bg-blue-500/10'
                   )}
                 >
-                  <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <div className="w-8 h-8 rounded-full bg-[var(--ff-bg-tertiary)] flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         'font-medium text-sm truncate',
-                        user.id === value ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'
+                        user.id === value ? 'text-blue-400' : 'text-[var(--ff-text-primary)]'
                       )}>
                         {user.name}
                       </span>
                       {user.id === value && (
-                        <span className="text-xs text-blue-600 dark:text-blue-400">(Current)</span>
+                        <span className="text-xs text-blue-400">(Current)</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-[var(--ff-text-secondary)]">
                       <span className="truncate">{user.email}</span>
                       {user.role && (
                         <>
@@ -230,7 +230,7 @@ export function UserSelector({
 
           {/* Clear Option */}
           {value && showClear && (
-            <div className="border-t border-gray-200 dark:border-gray-700 p-2">
+            <div className="border-t border-[var(--ff-border-light)] p-2">
               <button
                 type="button"
                 onClick={() => {
@@ -238,7 +238,7 @@ export function UserSelector({
                   setIsOpen(false);
                   setSearchQuery('');
                 }}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] rounded-md transition-colors"
               >
                 <X className="w-4 h-4" />
                 Clear Assignment

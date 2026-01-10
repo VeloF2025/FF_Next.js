@@ -34,10 +34,10 @@ export function SOWFileUploader({
             <FileSpreadsheet className="w-8 h-8 text-blue-600" />
           )}
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">
           {currentStepData.title}
         </h3>
-        <p className="text-gray-600 max-w-md mx-auto">
+        <p className="text-[var(--ff-text-secondary)] max-w-md mx-auto">
           {currentStepData.description}
         </p>
       </div>
@@ -45,7 +45,7 @@ export function SOWFileUploader({
       {/* Upload Area */}
       {!isCurrentStepComplete && (
         <div className="max-w-md mx-auto">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+          <div className="border-2 border-dashed border-[var(--ff-border-light)] rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -61,12 +61,12 @@ export function SOWFileUploader({
               {isUploading ? (
                 <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
               ) : (
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <Upload className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
               )}
-              <p className="text-gray-600">
+              <p className="text-[var(--ff-text-secondary)]">
                 {isUploading ? 'Processing file...' : 'Click to upload Excel file'}
               </p>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-[var(--ff-text-tertiary)] mt-2">
                 {uploadProgress ? uploadProgress : 'Supports .xlsx, .xls, and .csv files'}
               </p>
             </label>

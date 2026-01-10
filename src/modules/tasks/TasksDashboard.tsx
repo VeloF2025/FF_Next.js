@@ -63,12 +63,12 @@ export function TasksDashboard() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Task Management</h1>
-        <p className="text-gray-600 mt-1">Create, assign and track tasks across projects</p>
+        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Task Management</h1>
+        <p className="text-[var(--ff-text-secondary)] mt-1">Create, assign and track tasks across projects</p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-[var(--ff-border-light)] mb-6">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => (
             <button
@@ -78,12 +78,12 @@ export function TasksDashboard() {
                 py-2 px-1 border-b-2 font-medium text-sm transition-colors
                 ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                 }
               `}
             >
               {tab.label}
-              <span className="ml-2 py-0.5 px-2 rounded-full bg-gray-100 text-xs">
+              <span className="ml-2 py-0.5 px-2 rounded-full bg-[var(--ff-bg-tertiary)] text-xs">
                 {tab.count}
               </span>
             </button>
@@ -97,22 +97,22 @@ export function TasksDashboard() {
           <div
             key={card.title}
             onClick={card.onClick}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+            className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-start space-x-4">
               <div className={`${card.color} p-3 rounded-lg`}>
                 <card.icon className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">
                   {card.title}
                   {card.count !== undefined && (
-                    <span className="ml-2 text-sm font-normal text-gray-500">
+                    <span className="ml-2 text-sm font-normal text-[var(--ff-text-secondary)]">
                       ({card.count})
                     </span>
                   )}
                 </h3>
-                <p className="text-sm text-gray-600">{card.description}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">{card.description}</p>
               </div>
             </div>
           </div>
@@ -122,14 +122,14 @@ export function TasksDashboard() {
       {/* Task List Preview */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Tasks</h2>
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Recent Tasks</h2>
           <button className="text-sm text-blue-600 hover:text-blue-700">
             View all →
           </button>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
           <div className="p-6">
-            <p className="text-gray-500 text-center">No tasks to display</p>
+            <p className="text-[var(--ff-text-secondary)] text-center">No tasks to display</p>
           </div>
         </div>
       </div>

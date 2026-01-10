@@ -136,9 +136,9 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-indigo-600">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ff-border-light)] bg-gradient-to-r from-blue-600 to-indigo-600">
                     <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                         <Calendar className="w-5 h-5" />
                         Schedule Meeting
@@ -154,18 +154,18 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                 {/* Success State */}
                 {success ? (
                     <div className="p-6 text-center">
-                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <CheckCircle className="w-8 h-8 text-green-600" />
+                        <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <CheckCircle className="w-8 h-8 text-green-400" />
                         </div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Meeting Scheduled!</h3>
-                        <p className="text-gray-600 mb-4">
+                        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Meeting Scheduled!</h3>
+                        <p className="text-[var(--ff-text-secondary)] mb-4">
                             {attendees.length > 0
                                 ? `Email invites have been sent to ${attendees.length} attendee(s).`
                                 : 'Your meeting has been created.'}
                         </p>
 
-                        <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                            <p className="text-sm text-gray-500 mb-2">Meeting Link:</p>
+                        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4 mb-4">
+                            <p className="text-sm text-[var(--ff-text-secondary)] mb-2">Meeting Link:</p>
                             <a
                                 href={success.meetingUrl}
                                 target="_blank"
@@ -181,7 +181,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                 href={success.calendarLinks.googleCalUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm"
+                                className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm"
                             >
                                 📅 Add to Google Calendar
                             </a>
@@ -189,7 +189,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                 href={success.calendarLinks.outlookUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm"
+                                className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm"
                             >
                                 📧 Add to Outlook
                             </a>
@@ -197,7 +197,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
                         <button
                             onClick={handleClose}
-                            className="w-full py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+                            className="w-full py-3 bg-[var(--ff-text-primary)] text-[var(--ff-bg-primary)] rounded-lg hover:opacity-90"
                         >
                             Done
                         </button>
@@ -208,7 +208,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                         <div className="p-6 space-y-5">
                             {/* Error */}
                             {error && (
-                                <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
+                                <div className="flex items-center gap-2 px-4 py-3 bg-red-500/20 text-red-400 rounded-lg text-sm">
                                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
                                     {error}
                                 </div>
@@ -216,7 +216,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
                             {/* Title */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                                     Meeting Title *
                                 </label>
                                 <input
@@ -224,14 +224,14 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder="Weekly Team Standup"
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full px-4 py-2.5 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     required
                                 />
                             </div>
 
                             {/* Description */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                                     Description (optional)
                                 </label>
                                 <textarea
@@ -239,14 +239,14 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Discuss project updates and blockers"
                                     rows={2}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                    className="w-full px-4 py-2.5 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                                 />
                             </div>
 
                             {/* Date & Time */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                                         <Calendar className="w-4 h-4 inline mr-1" />
                                         Date *
                                     </label>
@@ -255,12 +255,12 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                         value={date}
                                         onChange={(e) => setDate(e.target.value)}
                                         min={new Date().toISOString().split('T')[0]}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className="w-full px-4 py-2.5 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                                         <Clock className="w-4 h-4 inline mr-1" />
                                         Time *
                                     </label>
@@ -268,7 +268,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                         type="time"
                                         value={time}
                                         onChange={(e) => setTime(e.target.value)}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        className="w-full px-4 py-2.5 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         required
                                     />
                                 </div>
@@ -276,13 +276,13 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
                             {/* Duration */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                                     Duration
                                 </label>
                                 <select
                                     value={duration}
                                     onChange={(e) => setDuration(Number(e.target.value))}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full px-4 py-2.5 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 >
                                     <option value={15}>15 minutes</option>
                                     <option value={30}>30 minutes</option>
@@ -295,7 +295,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
 
                             {/* Attendees */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                                     <Users className="w-4 h-4 inline mr-1" />
                                     Invite Attendees
                                 </label>
@@ -307,14 +307,14 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                         value={newEmail}
                                         onChange={(e) => setNewEmail(e.target.value)}
                                         placeholder="email@example.com"
-                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                        className="flex-1 px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                     />
                                     <input
                                         type="text"
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
                                         placeholder="Name (optional)"
-                                        className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                        className="w-32 px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                     />
                                     <button
                                         type="button"
@@ -331,18 +331,18 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                         {attendees.map((attendee, index) => (
                                             <div
                                                 key={index}
-                                                className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg"
+                                                className="flex items-center justify-between px-3 py-2 bg-[var(--ff-bg-tertiary)] rounded-lg"
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    <Mail className="w-4 h-4 text-gray-400" />
-                                                    <span className="text-sm">
+                                                    <Mail className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                                                    <span className="text-sm text-[var(--ff-text-primary)]">
                                                         {attendee.name ? `${attendee.name} (${attendee.email})` : attendee.email}
                                                     </span>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveAttendee(index)}
-                                                    className="p-1 text-gray-400 hover:text-red-500"
+                                                    className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-500"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
@@ -352,7 +352,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                                 )}
 
                                 {attendees.length === 0 && (
-                                    <p className="text-sm text-gray-500 italic">
+                                    <p className="text-sm text-[var(--ff-text-secondary)] italic">
                                         No attendees added. You can schedule without inviting anyone.
                                     </p>
                                 )}
@@ -360,11 +360,11 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+                        <div className="px-6 py-4 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] flex gap-3">
                             <button
                                 type="button"
                                 onClick={handleClose}
-                                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+                                className="flex-1 py-2.5 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
                             >
                                 Cancel
                             </button>

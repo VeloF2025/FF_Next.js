@@ -62,29 +62,29 @@ function TemplateCard({
 
   const getStatusColor = (status: WorkflowStatus) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
-      case 'draft': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
-      case 'archived': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      case 'active': return 'bg-green-500/20 text-green-400';
+      case 'draft': return 'bg-yellow-500/20 text-yellow-400';
+      case 'archived': return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]';
+      default: return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]';
     }
   };
 
   const getCategoryColor = (category: WorkflowCategory) => {
     switch (category) {
-      case 'project': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
-      case 'maintenance': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
-      case 'emergency': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
-      case 'telecommunications': return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      case 'project': return 'bg-blue-500/20 text-blue-400';
+      case 'maintenance': return 'bg-purple-500/20 text-purple-400';
+      case 'emergency': return 'bg-red-500/20 text-red-400';
+      case 'telecommunications': return 'bg-cyan-500/20 text-cyan-400';
+      default: return 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]';
     }
   };
 
   return (
     <div
-      className={`relative bg-white dark:bg-gray-800 rounded-lg border-2 transition-all duration-200 hover:shadow-md cursor-pointer ${
-        isSelected 
-          ? 'border-blue-500 shadow-md' 
-          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+      className={`relative bg-[var(--ff-bg-secondary)] rounded-lg border-2 transition-all duration-200 hover:shadow-md cursor-pointer ${
+        isSelected
+          ? 'border-blue-500 shadow-md'
+          : 'border-[var(--ff-border-light)] hover:border-[var(--ff-border-light)]'
       }`}
       onClick={() => onSelect?.(template)}
     >
@@ -93,24 +93,24 @@ function TemplateCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-2">
-              <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+              <FileText className="w-4 h-4 text-[var(--ff-text-tertiary)] flex-shrink-0" />
+              <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] truncate">
                 {template.name}
               </h3>
               {template.isDefault && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-500/20 text-indigo-400">
                   Default
                 </span>
               )}
             </div>
-            
+
             {template.description && (
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+              <p className="text-xs text-[var(--ff-text-secondary)] mb-3 line-clamp-2">
                 {template.description}
               </p>
             )}
 
-            <div className="flex items-center space-x-3 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center space-x-3 text-xs text-[var(--ff-text-tertiary)]">
               <span className="flex items-center space-x-1">
                 <Calendar className="w-3 h-3" />
                 <span>v{template.version}</span>
@@ -129,10 +129,10 @@ function TemplateCard({
                 e.stopPropagation();
                 setShowMenu(!showMenu);
               }}
-              className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-1 rounded-full hover:bg-[var(--ff-bg-hover)] transition-colors"
               aria-label="Template actions"
             >
-              <MoreVertical className="w-4 h-4 text-gray-400" />
+              <MoreVertical className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
             </button>
 
             {showMenu && (
@@ -141,14 +141,14 @@ function TemplateCard({
                   className="fixed inset-0 z-10"
                   onClick={() => setShowMenu(false)}
                 />
-                <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 w-32">
+                <div className="absolute right-0 top-8 z-20 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-md shadow-lg py-1 w-32">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onEdit?.(template.id);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-2"
                   >
                     <Edit3 className="w-3 h-3" />
                     <span>Edit</span>
@@ -159,7 +159,7 @@ function TemplateCard({
                       onDuplicate?.(template.id);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-2"
                   >
                     <Copy className="w-3 h-3" />
                     <span>Duplicate</span>
@@ -170,7 +170,7 @@ function TemplateCard({
                       onExport?.(template.id);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    className="w-full px-3 py-1.5 text-left text-xs text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center space-x-2"
                   >
                     <Download className="w-3 h-3" />
                     <span>Export</span>
@@ -182,7 +182,7 @@ function TemplateCard({
                         onDelete?.(template.id);
                         setShowMenu(false);
                       }}
-                      className="w-full px-3 py-1.5 text-left text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center space-x-2"
+                      className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:bg-red-500/20 flex items-center space-x-2"
                     >
                       <Trash2 className="w-3 h-3" />
                       <span>Delete</span>
@@ -196,7 +196,7 @@ function TemplateCard({
       </div>
 
       {/* Template Footer */}
-      <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+      <div className="px-4 py-3 border-t border-[var(--ff-border-light)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(template.status)}`}>
@@ -206,11 +206,11 @@ function TemplateCard({
               {template.category.charAt(0).toUpperCase() + template.category.slice(1)}
             </span>
           </div>
-          
+
           {template.tags.length > 0 && (
             <div className="flex items-center space-x-1">
-              <Tag className="w-3 h-3 text-gray-400" />
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <Tag className="w-3 h-3 text-[var(--ff-text-tertiary)]" />
+              <span className="text-xs text-[var(--ff-text-tertiary)]">
                 {template.tags.length} tag{template.tags.length > 1 ? 's' : ''}
               </span>
             </div>
@@ -356,16 +356,16 @@ export function TemplateList({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">
             Workflow Templates
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
             Manage your workflow templates and create new ones
           </p>
         </div>
-        
+
         <div className="flex items-center space-x-3">
-          <button className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <button className="inline-flex items-center px-3 py-2 border border-[var(--ff-border-light)] rounded-md shadow-sm text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
             <Upload className="w-4 h-4 mr-2" />
             Import
           </button>
@@ -379,22 +379,22 @@ export function TemplateList({
       {/* Search and Filters */}
       <div className="flex items-center space-x-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search templates..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-md bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
-        
+
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
             showFilters
-              ? 'border-blue-500 text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300'
-              : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              ? 'border-blue-500 text-blue-600 bg-blue-500/20'
+              : 'border-[var(--ff-border-light)] text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)]'
           }`}
         >
           <Filter className="w-4 h-4 mr-2" />
@@ -404,9 +404,9 @@ export function TemplateList({
 
       {/* Error Alert */}
       {state.error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
-          <span className="text-sm text-red-700 dark:text-red-300">{state.error}</span>
+        <div className="p-4 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center space-x-2">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-sm text-red-400">{state.error}</span>
         </div>
       )}
 
@@ -414,15 +414,15 @@ export function TemplateList({
       {state.isLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-3 text-gray-600 dark:text-gray-400">Loading templates...</span>
+          <span className="ml-3 text-[var(--ff-text-secondary)]">Loading templates...</span>
         </div>
       ) : state.templates.length === 0 ? (
         <div className="text-center py-12">
-          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+          <FileText className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">
             No templates found
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-[var(--ff-text-secondary)] mb-6">
             {searchTerm || Object.keys(state.filter).length > 0
               ? 'Try adjusting your search or filters'
               : 'Get started by creating your first workflow template'}
@@ -452,29 +452,29 @@ export function TemplateList({
       {/* Pagination */}
       {state.templates.length > 0 && state.totalCount > state.pageSize && (
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-700 dark:text-gray-300">
+          <div className="text-sm text-[var(--ff-text-primary)]">
             Showing {((state.currentPage - 1) * state.pageSize) + 1} to{' '}
             {Math.min(state.currentPage * state.pageSize, state.totalCount)} of{' '}
             {state.totalCount} templates
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <button
               onClick={() => loadTemplates(state.currentPage - 1)}
               disabled={state.currentPage <= 1 || state.isLoading}
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-1 border border-[var(--ff-border-light)] rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               Previous
             </button>
-            
-            <span className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300">
+
+            <span className="px-3 py-1 text-sm text-[var(--ff-text-primary)]">
               Page {state.currentPage} of {Math.ceil(state.totalCount / state.pageSize)}
             </span>
-            
+
             <button
               onClick={() => loadTemplates(state.currentPage + 1)}
               disabled={state.currentPage >= Math.ceil(state.totalCount / state.pageSize) || state.isLoading}
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-1 border border-[var(--ff-border-light)] rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               Next
             </button>
@@ -484,3 +484,5 @@ export function TemplateList({
     </div>
   );
 }
+
+// 🟢 WORKING: Template list with dark mode support using CSS variables

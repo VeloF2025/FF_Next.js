@@ -127,13 +127,13 @@ export function ExitEmployeeModal({
   const getStatusColor = () => {
     switch (targetStatus) {
       case StaffStatus.TERMINATED:
-        return 'text-red-500';
+        return 'text-red-400';
       case StaffStatus.RESIGNED:
-        return 'text-orange-500';
+        return 'text-orange-400';
       case StaffStatus.RETIRED:
-        return 'text-blue-500';
+        return 'text-blue-400';
       default:
-        return 'text-gray-500';
+        return 'text-[var(--ff-text-tertiary)]';
     }
   };
 
@@ -289,7 +289,7 @@ export function ExitEmployeeModal({
               </div>
               <div className="flex justify-between">
                 <span>Rehireable:</span>
-                <span className={`font-medium ${isRehireable ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`font-medium ${isRehireable ? 'text-green-400' : 'text-red-400'}`}>
                   {isRehireable ? 'Yes' : 'No'}
                 </span>
               </div>

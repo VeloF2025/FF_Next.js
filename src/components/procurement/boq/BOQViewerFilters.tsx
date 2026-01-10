@@ -25,18 +25,18 @@ export default function BOQViewerFilters({
   setVisibleColumns
 }: BOQViewerFiltersProps) {
   return (
-    <div className="bg-white p-4 rounded-lg border space-y-4">
+    <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)] space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* Search */}
         <div className="md:col-span-2">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
             <input
               type="text"
               placeholder="Search items..."
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md text-sm"
+              className="pl-10 pr-4 py-2 w-full border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
             />
           </div>
         </div>
@@ -45,7 +45,7 @@ export default function BOQViewerFilters({
         <select
           value={filters.mappingStatus}
           onChange={(e) => setFilters({ ...filters, mappingStatus: e.target.value as BOQItemMappingStatusType | '' })}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          className="px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
         >
           <option value="">All Mapping Status</option>
           <option value="pending">Pending</option>
@@ -58,7 +58,7 @@ export default function BOQViewerFilters({
         <select
           value={filters.procurementStatus}
           onChange={(e) => setFilters({ ...filters, procurementStatus: e.target.value as ProcurementStatusType | '' })}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          className="px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
         >
           <option value="">All Procurement Status</option>
           <option value="pending">Pending</option>
@@ -72,7 +72,7 @@ export default function BOQViewerFilters({
         <select
           value={filters.phase}
           onChange={(e) => setFilters({ ...filters, phase: e.target.value })}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          className="px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
         >
           <option value="">All Phases</option>
           {filterOptions.phases.map(phase => (
@@ -84,7 +84,7 @@ export default function BOQViewerFilters({
         <select
           value={filters.category}
           onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          className="px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
         >
           <option value="">All Categories</option>
           {filterOptions.categories.map(category => (
@@ -99,35 +99,35 @@ export default function BOQViewerFilters({
             <input
               type="checkbox"
               checked={filters.hasIssues === true}
-              onChange={(e) => setFilters({ 
-                ...filters, 
-                hasIssues: e.target.checked ? true : null 
+              onChange={(e) => setFilters({
+                ...filters,
+                hasIssues: e.target.checked ? true : null
               })}
               className="rounded"
             />
-            <span className="ml-2 text-sm text-gray-700">Show only items with issues</span>
+            <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Show only items with issues</span>
           </label>
         </div>
 
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setFilters(INITIAL_FILTERS)}
-            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-900"
+            className="px-3 py-1 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
           >
             Clear Filters
           </button>
 
           {/* Column Settings */}
           <div className="relative group">
-            <button className="p-2 text-gray-500 hover:text-gray-700">
+            <button className="p-2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]">
               <Settings className="h-4 w-4" />
             </button>
-            
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border hidden group-hover:block z-10">
+
+            <div className="absolute right-0 mt-2 w-56 bg-[var(--ff-bg-secondary)] rounded-md shadow-lg border border-[var(--ff-border-light)] hidden group-hover:block z-10">
               <div className="p-2">
-                <div className="text-xs font-semibold text-gray-700 px-2 py-1">Visible Columns</div>
+                <div className="text-xs font-semibold text-[var(--ff-text-secondary)] px-2 py-1">Visible Columns</div>
                 {Object.keys(visibleColumns).map(key => (
-                  <label key={key} className="flex items-center px-2 py-1 hover:bg-gray-50">
+                  <label key={key} className="flex items-center px-2 py-1 hover:bg-[var(--ff-bg-hover)]">
                     <input
                       type="checkbox"
                       checked={visibleColumns[key as keyof VisibleColumns]}
@@ -137,7 +137,7 @@ export default function BOQViewerFilters({
                       })}
                       className="rounded"
                     />
-                    <span className="ml-2 text-sm text-gray-700">
+                    <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">
                       {key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}
                     </span>
                   </label>

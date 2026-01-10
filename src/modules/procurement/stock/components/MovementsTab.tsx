@@ -11,11 +11,11 @@ interface MovementsTabProps {
 export const MovementsTab: React.FC<MovementsTabProps> = ({ movements, onViewAll }) => {
   const getMovementTypeBadge = (type: StockMovementData['type']) => {
     const config = {
-      'asn': { color: 'bg-blue-100 text-blue-800', label: 'ASN', icon: Truck },
-      'grn': { color: 'bg-green-100 text-green-800', label: 'GRN', icon: Package },
-      'issue': { color: 'bg-purple-100 text-purple-800', label: 'Issue', icon: ArrowRight },
-      'transfer': { color: 'bg-orange-100 text-orange-800', label: 'Transfer', icon: ArrowLeft },
-      'adjustment': { color: 'bg-gray-100 text-gray-800', label: 'Adjustment', icon: FileText }
+      'asn': { color: 'bg-blue-500/20 text-blue-400', label: 'ASN', icon: Truck },
+      'grn': { color: 'bg-green-500/20 text-green-400', label: 'GRN', icon: Package },
+      'issue': { color: 'bg-purple-500/20 text-purple-400', label: 'Issue', icon: ArrowRight },
+      'transfer': { color: 'bg-orange-500/20 text-orange-400', label: 'Transfer', icon: ArrowLeft },
+      'adjustment': { color: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]', label: 'Adjustment', icon: FileText }
     };
 
     const { color, label, icon: Icon } = config[type];
@@ -29,10 +29,10 @@ export const MovementsTab: React.FC<MovementsTabProps> = ({ movements, onViewAll
 
   const getStatusBadge = (status: StockMovementData['status']) => {
     const colors = {
-      'completed': 'bg-green-100 text-green-800',
-      'in-progress': 'bg-yellow-100 text-yellow-800',
-      'pending': 'bg-gray-100 text-gray-800',
-      'cancelled': 'bg-red-100 text-red-800'
+      'completed': 'bg-green-500/20 text-green-400',
+      'in-progress': 'bg-yellow-500/20 text-yellow-400',
+      'pending': 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]',
+      'cancelled': 'bg-red-500/20 text-red-400'
     };
 
     return (
@@ -45,24 +45,24 @@ export const MovementsTab: React.FC<MovementsTabProps> = ({ movements, onViewAll
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Recent Stock Movements</h3>
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Recent Stock Movements</h3>
         <Button variant="outline" onClick={onViewAll}>
           View All Movements
         </Button>
       </div>
 
-      <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-        <div className="divide-y divide-gray-200">
+      <div className="bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+        <div className="divide-y divide-[var(--ff-border-light)]">
           {movements.map((movement) => (
-            <div key={movement.id} className="p-6 bg-white hover:bg-gray-50 transition-colors">
+            <div key={movement.id} className="p-6 bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-semibold text-gray-900">{movement.reference}</h4>
+                    <h4 className="font-semibold text-[var(--ff-text-primary)]">{movement.reference}</h4>
                     {getMovementTypeBadge(movement.type)}
                   </div>
-                  <p className="text-gray-700 mb-2">{movement.itemDescription}</p>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <p className="text-[var(--ff-text-primary)] mb-2">{movement.itemDescription}</p>
+                  <div className="flex items-center gap-4 text-sm text-[var(--ff-text-secondary)]">
                     <span>{movement.itemCode}</span>
                     <span>{movement.quantity.toLocaleString()} {movement.unit}</span>
                     {movement.fromLocation && (
@@ -78,7 +78,7 @@ export const MovementsTab: React.FC<MovementsTabProps> = ({ movements, onViewAll
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-sm text-gray-500">
+              <div className="flex items-center justify-between text-sm text-[var(--ff-text-secondary)]">
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1">
                     <User className="h-4 w-4" />

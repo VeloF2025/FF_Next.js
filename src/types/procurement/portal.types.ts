@@ -2,13 +2,14 @@
 import type { LucideIcon } from 'lucide-react';
 import type { Project } from '@/types/project.types';
 
-export type ProcurementTabId = 
+export type ProcurementTabId =
   | 'overview'
   | 'boq'
-  | 'rfq' 
+  | 'rfq'
   | 'quotes'
   | 'purchase-orders'
   | 'stock'
+  | 'field-stock'
   | 'suppliers'
   | 'reports';
 
@@ -63,6 +64,8 @@ export interface ProcurementPermissions {
   canCreatePurchaseOrders: boolean;
   canAccessStock: boolean;
   canManageStock: boolean;
+  canAccessFieldStock: boolean;
+  canManageFieldStock: boolean;
   canApproveOrders: boolean;
   canAccessReports: boolean;
   canViewSuppliers: boolean;

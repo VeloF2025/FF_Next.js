@@ -34,18 +34,18 @@ export function FileDropZone({
   return (
     <div
       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-        dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+        dragActive ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-text-secondary)]'
       }`}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-      <p className="text-lg font-medium text-gray-900 mb-2">
+      <Upload className="h-12 w-12 text-[var(--ff-text-secondary)] mx-auto mb-4" />
+      <p className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">
         Drop your CSV or Excel file here
       </p>
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
         or click to browse from your computer
       </p>
       <input

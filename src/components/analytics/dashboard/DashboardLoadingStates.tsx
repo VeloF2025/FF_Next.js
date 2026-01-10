@@ -28,8 +28,8 @@ export function DashboardLoadingState({ loading }: DashboardLoadingStateProps) {
 export function DashboardEmptyState({ onSync, syncing }: DashboardEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-96">
-      <Database className="h-16 w-16 text-gray-400 mb-4" />
-      <p className="text-gray-600 mb-4">No analytics data available</p>
+      <Database className="h-16 w-16 text-[var(--ff-text-tertiary)] mb-4" />
+      <p className="text-[var(--ff-text-secondary)] mb-4">No analytics data available</p>
       <Button onClick={onSync} disabled={syncing}>
         {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
         Sync from Firebase

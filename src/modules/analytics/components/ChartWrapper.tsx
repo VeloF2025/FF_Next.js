@@ -12,7 +12,7 @@ interface ChartWrapperProps {
 export function ChartWrapper({ children, fallback, className = '' }: ChartWrapperProps) {
   const defaultFallback = (
     <div className={`flex items-center justify-center h-64 ${className}`}>
-      <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+      <RefreshCw className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
     </div>
   );
 

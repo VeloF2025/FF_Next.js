@@ -78,50 +78,50 @@ function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-[var(--ff-bg-tertiary)]">
       {/* Portal Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] shadow-sm">
         <div className="px-6 py-4">
           {/* Navigation Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleBackToSettings}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                className="flex items-center space-x-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
                 aria-label="Back to Settings"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="text-sm">Settings</span>
               </button>
-              <div className="h-4 w-px bg-gray-300" />
+              <div className="h-4 w-px bg-[var(--ff-border-light)]" />
               <div className="flex items-center space-x-3">
                 <GitBranch className="w-6 h-6 text-blue-600" />
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Workflow Portal</h1>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Workflow Portal</h1>
+                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
                     Manage workflow templates and project assignments
                   </p>
                 </div>
               </div>
             </div>
-            
+
             {/* Quick Stats */}
             <div className="hidden lg:flex items-center space-x-6 text-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-gray-600">
+                <span className="text-[var(--ff-text-secondary)]">
                   {templateStats.totalTemplates} Templates
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-gray-600">
+                <span className="text-[var(--ff-text-secondary)]">
                   {templateStats.activeTemplates} Active
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                <span className="text-gray-600">
+                <span className="text-[var(--ff-text-secondary)]">
                   {templateStats.draftTemplates} Drafts
                 </span>
               </div>
@@ -130,12 +130,12 @@ function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
 
           {/* Error Alert */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-              <span className="text-sm text-red-700">{error}</span>
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+              <span className="text-sm text-red-400">{error}</span>
               <button
                 onClick={() => setError(undefined)}
-                className="ml-auto text-red-600 hover:text-red-800 p-1"
+                className="ml-auto text-red-400 hover:text-red-300 p-1"
                 aria-label="Dismiss error"
               >
                 ×
@@ -158,7 +158,7 @@ function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
-              <p className="text-gray-500">Loading workflow data...</p>
+              <p className="text-[var(--ff-text-secondary)]">Loading workflow data...</p>
             </div>
           </div>
         ) : (
@@ -170,6 +170,8 @@ function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
     </div>
   );
 }
+
+// 🟢 WORKING: Main Workflow Portal with dark mode support using CSS variables
 
 // Main portal page component with error boundary
 export function WorkflowPortalPage({ children }: WorkflowPortalPageProps) {

@@ -82,65 +82,65 @@ export function StandardActionButtons({
       {showView && (
         <button
           onClick={handleView}
-          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+          className="p-1 text-[var(--ff-text-secondary)] hover:text-blue-400 transition-colors"
           title="View"
         >
           <Eye className="h-4 w-4" />
         </button>
       )}
-      
+
       {showEdit && (
         <button
           onClick={handleEdit}
-          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+          className="p-1 text-[var(--ff-text-secondary)] hover:text-blue-400 transition-colors"
           title="Edit"
         >
           <Edit className="h-4 w-4" />
         </button>
       )}
-      
+
       {showDelete && (
         <button
           onClick={handleDelete}
-          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+          className="p-1 text-[var(--ff-text-secondary)] hover:text-red-400 transition-colors"
           title="Delete"
         >
           <Trash2 className="h-4 w-4" />
         </button>
       )}
-      
+
       {showDownload && onDownload && (
         <button
           onClick={onDownload}
-          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+          className="p-1 text-[var(--ff-text-secondary)] hover:text-blue-400 transition-colors"
           title="Download"
         >
           <Download className="h-4 w-4" />
         </button>
       )}
-      
+
       {showArchive && onArchive && (
         <button
           onClick={onArchive}
-          className="p-1 text-gray-400 hover:text-yellow-600 transition-colors"
+          className="p-1 text-[var(--ff-text-secondary)] hover:text-yellow-400 transition-colors"
           title="Archive"
         >
           <Archive className="h-4 w-4" />
         </button>
       )}
-      
+
       {(showMore || moreActions.length > 0) && (
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
             title="More actions"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
-          
+
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+            <div className="absolute right-0 mt-2 w-48 bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg border border-[var(--ff-border-light)] z-10">
               <div className="py-1">
                 {moreActions.map((action, index) => {
                   const Icon = action.icon;
@@ -151,8 +151,8 @@ export function StandardActionButtons({
                         action.onClick();
                         setShowDropdown(false);
                       }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center gap-2 ${
-                        action.className || 'text-gray-700'
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--ff-bg-hover)] flex items-center gap-2 ${
+                        action.className || 'text-[var(--ff-text-primary)]'
                       }`}
                     >
                       {Icon && <Icon className="h-4 w-4" />}
@@ -178,32 +178,32 @@ interface StatusBadgeProps {
 export function StatusBadge({ status, variant: _ = 'default' }: StatusBadgeProps) {
   const statusColors: Record<string, string> = {
     // General statuses
-    active: 'bg-green-100 text-green-800',
-    inactive: 'bg-gray-100 text-gray-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    completed: 'bg-blue-100 text-blue-800',
-    cancelled: 'bg-red-100 text-red-800',
-    approved: 'bg-green-100 text-green-800',
-    rejected: 'bg-red-100 text-red-800',
-    draft: 'bg-gray-100 text-gray-800',
-    
+    active: 'bg-green-500/20 text-green-400',
+    inactive: 'bg-gray-500/20 text-gray-400',
+    pending: 'bg-yellow-500/20 text-yellow-400',
+    completed: 'bg-blue-500/20 text-blue-400',
+    cancelled: 'bg-red-500/20 text-red-400',
+    approved: 'bg-green-500/20 text-green-400',
+    rejected: 'bg-red-500/20 text-red-400',
+    draft: 'bg-gray-500/20 text-gray-400',
+
     // Project specific
-    planning: 'bg-purple-100 text-purple-800',
-    'in-progress': 'bg-blue-100 text-blue-800',
-    'on-hold': 'bg-orange-100 text-orange-800',
-    
+    planning: 'bg-purple-500/20 text-purple-400',
+    'in-progress': 'bg-blue-500/20 text-blue-400',
+    'on-hold': 'bg-orange-500/20 text-orange-400',
+
     // Staff specific
-    available: 'bg-green-100 text-green-800',
-    'on-leave': 'bg-yellow-100 text-yellow-800',
-    busy: 'bg-red-100 text-red-800',
-    
+    available: 'bg-green-500/20 text-green-400',
+    'on-leave': 'bg-yellow-500/20 text-yellow-400',
+    busy: 'bg-red-500/20 text-red-400',
+
     // Procurement specific
-    ordered: 'bg-blue-100 text-blue-800',
-    delivered: 'bg-green-100 text-green-800',
-    processing: 'bg-yellow-100 text-yellow-800'
+    ordered: 'bg-blue-500/20 text-blue-400',
+    delivered: 'bg-green-500/20 text-green-400',
+    processing: 'bg-yellow-500/20 text-yellow-400'
   };
 
-  const colorClass = statusColors[status.toLowerCase().replace(/\s+/g, '-')] || 'bg-gray-100 text-gray-800';
+  const colorClass = statusColors[status.toLowerCase().replace(/\s+/g, '-')] || 'bg-gray-500/20 text-gray-400';
 
   return (
     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${colorClass}`}>
@@ -219,14 +219,14 @@ interface PriorityBadgeProps {
 
 export function PriorityBadge({ priority }: PriorityBadgeProps) {
   const priorityColors: Record<string, string> = {
-    low: 'bg-gray-100 text-gray-800',
-    medium: 'bg-yellow-100 text-yellow-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
-    urgent: 'bg-red-100 text-red-800'
+    low: 'bg-gray-500/20 text-gray-400',
+    medium: 'bg-yellow-500/20 text-yellow-400',
+    high: 'bg-orange-500/20 text-orange-400',
+    critical: 'bg-red-500/20 text-red-400',
+    urgent: 'bg-red-500/20 text-red-400'
   };
 
-  const colorClass = priorityColors[priority.toLowerCase()] || 'bg-gray-100 text-gray-800';
+  const colorClass = priorityColors[priority.toLowerCase()] || 'bg-gray-500/20 text-gray-400';
 
   return (
     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${colorClass}`}>

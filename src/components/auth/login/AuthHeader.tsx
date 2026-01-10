@@ -8,10 +8,10 @@ import { AuthHeaderProps } from './LoginFormTypes';
 export function AuthHeader({ isSignUp, onModeChange }: AuthHeaderProps) {
   return (
     <div>
-      <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+      <h2 className="mt-6 text-center text-3xl font-extrabold text-[var(--ff-text-primary)]">
         {isSignUp ? 'Create your account' : 'Sign in to FibreFlow'}
       </h2>
-      <p className="mt-2 text-center text-sm text-gray-600">
+      <p className="mt-2 text-center text-sm text-[var(--ff-text-secondary)]">
         {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
         <button
           type="button"

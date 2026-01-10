@@ -130,23 +130,23 @@ export function ProjectFilter({
     onViewModeChange('single');
   };
 
-  // Get status badge styles
+  // Get status badge styles - dark mode compatible
   const getStatusBadgeStyles = (status: ProjectStatus) => {
     const baseStyles = 'px-2 py-0.5 text-xs font-medium rounded-full';
-    
+
     switch (status) {
       case ProjectStatus.ACTIVE:
-        return `${baseStyles} bg-green-100 text-green-700`;
+        return `${baseStyles} bg-green-500/20 text-green-400`;
       case ProjectStatus.COMPLETED:
-        return `${baseStyles} bg-blue-100 text-blue-700`;
+        return `${baseStyles} bg-blue-500/20 text-blue-400`;
       case ProjectStatus.ON_HOLD:
-        return `${baseStyles} bg-yellow-100 text-yellow-700`;
+        return `${baseStyles} bg-yellow-500/20 text-yellow-400`;
       case ProjectStatus.CANCELLED:
-        return `${baseStyles} bg-red-100 text-red-700`;
+        return `${baseStyles} bg-red-500/20 text-red-400`;
       case ProjectStatus.PLANNING:
-        return `${baseStyles} bg-purple-100 text-purple-700`;
+        return `${baseStyles} bg-purple-500/20 text-purple-400`;
       default:
-        return `${baseStyles} bg-gray-100 text-gray-700`;
+        return `${baseStyles} bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]`;
     }
   };
 
@@ -162,24 +162,24 @@ export function ProjectFilter({
         <div className="flex items-center gap-2 flex-1 text-left">
           {viewMode === 'all' ? (
             <>
-              <Globe className="h-4 w-4 text-blue-600" />
+              <Globe className="h-4 w-4 text-blue-400" />
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-blue-900 truncate">
+                <div className="font-medium text-blue-400 truncate">
                   All Projects
                 </div>
-                <div className="text-xs text-blue-600">
+                <div className="text-xs text-blue-400/70">
                   Aggregate view • {allProjects.filter(p => p.status === ProjectStatus.ACTIVE).length} active
                 </div>
               </div>
             </>
           ) : selectedProject ? (
             <>
-              <Building2 className="h-4 w-4 text-gray-500" />
+              <Building2 className="h-4 w-4 text-[var(--ff-text-secondary)]" />
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 truncate">
+                <div className="font-medium text-[var(--ff-text-primary)] truncate">
                   {selectedProject.name}
                 </div>
-                <div className="text-xs text-gray-500 flex items-center gap-2">
+                <div className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-2">
                   <span>{selectedProject.code}</span>
                   <span className={getStatusBadgeStyles(selectedProject.status)}>
                     {selectedProject.status.replace('_', ' ')}
@@ -189,8 +189,8 @@ export function ProjectFilter({
             </>
           ) : (
             <>
-              <Filter className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-500">Select project or view all</span>
+              <Filter className="h-4 w-4 text-[var(--ff-text-secondary)]" />
+              <span className="text-[var(--ff-text-secondary)]">Select project or view all</span>
             </>
           )}
         </div>
@@ -200,11 +200,11 @@ export function ProjectFilter({
             <button
               type="button"
               onClick={handleClearSelection}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
               disabled={disabled}
               title="Clear selection"
             >
-              <X className="h-3 w-3 text-gray-400" />
+              <X className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
             </button>
           )}
           <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -213,33 +213,33 @@ export function ProjectFilter({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-lg z-50">
           {/* Search and Filters */}
-          <div className="p-3 border-b border-gray-100 space-y-3">
+          <div className="p-3 border-b border-[var(--ff-border-light)] space-y-3">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder:text-[var(--ff-text-tertiary)]"
                 autoFocus
               />
             </div>
 
             {/* Status Filter */}
             <div className="flex gap-2 flex-wrap">
-              <span className="text-xs text-gray-500 py-1">Status:</span>
+              <span className="text-xs text-[var(--ff-text-secondary)] py-1">Status:</span>
               {(['all', ProjectStatus.PLANNING, ProjectStatus.ACTIVE, ProjectStatus.ON_HOLD, ProjectStatus.COMPLETED, ProjectStatus.CANCELLED] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
                   className={`px-2 py-1 text-xs font-medium rounded-full transition-colors ${
                     statusFilter === status
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-purple-500/20 text-purple-400'
+                      : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
                   }`}
                 >
                   {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -253,27 +253,27 @@ export function ProjectFilter({
           <div className="max-h-64 overflow-y-auto">
             {/* All Projects Option */}
             {!searchTerm && statusFilter === 'all' && (
-              <div className="py-1 border-b border-gray-100">
+              <div className="py-1 border-b border-[var(--ff-border-light)]">
                 <button
                   onClick={handleAllProjectsSelect}
-                  className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors ${
-                    viewMode === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                  className={`w-full px-4 py-3 text-left hover:bg-blue-500/10 transition-colors ${
+                    viewMode === 'all' ? 'bg-blue-500/10 text-blue-400' : 'text-[var(--ff-text-primary)]'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 text-blue-600" />
+                    <Globe className="h-4 w-4 text-blue-400" />
                     <div className="flex-1">
                       <div className="font-medium">All Projects</div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-[var(--ff-text-secondary)]">
                         Aggregate view across {allProjects.length} projects
                       </div>
                     </div>
-                    {viewMode === 'all' && <Check className="h-4 w-4 text-blue-600" />}
+                    {viewMode === 'all' && <Check className="h-4 w-4 text-blue-400" />}
                   </div>
                 </button>
               </div>
             )}
-            
+
             {/* Individual Projects */}
             {filteredProjects.length > 0 ? (
               <div className="py-1">
@@ -281,17 +281,17 @@ export function ProjectFilter({
                   <button
                     key={project.id}
                     onClick={() => handleProjectSelect(project)}
-                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                      selectedProject?.id === project.id && viewMode === 'single' 
-                        ? 'bg-primary-50 text-primary-700' 
-                        : 'text-gray-900'
+                    className={`w-full px-4 py-3 text-left hover:bg-[var(--ff-bg-hover)] transition-colors ${
+                      selectedProject?.id === project.id && viewMode === 'single'
+                        ? 'bg-purple-500/10 text-purple-400'
+                        : 'text-[var(--ff-text-primary)]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      <Building2 className="h-4 w-4 text-[var(--ff-text-secondary)] flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{project.name}</div>
-                        <div className="text-sm text-gray-500 flex items-center gap-2">
+                        <div className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
                           <span>{project.code}</span>
                           <span className={getStatusBadgeStyles(project.status)}>
                             {project.status.replace('_', ' ')}
@@ -302,29 +302,29 @@ export function ProjectFilter({
                         </div>
                       </div>
                       {selectedProject?.id === project.id && viewMode === 'single' && (
-                        <Check className="h-4 w-4 text-primary-600 flex-shrink-0" />
+                        <Check className="h-4 w-4 text-purple-400 flex-shrink-0" />
                       )}
                     </div>
                   </button>
                 ))}
               </div>
             ) : searchTerm || statusFilter !== 'all' ? (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                <Filter className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <div className="px-4 py-6 text-center text-[var(--ff-text-secondary)] text-sm">
+                <Filter className="h-8 w-8 mx-auto mb-2 text-[var(--ff-text-tertiary)]" />
                 <p>No projects found</p>
                 <p className="text-xs">Try adjusting your filters</p>
               </div>
             ) : (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">
-                <Building2 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+              <div className="px-4 py-6 text-center text-[var(--ff-text-secondary)] text-sm">
+                <Building2 className="h-8 w-8 mx-auto mb-2 text-[var(--ff-text-tertiary)]" />
                 <p>No projects available</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="p-3 border-t border-gray-100 bg-gray-50">
-            <div className="flex justify-between items-center text-xs text-gray-500">
+          <div className="p-3 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+            <div className="flex justify-between items-center text-xs text-[var(--ff-text-secondary)]">
               <span>
                 {searchTerm || statusFilter !== 'all'
                   ? `${filteredProjects.length} project${filteredProjects.length !== 1 ? 's' : ''} found`
@@ -333,7 +333,7 @@ export function ProjectFilter({
               </span>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-primary-600 hover:text-primary-700"
+                className="text-purple-400 hover:text-purple-300"
               >
                 Close
               </button>

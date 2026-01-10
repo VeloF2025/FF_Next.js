@@ -22,16 +22,16 @@ export function DropsManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Loading drops data from database...</div>
+        <div className="text-lg text-[var(--ff-text-secondary)]">Loading drops data from database...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-800">Error loading drops: {error}</p>
-        <p className="text-sm text-red-600 mt-2">Using fallback data</p>
+      <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
+        <p className="text-red-400">Error loading drops: {error}</p>
+        <p className="text-sm text-red-400 mt-2">Using fallback data</p>
       </div>
     );
   }

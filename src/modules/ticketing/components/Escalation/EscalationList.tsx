@@ -98,22 +98,22 @@ function getStatusStyles(status: EscalationStatus): {
   switch (status) {
     case 'open':
       return {
-        container: 'bg-red-500/20 text-red-300 border-red-500/30',
+        container: 'bg-red-500/20 text-red-400 border-red-500/30',
         icon: <AlertTriangle className="w-3 h-3" />,
       };
     case 'investigating':
       return {
-        container: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+        container: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
         icon: <TrendingUp className="w-3 h-3" />,
       };
     case 'resolved':
       return {
-        container: 'bg-green-500/20 text-green-300 border-green-500/30',
+        container: 'bg-green-500/20 text-green-400 border-green-500/30',
         icon: <CheckCircle2 className="w-3 h-3" />,
       };
     case 'no_action':
       return {
-        container: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+        container: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
         icon: <XCircle className="w-3 h-3" />,
       };
     default:

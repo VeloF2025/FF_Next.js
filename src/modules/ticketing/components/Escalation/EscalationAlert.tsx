@@ -63,25 +63,25 @@ function getSeverityStyles(severity: 'critical' | 'high' | 'medium'): {
       return {
         container: 'bg-red-500/10 border-red-500/30',
         icon: 'text-red-400',
-        badge: 'bg-red-500/20 text-red-300 border-red-500/30',
+        badge: 'bg-red-500/20 text-red-400 border-red-500/30',
       };
     case 'high':
       return {
         container: 'bg-orange-500/10 border-orange-500/30',
         icon: 'text-orange-400',
-        badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+        badge: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
       };
     case 'medium':
       return {
         container: 'bg-yellow-500/10 border-yellow-500/30',
         icon: 'text-yellow-400',
-        badge: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+        badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
       };
     default:
       return {
         container: 'bg-blue-500/10 border-blue-500/30',
         icon: 'text-blue-400',
-        badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+        badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       };
   }
 }

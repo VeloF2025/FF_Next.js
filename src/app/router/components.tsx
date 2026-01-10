@@ -29,10 +29,10 @@ export function ProtectedRoute() {
 // 404 Not Found component
 export function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--ff-background-primary)]">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
-        <p className="text-gray-600">Page not found</p>
+        <h1 className="text-4xl font-bold text-[var(--ff-text-primary)] mb-4">404</h1>
+        <p className="text-[var(--ff-text-secondary)]">Page not found</p>
       </div>
     </div>
   );

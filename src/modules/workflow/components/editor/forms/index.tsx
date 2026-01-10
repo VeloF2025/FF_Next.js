@@ -139,39 +139,39 @@ export function WorkflowEditorForms() {
     <>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
             Phase Name
           </label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)]"
             placeholder="e.g., Planning Phase"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
             Color
           </label>
           <input
             type="color"
             value={formData.color || '#3B82F6'}
             onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-            className="w-full h-10 border border-gray-300 dark:border-gray-600 rounded-md"
+            className="w-full h-10 border border-[var(--ff-border-light)] rounded-md"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
           Description
         </label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)]"
           rows={3}
           placeholder="Describe what happens in this phase..."
         />
@@ -440,26 +440,26 @@ export function WorkflowEditorForms() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
               {state.editingItem.id ? 'Edit' : 'Create'} {state.editingItem.type.charAt(0).toUpperCase() + state.editingItem.type.slice(1)}
             </h2>
             <button
               type="button"
               onClick={stopEditingItem}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
+            <div className="bg-red-500/20 border border-red-400 rounded-md p-3">
               <div className="flex items-center">
                 <AlertCircle className="h-4 w-4 text-red-400 mr-2" />
-                <span className="text-red-800 dark:text-red-200 text-sm">{error}</span>
+                <span className="text-red-400 text-sm">{error}</span>
               </div>
             </div>
           )}
@@ -468,12 +468,12 @@ export function WorkflowEditorForms() {
           {state.editingItem.type === 'step' && renderStepForm()}
           {state.editingItem.type === 'task' && renderTaskForm()}
 
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end space-x-3 pt-6 border-t border-[var(--ff-border-light)]">
             <button
               type="button"
               onClick={stopEditingItem}
               disabled={loading}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

@@ -65,7 +65,7 @@ export function QFieldSyncDashboard() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading QField Sync Dashboard...</p>
+          <p className="text-[var(--ff-text-secondary)]">Loading QField Sync Dashboard...</p>
         </div>
       </div>
     );
@@ -76,8 +76,8 @@ export function QFieldSyncDashboard() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Connection Error</h2>
-          <p className="text-gray-600">{error}</p>
+          <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Connection Error</h2>
+          <p className="text-[var(--ff-text-secondary)]">{error}</p>
           <button
             onClick={refreshData}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -95,11 +95,11 @@ export function QFieldSyncDashboard() {
       <div className="mb-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)] flex items-center gap-3">
               <ArrowDownUp className="h-8 w-8 text-blue-600" />
               QField Sync
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-[var(--ff-text-secondary)] mt-1">
               Synchronize field data between QFieldCloud and FibreFlow
             </p>
           </div>
@@ -107,7 +107,7 @@ export function QFieldSyncDashboard() {
           <div className="flex gap-3">
             <button
               onClick={() => setShowConfig(true)}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              className="px-4 py-2 border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center gap-2"
             >
               <Settings className="h-4 w-4" />
               Settings
@@ -144,14 +144,14 @@ export function QFieldSyncDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-[var(--ff-border-light)] mb-6">
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setSelectedTab('overview')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               selectedTab === 'overview'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
             }`}
           >
             Overview
@@ -161,7 +161,7 @@ export function QFieldSyncDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               selectedTab === 'installations'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
             }`}
           >
             Poles & Drops
@@ -171,7 +171,7 @@ export function QFieldSyncDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               selectedTab === 'data'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
             }`}
           >
             Fiber Cables
@@ -181,7 +181,7 @@ export function QFieldSyncDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               selectedTab === 'history'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
             }`}
           >
             Sync History
@@ -191,7 +191,7 @@ export function QFieldSyncDashboard() {
             className={`py-2 px-1 border-b-2 font-medium text-sm relative ${
               selectedTab === 'conflicts'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
             }`}
           >
             Conflicts
@@ -215,28 +215,28 @@ export function QFieldSyncDashboard() {
 
           {/* Recent Projects */}
           {dashboardData?.projects && dashboardData.projects.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">QFieldCloud Projects</h3>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">QFieldCloud Projects</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {dashboardData.projects.map((project) => (
                   <div
                     key={project.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                    className="border border-[var(--ff-border-light)] rounded-lg p-4 hover:bg-[var(--ff-bg-hover)]"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-gray-900">{project.name}</h4>
+                      <h4 className="font-medium text-[var(--ff-text-primary)]">{project.name}</h4>
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           project.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
                         }`}
                       >
                         {project.status}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{project.description}</p>
-                    <div className="flex items-center text-xs text-gray-500">
+                    <p className="text-sm text-[var(--ff-text-secondary)] mb-2">{project.description}</p>
+                    <div className="flex items-center text-xs text-[var(--ff-text-tertiary)]">
                       <Clock className="h-3 w-3 mr-1" />
                       {new Date(project.lastModified).toLocaleDateString()}
                     </div>
@@ -261,9 +261,9 @@ export function QFieldSyncDashboard() {
           {syncHistory && syncHistory.length > 0 ? (
             <SyncHistoryTable history={syncHistory} />
           ) : (
-            <div className="bg-white rounded-lg shadow p-8 text-center">
-              <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No sync history available</p>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-8 text-center">
+              <Clock className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+              <p className="text-[var(--ff-text-secondary)]">No sync history available</p>
             </div>
           )}
         </div>
@@ -277,9 +277,9 @@ export function QFieldSyncDashboard() {
               onResolve={resolveConflict}
             />
           ) : (
-            <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-8 text-center">
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-              <p className="text-gray-600">No conflicts to resolve</p>
+              <p className="text-[var(--ff-text-secondary)]">No conflicts to resolve</p>
             </div>
           )}
         </div>

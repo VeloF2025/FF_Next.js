@@ -48,7 +48,7 @@ export const SelectTrigger = forwardRef<HTMLButtonElement, SelectTriggerProps>(
         type="button"
         onClick={() => setOpen(!open)}
         className={clsx(
-          'flex h-10 w-full items-center justify-between rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full items-center justify-between rounded-md border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] px-3 py-2 text-sm placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
           className
         )}
         {...props}
@@ -73,7 +73,7 @@ export function SelectValue({ placeholder }: SelectValueProps) {
   const { value } = context;
 
   return (
-    <span className={clsx(!value && 'text-gray-500')}>
+    <span className={clsx(!value && 'text-[var(--ff-text-tertiary)]')}>
       {value || placeholder}
     </span>
   );
@@ -100,7 +100,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
       />
       <div
         className={clsx(
-          'absolute z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1 text-gray-950 dark:text-gray-50 shadow-md animate-in fade-in-0 zoom-in-95',
+          'absolute z-50 min-w-[8rem] overflow-hidden rounded-md border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-1 text-[var(--ff-text-primary)] shadow-md animate-in fade-in-0 zoom-in-95',
           'top-full mt-1 w-full',
           className
         )}
@@ -127,8 +127,8 @@ export function SelectItem({ value, className, children }: SelectItemProps) {
   return (
     <div
       className={clsx(
-        'relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-gray-100 dark:focus:bg-gray-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-        isSelected && 'bg-gray-100 dark:bg-gray-700',
+        'relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-[var(--ff-bg-hover)] hover:bg-[var(--ff-bg-hover)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+        isSelected && 'bg-[var(--ff-bg-hover)]',
         className
       )}
       onClick={() => {

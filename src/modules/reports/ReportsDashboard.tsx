@@ -131,7 +131,7 @@ export default function ReportsDashboard() {
       />
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-[var(--ff-border-light)] mb-6">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => (
             <button
@@ -141,7 +141,7 @@ export default function ReportsDashboard() {
                 py-2 px-1 border-b-2 font-medium text-sm transition-colors
                 ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                 }
               `}
             >
@@ -157,22 +157,22 @@ export default function ReportsDashboard() {
           <div
             key={category.title}
             onClick={category.onClick}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+            className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-start space-x-4">
               <div className={`${category.color} p-3 rounded-lg`}>
                 <category.icon className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">
                   {category.title}
                   {category.count !== undefined && (
-                    <span className="ml-2 text-sm font-normal text-gray-500">
+                    <span className="ml-2 text-sm font-normal text-[var(--ff-text-secondary)]">
                       ({category.count})
                     </span>
                   )}
                 </h3>
-                <p className="text-sm text-gray-600">{category.description}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">{category.description}</p>
               </div>
             </div>
           </div>
@@ -180,20 +180,20 @@ export default function ReportsDashboard() {
       </div>
 
       {/* Recent Reports */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Reports</h2>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
+        <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Recent Reports</h2>
         </div>
         <div className="p-6">
           {recentReports.length > 0 ? (
             <div className="space-y-3">
               {recentReports.map((report, index) => (
-                <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
+                <div key={index} className="flex items-center justify-between p-3 hover:bg-[var(--ff-bg-hover)] rounded-lg">
                   <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-gray-400" />
+                    <FileText className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
                     <div>
-                      <p className="font-medium text-gray-900">{report.name}</p>
-                      <p className="text-sm text-gray-500">{report.type} • {report.date}</p>
+                      <p className="font-medium text-[var(--ff-text-primary)]">{report.name}</p>
+                      <p className="text-sm text-[var(--ff-text-secondary)]">{report.type} • {report.date}</p>
                     </div>
                   </div>
                   <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
@@ -203,7 +203,7 @@ export default function ReportsDashboard() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center">No recent reports</p>
+            <p className="text-[var(--ff-text-secondary)] text-center">No recent reports</p>
           )}
         </div>
       </div>

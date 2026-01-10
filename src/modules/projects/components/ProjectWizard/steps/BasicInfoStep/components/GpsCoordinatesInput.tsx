@@ -23,14 +23,14 @@ export function GpsCoordinatesInput({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-[var(--ff-text-primary)]">
           GPS Coordinates *
         </label>
         <button
           type="button"
           onClick={onGetCurrentLocation}
           disabled={isGeocoding}
-          className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50"
+          className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-500/20 border border-blue-500/30 rounded-md hover:bg-blue-500/30 disabled:opacity-50"
         >
           {isGeocoding ? (
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -42,8 +42,8 @@ export function GpsCoordinatesInput({
       </div>
 
       {/* GPS Input - Any Format */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="mb-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-md">
+        <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
           Paste GPS Coordinates (Any Format)
         </label>
         <div className="flex gap-2">
@@ -52,7 +52,7 @@ export function GpsCoordinatesInput({
             value={gpsInput}
             onChange={(e) => onGpsInputChange(e.target.value)}
             placeholder="e.g., -34.031085, 18.463559 or 33.9221° S, 18.4231° E"
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 text-sm border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             type="button"
@@ -63,15 +63,15 @@ export function GpsCoordinatesInput({
             Parse
           </button>
         </div>
-        <p className="mt-1 text-xs text-gray-600">
+        <p className="mt-1 text-xs text-[var(--ff-text-secondary)]">
           Supports: decimal (-34.031, 18.463), DMS (33°55'19" S, 18°25'23" E), and more
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <input
-            {...register('location.coordinates.latitude' as any, { 
+            {...register('location.coordinates.latitude' as any, {
               required: 'Latitude is required',
               pattern: {
                 value: /^-?([1-8]?[0-9]\.{1}\d{1,6}$|90\.{1}0{1,6}$)/,
@@ -80,17 +80,17 @@ export function GpsCoordinatesInput({
             })}
             type="number"
             step="any"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Latitude (e.g., -26.195246)"
           />
           {errors.location?.coordinates?.latitude && (
             <p className="mt-1 text-sm text-red-600">{errors.location.coordinates.latitude.message}</p>
           )}
         </div>
-        
+
         <div>
           <input
-            {...register('location.coordinates.longitude' as any, { 
+            {...register('location.coordinates.longitude' as any, {
               required: 'Longitude is required',
               pattern: {
                 value: /^-?(([-+]?)([\d]{1,3})((\.)(\d+))?)/,
@@ -99,7 +99,7 @@ export function GpsCoordinatesInput({
             })}
             type="number"
             step="any"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Longitude (e.g., 28.034088)"
           />
           {errors.location?.coordinates?.longitude && (

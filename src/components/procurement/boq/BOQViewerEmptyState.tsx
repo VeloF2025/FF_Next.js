@@ -21,11 +21,11 @@ export default function BOQViewerEmptyState({
   );
 
   return (
-    <div className="text-center py-12 bg-white rounded-lg border">
-      <Search className="mx-auto h-12 w-12 text-gray-400" />
-      <h3 className="mt-4 text-lg font-medium text-gray-900">No Items Found</h3>
-      <p className="mt-2 text-sm text-gray-500">
-        {totalItems === 0 
+    <div className="text-center py-12 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+      <Search className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)]" />
+      <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">No Items Found</h3>
+      <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">
+        {totalItems === 0
           ? "This BOQ doesn't contain any items yet."
           : "No items match your current filters."
         }

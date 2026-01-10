@@ -11,13 +11,13 @@ interface NeonSOWHeaderProps {
 
 export function NeonSOWHeader({ neonHealth }: NeonSOWHeaderProps) {
   return (
-    <div className="p-6 border-b border-gray-200">
+    <div className="p-6 border-b border-[var(--ff-border-light)]">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <Database className="h-6 w-6 text-purple-600 mr-3" />
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Scope of Work Data</h2>
-            <p className="text-sm text-gray-600">Data from Neon PostgreSQL database</p>
+            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Scope of Work Data</h2>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Data from Neon PostgreSQL database</p>
           </div>
         </div>
         

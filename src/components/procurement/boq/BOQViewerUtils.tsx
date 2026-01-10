@@ -12,34 +12,34 @@ import toast from 'react-hot-toast';
  */
 export const getStatusBadge = (status: string, type: 'mapping' | 'procurement') => {
   const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
-  
+
   if (type === 'mapping') {
     switch (status) {
       case 'mapped':
-        return `${baseClasses} bg-green-100 text-green-800`;
+        return `${baseClasses} bg-green-500/20 text-green-400`;
       case 'pending':
-        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+        return `${baseClasses} bg-yellow-500/20 text-yellow-400`;
       case 'manual':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
+        return `${baseClasses} bg-blue-500/20 text-blue-400`;
       case 'exception':
-        return `${baseClasses} bg-red-100 text-red-800`;
+        return `${baseClasses} bg-red-500/20 text-red-400`;
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return `${baseClasses} bg-gray-500/20 text-gray-400`;
     }
   } else {
     switch (status) {
       case 'pending':
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return `${baseClasses} bg-gray-500/20 text-gray-400`;
       case 'rfq_created':
-        return `${baseClasses} bg-blue-100 text-blue-800`;
+        return `${baseClasses} bg-blue-500/20 text-blue-400`;
       case 'quoted':
-        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+        return `${baseClasses} bg-yellow-500/20 text-yellow-400`;
       case 'awarded':
-        return `${baseClasses} bg-green-100 text-green-800`;
+        return `${baseClasses} bg-green-500/20 text-green-400`;
       case 'ordered':
-        return `${baseClasses} bg-purple-100 text-purple-800`;
+        return `${baseClasses} bg-purple-500/20 text-purple-400`;
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
+        return `${baseClasses} bg-gray-500/20 text-gray-400`;
     }
   }
 };

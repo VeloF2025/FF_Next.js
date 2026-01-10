@@ -8,17 +8,17 @@ interface SOWStatsProps {
 export function SOWStats({ sows }: SOWStatsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div className="bg-white rounded-lg border border-neutral-200 p-4">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-neutral-600">Total SOWs</span>
-          <FileText className="h-4 w-4 text-neutral-400" />
+          <span className="text-sm text-[var(--ff-text-secondary)]">Total SOWs</span>
+          <FileText className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
         </div>
-        <p className="text-2xl font-semibold text-neutral-900">{sows.length}</p>
+        <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">{sows.length}</p>
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 p-4">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-neutral-600">Active</span>
+          <span className="text-sm text-[var(--ff-text-secondary)]">Active</span>
           <CheckCircle className="h-4 w-4 text-success-600" />
         </div>
         <p className="text-2xl font-semibold text-success-600">
@@ -26,9 +26,9 @@ export function SOWStats({ sows }: SOWStatsProps) {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 p-4">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-neutral-600">Pending</span>
+          <span className="text-sm text-[var(--ff-text-secondary)]">Pending</span>
           <Clock className="h-4 w-4 text-warning-600" />
         </div>
         <p className="text-2xl font-semibold text-warning-600">
@@ -36,9 +36,9 @@ export function SOWStats({ sows }: SOWStatsProps) {
         </p>
       </div>
 
-      <div className="bg-white rounded-lg border border-neutral-200 p-4">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-neutral-600">Total Value</span>
+          <span className="text-sm text-[var(--ff-text-secondary)]">Total Value</span>
           <DollarSign className="h-4 w-4 text-primary-600" />
         </div>
         <p className="text-2xl font-semibold text-primary-600">

@@ -22,60 +22,60 @@ export function TrackerTable({ data, isLoading, expandedRows, toggleRowExpansion
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'text-green-600 bg-green-50';
-      case 'in_progress': return 'text-blue-600 bg-blue-50';
-      case 'issue': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
+      case 'completed': return 'text-green-400 bg-green-500/20';
+      case 'in_progress': return 'text-blue-400 bg-blue-500/20';
+      case 'issue': return 'text-red-400 bg-red-500/20';
+      default: return 'text-gray-400 bg-gray-500/20';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg border overflow-hidden">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="bg-gray-50 border-b">
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Identifier</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phase</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Photos</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">QC</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            <tr className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Type</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Identifier</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Location</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Phase</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Progress</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Photos</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">QC</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Updated</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   Loading tracker data...
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   No items found matching your filters
                 </td>
               </tr>
             ) : (
               data.map((item) => (
                 <React.Fragment key={item.id}>
-                  <tr className="border-b hover:bg-gray-50">
+                  <tr className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {getTypeIcon(item.type)}
-                        <span className="text-xs font-medium uppercase text-gray-600">
+                        <span className="text-xs font-medium uppercase text-[var(--ff-text-secondary)]">
                           {item.type}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium">{item.identifier}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.location}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--ff-text-primary)]">{item.identifier}</td>
+                    <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">{item.location}</td>
                     <td className="px-4 py-3">
-                      <span className="text-xs font-medium text-gray-600">{item.phase}</span>
+                      <span className="text-xs font-medium text-[var(--ff-text-secondary)]">{item.phase}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
@@ -84,7 +84,7 @@ export function TrackerTable({ data, isLoading, expandedRows, toggleRowExpansion
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div className="flex-1 bg-[var(--ff-bg-tertiary)] rounded-full h-2">
                           <div
                             className={`h-2 rounded-full ${
                               item.progress === 100 ? 'bg-green-500' :
@@ -94,13 +94,13 @@ export function TrackerTable({ data, isLoading, expandedRows, toggleRowExpansion
                             style={{ width: `${item.progress}%` }}
                           />
                         </div>
-                        <span className="text-xs font-medium text-gray-600">{item.progress}%</span>
+                        <span className="text-xs font-medium text-[var(--ff-text-secondary)]">{item.progress}%</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <Camera className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm">{item.photos}/{item.totalPhotos}</span>
+                        <Camera className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                        <span className="text-sm text-[var(--ff-text-primary)]">{item.photos}/{item.totalPhotos}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -110,27 +110,27 @@ export function TrackerTable({ data, isLoading, expandedRows, toggleRowExpansion
                         ) : (
                           <AlertTriangle className="w-4 h-4 text-yellow-500" />
                         )}
-                        <span className="text-sm">{item.qualityChecks}/{item.totalChecks}</span>
+                        <span className="text-sm text-[var(--ff-text-primary)]">{item.qualityChecks}/{item.totalChecks}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">
                       {item.lastUpdated ? format(item.lastUpdated, 'MMM dd, HH:mm') : 'N/A'}
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => toggleRowExpansion(item.id)}
-                        className="p-1 hover:bg-gray-100 rounded"
+                        className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
                       >
                         {expandedRows.has(item.id) ? (
-                          <ChevronUp className="w-4 h-4" />
+                          <ChevronUp className="w-4 h-4 text-[var(--ff-text-secondary)]" />
                         ) : (
-                          <ChevronDown className="w-4 h-4" />
+                          <ChevronDown className="w-4 h-4 text-[var(--ff-text-secondary)]" />
                         )}
                       </button>
                     </td>
                   </tr>
                   {expandedRows.has(item.id) && (
-                    <tr className="bg-gray-50">
+                    <tr className="bg-[var(--ff-bg-tertiary)]">
                       <td colSpan={10} className="px-8 py-4">
                         <TrackerRowDetails item={item} />
                       </td>
@@ -150,47 +150,47 @@ function TrackerRowDetails({ item }: { item: TrackerItem }) {
   return (
     <div className="grid grid-cols-2 gap-4 text-sm">
       <div>
-        <h4 className="font-medium mb-2">Details</h4>
+        <h4 className="font-medium mb-2 text-[var(--ff-text-primary)]">Details</h4>
         <dl className="space-y-1">
           {item.type === 'pole' && (
             <div className="flex justify-between">
-              <dt className="text-gray-600">Drop Count:</dt>
-              <dd className="font-medium">{item.metadata?.dropCount || 0}/12</dd>
+              <dt className="text-[var(--ff-text-secondary)]">Drop Count:</dt>
+              <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.dropCount || 0}/12</dd>
             </div>
           )}
           {item.type === 'drop' && (
             <>
               <div className="flex justify-between">
-                <dt className="text-gray-600">Pole Number:</dt>
-                <dd className="font-medium">{item.metadata?.poleNumber || 'N/A'}</dd>
+                <dt className="text-[var(--ff-text-secondary)]">Pole Number:</dt>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.poleNumber || 'N/A'}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-600">Home Owner:</dt>
-                <dd className="font-medium">{item.metadata?.homeOwner || 'N/A'}</dd>
+                <dt className="text-[var(--ff-text-secondary)]">Home Owner:</dt>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.homeOwner || 'N/A'}</dd>
               </div>
             </>
           )}
           {item.type === 'fiber' && (
             <>
               <div className="flex justify-between">
-                <dt className="text-gray-600">Length:</dt>
-                <dd className="font-medium">{item.metadata?.length || 0}m</dd>
+                <dt className="text-[var(--ff-text-secondary)]">Length:</dt>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.length || 0}m</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-600">Cable Type:</dt>
-                <dd className="font-medium">{item.metadata?.cableType || 'N/A'}</dd>
+                <dt className="text-[var(--ff-text-secondary)]">Cable Type:</dt>
+                <dd className="font-medium text-[var(--ff-text-primary)]">{item.metadata?.cableType || 'N/A'}</dd>
               </div>
             </>
           )}
         </dl>
       </div>
       <div>
-        <h4 className="font-medium mb-2">Actions</h4>
+        <h4 className="font-medium mb-2 text-[var(--ff-text-primary)]">Actions</h4>
         <div className="space-y-2">
           <button className="w-full px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
             View Details
           </button>
-          <button className="w-full px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50">
+          <button className="w-full px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]">
             Update Status
           </button>
         </div>

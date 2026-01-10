@@ -62,12 +62,12 @@ export function NokiaEquipmentDashboard() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Nokia Equipment Data</h1>
-        <p className="text-gray-600 mt-1">Manage Nokia network equipment inventory and installations</p>
+        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Nokia Equipment Data</h1>
+        <p className="text-[var(--ff-text-secondary)] mt-1">Manage Nokia network equipment inventory and installations</p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
+      <div className="border-b border-[var(--ff-border-light)] mb-6">
         <nav className="-mb-px flex space-x-8">
           {tabs.map((tab) => (
             <button
@@ -77,7 +77,7 @@ export function NokiaEquipmentDashboard() {
                 py-2 px-1 border-b-2 font-medium text-sm transition-colors
                 ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                 }
               `}
             >
@@ -93,20 +93,20 @@ export function NokiaEquipmentDashboard() {
           <div
             key={card.title}
             onClick={card.onClick}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+            className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-start space-x-4">
               <div className={`${card.color} p-3 rounded-lg`}>
                 <card.icon className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">
                   {card.title}
                 </h3>
-                <p className="text-sm text-gray-600 mb-2">{card.description}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-2">{card.description}</p>
                 {card.stats && (
                   <div className="flex gap-4 text-xs">
-                    <span className="text-gray-500">
+                    <span className="text-[var(--ff-text-secondary)]">
                       Total: <span className="font-semibold">{card.stats.total}</span>
                     </span>
                     <span className="text-green-600">
@@ -125,10 +125,10 @@ export function NokiaEquipmentDashboard() {
 
       {/* Equipment Summary */}
       <div className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Equipment Summary</h2>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Equipment Summary</h2>
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
           <div className="p-6">
-            <p className="text-gray-500 text-center">No equipment data available</p>
+            <p className="text-[var(--ff-text-secondary)] text-center">No equipment data available</p>
           </div>
         </div>
       </div>

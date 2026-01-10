@@ -10,11 +10,11 @@ interface SOWEmptyStateProps {
 
 export function SOWEmptyState({ onImportClick }: SOWEmptyStateProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-8">
       <div className="text-center">
-        <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No SOW Data Found</h3>
-        <p className="text-gray-500 mb-6">
+        <Database className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No SOW Data Found</h3>
+        <p className="text-[var(--ff-text-secondary)] mb-6">
           This project doesn't have any Scope of Work data yet.
         </p>
         
@@ -27,7 +27,7 @@ export function SOWEmptyState({ onImportClick }: SOWEmptyStateProps) {
         </button>
         
         <div className="mt-4">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--ff-text-secondary)]">
             Upload Excel files containing poles, drops, and fibre scope data
           </p>
         </div>

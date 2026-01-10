@@ -131,9 +131,9 @@ export function RemindersTab() {
   };
 
   const priorityColors = {
-    high: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-    medium: 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400',
-    low: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+    high: 'bg-red-500/20 text-red-400',
+    medium: 'bg-amber-500/20 text-amber-400',
+    low: 'bg-blue-500/20 text-blue-400'
   };
 
   if (loading) {
@@ -143,7 +143,7 @@ export function RemindersTab() {
   return (
     <div className="space-y-6">
       {/* Email Preferences */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
           <Bell className="w-5 h-5 mr-2" />
           Daily Email Reminders
@@ -166,7 +166,7 @@ export function RemindersTab() {
                 <label className="block text-sm font-medium mb-2">Send time</label>
                 <input
                   type="time"
-                  className="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                  className="rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                   value={preferences.send_time.slice(0, 5)}
                   onChange={(e) => handleUpdatePreferences({ send_time: `${e.target.value}:00` })}
                 />
@@ -175,7 +175,7 @@ export function RemindersTab() {
               <div>
                 <label className="block text-sm font-medium mb-2">Timezone</label>
                 <select
-                  className="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                  className="rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                   value={preferences.timezone}
                   onChange={(e) => handleUpdatePreferences({ timezone: e.target.value })}
                 >
@@ -191,7 +191,7 @@ export function RemindersTab() {
       </div>
 
       {/* Reminders List */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Your Reminders</h3>
           <button
@@ -205,14 +205,14 @@ export function RemindersTab() {
 
         {/* New Reminder Form */}
         {showNewForm && (
-          <form onSubmit={handleCreateReminder} className="mb-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+          <form onSubmit={handleCreateReminder} className="mb-6 p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Title *</label>
                 <input
                   type="text"
                   required
-                  className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                  className="w-full rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                   value={newReminder.title}
                   onChange={(e) => setNewReminder({ ...newReminder, title: e.target.value })}
                   placeholder="e.g., Review contractor invoices"
@@ -222,7 +222,7 @@ export function RemindersTab() {
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
                 <textarea
-                  className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                  className="w-full rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                   rows={2}
                   value={newReminder.description}
                   onChange={(e) => setNewReminder({ ...newReminder, description: e.target.value })}
@@ -235,7 +235,7 @@ export function RemindersTab() {
                   <label className="block text-sm font-medium mb-1">Due Date</label>
                   <input
                     type="date"
-                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                    className="w-full rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                     value={newReminder.due_date}
                     onChange={(e) => setNewReminder({ ...newReminder, due_date: e.target.value })}
                   />
@@ -244,7 +244,7 @@ export function RemindersTab() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Priority</label>
                   <select
-                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                    className="w-full rounded-lg border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]"
                     value={newReminder.priority}
                     onChange={(e) => setNewReminder({ ...newReminder, priority: e.target.value as any })}
                   >
@@ -265,7 +265,7 @@ export function RemindersTab() {
                 <button
                   type="button"
                   onClick={() => setShowNewForm(false)}
-                  className="bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  className="bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)] px-4 py-2 rounded-lg text-sm font-medium"
                 >
                   Cancel
                 </button>
@@ -276,7 +276,7 @@ export function RemindersTab() {
 
         {/* Reminders List */}
         {reminders.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-[var(--ff-text-tertiary)]">
             No pending reminders. Click "Add Reminder" to create one.
           </div>
         ) : (
@@ -284,7 +284,7 @@ export function RemindersTab() {
             {reminders.map((reminder) => (
               <div
                 key={reminder.id}
-                className="flex items-start space-x-4 p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex items-start space-x-4 p-4 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
               >
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
@@ -294,12 +294,12 @@ export function RemindersTab() {
                     </span>
                   </div>
                   {reminder.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    <p className="text-sm text-[var(--ff-text-secondary)] mb-2">
                       {reminder.description}
                     </p>
                   )}
                   {reminder.due_date && (
-                    <div className="flex items-center text-xs text-gray-500">
+                    <div className="flex items-center text-xs text-[var(--ff-text-tertiary)]">
                       <Calendar className="w-3 h-3 mr-1" />
                       Due: {new Date(reminder.due_date).toLocaleDateString()}
                     </div>
@@ -309,21 +309,21 @@ export function RemindersTab() {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleUpdateStatus(reminder.id, 'completed')}
-                    className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                    className="p-2 text-green-600 hover:bg-green-500/20 rounded-lg transition-colors"
                     title="Mark as completed"
                   >
                     <Check className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(reminder.id, 'dismissed')}
-                    className="p-2 text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="p-2 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors"
                     title="Dismiss"
                   >
                     <X className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteReminder(reminder.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    className="p-2 text-red-600 hover:bg-red-500/20 rounded-lg transition-colors"
                     title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />

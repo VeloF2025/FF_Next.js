@@ -150,12 +150,12 @@ export default function PolesSyncPage() {
         <title>Poles Sync | FibreFlow</title>
       </Head>
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 to-indigo-700 p-8">
+      <div className="min-h-screen bg-[var(--ff-bg-tertiary)] p-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-8 text-white">
-            <h1 className="text-4xl font-bold">🏗️ Poles Sync Module</h1>
-            <p className="mt-2 text-purple-100">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-[var(--ff-text-primary)]">🏗️ Poles Sync Module</h1>
+            <p className="mt-2 text-[var(--ff-text-secondary)]">
               Extract and sync poles from all Home projects to QFieldCloud
             </p>
           </div>
@@ -165,14 +165,14 @@ export default function PolesSyncPage() {
             {/* Left Column - Controls */}
             <div className="lg:col-span-1 space-y-6">
               {/* Project Selection Card */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-lg font-semibold mb-4">📁 Destination Project</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg p-6">
+                <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">📁 Destination Project</h2>
 
                 <select
                   value={selectedProject}
                   onChange={(e) => setSelectedProject(e.target.value)}
                   disabled={loading || syncing}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="">-- Select a project --</option>
                   {projects.map((project) => (
@@ -182,17 +182,17 @@ export default function PolesSyncPage() {
                   ))}
                 </select>
 
-                <p className="mt-3 text-xs text-gray-500">
+                <p className="mt-3 text-xs text-[var(--ff-text-tertiary)]">
                   Poles will be added to the selected QFieldCloud project
                 </p>
               </div>
 
               {/* Sync Control Card */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-lg font-semibold mb-4">🚀 Run Sync</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg p-6">
+                <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">🚀 Run Sync</h2>
 
                 {lastSync && (
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
                     Last sync: {new Date(lastSync).toLocaleString()}
                   </p>
                 )}
@@ -200,13 +200,13 @@ export default function PolesSyncPage() {
                 <button
                   onClick={handleSync}
                   disabled={syncing || !selectedProject}
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition font-medium shadow-lg"
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed transition font-medium shadow-lg"
                 >
                   {syncing ? '⏳ Syncing Poles...' : '🚀 Start Poles Sync'}
                 </button>
 
                 {syncing && (
-                  <p className="text-xs text-gray-500 mt-2 text-center">
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-2 text-center">
                     This may take 1-2 minutes...
                   </p>
                 )}
@@ -214,35 +214,35 @@ export default function PolesSyncPage() {
 
               {/* Stats Card */}
               {stats && (
-                <div className="bg-white rounded-lg shadow-lg p-6">
-                  <h2 className="text-lg font-semibold mb-4">📊 Summary</h2>
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg p-6">
+                  <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">📊 Summary</h2>
 
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Total Poles:</span>
-                      <span className="text-sm font-medium">{stats.total_poles?.toLocaleString()}</span>
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Total Poles:</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)]">{stats.total_poles?.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">🟢 Planted:</span>
-                      <span className="text-sm font-medium text-green-600">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">🟢 Planted:</span>
+                      <span className="text-sm font-medium text-green-400">
                         {stats.planted?.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">🔵 Surveyed:</span>
-                      <span className="text-sm font-medium text-blue-600">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">🔵 Surveyed:</span>
+                      <span className="text-sm font-medium text-blue-400">
                         {stats.surveyed?.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">⚪ Unknown:</span>
-                      <span className="text-sm font-medium text-gray-600">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">⚪ Unknown:</span>
+                      <span className="text-sm font-medium text-[var(--ff-text-secondary)]">
                         {stats.unknown?.toLocaleString()}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Merged:</span>
-                      <span className="text-sm font-medium text-purple-600">
+                      <span className="text-sm text-[var(--ff-text-secondary)]">Merged:</span>
+                      <span className="text-sm font-medium text-purple-400">
                         {stats.duplicates_merged?.toLocaleString()}
                       </span>
                     </div>
@@ -251,20 +251,20 @@ export default function PolesSyncPage() {
               )}
 
               {/* Legend Card */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-lg font-semibold mb-4">🎨 Layer Colors</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg p-6">
+                <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">🎨 Layer Colors</h2>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                    <span className="text-sm">Planted Poles</span>
+                    <span className="text-sm text-[var(--ff-text-primary)]">Planted Poles</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                    <span className="text-sm">Surveyed Poles</span>
+                    <span className="text-sm text-[var(--ff-text-primary)]">Surveyed Poles</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-full bg-gray-400"></div>
-                    <span className="text-sm">Unknown Status</span>
+                    <span className="text-sm text-[var(--ff-text-primary)]">Unknown Status</span>
                   </div>
                 </div>
               </div>
@@ -272,13 +272,13 @@ export default function PolesSyncPage() {
 
             {/* Right Column - Logs */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow-lg">
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-lg">
                 {/* Log Header */}
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">📜 Live Logs</h2>
+                <div className="p-4 border-b border-[var(--ff-border-light)] flex justify-between items-center">
+                  <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">📜 Live Logs</h2>
                   <button
                     onClick={handleClearLogs}
-                    className="text-sm text-gray-600 hover:text-gray-900"
+                    className="text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                   >
                     Clear
                   </button>
@@ -324,8 +324,8 @@ export default function PolesSyncPage() {
 
                 {/* Error Alert */}
                 {error && (
-                  <div className="p-4 bg-red-50 border-t border-red-200">
-                    <p className="text-sm text-red-800">❌ {error}</p>
+                  <div className="p-4 bg-red-500/20 border-t border-red-500/50">
+                    <p className="text-sm text-red-400">❌ {error}</p>
                   </div>
                 )}
               </div>

@@ -37,8 +37,8 @@ export default function BOQViewerTable({
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
     <button
       onClick={() => onSort(field)}
-      className={`flex items-center space-x-1 hover:text-gray-700 ${
-        sortField === field ? 'text-gray-900 font-medium' : 'text-gray-500'
+      className={`flex items-center space-x-1 hover:text-[var(--ff-text-secondary)] ${
+        sortField === field ? 'text-[var(--ff-text-primary)] font-medium' : 'text-[var(--ff-text-tertiary)]'
       }`}
     >
       <span>{label}</span>
@@ -48,96 +48,96 @@ export default function BOQViewerTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+        <thead className="bg-[var(--ff-bg-tertiary)]">
           <tr>
             {mode === 'edit' && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Actions
               </th>
             )}
-            
+
             {visibleColumns.lineNumber && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 <SortButton field="lineNumber" label="Line #" />
               </th>
             )}
-            
+
             {visibleColumns.itemCode && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Item Code
               </th>
             )}
-            
+
             {visibleColumns.description && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 <SortButton field="description" label="Description" />
               </th>
             )}
-            
+
             {visibleColumns.category && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Category
               </th>
             )}
-            
+
             {visibleColumns.quantity && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 <SortButton field="quantity" label="Quantity" />
               </th>
             )}
-            
+
             {visibleColumns.uom && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 UOM
               </th>
             )}
-            
+
             {visibleColumns.unitPrice && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 <SortButton field="unitPrice" label="Unit Price" />
               </th>
             )}
-            
+
             {visibleColumns.totalPrice && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 <SortButton field="totalPrice" label="Total Price" />
               </th>
             )}
-            
+
             {visibleColumns.mappingStatus && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 <SortButton field="mappingConfidence" label="Mapping" />
               </th>
             )}
-            
+
             {visibleColumns.procurementStatus && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Procurement
               </th>
             )}
-            
+
             {visibleColumns.phase && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Phase
               </th>
             )}
-            
+
             {visibleColumns.task && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Task
               </th>
             )}
-            
+
             {visibleColumns.site && (
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                 Site
               </th>
             )}
           </tr>
         </thead>
-        
-        <tbody className="bg-white divide-y divide-gray-200">
+
+        <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
           {items.map((item) => (
             <BOQViewerTableRow
               key={item.id}

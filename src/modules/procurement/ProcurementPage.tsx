@@ -64,6 +64,7 @@ export function ProcurementPage() {
     quotes: {},
     'purchase-orders': {},
     stock: {},
+    'field-stock': {},
     suppliers: {},
     reports: {}
   });
@@ -360,6 +361,7 @@ export function ProcurementPage() {
         quotes: {},
         'purchase-orders': {},
         stock: {},
+        'field-stock': {},
         suppliers: {},
         reports: {}
       });
@@ -369,12 +371,12 @@ export function ProcurementPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Portal Header */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Procurement Portal</h1>
-              <p className="text-sm text-gray-500">
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement Portal</h1>
+              <p className="text-sm text-[var(--ff-text-secondary)]">
                 Integrated procurement management system
               </p>
             </div>
@@ -422,8 +424,8 @@ export function ProcurementPage() {
                     ${isActive
                       ? 'border-primary-500 text-primary-600 bg-primary-50'
                       : isDisabled
-                      ? 'border-transparent text-gray-400 cursor-not-allowed'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                      ? 'border-transparent text-[var(--ff-text-tertiary)] cursor-not-allowed'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
                     }
                     disabled:opacity-50
                   `}
@@ -435,19 +437,19 @@ export function ProcurementPage() {
                   {tab.badge && tab.badge.count && tab.badge.count > 0 && (
                     <span className={`
                       ml-1 px-2 py-0.5 text-xs font-medium rounded-full
-                      ${tab.badge.type === 'error' ? 'bg-red-100 text-red-700' :
-                        tab.badge.type === 'warning' ? 'bg-yellow-100 text-yellow-700' :
-                        tab.badge.type === 'success' ? 'bg-green-100 text-green-700' :
-                        'bg-blue-100 text-blue-700'
+                      ${tab.badge.type === 'error' ? 'bg-red-500/20 text-red-400' :
+                        tab.badge.type === 'warning' ? 'bg-yellow-500/20 text-yellow-400' :
+                        tab.badge.type === 'success' ? 'bg-green-500/20 text-green-400' :
+                        'bg-blue-500/20 text-blue-400'
                       }
                     `}>
                       {tab.badge.count > 99 ? '99+' : tab.badge.count}
                     </span>
                   )}
-                  
+
                   {/* Disabled Overlay */}
                   {isDisabled && (
-                    <div className="absolute inset-0 bg-white bg-opacity-60 cursor-not-allowed" />
+                    <div className="absolute inset-0 bg-[var(--ff-bg-secondary)] bg-opacity-60 cursor-not-allowed" />
                   )}
                 </button>
               );
@@ -457,7 +459,7 @@ export function ProcurementPage() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="flex-1 overflow-auto bg-[var(--ff-bg-tertiary)]">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500" />

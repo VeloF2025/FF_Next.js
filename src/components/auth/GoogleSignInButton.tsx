@@ -23,10 +23,10 @@ export function GoogleSignInButton({
       onClick={handleClick}
       disabled={loading || disabled}
       className={`
-        relative w-full flex justify-center items-center py-2 px-4 
-        border border-gray-300 rounded-lg text-sm font-medium 
-        text-gray-700 bg-white hover:bg-gray-50 
-        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
+        relative w-full flex justify-center items-center py-2 px-4
+        border border-[var(--ff-border-light)] rounded-lg text-sm font-medium
+        text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)]
+        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
         disabled:opacity-50 disabled:cursor-not-allowed
         transition-colors duration-200
         ${className}
@@ -34,7 +34,7 @@ export function GoogleSignInButton({
     >
       {loading ? (
         <div className="flex items-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--ff-text-secondary)] mr-2"></div>
           Signing in...
         </div>
       ) : (

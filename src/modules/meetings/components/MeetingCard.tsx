@@ -15,11 +15,11 @@ interface MeetingCardProps {
 export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'text-blue-600 bg-blue-100';
-      case 'in_progress': return 'text-green-600 bg-green-100';
-      case 'completed': return 'text-gray-600 bg-gray-100';
-      case 'cancelled': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'scheduled': return 'text-blue-400 bg-blue-500/20';
+      case 'in_progress': return 'text-green-400 bg-green-500/20';
+      case 'completed': return 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)]';
+      case 'cancelled': return 'text-red-400 bg-red-500/20';
+      default: return 'text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)]';
     }
   };
 
@@ -39,7 +39,7 @@ export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardPr
   const isInProgress = meeting.status === 'in_progress';
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-2">
           {getTypeIcon(meeting.type)}
@@ -50,26 +50,26 @@ export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardPr
             {meeting.status.replace('_', ' ')}
           </span>
         </div>
-        
+
         <div className="flex items-center space-x-1">
           <button
             onClick={() => onEdit(meeting)}
-            className="p-1 text-gray-400 hover:text-gray-600"
+            className="p-1 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete(meeting.id)}
-            className="p-1 text-gray-400 hover:text-red-600"
+            className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-600"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <h3 className="font-medium text-gray-900 mb-2">{meeting.title}</h3>
-      
-      <div className="space-y-2 text-sm text-gray-600 mb-3">
+      <h3 className="font-medium text-[var(--ff-text-primary)] mb-2">{meeting.title}</h3>
+
+      <div className="space-y-2 text-sm text-[var(--ff-text-secondary)] mb-3">
         <div className="flex items-center">
           <Calendar className="w-4 h-4 mr-2" />
           <span>{meeting.date.toLocaleDateString()}</span>
@@ -102,15 +102,15 @@ export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardPr
 
       {meeting.agenda.length > 0 && (
         <div className="mb-3">
-          <h4 className="text-sm font-medium text-gray-900 mb-1">Keywords:</h4>
+          <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-1">Keywords:</h4>
           <div className="flex flex-wrap gap-1">
             {meeting.agenda.slice(0, 4).map((item, index) => (
-              <span key={index} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+              <span key={index} className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">
                 {item}
               </span>
             ))}
             {meeting.agenda.length > 4 && (
-              <span className="text-xs text-gray-500 px-2 py-1">
+              <span className="text-xs text-[var(--ff-text-secondary)] px-2 py-1">
                 +{meeting.agenda.length - 4} more
               </span>
             )}
@@ -120,16 +120,16 @@ export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardPr
 
       {meeting.notes && (
         <div className="mb-3">
-          <h4 className="text-sm font-medium text-gray-900 mb-1 flex items-center">
+          <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-1 flex items-center">
             <FileText className="w-3 h-3 mr-1" />
             Action Items:
           </h4>
-          <p className="text-xs text-gray-600 line-clamp-2">{meeting.notes.split('\n')[0]}</p>
+          <p className="text-xs text-[var(--ff-text-secondary)] line-clamp-2">{meeting.notes.split('\n')[0]}</p>
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <div className="text-xs text-gray-500">
+      <div className="flex items-center justify-between pt-3 border-t border-[var(--ff-border-light)]">
+        <div className="text-xs text-[var(--ff-text-secondary)]">
           Organized by {meeting.organizer}
         </div>
 
@@ -139,7 +139,7 @@ export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardPr
               href={meeting.meetingLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
+              className="flex items-center px-3 py-1 rounded-md text-sm font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]"
             >
               <ExternalLink className="w-3 h-3 mr-1" />
               View Transcript

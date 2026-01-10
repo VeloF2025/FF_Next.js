@@ -16,7 +16,7 @@ export function ModuleCard({ card, isDisabled, onNavigate }: ModuleCardProps) {
   return (
     <div
       className={`
-        bg-white rounded-lg border border-gray-200 overflow-hidden
+        bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden
         transition-all duration-200 hover:shadow-lg
         ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1'}
       `}
@@ -33,14 +33,14 @@ export function ModuleCard({ card, isDisabled, onNavigate }: ModuleCardProps) {
               e.stopPropagation();
               if (!isDisabled) onNavigate(`/app/procurement/${card.id}`);
             }}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)] transition-colors"
             disabled={isDisabled}
           >
             <ArrowRight className="h-5 w-5" />
           </button>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">{card.title}</h3>
-        <p className="text-sm text-gray-600 mb-4">{card.description}</p>
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">{card.title}</h3>
+        <p className="text-sm text-[var(--ff-text-secondary)] mb-4">{card.description}</p>
       </div>
 
       {/* Metrics Grid */}
@@ -49,24 +49,24 @@ export function ModuleCard({ card, isDisabled, onNavigate }: ModuleCardProps) {
           {card.metrics.map((metric, index) => (
             <div key={index} className="text-center">
               <div className={`text-lg font-bold ${
-                metric.status === 'success' ? 'text-green-600' :
-                metric.status === 'warning' ? 'text-yellow-600' :
-                metric.status === 'error' ? 'text-red-600' :
-                metric.status === 'info' ? 'text-blue-600' :
-                'text-gray-900'
+                metric.status === 'success' ? 'text-green-400' :
+                metric.status === 'warning' ? 'text-yellow-400' :
+                metric.status === 'error' ? 'text-red-400' :
+                metric.status === 'info' ? 'text-blue-400' :
+                'text-[var(--ff-text-primary)]'
               }`}>
                 {metric.format === 'currency' && 'R '}
                 {typeof metric.value === 'number' ? metric.value.toLocaleString() : metric.value}
                 {metric.format === 'percentage' && '%'}
               </div>
-              <div className="text-xs text-gray-500">{metric.label}</div>
+              <div className="text-xs text-[var(--ff-text-secondary)]">{metric.label}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-gray-50 px-6 py-4 border-t border-gray-100">
+      <div className="bg-[var(--ff-bg-tertiary)] px-6 py-4 border-t border-[var(--ff-border-light)]">
         <div className="flex gap-2">
           {card.quickActions.slice(0, 2).map((action: QuickAction, index: number) => {
             const ActionIcon = action.icon;

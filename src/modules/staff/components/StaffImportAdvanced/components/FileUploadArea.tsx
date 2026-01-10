@@ -14,9 +14,9 @@ interface FileUploadAreaProps {
 
 export function FileUploadArea({ selectedFile, onFileSelect, onClearFile }: FileUploadAreaProps) {
   const getFileIcon = (fileName: string) => {
-    if (fileName.endsWith('.csv')) return <FileText className="w-5 h-5 text-green-500" />;
-    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return <Table className="w-5 h-5 text-blue-500" />;
-    return <FileText className="w-5 h-5 text-gray-500" />;
+    if (fileName.endsWith('.csv')) return <FileText className="w-5 h-5 text-green-400" />;
+    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) return <Table className="w-5 h-5 text-blue-400" />;
+    return <FileText className="w-5 h-5 text-[var(--ff-text-tertiary)]" />;
   };
 
   return (

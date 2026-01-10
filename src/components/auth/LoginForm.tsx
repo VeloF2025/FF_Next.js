@@ -82,7 +82,7 @@ export function LoginForm({ onSuccess, mode = 'login', onModeChange }: LoginForm
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--ff-bg-tertiary)] py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <AuthHeader 
           isSignUp={isSignUp} 
@@ -133,7 +133,7 @@ export function LoginForm({ onSuccess, mode = 'login', onModeChange }: LoginForm
           <SubmitButton isSignUp={isSignUp} isLoading={isLoading} />
         </form>
 
-        <div className="text-center text-xs text-gray-500">
+        <div className="text-center text-xs text-[var(--ff-text-tertiary)]">
           By continuing, you agree to FibreFlow&apos;s Terms of Service and Privacy Policy
         </div>
       </div>

@@ -36,7 +36,7 @@ export function PoleTrackerList() {
         />
         <div className="ff-data-panel">
           <div className="flex justify-center items-center py-12">
-            <div className="text-gray-500">Loading poles...</div>
+            <div className="text-[var(--ff-text-secondary)]">Loading poles...</div>
           </div>
         </div>
       </div>

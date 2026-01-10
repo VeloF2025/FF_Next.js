@@ -75,7 +75,7 @@ export function TicketFilters({ filters, onFiltersChange, compact = false }: Tic
           className={cn(
             'flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors',
             showFilters
-              ? 'bg-blue-500/20 border-blue-500/30 text-blue-600 dark:text-blue-400'
+              ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
               : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
           )}
         >

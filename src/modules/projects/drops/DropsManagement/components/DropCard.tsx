@@ -34,13 +34,13 @@ export function DropCard({ drop, onDropClick }: DropCardProps) {
 
   return (
     <div
-      className="bg-white rounded-lg border border-neutral-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+      className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => onDropClick(drop)}
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h3 className="font-medium text-neutral-900">{drop.dropNumber}</h3>
-          <p className="text-sm text-neutral-600">Pole: {drop.poleNumber}</p>
+          <h3 className="font-medium text-[var(--ff-text-primary)]">{drop.dropNumber}</h3>
+          <p className="text-sm text-[var(--ff-text-secondary)]">Pole: {drop.poleNumber}</p>
         </div>
         <span className={cn(
           'px-2 py-1 text-xs font-medium rounded-full border flex items-center gap-1',
@@ -53,26 +53,26 @@ export function DropCard({ drop, onDropClick }: DropCardProps) {
 
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm">
-          <User className="h-4 w-4 text-neutral-400" />
-          <span className="text-neutral-900">{drop.customerName}</span>
-        </div>
-        
-        <div className="flex items-center gap-2 text-sm">
-          <MapPin className="h-4 w-4 text-neutral-400" />
-          <span className="text-neutral-600">{drop.address}</span>
+          <User className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+          <span className="text-[var(--ff-text-primary)]">{drop.customerName}</span>
         </div>
 
         <div className="flex items-center gap-2 text-sm">
-          <Cable className="h-4 w-4 text-neutral-400" />
-          <span className="text-neutral-600">
+          <MapPin className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+          <span className="text-[var(--ff-text-secondary)]">{drop.address}</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm">
+          <Cable className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+          <span className="text-[var(--ff-text-secondary)]">
             {drop.cableLength}m • {drop.installationType}
           </span>
         </div>
 
         {drop.scheduledDate && (
           <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-4 w-4 text-neutral-400" />
-            <span className="text-neutral-600">
+            <Calendar className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+            <span className="text-[var(--ff-text-secondary)]">
               {new Date(drop.scheduledDate).toLocaleDateString()}
             </span>
           </div>
@@ -80,13 +80,13 @@ export function DropCard({ drop, onDropClick }: DropCardProps) {
 
         {drop.technician && (
           <div className="flex items-center gap-2 text-sm">
-            <User className="h-4 w-4 text-neutral-400" />
-            <span className="text-neutral-600">{drop.technician}</span>
+            <User className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+            <span className="text-[var(--ff-text-secondary)]">{drop.technician}</span>
           </div>
         )}
 
         {drop.issues && drop.issues.length > 0 && (
-          <div className="mt-2 p-2 bg-error-50 rounded text-sm text-error-700">
+          <div className="mt-2 p-2 bg-error-500/20 rounded text-sm text-error-400">
             <AlertCircle className="h-4 w-4 inline mr-1" />
             {drop.issues[0]}
           </div>

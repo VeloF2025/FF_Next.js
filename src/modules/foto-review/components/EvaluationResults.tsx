@@ -12,8 +12,8 @@ import type { EvaluationResultsProps } from '../types';
 export function EvaluationResults({ evaluation }: EvaluationResultsProps) {
   if (!evaluation) {
     return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <p className="text-gray-500 text-center">No evaluation results to display</p>
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6">
+        <p className="text-[var(--ff-text-secondary)] text-center">No evaluation results to display</p>
       </div>
     );
   }
@@ -25,25 +25,25 @@ export function EvaluationResults({ evaluation }: EvaluationResultsProps) {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600 bg-green-50';
-    if (score >= 6) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
+    if (score >= 8) return 'text-green-400 bg-green-500/20';
+    if (score >= 6) return 'text-yellow-400 bg-yellow-500/20';
+    return 'text-red-400 bg-red-500/20';
   };
 
   const getScoreTextColor = (score: number) => {
-    if (score >= 8) return 'text-green-600';
-    if (score >= 6) return 'text-yellow-600';
-    return 'text-red-600';
+    if (score >= 8) return 'text-green-400';
+    if (score >= 6) return 'text-yellow-400';
+    return 'text-red-400';
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md">
       {/* Header */}
-      <div className="p-6 border-b">
+      <div className="p-6 border-b border-[var(--ff-border-light)]">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Detailed Step Results</h3>
-            <p className="text-sm text-gray-600 mt-1">AI evaluation for each installation step</p>
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Detailed Step Results</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">AI evaluation for each installation step</p>
           </div>
           <button
             onClick={handleDownloadReport}
@@ -57,28 +57,28 @@ export function EvaluationResults({ evaluation }: EvaluationResultsProps) {
       </div>
 
       {/* Step Results */}
-      <div className="divide-y">
+      <div className="divide-y divide-[var(--ff-border-light)]">
         {evaluation.step_results.map((step) => (
-          <div key={step.step_number} className="p-6 hover:bg-gray-50 transition-colors">
+          <div key={step.step_number} className="p-6 hover:bg-[var(--ff-bg-hover)] transition-colors">
             {/* Step Header */}
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3 flex-1">
                 {/* Status Icon */}
                 {step.passed ? (
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                  <CheckCircle className="w-6 h-6 text-green-400 flex-shrink-0" />
                 ) : (
-                  <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                  <XCircle className="w-6 h-6 text-red-400 flex-shrink-0" />
                 )}
 
                 {/* Step Info */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-500">Step {step.step_number}</span>
-                    <span className={`text-xs font-semibold ${step.passed ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className="text-xs font-medium text-[var(--ff-text-tertiary)]">Step {step.step_number}</span>
+                    <span className={`text-xs font-semibold ${step.passed ? 'text-green-400' : 'text-red-400'}`}>
                       {step.passed ? 'PASS' : 'FAIL'}
                     </span>
                   </div>
-                  <h4 className="font-medium text-gray-900 mt-1">{step.step_label}</h4>
+                  <h4 className="font-medium text-[var(--ff-text-primary)] mt-1">{step.step_label}</h4>
                 </div>
               </div>
 
@@ -92,12 +92,12 @@ export function EvaluationResults({ evaluation }: EvaluationResultsProps) {
 
             {/* AI Comment */}
             <div className="ml-9 mt-2">
-              <p className="text-sm text-gray-700 leading-relaxed">{step.comment}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)] leading-relaxed">{step.comment}</p>
             </div>
 
             {/* Score Bar */}
             <div className="ml-9 mt-3">
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${
                     step.passed ? 'bg-green-500' : 'bg-red-500'
@@ -112,13 +112,13 @@ export function EvaluationResults({ evaluation }: EvaluationResultsProps) {
 
       {/* Markdown Report (if available) */}
       {evaluation.markdown_report && (
-        <div className="p-6 border-t bg-gray-50">
+        <div className="p-6 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
           <details className="cursor-pointer">
-            <summary className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
+            <summary className="font-medium text-[var(--ff-text-primary)] hover:text-blue-400 transition-colors">
               View Full Markdown Report
             </summary>
-            <div className="mt-4 bg-white rounded-lg p-4 border">
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">
+            <div className="mt-4 bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+              <pre className="text-xs text-[var(--ff-text-secondary)] whitespace-pre-wrap font-mono">
                 {evaluation.markdown_report}
               </pre>
             </div>

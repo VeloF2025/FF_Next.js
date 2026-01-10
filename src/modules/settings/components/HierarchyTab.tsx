@@ -84,22 +84,22 @@ export function HierarchyTab() {
         </button>
       </div>
       
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <p className="text-blue-800">
+      <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-6">
+        <p className="text-blue-400">
           The reporting hierarchy is built from the "Reports To" relationships in staff profiles.
           Click on staff members to view their details or edit reporting relationships.
         </p>
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-12">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-12">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading organizational hierarchy...</p>
+            <p className="text-[var(--ff-text-secondary)]">Loading organizational hierarchy...</p>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
           {hierarchy.length > 0 ? (
             <div className="space-y-4">
               {hierarchy.map(root => (
@@ -107,7 +107,7 @@ export function HierarchyTab() {
               ))}
             </div>
           ) : (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-[var(--ff-text-secondary)] py-8">
               <GitBranch className="w-12 h-12 mx-auto mb-3" />
               <p>No staff members found</p>
               <p className="text-sm mt-2">Add staff members to see the organizational hierarchy</p>
@@ -135,11 +135,11 @@ function HierarchyNode({ person, level }: HierarchyNodeProps) {
 
   return (
     <div className="relative">
-      <div 
-        className={`flex items-center p-3 rounded-lg border transition-colors cursor-pointer hover:bg-gray-50 ${
-          level === 0 ? 'border-blue-200 bg-blue-50' : 
-          level === 1 ? 'border-green-200 bg-green-50' :
-          'border-gray-200 bg-white'
+      <div
+        className={`flex items-center p-3 rounded-lg border transition-colors cursor-pointer hover:bg-[var(--ff-bg-hover)] ${
+          level === 0 ? 'border-blue-500/30 bg-blue-500/20' :
+          level === 1 ? 'border-green-500/30 bg-green-500/20' :
+          'border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]'
         }`}
         style={{ marginLeft: `${level * 24}px` }}
         onClick={handleNavigate}
@@ -151,12 +151,12 @@ function HierarchyNode({ person, level }: HierarchyNodeProps) {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
             }}
-            className="mr-2 p-1 rounded hover:bg-gray-200"
+            className="mr-2 p-1 rounded hover:bg-[var(--ff-bg-tertiary)]"
           >
             {isExpanded ? '▼' : '▶'}
           </button>
         )}
-        
+
         {/* Staff Avatar */}
         <div className={`h-10 w-10 rounded-full flex items-center justify-center mr-3 ${
           level === 0 ? 'bg-blue-600 text-white' :
@@ -171,23 +171,23 @@ function HierarchyNode({ person, level }: HierarchyNodeProps) {
         {/* Staff Info */}
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900">{person.name}</span>
+            <span className="font-medium text-[var(--ff-text-primary)]">{person.name}</span>
             {level === 0 && (
-              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+              <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-400 rounded-full">
                 Executive
               </span>
             )}
             {level === 1 && (
-              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+              <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-full">
                 Manager
               </span>
             )}
           </div>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-[var(--ff-text-secondary)]">
             {person.position} • {person.department?.replace('_', ' ')}
           </div>
           {hasChildren && (
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-[var(--ff-text-tertiary)] mt-1">
               {person.children.length} direct report{person.children.length !== 1 ? 's' : ''}
             </div>
           )}
@@ -195,9 +195,9 @@ function HierarchyNode({ person, level }: HierarchyNodeProps) {
 
         {/* Status Badge */}
         <span className={`px-2 py-1 text-xs rounded-full ${
-          person.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-          person.status === 'ON_LEAVE' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-gray-100 text-gray-800'
+          person.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
+          person.status === 'ON_LEAVE' ? 'bg-yellow-500/20 text-yellow-400' :
+          'bg-gray-500/20 text-gray-400'
         }`}>
           {person.status?.replace('_', ' ') || 'Unknown'}
         </span>

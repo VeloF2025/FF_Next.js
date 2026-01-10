@@ -21,7 +21,7 @@ export function SOWStepProgress({ steps, currentStep }: SOWStepProgressProps) {
                 ? 'bg-green-500 text-white'
                 : index === currentStep
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-600'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
             }`}>
               {step.completed ? (
                 <CheckCircle className="w-5 h-5" />
@@ -30,12 +30,12 @@ export function SOWStepProgress({ steps, currentStep }: SOWStepProgressProps) {
               )}
             </div>
             <span className={`ml-2 text-sm ${
-              step.completed ? 'text-green-600' : index === currentStep ? 'text-blue-600' : 'text-gray-500'
+              step.completed ? 'text-green-600' : index === currentStep ? 'text-blue-600' : 'text-[var(--ff-text-secondary)]'
             }`}>
               {step.title}
             </span>
             {index < steps.length - 1 && (
-              <ArrowRight className="w-4 h-4 text-gray-400 ml-4 mr-4" />
+              <ArrowRight className="w-4 h-4 text-[var(--ff-text-tertiary)] ml-4 mr-4" />
             )}
           </div>
         ))}

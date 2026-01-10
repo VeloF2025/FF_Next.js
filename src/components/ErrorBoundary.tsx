@@ -64,28 +64,28 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center px-4">
           <div className="max-w-2xl w-full">
-            <div className="bg-white shadow-lg rounded-lg p-8">
+            <div className="bg-[var(--ff-bg-secondary)] shadow-lg rounded-lg p-8">
               {/* Error Icon and Title */}
               <div className="flex items-center justify-center mb-6">
-                <div className="bg-red-100 rounded-full p-3">
-                  <AlertTriangle className="h-12 w-12 text-red-600" />
+                <div className="bg-red-500/20 rounded-full p-3">
+                  <AlertTriangle className="h-12 w-12 text-red-400" />
                 </div>
               </div>
-              
-              <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
+
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] text-center mb-2">
                 Oops! Something went wrong
               </h1>
-              
-              <p className="text-gray-600 text-center mb-6">
+
+              <p className="text-[var(--ff-text-secondary)] text-center mb-6">
                 We&apos;re sorry, but something unexpected happened. The error has been logged and we&apos;ll look into it.
               </p>
 
               {/* Error Message */}
               {this.state.error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                  <p className="text-sm font-mono text-red-800">
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
+                  <p className="text-sm font-mono text-red-400">
                     {this.state.error.message || 'An unexpected error occurred'}
                   </p>
                 </div>
@@ -102,7 +102,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 </button>
                 <button
                   onClick={this.handleGoHome}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
                 >
                   <Home className="h-4 w-4" />
                   Go to Dashboard
@@ -110,10 +110,10 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
 
               {/* Technical Details (Collapsible) */}
-              <div className="border-t pt-4">
+              <div className="border-t border-[var(--ff-border-light)] pt-4">
                 <button
                   onClick={this.toggleDetails}
-                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
                 >
                   {this.state.showDetails ? (
                     <ChevronUp className="h-4 w-4" />
@@ -122,25 +122,25 @@ export class ErrorBoundary extends Component<Props, State> {
                   )}
                   Technical Details
                 </button>
-                
+
                 {this.state.showDetails && this.state.errorInfo && (
                   <div className="mt-4 space-y-4">
                     {/* Stack Trace */}
                     <div>
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-2">
                         Stack Trace
                       </h3>
-                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
+                      <pre className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] p-4 rounded-lg overflow-x-auto text-xs border border-[var(--ff-border-light)]">
                         {this.state.error?.stack}
                       </pre>
                     </div>
-                    
+
                     {/* Component Stack */}
                     <div>
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-2">
                         Component Stack
                       </h3>
-                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
+                      <pre className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] p-4 rounded-lg overflow-x-auto text-xs border border-[var(--ff-border-light)]">
                         {this.state.errorInfo.componentStack}
                       </pre>
                     </div>
@@ -150,7 +150,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             {/* Help Text */}
-            <p className="text-center text-sm text-gray-500 mt-6">
+            <p className="text-center text-sm text-[var(--ff-text-secondary)] mt-6">
               If this problem persists, please contact support with the error details above.
             </p>
           </div>

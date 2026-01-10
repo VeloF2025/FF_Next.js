@@ -105,24 +105,24 @@ export default function OneMapImportPage() {
     <AppLayout>
       <div className="p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Import Geographic Data from 1Map</h1>
-          <p className="text-gray-600 mt-1">Upload Excel files exported from 1Map application to import geographic data</p>
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Import Geographic Data from 1Map</h1>
+          <p className="text-[var(--ff-text-secondary)] mt-1">Upload Excel files exported from 1Map application to import geographic data</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6">
           {/* File Upload Area */}
           {!selectedFile ? (
             <div
-              className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-gray-400 transition-colors cursor-pointer"
+              className="border-2 border-dashed border-[var(--ff-border-light)] rounded-lg p-12 text-center hover:border-[var(--ff-border-medium)] transition-colors cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
             >
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-lg font-medium text-gray-900 mb-2">
+              <Upload className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)] mb-4" />
+              <p className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">
                 Click to browse or drag and drop
               </p>
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="text-sm text-[var(--ff-text-tertiary)] mb-4">
                 Select Excel file (.xlsx, .xls) or CSV file from 1Map export
               </p>
               <button
@@ -146,13 +146,13 @@ export default function OneMapImportPage() {
           ) : (
             <div className="space-y-4">
               {/* Selected File Display */}
-              <div className="border rounded-lg p-4 bg-gray-50">
+              <div className="border border-[var(--ff-border-light)] rounded-lg p-4 bg-[var(--ff-bg-tertiary)]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <FileSpreadsheet className="h-10 w-10 text-green-600" />
+                    <FileSpreadsheet className="h-10 w-10 text-green-500" />
                     <div>
-                      <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="font-medium text-[var(--ff-text-primary)]">{selectedFile.name}</p>
+                      <p className="text-sm text-[var(--ff-text-tertiary)]">
                         {formatFileSize(selectedFile.size)} • Ready to import
                       </p>
                     </div>
@@ -163,25 +163,25 @@ export default function OneMapImportPage() {
                       setUploadStatus('idle');
                       setUploadMessage('');
                     }}
-                    className="p-1 hover:bg-gray-200 rounded"
+                    className="p-1 hover:bg-[var(--ff-bg-hover)] rounded"
                   >
-                    <X className="h-5 w-5 text-gray-500" />
+                    <X className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
                   </button>
                 </div>
               </div>
 
               {/* Upload Status Messages */}
               {uploadStatus === 'success' && (
-                <div className="flex items-center p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
-                  <p className="text-green-800">{uploadMessage}</p>
+                <div className="flex items-center p-4 bg-green-500/20 border border-green-500/50 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
+                  <p className="text-green-400">{uploadMessage}</p>
                 </div>
               )}
 
               {uploadStatus === 'error' && (
-                <div className="flex items-center p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-600 mr-3" />
-                  <p className="text-red-800">{uploadMessage}</p>
+                <div className="flex items-center p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
+                  <p className="text-red-400">{uploadMessage}</p>
                 </div>
               )}
 
@@ -192,7 +192,7 @@ export default function OneMapImportPage() {
                   disabled={uploading}
                   className={`px-6 py-2 rounded-lg font-medium ${
                     uploading
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      ? 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
                       : 'bg-green-600 text-white hover:bg-green-700'
                   }`}
                 >
@@ -206,7 +206,7 @@ export default function OneMapImportPage() {
                     fileInputRef.current?.click();
                   }}
                   disabled={uploading}
-                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  className="px-6 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] border border-[var(--ff-border-light)]"
                 >
                   Choose Different File
                 </button>
@@ -215,9 +215,9 @@ export default function OneMapImportPage() {
           )}
 
           {/* Information Panel */}
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-            <h3 className="font-medium text-blue-900 mb-2">Expected Data Format from 1Map</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="mt-8 p-4 bg-blue-500/20 rounded-lg">
+            <h3 className="font-medium text-blue-400 mb-2">Expected Data Format from 1Map</h3>
+            <ul className="text-sm text-blue-300 space-y-1">
               <li>• Pole locations with GPS coordinates (latitude, longitude)</li>
               <li>• Fiber cable routes with start and end points</li>
               <li>• Splice points and junction boxes</li>

@@ -22,8 +22,8 @@ export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
         <div className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Today's Meetings</p>
-              <p className="text-2xl font-bold">{stats.todayMeetings}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Today's Meetings</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.todayMeetings}</p>
             </div>
             <Calendar className="w-8 h-8 text-blue-500" />
           </div>
@@ -34,8 +34,8 @@ export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
         <div className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">This Week</p>
-              <p className="text-2xl font-bold">{stats.weekMeetings}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">This Week</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.weekMeetings}</p>
             </div>
             <Clock className="w-8 h-8 text-green-500" />
           </div>
@@ -46,8 +46,8 @@ export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
         <div className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Action Items</p>
-              <p className="text-2xl font-bold">{stats.actionItems}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Action Items</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.actionItems}</p>
             </div>
             <FileText className="w-8 h-8 text-orange-500" />
           </div>
@@ -58,8 +58,8 @@ export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
         <div className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Hours</p>
-              <p className="text-2xl font-bold">{stats.totalHours}h</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total Hours</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.totalHours}h</p>
             </div>
             <Users className="w-8 h-8 text-purple-500" />
           </div>

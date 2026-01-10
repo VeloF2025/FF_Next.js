@@ -108,33 +108,33 @@ export function NotesTab({ ticketId }: NotesTabProps) {
         {/* Visibility filter tabs */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-[var(--ff-text-secondary)]">Show:</span>
-          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <div className="flex rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
             <button
               onClick={() => setVisibilityFilter('all')}
               className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                 visibilityFilter === 'all'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
               }`}
             >
               All ({summary.total})
             </button>
             <button
               onClick={() => setVisibilityFilter('private')}
-              className={`px-3 py-1.5 text-sm font-medium border-l border-gray-300 dark:border-gray-600 transition-colors ${
+              className={`px-3 py-1.5 text-sm font-medium border-l border-[var(--ff-border-light)] transition-colors ${
                 visibilityFilter === 'private'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
               }`}
             >
               Private ({summary.private})
             </button>
             <button
               onClick={() => setVisibilityFilter('public')}
-              className={`px-3 py-1.5 text-sm font-medium border-l border-gray-300 dark:border-gray-600 transition-colors ${
+              className={`px-3 py-1.5 text-sm font-medium border-l border-[var(--ff-border-light)] transition-colors ${
                 visibilityFilter === 'public'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
               }`}
             >
               Public ({summary.public})
@@ -237,7 +237,7 @@ export function NotesTab({ ticketId }: NotesTabProps) {
                     setIsAddingNote(false);
                     setNewNoteContent('');
                   }}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium"
+                  className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors font-medium"
                 >
                   Cancel
                 </button>
@@ -324,7 +324,7 @@ function NoteCard({ note, onDelete, isDeleting, formatDate }: NoteCardProps) {
   const isPrivate = note.visibility === 'private';
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div className="p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* Header with visibility badge */}
@@ -332,8 +332,8 @@ function NoteCard({ note, onDelete, isDeleting, formatDate }: NoteCardProps) {
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${
                 isPrivate
-                  ? 'bg-amber-200 text-amber-900 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                  : 'bg-green-200 text-green-900 dark:bg-green-900/40 dark:text-green-300 border border-green-300 dark:border-green-700'
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-green-500/20 text-green-400 border border-green-500/30'
               }`}
             >
               {isPrivate ? (
@@ -367,7 +367,7 @@ function NoteCard({ note, onDelete, isDeleting, formatDate }: NoteCardProps) {
             </span>
 
             {note.is_resolution && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400">
                 Resolution
               </span>
             )}
@@ -397,7 +397,7 @@ function NoteCard({ note, onDelete, isDeleting, formatDate }: NoteCardProps) {
         <button
           onClick={onDelete}
           disabled={isDeleting}
-          className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50"
+          className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/20 rounded transition-colors disabled:opacity-50"
           title="Delete note"
         >
           <svg

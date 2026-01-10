@@ -347,7 +347,7 @@ export function EditorCanvas() {
   return (
     <div
       ref={canvasRef}
-      className="relative h-full w-full overflow-hidden bg-gray-50 dark:bg-gray-900 cursor-grab active:cursor-grabbing select-none"
+      className="relative h-full w-full overflow-hidden bg-[var(--ff-bg-tertiary)] cursor-grab active:cursor-grabbing select-none"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -359,7 +359,7 @@ export function EditorCanvas() {
       {/* Grid Background */}
       {state.settings.showGrid && (
         <svg
-          className="absolute inset-0 w-full h-full text-gray-300 dark:text-gray-600 pointer-events-none"
+          className="absolute inset-0 w-full h-full text-[var(--ff-border-light)] pointer-events-none"
           style={{ zIndex: 0 }}
         >
           {gridPattern}
@@ -391,7 +391,7 @@ export function EditorCanvas() {
       {renderSelectionBox}
 
       {/* Canvas Info */}
-      <div className="absolute bottom-2 left-2 text-xs text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-2 py-1 rounded backdrop-blur-sm">
+      <div className="absolute bottom-2 left-2 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)]/80 px-2 py-1 rounded backdrop-blur-sm">
         Zoom: {Math.round(transform.scale * 100)}% | Nodes: {state.nodes.length}
       </div>
 
@@ -400,13 +400,13 @@ export function EditorCanvas() {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center max-w-md">
             <div className="text-6xl mb-4">🎯</div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
               Start Building Your Workflow
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-[var(--ff-text-secondary)] mb-4">
               Drag components from the palette or double-click to add phases, steps, and tasks.
             </p>
-            <div className="text-sm text-gray-500 dark:text-gray-500 space-y-1">
+            <div className="text-sm text-[var(--ff-text-tertiary)] space-y-1">
               <div>• Alt + click and drag to pan</div>
               <div>• Ctrl + scroll to zoom</div>
               <div>• Drag to select multiple nodes</div>

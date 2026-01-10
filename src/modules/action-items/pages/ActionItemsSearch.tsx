@@ -61,7 +61,7 @@ export function ActionItemsSearch() {
       <div className="mb-6">
         <button
           onClick={() => router.push('/action-items')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+          className="flex items-center gap-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
@@ -70,18 +70,18 @@ export function ActionItemsSearch() {
         <div className="flex items-center gap-3">
           <Filter className="w-8 h-8 text-indigo-500" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Filter & Search Action Items</h1>
-            <p className="text-gray-600 mt-1">Find specific action items</p>
+            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Filter & Search Action Items</h1>
+            <p className="text-[var(--ff-text-secondary)] mt-1">Find specific action items</p>
           </div>
         </div>
       </div>
 
       {/* Search Form */}
-      <form onSubmit={handleSearch} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+      <form onSubmit={handleSearch} className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           {/* Search text */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
               Search description
             </label>
             <input
@@ -89,13 +89,13 @@ export function ActionItemsSearch() {
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder="Search in descriptions..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           {/* Assignee */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
               Assignee name
             </label>
             <input
@@ -103,19 +103,19 @@ export function ActionItemsSearch() {
               value={filters.assignee_name}
               onChange={(e) => setFilters({ ...filters, assignee_name: e.target.value })}
               placeholder="Filter by assignee..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
               Status
             </label>
             <select
               value={filters.status || ''}
               onChange={(e) => setFilters({ ...filters, status: e.target.value as any || undefined })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All statuses</option>
               <option value="pending">Pending</option>
@@ -127,13 +127,13 @@ export function ActionItemsSearch() {
 
           {/* Priority */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
               Priority
             </label>
             <select
               value={filters.priority || ''}
               onChange={(e) => setFilters({ ...filters, priority: e.target.value as any || undefined })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All priorities</option>
               <option value="low">Low</option>
@@ -157,7 +157,7 @@ export function ActionItemsSearch() {
           <button
             type="button"
             onClick={handleReset}
-            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+            className="px-4 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-md hover:bg-[var(--ff-bg-hover)]"
           >
             Reset
           </button>
@@ -166,15 +166,15 @@ export function ActionItemsSearch() {
 
       {/* Results */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-6">
+          <p className="text-red-400">{error}</p>
         </div>
       )}
 
       {items.length > 0 && (
         <>
           <div className="mb-4">
-            <p className="text-gray-600">
+            <p className="text-[var(--ff-text-secondary)]">
               Found <span className="font-semibold">{items.length}</span> action items
             </p>
           </div>
@@ -184,8 +184,8 @@ export function ActionItemsSearch() {
 
       {!loading && items.length === 0 && !error && filters.search && (
         <div className="text-center py-12">
-          <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No action items match your search criteria</p>
+          <Search className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+          <p className="text-[var(--ff-text-secondary)]">No action items match your search criteria</p>
         </div>
       )}
     </div>

@@ -114,12 +114,12 @@ export function ClientImport({ onComplete }: ClientImportProps = {}) {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
+        <div className="p-6 border-b border-[var(--ff-border-light)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Building2 className="h-6 w-6 text-blue-600" />
-              <h2 className="text-xl font-semibold text-gray-900">Import Clients</h2>
+              <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Import Clients</h2>
             </div>
             <ClientImportActions
               onDownloadTemplate={handleDownloadTemplate}

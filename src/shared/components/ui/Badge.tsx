@@ -16,9 +16,9 @@ export function Badge({
 
   const variantStyles = {
     default: 'bg-purple-600 text-white hover:bg-purple-700',
-    secondary: 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700',
-    destructive: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/30',
-    outline: 'text-gray-950 dark:text-gray-50 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800',
+    secondary: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]',
+    destructive: 'bg-red-500/20 text-red-400 hover:bg-red-500/30',
+    outline: 'text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]',
   };
 
   const sizeStyles = {

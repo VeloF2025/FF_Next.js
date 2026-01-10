@@ -50,18 +50,18 @@ export default function LiveKitMeetingPage() {
 
     if (!roomId || typeof roomId !== 'string') {
         return (
-            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-white animate-spin" />
+            <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-[var(--ff-text-primary)] animate-spin" />
             </div>
         );
     }
 
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
                 <div className="text-center">
-                    <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-4" />
-                    <p className="text-gray-400">Loading meeting...</p>
+                    <Loader2 className="w-8 h-8 text-[var(--ff-text-primary)] animate-spin mx-auto mb-4" />
+                    <p className="text-[var(--ff-text-secondary)]">Loading meeting...</p>
                 </div>
             </div>
         );

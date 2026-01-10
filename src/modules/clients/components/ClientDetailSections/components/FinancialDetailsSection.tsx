@@ -4,27 +4,27 @@ import { formatCurrency, getCreditRatingColor, formatTextUppercase } from '../ut
 
 export function FinancialDetailsSection({ client }: SectionProps) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Information</h3>
-      
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+      <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Financial Information</h3>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="text-sm text-gray-500">Credit Limit</p>
-          <p className="font-medium text-lg">{formatCurrency(client.creditLimit)}</p>
+          <p className="text-sm text-[var(--ff-text-tertiary)]">Credit Limit</p>
+          <p className="font-medium text-lg text-[var(--ff-text-primary)]">{formatCurrency(client.creditLimit)}</p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Current Balance</p>
-          <p className="font-medium text-lg">{formatCurrency(client.currentBalance)}</p>
+          <p className="text-sm text-[var(--ff-text-tertiary)]">Current Balance</p>
+          <p className="font-medium text-lg text-[var(--ff-text-primary)]">{formatCurrency(client.currentBalance)}</p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Payment Terms</p>
-          <p className="font-medium">{formatTextUppercase(client.paymentTerms)}</p>
+          <p className="text-sm text-[var(--ff-text-tertiary)]">Payment Terms</p>
+          <p className="font-medium text-[var(--ff-text-primary)]">{formatTextUppercase(client.paymentTerms)}</p>
         </div>
 
         <div>
-          <p className="text-sm text-gray-500">Credit Rating</p>
+          <p className="text-sm text-[var(--ff-text-tertiary)]">Credit Rating</p>
           <p className={`font-medium ${getCreditRatingColor(client.creditRating)}`}>
             {client.creditRating.charAt(0).toUpperCase() + client.creditRating.slice(1)}
           </p>

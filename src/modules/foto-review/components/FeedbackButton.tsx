@@ -56,9 +56,9 @@ export function FeedbackButton({
   if (evaluation.feedback_sent) {
     return (
       <div className="text-center py-2 text-sm">
-        <span className="text-green-600 font-medium">✓ Feedback sent</span>
+        <span className="text-green-400 font-medium">✓ Feedback sent</span>
         {evaluation.feedback_sent_at && (
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
             {new Date(evaluation.feedback_sent_at).toLocaleString()}
           </p>
         )}
@@ -89,7 +89,7 @@ export function FeedbackButton({
               <h3 className="text-lg font-semibold text-white">Preview WhatsApp Message</h3>
               <button
                 onClick={() => setShowPreview(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[var(--ff-text-tertiary)] hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -98,7 +98,7 @@ export function FeedbackButton({
             {/* Message Preview */}
             <div className="p-6">
               <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <pre className="whitespace-pre-wrap text-sm text-gray-200 font-sans">
+                <pre className="whitespace-pre-wrap text-sm text-[var(--ff-text-primary)] font-sans">
                   {formatFeedbackMessage()}
                 </pre>
               </div>

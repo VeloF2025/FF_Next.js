@@ -41,10 +41,10 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-64 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-center h-64 bg-[var(--ff-bg-tertiary)] rounded-lg">
                 <div className="text-center">
                     <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-gray-600 dark:text-gray-400">Loading photos...</p>
+                    <p className="text-[var(--ff-text-tertiary)]">Loading photos...</p>
                 </div>
             </div>
         );
@@ -52,11 +52,11 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
 
     if (steps.length === 0) {
         return (
-            <div className="flex items-center justify-center h-64 bg-gray-50 dark:bg-gray-700 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+            <div className="flex items-center justify-center h-64 bg-[var(--ff-bg-tertiary)] rounded-lg border-2 border-dashed border-[var(--ff-border-light)]">
                 <div className="text-center">
-                    <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500 dark:text-gray-400 text-lg">No photos for {drNumber}</p>
-                    <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Photos will appear once uploaded</p>
+                    <Camera className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-3" />
+                    <p className="text-[var(--ff-text-secondary)] text-lg">No photos for {drNumber}</p>
+                    <p className="text-[var(--ff-text-tertiary)] text-sm mt-2">Photos will appear once uploaded</p>
                 </div>
             </div>
         );
@@ -71,7 +71,7 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                         key={`${step.step_number}-${step.filename}`}
                         onClick={() => openLightbox(index)}
                         className={`relative aspect-square rounded-lg overflow-hidden cursor-pointer group transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${step.critical
-                                ? 'ring-2 ring-orange-400 dark:ring-orange-500'
+                                ? 'ring-2 ring-orange-500'
                                 : 'hover:ring-2 hover:ring-blue-400'
                             }`}
                     >
@@ -178,13 +178,13 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                             <p className="text-xl font-semibold">
                                 Step {steps[selectedIndex].step_number}: {steps[selectedIndex].step_label}
                             </p>
-                            <p className="text-sm text-gray-300 mt-1">
+                            <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">
                                 {selectedIndex + 1} of {steps.length}
                             </p>
 
                             {/* Evaluation Info */}
                             {steps[selectedIndex].evaluation && (
-                                <div className="mt-4 p-4 bg-gray-800 rounded-lg max-w-md mx-auto">
+                                <div className="mt-4 p-4 bg-[var(--ff-bg-secondary)] rounded-lg max-w-md mx-auto">
                                     <div className="flex items-center justify-center gap-2 mb-2">
                                         {steps[selectedIndex].evaluation.pass ? (
                                             <CheckCircle className="w-5 h-5 text-green-400" />
@@ -196,7 +196,7 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                                         </span>
                                     </div>
                                     {steps[selectedIndex].evaluation.findings.length > 0 && (
-                                        <ul className="text-sm text-gray-300 text-left list-disc list-inside">
+                                        <ul className="text-sm text-[var(--ff-text-tertiary)] text-left list-disc list-inside">
                                             {steps[selectedIndex].evaluation.findings.map((f, i) => (
                                                 <li key={i}>{f}</li>
                                             ))}

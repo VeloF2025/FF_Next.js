@@ -10,18 +10,18 @@ interface DeviceStatusProps {
 
 export function DeviceStatus({ battery, signal, gpsAccuracy, storage }: DeviceStatusProps) {
   const getBatteryColor = (level: number) => {
-    if (level > 50) return 'text-green-600';
-    if (level > 20) return 'text-yellow-600';
-    return 'text-red-600';
+    if (level > 50) return 'text-green-400';
+    if (level > 20) return 'text-yellow-400';
+    return 'text-red-400';
   };
 
   const getSignalColor = (strength: string) => {
     switch (strength) {
-      case 'excellent': return 'text-green-600';
-      case 'good': return 'text-blue-600';
-      case 'fair': return 'text-yellow-600';
-      case 'poor': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'excellent': return 'text-green-400';
+      case 'good': return 'text-blue-400';
+      case 'fair': return 'text-yellow-400';
+      case 'poor': return 'text-red-400';
+      default: return 'text-[var(--ff-text-secondary)]';
     }
   };
 
@@ -38,8 +38,8 @@ export function DeviceStatus({ battery, signal, gpsAccuracy, storage }: DeviceSt
   const storagePercentage = (storage.used / storage.total) * 100;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4">
-      <h3 className="font-medium text-gray-900 mb-4 flex items-center">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+      <h3 className="font-medium text-[var(--ff-text-primary)] mb-4 flex items-center">
         <Smartphone className="w-4 h-4 mr-2" />
         Device Status
       </h3>
@@ -56,12 +56,12 @@ export function DeviceStatus({ battery, signal, gpsAccuracy, storage }: DeviceSt
               {battery}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
             <div
               className={cn(
                 "h-2 rounded-full",
-                battery > 50 ? "bg-green-600" :
-                battery > 20 ? "bg-yellow-600" : "bg-red-600"
+                battery > 50 ? "bg-green-500" :
+                battery > 20 ? "bg-yellow-500" : "bg-red-500"
               )}
               style={{ width: `${battery}%` }}
             />
@@ -84,7 +84,7 @@ export function DeviceStatus({ battery, signal, gpsAccuracy, storage }: DeviceSt
               <div
                 key={bar}
                 className={cn(
-                  "w-2 bg-gray-200 rounded-sm",
+                  "w-2 bg-[var(--ff-bg-tertiary)] rounded-sm",
                   bar <= getSignalBars(signal) ? getSignalColor(signal).replace('text-', 'bg-') : ''
                 )}
                 style={{ height: `${bar * 3 + 4}px` }}
@@ -112,12 +112,12 @@ export function DeviceStatus({ battery, signal, gpsAccuracy, storage }: DeviceSt
               {storage.used.toFixed(1)} / {storage.total}GB
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
             <div
               className={cn(
                 "h-2 rounded-full",
-                storagePercentage > 80 ? "bg-red-600" :
-                storagePercentage > 60 ? "bg-yellow-600" : "bg-green-600"
+                storagePercentage > 80 ? "bg-red-500" :
+                storagePercentage > 60 ? "bg-yellow-500" : "bg-green-500"
               )}
               style={{ width: `${storagePercentage}%` }}
             />

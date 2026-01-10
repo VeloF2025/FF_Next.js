@@ -126,11 +126,11 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
       )}
 
       {/* Company Information */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+      <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Company Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Company Name *
             </label>
             <input
@@ -138,12 +138,12 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
               required
               value={formData.companyName}
               onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Registration Number *
               {error?.includes('already exists') && (
                 <span className="ml-2 text-xs text-red-600">⚠️ May be duplicate</span>
@@ -163,14 +163,14 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Business Type *
             </label>
             <select
               required
               value={formData.businessType}
               onChange={(e) => setFormData({ ...formData, businessType: e.target.value as any })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {BUSINESS_TYPES.map((type) => (
                 <option key={type.value} value={type.value}>
@@ -181,19 +181,19 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Industry Category
             </label>
             <input
               type="text"
               value={formData.industryCategory}
               onChange={(e) => setFormData({ ...formData, industryCategory: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Years in Business
             </label>
             <input
@@ -201,18 +201,18 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
               min="0"
               value={formData.yearsInBusiness || ''}
               onChange={(e) => setFormData({ ...formData, yearsInBusiness: e.target.value ? parseInt(e.target.value) : undefined })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
       </div>
 
       {/* Contact Information */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+      <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Contact Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Contact Person *
             </label>
             <input
@@ -220,12 +220,12 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
               required
               value={formData.contactPerson}
               onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Email *
               {error?.includes('already exists') && (
                 <span className="ml-2 text-xs text-red-600">⚠️ May be duplicate</span>
@@ -245,7 +245,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Phone *
             </label>
             <input
@@ -253,60 +253,60 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
               required
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Alternate Phone
             </label>
             <input
               type="tel"
               value={formData.alternatePhone}
               onChange={(e) => setFormData({ ...formData, alternatePhone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
       </div>
 
       {/* Address */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Address</h3>
+      <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Address</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Physical Address
             </label>
             <textarea
               rows={2}
               value={formData.physicalAddress}
               onChange={(e) => setFormData({ ...formData, physicalAddress: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               City
             </label>
             <input
               type="text"
               value={formData.city}
               onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Province
             </label>
             <select
               value={formData.province}
               onChange={(e) => setFormData({ ...formData, province: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Province</option>
               {SA_PROVINCES.map((province) => (
@@ -318,73 +318,73 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Postal Code
             </label>
             <input
               type="text"
               value={formData.postalCode}
               onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
       </div>
 
       {/* Banking Details */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Banking Details</h3>
+      <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Banking Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Bank Name
             </label>
             <input
               type="text"
               value={formData.bankName}
               onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Account Number
             </label>
             <input
               type="text"
               value={formData.accountNumber}
               onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Branch Code
             </label>
             <input
               type="text"
               value={formData.branchCode}
               onChange={(e) => setFormData({ ...formData, branchCode: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
       </div>
 
       {/* Status */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Status</h3>
+      <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Status</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Contractor Status
             </label>
             <select
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {CONTRACTOR_STATUSES.map((status) => (
                 <option key={status.value} value={status.value}>
@@ -395,13 +395,13 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Compliance Status
             </label>
             <select
               value={formData.complianceStatus}
               onChange={(e) => setFormData({ ...formData, complianceStatus: e.target.value as any })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {COMPLIANCE_STATUSES.map((status) => (
                 <option key={status.value} value={status.value}>
@@ -426,17 +426,17 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
       </div>
 
       {/* Notes */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
+      <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Additional Information</h3>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
             Notes
           </label>
           <textarea
             rows={4}
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Any additional notes about this contractor..."
           />
         </div>

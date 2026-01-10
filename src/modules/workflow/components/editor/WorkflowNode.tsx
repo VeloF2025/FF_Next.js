@@ -214,8 +214,8 @@ const TaskNode = memo(({ data, isSelected, isDragging }: {
       case 'critical': return 'bg-red-500';
       case 'high': return 'bg-orange-500';
       case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-gray-400';
-      default: return 'bg-gray-400';
+      case 'low': return 'bg-[var(--ff-text-tertiary)]';
+      default: return 'bg-[var(--ff-text-tertiary)]';
     }
   };
 
@@ -303,9 +303,9 @@ export const WorkflowNode = memo(({
       {NodeComponent}
       
       {/* Connection Points */}
-      <div className="absolute -left-2 top-1/2 w-4 h-4 bg-white border-2 border-gray-300 rounded-full transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity" 
+      <div className="absolute -left-2 top-1/2 w-4 h-4 bg-[var(--ff-bg-secondary)] border-2 border-[var(--ff-border-light)] rounded-full transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
            title="Input connection point" />
-      <div className="absolute -right-2 top-1/2 w-4 h-4 bg-white border-2 border-gray-300 rounded-full transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity" 
+      <div className="absolute -right-2 top-1/2 w-4 h-4 bg-[var(--ff-bg-secondary)] border-2 border-[var(--ff-border-light)] rounded-full transform -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
            title="Output connection point" />
     </div>
   );

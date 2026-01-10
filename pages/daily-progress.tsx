@@ -108,10 +108,10 @@ export default function DailyProgressPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed': return 'bg-green-500/20 text-green-400';
+      case 'in_progress': return 'bg-blue-500/20 text-blue-400';
+      case 'pending': return 'bg-yellow-500/20 text-yellow-400';
+      default: return 'bg-gray-500/20 text-gray-400';
     }
   };
 
@@ -139,15 +139,15 @@ export default function DailyProgressPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">Daily Progress</h1>
-            <p className="text-gray-600">Track today's field operations and team performance</p>
+            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Daily Progress</h1>
+            <p className="text-[var(--ff-text-secondary)]">Track today's field operations and team performance</p>
           </div>
           <div className="flex gap-3">
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-2 border rounded-lg"
+              className="px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
             />
             <Button onClick={refreshData} disabled={loading}>
               {loading ? 'Refreshing...' : 'Refresh'}
@@ -157,70 +157,70 @@ export default function DailyProgressPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Completion Rate</p>
-                  <p className="text-2xl font-bold">{stats.completionRate}%</p>
-                  <p className="text-xs text-green-600 mt-1">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Completion Rate</p>
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.completionRate}%</p>
+                  <p className="text-xs text-green-400 mt-1">
                     +5% from yesterday
                   </p>
                 </div>
-                <div className="bg-green-100 p-3 rounded-full">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
+                <div className="bg-green-500/20 p-3 rounded-full">
+                  <TrendingUp className="h-6 w-6 text-green-400" />
                 </div>
               </div>
               <Progress value={stats.completionRate} className="mt-3" />
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Tasks Today</p>
-                  <p className="text-2xl font-bold">{stats.totalTasks}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Tasks Today</p>
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.totalTasks}</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                     {stats.completedTasks} completed
                   </p>
                 </div>
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <CheckCircle className="h-6 w-6 text-blue-600" />
+                <div className="bg-blue-500/20 p-3 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Active Teams</p>
-                  <p className="text-2xl font-bold">{stats.activeTeams}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Active Teams</p>
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.activeTeams}</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                     Across {stats.activeProjects} projects
                   </p>
                 </div>
-                <div className="bg-purple-100 p-3 rounded-full">
-                  <Users className="h-6 w-6 text-purple-600" />
+                <div className="bg-purple-500/20 p-3 rounded-full">
+                  <Users className="h-6 w-6 text-purple-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Hours Worked</p>
-                  <p className="text-2xl font-bold">{stats.hoursWorked}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Hours Worked</p>
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.hoursWorked}</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                     Combined team hours
                   </p>
                 </div>
-                <div className="bg-orange-100 p-3 rounded-full">
-                  <Clock className="h-6 w-6 text-orange-600" />
+                <div className="bg-orange-500/20 p-3 rounded-full">
+                  <Clock className="h-6 w-6 text-orange-400" />
                 </div>
               </div>
             </CardContent>
@@ -240,24 +240,24 @@ export default function DailyProgressPage() {
             <CardContent className="space-y-4">
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">Completed</span>
-                  <span className="text-sm font-medium">{stats.completedTasks}</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Completed</span>
+                  <span className="text-sm font-medium text-[var(--ff-text-primary)]">{stats.completedTasks}</span>
                 </div>
-                <Progress value={(stats.completedTasks / stats.totalTasks) * 100} className="h-2 bg-green-100" />
+                <Progress value={(stats.completedTasks / stats.totalTasks) * 100} className="h-2 bg-green-500/20" />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">In Progress</span>
-                  <span className="text-sm font-medium">{stats.inProgressTasks}</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">In Progress</span>
+                  <span className="text-sm font-medium text-[var(--ff-text-primary)]">{stats.inProgressTasks}</span>
                 </div>
-                <Progress value={(stats.inProgressTasks / stats.totalTasks) * 100} className="h-2 bg-blue-100" />
+                <Progress value={(stats.inProgressTasks / stats.totalTasks) * 100} className="h-2 bg-blue-500/20" />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">Pending</span>
-                  <span className="text-sm font-medium">{stats.pendingTasks}</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Pending</span>
+                  <span className="text-sm font-medium text-[var(--ff-text-primary)]">{stats.pendingTasks}</span>
                 </div>
-                <Progress value={(stats.pendingTasks / stats.totalTasks) * 100} className="h-2 bg-yellow-100" />
+                <Progress value={(stats.pendingTasks / stats.totalTasks) * 100} className="h-2 bg-yellow-500/20" />
               </div>
             </CardContent>
           </Card>
@@ -273,15 +273,15 @@ export default function DailyProgressPage() {
             <CardContent>
               <div className="space-y-3">
                 {todaysTasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                  <div key={task.id} className="flex items-center justify-between p-3 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]">
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
                         <Badge className={getPriorityColor(task.priority)} variant="default">
                           {task.priority}
                         </Badge>
-                        <h4 className="font-medium">{task.title}</h4>
+                        <h4 className="font-medium text-[var(--ff-text-primary)]">{task.title}</h4>
                       </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 mt-2 text-sm text-[var(--ff-text-secondary)]">
                         <span>{task.project}</span>
                         <span>•</span>
                         <span>{task.assignee}</span>
@@ -303,7 +303,7 @@ export default function DailyProgressPage() {
                       {task.status === 'in_progress' && (
                         <div className="w-24">
                           <Progress value={task.progress} className="h-2" />
-                          <span className="text-xs text-gray-500">{task.progress}%</span>
+                          <span className="text-xs text-[var(--ff-text-tertiary)]">{task.progress}%</span>
                         </div>
                       )}
                       <Badge className={getStatusColor(task.status)} variant="secondary">
@@ -318,43 +318,43 @@ export default function DailyProgressPage() {
         </div>
 
         {/* Project Performance */}
-        <Card>
+        <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-[var(--ff-text-primary)]">
               <Target className="h-5 w-5" />
               Project Performance Today
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-[var(--ff-border-light)] rounded-lg">
                 <div>
-                  <h4 className="font-medium">Sandton Network Upgrade</h4>
-                  <p className="text-sm text-gray-600 mt-1">15 tasks completed • 3 in progress</p>
+                  <h4 className="font-medium text-[var(--ff-text-primary)]">Sandton Network Upgrade</h4>
+                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">15 tasks completed • 3 in progress</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-green-600">83%</p>
-                  <p className="text-xs text-gray-500">Daily target achieved</p>
+                  <p className="text-2xl font-bold text-green-400">83%</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)]">Daily target achieved</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-[var(--ff-border-light)] rounded-lg">
                 <div>
-                  <h4 className="font-medium">Midrand Infrastructure</h4>
-                  <p className="text-sm text-gray-600 mt-1">10 tasks completed • 5 in progress</p>
+                  <h4 className="font-medium text-[var(--ff-text-primary)]">Midrand Infrastructure</h4>
+                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">10 tasks completed • 5 in progress</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-blue-600">67%</p>
-                  <p className="text-xs text-gray-500">Daily target achieved</p>
+                  <p className="text-2xl font-bold text-blue-400">67%</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)]">Daily target achieved</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center justify-between p-4 border border-[var(--ff-border-light)] rounded-lg">
                 <div>
-                  <h4 className="font-medium">Rosebank Residential</h4>
-                  <p className="text-sm text-gray-600 mt-1">7 tasks completed • 4 in progress</p>
+                  <h4 className="font-medium text-[var(--ff-text-primary)]">Rosebank Residential</h4>
+                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">7 tasks completed • 4 in progress</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-yellow-600">58%</p>
-                  <p className="text-xs text-gray-500">Daily target achieved</p>
+                  <p className="text-2xl font-bold text-yellow-400">58%</p>
+                  <p className="text-xs text-[var(--ff-text-tertiary)]">Daily target achieved</p>
                 </div>
               </div>
             </div>

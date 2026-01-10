@@ -11,20 +11,20 @@ export function SOWStatusBadge({ status }: SOWStatusBadgeProps) {
       case DocumentStatus.APPROVED:
         return {
           icon: CheckCircle,
-          className: 'bg-green-100 text-green-800',
+          className: 'bg-green-500/20 text-green-400',
           label: 'Approved'
         };
       case DocumentStatus.REJECTED:
         return {
           icon: AlertCircle,
-          className: 'bg-red-100 text-red-800',
+          className: 'bg-red-500/20 text-red-400',
           label: 'Rejected'
         };
       case DocumentStatus.PENDING:
       default:
         return {
           icon: Clock,
-          className: 'bg-yellow-100 text-yellow-800',
+          className: 'bg-yellow-500/20 text-yellow-400',
           label: 'Pending'
         };
     }

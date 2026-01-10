@@ -20,12 +20,12 @@ export function LoginFields({
     <div className="space-y-4">
       {/* Email field */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="email" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
           Email address
         </label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Mail className="h-5 w-5 text-gray-400" />
+            <Mail className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
           </div>
           <input
             id="email"
@@ -35,7 +35,7 @@ export function LoginFields({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full pl-10 pr-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter your email"
           />
         </div>
@@ -43,12 +43,12 @@ export function LoginFields({
 
       {/* Password field */}
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="password" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
           Password
         </label>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Lock className="h-5 w-5 text-gray-400" />
+            <Lock className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
           </div>
           <input
             id="password"
@@ -58,7 +58,7 @@ export function LoginFields({
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="block w-full pl-10 pr-10 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter your password"
             minLength={6}
           />
@@ -68,9 +68,9 @@ export function LoginFields({
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
           >
             {showPassword ? (
-              <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <EyeOff className="h-5 w-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]" />
             ) : (
-              <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              <Eye className="h-5 w-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]" />
             )}
           </button>
         </div>
@@ -85,9 +85,9 @@ export function LoginFields({
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-[var(--ff-border-light)] rounded"
           />
-          <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
+          <label htmlFor="rememberMe" className="ml-2 block text-sm text-[var(--ff-text-primary)]">
             Remember me
           </label>
         </div>

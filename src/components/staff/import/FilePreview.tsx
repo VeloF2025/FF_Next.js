@@ -7,25 +7,25 @@ import { FilePreviewProps } from './StaffImportTypes';
 
 export function FilePreview({ file, isImporting, onImport, onCancel }: FilePreviewProps) {
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
+    <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <FileSpreadsheet className="h-8 w-8 text-green-600" />
+          <FileSpreadsheet className="h-8 w-8 text-green-400" />
           <div>
-            <p className="font-medium text-gray-900">{file.name}</p>
-            <p className="text-sm text-gray-500">
+            <p className="font-medium text-[var(--ff-text-primary)]">{file.name}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">
               {(file.size / 1024).toFixed(2)} KB
             </p>
           </div>
         </div>
         <button
           onClick={onCancel}
-          className="p-1 text-gray-400 hover:text-gray-600"
+          className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
         >
           <X className="h-5 w-5" />
         </button>
       </div>
-      
+
       <div className="flex gap-3">
         <button
           onClick={onImport}
@@ -46,7 +46,7 @@ export function FilePreview({ file, isImporting, onImport, onCancel }: FilePrevi
         </button>
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
         >
           Cancel
         </button>

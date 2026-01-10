@@ -82,20 +82,20 @@ export function SOWProjectSelector({ onProjectSelect, className = '' }: SOWProje
         <div className="flex items-center gap-2 flex-1 text-left">
           {selectedProject ? (
             <>
-              <Building2 className="h-4 w-4 text-gray-500" />
+              <Building2 className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 truncate">
+                <div className="font-medium text-[var(--ff-text-primary)] truncate">
                   {selectedProject.name}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-[var(--ff-text-secondary)]">
                   {selectedProject.code}
                 </div>
               </div>
             </>
           ) : (
             <>
-              <Building2 className="h-4 w-4 text-gray-500" />
-              <span className="text-gray-500">Select a project</span>
+              <Building2 className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+              <span className="text-[var(--ff-text-tertiary)]">Select a project</span>
             </>
           )}
         </div>
@@ -104,16 +104,16 @@ export function SOWProjectSelector({ onProjectSelect, className = '' }: SOWProje
       </Button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-          <div className="p-3 border-b border-gray-100">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-lg z-50">
+          <div className="p-3 border-b border-[var(--ff-border-light)]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 autoFocus
               />
             </div>
@@ -121,7 +121,7 @@ export function SOWProjectSelector({ onProjectSelect, className = '' }: SOWProje
 
           <div className="max-h-64 overflow-y-auto">
             {isLoadingProjects ? (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">
+              <div className="px-4 py-6 text-center text-[var(--ff-text-secondary)] text-sm">
                 <div className="flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading projects...
@@ -133,24 +133,24 @@ export function SOWProjectSelector({ onProjectSelect, className = '' }: SOWProje
                   <button
                     key={project.id}
                     onClick={() => handleProjectSelect(project)}
-                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                    className={`w-full px-4 py-3 text-left hover:bg-[var(--ff-bg-hover)] transition-colors ${
                       selectedProject?.id === project.id
-                        ? 'bg-primary-50 text-primary-700' 
-                        : 'text-gray-900'
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-[var(--ff-text-primary)]'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-gray-500" />
+                      <Building2 className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
                       <div>
                         <div className="font-medium">{project.name}</div>
-                        <div className="text-sm text-gray-500">{project.code || 'No code'}</div>
+                        <div className="text-sm text-[var(--ff-text-secondary)]">{project.code || 'No code'}</div>
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
             ) : searchTerm ? (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">
+              <div className="px-4 py-6 text-center text-[var(--ff-text-secondary)] text-sm">
                 No projects found matching "{searchTerm}"
               </div>
             ) : loadError ? (
@@ -164,14 +164,14 @@ export function SOWProjectSelector({ onProjectSelect, className = '' }: SOWProje
                 </button>
               </div>
             ) : (
-              <div className="px-4 py-6 text-center text-gray-500 text-sm">
+              <div className="px-4 py-6 text-center text-[var(--ff-text-secondary)] text-sm">
                 No active projects available
               </div>
             )}
           </div>
 
-          <div className="p-3 border-t border-gray-100 bg-gray-50">
-            <div className="flex justify-between items-center text-xs text-gray-500">
+          <div className="p-3 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+            <div className="flex justify-between items-center text-xs text-[var(--ff-text-secondary)]">
               <span>
                 {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''} available
               </span>

@@ -49,7 +49,7 @@ export function MeetingForm({ meeting, isOpen, onClose, onSave }: MeetingFormPro
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <MeetingFormHeader isEditing={!!meeting} onClose={onClose} />
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">

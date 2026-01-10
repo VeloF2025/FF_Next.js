@@ -41,10 +41,10 @@ export function PhotoGallery({ photos, dr_number }: PhotoGalleryProps) {
 
   if (photos.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 bg-gray-50 dark:bg-gray-700 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+      <div className="flex items-center justify-center h-64 bg-[var(--ff-bg-tertiary)] rounded-lg border-2 border-dashed border-[var(--ff-border-light)]">
         <div className="text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-lg">No photos available for {dr_number}</p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">Photos will appear here once uploaded</p>
+          <p className="text-[var(--ff-text-secondary)] text-lg">No photos available for {dr_number}</p>
+          <p className="text-[var(--ff-text-tertiary)] text-sm mt-2">Photos will appear here once uploaded</p>
         </div>
       </div>
     );
@@ -57,7 +57,7 @@ export function PhotoGallery({ photos, dr_number }: PhotoGalleryProps) {
         {photos.map((photo, index) => (
           <button
             key={photo.id}
-            className="relative aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 dark:hover:ring-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all group"
+            className="relative aspect-square bg-[var(--ff-bg-tertiary)] rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all group"
             onClick={() => openLightbox(index)}
             title={`${photo.stepLabel}\n${photo.filename}\n${photo.timestamp ? new Date(photo.timestamp).toLocaleString() : 'No timestamp'}`}
             aria-label={`View ${photo.stepLabel} - ${photo.filename}`}
@@ -78,9 +78,9 @@ export function PhotoGallery({ photos, dr_number }: PhotoGalleryProps) {
             <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center p-4 pointer-events-none" aria-hidden="true">
               <div className="text-white text-center space-y-1">
                 <p className="text-sm font-semibold">{photo.stepLabel}</p>
-                <p className="text-xs text-gray-300 break-all">{photo.filename}</p>
+                <p className="text-xs text-[var(--ff-text-tertiary)] break-all">{photo.filename}</p>
                 {photo.timestamp && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-[var(--ff-text-tertiary)]">
                     {new Date(photo.timestamp).toLocaleString()}
                   </p>
                 )}
@@ -158,10 +158,10 @@ export function PhotoGallery({ photos, dr_number }: PhotoGalleryProps) {
             {photos[selectedPhotoIndex] && (
               <div className="mt-4 text-center text-white">
                 <p className="text-lg font-semibold">{photos[selectedPhotoIndex].stepLabel}</p>
-                <p className="text-sm text-gray-300 mt-1">
+                <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">
                   {selectedPhotoIndex + 1} of {photos.length}
                 </p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                   {photos[selectedPhotoIndex].filename}
                 </p>
               </div>

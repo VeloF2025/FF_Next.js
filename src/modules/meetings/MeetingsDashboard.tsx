@@ -138,8 +138,8 @@ export function MeetingsDashboard() {
       {/* Header */}
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Meetings Management</h1>
-          <p className="text-gray-600">Schedule, manage and track all meetings</p>
+          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)] mb-2">Meetings Management</h1>
+          <p className="text-[var(--ff-text-secondary)]">Schedule, manage and track all meetings</p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
@@ -154,7 +154,7 @@ export function MeetingsDashboard() {
               onClick={handleStartVideoMeeting}
               disabled={isCreatingRoom}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isCreatingRoom
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
                 : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
             >
@@ -163,7 +163,7 @@ export function MeetingsDashboard() {
             </button>
             <Link
               href="/recordings"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               <Film className="w-4 h-4" />
               Recordings
@@ -172,7 +172,7 @@ export function MeetingsDashboard() {
               onClick={handleSync}
               disabled={isSyncing}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isSyncing
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
             >
@@ -203,7 +203,7 @@ export function MeetingsDashboard() {
                     onClick={() => setActiveTab(tab)}
                     className={`py-4 px-1 border-b-2 font-medium text-sm capitalize ${activeTab === tab
                       ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                       }`}
                   >
                     {tab}

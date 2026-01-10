@@ -55,26 +55,26 @@ interface DepartmentCardProps {
 
 function DepartmentCard({ department, onEdit, onDelete }: DepartmentCardProps) {
   return (
-    <div className="bg-white rounded-lg p-4 border border-gray-200">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
       <div className="flex justify-between items-start mb-2">
-        <h3 className="font-semibold text-gray-900">{department.name}</h3>
+        <h3 className="font-semibold text-[var(--ff-text-primary)]">{department.name}</h3>
         <div className="flex space-x-1">
           <button
             onClick={() => onEdit(department)}
-            className="p-1 text-gray-400 hover:text-blue-600"
+            className="p-1 text-[var(--ff-text-tertiary)] hover:text-blue-600"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete(department.id)}
-            className="p-1 text-gray-400 hover:text-red-600"
+            className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-600"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
-      
-      <div className="text-sm text-gray-600 space-y-1">
+
+      <div className="text-sm text-[var(--ff-text-secondary)] space-y-1">
         {department.headEmployeeName && (
           <p>Head: {department.headEmployeeName}</p>
         )}
@@ -83,7 +83,7 @@ function DepartmentCard({ department, onEdit, onDelete }: DepartmentCardProps) {
         )}
         <p>Employees: {department.employeeCount || 0}</p>
         <p className={`inline-block px-2 py-1 rounded text-xs ${
-          department.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          department.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
         }`}>
           {department.isActive ? 'Active' : 'Inactive'}
         </p>

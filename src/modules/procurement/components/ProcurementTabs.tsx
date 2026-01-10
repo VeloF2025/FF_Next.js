@@ -1,12 +1,13 @@
 // 🟢 WORKING: Comprehensive procurement tabs with badges and state management
 import { useMemo } from 'react';
-import { 
+import {
   BarChart3,
-  FileText, 
-  Send, 
-  ShoppingCart, 
+  FileText,
+  Send,
+  ShoppingCart,
   Quote,
   Package,
+  MapPin,
   Truck,
   ClipboardList,
   Lock
@@ -91,18 +92,26 @@ export function ProcurementTabs({
       requiresProject: true,
       permission: 'canViewPurchaseOrders'
     },
-    { 
-      id: 'stock', 
-      label: 'Stock Movement', 
-      icon: Package, 
+    {
+      id: 'stock',
+      label: 'Stock Movement',
+      icon: Package,
       path: '/app/procurement/stock',
       requiresProject: true,
       permission: 'canAccessStock'
     },
-    { 
-      id: 'suppliers', 
-      label: 'Suppliers', 
-      icon: Truck, 
+    {
+      id: 'field-stock',
+      label: 'Field Stock',
+      icon: MapPin,
+      path: '/procurement/field-stock',
+      requiresProject: false,
+      permission: 'canAccessFieldStock'
+    },
+    {
+      id: 'suppliers',
+      label: 'Suppliers',
+      icon: Truck,
       path: '/app/procurement/suppliers',
       requiresProject: false,
       permission: 'canViewSuppliers'
@@ -167,20 +176,20 @@ export function ProcurementTabs({
     };
   };
 
-  // Get badge styles based on type
+  // Get badge styles based on type - dark mode compatible
   const getBadgeStyles = (type?: 'info' | 'warning' | 'error' | 'success') => {
     const baseStyles = 'ml-2 px-2 py-0.5 text-xs font-medium rounded-full min-w-[1.5rem] text-center';
-    
+
     switch (type) {
       case 'error':
-        return `${baseStyles} bg-red-100 text-red-700`;
+        return `${baseStyles} bg-red-500/20 text-red-400`;
       case 'warning':
-        return `${baseStyles} bg-yellow-100 text-yellow-700`;
+        return `${baseStyles} bg-yellow-500/20 text-yellow-400`;
       case 'success':
-        return `${baseStyles} bg-green-100 text-green-700`;
+        return `${baseStyles} bg-green-500/20 text-green-400`;
       case 'info':
       default:
-        return `${baseStyles} bg-blue-100 text-blue-700`;
+        return `${baseStyles} bg-blue-500/20 text-blue-400`;
     }
   };
 
@@ -200,10 +209,10 @@ export function ProcurementTabs({
               relative py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap
               flex items-center gap-2 transition-all duration-200 min-w-fit
               ${isActive
-                ? 'border-primary-500 text-primary-600 bg-primary-50'
+                ? 'border-purple-500 text-purple-400 bg-purple-500/10'
                 : isDisabled || !hasPermission
-                ? 'border-transparent text-gray-400 cursor-not-allowed'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                ? 'border-transparent text-[var(--ff-text-tertiary)] cursor-not-allowed'
+                : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
               }
               ${isLoading ? 'opacity-50 cursor-wait' : ''}
               disabled:opacity-50
@@ -220,7 +229,7 @@ export function ProcurementTabs({
             {/* Icon */}
             <div className="flex items-center gap-1">
               <Icon className="h-4 w-4 flex-shrink-0" />
-              {showLock && <Lock className="h-3 w-3 text-gray-400" />}
+              {showLock && <Lock className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
             </div>
             
             {/* Label */}
