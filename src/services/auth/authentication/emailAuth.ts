@@ -1,9 +1,9 @@
 /**
  * Email Authentication
- * Migrated from Firebase to Clerk with development bypass
+ * Mock implementation for development mode
  */
 
-import { clerkAuth, User as ClerkUser } from '../clerkAuth';
+import { clerkAuth, User as ClerkUser } from '../mockAuth';
 import { authConfig } from '@/config/auth.config';
 import { LoginCredentials, RegisterCredentials, PasswordResetRequest, User } from '@/types/auth.types';
 import { createUserProfile, getUserProfile, updateLastLogin } from '../userService';

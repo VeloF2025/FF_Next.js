@@ -4,7 +4,7 @@
  */
 
 import { ProcurementContext } from '@/types/procurement/base.types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useProject } from '@/hooks/useProject';
 
 interface ProcurementContextResult {
@@ -15,17 +15,17 @@ interface ProcurementContextResult {
 }
 
 export function useProcurementContext(): ProcurementContextResult {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { currentProject, isLoading: projectLoading } = useProject();
 
   const isLoading = authLoading || projectLoading;
-  
-  const error = !user ? 'User not authenticated' : 
+
+  const error = !user ? 'User not authenticated' :
                 !currentProject ? 'No project selected' : null;
 
   const context: ProcurementContext | null = user && currentProject ? {
-    userId: user.id,
-    userName: user.name || user.email || 'Unknown User',
+    userId: user.uid,
+    userName: user.displayName || user.email || 'Unknown User',
     projectId: currentProject.id,
     projectName: currentProject.name,
     permissions: {

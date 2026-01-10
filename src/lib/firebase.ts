@@ -1,7 +1,7 @@
 /**
  * Firebase Configuration - Mock Implementation
- * This is a mock implementation since the app has migrated to Clerk authentication.
- * Firebase references are kept for backward compatibility but don't perform actual operations.
+ * This is a mock implementation - Firebase has been removed.
+ * References are kept for backward compatibility but don't perform actual operations.
  */
 
 // Mock Firebase app
@@ -36,8 +36,8 @@ export const auth = {
   currentUser: null,
   onAuthStateChanged: () => () => {},
   signOut: () => Promise.resolve(),
-  signInWithEmailAndPassword: () => Promise.reject(new Error('Use Clerk authentication')),
-  createUserWithEmailAndPassword: () => Promise.reject(new Error('Use Clerk authentication'))
+  signInWithEmailAndPassword: () => Promise.reject(new Error('Use AuthContext for authentication')),
+  createUserWithEmailAndPassword: () => Promise.reject(new Error('Use AuthContext for authentication'))
 };
 
 // Mock Storage

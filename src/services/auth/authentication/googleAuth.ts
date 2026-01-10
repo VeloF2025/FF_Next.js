@@ -1,9 +1,9 @@
 /**
  * Google Authentication
- * Google OAuth authentication methods using Clerk
+ * Google OAuth authentication methods (mock implementation)
  */
 
-import { clerkAuth } from '../clerkAuth';
+import { clerkAuth } from '../mockAuth';
 import { authConfig } from '@/config/auth.config';
 import { User } from '@/types/auth.types';
 import { getUserProfile, updateLastLogin } from '../userService';
