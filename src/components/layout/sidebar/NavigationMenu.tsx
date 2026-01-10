@@ -1,5 +1,7 @@
+'use client';
+
 import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { usePathname } from 'next/navigation';
 import type { NavSection, SidebarStyles } from './types';
 import type { ThemeConfig } from '@/types/theme.types';
 
@@ -11,8 +13,7 @@ interface NavigationMenuProps {
 }
 
 export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, themeConfig }: NavigationMenuProps) {
-  const router = useRouter();
-  const pathname = router.pathname;
+  const pathname = usePathname();
 
   return (
     <>
