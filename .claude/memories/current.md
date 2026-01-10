@@ -30,15 +30,22 @@
 - [x] Removed `legacyBehavior` and nested `<a>` tag pattern
 - [x] Commit: `28d90f6`
 
+### Suppliers Page Fix
+- [x] Fixed /suppliers page crashing with "useNavigate() may be used only in context of <Router>"
+- [x] Root cause: `SupplierCard.tsx` using `useNavigate` from `react-router-dom`
+- [x] Changed to `useRouter` from `next/router` and `router.push()`
+- [x] Commit: `e943696`
+
 ---
 
 ## Key Commits
 
 | Commit | Description |
 |--------|-------------|
+| `e943696` | fix(suppliers): replace react-router useNavigate with Next.js useRouter |
+| `c926f8f` | feat(nav): add Field Stock Control to sidebar menu |
 | `28d90f6` | fix(sidebar): fix navigation by using Pages Router API |
 | `f125029` | feat: Field Stock Control (PRD-027) + Complete Dark Mode |
-| `342e88d` | feat(field-stock): Implement PRD-027 Field Stock Control |
 
 ---
 
