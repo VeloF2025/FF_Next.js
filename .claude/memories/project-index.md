@@ -1,6 +1,6 @@
 # FibreFlow Project Index
 
-**Last Updated**: 2026-01-09
+**Last Updated**: 2026-01-10
 
 ---
 
@@ -10,9 +10,10 @@
 |-------|-------|
 | Name | FibreFlow Next.js |
 | Type | Fiber network project management |
-| Framework | Next.js 14+ (App Router) |
+| Framework | Next.js 14+ (Pages Router) |
 | Database | Neon PostgreSQL |
 | Auth | Clerk |
+| Dark Mode | ✅ Complete (CSS variable system) |
 
 ---
 
@@ -61,6 +62,12 @@ src/modules/{name}/
 - Source: WhatsApp groups
 - Module: `src/modules/wa-monitor/`
 
+### Field Stock Tables (PRD-027)
+- `field_stock_items` - Stock items at field locations
+- `field_stock_transactions` - All stock movements
+- `field_stock_requisitions` - Material requests
+- `field_stock_returns` - Returns to warehouse
+
 ### Other Key Tables
 - `projects` - Project definitions
 - `contractors` - Contractor records
@@ -91,6 +98,28 @@ pages/api/contractors/[id]/stages.ts     // Fails in production
 pages/api/contractors-stages.ts          // Works everywhere
 ```
 
+### Pages Router vs App Router (CRITICAL)
+This is a **Pages Router** app. Don't mix APIs:
+```tsx
+// ✅ CORRECT (Pages Router)
+import { useRouter } from 'next/router';
+const router = useRouter();
+const pathname = router.pathname;
+
+// ❌ WRONG (App Router - causes navigation issues)
+import { usePathname } from 'next/navigation';
+const pathname = usePathname();
+```
+
+### Next.js Link Component
+```tsx
+// ✅ MODERN - apply styles directly
+<Link href="/page" className="...">Text</Link>
+
+// ❌ OLD - avoid legacyBehavior
+<Link href="/page" legacyBehavior passHref><a>Text</a></Link>
+```
+
 ---
 
 ## Environments
@@ -103,6 +132,12 @@ pages/api/contractors-stages.ts          // Works everywhere
 ---
 
 ## Important Modules
+
+### field-stock (New - PRD-027)
+- Field stock tracking and management
+- 7 tabs: Overview, Items, Transactions, Requisitions, Returns, Transfers, Settings
+- API: `/api/procurement/field-stock/*`
+- Tables: `field_stock_items`, `field_stock_transactions`, `field_stock_requisitions`, `field_stock_returns`
 
 ### wa-monitor (Isolated)
 - Fully self-contained, zero external dependencies

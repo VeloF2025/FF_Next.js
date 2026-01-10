@@ -1,188 +1,146 @@
 # FibreFlow Current Session Progress
 
-**Last Updated**: 2026-01-09
-**Session Type**: PAI Integration + GitHub Workflow + TDD Enforcement + Module Documentation
+**Last Updated**: 2026-01-10
+**Session Type**: Field Stock Control + Dark Mode Complete + Navigation Fix
 
 ---
 
 ## Completed This Session
 
-### PAI Integration (Phases 1-3)
-- [x] CORE skill with FF-specific response format
-- [x] Memory system (current.md, project-index.md)
-- [x] Protocols: NLNH, DGTS, Zero Tolerance
-- [x] Skills: typescript-fixer, boss-orchestrator, fabric, research, observability, auto
-- [x] Hooks: pre-commit, expert-load, token-tracker
-- [x] expertise.yaml with FF patterns and anti-patterns
+### Field Stock Control (PRD-027)
+- [x] Full implementation of field stock tracking system
+- [x] 7 tabs: Overview, Stock Items, Transactions, Requisitions, Returns, Transfers, Settings
+- [x] Database migrations: 027-031 (core, transactions, returns, drops columns, fixes)
+- [x] API endpoints: `/api/procurement/field-stock/*`
+- [x] E2E tests for all 7 tabs
+- [x] Fixed infinite loop bugs in 5 React hooks using `useRef` pattern
 
-### GitHub Workflow
-- [x] CLI helpers: scripts/gh-workflows.sh
-- [x] Slash commands: /pr, /review, /sync, /tdd
-- [x] CLAUDE.md updated with GitHub section
+### Dark Mode Complete (Phase 6)
+- [x] Converted 314 files to CSS variable system
+- [x] All pages/directory files converted
+- [x] All src/components/ converted
+- [x] All src/modules/ (34 modules) converted
+- [x] WA Monitor MUI components updated
+- [x] PR #33 merged with squash
 
-### TDD Enforcement
-- [x] Protocol: .claude/protocols/tdd-enforcement.md
-- [x] Skill: .claude/skills/tdd/SKILL.md
-- [x] Hook: .claude/hooks/tdd-reminder.ts
-- [x] Command: .claude/commands/tdd.md
-- [x] Template: tests/specs/_TEMPLATE.spec.md
-- [x] CLAUDE.md updated with TDD section
+### Sidebar Navigation Fix
+- [x] Fixed navigation not working on /staff and /clients pages
+- [x] Root cause: `NavigationMenu.tsx` using App Router API in Pages Router app
+- [x] Changed `usePathname` (next/navigation) → `useRouter` (next/router)
+- [x] Removed `legacyBehavior` and nested `<a>` tag pattern
+- [x] Commit: `28d90f6`
 
-### Module Documentation System
-- [x] Created .claude/modules/ directory with 34 module profiles
-- [x] Created _index.yaml with module categories and quick reference
-- [x] Created module-context skill for loading module context
-- [x] Comprehensive profiles include:
-  - Purpose, status, complexity
-  - Internal and external dependencies
-  - Database tables and key queries
-  - API endpoints
-  - Services with methods
-  - Components and hooks
-  - Patterns and gotchas
+---
+
+## Key Commits
+
+| Commit | Description |
+|--------|-------------|
+| `28d90f6` | fix(sidebar): fix navigation by using Pages Router API |
+| `f125029` | feat: Field Stock Control (PRD-027) + Complete Dark Mode |
+| `342e88d` | feat(field-stock): Implement PRD-027 Field Stock Control |
 
 ---
 
 ## Files Created/Modified
 
-### New Files
+### Field Stock Control
 ```
-.claude/
-├── commands/
-│   ├── pr.md
-│   ├── review.md
-│   ├── sync.md
-│   └── tdd.md
+pages/api/procurement/field-stock/
+├── dashboard/
+├── items/
+├── transactions/
+├── requisitions/
+├── returns/
+└── transfers/
+
+pages/procurement/field-stock/
+├── index.tsx
+└── [tab].tsx
+
+src/modules/procurement/field-stock/
+├── components/
 ├── hooks/
-│   ├── expert-load.ts
-│   ├── pre-commit.ts
-│   ├── tdd-reminder.ts
-│   └── token-tracker.ts
-├── memories/
-│   ├── current.md
-│   └── project-index.md
-├── protocols/
-│   ├── dgts-validation.md
-│   ├── nlnh-protocol.md
-│   ├── tdd-enforcement.md
-│   └── zero-tolerance-quality.md
-├── skills/
-│   ├── auto/SKILL.md
-│   ├── boss-orchestrator/SKILL.md
-│   ├── CORE/SKILL.md
-│   ├── fabric/SKILL.md
-│   ├── observability/SKILL.md
-│   ├── research/SKILL.md
-│   ├── tdd/SKILL.md
-│   └── typescript-fixer/SKILL.md
-├── expertise.yaml
-├── settings.json
-└── settings.local.json
+├── services/
+└── types/
 
-scripts/
-└── gh-workflows.sh
-
-tests/
-└── specs/
-    └── _TEMPLATE.spec.md
+scripts/migrations/
+├── 027_field_stock_core.sql
+├── 028_field_stock_transactions.sql
+├── 029_field_stock_returns.sql
+├── 030_drops_stock_columns.sql
+└── 031_field_stock_fixes.sql
 ```
 
-### Modified Files
-- CLAUDE.md - Added GitHub Workflow, TDD, and Protocols sections
-
----
-
-## Ready to Commit
-
-All files are ready. Suggested commit:
-```bash
-git add .claude/ scripts/gh-workflows.sh tests/specs/ CLAUDE.md
-git commit -m "feat: add PAI integration, GitHub workflow, and TDD enforcement
-
-- PAI skills: CORE, tdd, fabric, research, observability, auto
-- Hooks: pre-commit validation, expert-load, tdd-reminder, token-tracker
-- Protocols: NLNH, DGTS, Zero Tolerance, TDD Enforcement
-- GitHub CLI helpers: ff-sync, ff-pr, ff-review, ff-merge
-- Slash commands: /pr, /review, /sync, /tdd
-- Test spec template for TDD workflow
-
-Works with PAI, BMad, Agent-OS, or vanilla Claude Code."
+### Navigation Fix
+```
+src/components/layout/sidebar/NavigationMenu.tsx
 ```
 
 ---
 
-## TDD Workflow Summary
+## Lessons Learned
 
-1. **Spec**: Create requirement (PRD, issue, or story)
-2. **Test Spec**: `/tdd spec "feature-name"` → tests/specs/feature.spec.md
-3. **Generate Tests**: `/tdd generate tests/specs/feature.spec.md`
-4. **Implement**: Write code to pass tests
-5. **Validate**: `/tdd validate` before PR
-6. **PR**: `/pr` with TDD compliance check
+### React Hooks Infinite Loop Prevention
+When using `useEffect` with callback functions that change on every render:
+```tsx
+// ❌ BAD - causes infinite loop
+useEffect(() => {
+  onSelectionChange?.(selected);
+}, [selected, onSelectionChange]);
+
+// ✅ GOOD - use useRef to prevent re-triggers
+const onSelectionChangeRef = useRef(onSelectionChange);
+onSelectionChangeRef.current = onSelectionChange;
+
+useEffect(() => {
+  onSelectionChangeRef.current?.(selected);
+}, [selected]);
+```
+
+### Next.js Pages Router vs App Router
+- Pages Router: Use `useRouter` from `next/router`
+- App Router: Use `usePathname` from `next/navigation`
+- Don't mix them! Causes navigation and hydration issues.
+
+### Next.js Link Component
+```tsx
+// ❌ OLD (legacyBehavior) - can cause issues
+<Link href="/page" legacyBehavior passHref>
+  <a className="...">Text</a>
+</Link>
+
+// ✅ MODERN - apply styles directly to Link
+<Link href="/page" className="...">
+  Text
+</Link>
+```
 
 ---
 
-## Quick Reference
+## Current State
 
-### CLI Commands
-```bash
-source ~/Workspace/FF_Next.js/scripts/gh-workflows.sh
-ff-help  # See all commands
-```
-
-### Slash Commands
-```
-/pr          - Create PR with standards
-/review 123  - Review PR #123
-/sync        - Morning status check
-/tdd spec X  - Create test spec
-/tdd validate - Check TDD compliance
-```
-
-### Hooks (Automatic)
-- SessionStart: Loads FF expertise
-- PreToolUse (Bash): Pre-commit validation on git commit
-- PreToolUse (Write/Edit): TDD reminder for src/ files
-- PostToolUse: Token tracking
+- **Branch**: master
+- **Build**: ✅ Passing
+- **Dark Mode**: ✅ Complete (all 314 files converted)
+- **Field Stock**: ✅ Implemented and tested
+- **Navigation**: ✅ Fixed and working
 
 ---
 
-## Blockers & Questions
+## Next Steps
 
-None currently.
+- [ ] Deploy to production server
+- [ ] Monitor for any dark mode edge cases
+- [ ] Continue with next feature/PRD
 
 ---
 
 ## Context for Next Session
 
-PAI + GitHub + TDD fully integrated. System is ready for use by both Hein and Louis with their preferred methodologies (PAI, BMad, Agent-OS).
+All major work completed:
+1. Field Stock Control fully implemented with E2E tests
+2. Dark Mode converted across entire codebase (CSS variable system)
+3. Sidebar navigation fixed for Pages Router compatibility
 
----
-
-## Dark Mode Phase 6 (2026-01-10)
-
-### Completed
-- [x] Fixed tailwind.config.mjs (`darkMode: 'class'`)
-- [x] Fixed pages/ directory (11 files)
-- [x] Fixed src/components/ (3 batches)
-- [x] Fixed src/modules/ (5 batches - 34 modules total)
-- [x] wa-monitor stat cards - MUI components updated with CSS variables
-
-### WA Monitor Changes Made
-Files modified for dark mode:
-- `src/modules/wa-monitor/components/WaMonitorDashboard.tsx`
-  - Added `sx={{ bgcolor: 'var(--ff-bg-secondary)', color: 'var(--ff-text-primary)' }}` to all MUI Cards
-  - Fixed Typography colors with CSS variables
-  - Fixed TableContainer and TableRow backgrounds
-- `src/modules/wa-monitor/components/WaMonitorFilters.tsx`
-  - Added `inputSx` styling object for MUI inputs
-
-### ⚠️ LESSON LEARNED (Corrected)
-**Browser automation for screenshots is FINE. DOM manipulation is NOT.**
-- ✅ SAFE: Navigate, screenshot, click theme toggle via UI
-- ❌ UNSAFE: `document.documentElement.classList.add('dark')` or `localStorage.setItem()`
-- DOM manipulation before React hydrates causes hydration errors (#418, #423)
-
-### Status
-- [x] wa-monitor dark mode VERIFIED WORKING (2026-01-10)
-- Stat cards now have dark backgrounds in dark mode
+System is stable and ready for production deployment.
