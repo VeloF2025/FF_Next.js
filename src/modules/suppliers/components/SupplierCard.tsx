@@ -1,7 +1,7 @@
-import { useNavigate } from 'react-router-dom';
-import { 
-  Building2, Mail, Phone, MapPin, Star, TrendingUp, 
-  AlertCircle, CheckCircle, Clock, XCircle, MoreVertical 
+import { useRouter } from 'next/router';
+import {
+  Building2, Mail, Phone, MapPin, Star, TrendingUp,
+  AlertCircle, CheckCircle, Clock, XCircle, MoreVertical
 } from 'lucide-react';
 import { Supplier, SupplierStatus } from '@/types/supplier.types';
 
@@ -10,10 +10,10 @@ interface SupplierCardProps {
 }
 
 export function SupplierCard({ supplier }: SupplierCardProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleClick = () => {
-    navigate(`/suppliers/${supplier.id}`);
+    router.push(`/suppliers/${supplier.id}`);
   };
 
   const getStatusIcon = () => {
