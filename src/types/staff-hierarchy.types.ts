@@ -52,6 +52,21 @@ export enum StaffPosition {
   DRIVER = 'Driver',
   GENERAL_WORKER = 'General Worker',
   INTERN = 'Intern',
+
+  // Finance Department Positions
+  FINANCIAL_MANAGER = 'Financial Manager',
+  ACCOUNTANT = 'Accountant',
+  BOOKKEEPER = 'Bookkeeper',
+  FINANCIAL_CONTROLLER = 'Financial Controller',
+  ACCOUNTS_PAYABLE = 'Accounts Payable',
+  ACCOUNTS_RECEIVABLE = 'Accounts Receivable',
+  PAYROLL_ADMINISTRATOR = 'Payroll Administrator',
+
+  // HR Department Positions
+  HR_MANAGER = 'HR Manager',
+  HR_OFFICER = 'HR Officer',
+  RECRUITMENT_SPECIALIST = 'Recruitment Specialist',
+
   OTHER = 'Other'
 }
 
@@ -221,7 +236,30 @@ export function getPositionsByDepartment(department: string): string[] {
     [StaffDepartment.COMMERCIAL_STRATEGY]: [
       StaffPosition.CCSO,
     ],
+    [StaffDepartment.FINANCE]: [
+      StaffPosition.FINANCIAL_MANAGER,
+      StaffPosition.FINANCIAL_CONTROLLER,
+      StaffPosition.ACCOUNTANT,
+      StaffPosition.BOOKKEEPER,
+      StaffPosition.ACCOUNTS_PAYABLE,
+      StaffPosition.ACCOUNTS_RECEIVABLE,
+      StaffPosition.PAYROLL_ADMINISTRATOR,
+    ],
+    [StaffDepartment.HR]: [
+      StaffPosition.HR_MANAGER,
+      StaffPosition.HR_OFFICER,
+      StaffPosition.RECRUITMENT_SPECIALIST,
+    ],
+    [StaffDepartment.ADMIN]: [
+      StaffPosition.ADMIN,
+      StaffPosition.ADMIN_ASSISTANT,
+      StaffPosition.DATA_CAPTURER,
+    ],
+    [StaffDepartment.LOGISTICS]: [
+      StaffPosition.LOGISTICS_COORDINATOR,
+      StaffPosition.DRIVER,
+    ],
   };
-  
+
   return departmentPositions[department] || [];
 }

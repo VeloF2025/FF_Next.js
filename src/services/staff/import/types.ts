@@ -8,44 +8,213 @@ export interface HeaderMapping {
   [key: string]: string;
 }
 
-// Default header mappings
-export const DEFAULT_HEADER_MAPPING: HeaderMapping = {
+/**
+ * Normalize a header string for consistent matching
+ * Converts to lowercase, removes spaces/underscores, trims whitespace
+ */
+export function normalizeHeader(header: string): string {
+  return header
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_-]+/g, ''); // Remove spaces, underscores, hyphens
+}
+
+/**
+ * Header mapping using normalized keys
+ * Maps normalized header names to StaffImportRow field names
+ */
+const NORMALIZED_HEADER_MAP: Record<string, string> = {
+  // Name variations
   'name': 'name',
-  'Name': 'name',
+  'fullname': 'name',
+  'staffname': 'name',
+  'employeename': 'name',
+
+  // First/Last name (will be combined into name)
+  'firstname': 'firstName',
+  'first': 'firstName',
+  'givenname': 'firstName',
+  'lastname': 'lastName',
+  'last': 'lastName',
+  'surname': 'lastName',
+  'familyname': 'lastName',
+
+  // Email
   'email': 'email',
-  'Email': 'email', 
+  'emailaddress': 'email',
+  'mail': 'email',
+  'workemail': 'email',
+
+  // Phone
   'phone': 'phone',
-  'Phone': 'phone',
-  'employee id': 'employeeId',
-  'Employee ID': 'employeeId',
+  'phonenumber': 'phone',
+  'mobile': 'phone',
+  'cellphone': 'phone',
+  'cell': 'phone',
+  'contact': 'phone',
+  'contactnumber': 'phone',
+
+  // Employee ID
+  'employeeid': 'employeeId',
+  'empid': 'employeeId',
+  'staffid': 'employeeId',
+  'id': 'employeeId',
+  'employeenumber': 'employeeId',
+  'empno': 'employeeId',
+  'staffno': 'employeeId',
+
+  // ID Number (SA ID)
+  'idnumber': 'idNumber',
+  'idno': 'idNumber',
+  'nationalid': 'idNumber',
+  'identitynumber': 'idNumber',
+  'said': 'idNumber',
+
+  // Position
   'position': 'position',
-  'Position': 'position',
+  'jobtitle': 'position',
+  'title': 'position',
+  'role': 'position',
+  'designation': 'position',
+
+  // Department
   'department': 'department',
-  'Department': 'department',
-  'department ': 'department', // Handle trailing space
-  'Primary Group': 'department', // Map Primary Group to department
-  'reports to': 'managerName',
-  'reports to ': 'managerName', // Handle trailing space
-  'Reports To': 'managerName',
-  'Level': 'level',
-  'Status': 'status',
-  'Skills': 'skills',
+  'dept': 'department',
+  'team': 'department',
+  'division': 'department',
+  'primarygroup': 'department',
+  'group': 'department',
+
+  // Manager
+  'reportsto': 'managerName',
+  'manager': 'managerName',
+  'managername': 'managerName',
+  'supervisor': 'managerName',
+  'linemanager': 'managerName',
+
+  // Status
+  'status': 'status',
+  'employmentstatus': 'status',
+
+  // Skills
+  'skills': 'skills',
+  'skill': 'skills',
+  'competencies': 'skills',
+
+  // Address
   'address': 'address',
-  'Address': 'address',
+  'streetaddress': 'address',
+  'street': 'address',
+
+  // City
   'city': 'city',
-  'City': 'city',
+  'town': 'city',
+
+  // Province
   'province': 'province',
-  'Province': 'province',
-  'postalCode': 'postalCode',
-  'Postal Code': 'postalCode',
-  'Emergency Contact Name': 'emergencyContactName',
-  'Emergency Contact Phone': 'emergencyContactPhone',
-  'start date': 'startDate',
-  'Start Date': 'startDate',
-  'Contract Type': 'contractType',
-  'Working Hours': 'workingHours',
-  'Alternative Phone': 'alternativePhone'
+  'state': 'province',
+  'region': 'province',
+
+  // Postal Code
+  'postalcode': 'postalCode',
+  'postcode': 'postalCode',
+  'zipcode': 'postalCode',
+  'zip': 'postalCode',
+
+  // Emergency Contact
+  'emergencycontactname': 'emergencyContactName',
+  'emergencycontact': 'emergencyContactName',
+  'emergencyname': 'emergencyContactName',
+  'nextofkin': 'emergencyContactName',
+  'emergencycontactphone': 'emergencyContactPhone',
+  'emergencyphone': 'emergencyContactPhone',
+  'emergencynumber': 'emergencyContactPhone',
+
+  // Start Date
+  'startdate': 'startDate',
+  'hiredate': 'startDate',
+  'joindate': 'startDate',
+  'datejoined': 'startDate',
+  'employmentdate': 'startDate',
+  'commencementdate': 'startDate',
+
+  // Contract Type
+  'contracttype': 'contractType',
+  'employmenttype': 'contractType',
+  'contract': 'contractType',
+  'type': 'contractType',
+
+  // Working Hours
+  'workinghours': 'workingHours',
+  'hours': 'workingHours',
+  'workhours': 'workingHours',
+
+  // Alternative Phone
+  'alternativephone': 'alternativePhone',
+  'altphone': 'alternativePhone',
+  'secondaryphone': 'alternativePhone',
+  'homephone': 'alternativePhone',
+
+  // Salary
+  'salary': 'salary',
+  'rate': 'salary',
+  'hourlyrate': 'salary',
+  'monthlyrate': 'salary',
+  'pay': 'salary',
+
+  // Level
+  'level': 'level',
+  'grade': 'level',
+  'joblevel': 'level',
 };
+
+/**
+ * Get the mapped field name for a header
+ * @param header - The original header from the file
+ * @returns The mapped field name or the normalized header if no mapping exists
+ */
+export function getFieldNameFromHeader(header: string): string {
+  const normalized = normalizeHeader(header);
+  return NORMALIZED_HEADER_MAP[normalized] || normalized;
+}
+
+/**
+ * Map a row object with original headers to standardized field names
+ * @param row - Object with original header keys
+ * @returns Object with standardized field names
+ */
+export function mapRowHeaders(row: Record<string, unknown>): Record<string, unknown> {
+  const mapped: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(row)) {
+    const fieldName = getFieldNameFromHeader(key);
+    mapped[fieldName] = value;
+  }
+
+  // Handle firstName + lastName -> name combination
+  if (mapped['firstName'] && mapped['lastName']) {
+    mapped['name'] = `${mapped['firstName']} ${mapped['lastName']}`.trim();
+  } else if (mapped['firstName'] && !mapped['name']) {
+    mapped['name'] = String(mapped['firstName']);
+  } else if (mapped['lastName'] && !mapped['name']) {
+    mapped['name'] = String(mapped['lastName']);
+  }
+
+  return mapped;
+}
+
+// Legacy DEFAULT_HEADER_MAPPING for backward compatibility
+// This is now generated from NORMALIZED_HEADER_MAP
+export const DEFAULT_HEADER_MAPPING: HeaderMapping = Object.entries(NORMALIZED_HEADER_MAP).reduce(
+  (acc, [normalized, field]) => {
+    // Add common case variations
+    acc[normalized] = field;
+    acc[normalized.charAt(0).toUpperCase() + normalized.slice(1)] = field; // Title case
+    acc[normalized.toUpperCase()] = field; // UPPER CASE
+    return acc;
+  },
+  {} as HeaderMapping
+);
 
 // Import template columns
 export const IMPORT_TEMPLATE_COLUMNS = [

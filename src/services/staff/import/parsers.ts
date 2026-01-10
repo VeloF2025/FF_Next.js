@@ -3,7 +3,65 @@
  * Utility functions for parsing import data
  */
 
-import { Skill } from '@/types/staff/enums.types';
+import { Skill, ContractType } from '@/types/staff/enums.types';
+import { SAContractType } from '@/types/staff/compliance.types';
+
+/**
+ * Map legacy contract type values to SA-compliant values
+ */
+const CONTRACT_TYPE_MAPPING: Record<string, SAContractType> = {
+  // Full-time variations -> permanent
+  'full-time': SAContractType.PERMANENT,
+  'full_time': SAContractType.PERMANENT,
+  'fulltime': SAContractType.PERMANENT,
+  'full time': SAContractType.PERMANENT,
+  'permanent': SAContractType.PERMANENT,
+  'perm': SAContractType.PERMANENT,
+
+  // Part-time variations
+  'part-time': SAContractType.PART_TIME,
+  'part_time': SAContractType.PART_TIME,
+  'parttime': SAContractType.PART_TIME,
+  'part time': SAContractType.PART_TIME,
+
+  // Fixed term / contract
+  'contract': SAContractType.FIXED_TERM,
+  'fixed-term': SAContractType.FIXED_TERM,
+  'fixed_term': SAContractType.FIXED_TERM,
+  'fixedterm': SAContractType.FIXED_TERM,
+  'fixed term': SAContractType.FIXED_TERM,
+  'limited duration': SAContractType.FIXED_TERM,
+
+  // Temporary
+  'temp': SAContractType.TEMPORARY,
+  'temporary': SAContractType.TEMPORARY,
+  'casual': SAContractType.TEMPORARY,
+
+  // Independent contractor / freelance
+  'freelance': SAContractType.INDEPENDENT_CONTRACTOR,
+  'freelancer': SAContractType.INDEPENDENT_CONTRACTOR,
+  'contractor': SAContractType.INDEPENDENT_CONTRACTOR,
+  'independent': SAContractType.INDEPENDENT_CONTRACTOR,
+  'independent_contractor': SAContractType.INDEPENDENT_CONTRACTOR,
+  'independent contractor': SAContractType.INDEPENDENT_CONTRACTOR,
+
+  // Intern / Learner
+  'intern': SAContractType.INTERN,
+  'internship': SAContractType.INTERN,
+  'learner': SAContractType.INTERN,
+  'learnership': SAContractType.INTERN,
+};
+
+/**
+ * Parse and normalize contract type from import value
+ * Maps legacy values to SA-compliant SAContractType enum
+ */
+export function parseContractType(value: string | undefined): SAContractType {
+  if (!value) return SAContractType.PERMANENT;
+
+  const normalized = value.toLowerCase().trim();
+  return CONTRACT_TYPE_MAPPING[normalized] || SAContractType.PERMANENT;
+}
 
 /**
  * Parse date from various formats

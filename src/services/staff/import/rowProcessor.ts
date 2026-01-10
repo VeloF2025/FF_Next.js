@@ -9,11 +9,11 @@ import {
   StaffImportError,
   StaffFormData,
   StaffMember,
-  ContractType,
   StaffStatus
 } from '@/types/staff.types';
+import { SAContractType } from '@/types/staff/compliance.types';
 import { extractUniqueManagers, sortByManagerHierarchy, findManagerByName } from './managerResolver';
-import { parseDate, parseSkills } from './parsers';
+import { parseDate, parseSkills, parseContractType } from './parsers';
 import { log } from '@/lib/logger';
 
 /**
@@ -140,33 +140,35 @@ export async function processImportRows(
       }
       
       // Create staff form data that matches StaffFormData interface
+      const parsedContractType = parseContractType(row.contractType);
       const formData: StaffFormData = {
         name: row.name.trim(),
         email: row.email.trim(),
         phone: row.phone.trim() || '',
         ...(row.alternativePhone && { alternativePhone: row.alternativePhone }),
         employeeId: employeeId,
+        ...(row.idNumber && { idNumber: row.idNumber }), // SA ID Number
         position: row.position || 'Staff',
         department: row.department || 'Operations',
-        contractType: ContractType.PERMANENT, // Default contract type
+        saContractType: parsedContractType, // SA-compliant contract type
+        contractType: parsedContractType as unknown as any, // Legacy field
         status: StaffStatus.ACTIVE, // Default status
         ...(reportsTo && { reportsTo }), // Only include if manager found
         startDate: startDate, // Use parsed date
-        // endDate not included as it.s undefined
         address: row.address || '',
         city: row.city || '',
         province: row.province || '',
         postalCode: row.postalCode || '',
         ...(row.emergencyContactName && { emergencyContactName: row.emergencyContactName }),
         ...(row.emergencyContactPhone && { emergencyContactPhone: row.emergencyContactPhone }),
+        ...(row.salary && { salaryAmount: parseFloat(row.salary) || undefined }),
         experienceYears: 0,
-        workingHours: "9:00-17:00",
+        workingHours: row.workingHours || "9:00-17:00",
         availableWeekends: false,
         availableNights: false,
         timeZone: "Africa/Johannesburg",
         maxProjectCount: 5,
         skills: parseSkills(row.skills),
-        // notes not included as it's empty
       };
       
       // Import the staff member using createOrUpdate to handle both new and existing

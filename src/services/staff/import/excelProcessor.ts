@@ -6,7 +6,9 @@
 import * as XLSX from 'xlsx';
 import { StaffImportRow, StaffImportResult, StaffMember } from '@/types/staff.types';
 import { processImportRows } from './rowProcessor';
+import { mapRowHeaders } from './types';
 import { safeToDate } from '@/utils/dateHelpers';
+import { log } from '@/lib/logger';
 
 /**
  * Import staff from Excel file
@@ -14,7 +16,7 @@ import { safeToDate } from '@/utils/dateHelpers';
 export async function importFromExcel(file: File, overwriteExisting: boolean = true): Promise<StaffImportResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = async (e) => {
       try {
         const data = e.target?.result;
@@ -35,36 +37,46 @@ export async function importFromExcel(file: File, overwriteExisting: boolean = t
           raw: false,
           dateNF: 'yyyy/mm/dd'
         });
-        
-        // Map Excel columns to staff fields
-        const rows: StaffImportRow[] = jsonData.map((row: any) => ({
-          employeeId: row['Employee ID'] || row['employee id'] || '',
-          name: row['Name'] || row['name'] || '',
-          email: row['Email'] || row['email'] || '',
-          phone: row['Phone'] || row['phone'] || '',
-          position: row['Position'] || row['position'] || 'Staff',
-          department: row['Department'] || row['department'] || row['Primary Group'] || 'Operations',
-          managerName: row['Reports To'] || row['reports to'] || '',
-          skills: row['Skills'] || row['skills'] || '',
-          alternativePhone: row['Alternative Phone'] || row['alternative phone'] || '',
-          address: row['Address'] || row['address'] || '',
-          city: row['City'] || row['city'] || '',
-          province: row['Province'] || row['province'] || '',
-          postalCode: row['Postal Code'] || row['postal code'] || '',
-          emergencyContactName: row['Emergency Contact Name'] || '',
-          emergencyContactPhone: row['Emergency Contact Phone'] || '',
-          startDate: row['Start Date'] || row['start date'] || '',
-          contractType: row['Contract Type'] || '',
-          workingHours: row['Working Hours'] || ''
-        }));
-        
+
+        log.info(`Processing ${jsonData.length} rows from Excel`, undefined, 'excelProcessor');
+
+        // Map Excel columns to staff fields using normalized header mapping
+        const rows: StaffImportRow[] = jsonData.map((row: Record<string, unknown>) => {
+          // Use the normalized header mapping
+          const mapped = mapRowHeaders(row);
+
+          return {
+            employeeId: String(mapped['employeeId'] || ''),
+            name: String(mapped['name'] || ''),
+            email: String(mapped['email'] || ''),
+            phone: String(mapped['phone'] || ''),
+            position: String(mapped['position'] || 'Staff'),
+            department: String(mapped['department'] || 'Operations'),
+            managerName: String(mapped['managerName'] || ''),
+            skills: String(mapped['skills'] || ''),
+            alternativePhone: String(mapped['alternativePhone'] || ''),
+            address: String(mapped['address'] || ''),
+            city: String(mapped['city'] || ''),
+            province: String(mapped['province'] || ''),
+            postalCode: String(mapped['postalCode'] || ''),
+            emergencyContactName: String(mapped['emergencyContactName'] || ''),
+            emergencyContactPhone: String(mapped['emergencyContactPhone'] || ''),
+            startDate: String(mapped['startDate'] || ''),
+            contractType: String(mapped['contractType'] || ''),
+            workingHours: String(mapped['workingHours'] || ''),
+            idNumber: String(mapped['idNumber'] || ''),
+            salary: String(mapped['salary'] || ''),
+          };
+        });
+
         const result = await processImportRows(rows, overwriteExisting);
         resolve(result);
       } catch (error) {
+        log.error('Excel import failed:', { data: error }, 'excelProcessor');
         reject(error);
       }
     };
-    
+
     reader.onerror = () => reject(new Error('Failed to read Excel file'));
     reader.readAsBinaryString(file);
   });

@@ -10,6 +10,7 @@ export interface StaffImportRow {
   phone?: string;
   alternativePhone?: string;
   employeeId?: string;
+  idNumber?: string;           // SA ID Number
   position?: string;
   department?: string;
   level?: string;
@@ -25,6 +26,7 @@ export interface StaffImportRow {
   contractType?: string;
   workingHours?: string;
   managerName?: string;
+  salary?: string;             // Salary/Rate
 }
 
 export interface StaffImportResult {
