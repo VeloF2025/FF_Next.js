@@ -80,54 +80,56 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header with search and add button */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
-            <input
-              type="text"
-              placeholder="Search contractors..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex-1 min-w-[200px] max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+              <input
+                type="text"
+                placeholder="Search contractors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-[var(--ff-text-tertiary)]"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-[var(--ff-text-secondary)]">
+              {filteredContractors.length} of {contractors.length} contractors
+            </span>
+            <Link
+              href="/contractors/new"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              Add Contractor
+            </Link>
           </div>
         </div>
-
-        <Link
-          href="/contractors/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Add Contractor
-        </Link>
-      </div>
-
-      {/* Contractors count */}
-      <div className="text-sm text-[var(--ff-text-secondary)]">
-        Showing {filteredContractors.length} of {contractors.length} contractors
       </div>
 
       {/* Contractors table */}
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
         <table className="w-full">
-          <thead className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
+          <thead className="bg-[var(--ff-bg-tertiary)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Company
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Contact
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-primary)] uppercase">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Compliance
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-primary)] uppercase">
+              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -135,14 +137,14 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
           <tbody className="divide-y divide-[var(--ff-border-light)]">
             {filteredContractors.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
+                <td colSpan={5} className="px-6 py-12 text-center text-[var(--ff-text-secondary)]">
                   No contractors found
                 </td>
               </tr>
             ) : (
               filteredContractors.map((contractor) => (
-                <tr key={contractor.id} className="hover:bg-[var(--ff-bg-hover)]">
-                  <td className="px-4 py-3">
+                <tr key={contractor.id} className="hover:bg-[var(--ff-bg-hover)] transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="font-medium text-[var(--ff-text-primary)]">
                         {contractor.companyName}
@@ -152,7 +154,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm text-[var(--ff-text-primary)]">
                         {contractor.contactPerson}
@@ -165,7 +167,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         getStatusColor(contractor.status) === 'green'
@@ -180,7 +182,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                       {contractor.status.replace('_', ' ').toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         getComplianceColor(contractor.complianceStatus) === 'green'
@@ -195,18 +197,18 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                       {contractor.complianceStatus.replace('_', ' ').toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Link
                         href={`/contractors/${contractor.id}`}
-                        className="p-1 text-blue-600 hover:text-blue-900"
+                        className="p-1 text-blue-400 hover:text-blue-300"
                         title="View"
                       >
                         <Eye className="h-4 w-4" />
                       </Link>
                       <Link
                         href={`/contractors/${contractor.id}/edit`}
-                        className="p-1 text-yellow-600 hover:text-yellow-900"
+                        className="p-1 text-indigo-400 hover:text-indigo-300"
                         title="Edit"
                       >
                         <Edit className="h-4 w-4" />
@@ -214,7 +216,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                       <button
                         onClick={() => handleDelete(contractor.id, contractor.companyName)}
                         disabled={isDeleting === contractor.id}
-                        className="p-1 text-red-600 hover:text-red-900 disabled:opacity-50"
+                        className="p-1 text-red-400 hover:text-red-300 disabled:opacity-50"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />

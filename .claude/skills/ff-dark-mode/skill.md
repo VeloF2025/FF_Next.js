@@ -230,6 +230,38 @@ After making changes:
 6. Check hover states work correctly
 7. Check no "flash" of wrong colors on page load
 
+## CARD GRID LAYOUT PATTERN (Reference: Suppliers)
+
+The preferred card layout uses a responsive grid with consistent spacing:
+
+```tsx
+// Container with vertical spacing
+<div className="p-6 space-y-6">
+
+// Stat cards row (4 columns on large screens)
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <StatCard />
+</div>
+
+// Main content cards (3 columns on xl screens)
+<div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+  <Card />
+</div>
+```
+
+### Key Classes:
+- `p-6` - Page padding
+- `space-y-6` - Vertical spacing between sections
+- `gap-4` - Grid gap (1rem)
+- `grid-cols-1 lg:grid-cols-2 xl:grid-cols-3` - Responsive columns
+
+### Card Component Pattern:
+```tsx
+<div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)] hover:shadow-lg transition-shadow cursor-pointer">
+  {/* Card content */}
+</div>
+```
+
 ## FILES LOCATION
 
 - CSS Variables: `src/styles/design-system.css` (lines 125-143 for dark mode)

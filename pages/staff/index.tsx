@@ -222,9 +222,9 @@ export default function StaffPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Staff Management</h1>
             <p className="text-[var(--ff-text-secondary)]">Manage your team members and their assignments</p>
@@ -249,7 +249,7 @@ export default function StaffPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -318,60 +318,60 @@ export default function StaffPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-secondary)] h-5 w-5" />
-              <Input
-                type="text"
-                placeholder="Search by name, ID, or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)]"
-              />
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] h-4 w-4" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, ID, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
             </div>
-          </div>
-          <select
-            value={filterDepartment}
-            onChange={(e) => setFilterDepartment(e.target.value)}
-            className="px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Departments</option>
-            {departments.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Status</option>
-            <optgroup label="Current">
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="on_leave">On Leave</option>
-              <option value="suspended">Suspended</option>
-            </optgroup>
-            {includeFormerEmployees && (
-              <optgroup label="Former">
-                <option value="terminated">Terminated</option>
-                <option value="resigned">Resigned</option>
-                <option value="retired">Retired</option>
+            <select
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+              className="px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Departments</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Status</option>
+              <optgroup label="Current">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="on_leave">On Leave</option>
+                <option value="suspended">Suspended</option>
               </optgroup>
-            )}
-          </select>
-          <label className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg cursor-pointer hover:bg-[var(--ff-bg-hover)] transition-colors">
-            <input
-              type="checkbox"
-              checked={includeFormerEmployees}
-              onChange={(e) => setIncludeFormerEmployees(e.target.checked)}
-              className="w-4 h-4 rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-[var(--ff-text-primary)] whitespace-nowrap">
-              Include Former
-            </span>
-          </label>
+              {includeFormerEmployees && (
+                <optgroup label="Former">
+                  <option value="terminated">Terminated</option>
+                  <option value="resigned">Resigned</option>
+                  <option value="retired">Retired</option>
+                </optgroup>
+              )}
+            </select>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeFormerEmployees}
+                onChange={(e) => setIncludeFormerEmployees(e.target.checked)}
+                className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-[var(--ff-text-primary)]">Include Former</span>
+            </label>
+          </div>
         </div>
 
         {/* Staff Table */}
