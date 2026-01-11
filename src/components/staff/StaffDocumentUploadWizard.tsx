@@ -417,7 +417,7 @@ export function StaffDocumentUploadWizard({
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 onChange={handleFileChange}
-                className="absolute opacity-0 w-0 h-0 pointer-events-none"
+                className="sr-only"
                 id="wizard-file-upload"
               />
               <label
