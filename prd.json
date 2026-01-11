@@ -1,0 +1,263 @@
+{
+  "project_name": "PRD-033: OCR-First Document Upload Flow",
+  "prd_reference": "docs/PRDs/PRD-033-ocr-first-upload-flow.md",
+  "description": "Transform document upload from manual-first to OCR-first. User uploads file → OCR processes (5-10s) → shows extracted data → user confirms → saves. Eliminates 90% of manual data entry.",
+  "user_stories": [
+    {
+      "id": "prd033-001",
+      "title": "Create StaffDocumentUploadWizard orchestrator component",
+      "description": "Create the main wizard component that orchestrates the multi-step OCR-first upload flow. Manages state machine: file_upload → ocr_processing → ocr_preview (or manual_entry) → confirmation → saving → complete. Handles file selection, OCR API calls, preview display, and final submission.",
+      "acceptance_criteria": [
+        "File created at src/components/staff/StaffDocumentUploadWizard.tsx",
+        "State machine with 7 steps: file_upload, ocr_processing, ocr_preview, manual_entry, confirmation, saving, complete",
+        "WizardState interface tracks: currentStep, file, ocrResult, selectedDocumentType, documentName, extractedFields, fieldOverrides",
+        "handleFileSelected() method uploads file and calls /api/documents-ocr-preview",
+        "processOcr() method with 30s timeout using AbortController",
+        "Confidence-based routing: ≥50% → ocr_preview, <50% → manual_entry",
+        "handleSubmit() calls /api/staff-documents-upload with ocrConfirmed flag",
+        "Props: staffId, onSuccess, onCancel",
+        "Uses FF design system CSS variables",
+        "Dark mode support"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "prd033-002",
+      "title": "Create FileUploadStep component",
+      "description": "Create file upload step with drag-and-drop support. Validates file type (PDF, JPG, PNG) and size (<10MB). Auto-advances to OCR processing step after file selection.",
+      "acceptance_criteria": [
+        "File created at src/components/staff/documents/FileUploadStep.tsx",
+        "Drag-and-drop zone with visual feedback (border highlight on drag-over)",
+        "File picker button as alternative to drag-drop",
+        "File validation: PDF, JPG, PNG, JPEG only",
+        "File validation: max 10MB size",
+        "Shows selected file name and size before proceeding",
+        "Auto-advances to next step on valid file selection",
+        "Error messages for invalid files",
+        "Props: onFileSelected, onCancel",
+        "Responsive design and dark mode"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "prd033-003",
+      "title": "Create OcrProcessingStep component",
+      "description": "Create OCR processing loading step. Shows animated spinner with progress message. Displays timeout warning after 20 seconds. Automatically transitions to preview or manual entry based on OCR results.",
+      "acceptance_criteria": [
+        "File created at src/components/staff/documents/OcrProcessingStep.tsx",
+        "Animated loading spinner (use existing FF loading component or create simple CSS spinner)",
+        "Message: 'Analyzing document...' with animated dots",
+        "Progress estimation: 'Typically takes 5-10 seconds'",
+        "Warning after 20s: 'Still processing... (may take up to 30s)'",
+        "Props: fileName, fileSize",
+        "Centered layout with consistent spacing",
+        "Dark mode support"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "prd033-004",
+      "title": "Create OcrPreviewStep component",
+      "description": "Create OCR preview step showing extracted data for user review. Displays detected document type with confidence, all extracted fields as editable inputs, confidence badges per field, validation warnings. Allows user to confirm or switch to manual entry.",
+      "acceptance_criteria": [
+        "File created at src/components/staff/documents/OcrPreviewStep.tsx",
+        "Document type header with confidence badge (green ≥90%, yellow 70-90%, red <70%)",
+        "If confidence <80%, show top 3 document type guesses as radio buttons",
+        "Extracted fields displayed as editable input fields",
+        "Each field shows confidence badge next to label",
+        "Color-coded fields: green >90%, yellow 70-90%, red <70%",
+        "Validation warnings for invalid data (e.g., invalid SA ID number)",
+        "Track field overrides (user edits) separately from OCR values",
+        "Buttons: [Confirm & Save] (primary) and [Enter Manually] (secondary)",
+        "Props: ocrResult, onConfirm, onManualEntry, onFieldChange",
+        "Uses ocrFieldMappings.ts for field labels and validation",
+        "Responsive layout and dark mode"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "prd033-005",
+      "title": "Create ManualEntryStep component",
+      "description": "Create manual entry fallback form. Reuses existing StaffDocumentUploadForm logic but within wizard flow. Shown when OCR confidence <50% or when user clicks 'Enter Manually' from preview.",
+      "acceptance_criteria": [
+        "File created at src/components/staff/documents/ManualEntryStep.tsx",
+        "Shows message: 'OCR could not confidently detect document type. Please enter details manually.'",
+        "If reached from timeout: 'OCR processing timed out. Please enter details manually.'",
+        "Form fields: documentType (dropdown), documentName (text), all relevant fields per type",
+        "Uses existing document type options from staff-document.types.ts",
+        "Dynamic field rendering based on selected document type",
+        "Validation on all required fields",
+        "Buttons: [Save Document] (primary) and [Back] (secondary, returns to file upload)",
+        "Props: file, onSubmit, onBack, ocrError (optional error message)",
+        "Form state management with React Hook Form or similar",
+        "Dark mode support"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "prd033-006",
+      "title": "Update StaffDocumentList to use OCR-first wizard",
+      "description": "Replace existing StaffDocumentUploadForm with new StaffDocumentUploadWizard in StaffDocumentList component. Maintain backward compatibility with existing document management features.",
+      "acceptance_criteria": [
+        "Import StaffDocumentUploadWizard in src/components/staff/StaffDocumentList.tsx",
+        "Replace showUploadForm state usage to show wizard instead of old form",
+        "Pass staffId prop to wizard",
+        "Handle onSuccess callback to refresh document list",
+        "Handle onCancel callback to close wizard",
+        "Remove old StaffDocumentUploadForm import if no longer needed",
+        "Test: Clicking 'Upload Document' button opens new wizard",
+        "Test: Successful upload refreshes document list",
+        "Test: Cancel closes wizard without saving",
+        "No TypeScript errors"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "prd033-007",
+      "title": "Update staff-documents-upload API for OCR data",
+      "description": "Modify /api/staff-documents-upload to accept OCR-confirmed data. When ocrConfirmed=true, skip async webhook and store OCR result with status='confirmed'. Support both OCR-first and manual upload flows.",
+      "acceptance_criteria": [
+        "Accept new field: ocrConfirmed (boolean)",
+        "Accept new field: ocrResultPreview (JSON, optional)",
+        "If ocrConfirmed=true: store OCR result in document_ocr_results with status='confirmed'",
+        "If ocrConfirmed=true: apply extractedFields to staff_documents record",
+        "If ocrConfirmed=true: skip webhook trigger (OCR already processed)",
+        "If ocrConfirmed=false: traditional flow (save + trigger webhook)",
+        "Map camelCase field names to snake_case database columns",
+        "Store OCR metadata: tierUsed, confidence, processingTimeMs",
+        "Return success with documentId and ocrResultId",
+        "Backward compatible: works without OCR fields (manual uploads)",
+        "Use apiResponse helper for responses",
+        "Proper error handling and logging",
+        "No TypeScript errors"
+      ],
+      "components_affected": [
+        "api",
+        "database"
+      ],
+      "status": "completed"
+    },
+    {
+      "id": "prd033-008",
+      "title": "Create ConfidenceBadge reusable component",
+      "description": "Create reusable confidence badge component for displaying OCR confidence scores with color coding. Used in OcrPreviewStep and other OCR-related UI.",
+      "acceptance_criteria": [
+        "File created at src/components/staff/documents/ConfidenceBadge.tsx",
+        "Props: confidence (number 0-1), size ('sm' | 'md' | 'lg')",
+        "Color coding: green ≥0.9, yellow 0.7-0.9, red <0.7",
+        "Displays percentage: '95%' for confidence=0.95",
+        "Small badge for inline use, larger for headers",
+        "Tooltip showing confidence level: 'High confidence', 'Medium confidence', 'Low confidence'",
+        "Accessible: proper ARIA labels",
+        "Dark mode support with appropriate contrast",
+        "Export as default"
+      ],
+      "components_affected": [
+        "ui"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "prd033-009",
+      "title": "Add OCR wizard integration tests",
+      "description": "Create integration tests for OCR-first upload wizard flow. Test happy path (high confidence), medium confidence (top 3 guesses), low confidence (manual fallback), and timeout scenarios.",
+      "acceptance_criteria": [
+        "Test file created at src/components/staff/__tests__/StaffDocumentUploadWizard.test.tsx",
+        "Test 1: High confidence flow (file → OCR → preview → confirm → save)",
+        "Test 2: Medium confidence flow (file → OCR → choose from 3 types → confirm)",
+        "Test 3: Low confidence flow (file → OCR → manual entry → save)",
+        "Test 4: Timeout flow (file → OCR timeout → manual entry)",
+        "Test 5: Cancel at each step returns to document list",
+        "Test 6: Field editing in preview updates state correctly",
+        "Mock /api/documents-ocr-preview responses",
+        "Mock /api/staff-documents-upload responses",
+        "All tests pass with npm test",
+        "Use Vitest or React Testing Library"
+      ],
+      "components_affected": [
+        "testing"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "prd033-010",
+      "title": "Update documentation and page logs",
+      "description": "Document the OCR-first upload flow implementation, update page logs for StaffDocumentList, and create user guide for OCR wizard.",
+      "acceptance_criteria": [
+        "Update docs/page-logs/staff-documents.md with OCR wizard changes",
+        "Document wizard state machine and flow transitions",
+        "Add troubleshooting section for OCR failures",
+        "Create user guide: docs/user-guides/ocr-document-upload.md",
+        "Document confidence thresholds and their meanings",
+        "Include screenshots or ASCII diagrams of wizard steps",
+        "Update CLAUDE.md if new patterns established",
+        "All documentation in markdown format"
+      ],
+      "components_affected": [
+        "docs"
+      ],
+      "status": "pending"
+    }
+  ],
+  "technical_constraints": [
+    "Use existing FF module patterns and component structure",
+    "Follow src/components/staff/documents/ directory organization",
+    "Use apiResponse helper for API responses",
+    "No console.log - use log from @/lib/logger",
+    "Follow CLAUDE.md guidelines (max 300 lines per file, components < 200 lines)",
+    "Use VF Storage server for document retrieval",
+    "OCR Service endpoint: http://100.96.203.105:8095",
+    "All TypeScript, no any types",
+    "Dark mode support for all UI components",
+    "Use existing design system CSS variables",
+    "Responsive design (mobile, tablet, desktop)",
+    "Accessibility: proper ARIA labels, keyboard navigation"
+  ],
+  "quality_gates": [
+    "npm run type-check passes",
+    "npm run lint passes",
+    "npm run build succeeds",
+    "npm test passes (integration tests)",
+    "No console.log statements",
+    "Visual verification with Chrome extension",
+    "Test on mobile viewport (375px width)",
+    "Test dark mode toggle"
+  ],
+  "integration_points": {
+    "existing_components": [
+      "src/components/staff/StaffDocumentList.tsx - parent component",
+      "src/components/shared/OcrResultsModal.tsx - existing OCR modal (may reuse)",
+      "src/hooks/useOcrExtraction.ts - existing OCR hook (reference)",
+      "src/services/ocrService.ts - OCR service client",
+      "src/config/ocrFieldMappings.ts - field configurations"
+    ],
+    "new_api_endpoints": [
+      "pages/api/documents-ocr-preview.ts - CREATED (synchronous OCR)",
+      "pages/api/staff-documents-upload.ts - MODIFY (accept OCR data)"
+    ],
+    "database_tables": [
+      "staff_documents - enhanced with new columns (PRD-034)",
+      "document_ocr_results - stores OCR extraction results",
+      "document_expiry_alerts - auto-generated expiry alerts",
+      "staff_compliance_status - compliance tracking"
+    ]
+  }
+}
