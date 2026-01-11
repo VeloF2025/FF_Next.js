@@ -62,7 +62,7 @@ export class OcrService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/health`, {
+      const response = await fetch(`${this.baseUrl}/ocr/health`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
       });
