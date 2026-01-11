@@ -6,6 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { getAuth } from '@/lib/auth-mock';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 
@@ -33,17 +34,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Get the current user for verifier ID
-    // In production, this would come from Clerk auth
+    // Get the current user for verifier ID from Clerk
+    const { userId } = getAuth(req);
 
-    // Find staff member by clerk ID if available
+    // Find staff member by user_id if available
+    // Note: userId might be a demo/mock value, so we handle gracefully
     let verifierId: string | null = null;
     if (userId) {
-      const [staffMember] = await sql`
-        SELECT id FROM staff WHERE clerk_id = ${userId}
-      `;
-      if (staffMember) {
-        verifierId = staffMember.id as string;
+      try {
+        const [staffMember] = await sql`
+          SELECT id FROM staff WHERE user_id = ${userId}
+        `;
+        if (staffMember) {
+          verifierId = staffMember.id as string;
+        }
+      } catch {
+        // User ID not found or invalid format - continue without verifier
+        logger.warn('Could not find staff member for user', { userId });
       }
     }
 
@@ -70,8 +77,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const [document] = await sql`
       SELECT
         sd.*,
-        s.name as staff_name,
-        v.name as verifier_name
+        CONCAT(s.first_name, ' ', s.last_name) as staff_name,
+        CONCAT(v.first_name, ' ', v.last_name) as verifier_name
       FROM staff_documents sd
       LEFT JOIN staff s ON s.id = sd.staff_id
       LEFT JOIN staff v ON v.id = sd.verified_by

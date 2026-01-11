@@ -175,3 +175,109 @@ export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   qualifications: 'Qualifications & Certifications',
   other: 'Other Documents'
 };
+
+// ============================================================
+// VF Storage Integration (PRD-021)
+// ============================================================
+
+/**
+ * VF Storage server configuration
+ */
+export const VF_STORAGE_CONFIG = {
+  baseUrl: 'http://100.96.203.105:8091',
+  endpoints: {
+    upload: '/upload',
+    list: '/list',
+    delete: '/delete',
+    health: '/health',
+  },
+  staffDocumentsPath: 'staff/documents',
+};
+
+/**
+ * Allowed file types for upload
+ */
+export const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
+export const ALLOWED_EXTENSIONS = [
+  '.pdf', '.jpg', '.jpeg', '.png', '.gif',
+  '.doc', '.docx', '.xls', '.xlsx',
+];
+
+/**
+ * Maximum file size (10MB)
+ */
+export const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Check if a file type is allowed
+ */
+export function isAllowedFileType(mimeType: string): boolean {
+  return ALLOWED_MIME_TYPES.includes(mimeType);
+}
+
+/**
+ * Check if a file size is within limit
+ */
+export function isFileSizeValid(size: number): boolean {
+  return size <= MAX_FILE_SIZE;
+}
+
+/**
+ * Get human-readable file size
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * VF Storage upload response
+ */
+export interface VFStorageUploadResponse {
+  success: boolean;
+  filename: string;
+  path: string;
+  url: string;
+  size: number;
+}
+
+/**
+ * VF Storage file list response
+ */
+export interface VFStorageFile {
+  name: string;
+  path: string;
+  size: number;
+  modified: string;
+}
+
+/**
+ * Required documents for employees (SA Labour Law)
+ */
+export const REQUIRED_DOCUMENTS_EMPLOYEE: DocumentType[] = [
+  'id_document',
+  'employment_contract',
+  'tax_document',
+];
+
+/**
+ * Required documents for contractors
+ */
+export const REQUIRED_DOCUMENTS_CONTRACTOR: DocumentType[] = [
+  'id_document',
+  'employment_contract', // Service agreement
+  'tax_document',        // Tax clearance
+];

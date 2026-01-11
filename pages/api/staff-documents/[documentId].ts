@@ -2,12 +2,12 @@
  * Staff Document API
  * GET /api/staff-documents/[documentId] - Get single document
  * PUT /api/staff-documents/[documentId] - Update document metadata
- * DELETE /api/staff-documents/[documentId] - Delete document
+ * DELETE /api/staff-documents/[documentId] - Delete document (VF Storage)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { localFileStorage } from '@/services/localFileStorage';
+import { deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 
@@ -97,20 +97,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(404).json({ error: 'Document not found' });
       }
 
-      // Delete from local storage
-      if (document.file_url) {
+      // Delete from VF Storage
+      if (document.file_path || document.file_url) {
         try {
-          // Extract path from URL (format: /api/uploads/staff-documents/...)
-          const url = document.file_url as string;
-          const pathMatch = url.match(/staff-documents\/.*$/);
-          if (pathMatch) {
-            await localFileStorage.deleteFile(pathMatch[0]);
-            logger.info('Deleted file from local storage', { path: pathMatch[0] });
+          const filePath = (document.file_path || document.file_url) as string;
+
+          // Extract filename from path
+          // Path format: staff/documents/{staffId}_{originalFilename}
+          // Or URL format: http://100.96.203.105:8091/staff/documents/{filename}
+          const pathParts = filePath.split('/');
+          const filename = pathParts[pathParts.length - 1];
+
+          if (filename) {
+            // Extract staffId from filename prefix (format: {staffId}_{originalFilename})
+            const staffIdFromFilename = filename.split('_')[0];
+            const deleted = await deleteStaffDocument(staffIdFromFilename, filename);
+            if (deleted) {
+              logger.info('Deleted file from VF Storage', { filename });
+            } else {
+              logger.warn('VF Storage delete returned false', { filename });
+            }
           }
         } catch (storageError: unknown) {
           // Log but don't fail if storage delete fails
           const errorMsg = storageError instanceof Error ? storageError.message : 'Unknown';
-          logger.warn('Failed to delete file from local storage', { error: errorMsg });
+          logger.warn('Failed to delete file from VF Storage', { error: errorMsg });
         }
       }
 

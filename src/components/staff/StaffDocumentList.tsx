@@ -304,7 +304,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
                 {/* Actions */}
                 <div className="flex items-center gap-1">
                   <a
-                    href={doc.fileUrl}
+                    href={`/api/staff-documents-download?documentId=${doc.id}&inline=true`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 text-[var(--ff-text-secondary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
@@ -313,7 +313,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
                     <Eye className="h-4 w-4" />
                   </a>
                   <a
-                    href={doc.fileUrl}
+                    href={`/api/staff-documents-download?documentId=${doc.id}`}
                     download
                     className="p-2 text-[var(--ff-text-secondary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
                     title="Download"

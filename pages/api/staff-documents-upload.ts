@@ -1,7 +1,7 @@
 /**
  * Staff Documents Upload API
  * POST /api/staff-documents-upload
- * Handles file upload to local storage + metadata to Neon
+ * Handles file upload to VF Storage + metadata to Neon
  *
  * Protected by Arcjet:
  * - Bot detection
@@ -13,7 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import formidable from 'formidable';
 import fs from 'fs';
-import { localFileStorage } from '@/services/localFileStorage';
+import { uploadStaffDocument, isVFStorageAvailable, deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import type { DocumentType } from '@/types/staff-document.types';
@@ -117,21 +117,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Read file buffer
     const fileBuffer = await fs.promises.readFile(file.filepath);
 
-    // Upload to local storage
-    const uploadPath = localFileStorage.getStaffDocumentPath(staffId, documentType);
-    const uploadResult = await localFileStorage.uploadFile(
+    // Check if VF Storage is available (required)
+    const storageAvailable = await isVFStorageAvailable();
+    if (!storageAvailable) {
+      logger.error('VF Storage server is not available');
+      return res.status(503).json({
+        error: 'Storage service unavailable',
+        message: 'The file storage server is not responding. Please try again later.',
+      });
+    }
+
+    // Upload to VF Storage server
+    logger.info('Uploading to VF Storage', { staffId, documentType });
+    const vfResult = await uploadStaffDocument(
+      staffId,
       fileBuffer,
-      uploadPath,
       file.originalFilename || 'document',
-      file.mimetype || 'application/octet-stream'
+      documentType
     );
 
+    const fileUrl = vfResult.url;
+    const filePath = vfResult.path;
+    storagePath = filePath;
     uploadedToStorage = true;
-    storagePath = uploadResult.path;
-
-    // Generate file URL (use API endpoint for serving files)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const fileUrl = `${baseUrl}/api/uploads/${uploadResult.path}`;
 
     // Save metadata to Neon
     const [document] = await sql`
@@ -140,25 +148,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         document_type,
         document_name,
         file_url,
+        file_path,
+        file_name,
         file_size,
         mime_type,
         expiry_date,
         issued_date,
         issuing_authority,
         document_number,
-        verification_status
+        verification_status,
+        status,
+        uploaded_at
       ) VALUES (
         ${staffId},
         ${documentType},
         ${documentName},
         ${fileUrl},
+        ${filePath},
+        ${file.originalFilename || 'document'},
         ${file.size},
         ${file.mimetype},
         ${expiryDate ? new Date(expiryDate) : null},
         ${issuedDate ? new Date(issuedDate) : null},
         ${issuingAuthority || null},
         ${documentNumber || null},
-        ${'pending'}
+        ${'pending'},
+        ${'pending'},
+        NOW()
       )
       RETURNING *
     `;
@@ -184,14 +200,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Staff document upload error', { error: errorMessage });
 
-    // Cleanup: Remove uploaded file from local storage if DB insert failed
+    // Cleanup: Remove uploaded file from VF Storage if DB insert failed
     if (uploadedToStorage && storagePath) {
       try {
-        await localFileStorage.deleteFile(storagePath);
-        logger.info('Cleaned up local file after error', { path: storagePath });
+        // Parse the path to extract filename
+        // Path format: staff/documents/{staffId}_{filename}
+        const pathParts = storagePath.split('/');
+        if (pathParts.length >= 3) {
+          const filename = pathParts[pathParts.length - 1];
+          // Extract staffId from filename prefix
+          const staffIdFromFilename = filename.split('_')[0];
+          await deleteStaffDocument(staffIdFromFilename, filename);
+          logger.info('Cleaned up VF Storage file after error', { path: storagePath });
+        }
       } catch (cleanupError: unknown) {
         const cleanupMsg = cleanupError instanceof Error ? cleanupError.message : 'Unknown';
-        logger.error('Failed to cleanup local file', { error: cleanupMsg });
+        logger.error('Failed to cleanup VF Storage file', { error: cleanupMsg });
       }
     }
 

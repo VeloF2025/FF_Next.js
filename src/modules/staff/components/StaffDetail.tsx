@@ -21,12 +21,32 @@ export function StaffDetail() {
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this staff member?')) return;
-    
+
     try {
       await deleteMutation.mutateAsync(id!);
       router.push('/app/staff');
     } catch (error) {
       alert('Failed to delete staff member');
+    }
+  };
+
+  const handleVerifyDocument = async (documentId: string, status: 'verified' | 'rejected', notes?: string) => {
+    try {
+      const response = await fetch(`/api/staff-documents/${documentId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, notes }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to verify document');
+      }
+
+      // Refresh the page to show updated status
+      router.replace(router.asPath);
+    } catch (error) {
+      log.error('Document verification failed', { documentId, error });
+      alert('Failed to verify document');
     }
   };
 
@@ -147,7 +167,7 @@ export function StaffDetail() {
         <div className="p-6">
           {/* Documents Tab */}
           {activeTab === 'documents' && (
-            <StaffDocumentList staffId={id} />
+            <StaffDocumentList staffId={id} isAdmin={true} onVerify={handleVerifyDocument} />
           )}
 
           {/* Projects Tab */}
