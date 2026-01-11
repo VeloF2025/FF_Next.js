@@ -202,6 +202,13 @@ export function StaffDocumentUploadWizard({
     }
   };
 
+  const handleLabelClick = () => {
+    const fileInput = document.getElementById('wizard-file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
   // =========================================================================
   // Step 2: OCR Processing
   // =========================================================================
@@ -417,11 +424,13 @@ export function StaffDocumentUploadWizard({
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 onChange={handleFileChange}
-                className="sr-only"
+                className="absolute opacity-0 w-px h-px"
                 id="wizard-file-upload"
+                aria-label="Upload document file"
               />
               <label
                 htmlFor="wizard-file-upload"
+                onClick={handleLabelClick}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
