@@ -181,6 +181,27 @@ export function StaffDocumentUploadWizard({
     }
   };
 
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      handleFileSelected(droppedFile);
+    }
+  };
+
   // =========================================================================
   // Step 2: OCR Processing
   // =========================================================================
@@ -401,6 +422,9 @@ export function StaffDocumentUploadWizard({
               />
               <label
                 htmlFor="wizard-file-upload"
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
                 className="flex items-center justify-center gap-3 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] hover:border-blue-400 hover:bg-blue-500/10"
               >
                 <Upload className="h-8 w-8 text-[var(--ff-text-secondary)]" />
