@@ -160,7 +160,12 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
   return (
     <div className="space-y-6">
       {/* Header */}
-      <TicketHeader ticket={ticket} backLink={backLink} />
+      <TicketHeader
+        ticket={ticket}
+        backLink={backLink}
+        onStatusChange={handleActionComplete}
+        onPriorityChange={handleActionComplete}
+      />
 
       {/* Tab Navigation */}
       <div className="border-b border-[var(--ff-border-light)]">

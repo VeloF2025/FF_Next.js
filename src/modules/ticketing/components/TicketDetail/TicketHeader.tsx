@@ -31,7 +31,8 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { TicketStatusBadge } from '../TicketList/TicketStatusBadge';
+import { ClickableStatusBadge } from './ClickableStatusBadge';
+import { ClickablePriorityBadge } from './ClickablePriorityBadge';
 import type { EnrichedTicket } from '../../types/ticket';
 
 interface TicketHeaderProps {
@@ -39,21 +40,10 @@ interface TicketHeaderProps {
   ticket: EnrichedTicket;
   /** Back link URL */
   backLink?: string;
-}
-
-/**
- * 🟢 WORKING: Get priority badge styling
- */
-function getPriorityBadgeStyle(priority: string): string {
-  const priorityColors: Record<string, string> = {
-    low: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-    normal: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    high: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    urgent: 'bg-red-500/20 text-red-400 border-red-500/30',
-    critical: 'bg-red-600/20 text-red-500 border-red-600/30',
-  };
-
-  return priorityColors[priority] || priorityColors.normal;
+  /** Callback when status changes */
+  onStatusChange?: (newStatus: string) => void;
+  /** Callback when priority changes */
+  onPriorityChange?: (newPriority: string) => void;
 }
 
 /**
@@ -66,7 +56,7 @@ function getGoogleMapsUrl(lat: number, lng: number): string {
 /**
  * 🟢 WORKING: Ticket header component
  */
-export function TicketHeader({ ticket, backLink = '/ticketing/tickets' }: TicketHeaderProps) {
+export function TicketHeader({ ticket, backLink = '/ticketing/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
   // Get GPS coordinates from enrichment or ticket
   const gps = ticket.fibreflow_enrichment?.fibreflow_gps
     || ticket.fibreflow_enrichment?.onemap_gps
@@ -89,17 +79,20 @@ export function TicketHeader({ ticket, backLink = '/ticketing/tickets' }: Ticket
           <h1 className="text-3xl font-bold text-[var(--ff-text-primary)] mb-2">{ticket.ticket_uid}</h1>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <TicketStatusBadge status={ticket.status} showIcon />
+            <ClickableStatusBadge
+              status={ticket.status}
+              ticketId={ticket.id}
+              onStatusChange={onStatusChange}
+              showIcon
+            />
 
             {/* Priority Badge */}
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border uppercase',
-                getPriorityBadgeStyle(ticket.priority)
-              )}
-            >
-              {ticket.priority}
-            </span>
+            <ClickablePriorityBadge
+              priority={ticket.priority}
+              ticketId={ticket.id}
+              onPriorityChange={onPriorityChange}
+              showIcon
+            />
 
             {/* Source Badge */}
             {ticket.source && (
