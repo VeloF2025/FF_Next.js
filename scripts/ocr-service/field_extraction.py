@@ -424,6 +424,13 @@ def classify_document(text: str) -> ClassificationResult:
         # Combined score (keywords weighted more)
         total_score = keyword_score * 0.6 + pattern_score * 0.4
 
+        # Boost confidence for strong evidence (many keywords AND patterns matched)
+        # ID documents with 5+ keywords and 2+ patterns are very likely correct
+        if len(matched_kw) >= 5 and len(matched_pt) >= 2:
+            total_score = max(total_score, 0.90)  # Floor at 90%
+        elif len(matched_kw) >= 3 and len(matched_pt) >= 1:
+            total_score = max(total_score, 0.85)  # Floor at 85%
+
         if total_score > best_score:
             best_score = total_score
             best_match = doc_type
