@@ -358,23 +358,32 @@ export function StaffDocumentUploadWizard({
         ...state.fieldOverrides,
       };
 
-      // Extract common fields
-      const documentNumber = finalFields.documentNumber || finalFields.idNumber || '';
-      const issuedDate = finalFields.issuedDate || finalFields.issueDate || '';
-      const expiryDate = finalFields.expiryDate || finalFields.expirationDate || '';
-      const issuingAuthority = finalFields.issuingAuthority || '';
+      // Helper to extract value from OCR field objects or raw values
+      const extractValue = (field: unknown): string => {
+        if (field === null || field === undefined) return '';
+        if (typeof field === 'object' && 'value' in field) {
+          return String((field as { value: unknown }).value ?? '');
+        }
+        return String(field);
+      };
+
+      // Extract common fields (handle both OCR field objects and raw values)
+      const documentNumber = extractValue(finalFields.documentNumber) || extractValue(finalFields.idNumber);
+      const issuedDate = extractValue(finalFields.issuedDate) || extractValue(finalFields.issueDate);
+      const expiryDate = extractValue(finalFields.expiryDate) || extractValue(finalFields.expirationDate);
+      const issuingAuthority = extractValue(finalFields.issuingAuthority);
 
       if (documentNumber) {
-        formData.append('documentNumber', String(documentNumber));
+        formData.append('documentNumber', documentNumber);
       }
       if (issuedDate) {
-        formData.append('issuedDate', String(issuedDate));
+        formData.append('issuedDate', issuedDate);
       }
       if (expiryDate) {
-        formData.append('expiryDate', String(expiryDate));
+        formData.append('expiryDate', expiryDate);
       }
       if (issuingAuthority) {
-        formData.append('issuingAuthority', String(issuingAuthority));
+        formData.append('issuingAuthority', issuingAuthority);
       }
 
       // Upload document
@@ -735,16 +744,22 @@ export function StaffDocumentUploadWizard({
             <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
               <p className="text-xs text-[var(--ff-text-secondary)] mb-2">Extracted Data</p>
               <div className="space-y-1">
-                {Object.entries(finalFields).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--ff-text-secondary)]">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}:
-                    </span>
-                    <span className="text-[var(--ff-text-primary)] font-medium">
-                      {String(value)}
-                    </span>
-                  </div>
-                ))}
+                {Object.entries(finalFields).map(([key, value]) => {
+                  // Handle both raw values and OCR field objects {value, confidence, validated}
+                  const displayValue = typeof value === 'object' && value !== null && 'value' in value
+                    ? String((value as { value: unknown }).value ?? '')
+                    : String(value ?? '');
+                  return (
+                    <div key={key} className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--ff-text-secondary)]">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}:
+                      </span>
+                      <span className="text-[var(--ff-text-primary)] font-medium">
+                        {displayValue}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
