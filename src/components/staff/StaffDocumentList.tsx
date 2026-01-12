@@ -35,6 +35,8 @@ import {
   DOCUMENT_CATEGORY_LABELS,
 } from '@/types/staff-document.types';
 import { StaffDocumentUploadWizard } from './StaffDocumentUploadWizard';
+import { DocumentVerificationPanel } from './DocumentVerificationPanel';
+import type { DocumentVerification } from '@/types/staff-document.types';
 import { createLogger } from '@/lib/logger';
 import { useOcrExtraction } from '@/hooks/useOcrExtraction';
 import { OcrResultsModal } from '@/components/shared/OcrResultsModal';
@@ -72,6 +74,9 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Verification panel state
+  const [selectedDocForVerification, setSelectedDocForVerification] = useState<StaffDocument | null>(null);
 
   // OCR state
   const [ocrStatuses, setOcrStatuses] = useState<Record<string, OcrDocumentStatus>>({});
@@ -147,6 +152,66 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
   const handleUploadSuccess = () => {
     setShowUploadForm(false);
     fetchDocuments();
+  };
+
+  // =========================================================================
+  // Verification Panel Handlers
+  // =========================================================================
+
+  /**
+   * Handle document verification from the panel
+   */
+  const handlePanelVerify = async (
+    documentId: string,
+    verification: DocumentVerification
+  ): Promise<{ success: boolean }> => {
+    try {
+      const response = await fetch(`/api/staff-documents/${documentId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(verification),
+      });
+
+      if (!response.ok) {
+        throw new Error('Verification failed');
+      }
+
+      // Update local state
+      setDocuments((prev) =>
+        prev.map((d) =>
+          d.id === documentId
+            ? { ...d, verificationStatus: verification.status }
+            : d
+        )
+      );
+
+      // Also call parent onVerify if provided (for backward compatibility)
+      if (onVerify) {
+        onVerify(documentId, verification.status, verification.notes);
+      }
+
+      logger.info('Document verified via panel', { documentId, status: verification.status });
+      return { success: true };
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Unknown error';
+      logger.error('Verification failed', { documentId, error: errMsg });
+      throw err;
+    }
+  };
+
+  /**
+   * Open verification panel for a document
+   */
+  const handleOpenVerificationPanel = (doc: StaffDocument) => {
+    setSelectedDocForVerification(doc);
+  };
+
+  /**
+   * Close verification panel
+   */
+  const handleCloseVerificationPanel = () => {
+    setSelectedDocForVerification(null);
+    fetchDocuments(); // Refresh to get updated status
   };
 
   // =========================================================================
@@ -447,8 +512,19 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
         </div>
       ) : (
         <div className="divide-y divide-[var(--ff-border-light)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-          {filteredDocuments.map((doc) => (
-            <div key={doc.id} className="p-4 bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
+          {filteredDocuments.map((doc) => {
+            const canOpenPanel = isAdmin && doc.verificationStatus === 'pending';
+            return (
+            <div
+              key={doc.id}
+              className={`p-4 bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors ${
+                canOpenPanel ? 'cursor-pointer' : ''
+              }`}
+              onClick={canOpenPanel ? () => handleOpenVerificationPanel(doc) : undefined}
+              role={canOpenPanel ? 'button' : undefined}
+              tabIndex={canOpenPanel ? 0 : undefined}
+              onKeyDown={canOpenPanel ? (e) => e.key === 'Enter' && handleOpenVerificationPanel(doc) : undefined}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 flex-1">
                   <div className="p-2 bg-[var(--ff-bg-tertiary)] rounded-lg">
@@ -473,8 +549,8 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1">
+                {/* Actions - stop propagation to prevent row click */}
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   {/* OCR Extract Data button - only for eligible documents */}
                   {isOcrEligible(doc.documentType) && (
                     <>
@@ -519,11 +595,11 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
                   >
                     <Download className="h-4 w-4" />
                   </a>
-                  {isAdmin && doc.verificationStatus === 'pending' && onVerify && (
+                  {isAdmin && doc.verificationStatus === 'pending' && (
                     <button
-                      onClick={() => onVerify(doc.id, 'verified')}
+                      onClick={() => handleOpenVerificationPanel(doc)}
                       className="p-2 text-[var(--ff-text-secondary)] hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
-                      title="Verify"
+                      title="Review & Verify"
                     >
                       <Shield className="h-4 w-4" />
                     </button>
@@ -543,7 +619,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 
@@ -586,6 +662,18 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
               <XCircle className="h-4 w-4" />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Document Verification Panel Modal */}
+      {selectedDocForVerification && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <DocumentVerificationPanel
+            document={selectedDocForVerification}
+            onVerify={handlePanelVerify}
+            onClose={handleCloseVerificationPanel}
+            isAdmin={isAdmin}
+          />
         </div>
       )}
 
