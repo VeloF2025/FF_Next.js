@@ -399,7 +399,14 @@ def classify_document(text: str) -> ClassificationResult:
     for doc_type, keywords in DOCUMENT_KEYWORDS.items():
         # Count keyword matches
         matched_kw = [kw for kw in keywords if kw.upper() in upper_text]
-        keyword_score = len(matched_kw) / len(keywords) if keywords else 0
+
+        # For large keyword sets, use absolute count-based scoring
+        # This prevents dilution when many keywords are defined
+        if len(keywords) > 20:
+            # ID documents: need at least 2 matches, score based on count
+            keyword_score = min(len(matched_kw) / 5.0, 1.0)  # 5+ matches = 100%
+        else:
+            keyword_score = len(matched_kw) / len(keywords) if keywords else 0
 
         # Count pattern matches
         patterns = DOCUMENT_PATTERNS.get(doc_type, [])
@@ -408,6 +415,11 @@ def classify_document(text: str) -> ClassificationResult:
             if re.search(pattern, text, re.IGNORECASE):
                 matched_pt.append(pattern)
         pattern_score = len(matched_pt) / len(patterns) if patterns else 0
+
+        # For non-ID documents, require at least 1 keyword match for patterns to count
+        # This prevents bank_details from matching on numeric patterns alone
+        if doc_type != DocumentType.ID_DOCUMENT and len(matched_kw) == 0:
+            pattern_score = 0  # Don't count patterns without keyword evidence
 
         # Combined score (keywords weighted more)
         total_score = keyword_score * 0.6 + pattern_score * 0.4
