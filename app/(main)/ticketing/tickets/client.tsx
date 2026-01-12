@@ -36,7 +36,7 @@ const KanbanIcon = () => (
 );
 
 export default function TicketsListPageClient() {
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   // Load saved preference from localStorage
   useEffect(() => {

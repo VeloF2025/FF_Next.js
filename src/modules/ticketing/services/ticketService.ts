@@ -468,6 +468,17 @@ export async function listTickets(
     values.push(offset);
     const offsetParam = paramCounter;
 
+    // 🟢 WORKING: First get the total count (without pagination)
+    const countSql = `
+      SELECT COUNT(*) as count
+      FROM tickets t
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached)\b/g, 't.$1') : ''}
+    `;
+    // Count query uses same filter values but without LIMIT/OFFSET
+    const countValues = values.slice(0, -2); // Remove the last two values (limit and offset)
+    const countResult = await queryOne<{ count: string }>(countSql, countValues);
+    const totalCount = parseInt(countResult?.count || '0', 10);
+
     // 🟢 WORKING: Query with pagination, ordering, and assigned user info
     const sql = `
       SELECT
@@ -491,16 +502,17 @@ export async function listTickets(
 
     logger.debug('Tickets fetched successfully', {
       count: tickets.length,
+      total: totalCount,
       page,
       pageSize
     });
 
     return {
       tickets,
-      total: tickets.length,
+      total: totalCount,
       page,
       limit: pageSize,
-      total_pages: Math.ceil(tickets.length / pageSize)
+      total_pages: Math.ceil(totalCount / pageSize)
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

@@ -114,7 +114,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: result.tickets,
-      pagination: result.pagination,
+      pagination: {
+        page: result.page,
+        pageSize: result.limit,
+        total: result.total,
+        totalPages: result.total_pages,
+      },
       meta: {
         timestamp: new Date().toISOString(),
       },
