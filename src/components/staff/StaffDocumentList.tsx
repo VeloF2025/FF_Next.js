@@ -3,9 +3,10 @@
 /**
  * Staff Document List
  * Displays and manages staff documents with filtering and actions
+ * Includes OCR extraction features (PRD-032)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   FileText,
   Download,
@@ -19,6 +20,9 @@ import {
   Eye,
   Shield,
   Search,
+  Scan,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 import {
   StaffDocument,
@@ -30,8 +34,17 @@ import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_CATEGORY_LABELS,
 } from '@/types/staff-document.types';
-import { StaffDocumentUploadForm } from './StaffDocumentUploadForm';
+import { StaffDocumentUploadWizard } from './StaffDocumentUploadWizard';
 import { createLogger } from '@/lib/logger';
+import { useOcrExtraction } from '@/hooks/useOcrExtraction';
+import { OcrResultsModal } from '@/components/shared/OcrResultsModal';
+import {
+  OcrDocumentTable,
+  OcrEntityType,
+  OcrStatus,
+  type FieldsToApply,
+} from '@/types/ocr.types';
+import { OCR_ELIGIBLE_DOCUMENT_TYPES } from '@/config/ocrFieldMappings';
 
 const logger = createLogger('StaffDocumentList');
 
@@ -39,9 +52,18 @@ interface StaffDocumentListProps {
   staffId: string;
   isAdmin?: boolean;
   onVerify?: (documentId: string, status: 'verified' | 'rejected', notes?: string) => void;
+  /** Callback when OCR fields are applied to refresh parent data */
+  onOcrApplied?: () => void;
 }
 
-export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffDocumentListProps) {
+// OCR status stored per document
+interface OcrDocumentStatus {
+  hasOcrResult: boolean;
+  ocrStatus?: OcrStatus;
+  extractedFieldCount?: number;
+}
+
+export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApplied }: StaffDocumentListProps) {
   const [documents, setDocuments] = useState<StaffDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +72,27 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // OCR state
+  const [ocrStatuses, setOcrStatuses] = useState<Record<string, OcrDocumentStatus>>({});
+  const [processingDocId, setProcessingDocId] = useState<string | null>(null);
+  const [showOcrModal, setShowOcrModal] = useState(false);
+  const [selectedDocForOcr, setSelectedDocForOcr] = useState<StaffDocument | null>(null);
+
+  // OCR extraction hook
+  const {
+    result: ocrResult,
+    currentEntityData,
+    isProcessing: isOcrProcessing,
+    isPolling,
+    isConfirming,
+    error: ocrError,
+    processDocument,
+    getResults,
+    confirmFields,
+    clearResult,
+    clearError: clearOcrError,
+  } = useOcrExtraction();
 
   const fetchDocuments = async () => {
     setIsLoading(true);
@@ -104,6 +147,134 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
   const handleUploadSuccess = () => {
     setShowUploadForm(false);
     fetchDocuments();
+  };
+
+  // =========================================================================
+  // OCR Handlers
+  // =========================================================================
+
+  /**
+   * Check if a document type is eligible for OCR extraction
+   */
+  const isOcrEligible = useCallback((documentType: string): boolean => {
+    return documentType in OCR_ELIGIBLE_DOCUMENT_TYPES;
+  }, []);
+
+  /**
+   * Handle Extract Data button click
+   */
+  const handleExtractData = useCallback(
+    async (doc: StaffDocument) => {
+      setProcessingDocId(doc.id);
+      setSelectedDocForOcr(doc);
+      clearOcrError();
+
+      try {
+        await processDocument(
+          doc.id,
+          OcrDocumentTable.STAFF_DOCUMENTS,
+          OcrEntityType.STAFF,
+          staffId
+        );
+      } catch (err) {
+        logger.error('OCR processing failed', { documentId: doc.id, error: err });
+      }
+    },
+    [processDocument, staffId, clearOcrError]
+  );
+
+  /**
+   * View existing OCR results
+   */
+  const handleViewOcrResults = useCallback(
+    async (doc: StaffDocument) => {
+      setSelectedDocForOcr(doc);
+      await getResults(doc.id, OcrDocumentTable.STAFF_DOCUMENTS);
+      setShowOcrModal(true);
+    },
+    [getResults]
+  );
+
+  /**
+   * Handle OCR confirmation
+   */
+  const handleOcrConfirm = useCallback(
+    async (fieldsToApply: FieldsToApply) => {
+      if (!ocrResult) return;
+
+      const response = await confirmFields(ocrResult.id, fieldsToApply);
+
+      if (response?.success) {
+        logger.info('OCR fields applied', {
+          ocrResultId: ocrResult.id,
+          fieldsApplied: response.appliedFields
+        });
+
+        // Update OCR status for this document
+        if (selectedDocForOcr) {
+          setOcrStatuses((prev) => ({
+            ...prev,
+            [selectedDocForOcr.id]: {
+              hasOcrResult: true,
+              ocrStatus: OcrStatus.CONFIRMED,
+              extractedFieldCount: response.appliedFields.length,
+            },
+          }));
+        }
+
+        // Close modal and notify parent
+        setShowOcrModal(false);
+        clearResult();
+        onOcrApplied?.();
+      }
+    },
+    [ocrResult, confirmFields, selectedDocForOcr, clearResult, onOcrApplied]
+  );
+
+  /**
+   * Close OCR modal
+   */
+  const handleCloseOcrModal = useCallback(() => {
+    setShowOcrModal(false);
+    setSelectedDocForOcr(null);
+    clearResult();
+  }, [clearResult]);
+
+  // Show OCR modal when result is ready
+  useEffect(() => {
+    if (ocrResult && processingDocId && !isOcrProcessing && !isPolling) {
+      setShowOcrModal(true);
+      setProcessingDocId(null);
+    }
+  }, [ocrResult, processingDocId, isOcrProcessing, isPolling]);
+
+  /**
+   * Get OCR status badge for a document
+   */
+  const getOcrStatusBadge = (doc: StaffDocument) => {
+    const status = ocrStatuses[doc.id];
+
+    if (!status?.hasOcrResult) return null;
+
+    if (status.ocrStatus === OcrStatus.CONFIRMED) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400">
+          <Sparkles className="h-3 w-3" />
+          Data Extracted
+        </span>
+      );
+    }
+
+    if (status.ocrStatus === OcrStatus.PENDING) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-purple-500/20 text-purple-400">
+          <Scan className="h-3 w-3" />
+          Review Available
+        </span>
+      );
+    }
+
+    return null;
   };
 
   // Filter documents
@@ -287,6 +458,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-medium text-[var(--ff-text-primary)] truncate">{doc.documentName}</h4>
                       {getStatusBadge(doc.verificationStatus)}
+                      {getOcrStatusBadge(doc)}
                     </div>
                     <p className="text-xs text-[var(--ff-text-secondary)] mt-0.5">{DOCUMENT_TYPE_LABELS[doc.documentType]}</p>
                     {doc.documentNumber && (
@@ -303,6 +475,33 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
+                  {/* OCR Extract Data button - only for eligible documents */}
+                  {isOcrEligible(doc.documentType) && (
+                    <>
+                      {processingDocId === doc.id ? (
+                        <span className="p-2 text-purple-400">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </span>
+                      ) : ocrStatuses[doc.id]?.hasOcrResult ? (
+                        <button
+                          onClick={() => handleViewOcrResults(doc)}
+                          className="p-2 text-[var(--ff-text-secondary)] hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                          title="View Extracted Data"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleExtractData(doc)}
+                          disabled={isOcrProcessing || isPolling}
+                          className="p-2 text-[var(--ff-text-secondary)] hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors disabled:opacity-50"
+                          title="Extract Data from Document"
+                        >
+                          <Scan className="h-4 w-4" />
+                        </button>
+                      )}
+                    </>
+                  )}
                   <a
                     href={`/api/staff-documents-download?documentId=${doc.id}&inline=true`}
                     target="_blank"
@@ -362,12 +561,43 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify }: StaffD
         </span>
       </div>
 
-      {/* Upload form modal */}
+      {/* Upload wizard modal - OCR-first flow (PRD-033) */}
       {showUploadForm && (
-        <StaffDocumentUploadForm
+        <StaffDocumentUploadWizard
           staffId={staffId}
           onSuccess={handleUploadSuccess}
           onCancel={() => setShowUploadForm(false)}
+        />
+      )}
+
+      {/* OCR Error */}
+      {ocrError && (
+        <div className="fixed bottom-4 right-4 p-4 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm max-w-md z-50">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium">OCR Processing Error</p>
+              <p className="text-xs mt-1 opacity-80">{ocrError}</p>
+            </div>
+            <button
+              onClick={clearOcrError}
+              className="text-red-400 hover:text-red-300"
+            >
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* OCR Results Modal */}
+      {ocrResult && (
+        <OcrResultsModal
+          result={ocrResult}
+          currentEntityData={currentEntityData}
+          isOpen={showOcrModal}
+          onClose={handleCloseOcrModal}
+          onConfirm={handleOcrConfirm}
+          isConfirming={isConfirming}
         />
       )}
     </div>

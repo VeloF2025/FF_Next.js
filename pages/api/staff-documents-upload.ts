@@ -65,6 +65,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const expiryDate = Array.isArray(fields.expiryDate) ? fields.expiryDate[0] : fields.expiryDate;
     const issuingAuthority = Array.isArray(fields.issuingAuthority) ? fields.issuingAuthority[0] : fields.issuingAuthority;
 
+    // OCR-first flow fields (PRD-033)
+    const ocrConfirmedRaw = Array.isArray(fields.ocrConfirmed) ? fields.ocrConfirmed[0] : fields.ocrConfirmed;
+    const ocrConfirmed = ocrConfirmedRaw === 'true';
+
     // Validate required fields
     if (!staffId || !documentType || !documentName) {
       return res.status(400).json({
@@ -190,7 +194,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       throw new Error('Failed to create document record');
     }
 
-    logger.info('Staff document uploaded', { staffId, documentType, documentId: document.id });
+    logger.info('Staff document uploaded', { staffId, documentType, documentId: document.id, ocrConfirmed });
+
+    // PRD-033: If OCR was confirmed by user, skip webhook (already processed)
+    if (!ocrConfirmed) {
+      // Trigger autonomous OCR processing webhook (fire and forget)
+      triggerOcrWebhook({
+        documentId: document.id as string,
+        documentTable: 'staff_documents',
+        entityType: 'staff',
+        entityId: staffId,
+        documentType: documentType,
+        fileName: file.originalFilename || 'document',
+        fileUrl: fileUrl,
+      }).catch((err) => {
+        // Log but don't fail the upload if webhook fails
+        logger.warn('OCR webhook trigger failed', { error: String(err), documentId: document.id });
+      });
+    } else {
+      logger.info('OCR webhook skipped - user confirmed OCR results', { documentId: document.id });
+    }
 
     return res.status(201).json({
       success: true,
@@ -208,10 +231,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const pathParts = storagePath.split('/');
         if (pathParts.length >= 3) {
           const filename = pathParts[pathParts.length - 1];
-          // Extract staffId from filename prefix
-          const staffIdFromFilename = filename.split('_')[0];
-          await deleteStaffDocument(staffIdFromFilename, filename);
-          logger.info('Cleaned up VF Storage file after error', { path: storagePath });
+          if (filename) {
+            // Extract staffId from filename prefix
+            const staffIdFromFilename = filename.split('_')[0];
+            if (staffIdFromFilename) {
+              await deleteStaffDocument(staffIdFromFilename, filename);
+              logger.info('Cleaned up VF Storage file after error', { path: storagePath });
+            }
+          }
         }
       } catch (cleanupError: unknown) {
         const cleanupMsg = cleanupError instanceof Error ? cleanupError.message : 'Unknown';
@@ -286,4 +313,35 @@ function mapDbToDocument(row: Record<string, unknown>) {
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
   };
+}
+
+// Trigger OCR webhook for autonomous processing
+interface OcrWebhookPayload {
+  documentId: string;
+  documentTable: 'staff_documents' | 'contractor_documents';
+  entityType: 'staff' | 'contractor';
+  entityId: string;
+  documentType: string;
+  fileName: string;
+  fileUrl: string;
+}
+
+async function triggerOcrWebhook(payload: OcrWebhookPayload): Promise<void> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+
+  const response = await fetch(`${baseUrl}/api/webhooks/document-uploaded`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...payload,
+      uploadedAt: new Date().toISOString(),
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Webhook failed: ${response.status} - ${error}`);
+  }
+
+  logger.info('OCR webhook triggered successfully', { documentId: payload.documentId });
 }
