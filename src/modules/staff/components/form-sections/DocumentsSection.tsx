@@ -5,15 +5,13 @@
 
 import { FileText, Info } from 'lucide-react';
 import { StaffDocumentList } from '@/components/staff/StaffDocumentList';
-import { ContractType } from '@/types/staff.types';
 
 interface DocumentsSectionProps {
   staffId: string | undefined;
   isEditing: boolean;
-  contractType?: ContractType;
 }
 
-export function DocumentsSection({ staffId, isEditing, contractType }: DocumentsSectionProps) {
+export function DocumentsSection({ staffId, isEditing }: DocumentsSectionProps) {
   // Only show when editing (need staff ID for document uploads)
   if (!isEditing || !staffId) {
     return (
@@ -39,9 +37,6 @@ export function DocumentsSection({ staffId, isEditing, contractType }: Documents
     );
   }
 
-  // Determine if this is an employee or contractor based on contract type
-  const isEmployee = contractType !== ContractType.CONTRACTOR;
-
   return (
     <div>
       <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4 flex items-center gap-2">
@@ -50,7 +45,6 @@ export function DocumentsSection({ staffId, isEditing, contractType }: Documents
       </h2>
       <StaffDocumentList
         staffId={staffId}
-        isEmployee={isEmployee}
         isAdmin={true}
       />
     </div>
