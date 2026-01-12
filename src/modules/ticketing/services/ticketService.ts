@@ -450,6 +450,19 @@ export async function listTickets(
       paramCounter++;
     }
 
+    // 🟢 WORKING: Search filter - searches ticket_uid, dr_number, title, and description
+    if (filters.search && filters.search.trim()) {
+      const searchTerm = `%${filters.search.trim()}%`;
+      whereClauses.push(`(
+        ticket_uid ILIKE $${paramCounter} OR
+        dr_number ILIKE $${paramCounter} OR
+        title ILIKE $${paramCounter} OR
+        description ILIKE $${paramCounter}
+      )`);
+      values.push(searchTerm);
+      paramCounter++;
+    }
+
     // 🟢 WORKING: Build WHERE clause
     const whereClause = whereClauses.length > 0
       ? `WHERE ${whereClauses.join(' AND ')}`

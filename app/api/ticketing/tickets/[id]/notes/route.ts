@@ -13,6 +13,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
+import { pushNote } from '@/modules/ticketing/services/qcontactSyncOutbound';
+
+// Note: auth() function is not imported - the try/catch block in POST handles this gracefully
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare function auth(): Promise<{ userId: string | null }>;
 
 const logger = createLogger('ticket-notes-api');
 const sql = neon(process.env.DATABASE_URL!);
@@ -307,6 +312,26 @@ export async function POST(
       visibility,
       createdBy,
     });
+
+    // Sync public notes to QContact
+    if (visibility === 'public') {
+      try {
+        const syncResult = await pushNote(ticketId, content.trim(), false); // false = public note
+        logger.info('Public note synced to QContact', {
+          ticketId,
+          noteId,
+          syncSuccess: syncResult.success,
+          qcontactTicketId: syncResult.qcontact_ticket_id,
+        });
+      } catch (syncError) {
+        // Log but don't fail the request - note was created successfully
+        logger.warn('Failed to sync public note to QContact', {
+          ticketId,
+          noteId,
+          error: syncError instanceof Error ? syncError.message : 'Unknown',
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

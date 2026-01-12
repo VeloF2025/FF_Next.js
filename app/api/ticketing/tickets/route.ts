@@ -99,6 +99,11 @@ export async function GET(req: NextRequest) {
       filters.sla_breached = searchParams.get('sla_breached') === 'true';
     }
 
+    // Search term
+    if (searchParams.has('search')) {
+      filters.search = searchParams.get('search')!;
+    }
+
     // Pagination
     if (searchParams.has('page')) {
       filters.page = parseInt(searchParams.get('page')!, 10);
