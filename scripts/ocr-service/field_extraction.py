@@ -66,14 +66,21 @@ class ExtractionResult:
 # Document type detection keywords
 DOCUMENT_KEYWORDS = {
     DocumentType.ID_DOCUMENT: [
+        # Primary identifiers (appear on both old and new IDs)
         "REPUBLIC OF SOUTH AFRICA",
-        "REPUBLIEK VAN SUID-AFRIKA",
         "IDENTITY",
-        "IDENTITEIT",
-        "ID NUMBER",
-        "IDENTITEITSNOMMER",
+        # Smart ID Card specific
+        "NATIONAL IDENTITY CARD",
+        "IDENTITY NUMBER",
+        "SURNAME",
+        "NATIONALITY",
+        # Old ID Book specific
         "DEPARTMENT OF HOME AFFAIRS",
-        "SMART ID",
+        "ID NUMBER",
+        # Afrikaans variants (old ID books)
+        "REPUBLIEK VAN SUID-AFRIKA",
+        "IDENTITEIT",
+        "IDENTITEITSNOMMER",
     ],
     DocumentType.BANK_DETAILS: [
         "BANK",
@@ -126,7 +133,10 @@ DOCUMENT_KEYWORDS = {
 
 # Document type patterns
 DOCUMENT_PATTERNS = {
-    DocumentType.ID_DOCUMENT: [r"\d{13}"],  # SA ID number
+    DocumentType.ID_DOCUMENT: [
+        r"\d{13}",  # SA ID number (13 digits)
+        r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date: "03 FEB 1978"
+    ],
     DocumentType.BANK_DETAILS: [r"\d{9,12}", r"\d{6}"],  # Account and branch
     DocumentType.TAX_DOCUMENT: [r"\d{10}", r"IRP5"],  # Tax number
     DocumentType.CIPC_REGISTRATION: [r"\d{4}/\d{6}/\d{2}"],  # CIPC format
@@ -138,13 +148,20 @@ DOCUMENT_PATTERNS = {
 FIELD_MAPPINGS = {
     DocumentType.ID_DOCUMENT: {
         EntityType.STAFF: {
+            # ID Number variants
+            "Identity Number": "idNumber",
             "ID Number": "idNumber",
+            # Name fields
             "Surname": "lastName",
-            "First Names": "firstName",
             "Names": "firstName",
+            "First Names": "firstName",
+            # Date and demographics
             "Date of Birth": "dateOfBirth",
+            "Sex": "gender",
             "Gender": "gender",
             "Nationality": "nationality",
+            "Country of Birth": "countryOfBirth",
+            "Status": "citizenshipStatus",
         },
     },
     DocumentType.BANK_DETAILS: {
