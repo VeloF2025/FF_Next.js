@@ -205,21 +205,37 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
   documentType: 'id_document',
   displayName: 'SA ID Document',
   keywords: [
+    // Primary identifiers (high weight - appear on both old and new IDs)
     'REPUBLIC OF SOUTH AFRICA',
-    'REPUBLIEK VAN SUID-AFRIKA',
     'IDENTITY',
-    'IDENTITEIT',
-    'ID NUMBER',
-    'IDENTITEITSNOMMER',
+    // Smart ID Card specific
+    'NATIONAL IDENTITY CARD',
+    'IDENTITY NUMBER',
+    'SURNAME',
+    'NATIONALITY',
+    // Old ID Book specific
     'DEPARTMENT OF HOME AFFAIRS',
-    'SMART ID',
+    'ID NUMBER',
+    // Afrikaans variants (old ID books)
+    'REPUBLIEK VAN SUID-AFRIKA',
+    'IDENTITEIT',
+    'IDENTITEITSNOMMER',
   ],
   patterns: [
-    /\d{13}/, // SA ID number
-    /\d{2}[.\-/]\d{2}[.\-/]\d{2,4}/, // Date format
+    /\d{13}/, // SA ID number (13 digits)
+    /\d{2}\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}/i, // Date: "03 FEB 1978"
+    /\d{2}[.\-/]\d{2}[.\-/]\d{2,4}/, // Numeric date format
   ],
   entityType: OcrEntityType.STAFF,
   fieldMappings: [
+    // ID Number - multiple label variants
+    {
+      ocrLabel: 'Identity Number',
+      entityField: 'idNumber',
+      validationRules: [
+        { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
+      ],
+    },
     {
       ocrLabel: 'ID Number',
       entityField: 'idNumber',
@@ -227,11 +243,19 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
         { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
       ],
     },
+    // Name fields
     {
       ocrLabel: 'Surname',
       entityField: 'lastName',
       validationRules: [
         { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid surname format' },
+      ],
+    },
+    {
+      ocrLabel: 'Names',
+      entityField: 'firstName',
+      validationRules: [
+        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
       ],
     },
     {
@@ -241,10 +265,15 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
         { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
       ],
     },
+    // Date and demographics
     {
       ocrLabel: 'Date of Birth',
       entityField: 'dateOfBirth',
       transform: 'parseDate',
+    },
+    {
+      ocrLabel: 'Sex',
+      entityField: 'gender',
     },
     {
       ocrLabel: 'Gender',
@@ -256,9 +285,17 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
       entityField: 'countryOfBirth',
     },
     {
+      ocrLabel: 'Nationality',
+      entityField: 'nationality',
+    },
+    {
       ocrLabel: 'Citizenship',
       entityField: 'nationality',
       transform: 'extractCitizenshipFromSAID',
+    },
+    {
+      ocrLabel: 'Status',
+      entityField: 'citizenshipStatus',
     },
   ],
 };
