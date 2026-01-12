@@ -16,6 +16,7 @@
 
 import { queryOne } from '../utils/db';
 import { getDefaultQContactClient } from './qcontactClient';
+import { getDefaultFiberTimeQContactClient } from './fibertimeQContactClient';
 import { TicketStatus } from '../types/ticket';
 import {
   SyncDirection,
@@ -529,9 +530,14 @@ export async function pushNote(
       is_internal: isInternal,
     };
 
-    // Push note to QContact
-    const qcontactClient = getDefaultQContactClient();
-    const response = await qcontactClient.addNote(ticket.external_id, requestPayload);
+    // Push note to QContact using FiberTime client (correct API format)
+    const fibertimeClient = getDefaultFiberTimeQContactClient();
+    const response = await fibertimeClient.addNote(ticket.external_id, noteContent, isInternal);
+
+    // Check if the API call succeeded
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to add note to QContact');
+    }
 
     // Log successful sync
     const syncLogId = await createSyncLog(
@@ -547,6 +553,7 @@ export async function pushNote(
     logger.info('Note pushed successfully', {
       ticketId,
       qcontactTicketId: ticket.external_id,
+      noteId: response.noteId,
       isInternal,
     });
 

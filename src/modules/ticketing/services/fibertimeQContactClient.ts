@@ -712,6 +712,103 @@ export class FiberTimeQContactClient {
   }
 
   /**
+   * Add a note to a case
+   * ⚠️ BLOCKED: QContact Note creation requires elevated permissions
+   *
+   * Current status: The Maintenance - Velocity user account returns 403 Access Denied
+   * when attempting to create notes via the API. FiberTime needs to grant note
+   * creation permissions to the Velocity account.
+   *
+   * @param caseId - QContact case ID (external_id)
+   * @param content - Note text content
+   * @param isInternal - Whether note is internal only (default: false)
+   * @returns Result with success status and error message
+   */
+  async addNote(
+    caseId: string | number,
+    content: string,
+    isInternal: boolean = false
+  ): Promise<{ success: boolean; noteId?: string; error?: string }> {
+    try {
+      logger.info('Adding note to QContact case', { caseId, contentLength: content.length, isInternal });
+
+      // Try creating Note entity directly (correct endpoint, but requires permission)
+      const url = `${this.baseUrl}/api/v2/entities/Note`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          entity_type: 'Case',
+          entity_id: parseInt(String(caseId)),
+          subtitle: content,
+          public_note: !isInternal,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle 401 - try to re-authenticate
+      if (response.status === 401 && this.password) {
+        logger.warn('QContact API returned 401 on addNote, attempting auto-refresh');
+        const authSuccess = await this.authenticate();
+        if (authSuccess) {
+          // Retry the request
+          return this.addNote(caseId, content, isInternal);
+        }
+      }
+
+      // Handle 403 - Permission denied (expected with current account)
+      if (response.status === 403) {
+        logger.warn('QContact note creation denied - Velocity account lacks Note CREATE permission', {
+          caseId,
+          status: response.status,
+        });
+        return {
+          success: false,
+          error: 'Permission denied: Velocity account cannot create notes in QContact. Contact FiberTime to enable note creation permissions.',
+        };
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('Failed to add note to QContact', {
+          caseId,
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 200),
+        });
+        return {
+          success: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+        };
+      }
+
+      const data = await response.json();
+      logger.info('Successfully added note to QContact', { caseId, noteId: data?.id });
+
+      return {
+        success: true,
+        noteId: data?.id?.toString(),
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Error adding note to QContact', { caseId, error: errorMsg });
+      return {
+        success: false,
+        error: errorMsg,
+      };
+    }
+  }
+
+  /**
    * Extract case reference from label
    * e.g., "Connection Issue FT499061" -> "FT499061"
    *       " FT490441" -> "FT490441"
