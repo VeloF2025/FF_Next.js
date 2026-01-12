@@ -47,6 +47,13 @@ export interface StaffMember {
   postalCode: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+
+  // Next of Kin (separate from emergency contact)
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelationship?: string;
+  nextOfKinAddress?: string;
   
   // Employment Terms
   startDate: Timestamp;
@@ -60,8 +67,22 @@ export interface StaffMember {
   taxNumber?: string;
   bankAccountNumber?: string;
   bankName?: string;
+  bankBranchCode?: string;
+  bankAccountType?: 'current' | 'savings' | 'transmission';
   salaryAmount?: number;
   benefitsPackage?: string;
+  noticePeriodDays?: number;
+
+  // SA Identity Documents
+  saIdNumber?: string;
+  passportNumber?: string;
+  passportCountry?: string;
+  passportExpiry?: Timestamp;
+
+  // Probation
+  probationEndDate?: Timestamp;
+  probationExtended?: boolean;
+  probationExtensionReason?: string;
 
   // SA Labour Compliance
   /** South African labour law compliance data */
@@ -127,4 +148,12 @@ export interface StaffMember {
   // Profile
   profilePhotoUrl?: string;
   bio?: string;
+
+  // CV/Resume
+  cvUrl?: string;
+  cvUploadedAt?: Timestamp;
+
+  // Company Vehicle Flag
+  /** Whether staff is assigned a company vehicle (triggers license requirement) */
+  hasCompanyVehicle?: boolean;
 }

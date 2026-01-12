@@ -1,23 +1,69 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Edit, Mail, Phone, Calendar, Briefcase, Award, FileText, FolderKanban, User } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  FileText,
+  FolderKanban,
+  User,
+  Briefcase,
+  Shield,
+  Car,
+  AlertTriangle,
+} from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
-import { format } from 'date-fns';
-import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
 import { StaffDocumentList } from '@/components/staff/StaffDocumentList';
 import { StaffProjectAssignment } from '@/components/staff/StaffProjectAssignment';
+import { OverviewTab } from './tabs/OverviewTab';
+import { EmploymentTab } from './tabs/EmploymentTab';
+import { ComplianceTab } from './tabs/ComplianceTab';
+import { VehiclesTab } from './tabs/VehiclesTab';
+import { DisciplinaryTab } from './tabs/DisciplinaryTab';
+import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
+import { VehicleAssignmentForm } from './VehicleAssignmentForm';
+import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 
-type TabType = 'overview' | 'documents' | 'projects';
+type TabType = 'overview' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects';
+
+const TABS: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'overview', label: 'Overview', icon: User },
+  { id: 'employment', label: 'Employment', icon: Briefcase },
+  { id: 'compliance', label: 'Compliance', icon: Shield },
+  { id: 'vehicles', label: 'Vehicles', icon: Car },
+  { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle },
+  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'projects', label: 'Projects', icon: FolderKanban },
+];
 
 export function StaffDetail() {
   const router = useRouter();
   const { id } = router.query as { id: string };
-  const { data: staff, isLoading, error } = useStaffMember(id || '');
+  const { data: staff, isLoading, error, refetch } = useStaffMember(id || '');
   const deleteMutation = useDeleteStaff();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // Modal states
+  const [showDisciplinaryForm, setShowDisciplinaryForm] = useState(false);
+  const [editingIncident, setEditingIncident] = useState<DisciplinaryIncident | null>(null);
+  const [showVehicleForm, setShowVehicleForm] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<VehicleAssignment | null>(null);
+  const [staffList, setStaffList] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch staff list for issued by dropdown
+  const fetchStaffList = useCallback(async () => {
+    try {
+      const response = await fetch('/api/staff?limit=100');
+      if (response.ok) {
+        const data = await response.json();
+        setStaffList(data.staff?.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })) || []);
+      }
+    } catch (err) {
+      log.error('Failed to fetch staff list', { error: err });
+    }
+  }, []);
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this staff member?')) return;
@@ -25,7 +71,8 @@ export function StaffDetail() {
     try {
       await deleteMutation.mutateAsync(id!);
       router.push('/app/staff');
-    } catch (error) {
+    } catch (err) {
+      log.error('Failed to delete staff member', { error: err });
       alert('Failed to delete staff member');
     }
   };
@@ -42,12 +89,121 @@ export function StaffDetail() {
         throw new Error('Failed to verify document');
       }
 
-      // Refresh the page to show updated status
       router.replace(router.asPath);
-    } catch (error) {
-      log.error('Document verification failed', { documentId, error });
+    } catch (err) {
+      log.error('Document verification failed', { documentId, error: err });
       alert('Failed to verify document');
     }
+  };
+
+  // CV Upload handler
+  const handleCvUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`/api/staff/${id}/cv-upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to upload CV');
+    }
+
+    refetch();
+  };
+
+  const handleCvDelete = async () => {
+    if (!confirm('Are you sure you want to remove the CV?')) return;
+
+    const response = await fetch(`/api/staff/${id}/cv-upload`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete CV');
+    }
+
+    refetch();
+  };
+
+  // Disciplinary handlers
+  const handleAddIncident = () => {
+    fetchStaffList();
+    setEditingIncident(null);
+    setShowDisciplinaryForm(true);
+  };
+
+  const handleEditIncident = (incident: DisciplinaryIncident) => {
+    fetchStaffList();
+    setEditingIncident(incident);
+    setShowDisciplinaryForm(true);
+  };
+
+  const handleSaveIncident = async (incident: Partial<DisciplinaryIncident>) => {
+    const method = incident.id ? 'PUT' : 'POST';
+    const response = await fetch(`/api/staff/${id}/disciplinary`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(incident),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to save incident');
+    }
+
+    router.replace(router.asPath);
+  };
+
+  // Vehicle handlers
+  const handleAddVehicle = () => {
+    setEditingVehicle(null);
+    setShowVehicleForm(true);
+  };
+
+  const handleEditVehicle = (vehicle: VehicleAssignment) => {
+    setEditingVehicle(vehicle);
+    setShowVehicleForm(true);
+  };
+
+  const handleRemoveVehicle = async (vehicleId: string) => {
+    if (!confirm('Are you sure you want to remove this vehicle assignment?')) return;
+
+    const response = await fetch(`/api/staff/${id}/vehicles?vehicleId=${vehicleId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      alert('Failed to remove vehicle assignment');
+      return;
+    }
+
+    router.replace(router.asPath);
+  };
+
+  const handleSaveVehicle = async (vehicle: Partial<VehicleAssignment>) => {
+    const method = vehicle.id ? 'PUT' : 'POST';
+    const response = await fetch(`/api/staff/${id}/vehicles`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(vehicle),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to save vehicle assignment');
+    }
+
+    router.replace(router.asPath);
+  };
+
+  // Document upload handler
+  const handleUploadDocument = (documentType: string) => {
+    // Switch to documents tab with the document type pre-selected
+    setActiveTab('documents');
+    // The StaffDocumentList component handles the actual upload
   };
 
   if (isLoading) {
@@ -60,7 +216,7 @@ export function StaffDetail() {
 
   if (error || !staff) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
           <p className="text-red-400">Staff member not found</p>
         </div>
@@ -68,18 +224,11 @@ export function StaffDetail() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-500/20 text-green-400';
-      case 'on_leave': return 'bg-yellow-500/20 text-yellow-400';
-      case 'inactive': return 'bg-gray-500/20 text-gray-400';
-      case 'suspended': return 'bg-red-500/20 text-red-400';
-      default: return 'bg-gray-500/20 text-gray-400';
-    }
-  };
+  // Check if staff has a valid driver's license
+  const hasValidLicense = staff.complianceComplete || false; // TODO: Check actual license document
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <div className="mb-6">
         <button
           onClick={() => router.push('/staff')}
@@ -102,7 +251,9 @@ export function StaffDetail() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">{staff.name}</h1>
-                <p className="text-sm text-[var(--ff-text-secondary)]">{staff.employeeId}</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">
+                  {staff.position || 'No position'} {staff.employeeId && `• ${staff.employeeId}`}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -125,265 +276,105 @@ export function StaffDetail() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-[var(--ff-border-light)]">
+        <div className="border-b border-[var(--ff-border-light)] overflow-x-auto">
           <nav className="flex -mb-px px-6" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`py-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 ${
-                activeTab === 'overview'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
-              }`}
-            >
-              <User className="h-4 w-4" />
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab('documents')}
-              className={`py-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 ${
-                activeTab === 'documents'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
-              }`}
-            >
-              <FileText className="h-4 w-4" />
-              Documents
-            </button>
-            <button
-              onClick={() => setActiveTab('projects')}
-              className={`py-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 ${
-                activeTab === 'projects'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
-              }`}
-            >
-              <FolderKanban className="h-4 w-4" />
-              Projects
-            </button>
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-3 px-4 text-sm font-medium border-b-2 flex items-center gap-2 whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
         {/* Content */}
         <div className="p-6">
-          {/* Documents Tab */}
+          {activeTab === 'overview' && (
+            <OverviewTab
+              staff={staff}
+              onCvUpload={handleCvUpload}
+              onCvDelete={handleCvDelete}
+            />
+          )}
+
+          {activeTab === 'employment' && (
+            <EmploymentTab staff={staff} />
+          )}
+
+          {activeTab === 'compliance' && (
+            <ComplianceTab
+              staff={staff}
+              onUploadDocument={handleUploadDocument}
+            />
+          )}
+
+          {activeTab === 'vehicles' && (
+            <VehiclesTab
+              staffId={id}
+              staffName={staff.name}
+              onAddVehicle={handleAddVehicle}
+              onEditVehicle={handleEditVehicle}
+              onRemoveVehicle={handleRemoveVehicle}
+            />
+          )}
+
+          {activeTab === 'disciplinary' && (
+            <DisciplinaryTab
+              staffId={id}
+              onAddIncident={handleAddIncident}
+              onEditIncident={handleEditIncident}
+            />
+          )}
+
           {activeTab === 'documents' && (
             <StaffDocumentList staffId={id} isAdmin={true} onVerify={handleVerifyDocument} />
           )}
 
-          {/* Projects Tab */}
           {activeTab === 'projects' && (
             <StaffProjectAssignment staffId={id} staffName={staff.name} />
           )}
-
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-          {/* Status Badge */}
-          <div>
-            <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(staff.status)}`}>
-              {staff.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
-            </span>
-          </div>
-
-          {/* Contact Information */}
-          <div>
-            <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Contact Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Email</p>
-                  <a href={`mailto:${staff.email}`} className="text-blue-400 hover:text-blue-300">
-                    {staff.email}
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Phone</p>
-                  <a href={`tel:${staff.phone}`} className="text-blue-400 hover:text-blue-300">
-                    {staff.phone}
-                  </a>
-                </div>
-              </div>
-
-              {staff.alternativePhone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">Alternative Phone</p>
-                    <a href={`tel:${staff.alternativePhone}`} className="text-blue-400 hover:text-blue-300">
-                      {staff.alternativePhone}
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Job Information */}
-          <div>
-            <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Job Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <Briefcase className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Position</p>
-                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.position}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Department</p>
-                <p className="font-medium text-[var(--ff-text-primary)]">
-                  {staff.department?.replace('_', ' ').charAt(0).toUpperCase() + (staff.department?.slice(1) || '') || 'Not specified'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Level</p>
-                <p className="font-medium text-[var(--ff-text-primary)]">
-                  {staff.level ? staff.level.replace('_', ' ').charAt(0).toUpperCase() + staff.level.slice(1) : 'Not specified'}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Contract Type</p>
-                <p className="font-medium text-[var(--ff-text-primary)]">
-                  {staff.contractType?.replace('_', ' ').charAt(0).toUpperCase() + (staff.contractType?.slice(1) || '') || 'Not specified'}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Start Date</p>
-                  <p className="font-medium text-[var(--ff-text-primary)]">
-                    {(() => {
-                      const startDate = staff.startDate;
-                      if (startDate) {
-                        try {
-                          const date = safeToDate(startDate);
-                          return format(date, 'dd MMM yyyy');
-                        } catch (error) {
-                          log.warn('Error formatting start date:', { data: error }, 'StaffDetail');
-                          return 'Invalid Date';
-                        }
-                      }
-                      return 'N/A';
-                    })()}
-                  </p>
-                </div>
-              </div>
-
-              {staff.endDate && (
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">End Date</p>
-                    <p className="font-medium text-[var(--ff-text-primary)]">
-                      {(() => {
-                        const endDate = staff.endDate;
-                        if (endDate) {
-                          try {
-                            const date = safeToDate(endDate);
-                            return format(date, 'dd MMM yyyy');
-                          } catch (error) {
-                            log.warn('Error formatting end date:', { data: error }, 'StaffDetail');
-                            return 'Invalid Date';
-                          }
-                        }
-                        return 'N/A';
-                      })()}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Skills */}
-          {staff.skills && Array.isArray(staff.skills) && staff.skills.length > 0 && (
-            <div>
-              <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Skills</h2>
-              <div className="flex flex-wrap gap-2">
-                {staff.skills.map((skill: string) => (
-                  <span
-                    key={skill}
-                    className="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-500/20 text-blue-400 rounded-full"
-                  >
-                    <Award className="w-3 h-3 mr-1" />
-                    {skill?.replace(/_/g, ' ').charAt(0).toUpperCase() + (skill?.slice(1) || '') || skill}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Project Information */}
-          <div>
-            <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Project Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-sm text-[var(--ff-text-secondary)]">Current Projects</p>
-                <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
-                  {staff.currentProjectCount || 0} / {staff.maxProjectCount || 5}
-                </p>
-                <div className="w-full bg-[var(--ff-border-light)] rounded-full h-2 mt-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${((staff.currentProjectCount || 0) / (staff.maxProjectCount || 5)) * 100}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-sm text-[var(--ff-text-secondary)]">Completed Projects</p>
-                <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
-                  {staff.totalProjectsCompleted || 0}
-                </p>
-              </div>
-
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-sm text-[var(--ff-text-secondary)]">Average Rating</p>
-                <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
-                  {(staff.averageProjectRating || 0).toFixed(1)} / 5.0
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Emergency Contact */}
-          {(staff.emergencyContactName || staff.emergencyContactPhone) && (
-            <div>
-              <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Emergency Contact</h2>
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                {staff.emergencyContactName && (
-                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.emergencyContactName}</p>
-                )}
-                {staff.emergencyContactPhone && (
-                  <p className="text-sm text-[var(--ff-text-secondary)]">{staff.emergencyContactPhone}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Address */}
-          {staff.address && (
-            <div>
-              <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Address</h2>
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-[var(--ff-text-primary)]">{staff.address}</p>
-                <p className="text-[var(--ff-text-secondary)]">{staff.city}, {staff.province} {staff.postalCode}</p>
-              </div>
-            </div>
-          )}
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Disciplinary Form Modal */}
+      {showDisciplinaryForm && (
+        <DisciplinaryIncidentForm
+          staffId={id}
+          incident={editingIncident}
+          issuedByOptions={staffList}
+          onSave={handleSaveIncident}
+          onClose={() => {
+            setShowDisciplinaryForm(false);
+            setEditingIncident(null);
+          }}
+        />
+      )}
+
+      {/* Vehicle Form Modal */}
+      {showVehicleForm && (
+        <VehicleAssignmentForm
+          staffId={id}
+          staffName={staff.name}
+          hasValidLicense={hasValidLicense}
+          vehicle={editingVehicle}
+          onSave={handleSaveVehicle}
+          onClose={() => {
+            setShowVehicleForm(false);
+            setEditingVehicle(null);
+          }}
+        />
+      )}
     </div>
   );
 }

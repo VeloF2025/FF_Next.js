@@ -25,3 +25,12 @@ export * from './import.types';
 
 // Summary types
 export * from './summary.types';
+
+// Compliance types
+export * from './compliance.types';
+
+// Disciplinary types
+export * from './disciplinary.types';
+
+// Vehicle types
+export * from './vehicle.types';
