@@ -77,6 +77,13 @@ DOCUMENT_KEYWORDS = {
         # Old ID Book specific
         "DEPARTMENT OF HOME AFFAIRS",
         "ID NUMBER",
+        # Passport specific (passports are valid ID documents)
+        "PASSPORT",
+        "PASSEPORT",
+        "GIVEN NAMES",
+        "DATE OF EXPIRY",
+        "DATE OF ISSUE",
+        "PASSPORT NO",
         # Afrikaans variants (old ID books)
         "REPUBLIEK VAN SUID-AFRIKA",
         "IDENTITEIT",
@@ -136,6 +143,7 @@ DOCUMENT_PATTERNS = {
     DocumentType.ID_DOCUMENT: [
         r"\d{13}",  # SA ID number (13 digits)
         r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date: "03 FEB 1978"
+        r"[A-Z]\d{8,9}",  # SA Passport number (e.g., A09060091)
     ],
     DocumentType.BANK_DETAILS: [r"\d{9,12}", r"\d{6}"],  # Account and branch
     DocumentType.TAX_DOCUMENT: [r"\d{10}", r"IRP5"],  # Tax number
@@ -148,15 +156,28 @@ DOCUMENT_PATTERNS = {
 FIELD_MAPPINGS = {
     DocumentType.ID_DOCUMENT: {
         EntityType.STAFF: {
-            # ID Number variants
+            # ID Number variants (SA ID and passport)
             "Identity Number": "idNumber",
+            "Identity No": "idNumber",
             "ID Number": "idNumber",
-            # Name fields
+            # Passport specific
+            "Passport No": "passportNumber",
+            "Passport Number": "passportNumber",
+            "Given names": "firstName",
+            "Given Names": "firstName",
+            "Date of issue": "issuedDate",
+            "Date of Issue": "issuedDate",
+            "Date of expiry": "expiryDate",
+            "Date of Expiry": "expiryDate",
+            "Date d'expiration": "expiryDate",
+            "Place of birth": "placeOfBirth",
+            "Place of Birth": "placeOfBirth",
+            # Common fields (ID card and passport)
             "Surname": "lastName",
             "Names": "firstName",
             "First Names": "firstName",
-            # Date and demographics
             "Date of Birth": "dateOfBirth",
+            "Date of birth": "dateOfBirth",
             "Sex": "gender",
             "Gender": "gender",
             "Nationality": "nationality",

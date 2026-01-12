@@ -205,7 +205,7 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
   documentType: 'id_document',
   displayName: 'SA ID Document',
   keywords: [
-    // Primary identifiers (high weight - appear on both old and new IDs)
+    // Primary identifiers (appear on both old and new IDs)
     'REPUBLIC OF SOUTH AFRICA',
     'IDENTITY',
     // Smart ID Card specific
@@ -216,6 +216,13 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
     // Old ID Book specific
     'DEPARTMENT OF HOME AFFAIRS',
     'ID NUMBER',
+    // Passport specific (passports are valid ID documents)
+    'PASSPORT',
+    'PASSEPORT',
+    'GIVEN NAMES',
+    'DATE OF EXPIRY',
+    'DATE OF ISSUE',
+    'PASSPORT NO',
     // Afrikaans variants (old ID books)
     'REPUBLIEK VAN SUID-AFRIKA',
     'IDENTITEIT',
@@ -223,8 +230,8 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
   ],
   patterns: [
     /\d{13}/, // SA ID number (13 digits)
-    /\d{2}\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}/i, // Date: "03 FEB 1978"
-    /\d{2}[.\-/]\d{2}[.\-/]\d{2,4}/, // Numeric date format
+    /\d{1,2}\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}/i, // Date: "03 FEB 1978"
+    /[A-Z]\d{8,9}/, // SA Passport number (e.g., A09060091)
   ],
   entityType: OcrEntityType.STAFF,
   fieldMappings: [
@@ -237,13 +244,71 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
       ],
     },
     {
+      ocrLabel: 'Identity No',
+      entityField: 'idNumber',
+      validationRules: [
+        { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
+      ],
+    },
+    {
       ocrLabel: 'ID Number',
       entityField: 'idNumber',
       validationRules: [
         { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
       ],
     },
-    // Name fields
+    // Passport specific fields
+    {
+      ocrLabel: 'Passport No',
+      entityField: 'passportNumber',
+    },
+    {
+      ocrLabel: 'Passport Number',
+      entityField: 'passportNumber',
+    },
+    {
+      ocrLabel: 'Given names',
+      entityField: 'firstName',
+      validationRules: [
+        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
+      ],
+    },
+    {
+      ocrLabel: 'Given Names',
+      entityField: 'firstName',
+      validationRules: [
+        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
+      ],
+    },
+    {
+      ocrLabel: 'Date of issue',
+      entityField: 'issuedDate',
+      transform: 'parseDate',
+    },
+    {
+      ocrLabel: 'Date of Issue',
+      entityField: 'issuedDate',
+      transform: 'parseDate',
+    },
+    {
+      ocrLabel: 'Date of expiry',
+      entityField: 'expiryDate',
+      transform: 'parseDate',
+    },
+    {
+      ocrLabel: 'Date of Expiry',
+      entityField: 'expiryDate',
+      transform: 'parseDate',
+    },
+    {
+      ocrLabel: 'Place of birth',
+      entityField: 'placeOfBirth',
+    },
+    {
+      ocrLabel: 'Place of Birth',
+      entityField: 'placeOfBirth',
+    },
+    // Common name fields (ID card and passport)
     {
       ocrLabel: 'Surname',
       entityField: 'lastName',
@@ -268,6 +333,11 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
     // Date and demographics
     {
       ocrLabel: 'Date of Birth',
+      entityField: 'dateOfBirth',
+      transform: 'parseDate',
+    },
+    {
+      ocrLabel: 'Date of birth',
       entityField: 'dateOfBirth',
       transform: 'parseDate',
     },
