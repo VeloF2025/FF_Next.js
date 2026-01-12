@@ -406,6 +406,108 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
 };
 
 /**
+ * SA Driver's License Configuration
+ */
+export const DRIVERS_LICENSE_CONFIG: DocumentTypeConfig = {
+  documentType: 'drivers_license',
+  displayName: "Driver's License",
+  keywords: [
+    // SA Driving License (English)
+    'DRIVING LICENCE',
+    'DRIVING LICENSE',
+    "DRIVER'S LICENSE",
+    "DRIVER'S LICENCE",
+    // SA Driving License (Afrikaans)
+    'BESTUURSLISENSIE',
+    'BESTUURDERLISENSIE',
+    // SA Driving License (Portuguese - on SA cards)
+    'CARTA DE CONDUCAO',
+    // Common fields
+    'LIC. NO',
+    'LISENSIENR',
+    'LICENSE NUMBER',
+    'LICENCE NUMBER',
+    'VALID/GELDIG',
+    'CODE/KODE',
+    'VEH.RESTR',
+    'VOERTUIGBEPERKING',
+    'FIRST ISSUE',
+    'EERSTE UITREIKING',
+    'DRIVER RESTRICTIONS',
+    'PrDP CATEGORIES',
+    'VEHICLE RESTRICTIONS',
+    // SADC regional
+    'SADC',
+    'ZA',
+    'SOUTH AFRICA',
+  ],
+  patterns: [
+    /\d{13}/, // SA ID number on license
+    /\d{2}\/\d{2}\/\d{4}\s*-\s*\d{2}\/\d{2}\/\d{4}/, // Valid date range: 08/11/2016 - 15/11/2021
+    /\d{2}\/\d{2}\/\d{4}/, // Single date format
+    /\d{8,12}[A-Z]{2}\d{2}/, // License number format like 30040008RD49
+    /(?:CODE|KODE)\s*[:\s]*[A-Z]{1,2}\d?/i, // License code like EB, B, C1
+    /(?:RESTR|BEPERK)[.:]?\s*\d/i, // Restrictions
+  ],
+  entityType: OcrEntityType.STAFF,
+  fieldMappings: [
+    // Name
+    { ocrLabel: 'Name', entityField: 'fullName' },
+    // ID Number
+    {
+      ocrLabel: 'ID No',
+      entityField: 'idNumber',
+      validationRules: [
+        { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
+      ],
+    },
+    {
+      ocrLabel: 'IDNo',
+      entityField: 'idNumber',
+      validationRules: [
+        { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
+      ],
+    },
+    // Birth date
+    { ocrLabel: 'Birth/Geboorte', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Birth', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Geboorte', entityField: 'dateOfBirth', transform: 'parseDate' },
+    // Gender
+    { ocrLabel: 'Sex', entityField: 'gender' },
+    { ocrLabel: 'Gender', entityField: 'gender' },
+    // License number
+    { ocrLabel: 'Lic. No', entityField: 'licenseNumber' },
+    { ocrLabel: 'Lic.No', entityField: 'licenseNumber' },
+    { ocrLabel: 'Lisensienr', entityField: 'licenseNumber' },
+    { ocrLabel: 'License No', entityField: 'licenseNumber' },
+    { ocrLabel: 'Licence No', entityField: 'licenseNumber' },
+    // Valid dates
+    { ocrLabel: 'Valid/Geldig', entityField: 'validityPeriod' },
+    { ocrLabel: 'Valid', entityField: 'validFrom', transform: 'parseDate' },
+    { ocrLabel: 'Geldig', entityField: 'validFrom', transform: 'parseDate' },
+    // License code
+    { ocrLabel: 'Code/Kode', entityField: 'licenseCode' },
+    { ocrLabel: 'Code', entityField: 'licenseCode' },
+    { ocrLabel: 'Kode', entityField: 'licenseCode' },
+    // Vehicle restrictions
+    { ocrLabel: 'Veh.restr', entityField: 'vehicleRestrictions' },
+    { ocrLabel: 'Voertuigbeperking', entityField: 'vehicleRestrictions' },
+    // Driver restrictions
+    { ocrLabel: 'Restr', entityField: 'driverRestrictions' },
+    { ocrLabel: 'Beperk', entityField: 'driverRestrictions' },
+    // First issue date
+    { ocrLabel: 'First issue', entityField: 'firstIssueDate', transform: 'parseDate' },
+    { ocrLabel: 'Eerste uitreiking', entityField: 'firstIssueDate', transform: 'parseDate' },
+    // Issued location
+    { ocrLabel: 'Issued/Uitgereik', entityField: 'issuedAt' },
+    { ocrLabel: 'Issued', entityField: 'issuedAt' },
+    { ocrLabel: 'Uitgereik', entityField: 'issuedAt' },
+    // PrDP category
+    { ocrLabel: 'PrDP', entityField: 'prdpCategory' },
+  ],
+};
+
+/**
  * Bank Confirmation Letter Configuration (Staff)
  */
 export const STAFF_BANK_CONFIRMATION_CONFIG: DocumentTypeConfig = {
@@ -681,6 +783,7 @@ export const BEE_CERTIFICATE_CONFIG: DocumentTypeConfig = {
 
 export const ALL_DOCUMENT_CONFIGS: DocumentTypeConfig[] = [
   SA_ID_CONFIG,
+  DRIVERS_LICENSE_CONFIG,
   STAFF_BANK_CONFIRMATION_CONFIG,
   TAX_DOCUMENT_CONFIG,
   CIPC_REGISTRATION_CONFIG,
@@ -850,6 +953,7 @@ export const OCR_ELIGIBLE_DOCUMENT_TYPES: Record<string, string> = {
   // Staff document types → OCR document types
   'sa_id': 'id_document',
   'passport': 'id_document', // Can extract basic info
+  'drivers_license': 'drivers_license', // SA Driver's License
   'bank_confirmation': 'bank_details',
   'banking_details': 'bank_details',
   'irp5': 'tax_document',

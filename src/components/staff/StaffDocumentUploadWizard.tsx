@@ -1,17 +1,18 @@
 'use client';
 
 /**
- * Staff Document Upload Wizard - OCR-First Upload Flow
- * PRD Reference: PRD-033 OCR-First Document Upload Flow
+ * Staff Document Upload Wizard - Type-First Upload Flow
+ * PRD Reference: PRD-033 OCR-First Document Upload Flow (Updated)
  *
- * 7-Step State Machine:
- * 1. file_upload - User selects file
- * 2. ocr_processing - Uploading and processing OCR
- * 3. ocr_preview - Show OCR results for confirmation (if confidence ≥50%)
- * 4. manual_entry - Manual field entry (if confidence <50%)
- * 5. confirmation - Final review before saving
- * 6. saving - Submitting to server
- * 7. complete - Success state
+ * NEW 8-Step State Machine:
+ * 1. select_type - User selects document type FIRST
+ * 2. file_upload - User selects file(s) based on type
+ * 3. ocr_processing - Uploading and processing OCR (if OCR-enabled type)
+ * 4. ocr_preview - Show OCR results for confirmation (if confidence ≥50%)
+ * 5. manual_entry - Manual field entry (if confidence <50% or upload-only type)
+ * 6. confirmation - Final review before saving
+ * 7. saving - Submitting to server
+ * 8. complete - Success state
  */
 
 import { useState, useCallback, useRef, useEffect, type ChangeEvent } from 'react';
@@ -34,8 +35,12 @@ import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_CATEGORY_LABELS,
   DOCUMENTS_WITH_EXPIRY,
+  isOcrEnabled,
+  isMultiFileDocument,
 } from '@/types/staff-document.types';
 import { createLogger } from '@/lib/logger';
+import { DocumentTypeSelector } from './DocumentTypeSelector';
+import { DriversLicenseUpload } from './DriversLicenseUpload';
 
 const logger = createLogger('StaffDocumentUploadWizard');
 
@@ -44,6 +49,7 @@ const OCR_PREVIEW_THRESHOLD = 0.50;
 
 // Step type definition
 type WizardStep =
+  | 'select_type'
   | 'file_upload'
   | 'ocr_processing'
   | 'ocr_preview'
@@ -52,12 +58,19 @@ type WizardStep =
   | 'saving'
   | 'complete';
 
+// Driver's license files interface
+interface DriversLicenseFiles {
+  front: File | null;
+  back: File | null;
+}
+
 // Wizard state interface
 interface WizardState {
   currentStep: WizardStep;
   file: File | null;
+  licenseFiles: DriversLicenseFiles;
   ocrResult: OcrPreviewResult | null;
-  selectedDocumentType: DocumentType;
+  selectedDocumentType: DocumentType | null;
   documentName: string;
   extractedFields: Record<string, unknown>;
   fieldOverrides: Record<string, unknown>;
@@ -99,10 +112,11 @@ export function StaffDocumentUploadWizard({
 }: StaffDocumentUploadWizardProps) {
   // Wizard state
   const [state, setState] = useState<WizardState>({
-    currentStep: 'file_upload',
+    currentStep: 'select_type',
     file: null,
+    licenseFiles: { front: null, back: null },
     ocrResult: null,
-    selectedDocumentType: 'id_document',
+    selectedDocumentType: null,
     documentName: '',
     extractedFields: {},
     fieldOverrides: {},
@@ -122,11 +136,59 @@ export function StaffDocumentUploadWizard({
   }, []);
 
   // Check if selected document type requires expiry date
-  const requiresExpiry = DOCUMENTS_WITH_EXPIRY.includes(state.selectedDocumentType);
+  const requiresExpiry = state.selectedDocumentType
+    ? DOCUMENTS_WITH_EXPIRY.includes(state.selectedDocumentType)
+    : false;
 
   // =========================================================================
-  // Step 1: File Upload Handlers
+  // Step 1: Document Type Selection Handlers
   // =========================================================================
+
+  const handleDocumentTypeSelect = useCallback((type: DocumentType) => {
+    setState((prev) => ({
+      ...prev,
+      selectedDocumentType: type,
+    }));
+  }, []);
+
+  const handleProceedToUpload = useCallback(() => {
+    if (!state.selectedDocumentType) {
+      setError('Please select a document type');
+      return;
+    }
+    setError(null);
+    setState((prev) => ({ ...prev, currentStep: 'file_upload' }));
+  }, [state.selectedDocumentType]);
+
+  // =========================================================================
+  // Step 2: File Upload Handlers
+  // =========================================================================
+
+  // Handler for driver's license dual file upload
+  const handleLicenseFilesChange = useCallback((files: DriversLicenseFiles) => {
+    setState((prev) => ({
+      ...prev,
+      licenseFiles: files,
+    }));
+  }, []);
+
+  // Process driver's license (both files)
+  const handleLicenseUploadProceed = useCallback(async () => {
+    const { front, back } = state.licenseFiles;
+    if (!front || !back) {
+      setError('Please upload both front and back of your driver\'s license');
+      return;
+    }
+
+    setError(null);
+    setState((prev) => ({
+      ...prev,
+      documentName: prev.documentName || 'Driver\'s License',
+    }));
+
+    // Process front side with OCR
+    await processOcr(front);
+  }, [state.licenseFiles]);
 
   const handleFileSelected = useCallback(async (file: File) => {
     setError(null);
@@ -170,9 +232,15 @@ export function StaffDocumentUploadWizard({
       setFilePreview(null);
     }
 
-    // Auto-advance to OCR processing
-    await processOcr(file);
-  }, []);
+    // Route based on document type
+    if (state.selectedDocumentType && isOcrEnabled(state.selectedDocumentType)) {
+      // OCR-enabled document - process OCR
+      await processOcr(file);
+    } else {
+      // Upload-only document - skip OCR, go to manual entry
+      setState((prev) => ({ ...prev, currentStep: 'manual_entry' }));
+    }
+  }, [state.selectedDocumentType]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -229,6 +297,11 @@ export function StaffDocumentUploadWizard({
       formData.append('staffId', staffId);
       formData.append('entityType', 'staff');
 
+      // Include document type hint for OCR (type-first flow)
+      if (state.selectedDocumentType) {
+        formData.append('documentType', state.selectedDocumentType);
+      }
+
       // Call OCR preview API
       const response = await fetch('/api/documents-ocr-preview', {
         method: 'POST',
@@ -245,11 +318,11 @@ export function StaffDocumentUploadWizard({
 
       const result: OcrPreviewResult = await response.json();
 
-      // Update state with OCR result
+      // Update state with OCR result (keep user-selected type in type-first flow)
       setState((prev) => ({
         ...prev,
         ocrResult: result,
-        selectedDocumentType: result.classification.documentType as DocumentType,
+        // Keep user-selected type instead of auto-detected
         extractedFields: result.extractedFields,
       }));
 
@@ -261,14 +334,14 @@ export function StaffDocumentUploadWizard({
         setState((prev) => ({ ...prev, currentStep: 'ocr_preview' }));
         logger.info('OCR completed with high confidence', {
           confidence: overallConfidence,
-          documentType: result.classification.documentType,
+          documentType: state.selectedDocumentType,
         });
       } else {
         // Low confidence - go to manual entry
         setState((prev) => ({ ...prev, currentStep: 'manual_entry' }));
         logger.info('OCR completed with low confidence', {
           confidence: overallConfidence,
-          documentType: result.classification.documentType,
+          documentType: state.selectedDocumentType,
         });
       }
     } catch (err) {
@@ -331,8 +404,21 @@ export function StaffDocumentUploadWizard({
   // =========================================================================
 
   const handleSubmit = async () => {
-    if (!state.file) {
+    const isDriversLicense = state.selectedDocumentType === 'drivers_license';
+
+    // Validate files based on document type
+    if (isDriversLicense) {
+      if (!state.licenseFiles.front || !state.licenseFiles.back) {
+        setError('Both front and back of driver\'s license are required');
+        return;
+      }
+    } else if (!state.file) {
       setError('No file selected');
+      return;
+    }
+
+    if (!state.selectedDocumentType) {
+      setError('No document type selected');
       return;
     }
 
@@ -345,7 +431,14 @@ export function StaffDocumentUploadWizard({
       formData.append('staffId', staffId);
       formData.append('documentType', state.selectedDocumentType);
       formData.append('documentName', state.documentName);
-      formData.append('file', state.file);
+
+      // Handle file(s) based on document type
+      if (isDriversLicense && state.licenseFiles.front && state.licenseFiles.back) {
+        formData.append('fileFront', state.licenseFiles.front);
+        formData.append('fileBack', state.licenseFiles.back);
+      } else if (state.file) {
+        formData.append('file', state.file);
+      }
 
       // Add OCR confirmed flag if OCR was used
       if (state.ocrResult) {
@@ -422,9 +515,87 @@ export function StaffDocumentUploadWizard({
 
   const renderStepContent = () => {
     switch (state.currentStep) {
+      case 'select_type':
+        return (
+          <div className="space-y-6">
+            <DocumentTypeSelector
+              selectedType={state.selectedDocumentType}
+              onSelect={handleDocumentTypeSelect}
+              existingDocumentTypes={[]}
+            />
+
+            <div className="flex justify-end pt-4 border-t border-[var(--ff-border-light)]">
+              <button
+                onClick={handleProceedToUpload}
+                disabled={!state.selectedDocumentType}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        );
+
       case 'file_upload':
+        // Check if this is a driver's license (needs front + back)
+        const isDriversLicense = state.selectedDocumentType === 'drivers_license';
+        const documentLabel = state.selectedDocumentType
+          ? DOCUMENT_TYPE_LABELS[state.selectedDocumentType]
+          : 'Document';
+
+        if (isDriversLicense) {
+          // Driver's license dual upload
+          const canProceedLicense = state.licenseFiles.front && state.licenseFiles.back;
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  onClick={() => setState((prev) => ({ ...prev, currentStep: 'select_type' }))}
+                  className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
+                  Upload {documentLabel}
+                </h3>
+              </div>
+
+              <DriversLicenseUpload
+                files={state.licenseFiles}
+                onFilesChange={handleLicenseFilesChange}
+                error={error || undefined}
+              />
+
+              <div className="flex justify-end pt-4 border-t border-[var(--ff-border-light)]">
+                <button
+                  onClick={handleLicenseUploadProceed}
+                  disabled={!canProceedLicense}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Process Document
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        // Standard single file upload
         return (
           <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setState((prev) => ({ ...prev, currentStep: 'select_type' }))}
+                className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
+                Upload {documentLabel}
+              </h3>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Select Document File
@@ -618,7 +789,7 @@ export function StaffDocumentUploadWizard({
             Document Type *
           </label>
           <select
-            value={state.selectedDocumentType}
+            value={state.selectedDocumentType || ''}
             onChange={(e) =>
               setState((prev) => ({
                 ...prev,
@@ -627,6 +798,7 @@ export function StaffDocumentUploadWizard({
             }
             className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="" disabled>Select a document type</option>
             {Object.entries(DOCUMENT_CATEGORIES).map(([category, types]) => (
               <optgroup key={category} label={DOCUMENT_CATEGORY_LABELS[category]}>
                 {types.map((type) => (
@@ -712,6 +884,8 @@ export function StaffDocumentUploadWizard({
       ...state.fieldOverrides,
     };
 
+    const isDriversLicense = state.selectedDocumentType === 'drivers_license';
+
     return (
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
@@ -719,17 +893,31 @@ export function StaffDocumentUploadWizard({
         </h3>
 
         <div className="space-y-3">
-          <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
-            <p className="text-xs text-[var(--ff-text-secondary)] mb-1">File</p>
-            <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-              {state.file?.name}
-            </p>
-          </div>
+          {isDriversLicense ? (
+            <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+              <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Files</p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                  Front: {state.licenseFiles.front?.name}
+                </p>
+                <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                  Back: {state.licenseFiles.back?.name}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+              <p className="text-xs text-[var(--ff-text-secondary)] mb-1">File</p>
+              <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                {state.file?.name}
+              </p>
+            </div>
+          )}
 
           <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
             <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Document Type</p>
             <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-              {DOCUMENT_TYPE_LABELS[state.selectedDocumentType]}
+              {state.selectedDocumentType ? DOCUMENT_TYPE_LABELS[state.selectedDocumentType] : 'Not selected'}
             </p>
           </div>
 

@@ -23,6 +23,8 @@ export interface StaffDocument {
   documentType: DocumentType;
   documentName: string;
   fileUrl: string;
+  fileUrlFront?: string;  // For multi-file documents (e.g., driver's license front)
+  fileUrlBack?: string;   // For multi-file documents (e.g., driver's license back)
   fileSize?: number;
   mimeType?: string;
   expiryDate?: string;
@@ -62,6 +64,8 @@ export interface StaffDocumentCreate {
   documentType: DocumentType;
   documentName: string;
   fileUrl: string;
+  fileUrlFront?: string;  // For multi-file documents
+  fileUrlBack?: string;   // For multi-file documents
   fileSize?: number;
   mimeType?: string;
   expiryDate?: string;
@@ -174,6 +178,90 @@ export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
   employment: 'Employment & Financial',
   qualifications: 'Qualifications & Certifications',
   other: 'Other Documents'
+};
+
+// ============================================================
+// Document Upload Categories (Type-First Flow)
+// ============================================================
+
+/**
+ * Documents that support OCR data extraction
+ * These will go through the OCR processing flow
+ */
+export const OCR_ENABLED_DOCUMENTS: DocumentType[] = [
+  'id_document',
+  'drivers_license',
+  'employment_contract',
+  'bank_details',
+  'tax_document',
+];
+
+/**
+ * Documents that are upload-only (no OCR extraction)
+ * These skip OCR and go directly to manual entry
+ */
+export const UPLOAD_ONLY_DOCUMENTS: DocumentType[] = [
+  'police_clearance',
+  'medical_certificate',
+  'certification',
+  'qualification',
+  'other',
+];
+
+/**
+ * Documents that require multiple file uploads
+ * Key is document type, value is array of file identifiers
+ */
+export const MULTI_FILE_DOCUMENTS: Partial<Record<DocumentType, string[]>> = {
+  drivers_license: ['front', 'back'],
+};
+
+/**
+ * Check if a document type supports OCR extraction
+ */
+export function isOcrEnabled(documentType: DocumentType): boolean {
+  return OCR_ENABLED_DOCUMENTS.includes(documentType);
+}
+
+/**
+ * Check if a document type requires multiple files
+ */
+export function isMultiFileDocument(documentType: DocumentType): boolean {
+  return documentType in MULTI_FILE_DOCUMENTS;
+}
+
+/**
+ * Get the file parts required for a document type
+ */
+export function getMultiFileParts(documentType: DocumentType): string[] {
+  return MULTI_FILE_DOCUMENTS[documentType] || ['file'];
+}
+
+/**
+ * Document type descriptions for the selection UI
+ */
+export const DOCUMENT_TYPE_DESCRIPTIONS: Record<DocumentType, string> = {
+  id_document: 'South African ID, Smart ID Card, or Passport',
+  drivers_license: 'Upload front and back of your license',
+  employment_contract: 'Employment agreement or service contract',
+  certification: 'Industry certifications (e.g., fibre splicing)',
+  qualification: 'Degrees, diplomas, or training certificates',
+  medical_certificate: 'Medical fitness certificate',
+  police_clearance: 'Criminal record check certificate',
+  bank_details: 'Bank confirmation letter or statement',
+  tax_document: 'IRP5, IT3a, or tax clearance certificate',
+  other: 'Any other relevant document',
+};
+
+/**
+ * Fields to extract per document type (for OCR-enabled documents)
+ */
+export const DOCUMENT_EXTRACTION_FIELDS: Partial<Record<DocumentType, string[]>> = {
+  id_document: ['idNumber', 'fullName', 'dateOfBirth', 'gender', 'nationality', 'issueDate', 'expiryDate'],
+  drivers_license: ['licenseNumber', 'idNumber', 'fullName', 'dateOfBirth', 'licenseCodes', 'restrictions', 'validFrom', 'validTo'],
+  employment_contract: ['startDate', 'endDate', 'contractType', 'position'],
+  bank_details: ['bankName', 'accountNumber', 'branchCode', 'accountType'],
+  tax_document: ['taxNumber'],
 };
 
 // ============================================================

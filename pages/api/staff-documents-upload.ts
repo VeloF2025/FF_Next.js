@@ -48,9 +48,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let tempFilePath: string | null = null;
-  let uploadedToStorage = false;
-  let storagePath: string | null = null;
+  const tempFilePaths: string[] = [];
+  const uploadedPaths: string[] = [];
 
   try {
     // Parse multipart form data
@@ -83,18 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Get uploaded file
-    const fileArray = Array.isArray(files.file) ? files.file : [files.file];
-    const file = fileArray[0];
-
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    // Store temp file path for cleanup
-    tempFilePath = file.filepath;
-
-    // Validate file type - Allow PDF, images, Word, and Excel
+    // Validate file type helper
     const allowedTypes = [
       'application/pdf',
       'image/jpeg',
@@ -104,22 +92,53 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ];
-    if (!allowedTypes.includes(file.mimetype || '')) {
-      return res.status(400).json({
-        error: 'Invalid file type. Allowed: PDF, JPG, PNG, Word (DOC/DOCX), Excel (XLS/XLSX)',
-      });
-    }
-
-    // Validate file size (10MB max)
     const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return res.status(400).json({
-        error: 'File too large. Maximum size: 10MB',
-      });
-    }
 
-    // Read file buffer
-    const fileBuffer = await fs.promises.readFile(file.filepath);
+    const validateFile = (file: formidable.File | undefined, name: string) => {
+      if (!file) {
+        throw new Error(`No ${name} file uploaded`);
+      }
+      if (!allowedTypes.includes(file.mimetype || '')) {
+        throw new Error(`Invalid ${name} file type. Allowed: PDF, JPG, PNG, Word, Excel`);
+      }
+      if (file.size > maxSize) {
+        throw new Error(`${name} file too large. Maximum size: 10MB`);
+      }
+      return file;
+    };
+
+    // Check for multi-file upload (driver's license front+back)
+    const isMultiFile = documentType === 'drivers_license';
+    let file: formidable.File | undefined;
+    let fileFront: formidable.File | undefined;
+    let fileBack: formidable.File | undefined;
+
+    if (isMultiFile) {
+      // Get front and back files
+      const fileFrontArray = Array.isArray(files.fileFront) ? files.fileFront : [files.fileFront];
+      const fileBackArray = Array.isArray(files.fileBack) ? files.fileBack : [files.fileBack];
+      fileFront = fileFrontArray[0];
+      fileBack = fileBackArray[0];
+
+      if (!fileFront || !fileBack) {
+        return res.status(400).json({ error: 'Driver\'s license requires both front and back files' });
+      }
+
+      validateFile(fileFront, 'front');
+      validateFile(fileBack, 'back');
+      tempFilePaths.push(fileFront.filepath, fileBack.filepath);
+    } else {
+      // Single file upload
+      const fileArray = Array.isArray(files.file) ? files.file : [files.file];
+      file = fileArray[0];
+
+      if (!file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      validateFile(file, 'document');
+      tempFilePaths.push(file.filepath);
+    }
 
     // Check if VF Storage is available (required)
     const storageAvailable = await isVFStorageAvailable();
@@ -131,19 +150,65 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Upload to VF Storage server
-    logger.info('Uploading to VF Storage', { staffId, documentType });
-    const vfResult = await uploadStaffDocument(
-      staffId,
-      fileBuffer,
-      file.originalFilename || 'document',
-      documentType
-    );
+    let fileUrl = '';
+    let filePath = '';
+    let fileUrlFront = '';
+    let filePathFront = '';
+    let fileUrlBack = '';
+    let filePathBack = '';
+    let primaryFileName = '';
+    let primaryFileSize = 0;
+    let primaryMimeType = '';
 
-    const fileUrl = vfResult.url;
-    const filePath = vfResult.path;
-    storagePath = filePath;
-    uploadedToStorage = true;
+    if (isMultiFile && fileFront && fileBack) {
+      // Upload front file
+      logger.info('Uploading driver\'s license front to VF Storage', { staffId });
+      const frontBuffer = await fs.promises.readFile(fileFront.filepath);
+      const frontResult = await uploadStaffDocument(
+        staffId,
+        frontBuffer,
+        `front_${fileFront.originalFilename || 'document'}`,
+        documentType
+      );
+      fileUrlFront = frontResult.url;
+      filePathFront = frontResult.path;
+      uploadedPaths.push(filePathFront);
+
+      // Upload back file
+      logger.info('Uploading driver\'s license back to VF Storage', { staffId });
+      const backBuffer = await fs.promises.readFile(fileBack.filepath);
+      const backResult = await uploadStaffDocument(
+        staffId,
+        backBuffer,
+        `back_${fileBack.originalFilename || 'document'}`,
+        documentType
+      );
+      fileUrlBack = backResult.url;
+      filePathBack = backResult.path;
+      uploadedPaths.push(filePathBack);
+
+      // Use front file as primary for metadata
+      primaryFileName = fileFront.originalFilename || 'document';
+      primaryFileSize = fileFront.size + fileBack.size;
+      primaryMimeType = fileFront.mimetype || '';
+    } else if (file) {
+      // Single file upload
+      logger.info('Uploading to VF Storage', { staffId, documentType });
+      const fileBuffer = await fs.promises.readFile(file.filepath);
+      const vfResult = await uploadStaffDocument(
+        staffId,
+        fileBuffer,
+        file.originalFilename || 'document',
+        documentType
+      );
+      fileUrl = vfResult.url;
+      filePath = vfResult.path;
+      uploadedPaths.push(filePath);
+
+      primaryFileName = file.originalFilename || 'document';
+      primaryFileSize = file.size;
+      primaryMimeType = file.mimetype || '';
+    }
 
     // Save metadata to Neon
     const [document] = await sql`
@@ -152,6 +217,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         document_type,
         document_name,
         file_url,
+        file_url_front,
+        file_url_back,
         file_path,
         file_name,
         file_size,
@@ -167,11 +234,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ${staffId},
         ${documentType},
         ${documentName},
-        ${fileUrl},
-        ${filePath},
-        ${file.originalFilename || 'document'},
-        ${file.size},
-        ${file.mimetype},
+        ${fileUrl || fileUrlFront},
+        ${fileUrlFront || null},
+        ${fileUrlBack || null},
+        ${filePath || filePathFront},
+        ${primaryFileName},
+        ${primaryFileSize},
+        ${primaryMimeType},
         ${expiryDate ? new Date(expiryDate) : null},
         ${issuedDate ? new Date(issuedDate) : null},
         ${issuingAuthority || null},
@@ -183,18 +252,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       RETURNING *
     `;
 
-    // Clean up temp file
-    if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {
-        // Ignore cleanup errors
-      });
+    // Clean up temp files
+    for (const tempPath of tempFilePaths) {
+      await fs.promises.unlink(tempPath).catch(() => {});
     }
 
     if (!document) {
       throw new Error('Failed to create document record');
     }
 
-    logger.info('Staff document uploaded', { staffId, documentType, documentId: document.id, ocrConfirmed });
+    logger.info('Staff document uploaded', { staffId, documentType, documentId: document.id, ocrConfirmed, isMultiFile });
 
     // PRD-033: If OCR was confirmed by user, skip webhook (already processed)
     if (!ocrConfirmed) {
@@ -205,8 +272,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         entityType: 'staff',
         entityId: staffId,
         documentType: documentType,
-        fileName: file.originalFilename || 'document',
-        fileUrl: fileUrl,
+        fileName: primaryFileName,
+        fileUrl: fileUrl || fileUrlFront,
       }).catch((err) => {
         // Log but don't fail the upload if webhook fails
         logger.warn('OCR webhook trigger failed', { error: String(err), documentId: document.id });
@@ -223,16 +290,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Staff document upload error', { error: errorMessage });
 
-    // Cleanup: Remove uploaded file from VF Storage if DB insert failed
-    if (uploadedToStorage && storagePath) {
+    // Cleanup: Remove uploaded files from VF Storage if DB insert failed
+    for (const storagePath of uploadedPaths) {
       try {
-        // Parse the path to extract filename
-        // Path format: staff/documents/{staffId}_{filename}
         const pathParts = storagePath.split('/');
         if (pathParts.length >= 3) {
           const filename = pathParts[pathParts.length - 1];
           if (filename) {
-            // Extract staffId from filename prefix
             const staffIdFromFilename = filename.split('_')[0];
             if (staffIdFromFilename) {
               await deleteStaffDocument(staffIdFromFilename, filename);
@@ -246,11 +310,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    // Cleanup: Remove temp file
-    if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {
-        // Ignore cleanup errors
-      });
+    // Cleanup: Remove temp files
+    for (const tempPath of tempFilePaths) {
+      await fs.promises.unlink(tempPath).catch(() => {});
     }
 
     return res.status(500).json({
@@ -300,6 +362,8 @@ function mapDbToDocument(row: Record<string, unknown>) {
     documentType: row.document_type,
     documentName: row.document_name,
     fileUrl: row.file_url,
+    fileUrlFront: row.file_url_front || undefined,
+    fileUrlBack: row.file_url_back || undefined,
     fileSize: row.file_size,
     mimeType: row.mime_type,
     expiryDate: row.expiry_date ? new Date(row.expiry_date as string).toISOString() : undefined,
