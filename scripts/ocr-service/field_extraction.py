@@ -66,6 +66,7 @@ class ExtractionResult:
 # Document type detection keywords
 DOCUMENT_KEYWORDS = {
     DocumentType.ID_DOCUMENT: [
+        # === SA ID Documents ===
         # Primary identifiers (appear on both old and new IDs)
         "REPUBLIC OF SOUTH AFRICA",
         "IDENTITY",
@@ -77,17 +78,73 @@ DOCUMENT_KEYWORDS = {
         # Old ID Book specific
         "DEPARTMENT OF HOME AFFAIRS",
         "ID NUMBER",
-        # Passport specific (passports are valid ID documents)
-        "PASSPORT",
-        "PASSEPORT",
-        "GIVEN NAMES",
-        "DATE OF EXPIRY",
-        "DATE OF ISSUE",
-        "PASSPORT NO",
         # Afrikaans variants (old ID books)
         "REPUBLIEK VAN SUID-AFRIKA",
         "IDENTITEIT",
         "IDENTITEITSNOMMER",
+
+        # === International Passports ===
+        # English
+        "PASSPORT",
+        "GIVEN NAMES",
+        "DATE OF EXPIRY",
+        "DATE OF ISSUE",
+        "PASSPORT NO",
+        "PLACE OF BIRTH",
+        "DATE OF BIRTH",
+        "AUTHORITY",
+        "TYPE",
+        "CODE",
+        "MACHINE READABLE",
+        # French
+        "PASSEPORT",
+        "NOM",
+        "PRÉNOMS",
+        "DATE DE NAISSANCE",
+        "LIEU DE NAISSANCE",
+        "DATE DE DÉLIVRANCE",
+        "DATE D'EXPIRATION",
+        # German
+        "REISEPASS",
+        "NACHNAME",
+        "VORNAMEN",
+        "GEBURTSDATUM",
+        "GEBURTSORT",
+        "AUSSTELLUNGSDATUM",
+        "GÜLTIG BIS",
+        # Spanish
+        "PASAPORTE",
+        "APELLIDOS",
+        "NOMBRE",
+        "FECHA DE NACIMIENTO",
+        "LUGAR DE NACIMIENTO",
+        "FECHA DE EXPEDICIÓN",
+        "FECHA DE CADUCIDAD",
+        # Portuguese
+        "PASSAPORTE",
+        "APELIDOS",
+        "NOMES",
+        "DATA DE NASCIMENTO",
+        "LOCAL DE NASCIMENTO",
+        # Italian
+        "PASSAPORTO",
+        "COGNOME",
+        "DATA DI NASCITA",
+        "LUOGO DI NASCITA",
+        # Dutch
+        "PASPOORT",
+        "ACHTERNAAM",
+        "VOORNAMEN",
+        "GEBOORTEDATUM",
+        "GEBOORTEPLAATS",
+        # Generic international
+        "MRZ",
+        "ICAO",
+        "TRAVEL DOCUMENT",
+        "ISSUING STATE",
+        "HOLDER",
+        "EXPIRY",
+        "VALID",
     ],
     DocumentType.BANK_DETAILS: [
         "BANK",
@@ -143,7 +200,10 @@ DOCUMENT_PATTERNS = {
     DocumentType.ID_DOCUMENT: [
         r"\d{13}",  # SA ID number (13 digits)
         r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date: "03 FEB 1978"
-        r"[A-Z]\d{8,9}",  # SA Passport number (e.g., A09060091)
+        r"[A-Z]{1,2}\d{6,9}",  # Generic passport number (1-2 letters + 6-9 digits)
+        r"\d{9}",  # Numeric passport numbers (some countries)
+        r"P[<>][A-Z]{3}",  # MRZ first line pattern (P<XXX or P>XXX)
+        r"[A-Z0-9<]{30,44}",  # MRZ line pattern (30-44 alphanumeric chars with <)
     ],
     DocumentType.BANK_DETAILS: [r"\d{9,12}", r"\d{6}"],  # Account and branch
     DocumentType.TAX_DOCUMENT: [r"\d{10}", r"IRP5"],  # Tax number
@@ -156,31 +216,96 @@ DOCUMENT_PATTERNS = {
 FIELD_MAPPINGS = {
     DocumentType.ID_DOCUMENT: {
         EntityType.STAFF: {
-            # ID Number variants (SA ID and passport)
+            # === SA ID Number variants ===
             "Identity Number": "idNumber",
             "Identity No": "idNumber",
             "ID Number": "idNumber",
-            # Passport specific
+
+            # === Passport Number (multiple languages) ===
             "Passport No": "passportNumber",
             "Passport Number": "passportNumber",
-            "Given names": "firstName",
-            "Given Names": "firstName",
-            "Date of issue": "issuedDate",
-            "Date of Issue": "issuedDate",
-            "Date of expiry": "expiryDate",
-            "Date of Expiry": "expiryDate",
-            "Date d'expiration": "expiryDate",
-            "Place of birth": "placeOfBirth",
-            "Place of Birth": "placeOfBirth",
-            # Common fields (ID card and passport)
+            "Passeport No": "passportNumber",
+            "Reisepass Nr": "passportNumber",
+            "Pasaporte No": "passportNumber",
+            "Passaporto No": "passportNumber",
+            "Paspoort Nr": "passportNumber",
+
+            # === Name Fields (multiple languages) ===
+            # English
             "Surname": "lastName",
             "Names": "firstName",
             "First Names": "firstName",
+            "Given names": "firstName",
+            "Given Names": "firstName",
+            # French
+            "Nom": "lastName",
+            "Prénoms": "firstName",
+            "Prenoms": "firstName",
+            # German
+            "Nachname": "lastName",
+            "Vornamen": "firstName",
+            # Spanish
+            "Apellidos": "lastName",
+            "Nombre": "firstName",
+            # Portuguese
+            "Apelidos": "lastName",
+            "Nomes": "firstName",
+            # Italian
+            "Cognome": "lastName",
+            # Dutch
+            "Achternaam": "lastName",
+
+            # === Date of Birth (multiple languages) ===
             "Date of Birth": "dateOfBirth",
             "Date of birth": "dateOfBirth",
+            "Date de naissance": "dateOfBirth",
+            "Geburtsdatum": "dateOfBirth",
+            "Fecha de nacimiento": "dateOfBirth",
+            "Data de nascimento": "dateOfBirth",
+            "Data di nascita": "dateOfBirth",
+            "Geboortedatum": "dateOfBirth",
+
+            # === Place of Birth (multiple languages) ===
+            "Place of birth": "placeOfBirth",
+            "Place of Birth": "placeOfBirth",
+            "Lieu de naissance": "placeOfBirth",
+            "Geburtsort": "placeOfBirth",
+            "Lugar de nacimiento": "placeOfBirth",
+            "Local de nascimento": "placeOfBirth",
+            "Luogo di nascita": "placeOfBirth",
+            "Geboorteplaats": "placeOfBirth",
+
+            # === Date of Issue (multiple languages) ===
+            "Date of issue": "issuedDate",
+            "Date of Issue": "issuedDate",
+            "Date de délivrance": "issuedDate",
+            "Ausstellungsdatum": "issuedDate",
+            "Fecha de expedición": "issuedDate",
+
+            # === Date of Expiry (multiple languages) ===
+            "Date of expiry": "expiryDate",
+            "Date of Expiry": "expiryDate",
+            "Date d'expiration": "expiryDate",
+            "Gültig bis": "expiryDate",
+            "Fecha de caducidad": "expiryDate",
+
+            # === Gender / Sex ===
             "Sex": "gender",
             "Gender": "gender",
+            "Sexe": "gender",
+            "Geschlecht": "gender",
+            "Sexo": "gender",
+            "Sesso": "gender",
+            "Geslacht": "gender",
+
+            # === Nationality / Citizenship ===
             "Nationality": "nationality",
+            "Nationalité": "nationality",
+            "Staatsangehörigkeit": "nationality",
+            "Nacionalidad": "nationality",
+            "Nacionalidade": "nationality",
+            "Nazionalità": "nationality",
+            "Nationaliteit": "nationality",
             "Country of Birth": "countryOfBirth",
             "Status": "citizenshipStatus",
         },
@@ -543,16 +668,31 @@ def _extract_id_document_special_fields(text: str, fields: Dict[str, ExtractedFi
 
 
 def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
-    """Extract passport-specific fields from text."""
+    """Extract passport-specific fields from text (international passports)."""
     upper_text = text.upper()
 
-    # Only process if this looks like a passport
-    if "PASSPORT" not in upper_text:
+    # Check for passport indicators in multiple languages
+    passport_indicators = [
+        "PASSPORT", "PASSEPORT", "REISEPASS", "PASAPORTE",
+        "PASSAPORTE", "PASSAPORTO", "PASPOORT", "TRAVEL DOCUMENT"
+    ]
+    is_passport = any(indicator in upper_text for indicator in passport_indicators)
+
+    if not is_passport:
         return
 
-    # Extract passport number (e.g., A09060091)
+    # Extract passport number - various formats:
+    # - A09060091 (SA: 1 letter + 8-9 digits)
+    # - AB1234567 (UK/EU: 2 letters + 7 digits)
+    # - 123456789 (US: 9 digits)
+    # - L01234567 (Canadian: 1 letter + 8 digits)
     if "passportNumber" not in fields:
-        passport_match = re.search(r"PASSPORT\s*(?:NO|NUMBER)?[:\s./]*([A-Z]\d{8,9})", upper_text)
+        # Try letter+digits format first (most common)
+        passport_match = re.search(
+            r"(?:PASSPORT|PASSEPORT|REISEPASS|PASAPORTE|PASSAPORTO|PASPOORT)\s*"
+            r"(?:NO|NR|NUMBER|NUMERO)?[:\s./]*([A-Z]{1,2}\d{6,9})",
+            upper_text
+        )
         if passport_match:
             fields["passportNumber"] = ExtractedField(
                 field_name="passportNumber",
@@ -561,6 +701,20 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                 source="regex_passport_no",
                 validated=True,
             )
+        else:
+            # Try numeric-only format (US passports)
+            numeric_match = re.search(
+                r"(?:PASSPORT|PASSEPORT)\s*(?:NO|NUMBER)?[:\s./]*(\d{9})\b",
+                upper_text
+            )
+            if numeric_match:
+                fields["passportNumber"] = ExtractedField(
+                    field_name="passportNumber",
+                    value=numeric_match.group(1),
+                    confidence=0.80,
+                    source="regex_passport_numeric",
+                    validated=True,
+                )
 
     # Extract names (Surname / Given names)
     if "lastName" not in fields:

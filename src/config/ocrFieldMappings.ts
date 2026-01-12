@@ -203,8 +203,9 @@ export function lookupBankFromBranchCode(branchCode: string): string | null {
  */
 export const SA_ID_CONFIG: DocumentTypeConfig = {
   documentType: 'id_document',
-  displayName: 'SA ID Document',
+  displayName: 'ID Document',
   keywords: [
+    // === SA ID Documents ===
     // Primary identifiers (appear on both old and new IDs)
     'REPUBLIC OF SOUTH AFRICA',
     'IDENTITY',
@@ -216,26 +217,86 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
     // Old ID Book specific
     'DEPARTMENT OF HOME AFFAIRS',
     'ID NUMBER',
-    // Passport specific (passports are valid ID documents)
-    'PASSPORT',
-    'PASSEPORT',
-    'GIVEN NAMES',
-    'DATE OF EXPIRY',
-    'DATE OF ISSUE',
-    'PASSPORT NO',
     // Afrikaans variants (old ID books)
     'REPUBLIEK VAN SUID-AFRIKA',
     'IDENTITEIT',
     'IDENTITEITSNOMMER',
+
+    // === International Passports ===
+    // English
+    'PASSPORT',
+    'GIVEN NAMES',
+    'DATE OF EXPIRY',
+    'DATE OF ISSUE',
+    'PASSPORT NO',
+    'PLACE OF BIRTH',
+    'DATE OF BIRTH',
+    'AUTHORITY',
+    'TYPE',
+    'CODE',
+    'MACHINE READABLE',
+    // French
+    'PASSEPORT',
+    'NOM',
+    'PRÉNOMS',
+    'DATE DE NAISSANCE',
+    'LIEU DE NAISSANCE',
+    'DATE DE DÉLIVRANCE',
+    "DATE D'EXPIRATION",
+    // German
+    'REISEPASS',
+    'NACHNAME',
+    'VORNAMEN',
+    'GEBURTSDATUM',
+    'GEBURTSORT',
+    'AUSSTELLUNGSDATUM',
+    'GÜLTIG BIS',
+    // Spanish
+    'PASAPORTE',
+    'APELLIDOS',
+    'NOMBRE',
+    'FECHA DE NACIMIENTO',
+    'LUGAR DE NACIMIENTO',
+    'FECHA DE EXPEDICIÓN',
+    'FECHA DE CADUCIDAD',
+    // Portuguese
+    'PASSAPORTE',
+    'APELIDOS',
+    'NOMES',
+    'DATA DE NASCIMENTO',
+    'LOCAL DE NASCIMENTO',
+    // Italian
+    'PASSAPORTO',
+    'COGNOME',
+    'NOME',
+    'DATA DI NASCITA',
+    'LUOGO DI NASCITA',
+    // Dutch
+    'PASPOORT',
+    'ACHTERNAAM',
+    'VOORNAMEN',
+    'GEBOORTEDATUM',
+    'GEBOORTEPLAATS',
+    // Generic international
+    'MRZ',
+    'ICAO',
+    'TRAVEL DOCUMENT',
+    'ISSUING STATE',
+    'HOLDER',
+    'EXPIRY',
+    'VALID',
   ],
   patterns: [
     /\d{13}/, // SA ID number (13 digits)
     /\d{1,2}\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}/i, // Date: "03 FEB 1978"
-    /[A-Z]\d{8,9}/, // SA Passport number (e.g., A09060091)
+    /[A-Z]{1,2}\d{6,9}/, // Generic passport number (1-2 letters + 6-9 digits)
+    /\d{9}/, // Numeric passport numbers (some countries)
+    /P[<>][A-Z]{3}/, // MRZ first line pattern (P<XXX or P>XXX)
+    /[A-Z0-9<]{30,44}/, // MRZ line pattern (30-44 alphanumeric chars with <)
   ],
   entityType: OcrEntityType.STAFF,
   fieldMappings: [
-    // ID Number - multiple label variants
+    // === SA ID Number variants ===
     {
       ocrLabel: 'Identity Number',
       entityField: 'idNumber',
@@ -257,116 +318,90 @@ export const SA_ID_CONFIG: DocumentTypeConfig = {
         { type: 'custom', value: 'validateSAID', errorMessage: 'Invalid SA ID number' },
       ],
     },
-    // Passport specific fields
-    {
-      ocrLabel: 'Passport No',
-      entityField: 'passportNumber',
-    },
-    {
-      ocrLabel: 'Passport Number',
-      entityField: 'passportNumber',
-    },
-    {
-      ocrLabel: 'Given names',
-      entityField: 'firstName',
-      validationRules: [
-        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
-      ],
-    },
-    {
-      ocrLabel: 'Given Names',
-      entityField: 'firstName',
-      validationRules: [
-        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
-      ],
-    },
-    {
-      ocrLabel: 'Date of issue',
-      entityField: 'issuedDate',
-      transform: 'parseDate',
-    },
-    {
-      ocrLabel: 'Date of Issue',
-      entityField: 'issuedDate',
-      transform: 'parseDate',
-    },
-    {
-      ocrLabel: 'Date of expiry',
-      entityField: 'expiryDate',
-      transform: 'parseDate',
-    },
-    {
-      ocrLabel: 'Date of Expiry',
-      entityField: 'expiryDate',
-      transform: 'parseDate',
-    },
-    {
-      ocrLabel: 'Place of birth',
-      entityField: 'placeOfBirth',
-    },
-    {
-      ocrLabel: 'Place of Birth',
-      entityField: 'placeOfBirth',
-    },
-    // Common name fields (ID card and passport)
-    {
-      ocrLabel: 'Surname',
-      entityField: 'lastName',
-      validationRules: [
-        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid surname format' },
-      ],
-    },
-    {
-      ocrLabel: 'Names',
-      entityField: 'firstName',
-      validationRules: [
-        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
-      ],
-    },
-    {
-      ocrLabel: 'First Names',
-      entityField: 'firstName',
-      validationRules: [
-        { type: 'regex', value: '^[A-Za-z\\s\\-\']+$', errorMessage: 'Invalid first name format' },
-      ],
-    },
-    // Date and demographics
-    {
-      ocrLabel: 'Date of Birth',
-      entityField: 'dateOfBirth',
-      transform: 'parseDate',
-    },
-    {
-      ocrLabel: 'Date of birth',
-      entityField: 'dateOfBirth',
-      transform: 'parseDate',
-    },
-    {
-      ocrLabel: 'Sex',
-      entityField: 'gender',
-    },
-    {
-      ocrLabel: 'Gender',
-      entityField: 'gender',
-      transform: 'extractGenderFromSAID',
-    },
-    {
-      ocrLabel: 'Country of Birth',
-      entityField: 'countryOfBirth',
-    },
-    {
-      ocrLabel: 'Nationality',
-      entityField: 'nationality',
-    },
-    {
-      ocrLabel: 'Citizenship',
-      entityField: 'nationality',
-      transform: 'extractCitizenshipFromSAID',
-    },
-    {
-      ocrLabel: 'Status',
-      entityField: 'citizenshipStatus',
-    },
+
+    // === Passport Number (multiple languages) ===
+    { ocrLabel: 'Passport No', entityField: 'passportNumber' },
+    { ocrLabel: 'Passport Number', entityField: 'passportNumber' },
+    { ocrLabel: 'Passeport No', entityField: 'passportNumber' },
+    { ocrLabel: 'Reisepass Nr', entityField: 'passportNumber' },
+    { ocrLabel: 'Pasaporte No', entityField: 'passportNumber' },
+    { ocrLabel: 'Passaporto No', entityField: 'passportNumber' },
+    { ocrLabel: 'Paspoort Nr', entityField: 'passportNumber' },
+
+    // === Surname / Last Name (multiple languages) ===
+    { ocrLabel: 'Surname', entityField: 'lastName' },
+    { ocrLabel: 'Nom', entityField: 'lastName' },
+    { ocrLabel: 'Nachname', entityField: 'lastName' },
+    { ocrLabel: 'Apellidos', entityField: 'lastName' },
+    { ocrLabel: 'Apelidos', entityField: 'lastName' },
+    { ocrLabel: 'Cognome', entityField: 'lastName' },
+    { ocrLabel: 'Achternaam', entityField: 'lastName' },
+
+    // === First Name / Given Names (multiple languages) ===
+    { ocrLabel: 'Names', entityField: 'firstName' },
+    { ocrLabel: 'First Names', entityField: 'firstName' },
+    { ocrLabel: 'Given names', entityField: 'firstName' },
+    { ocrLabel: 'Given Names', entityField: 'firstName' },
+    { ocrLabel: 'Prénoms', entityField: 'firstName' },
+    { ocrLabel: 'Prenoms', entityField: 'firstName' },
+    { ocrLabel: 'Vornamen', entityField: 'firstName' },
+    { ocrLabel: 'Nombre', entityField: 'firstName' },
+    { ocrLabel: 'Nomes', entityField: 'firstName' },
+
+    // === Date of Birth (multiple languages) ===
+    { ocrLabel: 'Date of Birth', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Date of birth', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Date de naissance', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Geburtsdatum', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Fecha de nacimiento', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Data de nascimento', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Data di nascita', entityField: 'dateOfBirth', transform: 'parseDate' },
+    { ocrLabel: 'Geboortedatum', entityField: 'dateOfBirth', transform: 'parseDate' },
+
+    // === Place of Birth (multiple languages) ===
+    { ocrLabel: 'Place of birth', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Place of Birth', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Lieu de naissance', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Geburtsort', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Lugar de nacimiento', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Local de nascimento', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Luogo di nascita', entityField: 'placeOfBirth' },
+    { ocrLabel: 'Geboorteplaats', entityField: 'placeOfBirth' },
+
+    // === Date of Issue (multiple languages) ===
+    { ocrLabel: 'Date of issue', entityField: 'issuedDate', transform: 'parseDate' },
+    { ocrLabel: 'Date of Issue', entityField: 'issuedDate', transform: 'parseDate' },
+    { ocrLabel: 'Date de délivrance', entityField: 'issuedDate', transform: 'parseDate' },
+    { ocrLabel: 'Ausstellungsdatum', entityField: 'issuedDate', transform: 'parseDate' },
+    { ocrLabel: 'Fecha de expedición', entityField: 'issuedDate', transform: 'parseDate' },
+
+    // === Date of Expiry (multiple languages) ===
+    { ocrLabel: 'Date of expiry', entityField: 'expiryDate', transform: 'parseDate' },
+    { ocrLabel: 'Date of Expiry', entityField: 'expiryDate', transform: 'parseDate' },
+    { ocrLabel: "Date d'expiration", entityField: 'expiryDate', transform: 'parseDate' },
+    { ocrLabel: 'Gültig bis', entityField: 'expiryDate', transform: 'parseDate' },
+    { ocrLabel: 'Fecha de caducidad', entityField: 'expiryDate', transform: 'parseDate' },
+
+    // === Gender / Sex (multiple languages) ===
+    { ocrLabel: 'Sex', entityField: 'gender' },
+    { ocrLabel: 'Gender', entityField: 'gender', transform: 'extractGenderFromSAID' },
+    { ocrLabel: 'Sexe', entityField: 'gender' },
+    { ocrLabel: 'Geschlecht', entityField: 'gender' },
+    { ocrLabel: 'Sexo', entityField: 'gender' },
+    { ocrLabel: 'Sesso', entityField: 'gender' },
+    { ocrLabel: 'Geslacht', entityField: 'gender' },
+
+    // === Nationality / Citizenship (multiple languages) ===
+    { ocrLabel: 'Nationality', entityField: 'nationality' },
+    { ocrLabel: 'Nationalité', entityField: 'nationality' },
+    { ocrLabel: 'Staatsangehörigkeit', entityField: 'nationality' },
+    { ocrLabel: 'Nacionalidad', entityField: 'nationality' },
+    { ocrLabel: 'Nacionalidade', entityField: 'nationality' },
+    { ocrLabel: 'Nazionalità', entityField: 'nationality' },
+    { ocrLabel: 'Nationaliteit', entityField: 'nationality' },
+    { ocrLabel: 'Country of Birth', entityField: 'countryOfBirth' },
+    { ocrLabel: 'Citizenship', entityField: 'nationality', transform: 'extractCitizenshipFromSAID' },
+    { ocrLabel: 'Status', entityField: 'citizenshipStatus' },
   ],
 };
 
