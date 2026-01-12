@@ -700,8 +700,8 @@ export class QContactClient {
  *
  * @example
  * const client = createQContactClient({
- *   base_url: process.env.QCONTACT_API_URL!,
- *   api_key: process.env.QCONTACT_API_KEY!,
+ *   base_url: process.env.FIBERTIME_QCONTACT_BASE_URL!,
+ *   api_key: process.env.FIBERTIME_QCONTACT_ACCESS_TOKEN!,
  *   timeout_ms: 10000,
  *   retry_attempts: 3,
  * });
@@ -723,8 +723,9 @@ let defaultClient: QContactClient | null = null;
 export function getDefaultQContactClient(): QContactClient {
   if (!defaultClient) {
     const config: QContactAPIConfig = {
-      base_url: process.env.QCONTACT_API_URL || '',
-      api_key: process.env.QCONTACT_API_KEY || '',
+      // Support both FIBERTIME_QCONTACT_* (current) and QCONTACT_* (legacy) env vars
+      base_url: process.env.FIBERTIME_QCONTACT_BASE_URL || process.env.QCONTACT_API_URL || '',
+      api_key: process.env.FIBERTIME_QCONTACT_ACCESS_TOKEN || process.env.QCONTACT_API_KEY || '',
       timeout_ms: parseInt(process.env.QCONTACT_TIMEOUT_MS || '30000', 10),
       retry_attempts: parseInt(process.env.QCONTACT_RETRY_ATTEMPTS || '3', 10),
     };
