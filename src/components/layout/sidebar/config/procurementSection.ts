@@ -11,6 +11,8 @@ import type { NavSection } from './types';
 
 export const procurementSection: NavSection = {
   section: 'PROCUREMENT',
+  sectionId: 'procurement',
+  isCollapsible: true,
   items: [
     {
       to: '/procurement',

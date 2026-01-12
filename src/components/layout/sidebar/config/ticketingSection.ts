@@ -16,6 +16,8 @@ import type { NavSection } from './types';
 
 export const ticketingSection: NavSection = {
   section: 'TICKETING',
+  sectionId: 'ticketing',
+  isCollapsible: true,
   items: [
     {
       to: '/ticketing',

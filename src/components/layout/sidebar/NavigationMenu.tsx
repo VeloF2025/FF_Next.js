@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { NavSection, SidebarStyles } from './types';
 import type { ThemeConfig } from '@/types/theme.types';
+import { CollapsibleSection } from './CollapsibleSection';
+import { useSectionCollapse } from './hooks/useSectionCollapse';
 
 interface NavigationMenuProps {
   visibleNavItems: NavSection[];
@@ -14,23 +16,33 @@ interface NavigationMenuProps {
 
 export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, themeConfig }: NavigationMenuProps) {
   const pathname = usePathname();
+  const { toggleSection, isSectionExpanded } = useSectionCollapse({ sections: visibleNavItems });
+
+  // Check if a section has an active item
+  const sectionHasActiveItem = (section: NavSection): boolean => {
+    return section.items.some(item =>
+      pathname === item.to || pathname.startsWith(item.to + '/')
+    );
+  };
 
   return (
     <>
-      {visibleNavItems.map((section, idx) => (
-        <div key={idx} className={`${isCollapsed ? 'px-2' : 'px-4'} mb-6`}>
-          {!isCollapsed && (
-            <div
-              className="text-xs font-semibold uppercase tracking-wider mb-3 px-2"
-              style={{ color: sidebarStyles.textColorTertiary }}
-            >
-              {section.section}
-            </div>
-          )}
-          <div className="space-y-1">
-            {section.items.map((item) => {
-              const isActive = pathname === item.to || pathname.startsWith(item.to + '/');
-              return (
+      {visibleNavItems.map((section) => (
+        <CollapsibleSection
+          key={section.sectionId}
+          sectionTitle={section.section}
+          sectionId={section.sectionId}
+          isExpanded={isSectionExpanded(section.sectionId)}
+          isCollapsible={section.isCollapsible ?? true}
+          onToggle={toggleSection}
+          isCollapsed={isCollapsed}
+          sidebarStyles={sidebarStyles}
+          themeConfig={themeConfig}
+          hasActiveItem={sectionHasActiveItem(section)}
+        >
+          {section.items.map((item) => {
+            const isActive = pathname === item.to || pathname.startsWith(item.to + '/');
+            return (
               <Link
                 key={item.to}
                 href={item.to}
@@ -80,10 +92,9 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
                   </div>
                 )}
               </Link>
-              );
-            })}
-          </div>
-        </div>
+            );
+          })}
+        </CollapsibleSection>
       ))}
     </>
   );

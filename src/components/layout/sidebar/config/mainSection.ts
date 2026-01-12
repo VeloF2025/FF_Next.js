@@ -7,6 +7,9 @@ import type { NavSection } from './types';
 
 export const mainSection: NavSection = {
   section: 'MAIN',
+  sectionId: 'main',
+  isCollapsible: true,
+  defaultExpanded: true,
   items: [
     {
       to: '/dashboard',

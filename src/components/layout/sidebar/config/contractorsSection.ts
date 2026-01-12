@@ -7,6 +7,8 @@ import type { NavSection } from './types';
 
 export const contractorsSection: NavSection = {
   section: 'CONTRACTORS',
+  sectionId: 'contractors',
+  isCollapsible: true,
   items: [
     {
       to: '/contractors',

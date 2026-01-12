@@ -7,11 +7,15 @@ export interface NavItem {
   label: string;
   shortLabel: string;
   permissions: Permission[];
+  subItems?: NavItem[];
 }
 
 export interface NavSection {
   section: string;
+  sectionId: string;
   items: NavItem[];
+  isCollapsible?: boolean;
+  defaultExpanded?: boolean;
 }
 
 export interface SidebarProps {

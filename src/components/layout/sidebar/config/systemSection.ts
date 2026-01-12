@@ -7,6 +7,8 @@ import type { NavSection } from './types';
 
 export const systemSection: NavSection = {
   section: 'SYSTEM',
+  sectionId: 'system',
+  isCollapsible: true,
   items: [
     {
       to: '/downloads',

@@ -7,6 +7,8 @@ import type { NavSection } from './types';
 
 export const fieldOperationsSection: NavSection = {
   section: 'FIELD OPERATIONS',
+  sectionId: 'field-ops',
+  isCollapsible: true,
   items: [
     {
       to: '/field',

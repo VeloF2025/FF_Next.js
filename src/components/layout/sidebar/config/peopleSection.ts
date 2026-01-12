@@ -6,15 +6,10 @@ import { Users } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const peopleSection: NavSection = {
-  section: 'PEOPLE & MANAGEMENT',
+  section: 'PEOPLE',
+  sectionId: 'people',
+  isCollapsible: true,
   items: [
-    {
-      to: '/clients',
-      icon: Users,
-      label: 'Clients',
-      shortLabel: 'Clients',
-      permissions: [],
-    },
     {
       to: '/staff',
       icon: Users,
