@@ -108,8 +108,18 @@ export default async function handler(
       'temp_ocr'  // Use a temp document type
     );
 
-    const fileUrl = uploadResult.url;
     const storagePath = uploadResult.path;
+
+    // Convert public HTTPS URL to internal HTTP URL for OCR service
+    // The OCR service runs on the same server and can't access via public domain (gets 404)
+    // Public: https://vf.fibreflow.app/path → Internal: http://100.96.203.105:8091/path
+    const VF_STORAGE_INTERNAL_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
+    let fileUrl = uploadResult.url;
+    if (fileUrl.includes('vf.fibreflow.app')) {
+      const urlPath = new URL(fileUrl).pathname;
+      fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
+      log.info('Converted public URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
+    }
 
     // Call OCR service synchronously (with 30s timeout)
     const controller = new AbortController();

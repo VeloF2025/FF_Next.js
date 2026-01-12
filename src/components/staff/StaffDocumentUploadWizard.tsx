@@ -420,22 +420,20 @@ export function StaffDocumentUploadWizard({
               <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Select Document File
               </label>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                onChange={handleFileChange}
-                className="absolute opacity-0 w-px h-px"
-                id="wizard-file-upload"
-                aria-label="Upload document file"
-              />
               <label
-                htmlFor="wizard-file-upload"
-                onClick={handleLabelClick}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
-                className="flex items-center justify-center gap-3 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] hover:border-blue-400 hover:bg-blue-500/10"
+                className="relative flex items-center justify-center gap-3 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] hover:border-blue-400 hover:bg-blue-500/10"
               >
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  id="wizard-file-upload"
+                  aria-label="Upload document file"
+                />
                 <Upload className="h-8 w-8 text-[var(--ff-text-secondary)]" />
                 <div className="text-center">
                   <p className="text-sm font-medium text-[var(--ff-text-primary)]">
