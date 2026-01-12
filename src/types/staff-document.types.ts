@@ -211,9 +211,10 @@ export const UPLOAD_ONLY_DOCUMENTS: DocumentType[] = [
 /**
  * Documents that require multiple file uploads
  * Key is document type, value is array of file identifiers
+ * Note: Driver's license simplified to single file (front only) - Jan 2026
  */
 export const MULTI_FILE_DOCUMENTS: Partial<Record<DocumentType, string[]>> = {
-  drivers_license: ['front', 'back'],
+  // Currently no document types require multiple files
 };
 
 /**
@@ -242,7 +243,7 @@ export function getMultiFileParts(documentType: DocumentType): string[] {
  */
 export const DOCUMENT_TYPE_DESCRIPTIONS: Record<DocumentType, string> = {
   id_document: 'South African ID, Smart ID Card, or Passport',
-  drivers_license: 'Upload front and back of your license',
+  drivers_license: 'Driver\'s license front page',
   employment_contract: 'Employment agreement or service contract',
   certification: 'Industry certifications (e.g., fibre splicing)',
   qualification: 'Degrees, diplomas, or training certificates',

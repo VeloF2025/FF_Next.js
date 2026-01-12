@@ -1,16 +1,18 @@
 /**
  * OCR Preview API - Synchronous OCR WITHOUT database save
  * PRD-033: OCR-First Document Upload Flow
- * 
+ *
  * Purpose: Process OCR and return results for user review BEFORE saving to DB
- * 
+ *
  * Flow:
- * 1. Accept file upload (FormData)
- * 2. Upload to temp location or stream to OCR service
+ * 1. Accept single file upload (FormData)
+ * 2. Upload to temp location and stream to OCR service
  * 3. Call OCR service synchronously (wait for response)
  * 4. Build classification + extraction results
  * 5. Return preview data (no DB save)
- * 
+ *
+ * Driver's License: Upload FRONT only - extracts ID, License No, Valid Period, Codes
+ *
  * Timeout: 30 seconds max
  */
 
@@ -20,7 +22,7 @@ import fs from 'fs';
 import { ocrService } from '@/services/ocrService';
 import { log } from '@/lib/logger';
 import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '@/services/vfStorageAdapter';
-import { OcrEntityType } from '@/types/ocr.types';
+import { OcrEntityType, type OcrFieldExtractionResponse } from '@/types/ocr.types';
 
 // Disable body parser for file uploads
 export const config = {
@@ -60,35 +62,41 @@ export default async function handler(
   }
 
   const startTime = Date.now();
+  const tempFilePaths: string[] = [];
+  const storagePaths: string[] = [];
 
   try {
     // Parse multipart form data
     const form = formidable({
-      maxFileSize: 10 * 1024 * 1024, // 10MB max
+      maxFileSize: 10 * 1024 * 1024, // 10MB max per file
       keepExtensions: true,
     });
 
     const [fields, files] = await form.parse(req);
 
-    const file = Array.isArray(files.file) ? files.file[0] : files.file;
+    // Get fields
     const staffId = Array.isArray(fields.staffId) ? fields.staffId[0] : fields.staffId;
     const entityType = Array.isArray(fields.entityType) ? fields.entityType[0] : fields.entityType || 'staff';
-
-    if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    const documentType = Array.isArray(fields.documentType) ? fields.documentType[0] : fields.documentType;
 
     if (!staffId) {
       return res.status(400).json({ error: 'staffId is required' });
     }
 
+    // Get uploaded file (single file for all document types)
+    const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
+
+    // Validate file presence
+    if (!uploadedFile) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
     log.info('OCR Preview request', {
-      fileName: file.originalFilename,
-      fileSize: file.size,
-      mimeType: file.mimetype,
+      documentType,
       staffId,
       entityType,
-    }, 'OcrPreviewAPI');
+      filename: uploadedFile.originalFilename,
+    });
 
     // Check VF Storage availability
     const storageAvailable = await isVFStorageAvailable();
@@ -97,68 +105,83 @@ export default async function handler(
       return res.status(503).json({ error: 'Storage service unavailable for OCR processing' });
     }
 
-    // Read file buffer
-    const fileBuffer = fs.readFileSync(file.filepath);
-
-    // Upload to VF Storage temporarily to get a URL for OCR service
-    const uploadResult = await uploadStaffDocument(
-      staffId,
-      fileBuffer,
-      file.originalFilename || 'ocr-preview-temp',
-      'temp_ocr'  // Use a temp document type
-    );
-
-    const storagePath = uploadResult.path;
-
-    // Convert public HTTPS URL to internal HTTP URL for OCR service
-    // The OCR service runs on the same server and can't access via public domain (gets 404)
-    // Public: https://vf.fibreflow.app/path → Internal: http://100.96.203.105:8091/path
     const VF_STORAGE_INTERNAL_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
-    let fileUrl = uploadResult.url;
-    if (fileUrl.includes('vf.fibreflow.app')) {
-      const urlPath = new URL(fileUrl).pathname;
-      fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
-      log.info('Converted public URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
-    }
 
-    // Call OCR service synchronously (with 30s timeout)
+    // Helper to upload file and get internal URL
+    const uploadAndGetUrl = async (file: formidable.File, suffix: string): Promise<string> => {
+      const fileBuffer = fs.readFileSync(file.filepath);
+      tempFilePaths.push(file.filepath);
+
+      const uploadResult = await uploadStaffDocument(
+        staffId,
+        fileBuffer,
+        `ocr-preview-${suffix}-${file.originalFilename || 'temp'}`,
+        'temp_ocr'
+      );
+
+      storagePaths.push(uploadResult.path);
+
+      // Convert to internal URL for OCR service
+      let fileUrl = uploadResult.url;
+      if (fileUrl.includes('vf.fibreflow.app')) {
+        const urlPath = new URL(fileUrl).pathname;
+        fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
+        log.info('Converted public URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
+      }
+
+      return fileUrl;
+    };
+
+    // Process OCR with timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
 
     try {
-      // Note: extractFields doesn't support AbortSignal yet, 30s is enforced by Next.js API timeout
+      // Upload file and process OCR
+      const fileUrl = await uploadAndGetUrl(uploadedFile, 'single');
+
       const ocrResult = await ocrService.extractFields({
         fileUrl,
-        documentType: undefined,  // Let OCR detect it
+        documentType: documentType || undefined,
         entityType: entityType === 'contractor' ? OcrEntityType.CONTRACTOR : OcrEntityType.STAFF,
+      });
+
+      log.info('OCR completed', {
+        documentType: ocrResult.classification?.documentType || documentType,
+        fieldsExtracted: Object.keys(ocrResult.extractedFields).length,
+        tierUsed: ocrResult.tierUsed,
       });
 
       clearTimeout(timeout);
 
-      // Clean up local temp file
-      fs.unlinkSync(file.filepath);
+      // Clean up temp files
+      for (const tempPath of tempFilePaths) {
+        try { fs.unlinkSync(tempPath); } catch {}
+      }
 
-      // Clean up VF Storage temp file (fire and forget - don't block response)
-      const filename = storagePath.split('/').pop();
-      if (filename) {
-        deleteStaffDocument(staffId, filename).catch(err => {
-          log.warn('Failed to cleanup temp OCR file from storage', { error: String(err), storagePath });
-        });
+      // Clean up storage files (fire and forget)
+      for (const storagePath of storagePaths) {
+        const filename = storagePath.split('/').pop();
+        if (filename) {
+          deleteStaffDocument(staffId, filename).catch(err => {
+            log.warn('Failed to cleanup temp OCR file', { error: String(err), storagePath });
+          });
+        }
       }
 
       const processingTimeMs = Date.now() - startTime;
 
       // Build response with defensive null checks
-      const documentType = ocrResult.classification?.documentType || 'unknown';
+      const detectedType = ocrResult.classification?.documentType || documentType || 'unknown';
       const confidence = ocrResult.classification?.confidence || 0;
 
       const response: OcrPreviewResponse = {
         success: true,
         classification: {
-          documentType,
+          documentType: detectedType,
           confidence,
-          displayName: getDocumentTypeName(documentType),
-          topGuesses: buildTopGuesses({ documentType, confidence }),
+          displayName: getDocumentTypeName(detectedType),
+          topGuesses: buildTopGuesses({ documentType: detectedType, confidence }),
         },
         extractedFields: ocrResult.extractedFields as Record<string, { value: any; confidence: number; validated: boolean }>,
         rawText: ocrResult.rawText || '',
@@ -178,17 +201,17 @@ export default async function handler(
     } catch (ocrError: any) {
       clearTimeout(timeout);
 
-      // Clean up local temp file
-      try {
-        fs.unlinkSync(file.filepath);
-      } catch {}
+      // Clean up temp files
+      for (const tempPath of tempFilePaths) {
+        try { fs.unlinkSync(tempPath); } catch {}
+      }
 
-      // Clean up VF Storage temp file
-      const filename = storagePath.split('/').pop();
-      if (filename) {
-        deleteStaffDocument(staffId, filename).catch(err => {
-          log.warn('Failed to cleanup temp OCR file after error', { error: String(err), storagePath });
-        });
+      // Clean up storage files
+      for (const storagePath of storagePaths) {
+        const filename = storagePath.split('/').pop();
+        if (filename) {
+          deleteStaffDocument(staffId, filename).catch(() => {});
+        }
       }
 
       if (ocrError.name === 'AbortError') {

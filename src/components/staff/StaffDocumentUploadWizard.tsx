@@ -36,11 +36,9 @@ import {
   DOCUMENT_CATEGORY_LABELS,
   DOCUMENTS_WITH_EXPIRY,
   isOcrEnabled,
-  isMultiFileDocument,
 } from '@/types/staff-document.types';
 import { createLogger } from '@/lib/logger';
 import { DocumentTypeSelector } from './DocumentTypeSelector';
-import { DriversLicenseUpload } from './DriversLicenseUpload';
 
 const logger = createLogger('StaffDocumentUploadWizard');
 
@@ -58,17 +56,10 @@ type WizardStep =
   | 'saving'
   | 'complete';
 
-// Driver's license files interface
-interface DriversLicenseFiles {
-  front: File | null;
-  back: File | null;
-}
-
 // Wizard state interface
 interface WizardState {
   currentStep: WizardStep;
   file: File | null;
-  licenseFiles: DriversLicenseFiles;
   ocrResult: OcrPreviewResult | null;
   selectedDocumentType: DocumentType | null;
   documentName: string;
@@ -114,7 +105,6 @@ export function StaffDocumentUploadWizard({
   const [state, setState] = useState<WizardState>({
     currentStep: 'select_type',
     file: null,
-    licenseFiles: { front: null, back: null },
     ocrResult: null,
     selectedDocumentType: null,
     documentName: '',
@@ -163,32 +153,6 @@ export function StaffDocumentUploadWizard({
   // =========================================================================
   // Step 2: File Upload Handlers
   // =========================================================================
-
-  // Handler for driver's license dual file upload
-  const handleLicenseFilesChange = useCallback((files: DriversLicenseFiles) => {
-    setState((prev) => ({
-      ...prev,
-      licenseFiles: files,
-    }));
-  }, []);
-
-  // Process driver's license (both files)
-  const handleLicenseUploadProceed = useCallback(async () => {
-    const { front, back } = state.licenseFiles;
-    if (!front || !back) {
-      setError('Please upload both front and back of your driver\'s license');
-      return;
-    }
-
-    setError(null);
-    setState((prev) => ({
-      ...prev,
-      documentName: prev.documentName || 'Driver\'s License',
-    }));
-
-    // Process front side with OCR
-    await processOcr(front);
-  }, [state.licenseFiles]);
 
   const handleFileSelected = useCallback(async (file: File) => {
     setError(null);
@@ -406,13 +370,8 @@ export function StaffDocumentUploadWizard({
   const handleSubmit = async () => {
     const isDriversLicense = state.selectedDocumentType === 'drivers_license';
 
-    // Validate files based on document type
-    if (isDriversLicense) {
-      if (!state.licenseFiles.front || !state.licenseFiles.back) {
-        setError('Both front and back of driver\'s license are required');
-        return;
-      }
-    } else if (!state.file) {
+    // Validate file presence
+    if (!state.file) {
       setError('No file selected');
       return;
     }
@@ -431,14 +390,7 @@ export function StaffDocumentUploadWizard({
       formData.append('staffId', staffId);
       formData.append('documentType', state.selectedDocumentType);
       formData.append('documentName', state.documentName);
-
-      // Handle file(s) based on document type
-      if (isDriversLicense && state.licenseFiles.front && state.licenseFiles.back) {
-        formData.append('fileFront', state.licenseFiles.front);
-        formData.append('fileBack', state.licenseFiles.back);
-      } else if (state.file) {
-        formData.append('file', state.file);
-      }
+      formData.append('file', state.file);
 
       // Add OCR confirmed flag if OCR was used
       if (state.ocrResult) {
@@ -461,13 +413,13 @@ export function StaffDocumentUploadWizard({
       };
 
       // Extract common fields (handle both OCR field objects and raw values)
-      const documentNumber = extractValue(finalFields.documentNumber) || extractValue(finalFields.idNumber);
+      const idNumber = extractValue(finalFields.idNumber) || extractValue(finalFields.documentNumber);
       const issuedDate = extractValue(finalFields.issuedDate) || extractValue(finalFields.issueDate);
       const expiryDate = extractValue(finalFields.expiryDate) || extractValue(finalFields.expirationDate);
       const issuingAuthority = extractValue(finalFields.issuingAuthority);
 
-      if (documentNumber) {
-        formData.append('documentNumber', documentNumber);
+      if (idNumber) {
+        formData.append('idNumber', idNumber);
       }
       if (issuedDate) {
         formData.append('issuedDate', issuedDate);
@@ -477,6 +429,19 @@ export function StaffDocumentUploadWizard({
       }
       if (issuingAuthority) {
         formData.append('issuingAuthority', issuingAuthority);
+      }
+
+      // Add driver's license specific fields
+      if (isDriversLicense) {
+        const licenseNumber = extractValue(finalFields.licenseNumber);
+        const licenseCodes = extractValue(finalFields.licenseCodes);
+        const validFrom = extractValue(finalFields.validFrom);
+        const validTo = extractValue(finalFields.validTo);
+
+        if (licenseNumber) formData.append('licenseNumber', licenseNumber);
+        if (licenseCodes) formData.append('licenseCodes', licenseCodes);
+        if (validFrom) formData.append('validFrom', validFrom);
+        if (validTo) formData.append('validTo', validTo);
       }
 
       // Upload document
@@ -538,50 +503,12 @@ export function StaffDocumentUploadWizard({
         );
 
       case 'file_upload':
-        // Check if this is a driver's license (needs front + back)
-        const isDriversLicense = state.selectedDocumentType === 'drivers_license';
+        // All document types use single file upload (including driver's license - front only)
         const documentLabel = state.selectedDocumentType
           ? DOCUMENT_TYPE_LABELS[state.selectedDocumentType]
           : 'Document';
 
-        if (isDriversLicense) {
-          // Driver's license dual upload
-          const canProceedLicense = state.licenseFiles.front && state.licenseFiles.back;
-          return (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <button
-                  onClick={() => setState((prev) => ({ ...prev, currentStep: 'select_type' }))}
-                  className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </button>
-                <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
-                  Upload {documentLabel}
-                </h3>
-              </div>
-
-              <DriversLicenseUpload
-                files={state.licenseFiles}
-                onFilesChange={handleLicenseFilesChange}
-                error={error || undefined}
-              />
-
-              <div className="flex justify-end pt-4 border-t border-[var(--ff-border-light)]">
-                <button
-                  onClick={handleLicenseUploadProceed}
-                  disabled={!canProceedLicense}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Process Document
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          );
-        }
-
-        // Standard single file upload
+        // Standard single file upload for all document types
         return (
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
@@ -770,19 +697,37 @@ export function StaffDocumentUploadWizard({
   };
 
   const renderManualEntry = () => {
+    const isDriversLicense = state.selectedDocumentType === 'drivers_license';
+
     return (
       <div className="space-y-4">
         <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
           <AlertCircle className="h-5 w-5 text-amber-400 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-400">Manual Entry Required</p>
+            <p className="text-sm font-medium text-amber-400">
+              {isDriversLicense ? 'Enter Driver\'s License Details' : 'Manual Entry Required'}
+            </p>
             <p className="text-xs text-amber-400/80 mt-1">
               {state.ocrResult
-                ? 'OCR confidence was low. Please verify and enter details manually.'
+                ? 'Please verify the extracted text and enter details below.'
                 : 'Please enter document details manually.'}
             </p>
           </div>
         </div>
+
+        {/* Show raw OCR text if available */}
+        {state.ocrResult?.rawText && (
+          <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border-light)]">
+            <p className="text-xs font-medium text-[var(--ff-text-secondary)] mb-2">
+              Extracted Text (for reference)
+            </p>
+            <div className="max-h-32 overflow-y-auto">
+              <pre className="text-xs text-[var(--ff-text-primary)] whitespace-pre-wrap font-mono">
+                {state.ocrResult.rawText}
+              </pre>
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
@@ -828,41 +773,103 @@ export function StaffDocumentUploadWizard({
 
         <div>
           <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-            Document/ID Number
+            ID Number *
           </label>
           <input
             type="text"
-            value={String(state.fieldOverrides.documentNumber ?? '')}
-            onChange={(e) => handleManualFieldChange('documentNumber', e.target.value)}
+            value={String(state.fieldOverrides.idNumber ?? '')}
+            onChange={(e) => handleManualFieldChange('idNumber', e.target.value)}
             className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., 9012345678012"
+            placeholder="e.g., 7802030000000"
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-              Issue Date
-            </label>
-            <input
-              type="date"
-              value={String(state.fieldOverrides.issuedDate ?? '')}
-              onChange={(e) => handleManualFieldChange('issuedDate', e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        {/* Driver's License specific fields */}
+        {isDriversLicense && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                License Number *
+              </label>
+              <input
+                type="text"
+                value={String(state.fieldOverrides.licenseNumber ?? '')}
+                onChange={(e) => handleManualFieldChange('licenseNumber', e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., 3JO004U08RD49"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                License Codes *
+              </label>
+              <input
+                type="text"
+                value={String(state.fieldOverrides.licenseCodes ?? '')}
+                onChange={(e) => handleManualFieldChange('licenseCodes', e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., EB, C1, A"
+              />
+              <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+                Enter all license codes separated by comma
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Valid From *
+                </label>
+                <input
+                  type="date"
+                  value={String(state.fieldOverrides.validFrom ?? '')}
+                  onChange={(e) => handleManualFieldChange('validFrom', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Valid To *
+                </label>
+                <input
+                  type="date"
+                  value={String(state.fieldOverrides.validTo ?? '')}
+                  onChange={(e) => handleManualFieldChange('validTo', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Standard date fields for non-license documents */}
+        {!isDriversLicense && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                Issue Date
+              </label>
+              <input
+                type="date"
+                value={String(state.fieldOverrides.issuedDate ?? '')}
+                onChange={(e) => handleManualFieldChange('issuedDate', e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                Expiry Date {requiresExpiry && '*'}
+              </label>
+              <input
+                type="date"
+                value={String(state.fieldOverrides.expiryDate ?? '')}
+                onChange={(e) => handleManualFieldChange('expiryDate', e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-              Expiry Date {requiresExpiry && '*'}
-            </label>
-            <input
-              type="date"
-              value={String(state.fieldOverrides.expiryDate ?? '')}
-              onChange={(e) => handleManualFieldChange('expiryDate', e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
+        )}
 
         <div className="flex justify-end pt-4">
           <button
@@ -893,26 +900,12 @@ export function StaffDocumentUploadWizard({
         </h3>
 
         <div className="space-y-3">
-          {isDriversLicense ? (
-            <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
-              <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Files</p>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                  Front: {state.licenseFiles.front?.name}
-                </p>
-                <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                  Back: {state.licenseFiles.back?.name}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
-              <p className="text-xs text-[var(--ff-text-secondary)] mb-1">File</p>
-              <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                {state.file?.name}
-              </p>
-            </div>
-          )}
+          <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+            <p className="text-xs text-[var(--ff-text-secondary)] mb-1">File</p>
+            <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+              {state.file?.name}
+            </p>
+          </div>
 
           <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
             <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Document Type</p>
