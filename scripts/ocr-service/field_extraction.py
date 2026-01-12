@@ -707,6 +707,30 @@ def _extract_id_document_special_fields(text: str, fields: Dict[str, ExtractedFi
                     validated=True,
                 )
 
+    # Extract SA Smart ID card issued date - ALWAYS run for ID documents
+    # Format: "This card has been issued by the 10 NOV 2016 Department of Home Affairs"
+    # This pattern is more specific than generic extraction, so always overwrite
+    upper_text = text.upper()
+    sa_id_issue_match = re.search(
+        r"(?:ISSUED|UITGEREIK)\s+(?:BY\s+THE|DEUR\s+DIE)?\s*(\d{1,2})\s*([A-Z]{3})\s*(\d{4})",
+        upper_text
+    )
+    if sa_id_issue_match:
+        day = sa_id_issue_match.group(1).zfill(2)
+        month_str = sa_id_issue_match.group(2)
+        year = sa_id_issue_match.group(3)
+        month_map = {"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
+                    "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"}
+        month = month_map.get(month_str, "01")
+        # Always overwrite - this pattern is more specific than generic extraction
+        fields["issuedDate"] = ExtractedField(
+            field_name="issuedDate",
+            value=f"{year}-{month}-{day}",
+            confidence=0.95,  # Higher confidence for specific pattern
+            source="regex_sa_id_issue",
+            validated=True,
+        )
+
     # Extract passport-specific fields from text
     _extract_passport_fields(text, fields)
 
