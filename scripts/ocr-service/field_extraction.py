@@ -483,39 +483,71 @@ def extract_fields(
 
 def _extract_field_value(text: str, label: str, doc_type: DocumentType) -> Optional[str]:
     """Extract a field value from text using various patterns."""
-    # Pattern 1: "Label: Value" or "Label : Value"
-    pattern1 = re.compile(rf"{re.escape(label)}\s*:\s*([^\n]+)", re.IGNORECASE)
+
+    # Determine what type of value we're looking for based on field name
+    is_name_field = any(x in label.lower() for x in ['surname', 'nom', 'name', 'nachname', 'apellido', 'cognome', 'achternaam'])
+    is_date_field = any(x in label.lower() for x in ['date', 'datum', 'fecha', 'data', 'birth', 'expiry', 'issue', 'naissance'])
+    is_nationality_field = any(x in label.lower() for x in ['nationality', 'nationalité', 'nacionalidad', 'citizen'])
+
+    # Pattern 1: "Label: Value" - extract value after colon, stop at next field or newline
+    # Use negative lookahead to stop at common field separators
+    pattern1 = re.compile(
+        rf"{re.escape(label)}\s*:\s*([^:\n]+?)(?=\s*(?:[A-Z][a-z]+\s*(?:/|:)|$|\n))",
+        re.IGNORECASE
+    )
     match = pattern1.search(text)
     if match:
-        return match.group(1).strip()
+        value = match.group(1).strip()
+        # For name fields, reject if it's purely numeric (likely an ID number)
+        if is_name_field and re.match(r'^\d+$', value):
+            pass  # Skip this match, try other patterns
+        # For date fields, validate it looks like a date
+        elif is_date_field and not re.search(r'\d', value):
+            pass  # Skip if no digits (not a date)
+        elif value:
+            return value
 
-    # Pattern 2: "Label Value" on same line
-    pattern2 = re.compile(rf"{re.escape(label)}\s+([A-Za-z0-9][^\n]{{0,50}})", re.IGNORECASE)
+    # Pattern 2: Simpler "Label: Value" to end of segment
+    pattern2 = re.compile(rf"{re.escape(label)}\s*:\s*([A-Za-z0-9][^\n:]*)", re.IGNORECASE)
     match = pattern2.search(text)
     if match:
-        return match.group(1).strip()
+        value = match.group(1).strip()
+        # Clean up - remove trailing slashes and other labels
+        value = re.split(r'\s+[A-Z][a-z]+\s*/\s*', value)[0].strip()
+        value = re.split(r'\s{2,}', value)[0].strip()  # Split on multiple spaces
+
+        if is_name_field and re.match(r'^\d+$', value):
+            pass  # Skip numeric values for name fields
+        elif value:
+            return value
+
+    # Pattern 3: "Label Value" on same line (no colon)
+    pattern3 = re.compile(rf"{re.escape(label)}\s+([A-Za-z][A-Za-z\s\-']+?)(?=\s*[A-Z][a-z]+|\s*$|\n)", re.IGNORECASE)
+    match = pattern3.search(text)
+    if match and is_name_field:
+        value = match.group(1).strip()
+        if value and not re.match(r'^\d+$', value):
+            return value
 
     # Special patterns based on document type
-    if doc_type == DocumentType.ID_DOCUMENT and "id" in label.lower():
-        # Look for 13-digit SA ID
-        id_match = re.search(r"\b(\d{13})\b", text)
-        if id_match:
-            return id_match.group(1)
+    if doc_type == DocumentType.ID_DOCUMENT:
+        # Only match ID number for ID-specific fields
+        if "id" in label.lower() and "identity" in label.lower():
+            id_match = re.search(r"\b(\d{13})\b", text)
+            if id_match:
+                return id_match.group(1)
 
     if doc_type in [DocumentType.BANK_DETAILS, DocumentType.BANK_CONFIRMATION]:
         if "account" in label.lower():
-            # Look for 9-12 digit account number
             acc_match = re.search(r"\b(\d{9,12})\b", text)
             if acc_match:
                 return acc_match.group(1)
         elif "branch" in label.lower():
-            # Look for 6-digit branch code
             branch_match = re.search(r"\b(\d{6})\b", text)
             if branch_match:
                 return branch_match.group(1)
 
     if doc_type == DocumentType.CIPC_REGISTRATION and "registration" in label.lower():
-        # Look for CIPC format YYYY/NNNNNN/NN
         cipc_match = re.search(r"\b(\d{4}/\d{6}/\d{2})\b", text)
         if cipc_match:
             return cipc_match.group(1)
@@ -716,28 +748,47 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                     validated=True,
                 )
 
-    # Extract names (Surname / Given names)
+    # Extract names (Surname / Given names) - handle bilingual format
     if "lastName" not in fields:
-        surname_match = re.search(r"(?:SURNAME|SUMAME|NOM)[:\s/]*([A-Z][A-Z\s]+?)(?:\n|GIVEN|PRENOM|ATI)", upper_text)
-        if surname_match:
-            fields["lastName"] = ExtractedField(
-                field_name="lastName",
-                value=surname_match.group(1).strip().title(),
-                confidence=0.80,
-                source="regex_surname",
-                validated=True,
-            )
+        # Pattern for "Surname / Nom: VAN VUUREN" or "Surname / Nom\nVAN VUUREN"
+        surname_patterns = [
+            r"SURNAME\s*/\s*NOM[:\s]*([A-Z][A-Z\s\-']+?)(?:\n|GIVEN|$)",
+            r"(?:SURNAME|NOM)[:\s]+([A-Z][A-Z\s\-']+?)(?:\n|GIVEN|PRENOM|$)",
+        ]
+        for pattern in surname_patterns:
+            surname_match = re.search(pattern, upper_text)
+            if surname_match:
+                value = surname_match.group(1).strip()
+                # Exclude if it's numeric or too short
+                if value and not re.match(r'^\d+$', value) and len(value) > 1:
+                    fields["lastName"] = ExtractedField(
+                        field_name="lastName",
+                        value=value.title(),
+                        confidence=0.85,
+                        source="regex_surname",
+                        validated=True,
+                    )
+                    break
 
     if "firstName" not in fields:
-        names_match = re.search(r"(?:GIVEN\s*NAMES?|PRÉNOMS?|PRENOMS?)[:\s/]*([A-Z][A-Z\s]+?)(?:\n|NATIONAL|DATE)", upper_text)
-        if names_match:
-            fields["firstName"] = ExtractedField(
-                field_name="firstName",
-                value=names_match.group(1).strip().title(),
-                confidence=0.80,
-                source="regex_given_names",
-                validated=True,
-            )
+        # Pattern for "Given names / Prénoms: JAN HENDRIK"
+        names_patterns = [
+            r"GIVEN\s*NAMES?\s*/\s*PR[EÉ]NOMS?[:\s]*([A-Z][A-Z\s\-']+?)(?:\n|NATIONAL|DATE|$)",
+            r"(?:GIVEN\s*NAMES?|PR[EÉ]NOMS?)[:\s]+([A-Z][A-Z\s\-']+?)(?:\n|NATIONAL|DATE|$)",
+        ]
+        for pattern in names_patterns:
+            names_match = re.search(pattern, upper_text)
+            if names_match:
+                value = names_match.group(1).strip()
+                if value and not re.match(r'^\d+$', value) and len(value) > 1:
+                    fields["firstName"] = ExtractedField(
+                        field_name="firstName",
+                        value=value.title(),
+                        confidence=0.85,
+                        source="regex_given_names",
+                        validated=True,
+                    )
+                    break
 
     # Extract date of birth (various formats: 03 FEB 1978, 1978-02-03, etc.)
     if "dateOfBirth" not in fields:
@@ -776,9 +827,13 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                 validated=True,
             )
 
-    # Extract date of expiry
+    # Extract date of expiry - handle bilingual format
     if "expiryDate" not in fields:
-        expiry_match = re.search(r"DATE\s*(?:OF\s*)?EXPIR[YA][:\s/]*(\d{1,2})\s*([A-Z]{3})\s*(\d{4})", upper_text)
+        # Also try "Date of expiry / Date d'expiration: 11 JAN 2030"
+        expiry_match = re.search(
+            r"(?:DATE\s*(?:OF\s*)?EXPIR[YA]|DATE\s*D['\s]*EXPIRATION)[:\s/]*(\d{1,2})\s*([A-Z]{3})\s*(\d{4})",
+            upper_text
+        )
         if expiry_match:
             day = expiry_match.group(1).zfill(2)
             month_str = expiry_match.group(2)
@@ -807,20 +862,32 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                 validated=True,
             )
 
-    # Extract nationality
-    if "nationality" not in fields:
-        nat_match = re.search(r"NATIONAL(?:ITY|ITE)[:\s/]*([A-Z][A-Z\s]+?)(?:\n|DATE|/)", upper_text)
+    # Extract nationality - handle bilingual format "SOUTH AFRICAN / SUD-AFRICAIN"
+    # Always try passport-specific extraction (it's more accurate than general extraction)
+    # Pattern for "Nationality / Nationalité: SOUTH AFRICAN / SUD-AFRICAIN"
+    # Use greedy match up to the slash separator for bilingual
+    nat_patterns = [
+        r"NATIONALITY\s*/\s*NATIONALIT[EÉ][:\s]*([A-Z][A-Z\s\-]+)\s*/",  # Match up to slash
+        r"NATIONAL(?:ITY|IT[EÉ])[:\s]+([A-Z][A-Z\s\-]+)\s*/",  # Match up to slash
+        r"NATIONALITY\s*/\s*NATIONALIT[EÉ][:\s]*([A-Z][A-Z\s\-]+?)(?:\n|DATE|IDENTITY|$)",
+        r"NATIONAL(?:ITY|IT[EÉ])[:\s]+([A-Z][A-Z\s\-]+?)(?:\n|DATE|$)",
+    ]
+    for pattern in nat_patterns:
+        nat_match = re.search(pattern, upper_text)
         if nat_match:
             nationality = nat_match.group(1).strip()
-            # Clean up common patterns
-            nationality = nationality.replace("SOUTH AFRICAN", "South African").replace("SUD-AFRICAIN", "")
-            fields["nationality"] = ExtractedField(
-                field_name="nationality",
-                value=nationality.strip().title() if nationality.strip() else "South African",
-                confidence=0.85,
-                source="regex_passport_nationality",
-                validated=True,
-            )
+            # Clean up - remove trailing spaces
+            nationality = nationality.strip()
+            if nationality and not re.match(r'^\d+$', nationality) and len(nationality) > 2:
+                # Overwrite any previous extraction with this more accurate one
+                fields["nationality"] = ExtractedField(
+                    field_name="nationality",
+                    value=nationality.title(),
+                    confidence=0.90,  # Higher confidence for passport-specific extraction
+                    source="regex_passport_nationality",
+                    validated=True,
+                )
+                break
 
 
 def _extract_bank_special_fields(
