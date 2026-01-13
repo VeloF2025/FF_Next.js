@@ -77,7 +77,8 @@ export interface StaffMember {
   saIdNumber?: string;
   passportNumber?: string;
   passportCountry?: string;
-  passportExpiry?: Timestamp;
+  passportExpiry?: Timestamp | string;
+  nationality?: string;
 
   // Probation
   probationEndDate?: Timestamp;

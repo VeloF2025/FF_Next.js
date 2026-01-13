@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class DocumentType(str, Enum):
     """Supported document types."""
     ID_DOCUMENT = "id_document"
+    PASSPORT = "passport"
     BANK_DETAILS = "bank_details"
     BANK_CONFIRMATION = "bank_confirmation"
     TAX_DOCUMENT = "tax_document"
@@ -66,7 +67,7 @@ class ExtractionResult:
 # Document type detection keywords
 DOCUMENT_KEYWORDS = {
     DocumentType.ID_DOCUMENT: [
-        # === SA ID Documents ===
+        # === SA ID Documents Only ===
         # Primary identifiers (appear on both old and new IDs)
         "REPUBLIC OF SOUTH AFRICA",
         "IDENTITY",
@@ -82,69 +83,43 @@ DOCUMENT_KEYWORDS = {
         "REPUBLIEK VAN SUID-AFRIKA",
         "IDENTITEIT",
         "IDENTITEITSNOMMER",
-
+        # SA ID specific - 13-digit ID is unique to SA
+        "SA IDENTITY",
+        "SOUTH AFRICAN ID",
+    ],
+    DocumentType.PASSPORT: [
         # === International Passports ===
-        # English
+        # English - Primary (passport-specific keywords)
         "PASSPORT",
-        "GIVEN NAMES",
+        "PASSPORT NO",
+        "PASSEPORT",  # French
+        "REISEPASS",  # German
+        "PASAPORTE",  # Spanish
+        "PASSAPORTE",  # Portuguese
+        "PASSAPORTO",  # Italian
+        "PASPOORT",   # Dutch
+        # Passport-specific fields
         "DATE OF EXPIRY",
         "DATE OF ISSUE",
-        "PASSPORT NO",
         "PLACE OF BIRTH",
-        "DATE OF BIRTH",
+        "ISSUING AUTHORITY",
         "AUTHORITY",
-        "TYPE",
-        "CODE",
+        "TRAVEL DOCUMENT",
         "MACHINE READABLE",
-        # French
-        "PASSEPORT",
-        "NOM",
-        "PRÉNOMS",
-        "DATE DE NAISSANCE",
-        "LIEU DE NAISSANCE",
-        "DATE DE DÉLIVRANCE",
-        "DATE D'EXPIRATION",
-        # German
-        "REISEPASS",
-        "NACHNAME",
-        "VORNAMEN",
-        "GEBURTSDATUM",
-        "GEBURTSORT",
-        "AUSSTELLUNGSDATUM",
-        "GÜLTIG BIS",
-        # Spanish
-        "PASAPORTE",
-        "APELLIDOS",
-        "NOMBRE",
-        "FECHA DE NACIMIENTO",
-        "LUGAR DE NACIMIENTO",
-        "FECHA DE EXPEDICIÓN",
-        "FECHA DE CADUCIDAD",
-        # Portuguese
-        "PASSAPORTE",
-        "APELIDOS",
-        "NOMES",
-        "DATA DE NASCIMENTO",
-        "LOCAL DE NASCIMENTO",
-        # Italian
-        "PASSAPORTO",
-        "COGNOME",
-        "DATA DI NASCITA",
-        "LUOGO DI NASCITA",
-        # Dutch
-        "PASPOORT",
-        "ACHTERNAAM",
-        "VOORNAMEN",
-        "GEBOORTEDATUM",
-        "GEBOORTEPLAATS",
-        # Generic international
         "MRZ",
         "ICAO",
-        "TRAVEL DOCUMENT",
         "ISSUING STATE",
-        "HOLDER",
-        "EXPIRY",
-        "VALID",
+        # Multi-language passport fields
+        "GIVEN NAMES",
+        "DATE D'EXPIRATION",
+        "DATE DE DÉLIVRANCE",
+        "GÜLTIG BIS",
+        "FECHA DE CADUCIDAD",
+        "FECHA DE EXPEDICIÓN",
+        # Type/Code fields common on passports
+        "TYPE P",
+        "TYPE/TYPE",
+        "CODE/CODE",
     ],
     DocumentType.BANK_DETAILS: [
         "BANK",
@@ -198,12 +173,16 @@ DOCUMENT_KEYWORDS = {
 # Document type patterns
 DOCUMENT_PATTERNS = {
     DocumentType.ID_DOCUMENT: [
-        r"\d{13}",  # SA ID number (13 digits)
+        r"\d{13}",  # SA ID number (13 digits) - unique to SA ID
         r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date: "03 FEB 1978"
+    ],
+    DocumentType.PASSPORT: [
         r"[A-Z]{1,2}\d{6,9}",  # Generic passport number (1-2 letters + 6-9 digits)
         r"\d{9}",  # Numeric passport numbers (some countries)
         r"P[<>][A-Z]{3}",  # MRZ first line pattern (P<XXX or P>XXX)
         r"[A-Z0-9<]{30,44}",  # MRZ line pattern (30-44 alphanumeric chars with <)
+        r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date: "03 FEB 1978"
+        r"(?:expir|valid)\s*(?:y|until|to)",  # Expiry indicators
     ],
     DocumentType.BANK_DETAILS: [r"\d{9,12}", r"\d{6}"],  # Account and branch
     DocumentType.TAX_DOCUMENT: [r"\d{10}", r"IRP5"],  # Tax number
@@ -308,6 +287,88 @@ FIELD_MAPPINGS = {
             "Nationaliteit": "nationality",
             "Country of Birth": "countryOfBirth",
             "Status": "citizenshipStatus",
+        },
+    },
+    DocumentType.PASSPORT: {
+        EntityType.STAFF: {
+            # === Passport Number (multiple languages) ===
+            "Passport No": "passportNumber",
+            "Passport Number": "passportNumber",
+            "Passeport No": "passportNumber",
+            "No du passeport": "passportNumber",
+            "Reisepass Nr": "passportNumber",
+            "Pasaporte No": "passportNumber",
+            "Passaporto No": "passportNumber",
+            "Paspoort Nr": "passportNumber",
+
+            # === Name Fields (multiple languages) ===
+            "Surname": "lastName",
+            "Names": "firstName",
+            "First Names": "firstName",
+            "Given names": "firstName",
+            "Given Names": "firstName",
+            "Nom": "lastName",
+            "Prénoms": "firstName",
+            "Prenoms": "firstName",
+            "Nachname": "lastName",
+            "Vornamen": "firstName",
+            "Apellidos": "lastName",
+            "Nombre": "firstName",
+            "Apelidos": "lastName",
+            "Nomes": "firstName",
+            "Cognome": "lastName",
+            "Achternaam": "lastName",
+
+            # === Date of Birth (multiple languages) ===
+            "Date of Birth": "dateOfBirth",
+            "Date of birth": "dateOfBirth",
+            "Date de naissance": "dateOfBirth",
+            "Geburtsdatum": "dateOfBirth",
+            "Fecha de nacimiento": "dateOfBirth",
+            "Data de nascimento": "dateOfBirth",
+            "Data di nascita": "dateOfBirth",
+            "Geboortedatum": "dateOfBirth",
+
+            # === Place of Birth ===
+            "Place of birth": "placeOfBirth",
+            "Place of Birth": "placeOfBirth",
+            "Lieu de naissance": "placeOfBirth",
+            "Geburtsort": "placeOfBirth",
+
+            # === Date of Issue (multiple languages) ===
+            "Date of issue": "issuedDate",
+            "Date of Issue": "issuedDate",
+            "Date de délivrance": "issuedDate",
+            "Ausstellungsdatum": "issuedDate",
+            "Fecha de expedición": "issuedDate",
+
+            # === Date of Expiry (multiple languages) ===
+            "Date of expiry": "expiryDate",
+            "Date of Expiry": "expiryDate",
+            "Date d'expiration": "expiryDate",
+            "Gültig bis": "expiryDate",
+            "Fecha de caducidad": "expiryDate",
+            "Valid until": "expiryDate",
+
+            # === Nationality / Citizenship ===
+            "Nationality": "nationality",
+            "Nationalité": "nationality",
+            "Staatsangehörigkeit": "nationality",
+            "Nacionalidad": "nationality",
+            "Nacionalidade": "nationality",
+
+            # === Issuing Authority / Country ===
+            "Authority": "passportCountry",
+            "Issuing Authority": "passportCountry",
+            "Autorité": "passportCountry",
+            "Issuing State": "passportCountry",
+            "Country code": "passportCountry",
+            "Code": "passportCountry",
+
+            # === Gender / Sex ===
+            "Sex": "gender",
+            "Gender": "gender",
+            "Sexe": "gender",
         },
     },
     DocumentType.BANK_DETAILS: {
@@ -494,6 +555,8 @@ def extract_fields(
     # Special extractions based on document type
     if document_type == DocumentType.ID_DOCUMENT:
         _extract_id_document_special_fields(text, fields)
+    elif document_type == DocumentType.PASSPORT:
+        _extract_passport_fields(text, fields)
     elif document_type in [DocumentType.BANK_DETAILS, DocumentType.BANK_CONFIRMATION]:
         _extract_bank_special_fields(text, fields, entity_type)
 
@@ -773,22 +836,34 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
     # - 123456789 (US: 9 digits)
     # - L01234567 (Canadian: 1 letter + 8 digits)
     if "passportNumber" not in fields:
-        # Try letter+digits format first (most common)
-        passport_match = re.search(
-            r"(?:PASSPORT|PASSEPORT|REISEPASS|PASAPORTE|PASSAPORTO|PASPOORT)\s*"
-            r"(?:NO|NR|NUMBER|NUMERO)?[:\s./]*([A-Z]{1,2}\d{6,9})",
-            upper_text
-        )
-        if passport_match:
-            fields["passportNumber"] = ExtractedField(
-                field_name="passportNumber",
-                value=passport_match.group(1),
-                confidence=0.85,
-                source="regex_passport_no",
-                validated=True,
-            )
-        else:
-            # Try numeric-only format (US passports)
+        # SA passport format: "Passport No / No du passeport PA ZAF A09060091"
+        # Note: PA = Type, ZAF = country, A09060091 = actual passport number
+        passport_patterns = [
+            # SA format: After country code (ZAF, etc)
+            r"\bPA\s+[A-Z]{3}\s+([A-Z]\d{8,9})\b",
+            # Generic: PASSPORT NO ... number (allow anything between)
+            r"(?:PASSPORT|PASSEPORT)\s*(?:NO|NR|NUMBER)?\s*[:\s./]*(?:[A-Z]{2,3}\s+)?(?:[A-Z]{3}\s+)?([A-Z]{1,2}\d{6,9})\b",
+            # Just the number format when document is known to be passport
+            r"\b([A-Z]\d{8,9})\b",  # SA: A + 8-9 digits
+            r"\b([A-Z]{2}\d{7})\b",  # EU: 2 letters + 7 digits
+        ]
+        for pattern in passport_patterns:
+            passport_match = re.search(pattern, upper_text)
+            if passport_match:
+                passport_num = passport_match.group(1)
+                # Validate it looks like a passport number (not an ID number)
+                if passport_num and not re.match(r'^\d{13}$', passport_num):  # Exclude SA ID numbers
+                    fields["passportNumber"] = ExtractedField(
+                        field_name="passportNumber",
+                        value=passport_num,
+                        confidence=0.85,
+                        source="regex_passport_no",
+                        validated=True,
+                    )
+                    break
+
+        # Fallback: Try numeric-only format (US passports)
+        if "passportNumber" not in fields:
             numeric_match = re.search(
                 r"(?:PASSPORT|PASSEPORT)\s*(?:NO|NUMBER)?[:\s./]*(\d{9})\b",
                 upper_text
@@ -844,64 +919,75 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                     )
                     break
 
-    # Extract date of birth (various formats: 03 FEB 1978, 1978-02-03, etc.)
+    # Extract dates from passport - OCR often runs fields together
+    # So we find all DD MMM YYYY dates and match them to nearby labels
+    month_map = {"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
+                "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"}
+
+    # Find all dates in DD MMM YYYY format
+    date_pattern = r"(\d{1,2})\s*([A-Z]{3})\s*(\d{4})"
+    all_dates = list(re.finditer(date_pattern, upper_text))
+
+    # Extract date of birth - look for date near "BIRTH" keyword
     if "dateOfBirth" not in fields:
-        # Try DD MMM YYYY format
-        dob_match = re.search(r"DATE\s*(?:OF\s*)?BIRTH[:\s/]*(\d{1,2})\s*([A-Z]{3})\s*(\d{4})", upper_text)
-        if dob_match:
-            day = dob_match.group(1).zfill(2)
-            month_str = dob_match.group(2)
-            year = dob_match.group(3)
-            month_map = {"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
-                        "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"}
-            month = month_map.get(month_str, "01")
-            fields["dateOfBirth"] = ExtractedField(
-                field_name="dateOfBirth",
-                value=f"{year}-{month}-{day}",
-                confidence=0.90,
-                source="regex_passport_dob",
-                validated=True,
-            )
+        birth_pos = upper_text.find("BIRTH")
+        if birth_pos >= 0:
+            # Find the closest date after "BIRTH"
+            for date_match in all_dates:
+                if date_match.start() > birth_pos and date_match.start() < birth_pos + 100:
+                    year = int(date_match.group(3))
+                    # DOB should be in the past (1900-2020)
+                    if 1900 <= year <= 2020:
+                        day = date_match.group(1).zfill(2)
+                        month = month_map.get(date_match.group(2), "01")
+                        fields["dateOfBirth"] = ExtractedField(
+                            field_name="dateOfBirth",
+                            value=f"{year}-{month}-{day}",
+                            confidence=0.90,
+                            source="regex_passport_dob",
+                            validated=True,
+                        )
+                        break
 
-    # Extract date of issue
+    # Extract date of issue - look for date near "ISSUE" keyword
     if "issuedDate" not in fields:
-        issue_match = re.search(r"DATE\s*(?:OF\s*)?ISSUE[:\s/]*(\d{1,2})\s*([A-Z]{3})\s*(\d{4})", upper_text)
-        if issue_match:
-            day = issue_match.group(1).zfill(2)
-            month_str = issue_match.group(2)
-            year = issue_match.group(3)
-            month_map = {"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
-                        "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"}
-            month = month_map.get(month_str, "01")
-            fields["issuedDate"] = ExtractedField(
-                field_name="issuedDate",
-                value=f"{year}-{month}-{day}",
-                confidence=0.90,
-                source="regex_passport_issue",
-                validated=True,
-            )
+        issue_pos = upper_text.find("ISSUE")
+        if issue_pos >= 0:
+            for date_match in all_dates:
+                if date_match.start() > issue_pos and date_match.start() < issue_pos + 100:
+                    year = int(date_match.group(3))
+                    # Issue date should be recent (2000-2030)
+                    if 2000 <= year <= 2030:
+                        day = date_match.group(1).zfill(2)
+                        month = month_map.get(date_match.group(2), "01")
+                        fields["issuedDate"] = ExtractedField(
+                            field_name="issuedDate",
+                            value=f"{year}-{month}-{day}",
+                            confidence=0.90,
+                            source="regex_passport_issue",
+                            validated=True,
+                        )
+                        break
 
-    # Extract date of expiry - handle bilingual format
+    # Extract date of expiry - look for date near "EXPIR" keyword
     if "expiryDate" not in fields:
-        # Also try "Date of expiry / Date d'expiration: 11 JAN 2030"
-        expiry_match = re.search(
-            r"(?:DATE\s*(?:OF\s*)?EXPIR[YA]|DATE\s*D['\s]*EXPIRATION)[:\s/]*(\d{1,2})\s*([A-Z]{3})\s*(\d{4})",
-            upper_text
-        )
-        if expiry_match:
-            day = expiry_match.group(1).zfill(2)
-            month_str = expiry_match.group(2)
-            year = expiry_match.group(3)
-            month_map = {"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
-                        "JUL": "07", "AUG": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12"}
-            month = month_map.get(month_str, "01")
-            fields["expiryDate"] = ExtractedField(
-                field_name="expiryDate",
-                value=f"{year}-{month}-{day}",
-                confidence=0.90,
-                source="regex_passport_expiry",
-                validated=True,
-            )
+        expiry_pos = max(upper_text.find("EXPIRY"), upper_text.find("EXPIRA"), upper_text.find("D'EXPIRATION"))
+        if expiry_pos >= 0:
+            for date_match in all_dates:
+                if date_match.start() > expiry_pos and date_match.start() < expiry_pos + 100:
+                    year = int(date_match.group(3))
+                    # Expiry date should be in the future or recent past (2020-2040)
+                    if 2020 <= year <= 2040:
+                        day = date_match.group(1).zfill(2)
+                        month = month_map.get(date_match.group(2), "01")
+                        fields["expiryDate"] = ExtractedField(
+                            field_name="expiryDate",
+                            value=f"{year}-{month}-{day}",
+                            confidence=0.90,
+                            source="regex_passport_expiry",
+                            validated=True,
+                        )
+                        break
 
     # Extract gender/sex
     if "gender" not in fields:
@@ -942,6 +1028,39 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                     validated=True,
                 )
                 break
+
+    # Extract passport country code (issuing country)
+    # Pattern: "Country code / Code du pays ... ZAF" or "PA ZAF" in document header
+    if "passportCountry" not in fields:
+        # Try to find 3-letter country code near "Country code" or after "PA"
+        country_patterns = [
+            r"COUNTRY\s*CODE[:\s/]*(?:[A-Z]{2}\s+)?([A-Z]{3})\b",  # "Country code / Code du pays ... ZAF"
+            r"\bPA\s+([A-Z]{3})\b",  # "PA ZAF" - Type + Country code
+            r"CODE\s*(?:/\s*CODE)?[:\s/]*([A-Z]{3})\b",  # Generic "Code: ZAF"
+        ]
+        for pattern in country_patterns:
+            country_match = re.search(pattern, upper_text)
+            if country_match:
+                country_code = country_match.group(1)
+                # Validate it's a plausible country code (3 uppercase letters)
+                if country_code and len(country_code) == 3:
+                    # Map common country codes to names
+                    country_names = {
+                        "ZAF": "South Africa", "GBR": "United Kingdom", "USA": "United States",
+                        "ZWE": "Zimbabwe", "NAM": "Namibia", "BWA": "Botswana",
+                        "MOZ": "Mozambique", "ZMB": "Zambia", "KEN": "Kenya",
+                        "NGA": "Nigeria", "GHA": "Ghana", "IND": "India",
+                        "PAK": "Pakistan", "BGD": "Bangladesh", "PHL": "Philippines",
+                    }
+                    country_name = country_names.get(country_code, country_code)
+                    fields["passportCountry"] = ExtractedField(
+                        field_name="passportCountry",
+                        value=country_name,
+                        confidence=0.85,
+                        source="regex_passport_country",
+                        validated=True,
+                    )
+                    break
 
 
 def _extract_bank_special_fields(

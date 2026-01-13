@@ -418,7 +418,8 @@ export function StaffDocumentUploadWizard({
       const issuedDate = extractValue(finalFields.issuedDate) || extractValue(finalFields.issueDate);
       const expiryDate = extractValue(finalFields.expiryDate) || extractValue(finalFields.expirationDate);
       const issuingAuthority = extractValue(finalFields.issuingAuthority);
-      const issuingCountry = extractValue(finalFields.issuingCountry);
+      const issuingCountry = extractValue(finalFields.issuingCountry) || extractValue(finalFields.passportCountry);
+      const nationality = extractValue(finalFields.nationality);
 
       // Handle document number based on document type
       const isPassport = state.selectedDocumentType === 'passport';
@@ -433,7 +434,7 @@ export function StaffDocumentUploadWizard({
       if (expiryDate) {
         formData.append('expiryDate', expiryDate);
       }
-      // For passport, use issuingCountry as issuingAuthority
+      // For passport, use issuingCountry/passportCountry as issuingAuthority
       const authority = isPassport ? issuingCountry : issuingAuthority;
       if (authority) {
         formData.append('issuingAuthority', authority);

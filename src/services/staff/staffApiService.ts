@@ -49,6 +49,23 @@ interface DbStaff {
   passportNumber?: string;
   passportCountry?: string;
   passportExpiry?: string;
+  nationality?: string;
+  // Photo verification fields (camelCase from API aliases)
+  profilePhotoUrl?: string;
+  idPhotoUrl?: string;
+  photoMatchScore?: number;
+  photoVerifiedAt?: string;
+  // Additional HR fields
+  cvUrl?: string;
+  cvUploadedAt?: string;
+  bio?: string;
+  workLocation?: string;
+  // Next of kin fields
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelationship?: string;
+  nextOfKinAddress?: string;
+  emergencyContactRelationship?: string;
 }
 
 /**
@@ -154,11 +171,23 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     passportNumber: dbStaff.passportNumber,
     passportCountry: dbStaff.passportCountry,
     passportExpiry: dbStaff.passportExpiry,
+    nationality: dbStaff.nationality,
     // Photo verification fields
     profilePhotoUrl: dbStaff.profilePhotoUrl,
     idPhotoUrl: dbStaff.idPhotoUrl,
     photoMatchScore: dbStaff.photoMatchScore,
     photoVerifiedAt: dbStaff.photoVerifiedAt ? toTimestamp(dbStaff.photoVerifiedAt) : undefined,
+    // Additional HR fields
+    cvUrl: dbStaff.cvUrl,
+    cvUploadedAt: dbStaff.cvUploadedAt ? toTimestamp(dbStaff.cvUploadedAt) : undefined,
+    bio: dbStaff.bio,
+    workLocation: dbStaff.workLocation,
+    // Next of kin fields
+    nextOfKinName: dbStaff.nextOfKinName,
+    nextOfKinPhone: dbStaff.nextOfKinPhone,
+    nextOfKinRelationship: dbStaff.nextOfKinRelationship,
+    nextOfKinAddress: dbStaff.nextOfKinAddress,
+    emergencyContactRelationship: dbStaff.emergencyContactRelationship,
   };
 }
 
