@@ -264,6 +264,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     logger.info('Staff document uploaded', { staffId, documentType, documentId: document.id, ocrConfirmed, isMultiFile });
 
+    // Sync document data to staff table based on document type
+    // This ensures OCR/manual data appears in employee details
+    await syncDocumentToStaff(staffId, documentType, {
+      documentNumber,
+      expiryDate,
+      issuingAuthority,
+    });
+
     // PRD-033: If OCR was confirmed by user, skip webhook (already processed)
     if (!ocrConfirmed) {
       // Trigger autonomous OCR processing webhook (fire and forget)
@@ -409,4 +417,67 @@ async function triggerOcrWebhook(payload: OcrWebhookPayload): Promise<void> {
   }
 
   logger.info('OCR webhook triggered successfully', { documentId: payload.documentId });
+}
+
+/**
+ * Sync document data to staff table based on document type
+ * This ensures OCR-extracted or manually entered data appears in employee details
+ */
+async function syncDocumentToStaff(
+  staffId: string,
+  documentType: string,
+  data: {
+    documentNumber?: string;
+    expiryDate?: string;
+    issuingAuthority?: string;
+  }
+): Promise<void> {
+  try {
+    // Only sync if we have data to sync
+    if (!data.documentNumber && !data.expiryDate && !data.issuingAuthority) {
+      return;
+    }
+
+    switch (documentType) {
+      case 'id_document':
+        // Detect if this is a SA ID (13 digits) or Passport (alphanumeric, has country)
+        const isSaId = data.documentNumber && /^\d{13}$/.test(data.documentNumber);
+        const isPassport = data.documentNumber && !isSaId && (data.issuingAuthority || data.expiryDate);
+
+        if (isSaId) {
+          // Sync SA ID number to staff table
+          await sql`
+            UPDATE staff
+            SET sa_id_number = ${data.documentNumber}, updated_at = NOW()
+            WHERE id = ${staffId}
+          `;
+          logger.info('Synced SA ID number to staff', { staffId, saIdNumber: data.documentNumber });
+        } else if (isPassport || data.issuingAuthority) {
+          // Sync passport details to staff table
+          await sql`
+            UPDATE staff
+            SET
+              passport_number = COALESCE(${data.documentNumber || null}, passport_number),
+              passport_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, passport_expiry),
+              passport_country = COALESCE(${data.issuingAuthority || null}, passport_country),
+              updated_at = NOW()
+            WHERE id = ${staffId}
+          `;
+          logger.info('Synced passport details to staff', { staffId, documentNumber: data.documentNumber, country: data.issuingAuthority });
+        }
+        break;
+
+      // Driver's license data stays in staff_documents (displayed via Vehicles tab)
+      // Other document types don't need staff table sync
+      default:
+        break;
+    }
+  } catch (error) {
+    // Log but don't fail the upload if sync fails
+    logger.warn('Failed to sync document data to staff table', {
+      staffId,
+      documentType,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }
