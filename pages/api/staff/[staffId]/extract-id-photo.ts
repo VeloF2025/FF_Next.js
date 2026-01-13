@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const { staffId } = req.query;
-  const { documentUrl } = req.body;
+  const { documentUrl, force } = req.body;
 
   if (!staffId || typeof staffId !== 'string') {
     return res.status(400).json({ error: 'Staff ID is required' });
@@ -43,6 +43,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Check if staff already has an ID photo (don't replace unless forced)
+    const [existingStaff] = await sql`
+      SELECT id_photo_url FROM staff WHERE id = ${staffId}
+    `;
+
+    if (existingStaff?.id_photo_url && !force) {
+      logger.info('Staff already has ID photo, skipping extraction (use force=true to replace)', {
+        staffId,
+        existingPhotoUrl: existingStaff.id_photo_url
+      });
+      return res.status(200).json({
+        success: true,
+        skipped: true,
+        message: 'ID photo already exists. Use force=true to replace.',
+        existingPhotoUrl: existingStaff.id_photo_url,
+      });
+    }
+
     // Check if VLLM is available
     let vllmAvailable = false;
     try {

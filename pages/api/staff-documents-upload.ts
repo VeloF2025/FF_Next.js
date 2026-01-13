@@ -444,31 +444,29 @@ async function syncDocumentToStaff(
 
     switch (documentType) {
       case 'sa_id':
-        // Sync SA ID number and ID photo to staff table
+        // Sync SA ID number to staff table (id_photo_url is set by extract-id-photo endpoint)
         await sql`
           UPDATE staff
           SET
             sa_id_number = COALESCE(${data.documentNumber || null}, sa_id_number),
-            id_photo_url = COALESCE(${data.fileUrl || null}, id_photo_url),
             updated_at = NOW()
           WHERE id = ${staffId}
         `;
-        logger.info('Synced SA ID to staff', { staffId, saIdNumber: data.documentNumber, idPhotoUrl: data.fileUrl });
+        logger.info('Synced SA ID to staff', { staffId, saIdNumber: data.documentNumber });
         break;
 
       case 'passport':
-        // Sync passport details and ID photo to staff table
+        // Sync passport details to staff table (id_photo_url is set by extract-id-photo endpoint)
         await sql`
           UPDATE staff
           SET
             passport_number = COALESCE(${data.documentNumber || null}, passport_number),
             passport_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, passport_expiry),
             passport_country = COALESCE(${data.issuingAuthority || null}, passport_country),
-            id_photo_url = COALESCE(${data.fileUrl || null}, id_photo_url),
             updated_at = NOW()
           WHERE id = ${staffId}
         `;
-        logger.info('Synced passport to staff', { staffId, documentNumber: data.documentNumber, idPhotoUrl: data.fileUrl });
+        logger.info('Synced passport to staff', { staffId, documentNumber: data.documentNumber });
         break;
 
       // Driver's license data stays in staff_documents (displayed via Vehicles tab)
