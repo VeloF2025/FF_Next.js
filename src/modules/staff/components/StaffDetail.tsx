@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import {
   ArrowLeft,
@@ -51,6 +51,26 @@ export function StaffDetail() {
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<VehicleAssignment | null>(null);
   const [staffList, setStaffList] = useState<{ id: string; name: string }[]>([]);
+  const [hasValidLicense, setHasValidLicense] = useState(false);
+
+  // Fetch license status when staff ID changes
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchLicenseStatus = async () => {
+      try {
+        const response = await fetch(`/api/staff/${id}/vehicles`);
+        if (response.ok) {
+          const data = await response.json();
+          setHasValidLicense(data.hasValidLicense || false);
+        }
+      } catch (err) {
+        log.error('Failed to fetch license status', { error: err });
+      }
+    };
+
+    fetchLicenseStatus();
+  }, [id]);
 
   // Fetch staff list for issued by dropdown
   const fetchStaffList = useCallback(async () => {
@@ -223,9 +243,6 @@ export function StaffDetail() {
       </div>
     );
   }
-
-  // Check if staff has a valid driver's license
-  const hasValidLicense = staff.complianceComplete || false; // TODO: Check actual license document
 
   return (
     <div className="max-w-6xl mx-auto">
