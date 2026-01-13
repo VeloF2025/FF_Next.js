@@ -195,13 +195,18 @@ export function VehiclesTab({
                         <Clock className="w-3 h-3" />
                         Pending Verification
                       </span>
-                    ) : (
+                    ) : licenseDetails.verificationStatus === 'expired' ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">
                         <XCircle className="w-3 h-3" />
+                        Expired
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-gray-500/20 text-gray-400 rounded">
                         {licenseDetails.verificationStatus}
                       </span>
                     )}
-                    {licenseDetails.isExpired && (
+                    {/* Show expired badge only if verified but now expired (date passed after verification) */}
+                    {licenseDetails.isExpired && licenseDetails.verificationStatus === 'verified' && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">
                         <XCircle className="w-3 h-3" />
                         Expired

@@ -892,7 +892,7 @@ export function StaffDocumentUploadWizard({
               </label>
               <input
                 type="text"
-                value={String(state.fieldOverrides.licenseNumber ?? '')}
+                value={String(state.fieldOverrides.licenseNumber ?? (state.extractedFields.licenseNumber as { value?: unknown })?.value ?? '')}
                 onChange={(e) => handleManualFieldChange('licenseNumber', e.target.value)}
                 className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., 3JO004U08RD49"
@@ -905,7 +905,7 @@ export function StaffDocumentUploadWizard({
               </label>
               <input
                 type="text"
-                value={String(state.fieldOverrides.licenseCodes ?? '')}
+                value={String(state.fieldOverrides.licenseCodes ?? (state.extractedFields.licenseCodes as { value?: unknown })?.value ?? '')}
                 onChange={(e) => handleManualFieldChange('licenseCodes', e.target.value)}
                 className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., EB, C1, A"
@@ -922,7 +922,7 @@ export function StaffDocumentUploadWizard({
                 </label>
                 <input
                   type="date"
-                  value={String(state.fieldOverrides.validFrom ?? '')}
+                  value={String(state.fieldOverrides.validFrom ?? (state.extractedFields.validFrom as { value?: unknown })?.value ?? '')}
                   onChange={(e) => handleManualFieldChange('validFrom', e.target.value)}
                   className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -933,7 +933,7 @@ export function StaffDocumentUploadWizard({
                 </label>
                 <input
                   type="date"
-                  value={String(state.fieldOverrides.validTo ?? '')}
+                  value={String(state.fieldOverrides.validTo ?? (state.extractedFields.validTo as { value?: unknown })?.value ?? '')}
                   onChange={(e) => handleManualFieldChange('validTo', e.target.value)}
                   className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />

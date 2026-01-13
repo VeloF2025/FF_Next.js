@@ -21,6 +21,7 @@ class DocumentType(str, Enum):
     """Supported document types."""
     ID_DOCUMENT = "id_document"
     PASSPORT = "passport"
+    DRIVERS_LICENSE = "drivers_license"
     BANK_DETAILS = "bank_details"
     BANK_CONFIRMATION = "bank_confirmation"
     TAX_DOCUMENT = "tax_document"
@@ -121,6 +122,44 @@ DOCUMENT_KEYWORDS = {
         "TYPE/TYPE",
         "CODE/CODE",
     ],
+    DocumentType.DRIVERS_LICENSE: [
+        # === SA Driver's License ===
+        # Primary identifiers
+        "DRIVING LICENCE",
+        "DRIVER'S LICENCE",
+        "DRIVER'S LICENSE",
+        "DRIVING LICENSE",
+        "MOTOR VEHICLE LICENCE",
+        # SA-specific terms
+        "DEPARTMENT OF TRANSPORT",
+        "TRAFFIC REGISTER",
+        "NATIS",
+        "NATIONAL TRAFFIC INFORMATION SYSTEM",
+        # Vehicle codes (unique to license)
+        "VEHICLE CODE",
+        "VEHICLE CLASS",
+        "CODE A",
+        "CODE B",
+        "CODE C",
+        "CODE EB",
+        "CODE EC",
+        # Date fields specific to licenses
+        "VALID FROM",
+        "VALID TO",
+        "FIRST ISSUE DATE",
+        "FIRST ISSUED",
+        # License-specific fields
+        "LICENCE NUMBER",
+        "LICENSE NUMBER",
+        "RESTRICTIONS",
+        "PROFESSIONAL DRIVING PERMIT",
+        "PDP",
+        "PrDP",
+        # Afrikaans variants
+        "BESTUURSLISENSIE",
+        "MOTORVOERTUIG",
+        "VERKEER",
+    ],
     DocumentType.BANK_DETAILS: [
         "BANK",
         "CONFIRMATION",
@@ -183,6 +222,14 @@ DOCUMENT_PATTERNS = {
         r"[A-Z0-9<]{30,44}",  # MRZ line pattern (30-44 alphanumeric chars with <)
         r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date: "03 FEB 1978"
         r"(?:expir|valid)\s*(?:y|until|to)",  # Expiry indicators
+    ],
+    DocumentType.DRIVERS_LICENSE: [
+        r"[A-Z]{2}\d{6,12}",  # SA license number format (2 letters + 6-12 digits)
+        r"\d{8,12}",  # Numeric license numbers
+        r"(?:code|CODE)\s*[A-Z]{1,3}[1-9]?",  # Vehicle codes (A, A1, B, C, C1, EB, EC)
+        r"\d{1,2}\s*(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d{4}",  # Date format
+        r"\d{4}[-/]\d{2}[-/]\d{2}",  # Date: YYYY-MM-DD or YYYY/MM/DD
+        r"(?:valid|geldig)\s*(?:from|to|tot|van)",  # Validity indicators
     ],
     DocumentType.BANK_DETAILS: [r"\d{9,12}", r"\d{6}"],  # Account and branch
     DocumentType.TAX_DOCUMENT: [r"\d{10}", r"IRP5"],  # Tax number
@@ -371,6 +418,70 @@ FIELD_MAPPINGS = {
             "Sexe": "gender",
         },
     },
+    DocumentType.DRIVERS_LICENSE: {
+        EntityType.STAFF: {
+            # === License Number ===
+            "Licence Number": "licenseNumber",
+            "License Number": "licenseNumber",
+            "Licence No": "licenseNumber",
+            "License No": "licenseNumber",
+            "DL Number": "licenseNumber",
+            "Driving Licence No": "licenseNumber",
+            "Lisensienommer": "licenseNumber",  # Afrikaans
+
+            # === Name Fields ===
+            "Surname": "lastName",
+            "Names": "firstName",
+            "First Names": "firstName",
+            "Full Name": "fullName",
+            "Van": "lastName",  # Afrikaans
+            "Naam": "firstName",  # Afrikaans
+
+            # === ID Number (often on license) ===
+            "Identity Number": "idNumber",
+            "ID Number": "idNumber",
+            "ID No": "idNumber",
+
+            # === Date Fields ===
+            "Date of Birth": "dateOfBirth",
+            "Birth Date": "dateOfBirth",
+            "Geboortedatum": "dateOfBirth",  # Afrikaans
+
+            "Valid From": "issuedDate",
+            "First Issue Date": "firstIssuedDate",
+            "First Issued": "firstIssuedDate",
+            "Eerste Uitgawe": "firstIssuedDate",  # Afrikaans
+
+            "Valid To": "expiryDate",
+            "Valid Until": "expiryDate",
+            "Expiry Date": "expiryDate",
+            "Expires": "expiryDate",
+            "Geldig Tot": "expiryDate",  # Afrikaans
+
+            # === Vehicle Codes ===
+            "Vehicle Code": "vehicleCode",
+            "Vehicle Codes": "vehicleCode",
+            "Code": "vehicleCode",
+            "Codes": "vehicleCode",
+            "Vehicle Class": "vehicleCode",
+            "Voertuigkode": "vehicleCode",  # Afrikaans
+
+            # === Restrictions ===
+            "Restrictions": "restrictions",
+            "Restriction": "restrictions",
+            "Beperkings": "restrictions",  # Afrikaans
+
+            # === Professional Driving Permit ===
+            "PrDP": "prdpType",
+            "PDP": "prdpType",
+            "Professional Driving Permit": "prdpType",
+
+            # === Issuing Authority ===
+            "Issuing Authority": "issuingAuthority",
+            "Traffic Department": "issuingAuthority",
+            "Issue Centre": "issuingAuthority",
+        },
+    },
     DocumentType.BANK_DETAILS: {
         EntityType.STAFF: {
             "Bank Name": "bankName",
@@ -557,6 +668,8 @@ def extract_fields(
         _extract_id_document_special_fields(text, fields)
     elif document_type == DocumentType.PASSPORT:
         _extract_passport_fields(text, fields)
+    elif document_type == DocumentType.DRIVERS_LICENSE:
+        _extract_drivers_license_fields(text, fields)
     elif document_type in [DocumentType.BANK_DETAILS, DocumentType.BANK_CONFIRMATION]:
         _extract_bank_special_fields(text, fields, entity_type)
 
@@ -1061,6 +1174,155 @@ def _extract_passport_fields(text: str, fields: Dict[str, ExtractedField]):
                         validated=True,
                     )
                     break
+
+
+def _extract_drivers_license_fields(text: str, fields: Dict[str, ExtractedField]):
+    """Extract driver's license specific fields from text (SA licenses)."""
+    upper_text = text.upper()
+    # Also create a cleaned version with OCR special chars replaced
+    cleaned_text = upper_text.replace('¢', '8').replace('¤', '8').replace('©', 'C')
+
+    # Check for license indicators (handle OCR variations)
+    license_indicators = [
+        "DRIVING LICENCE", "DRIVER'S LICENSE", "BESTUURSLISENSIE",
+        "DRIVING LICENSE", "LIC. NO", "LISENSIENR", "LISEASIENR",
+        "BESTUURSL'SENSIE", "BESTUURSL SENSIE"
+    ]
+    is_license = any(indicator in upper_text for indicator in license_indicators)
+
+    if not is_license:
+        return
+
+    # Extract license number - SA format: alphanumeric like "3JO004U08RD49"
+    # OCR often produces: "Lic. No./Liseasienr.: 3JO004U0¢8RD49" (¢ for 8)
+    if "licenseNumber" not in fields:
+        license_patterns = [
+            # Bilingual format with OCR variations: "Lic. No./Liseasienr.: VALUE"
+            r"LIC\.?\s*(?:NO\.?|NR\.?)\s*/?\s*L[I1]S[EA]+[S5]?[I1]?E?N?[R1I]?\.?\s*:?\s*([A-Z0-9¢¤©]{8,15})",
+            # English only: "Licence No.: VALUE" or "License Number: VALUE"
+            r"LICEN[CS]E?\s*(?:NO\.?|NUMBER|NR\.?)?\s*:?\s*([A-Z0-9¢¤©]{8,15})",
+            # Generic alphanumeric license number (allowing OCR special chars)
+            r"\b([0-9][A-Z]{1,2}[0-9¢¤]{3,6}[A-Z][0-9¢¤]{2}[A-Z0-9¢¤]{2,4})\b",
+        ]
+        for pattern in license_patterns:
+            match = re.search(pattern, cleaned_text) or re.search(pattern, upper_text)
+            if match:
+                license_num = match.group(1).strip()
+                # Clean OCR special chars from the extracted value
+                license_num = license_num.replace('¢', '8').replace('¤', '8').replace('©', 'C')
+                if license_num and len(license_num) >= 8:
+                    fields["licenseNumber"] = ExtractedField(
+                        field_name="licenseNumber",
+                        value=license_num,
+                        confidence=0.90,
+                        source="regex_license_no",
+                        validated=True,
+                    )
+                    break
+
+    # Extract vehicle codes - SA format: "Code: EB" or "Vehicle Code: EB, C1"
+    # OCR often produces: "Cade. ade: EB" or "C0DE: EB"
+    if "licenseCodes" not in fields:
+        code_patterns = [
+            # Handle OCR misreads: "Cade. ade: EB", "Code/Kode: EB"
+            r"(?:VEHICLE\s*)?C[O0A]DE\.?\s*(?:[/\.]?\s*(?:K[O0]DE|ADE))?\.?\s*:?\s*([A-Z]{1,2}[0-9]?(?:\s*,?\s*[A-Z]{1,2}[0-9]?)*)",
+            # Just "Code: EB" or "Cade: EB"
+            r"\bC[O0A]DE\.?\s*:?\s*([A-Z]{1,2}[0-9]?)\b",
+            # Look for common SA license codes pattern (EB, EC, C1, A, B)
+            r"\b(E[ABC]|C[01]|[AB])\s+[0-9]\s*(?:VEH|$)",
+        ]
+        for pattern in code_patterns:
+            match = re.search(pattern, upper_text)
+            if match:
+                codes = match.group(1).strip()
+                # Clean up - remove extra spaces and normalize
+                codes = re.sub(r'\s+', ', ', codes.strip())
+                if codes and len(codes) >= 1:
+                    fields["licenseCodes"] = ExtractedField(
+                        field_name="licenseCodes",
+                        value=codes,
+                        confidence=0.85,
+                        source="regex_vehicle_code",
+                        validated=True,
+                    )
+                    break
+
+    # Extract validity dates - SA format: "Valid/Geldig: 08/11/2016 - 18/11/2021"
+    # Also handles: "Valia/Geidig" (OCR misread)
+    date_pattern = r"(?:VALID|VALIA|GELDIG|GEIDIG)\s*/?\s*(?:VALID|VALIA|GELDIG|GEIDIG)?\s*:?\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})\s*[-–]\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})"
+    date_match = re.search(date_pattern, upper_text)
+    if date_match:
+        valid_from = date_match.group(1)
+        valid_to = date_match.group(2)
+
+        if "validFrom" not in fields and valid_from:
+            # Convert DD/MM/YYYY to ISO format YYYY-MM-DD
+            from_parts = re.split(r'[/\-\.]', valid_from)
+            if len(from_parts) == 3:
+                day, month, year = from_parts
+                if len(year) == 2:
+                    year = '20' + year if int(year) < 50 else '19' + year
+                iso_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                fields["validFrom"] = ExtractedField(
+                    field_name="validFrom",
+                    value=iso_date,
+                    confidence=0.85,
+                    source="regex_valid_from",
+                    validated=True,
+                )
+
+        if "validTo" not in fields and valid_to:
+            to_parts = re.split(r'[/\-\.]', valid_to)
+            if len(to_parts) == 3:
+                day, month, year = to_parts
+                if len(year) == 2:
+                    year = '20' + year if int(year) < 50 else '19' + year
+                # Handle truncated year like "202" -> "2021" or "2027"
+                if len(year) == 3:
+                    year = year + '1'  # Assume it was truncated
+                iso_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                fields["validTo"] = ExtractedField(
+                    field_name="validTo",
+                    value=iso_date,
+                    confidence=0.85,
+                    source="regex_valid_to",
+                    validated=True,
+                )
+
+    # Extract first issue date - "First issue/Eerste uitreiking: 2/08/2001"
+    if "firstIssued" not in fields:
+        first_issue_pattern = r"(?:FIRST\s*ISSUE|EERSTE?\s*UITREIK(?:ING)?)\s*/?\s*(?:FIRST\s*ISSUE|EERSTE?\s*UITREIK(?:ING)?)?\s*:?\s*(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4})"
+        first_match = re.search(first_issue_pattern, upper_text)
+        if first_match:
+            first_date = first_match.group(1)
+            parts = re.split(r'[/\-\.]', first_date)
+            if len(parts) == 3:
+                day, month, year = parts
+                if len(year) == 2:
+                    year = '20' + year if int(year) < 50 else '19' + year
+                iso_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                fields["firstIssued"] = ExtractedField(
+                    field_name="firstIssued",
+                    value=iso_date,
+                    confidence=0.80,
+                    source="regex_first_issue",
+                    validated=True,
+                )
+
+    # Extract restrictions - "Restr./Beperk.: 00"
+    if "restrictions" not in fields:
+        restr_pattern = r"(?:RESTR(?:ICTIONS?)?|BEPERK(?:INGS?)?)\s*/?\s*(?:RESTR(?:ICTIONS?)?|BEPERK(?:INGS?)?)?\s*:?\s*([A-Z0-9]{1,5})"
+        restr_match = re.search(restr_pattern, upper_text)
+        if restr_match:
+            restrictions = restr_match.group(1).strip()
+            if restrictions:
+                fields["restrictions"] = ExtractedField(
+                    field_name="restrictions",
+                    value=restrictions,
+                    confidence=0.80,
+                    source="regex_restrictions",
+                    validated=True,
+                )
 
 
 def _extract_bank_special_fields(

@@ -63,8 +63,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const documentName = Array.isArray(fields.documentName) ? fields.documentName[0] : fields.documentName;
     const documentNumber = Array.isArray(fields.documentNumber) ? fields.documentNumber[0] : fields.documentNumber;
     const issuedDate = Array.isArray(fields.issuedDate) ? fields.issuedDate[0] : fields.issuedDate;
-    const expiryDate = Array.isArray(fields.expiryDate) ? fields.expiryDate[0] : fields.expiryDate;
     const issuingAuthority = Array.isArray(fields.issuingAuthority) ? fields.issuingAuthority[0] : fields.issuingAuthority;
+
+    // Driver's license specific fields
+    const licenseNumber = Array.isArray(fields.licenseNumber) ? fields.licenseNumber[0] : fields.licenseNumber;
+    const licenseCodes = Array.isArray(fields.licenseCodes) ? fields.licenseCodes[0] : fields.licenseCodes;
+    const validFrom = Array.isArray(fields.validFrom) ? fields.validFrom[0] : fields.validFrom;
+    const validTo = Array.isArray(fields.validTo) ? fields.validTo[0] : fields.validTo;
+
+    // Use expiryDate, or validTo for driver's licenses
+    const rawExpiryDate = Array.isArray(fields.expiryDate) ? fields.expiryDate[0] : fields.expiryDate;
+    const expiryDate = rawExpiryDate || validTo; // validTo is used for driver's licenses
+
+    // For driver's licenses, use licenseNumber as documentNumber and validFrom as issuedDate
+    const effectiveDocumentNumber = documentNumber || licenseNumber;
+    const effectiveIssuedDate = issuedDate || validFrom;
 
     // OCR-first flow fields (PRD-033)
     const ocrConfirmedRaw = Array.isArray(fields.ocrConfirmed) ? fields.ocrConfirmed[0] : fields.ocrConfirmed;
@@ -213,6 +226,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       primaryMimeType = file.mimetype || '';
     }
 
+    // Determine verification status based on expiry date
+    // If document has expired, mark as 'expired' instead of 'pending'
+    let verificationStatus = 'pending';
+    if (expiryDate) {
+      const expiry = new Date(expiryDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Compare dates only, not time
+      if (expiry < today) {
+        verificationStatus = 'expired';
+        logger.info('Document has expired', { staffId, documentType, expiryDate });
+      }
+    }
+
     // Save metadata to Neon
     const [document] = await sql`
       INSERT INTO staff_documents (
@@ -245,11 +271,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ${primaryFileSize},
         ${primaryMimeType},
         ${expiryDate ? new Date(expiryDate) : null},
-        ${issuedDate ? new Date(issuedDate) : null},
+        ${effectiveIssuedDate ? new Date(effectiveIssuedDate) : null},
         ${issuingAuthority || null},
-        ${documentNumber || null},
-        ${'pending'},
-        ${'pending'},
+        ${effectiveDocumentNumber || null},
+        ${verificationStatus},
+        ${verificationStatus},
         NOW()
       )
       RETURNING *
@@ -269,10 +295,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Sync document data to staff table based on document type
     // This ensures OCR/manual data appears in employee details
     await syncDocumentToStaff(staffId, documentType, {
-      documentNumber,
+      documentNumber: effectiveDocumentNumber,
       expiryDate,
       issuingAuthority,
       fileUrl: fileUrl || fileUrlFront,
+      licenseCodes, // For driver's licenses
     });
 
     // PRD-033: If OCR was confirmed by user, skip webhook (already processed)
@@ -434,11 +461,12 @@ async function syncDocumentToStaff(
     expiryDate?: string;
     issuingAuthority?: string;
     fileUrl?: string;
+    licenseCodes?: string; // For driver's licenses
   }
 ): Promise<void> {
   try {
     // Only sync if we have data to sync
-    if (!data.documentNumber && !data.expiryDate && !data.issuingAuthority && !data.fileUrl) {
+    if (!data.documentNumber && !data.expiryDate && !data.issuingAuthority && !data.fileUrl && !data.licenseCodes) {
       return;
     }
 
@@ -469,7 +497,20 @@ async function syncDocumentToStaff(
         logger.info('Synced passport to staff', { staffId, documentNumber: data.documentNumber });
         break;
 
-      // Driver's license data stays in staff_documents (displayed via Vehicles tab)
+      case 'drivers_license':
+        // Sync driver's license details to staff table
+        await sql`
+          UPDATE staff
+          SET
+            drivers_license_number = COALESCE(${data.documentNumber || null}, drivers_license_number),
+            drivers_license_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, drivers_license_expiry),
+            drivers_license_codes = COALESCE(${data.licenseCodes || null}, drivers_license_codes),
+            updated_at = NOW()
+          WHERE id = ${staffId}
+        `;
+        logger.info('Synced drivers license to staff', { staffId, documentNumber: data.documentNumber, licenseCodes: data.licenseCodes });
+        break;
+
       // Other document types don't need staff table sync
       default:
         break;
