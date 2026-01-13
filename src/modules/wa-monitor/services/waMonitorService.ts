@@ -30,48 +30,70 @@ function getDbConnection() {
 /**
  * Get all QA review drops
  * Returns all drops ordered by created_at DESC (newest first)
+ * Enriched with OneMap serial data (ONT barcode, activation code, installer info)
  */
 export async function getAllDrops(): Promise<QaReviewDrop[]> {
   try {
     const sql = getDbConnection();
+    // Main query with LEFT JOIN to onemap_properties for serial data
+    // Uses DISTINCT ON to get only one OneMap record per drop (most recent)
     const rows = await sql`
       SELECT
-        id,
-        drop_number as "dropNumber",
-        review_date as "reviewDate",
-        user_name as "userName",
-        completed_photos as "completedPhotos",
-        outstanding_photos as "outstandingPhotos",
-        outstanding_photos_loaded_to_1map as "outstandingPhotosLoadedTo1map",
-        comment,
-        created_at as "createdAt",
-        updated_at as "updatedAt",
-        project,
-        assigned_agent as "assignedAgent",
-        completed,
-        incomplete,
-        feedback_sent as "feedbackSent",
-        sender_phone as "senderPhone",
-        resubmitted,
-        locked_by as "lockedBy",
-        locked_at as "lockedAt",
-        incorrect_steps as "incorrectSteps",
-        incorrect_comments as "incorrectComments",
-        step_01_house_photo as "step_01_house_photo",
-        step_02_cable_from_pole as "step_02_cable_from_pole",
-        step_03_cable_entry_outside as "step_03_cable_entry_outside",
-        step_04_cable_entry_inside as "step_04_cable_entry_inside",
-        step_05_wall_for_installation as "step_05_wall_for_installation",
-        step_06_ont_back_after_install as "step_06_ont_back_after_install",
-        step_07_power_meter_reading as "step_07_power_meter_reading",
-        step_08_ont_barcode as "step_08_ont_barcode",
-        step_09_ups_serial as "step_09_ups_serial",
-        step_10_final_installation as "step_10_final_installation",
-        step_11_green_lights as "step_11_green_lights",
-        step_12_customer_signature as "step_12_customer_signature"
-      FROM qa_photo_reviews
-      WHERE project != 'Marketing Activations'
-      ORDER BY created_at DESC
+        q.id,
+        q.drop_number as "dropNumber",
+        q.review_date as "reviewDate",
+        q.user_name as "userName",
+        q.completed_photos as "completedPhotos",
+        q.outstanding_photos as "outstandingPhotos",
+        q.outstanding_photos_loaded_to_1map as "outstandingPhotosLoadedTo1map",
+        q.comment,
+        q.created_at as "createdAt",
+        q.updated_at as "updatedAt",
+        q.project,
+        q.assigned_agent as "assignedAgent",
+        q.completed,
+        q.incomplete,
+        q.feedback_sent as "feedbackSent",
+        q.sender_phone as "senderPhone",
+        q.resubmitted,
+        q.locked_by as "lockedBy",
+        q.locked_at as "lockedAt",
+        q.incorrect_steps as "incorrectSteps",
+        q.incorrect_comments as "incorrectComments",
+        q.step_01_house_photo as "step_01_house_photo",
+        q.step_02_cable_from_pole as "step_02_cable_from_pole",
+        q.step_03_cable_entry_outside as "step_03_cable_entry_outside",
+        q.step_04_cable_entry_inside as "step_04_cable_entry_inside",
+        q.step_05_wall_for_installation as "step_05_wall_for_installation",
+        q.step_06_ont_back_after_install as "step_06_ont_back_after_install",
+        q.step_07_power_meter_reading as "step_07_power_meter_reading",
+        q.step_08_ont_barcode as "step_08_ont_barcode",
+        q.step_09_ups_serial as "step_09_ups_serial",
+        q.step_10_final_installation as "step_10_final_installation",
+        q.step_11_green_lights as "step_11_green_lights",
+        q.step_12_customer_signature as "step_12_customer_signature",
+        q.ont_serial_scanned as "ontSerialScanned",
+        q.ups_serial_scanned as "upsSerialScanned",
+        q.ont_consumption_id as "ontConsumptionId",
+        q.ups_consumption_id as "upsConsumptionId",
+        q.scan_gps_lat as "scanGpsLat",
+        q.scan_gps_lng as "scanGpsLng",
+        -- OneMap serial data (from onemap_properties table by drop_number)
+        op.ont_barcode as "onemapOntBarcode",
+        op.ont_activation_code as "onemapOntActivationCode",
+        op.ups_serial as "onemapUpsSerial",
+        op.installer_name as "onemapInstallerName",
+        op.installation_date as "onemapInstallationDate"
+      FROM qa_photo_reviews q
+      LEFT JOIN LATERAL (
+        SELECT ont_barcode, ont_activation_code, ups_serial, installer_name, installation_date
+        FROM onemap_properties
+        WHERE drop_number = q.drop_number
+        ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+        LIMIT 1
+      ) op ON true
+      WHERE q.project != 'Marketing Activations'
+      ORDER BY q.created_at DESC
     `;
 
     return rows.map(transformDbRowToDrop);
@@ -309,6 +331,19 @@ function transformDbRowToDrop(row: any): QaReviewDrop {
     step_10_final_installation: step_10,
     step_11_green_lights: step_11,
     step_12_customer_signature: step_12,
+    // Serial scanning fields (Stage 3 - Stock Tracking)
+    ontSerialScanned: row.ontSerialScanned || null,
+    upsSerialScanned: row.upsSerialScanned || null,
+    ontConsumptionId: row.ontConsumptionId || null,
+    upsConsumptionId: row.upsConsumptionId || null,
+    scanGpsLat: row.scanGpsLat ? parseFloat(row.scanGpsLat) : null,
+    scanGpsLng: row.scanGpsLng ? parseFloat(row.scanGpsLng) : null,
+    // OneMap serial data (fetched from 1Map by drop_number)
+    onemapOntBarcode: row.onemapOntBarcode || null,
+    onemapOntActivationCode: row.onemapOntActivationCode || null,
+    onemapUpsSerial: row.onemapUpsSerial || null,
+    onemapInstallerName: row.onemapInstallerName || null,
+    onemapInstallationDate: row.onemapInstallationDate || null,
   };
 }
 

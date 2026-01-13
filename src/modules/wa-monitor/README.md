@@ -419,16 +419,140 @@ tail -f /opt/wa-monitor/prod/logs/wa-monitor-prod.log
 - `/docs/wa-monitor/WA_MONITOR_DATA_FLOW_REPORT.md` - Data flow investigation
 - `/docs/wa-monitor/WA_MONITOR_LOCKING_SYSTEM.md` - Edit locking system
 
+## Serial Scanning Integration (Jan 2026)
+
+### Overview
+Steps 8 (ONT Barcode) and 9 (UPS Serial) now support **barcode scanning** to link installed equipment to drop numbers, enabling end-to-end stock traceability.
+
+### 4-Stage Stock Tracking System
+```
+Stage 1: Receipt → Stage 2: Checkout → Stage 3: Installation → Stage 4: Reconciliation
+(Warehouse)      (Morning)           (WA Monitor QA)         (End of Day)
+```
+
+### New Component: SerialScannerModal
+**Location**: `src/modules/wa-monitor/components/SerialScannerModal.tsx`
+
+Opens camera/barcode scanner for Steps 8 & 9:
+- Validates serial exists in `stock_serials` table
+- Confirms serial is issued to the technician
+- Prevents duplicate installations
+- Records GPS coordinates at scan time
+
+### Enhanced QaReviewCard
+Steps 8 & 9 now show:
+```
+[✓] 8. ONT Barcode
+    Serial: ONT-ABC123 ✓ [Scan] [Clear]
+
+[✓] 9. UPS Serial
+    Serial: UPS-XYZ789 ✓ [Scan] [Clear]
+```
+
+### API Endpoint: POST /api/wa-monitor-scan-serial
+Records serial scan and creates consumption record:
+
+**Request**:
+```json
+{
+  "qaReviewId": "uuid",
+  "dropNumber": "DR1234567",
+  "stepNumber": 8,
+  "serialNumber": "ONT-ABC123",
+  "technicianId": "user-id",
+  "technicianName": "John Smith",
+  "gpsLat": -25.7461,
+  "gpsLng": 28.1881,
+  "scanTimestamp": "2026-01-13T10:30:00Z"
+}
+```
+
+**Response** (Success):
+```json
+{
+  "success": true,
+  "data": {
+    "consumptionId": "uuid",
+    "serialStatus": "installed",
+    "dropUpdated": true,
+    "qaReviewUpdated": true
+  }
+}
+```
+
+**Error Codes**:
+- `SERIAL_NOT_FOUND` - Serial number not in system
+- `SERIAL_NOT_ISSUED` - Serial not issued to this technician
+- `ALREADY_INSTALLED` - Serial already installed at another drop
+
+### New Database Columns
+
+Added to `qa_photo_reviews` table:
+```sql
+-- Scanned serial numbers
+ont_serial_scanned VARCHAR(100),
+ups_serial_scanned VARCHAR(100),
+router_serial_scanned VARCHAR(100),
+
+-- Links to stock_consumptions
+ont_consumption_id UUID REFERENCES stock_consumptions(id),
+ups_consumption_id UUID REFERENCES stock_consumptions(id),
+router_consumption_id UUID REFERENCES stock_consumptions(id),
+
+-- Scan metadata
+scan_gps_lat DECIMAL(10, 7),
+scan_gps_lng DECIMAL(10, 7),
+scan_timestamp TIMESTAMP WITH TIME ZONE,
+
+-- Verification
+serials_verified BOOLEAN DEFAULT false,
+verification_notes TEXT
+```
+
+### User Workflow
+
+1. Complete Steps 1-7 (property photos, cable routing)
+2. **Step 8**: Tap "Scan" → Camera opens → Scan ONT barcode
+   - System validates: serial exists, issued to you, not already installed
+   - On success: Serial displayed with green checkmark
+   - On error: Toast message with specific error
+3. **Step 9**: Tap "Scan" → Scan UPS serial
+4. Complete Steps 10-12 (final photos, signature)
+5. Submit review → All serials linked to drop_number
+
+### Manual Entry Fallback
+If camera/barcode scan fails:
+1. Tap "Manual Entry" button
+2. Type serial number (e.g., "ONT-ABC123")
+3. System validates same as scan
+4. Useful for: damaged stickers, poor lighting, camera issues
+
+### Stock Status Lifecycle
+```
+available → issued → installed
+   ↓           ↓         ↓
+(Warehouse) (Technician) (At Drop)
+```
+
+### Related Documentation
+- **Field Stock Module**: `src/modules/field-stock/README.md`
+- **Stock Tracking Guide**: `docs/STOCK_TRACKING_GUIDE.md`
+- **Reconciliation Process**: `docs/RECONCILIATION_PROCESS.md`
+- **Daily Reconciliation Dashboard**: `/procurement/field-stock/reconciliation`
+
+---
+
 ## Version History
 
 | Date | Version | Changes |
 |------|---------|---------|
 | Jan 6, 2025 | 1.0 | Initial WA Monitor dashboard |
 | Nov 17, 2025 | 2.0 | **Incorrect photo marking** - Text input approach |
+| Jan 13, 2026 | 3.0 | **Serial scanning integration** - 4-stage stock tracking |
 
 ---
 
-**Last Updated**: November 17, 2025
-**Current Version**: 2.0 (Text Input Approach)
+**Last Updated**: January 13, 2026
+**Current Version**: 3.0 (Serial Scanning Integration)
 **Status**: ✅ Production Ready
 **Architecture**: Modular "Lego Block" Pattern

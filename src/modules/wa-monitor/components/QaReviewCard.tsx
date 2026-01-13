@@ -25,7 +25,7 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import { CheckCircle, XCircle, Send, Save, AlertTriangle, Edit2, X, Edit, Lock } from 'lucide-react';
+import { CheckCircle, XCircle, Send, Save, AlertTriangle, Edit2, X, Edit, Lock, Camera } from 'lucide-react';
 import type { QaReviewDrop, QaSteps } from '../types/wa-monitor.types';
 import { QA_STEP_LABELS, ORDERED_STEP_KEYS } from '../types/wa-monitor.types';
 import { DropStatusBadge } from './DropStatusBadge';
@@ -70,6 +70,9 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
   const [isLocked, setIsLocked] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
   const [currentUser] = useState('Louis Duplessis'); // TODO: Get from Clerk auth
+
+  // Legacy serial data (from old scanning system - kept for backward compatibility)
+  // New system uses OneMap data fetched from database (onemapOntBarcode, etc.)
 
   // Sync local state with props when drop data changes (e.g., after refresh)
   // Only sync if NOT editing (prevents overwriting active changes)
@@ -497,36 +500,97 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
           Installation QA Checklist (12 Photos)
         </Typography>
         <Box sx={{ pl: 1 }}>
-          {ORDERED_STEP_KEYS.map((stepKey, index) => (
-            <Box key={stepKey} sx={{ mb: 2 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={steps[stepKey]}
-                    onChange={() => handleStepChange(stepKey)}
-                    size="small"
-                    disabled={!isEditing}
+          {ORDERED_STEP_KEYS.map((stepKey, index) => {
+            // Determine if this step displays OneMap serial data (Step 8 = ONT, Step 9 = UPS)
+            const isOntStep = stepKey === 'step_08_ont_barcode';
+            const isUpsStep = stepKey === 'step_09_ups_serial';
+
+            return (
+              <Box key={stepKey} sx={{ mb: 2 }}>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={steps[stepKey]}
+                        onChange={() => handleStepChange(stepKey)}
+                        size="small"
+                        disabled={!isEditing}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2" color={steps[stepKey] ? 'success.main' : 'text.secondary'}>
+                        {index + 1}. {QA_STEP_LABELS[stepKey]}
+                      </Typography>
+                    }
                   />
-                }
-                label={
-                  <Typography variant="body2" color={steps[stepKey] ? 'success.main' : 'text.secondary'}>
-                    {index + 1}. {QA_STEP_LABELS[stepKey]}
-                  </Typography>
-                }
-              />
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="If incorrect, explain why (e.g., Photo unclear, wrong angle, not uploaded)"
-                value={incorrectComments[stepKey] || ''}
-                onChange={(e) => handleIncorrectCommentChange(stepKey, e.target.value)}
-                disabled={!isEditing}
-                sx={{ ml: 4, mt: 0.5 }}
-                variant="outlined"
-                helperText={incorrectComments[stepKey] && incorrectComments[stepKey].trim().length > 0 ? "⚠️ Marked as incorrect" : ""}
-              />
-            </Box>
-          ))}
+
+                  {/* OneMap Serial Data Display for Steps 8 & 9 */}
+                  {isOntStep && drop.onemapOntBarcode && (
+                    <Chip
+                      icon={<CheckCircle size={14} />}
+                      label={drop.onemapOntBarcode}
+                      color="success"
+                      size="small"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                  {isOntStep && !drop.onemapOntBarcode && (
+                    <Chip
+                      icon={<AlertTriangle size={14} />}
+                      label="No ONT data from 1Map"
+                      color="warning"
+                      size="small"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                  {isUpsStep && drop.onemapUpsSerial && (
+                    <Chip
+                      icon={<CheckCircle size={14} />}
+                      label={drop.onemapUpsSerial}
+                      color="success"
+                      size="small"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                  {isUpsStep && !drop.onemapUpsSerial && (
+                    <Chip
+                      icon={<AlertTriangle size={14} />}
+                      label="No UPS serial from 1Map"
+                      color="warning"
+                      size="small"
+                      variant="outlined"
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                </Box>
+
+                {/* OneMap installation details for Step 8 (ONT) */}
+                {isOntStep && (drop.onemapOntBarcode || drop.onemapInstallerName) && (
+                  <Box sx={{ ml: 4, mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      1Map Data: {drop.onemapInstallerName && `Installer: ${drop.onemapInstallerName}`}
+                      {drop.onemapInstallationDate && ` | Date: ${drop.onemapInstallationDate}`}
+                    </Typography>
+                  </Box>
+                )}
+
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="If incorrect, explain why (e.g., Photo unclear, wrong angle, not uploaded)"
+                  value={incorrectComments[stepKey] || ''}
+                  onChange={(e) => handleIncorrectCommentChange(stepKey, e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ ml: 4, mt: 0.5 }}
+                  variant="outlined"
+                  helperText={incorrectComments[stepKey] && incorrectComments[stepKey].trim().length > 0 ? "⚠️ Marked as incorrect" : ""}
+                />
+              </Box>
+            );
+          })}
         </Box>
 
         <Divider sx={{ my: 2 }} />

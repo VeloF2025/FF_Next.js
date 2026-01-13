@@ -99,6 +99,19 @@ export interface QaReviewDrop extends QaSteps {
   lockedAt: Date | null;
   incorrectSteps: string[];
   incorrectComments: Record<string, string>;
+  // Serial scanning fields (Stage 3 of Stock Tracking)
+  ontSerialScanned: string | null;
+  upsSerialScanned: string | null;
+  ontConsumptionId: string | null;
+  upsConsumptionId: string | null;
+  scanGpsLat: number | null;
+  scanGpsLng: number | null;
+  // OneMap serial data (fetched from 1Map by drop_number)
+  onemapOntBarcode: string | null;
+  onemapOntActivationCode: string | null;
+  onemapUpsSerial: string | null;
+  onemapInstallerName: string | null;
+  onemapInstallationDate: string | null;
 }
 
 /**
