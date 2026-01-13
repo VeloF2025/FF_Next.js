@@ -1655,10 +1655,16 @@ async def home():
             .btn-download:hover { background: #059669; transform: translateY(-1px); }
             .result { background: #16213e; padding: 25px; border-radius: 12px; margin-bottom: 20px; }
             .result h2 { color: #fff; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-            .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
-            .info-item { background: #0f172a; padding: 15px; border-radius: 8px; border-left: 3px solid #667eea; }
+            .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+            .info-item { background: #0f172a; padding: 15px; border-radius: 8px; border-left: 3px solid #667eea; transition: all 0.2s; position: relative; }
+            .info-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
             .info-item label { font-size: 11px; color: #94a3b8; display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
-            .info-item span { font-size: 16px; font-weight: 500; color: #fff; }
+            .info-item span { font-size: 16px; font-weight: 500; color: #fff; word-break: break-all; }
+            .info-item.serial { cursor: pointer; }
+            .info-item.serial:active { transform: translateY(0); }
+            .info-item.serial .copy-hint { position: absolute; top: 10px; right: 10px; font-size: 10px; color: #64748b; opacity: 0; transition: opacity 0.2s; }
+            .info-item.serial:hover .copy-hint { opacity: 1; }
+            .serial-value { font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
             .photos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
             .photo-card { background: #0f172a; border-radius: 12px; overflow: hidden; transition: transform 0.2s; }
             .photo-card:hover { transform: translateY(-4px); }
@@ -1671,6 +1677,8 @@ async def home():
             .loading { text-align: center; padding: 60px; color: #94a3b8; }
             .loading::after { content: ''; display: block; width: 40px; height: 40px; margin: 20px auto; border: 3px solid #334155; border-top-color: #667eea; border-radius: 50%; animation: spin 1s linear infinite; }
             @keyframes spin { to { transform: rotate(360deg); } }
+            @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(400px); opacity: 0; } }
             .error { background: #7f1d1d; color: #fca5a5; padding: 20px; border-radius: 8px; }
             .empty-state { text-align: center; padding: 40px; background: #1e293b; border-radius: 8px; margin-top: 20px; }
             .empty-state p { color: #94a3b8; margin-bottom: 15px; }
@@ -1721,6 +1729,22 @@ async def home():
         </div>
 
         <script>
+            function copyToClipboard(text, label) {
+                navigator.clipboard.writeText(text).then(() => {
+                    // Show temporary success message
+                    const msg = document.createElement('div');
+                    msg.textContent = `✅ ${label} copied: ${text}`;
+                    msg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 9999; animation: slideIn 0.3s ease-out;';
+                    document.body.appendChild(msg);
+                    setTimeout(() => {
+                        msg.style.animation = 'slideOut 0.3s ease-out';
+                        setTimeout(() => msg.remove(), 300);
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy:', err);
+                });
+            }
+
             function quickSearch(dr) {
                 document.getElementById('drInput').value = dr;
                 searchDR();
@@ -1859,13 +1883,19 @@ async def home():
                                 <label>Downloaded</label>
                                 <span>${data.local_photos ? data.local_photos.length : 0}</span>
                             </div>
-                            <div class="info-item" style="${data.ont_barcode ? 'border-left-color: #10b981;' : 'border-left-color: #f59e0b;'}">
+                            <div class="info-item serial ${data.ont_barcode ? '' : 'missing'}"
+                                 style="${data.ont_barcode ? 'border-left-color: #10b981;' : 'border-left-color: #f59e0b;'}"
+                                 onclick="${data.ont_barcode ? `copyToClipboard('${data.ont_barcode}', 'ONT Serial')` : ''}">
                                 <label>📦 ONT Serial</label>
-                                <span>${data.ont_barcode || 'Not synced'}</span>
+                                <span class="serial-value">${data.ont_barcode || 'Not synced'}</span>
+                                ${data.ont_barcode ? '<span class="copy-hint">Click to copy</span>' : ''}
                             </div>
-                            <div class="info-item" style="${data.ups_serial ? 'border-left-color: #10b981;' : 'border-left-color: #f59e0b;'}">
+                            <div class="info-item serial ${data.ups_serial ? '' : 'missing'}"
+                                 style="${data.ups_serial ? 'border-left-color: #10b981;' : 'border-left-color: #f59e0b;'}"
+                                 onclick="${data.ups_serial ? `copyToClipboard('${data.ups_serial}', 'UPS Serial')` : ''}">
                                 <label>🔋 UPS Serial</label>
-                                <span>${data.ups_serial || 'Not synced'}</span>
+                                <span class="serial-value">${data.ups_serial || 'Not synced'}</span>
+                                ${data.ups_serial ? '<span class="copy-hint">Click to copy</span>' : ''}
                             </div>
                         </div>
 
