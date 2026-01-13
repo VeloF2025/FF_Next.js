@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, Phone, MapPin, Calendar, FileText, Upload, Download, Trash2, Camera, User, RefreshCw, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, FileText, Upload, Download, Trash2, Camera, User, RefreshCw, CheckCircle, AlertCircle, XCircle, Briefcase, Building2, BadgeCheck, Users, Locate, CalendarDays, CreditCard, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import type { StaffMember } from '@/types/staff';
@@ -95,16 +95,238 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
     }
   };
 
+  const formatPosition = (position: string): string => {
+    return position?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'N/A';
+  };
+
+  const formatDepartment = (department: string): string => {
+    return department?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'N/A';
+  };
+
   return (
     <div className="space-y-6">
-      {/* Status Badge */}
+      {/* Employment Details - TOP SECTION */}
       <div>
-        <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(staff.status)}`}>
-          {staff.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
-        </span>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Employment Details</h2>
+          <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(staff.status)}`}>
+            {staff.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
+          </span>
+        </div>
+        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Position */}
+            <div className="flex items-center gap-3">
+              <Briefcase className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Position</p>
+                <p className="font-medium text-[var(--ff-text-primary)]">{formatPosition(staff.position as string)}</p>
+              </div>
+            </div>
+
+            {/* Department */}
+            <div className="flex items-center gap-3">
+              <Building2 className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Department</p>
+                <p className="font-medium text-[var(--ff-text-primary)]">{formatDepartment(staff.department)}</p>
+              </div>
+            </div>
+
+            {/* Employee ID */}
+            <div className="flex items-center gap-3">
+              <BadgeCheck className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Employee ID</p>
+                <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.employeeId || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* Reports To */}
+            {(staff.managerName || staff.reportsTo) && (
+              <div className="flex items-center gap-3">
+                <Users className="w-5 h-5 text-[var(--ff-text-muted)]" />
+                <div>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Reports To</p>
+                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.managerName || staff.reportsTo}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Work Location */}
+            {staff.workLocation && (
+              <div className="flex items-center gap-3">
+                <Locate className="w-5 h-5 text-[var(--ff-text-muted)]" />
+                <div>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Work Location</p>
+                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.workLocation}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Start Date */}
+            <div className="flex items-center gap-3">
+              <CalendarDays className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Start Date</p>
+                <p className="font-medium text-[var(--ff-text-primary)]">{formatDate(staff.startDate)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bio / Job Description */}
+          {staff.bio && (
+            <div className="mt-4 pt-4 border-t border-[var(--ff-border-primary)]">
+              <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Bio / Job Description</p>
+              <p className="text-[var(--ff-text-primary)]">{staff.bio}</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Photo Verification Section */}
+      {/* Contact Information */}
+      <div>
+        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Contact Information</h2>
+        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3">
+              <Mail className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Email</p>
+                <a href={`mailto:${staff.email}`} className="text-blue-400 hover:text-blue-300">
+                  {staff.email}
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Phone className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Phone</p>
+                <a href={`tel:${staff.phone}`} className="text-blue-400 hover:text-blue-300">
+                  {staff.phone}
+                </a>
+              </div>
+            </div>
+
+            {staff.alternativePhone && (
+              <div className="flex items-center gap-3">
+                <Phone className="w-5 h-5 text-[var(--ff-text-muted)]" />
+                <div>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Alternative Phone</p>
+                  <a href={`tel:${staff.alternativePhone}`} className="text-blue-400 hover:text-blue-300">
+                    {staff.alternativePhone}
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Address */}
+          {staff.address && (
+            <div className="mt-4 pt-4 border-t border-[var(--ff-border-primary)]">
+              <div className="flex items-start gap-3">
+                <MapPin className="w-5 h-5 text-[var(--ff-text-muted)] mt-0.5" />
+                <div>
+                  <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Address</p>
+                  <p className="text-[var(--ff-text-primary)]">{staff.address}</p>
+                  <p className="text-[var(--ff-text-secondary)]">
+                    {[staff.city, staff.province, staff.postalCode].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Identity Documents */}
+      {(staff.saIdNumber || staff.passportNumber) && (
+        <div>
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Identity Documents</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {staff.saIdNumber && (
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="w-5 h-5 text-[var(--ff-text-muted)]" />
+                  <div>
+                    <p className="text-sm text-[var(--ff-text-secondary)]">SA ID Number</p>
+                    <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.saIdNumber}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {staff.passportNumber && (
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <Globe className="w-5 h-5 text-[var(--ff-text-muted)]" />
+                  <div>
+                    <p className="text-sm text-[var(--ff-text-secondary)]">Passport Number</p>
+                    <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.passportNumber}</p>
+                    {staff.passportCountry && (
+                      <p className="text-xs text-[var(--ff-text-secondary)]">{staff.passportCountry}</p>
+                    )}
+                    {staff.passportExpiry && (
+                      <p className="text-xs text-[var(--ff-text-secondary)]">
+                        Expires: {formatDate(staff.passportExpiry)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Contact & Next of Kin */}
+      {(staff.emergencyContactName || staff.emergencyContactPhone || staff.nextOfKinName || staff.nextOfKinPhone) && (
+        <div>
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Emergency Contacts</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Emergency Contact */}
+            {(staff.emergencyContactName || staff.emergencyContactPhone) && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <p className="text-xs font-medium text-red-400 uppercase mb-2">Emergency Contact</p>
+                {staff.emergencyContactName && (
+                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.emergencyContactName}</p>
+                )}
+                {staff.emergencyContactRelationship && (
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{staff.emergencyContactRelationship}</p>
+                )}
+                {staff.emergencyContactPhone && (
+                  <a href={`tel:${staff.emergencyContactPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
+                    {staff.emergencyContactPhone}
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Next of Kin */}
+            {(staff.nextOfKinName || staff.nextOfKinPhone) && (
+              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+                <p className="text-xs font-medium text-[var(--ff-text-muted)] uppercase mb-2">Next of Kin</p>
+                {staff.nextOfKinName && (
+                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.nextOfKinName}</p>
+                )}
+                {staff.nextOfKinRelationship && (
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{staff.nextOfKinRelationship}</p>
+                )}
+                {staff.nextOfKinPhone && (
+                  <a href={`tel:${staff.nextOfKinPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
+                    {staff.nextOfKinPhone}
+                  </a>
+                )}
+                {staff.nextOfKinAddress && (
+                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{staff.nextOfKinAddress}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Photo Verification Section - MIDDLE */}
       <div>
         <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Photo Verification</h2>
         <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
@@ -235,7 +457,7 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
         </div>
       </div>
 
-      {/* CV Section */}
+      {/* CV / Resume Section - BOTTOM */}
       <div>
         <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">CV / Resume</h2>
         <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
@@ -300,132 +522,6 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
           )}
         </div>
       </div>
-
-      {/* Contact Information */}
-      <div>
-        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Contact Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <Mail className="w-5 h-5 text-[var(--ff-text-muted)]" />
-            <div>
-              <p className="text-sm text-[var(--ff-text-secondary)]">Email</p>
-              <a href={`mailto:${staff.email}`} className="text-blue-400 hover:text-blue-300">
-                {staff.email}
-              </a>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Phone className="w-5 h-5 text-[var(--ff-text-muted)]" />
-            <div>
-              <p className="text-sm text-[var(--ff-text-secondary)]">Phone</p>
-              <a href={`tel:${staff.phone}`} className="text-blue-400 hover:text-blue-300">
-                {staff.phone}
-              </a>
-            </div>
-          </div>
-
-          {staff.alternativePhone && (
-            <div className="flex items-center gap-3">
-              <Phone className="w-5 h-5 text-[var(--ff-text-muted)]" />
-              <div>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Alternative Phone</p>
-                <a href={`tel:${staff.alternativePhone}`} className="text-blue-400 hover:text-blue-300">
-                  {staff.alternativePhone}
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Address */}
-      {staff.address && (
-        <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Address</h2>
-          <div className="flex items-start gap-3 bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-            <MapPin className="w-5 h-5 text-[var(--ff-text-muted)] mt-0.5" />
-            <div>
-              <p className="text-[var(--ff-text-primary)]">{staff.address}</p>
-              <p className="text-[var(--ff-text-secondary)]">
-                {[staff.city, staff.province, staff.postalCode].filter(Boolean).join(', ')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Emergency Contact */}
-      {(staff.emergencyContactName || staff.emergencyContactPhone) && (
-        <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Emergency Contact</h2>
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-            {staff.emergencyContactName && (
-              <p className="font-medium text-[var(--ff-text-primary)]">{staff.emergencyContactName}</p>
-            )}
-            {staff.emergencyContactRelationship && (
-              <p className="text-sm text-[var(--ff-text-secondary)]">{staff.emergencyContactRelationship}</p>
-            )}
-            {staff.emergencyContactPhone && (
-              <a href={`tel:${staff.emergencyContactPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
-                {staff.emergencyContactPhone}
-              </a>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Next of Kin */}
-      {(staff.nextOfKinName || staff.nextOfKinPhone) && (
-        <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Next of Kin</h2>
-          <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-            {staff.nextOfKinName && (
-              <p className="font-medium text-[var(--ff-text-primary)]">{staff.nextOfKinName}</p>
-            )}
-            {staff.nextOfKinRelationship && (
-              <p className="text-sm text-[var(--ff-text-secondary)]">{staff.nextOfKinRelationship}</p>
-            )}
-            {staff.nextOfKinPhone && (
-              <a href={`tel:${staff.nextOfKinPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
-                {staff.nextOfKinPhone}
-              </a>
-            )}
-            {staff.nextOfKinAddress && (
-              <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{staff.nextOfKinAddress}</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SA ID / Passport */}
-      {(staff.saIdNumber || staff.passportNumber) && (
-        <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Identity Documents</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {staff.saIdNumber && (
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-sm text-[var(--ff-text-secondary)]">SA ID Number</p>
-                <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.saIdNumber}</p>
-              </div>
-            )}
-            {staff.passportNumber && (
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-sm text-[var(--ff-text-secondary)]">Passport Number</p>
-                <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.passportNumber}</p>
-                {staff.passportCountry && (
-                  <p className="text-xs text-[var(--ff-text-secondary)]">{staff.passportCountry}</p>
-                )}
-                {staff.passportExpiry && (
-                  <p className="text-xs text-[var(--ff-text-secondary)]">
-                    Expires: {formatDate(staff.passportExpiry)}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
