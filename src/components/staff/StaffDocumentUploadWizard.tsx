@@ -419,7 +419,7 @@ export function StaffDocumentUploadWizard({
       const issuingAuthority = extractValue(finalFields.issuingAuthority);
 
       if (idNumber) {
-        formData.append('idNumber', idNumber);
+        formData.append('documentNumber', idNumber);
       }
       if (issuedDate) {
         formData.append('issuedDate', issuedDate);
