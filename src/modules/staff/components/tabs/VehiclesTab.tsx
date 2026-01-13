@@ -1,10 +1,44 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Car, Plus, AlertTriangle, Calendar, Fuel, Gauge, FileWarning, Edit, Trash2 } from 'lucide-react';
+import { Car, Plus, AlertTriangle, Calendar, Fuel, Gauge, FileWarning, Edit, Trash2, CreditCard, CheckCircle2, Clock, XCircle, ExternalLink, Pencil, X, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import type { VehicleAssignment } from '@/types/staff';
 import { checkVehicleNeedsAttention, formatVehicleDisplayName } from '@/types/staff/vehicle.types';
+
+// Date format helpers (dd/mm/yyyy <-> yyyy-mm-dd)
+const isoToDisplay = (isoDate: string | null): string => {
+  if (!isoDate) return '';
+  try {
+    const [year, month, day] = isoDate.split('-');
+    return `${day}/${month}/${year}`;
+  } catch {
+    return '';
+  }
+};
+
+const displayToIso = (displayDate: string): string | null => {
+  if (!displayDate) return null;
+  // Accept dd/mm/yyyy format
+  const match = displayDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (match) {
+    const [, day, month, year] = match;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return null;
+};
+
+interface LicenseDetails {
+  id: string;
+  documentName: string;
+  documentNumber: string | null;
+  expiryDate: string | null;
+  issuedDate: string | null;
+  issuingAuthority: string | null;
+  verificationStatus: string;
+  fileUrl: string | null;
+  isExpired: boolean;
+}
 
 interface VehiclesTabProps {
   staffId: string;
@@ -23,8 +57,19 @@ export function VehiclesTab({
 }: VehiclesTabProps) {
   const [vehicles, setVehicles] = useState<VehicleAssignment[]>([]);
   const [hasValidLicense, setHasValidLicense] = useState(false);
+  const [licenseDetails, setLicenseDetails] = useState<LicenseDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // License edit modal state
+  const [showEditLicense, setShowEditLicense] = useState(false);
+  const [editForm, setEditForm] = useState({
+    documentNumber: '',
+    expiryDate: '',
+    issuedDate: '',
+    issuingAuthority: '',
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchVehicles = async () => {
@@ -35,6 +80,7 @@ export function VehiclesTab({
         const data = await response.json();
         setVehicles(data.vehicles || []);
         setHasValidLicense(data.hasValidLicense || false);
+        setLicenseDetails(data.licenseDetails || null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load vehicles');
       } finally {
@@ -49,6 +95,52 @@ export function VehiclesTab({
 
   const activeVehicles = vehicles.filter((v) => v.isActive);
   const inactiveVehicles = vehicles.filter((v) => !v.isActive);
+
+  // Open edit modal with current values
+  const handleEditLicense = () => {
+    if (licenseDetails) {
+      setEditForm({
+        documentNumber: licenseDetails.documentNumber || '',
+        expiryDate: isoToDisplay(licenseDetails.expiryDate),
+        issuedDate: isoToDisplay(licenseDetails.issuedDate),
+        issuingAuthority: licenseDetails.issuingAuthority || '',
+      });
+      setShowEditLicense(true);
+    }
+  };
+
+  // Save license details
+  const handleSaveLicense = async () => {
+    if (!licenseDetails?.id) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/staff-documents/${licenseDetails.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentNumber: editForm.documentNumber || null,
+          expiryDate: displayToIso(editForm.expiryDate),
+          issuedDate: displayToIso(editForm.issuedDate),
+          issuingAuthority: editForm.issuingAuthority || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update');
+
+      // Refresh data
+      const vehiclesResponse = await fetch(`/api/staff/${staffId}/vehicles`);
+      const data = await vehiclesResponse.json();
+      setLicenseDetails(data.licenseDetails || null);
+      setHasValidLicense(data.hasValidLicense || false);
+
+      setShowEditLicense(false);
+    } catch (err) {
+      console.error('Failed to save license details:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -68,21 +160,143 @@ export function VehiclesTab({
 
   return (
     <div className="space-y-6">
-      {/* License Warning */}
-      {!hasValidLicense && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <FileWarning className="w-5 h-5 text-yellow-400 mt-0.5" />
-            <div>
-              <p className="font-medium text-yellow-400">No Valid Driver&apos;s License</p>
-              <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-                {staffName} does not have a verified, non-expired driver&apos;s license on file.
-                A valid license is required before assigning a company vehicle.
-              </p>
+      {/* Driver's License Details Section */}
+      <div>
+        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">
+          Driver&apos;s License
+        </h2>
+
+        {licenseDetails ? (
+          <div className={`bg-[var(--ff-bg-tertiary)] rounded-lg p-4 border ${
+            hasValidLicense ? 'border-green-500/30' : 'border-yellow-500/30'
+          }`}>
+            {/* License Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  hasValidLicense ? 'bg-green-500/20' : 'bg-yellow-500/20'
+                }`}>
+                  <CreditCard className={`w-6 h-6 ${
+                    hasValidLicense ? 'text-green-400' : 'text-yellow-400'
+                  }`} />
+                </div>
+                <div>
+                  <p className="text-lg font-medium text-[var(--ff-text-primary)]">
+                    {licenseDetails.documentName}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {licenseDetails.verificationStatus === 'verified' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-green-500/20 text-green-400 rounded">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Verified
+                      </span>
+                    ) : licenseDetails.verificationStatus === 'pending' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-yellow-500/20 text-yellow-400 rounded">
+                        <Clock className="w-3 h-3" />
+                        Pending Verification
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">
+                        <XCircle className="w-3 h-3" />
+                        {licenseDetails.verificationStatus}
+                      </span>
+                    )}
+                    {licenseDetails.isExpired && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded">
+                        <XCircle className="w-3 h-3" />
+                        Expired
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleEditLicense}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit
+                </button>
+                {licenseDetails.fileUrl && (
+                  <a
+                    href={licenseDetails.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* License Details Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {licenseDetails.documentNumber && (
+                <div>
+                  <p className="text-xs text-[var(--ff-text-secondary)] mb-1">License Number</p>
+                  <p className="text-sm font-medium font-mono text-[var(--ff-text-primary)]">
+                    {licenseDetails.documentNumber}
+                  </p>
+                </div>
+              )}
+
+              {licenseDetails.expiryDate && (
+                <div>
+                  <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Expiry Date</p>
+                  <p className={`text-sm font-medium ${
+                    licenseDetails.isExpired ? 'text-red-400' : 'text-[var(--ff-text-primary)]'
+                  }`}>
+                    {format(new Date(licenseDetails.expiryDate), 'dd MMM yyyy')}
+                  </p>
+                </div>
+              )}
+
+              {licenseDetails.issuedDate && (
+                <div>
+                  <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Issued Date</p>
+                  <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                    {format(new Date(licenseDetails.issuedDate), 'dd MMM yyyy')}
+                  </p>
+                </div>
+              )}
+
+              {licenseDetails.issuingAuthority && (
+                <div>
+                  <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Issuing Authority</p>
+                  <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                    {licenseDetails.issuingAuthority}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Validation Message */}
+            {!hasValidLicense && licenseDetails.verificationStatus === 'pending' && (
+              <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
+                <p className="text-sm text-yellow-400">
+                  This license is pending verification. A vehicle cannot be assigned until the license is verified.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <FileWarning className="w-5 h-5 text-yellow-400 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-400">Valid License Required</p>
+                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+                  {staffName} must have a verified, non-expired driver&apos;s license on file
+                  before being assigned a company vehicle.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Add Vehicle Button */}
       {onAddVehicle && (
@@ -158,6 +372,105 @@ export function VehiclesTab({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Edit License Modal */}
+      {showEditLicense && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
+                Edit License Details
+              </h3>
+              <button
+                onClick={() => setShowEditLicense(false)}
+                className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  License Number
+                </label>
+                <input
+                  type="text"
+                  value={editForm.documentNumber}
+                  onChange={(e) => setEditForm({ ...editForm, documentNumber: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 1234567890"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Expiry Date
+                </label>
+                <input
+                  type="text"
+                  value={editForm.expiryDate}
+                  onChange={(e) => setEditForm({ ...editForm, expiryDate: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Issued Date
+                </label>
+                <input
+                  type="text"
+                  value={editForm.issuedDate}
+                  onChange={(e) => setEditForm({ ...editForm, issuedDate: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Issuing Authority
+                </label>
+                <input
+                  type="text"
+                  value={editForm.issuingAuthority}
+                  onChange={(e) => setEditForm({ ...editForm, issuingAuthority: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Department of Transport"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowEditLicense(false)}
+                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveLicense}
+                disabled={saving}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

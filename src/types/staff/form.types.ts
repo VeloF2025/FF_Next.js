@@ -29,8 +29,24 @@ export interface StaffFormData {
   city: string;
   province: string;
   postalCode: string;
+
+  // Emergency Contact
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
+
+  // Next of Kin
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelationship?: string;
+  nextOfKinAddress?: string;
+
+  // Identity Documents
+  saIdNumber?: string;
+  passportNumber?: string;
+  passportCountry?: string;
+  passportExpiry?: Date;
+
   startDate: Date;
   endDate?: Date;
   /** @deprecated Use saContractType instead */
@@ -45,6 +61,18 @@ export interface StaffFormData {
   timeZone: string;
   maxProjectCount: number;
   notes?: string;
+
+  // Compensation
+  salaryAmount?: number;
+  benefitsPackage?: string;
+  noticePeriodDays?: number;
+
+  // Bank Details
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankBranchCode?: string;
+  bankAccountType?: string;
+  taxNumber?: string;
 
   // SA Labour Compliance Fields (flattened for form)
   // UIF
@@ -71,7 +99,6 @@ export interface StaffFormData {
   contractRenewalDate?: Date;
   // SA Identity
   idNumber?: string;
-  passportNumber?: string;
   workPermitNumber?: string;
   workPermitExpiry?: Date;
 

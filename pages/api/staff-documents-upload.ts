@@ -107,37 +107,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return file;
     };
 
-    // Check for multi-file upload (driver's license front+back)
-    const isMultiFile = documentType === 'drivers_license';
+    // Check for multi-file upload (driver's license front+back) or single file
     let file: formidable.File | undefined;
     let fileFront: formidable.File | undefined;
     let fileBack: formidable.File | undefined;
 
+    // First, check for single file upload (works for all document types including driver's license)
+    const fileArray = Array.isArray(files.file) ? files.file : [files.file];
+    file = fileArray[0];
+
+    // If no single file and it's a driver's license, check for front+back (legacy support)
+    const isMultiFile = documentType === 'drivers_license' && !file;
+
     if (isMultiFile) {
-      // Get front and back files
+      // Get front and back files (legacy multi-file upload)
       const fileFrontArray = Array.isArray(files.fileFront) ? files.fileFront : [files.fileFront];
       const fileBackArray = Array.isArray(files.fileBack) ? files.fileBack : [files.fileBack];
       fileFront = fileFrontArray[0];
       fileBack = fileBackArray[0];
 
       if (!fileFront || !fileBack) {
-        return res.status(400).json({ error: 'Driver\'s license requires both front and back files' });
+        return res.status(400).json({ error: 'No file uploaded. Please select a document.' });
       }
 
       validateFile(fileFront, 'front');
       validateFile(fileBack, 'back');
       tempFilePaths.push(fileFront.filepath, fileBack.filepath);
-    } else {
-      // Single file upload
-      const fileArray = Array.isArray(files.file) ? files.file : [files.file];
-      file = fileArray[0];
-
-      if (!file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
+    } else if (file) {
+      // Single file upload (standard flow for all document types)
       validateFile(file, 'document');
       tempFilePaths.push(file.filepath);
+    } else {
+      return res.status(400).json({ error: 'No file uploaded' });
     }
 
     // Check if VF Storage is available (required)

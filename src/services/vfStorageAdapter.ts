@@ -94,7 +94,13 @@ export class VFStorageService {
       // Use the server's response directly - it returns the actual hashed filename and path
       const actualFilename = result.filename || fileName;
       const actualPath = result.path || `${type}/${category}/${actualFilename}`;
-      const actualUrl = result.url || `${this.baseUrl}/${actualPath}`;
+
+      // Fix: Server returns vf.fibreflow.app URLs but we need internal URLs
+      // Transform to use actual storage server URL for direct access
+      let actualUrl = result.url || `${this.baseUrl}/${actualPath}`;
+      if (actualUrl.includes('vf.fibreflow.app')) {
+        actualUrl = actualUrl.replace('https://vf.fibreflow.app', this.baseUrl);
+      }
 
       return {
         success: true,

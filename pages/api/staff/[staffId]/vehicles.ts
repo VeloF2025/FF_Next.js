@@ -53,23 +53,56 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
       }
 
-      // Check if staff has valid driver's license
-      const [licenseCheck] = await sql`
-        SELECT COUNT(*) as count
+      // Check if staff has valid driver's license and get license details
+      const [licenseDoc] = await sql`
+        SELECT
+          id,
+          document_name,
+          document_number,
+          expiry_date,
+          issued_date,
+          issuing_authority,
+          verification_status,
+          file_url
         FROM staff_documents
         WHERE staff_id = ${staffId}
           AND document_type = 'drivers_license'
-          AND verification_status = 'verified'
-          AND (expiry_date IS NULL OR expiry_date > CURRENT_DATE)
+        ORDER BY created_at DESC
+        LIMIT 1
       `;
 
-      const hasValidLicense = (licenseCheck?.count || 0) > 0;
+      const hasValidLicense = licenseDoc
+        ? licenseDoc.verification_status === 'verified' &&
+          (!licenseDoc.expiry_date || new Date(licenseDoc.expiry_date as string) > new Date())
+        : false;
+
+      // Map license details
+      const licenseDetails = licenseDoc
+        ? {
+            id: licenseDoc.id,
+            documentName: licenseDoc.document_name,
+            documentNumber: licenseDoc.document_number,
+            expiryDate: licenseDoc.expiry_date
+              ? new Date(licenseDoc.expiry_date as string).toISOString().split('T')[0]
+              : null,
+            issuedDate: licenseDoc.issued_date
+              ? new Date(licenseDoc.issued_date as string).toISOString().split('T')[0]
+              : null,
+            issuingAuthority: licenseDoc.issuing_authority,
+            verificationStatus: licenseDoc.verification_status,
+            fileUrl: licenseDoc.file_url,
+            isExpired: licenseDoc.expiry_date
+              ? new Date(licenseDoc.expiry_date as string) < new Date()
+              : false,
+          }
+        : null;
 
       return res.status(200).json({
         success: true,
         vehicles: vehicles.map((v) => mapDbToVehicle(v, hasValidLicense)),
         count: vehicles.length,
         hasValidLicense,
+        licenseDetails,
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

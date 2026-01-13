@@ -1,16 +1,15 @@
 import type { NextPage } from 'next';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { StaffForm } from '../../../src/modules/staff/components/StaffForm';
+import { StaffEditForm } from '../../../src/modules/staff/components/StaffEditForm';
 
 /**
- * Staff Edit Page
- * StaffForm automatically detects edit mode from URL params (router.query.id)
+ * Staff Edit Page - Tabbed edit form matching the view tabs
  */
 const StaffEditPage: NextPage = () => {
   return (
     <AppLayout>
       <div className="p-6">
-        <StaffForm />
+        <StaffEditForm />
       </div>
     </AppLayout>
   );
