@@ -4,7 +4,8 @@
  */
 
 export type DocumentType =
-  | 'id_document'
+  | 'sa_id'
+  | 'passport'
   | 'drivers_license'
   | 'employment_contract'
   | 'certification'
@@ -114,7 +115,8 @@ export interface ComplianceStatus {
 }
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
-  id_document: 'ID Document / Passport',
+  sa_id: 'SA ID Document',
+  passport: 'Passport',
   drivers_license: "Driver's License",
   employment_contract: 'Employment Contract',
   certification: 'Industry Certification',
@@ -127,7 +129,8 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
 };
 
 export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
-  id_document: 'IdCard',
+  sa_id: 'IdCard',
+  passport: 'BookOpen',
   drivers_license: 'Car',
   employment_contract: 'FileText',
   certification: 'Award',
@@ -140,6 +143,7 @@ export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
 };
 
 export const DOCUMENTS_WITH_EXPIRY: DocumentType[] = [
+  'passport',
   'drivers_license',
   'medical_certificate',
   'police_clearance',
@@ -147,7 +151,7 @@ export const DOCUMENTS_WITH_EXPIRY: DocumentType[] = [
 ];
 
 export const REQUIRED_DOCUMENTS: DocumentType[] = [
-  'id_document',
+  'sa_id',
   'employment_contract'
 ];
 
@@ -167,7 +171,7 @@ export const VERIFICATION_STATUS_COLORS: Record<VerificationStatus, string> = {
 
 // Document categories for grouping in UI
 export const DOCUMENT_CATEGORIES = {
-  identity: ['id_document', 'drivers_license', 'police_clearance'] as DocumentType[],
+  identity: ['sa_id', 'passport', 'drivers_license', 'police_clearance'] as DocumentType[],
   employment: ['employment_contract', 'bank_details', 'tax_document'] as DocumentType[],
   qualifications: ['certification', 'qualification', 'medical_certificate'] as DocumentType[],
   other: ['other'] as DocumentType[]
@@ -189,7 +193,8 @@ export const DOCUMENT_CATEGORY_LABELS: Record<string, string> = {
  * These will go through the OCR processing flow
  */
 export const OCR_ENABLED_DOCUMENTS: DocumentType[] = [
-  'id_document',
+  'sa_id',
+  'passport',
   'drivers_license',
   'employment_contract',
   'bank_details',
@@ -242,7 +247,8 @@ export function getMultiFileParts(documentType: DocumentType): string[] {
  * Document type descriptions for the selection UI
  */
 export const DOCUMENT_TYPE_DESCRIPTIONS: Record<DocumentType, string> = {
-  id_document: 'South African ID, Smart ID Card, or Passport',
+  sa_id: 'South African ID or Smart ID Card',
+  passport: 'For travel or foreign nationals',
   drivers_license: 'Driver\'s license front page',
   employment_contract: 'Employment agreement or service contract',
   certification: 'Industry certifications (e.g., fibre splicing)',
@@ -258,7 +264,8 @@ export const DOCUMENT_TYPE_DESCRIPTIONS: Record<DocumentType, string> = {
  * Fields to extract per document type (for OCR-enabled documents)
  */
 export const DOCUMENT_EXTRACTION_FIELDS: Partial<Record<DocumentType, string[]>> = {
-  id_document: ['idNumber', 'fullName', 'dateOfBirth', 'gender', 'nationality', 'issueDate', 'expiryDate'],
+  sa_id: ['idNumber', 'fullName', 'dateOfBirth', 'gender', 'nationality', 'issueDate'],
+  passport: ['passportNumber', 'fullName', 'dateOfBirth', 'nationality', 'issueDate', 'expiryDate', 'issuingCountry'],
   drivers_license: ['licenseNumber', 'idNumber', 'fullName', 'dateOfBirth', 'licenseCodes', 'restrictions', 'validFrom', 'validTo'],
   employment_contract: ['startDate', 'endDate', 'contractType', 'position'],
   bank_details: ['bankName', 'accountNumber', 'branchCode', 'accountType'],
@@ -357,7 +364,7 @@ export interface VFStorageFile {
  * Required documents for employees (SA Labour Law)
  */
 export const REQUIRED_DOCUMENTS_EMPLOYEE: DocumentType[] = [
-  'id_document',
+  'sa_id',
   'employment_contract',
   'tax_document',
 ];
@@ -366,7 +373,7 @@ export const REQUIRED_DOCUMENTS_EMPLOYEE: DocumentType[] = [
  * Required documents for contractors
  */
 export const REQUIRED_DOCUMENTS_CONTRACTOR: DocumentType[] = [
-  'id_document',
+  'sa_id',
   'employment_contract', // Service agreement
   'tax_document',        // Tax clearance
 ];

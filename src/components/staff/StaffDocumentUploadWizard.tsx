@@ -414,12 +414,18 @@ export function StaffDocumentUploadWizard({
 
       // Extract common fields (handle both OCR field objects and raw values)
       const idNumber = extractValue(finalFields.idNumber) || extractValue(finalFields.documentNumber);
+      const passportNumber = extractValue(finalFields.passportNumber);
       const issuedDate = extractValue(finalFields.issuedDate) || extractValue(finalFields.issueDate);
       const expiryDate = extractValue(finalFields.expiryDate) || extractValue(finalFields.expirationDate);
       const issuingAuthority = extractValue(finalFields.issuingAuthority);
+      const issuingCountry = extractValue(finalFields.issuingCountry);
 
-      if (idNumber) {
-        formData.append('documentNumber', idNumber);
+      // Handle document number based on document type
+      const isPassport = state.selectedDocumentType === 'passport';
+      const documentNumber = isPassport ? passportNumber : idNumber;
+
+      if (documentNumber) {
+        formData.append('documentNumber', documentNumber);
       }
       if (issuedDate) {
         formData.append('issuedDate', issuedDate);
@@ -427,8 +433,10 @@ export function StaffDocumentUploadWizard({
       if (expiryDate) {
         formData.append('expiryDate', expiryDate);
       }
-      if (issuingAuthority) {
-        formData.append('issuingAuthority', issuingAuthority);
+      // For passport, use issuingCountry as issuingAuthority
+      const authority = isPassport ? issuingCountry : issuingAuthority;
+      if (authority) {
+        formData.append('issuingAuthority', authority);
       }
 
       // Add driver's license specific fields
@@ -527,30 +535,35 @@ export function StaffDocumentUploadWizard({
               <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Select Document File
               </label>
-              <label
+              <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragEnter={handleDragEnter}
-                className="relative flex items-center justify-center gap-3 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] hover:border-blue-400 hover:bg-blue-500/10"
+                className="relative"
               >
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                   onChange={handleFileChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  className="sr-only"
                   id="wizard-file-upload"
                   aria-label="Upload document file"
                 />
-                <Upload className="h-8 w-8 text-[var(--ff-text-secondary)]" />
-                <div className="text-center">
-                  <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
-                    PDF, JPG, PNG, Word (Max 10MB)
-                  </p>
-                </div>
-              </label>
+                <label
+                  htmlFor="wizard-file-upload"
+                  className="flex items-center justify-center gap-3 px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] hover:border-blue-400 hover:bg-blue-500/10"
+                >
+                  <Upload className="h-8 w-8 text-[var(--ff-text-secondary)]" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                      Click to upload or drag and drop
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+                      PDF, JPG, PNG, Word (Max 10MB)
+                    </p>
+                  </div>
+                </label>
+              </div>
             </div>
 
             {filePreview && (
@@ -698,6 +711,15 @@ export function StaffDocumentUploadWizard({
 
   const renderManualEntry = () => {
     const isDriversLicense = state.selectedDocumentType === 'drivers_license';
+    const isSaId = state.selectedDocumentType === 'sa_id';
+    const isPassport = state.selectedDocumentType === 'passport';
+
+    const getEntryTitle = () => {
+      if (isDriversLicense) return "Enter Driver's License Details";
+      if (isSaId) return 'Enter SA ID Details';
+      if (isPassport) return 'Enter Passport Details';
+      return 'Manual Entry Required';
+    };
 
     return (
       <div className="space-y-4">
@@ -705,7 +727,7 @@ export function StaffDocumentUploadWizard({
           <AlertCircle className="h-5 w-5 text-amber-400 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-medium text-amber-400">
-              {isDriversLicense ? 'Enter Driver\'s License Details' : 'Manual Entry Required'}
+              {getEntryTitle()}
             </p>
             <p className="text-xs text-amber-400/80 mt-1">
               {state.ocrResult
@@ -771,18 +793,94 @@ export function StaffDocumentUploadWizard({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-            ID Number *
-          </label>
-          <input
-            type="text"
-            value={String(state.fieldOverrides.idNumber ?? '')}
-            onChange={(e) => handleManualFieldChange('idNumber', e.target.value)}
-            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., 7802030000000"
-          />
-        </div>
+        {/* SA ID specific fields */}
+        {isSaId && (
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+              SA ID Number *
+            </label>
+            <input
+              type="text"
+              maxLength={13}
+              value={String(state.fieldOverrides.idNumber ?? '')}
+              onChange={(e) => handleManualFieldChange('idNumber', e.target.value.replace(/\D/g, ''))}
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="13-digit SA ID number"
+            />
+          </div>
+        )}
+
+        {/* Passport specific fields */}
+        {isPassport && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                Passport Number *
+              </label>
+              <input
+                type="text"
+                value={String(state.fieldOverrides.passportNumber ?? '')}
+                onChange={(e) => handleManualFieldChange('passportNumber', e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., A12345678"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                Issuing Country *
+              </label>
+              <input
+                type="text"
+                value={String(state.fieldOverrides.issuingCountry ?? '')}
+                onChange={(e) => handleManualFieldChange('issuingCountry', e.target.value)}
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., South Africa, Zimbabwe"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Issue Date
+                </label>
+                <input
+                  type="date"
+                  value={String(state.fieldOverrides.issuedDate ?? '')}
+                  onChange={(e) => handleManualFieldChange('issuedDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Expiry Date *
+                </label>
+                <input
+                  type="date"
+                  value={String(state.fieldOverrides.expiryDate ?? '')}
+                  onChange={(e) => handleManualFieldChange('expiryDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Generic ID Number for other document types */}
+        {!isSaId && !isPassport && !isDriversLicense && (
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+              ID/Reference Number
+            </label>
+            <input
+              type="text"
+              value={String(state.fieldOverrides.idNumber ?? '')}
+              onChange={(e) => handleManualFieldChange('idNumber', e.target.value)}
+              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Document reference number (optional)"
+            />
+          </div>
+        )}
 
         {/* Driver's License specific fields */}
         {isDriversLicense && (
@@ -843,8 +941,8 @@ export function StaffDocumentUploadWizard({
           </>
         )}
 
-        {/* Standard date fields for non-license documents */}
-        {!isDriversLicense && (
+        {/* Standard date fields for documents that don't have their own date fields */}
+        {!isDriversLicense && !isPassport && (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">

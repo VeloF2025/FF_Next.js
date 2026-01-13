@@ -148,6 +148,53 @@ export function StaffDetail() {
     refetch();
   };
 
+  // Profile Photo handlers
+  const handleProfilePhotoUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`/api/staff/${id}/profile-photo`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to upload profile photo');
+    }
+
+    refetch();
+  };
+
+  const handleProfilePhotoDelete = async () => {
+    if (!confirm('Are you sure you want to remove the profile photo?')) return;
+
+    const response = await fetch(`/api/staff/${id}/profile-photo`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete profile photo');
+    }
+
+    refetch();
+  };
+
+  const handleComparePhotos = async () => {
+    // TODO: Implement face comparison with Qwen3 VLM when ready
+    const response = await fetch(`/api/staff/${id}/compare-photos`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      alert(data.error || 'Failed to compare photos');
+      return;
+    }
+
+    refetch();
+  };
+
   // Disciplinary handlers
   const handleAddIncident = () => {
     fetchStaffList();
@@ -322,6 +369,9 @@ export function StaffDetail() {
               staff={staff}
               onCvUpload={handleCvUpload}
               onCvDelete={handleCvDelete}
+              onProfilePhotoUpload={handleProfilePhotoUpload}
+              onProfilePhotoDelete={handleProfilePhotoDelete}
+              onComparePhotos={handleComparePhotos}
             />
           )}
 

@@ -26,7 +26,11 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
               s.sa_id_number as "saIdNumber",
               s.passport_number as "passportNumber",
               s.passport_country as "passportCountry",
-              s.passport_expiry as "passportExpiry"
+              s.passport_expiry as "passportExpiry",
+              s.id_photo_url as "idPhotoUrl",
+              s.profile_photo_url as "profilePhotoUrl",
+              s.photo_match_score as "photoMatchScore",
+              s.photo_verified_at as "photoVerifiedAt"
             FROM staff s
             WHERE s.id = ${id as string}
           `;
@@ -282,6 +286,12 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
         const exitType = updates.exitType || updates.exit_type || null;
         const exitReason = updates.exitReason || updates.exit_reason || null;
         const endDate = updates.endDate || updates.end_date || null;
+
+        // Identity document fields - allow explicit null/empty to clear
+        const saIdNumber = updates.saIdNumber !== undefined ? (updates.saIdNumber || null) : undefined;
+        const passportNumber = updates.passportNumber !== undefined ? (updates.passportNumber || null) : undefined;
+        const passportCountry = updates.passportCountry !== undefined ? (updates.passportCountry || null) : undefined;
+        const passportExpiry = updates.passportExpiry !== undefined ? (updates.passportExpiry || null) : undefined;
         const isRehireable = updates.isRehireable ?? updates.is_rehireable ?? null;
         const exitProcessedBy = updates.exitProcessedBy || updates.exit_processed_by || null;
 
@@ -305,6 +315,10 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
                 is_rehireable = COALESCE(${isRehireable}, is_rehireable),
                 exit_processed_by = COALESCE(${exitProcessedBy}, exit_processed_by),
                 exit_processed_date = NOW(),
+                sa_id_number = CASE WHEN ${saIdNumber !== undefined} THEN ${saIdNumber} ELSE sa_id_number END,
+                passport_number = CASE WHEN ${passportNumber !== undefined} THEN ${passportNumber} ELSE passport_number END,
+                passport_country = CASE WHEN ${passportCountry !== undefined} THEN ${passportCountry} ELSE passport_country END,
+                passport_expiry = CASE WHEN ${passportExpiry !== undefined} THEN ${passportExpiry}::timestamp ELSE passport_expiry END,
                 updated_at = NOW()
             WHERE id = ${req.query.id as string}
             RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
@@ -328,6 +342,10 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
                 exit_reason = COALESCE(${exitReason}, exit_reason),
                 is_rehireable = COALESCE(${isRehireable}, is_rehireable),
                 exit_processed_by = COALESCE(${exitProcessedBy}, exit_processed_by),
+                sa_id_number = CASE WHEN ${saIdNumber !== undefined} THEN ${saIdNumber} ELSE sa_id_number END,
+                passport_number = CASE WHEN ${passportNumber !== undefined} THEN ${passportNumber} ELSE passport_number END,
+                passport_country = CASE WHEN ${passportCountry !== undefined} THEN ${passportCountry} ELSE passport_country END,
+                passport_expiry = CASE WHEN ${passportExpiry !== undefined} THEN ${passportExpiry}::timestamp ELSE passport_expiry END,
                 updated_at = NOW()
             WHERE id = ${req.query.id as string}
             RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,

@@ -145,9 +145,15 @@ export interface StaffMember {
   createdBy: string;
   lastModifiedBy: string;
   
-  // Profile
+  // Profile & Photo Verification
   profilePhotoUrl?: string;
   bio?: string;
+  /** Photo extracted from ID document (SA ID or Passport) via OCR */
+  idPhotoUrl?: string;
+  /** AI face comparison score (0-100%) between ID photo and profile photo */
+  photoMatchScore?: number;
+  /** Timestamp of last photo comparison */
+  photoVerifiedAt?: Timestamp;
 
   // CV/Resume
   cvUrl?: string;

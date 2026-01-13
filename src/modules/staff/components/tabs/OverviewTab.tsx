@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, Phone, MapPin, Calendar, FileText, Upload, Download, Trash2 } from 'lucide-react';
+import { Mail, Phone, MapPin, Calendar, FileText, Upload, Download, Trash2, Camera, User, RefreshCw, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import type { StaffMember } from '@/types/staff';
@@ -10,11 +10,17 @@ interface OverviewTabProps {
   staff: StaffMember;
   onCvUpload?: (file: File) => Promise<void>;
   onCvDelete?: () => Promise<void>;
+  onProfilePhotoUpload?: (file: File) => Promise<void>;
+  onProfilePhotoDelete?: () => Promise<void>;
+  onComparePhotos?: () => Promise<void>;
 }
 
-export function OverviewTab({ staff, onCvUpload, onCvDelete }: OverviewTabProps) {
+export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUpload, onProfilePhotoDelete, onComparePhotos }: OverviewTabProps) {
   const [uploading, setUploading] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -29,6 +35,45 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete }: OverviewTabProps)
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onProfilePhotoUpload) return;
+
+    setPhotoUploading(true);
+    try {
+      await onProfilePhotoUpload(file);
+    } finally {
+      setPhotoUploading(false);
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleComparePhotos = async () => {
+    if (!onComparePhotos) return;
+    setComparing(true);
+    try {
+      await onComparePhotos();
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  const getMatchScoreColor = (score: number | undefined) => {
+    if (!score) return 'text-gray-400';
+    if (score >= 80) return 'text-green-400';
+    if (score >= 50) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  const getMatchScoreIcon = (score: number | undefined) => {
+    if (!score) return null;
+    if (score >= 80) return <CheckCircle className="w-5 h-5 text-green-400" />;
+    if (score >= 50) return <AlertCircle className="w-5 h-5 text-yellow-400" />;
+    return <XCircle className="w-5 h-5 text-red-400" />;
   };
 
   const getStatusColor = (status: string) => {
@@ -57,6 +102,137 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete }: OverviewTabProps)
         <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(staff.status)}`}>
           {staff.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
         </span>
+      </div>
+
+      {/* Photo Verification Section */}
+      <div>
+        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Photo Verification</h2>
+        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* ID Photo (from document) */}
+            <div className="text-center">
+              <p className="text-sm text-[var(--ff-text-secondary)] mb-2">ID Photo</p>
+              <div className="w-32 h-40 mx-auto bg-[var(--ff-bg-secondary)] rounded-lg overflow-hidden border border-[var(--ff-border-primary)] flex items-center justify-center">
+                {staff.idPhotoUrl ? (
+                  <img
+                    src={staff.idPhotoUrl}
+                    alt="ID Photo"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center p-4">
+                    <User className="w-12 h-12 text-[var(--ff-text-muted)] mx-auto mb-2" />
+                    <p className="text-xs text-[var(--ff-text-muted)]">No ID photo</p>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-[var(--ff-text-muted)] mt-2">
+                {staff.idPhotoUrl ? 'Extracted from ID' : 'Upload SA ID or Passport'}
+              </p>
+            </div>
+
+            {/* Profile Photo (manually uploaded) */}
+            <div className="text-center">
+              <p className="text-sm text-[var(--ff-text-secondary)] mb-2">Profile Photo</p>
+              <div className="w-32 h-40 mx-auto bg-[var(--ff-bg-secondary)] rounded-lg overflow-hidden border border-[var(--ff-border-primary)] flex items-center justify-center relative group">
+                {staff.profilePhotoUrl ? (
+                  <>
+                    <img
+                      src={staff.profilePhotoUrl}
+                      alt="Profile Photo"
+                      className="w-full h-full object-cover"
+                    />
+                    {onProfilePhotoDelete && (
+                      <button
+                        onClick={onProfilePhotoDelete}
+                        className="absolute top-1 right-1 p-1 bg-red-500/80 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove photo"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center p-4">
+                    <Camera className="w-12 h-12 text-[var(--ff-text-muted)] mx-auto mb-2" />
+                    <p className="text-xs text-[var(--ff-text-muted)]">No photo</p>
+                  </div>
+                )}
+              </div>
+              {onProfilePhotoUpload && (
+                <div className="mt-2">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoChange}
+                    className="sr-only"
+                    id="profile-photo-upload"
+                  />
+                  <label
+                    htmlFor="profile-photo-upload"
+                    className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-400 hover:text-blue-300 cursor-pointer ${photoUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    <Upload className="w-3 h-3" />
+                    {photoUploading ? 'Uploading...' : staff.profilePhotoUrl ? 'Change Photo' : 'Upload Photo'}
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Match Score and Compare Button */}
+          {(staff.idPhotoUrl && staff.profilePhotoUrl) && (
+            <div className="mt-4 pt-4 border-t border-[var(--ff-border-primary)]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {getMatchScoreIcon(staff.photoMatchScore)}
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Match Score:</span>
+                  <span className={`text-lg font-bold ${getMatchScoreColor(staff.photoMatchScore)}`}>
+                    {staff.photoMatchScore ? `${staff.photoMatchScore}%` : 'Not compared'}
+                  </span>
+                  {staff.photoVerifiedAt && (
+                    <span className="text-xs text-[var(--ff-text-muted)]">
+                      (Last checked: {formatDate(staff.photoVerifiedAt)})
+                    </span>
+                  )}
+                </div>
+                {onComparePhotos && (
+                  <button
+                    onClick={handleComparePhotos}
+                    disabled={comparing}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${comparing ? 'animate-spin' : ''}`} />
+                    {comparing ? 'Comparing...' : 'Compare Photos'}
+                  </button>
+                )}
+              </div>
+              {staff.photoMatchScore !== undefined && staff.photoMatchScore < 50 && (
+                <p className="mt-2 text-xs text-red-400">
+                  Warning: Low match score. Please verify this staff member&apos;s identity manually.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Help text when one photo is missing */}
+          {(!staff.idPhotoUrl || !staff.profilePhotoUrl) && (
+            <div className="mt-4 pt-4 border-t border-[var(--ff-border-primary)]">
+              <p className="text-sm text-[var(--ff-text-muted)]">
+                {!staff.idPhotoUrl && !staff.profilePhotoUrl && (
+                  'Upload an SA ID or Passport in Documents tab to extract ID photo, then upload a profile photo to compare.'
+                )}
+                {staff.idPhotoUrl && !staff.profilePhotoUrl && (
+                  'Upload a profile photo to compare against the ID photo.'
+                )}
+                {!staff.idPhotoUrl && staff.profilePhotoUrl && (
+                  'Upload an SA ID or Passport in Documents tab to extract ID photo for comparison.'
+                )}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* CV Section */}

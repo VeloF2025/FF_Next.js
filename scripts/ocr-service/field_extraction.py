@@ -692,23 +692,34 @@ def _extract_id_document_special_fields(text: str, fields: Dict[str, ExtractedFi
             full_year = 2000 + year if year <= 29 else 1900 + year
             dob = f"{full_year}-{mm}-{dd}"
 
-            if "dateOfBirth" not in fields:
-                fields["dateOfBirth"] = ExtractedField(
-                    field_name="dateOfBirth",
-                    value=dob,
-                    confidence=0.95,
-                    source="derived_from_id",
-                    validated=True,
-                )
+            # ALWAYS overwrite dateOfBirth from SA ID - more reliable than OCR
+            fields["dateOfBirth"] = ExtractedField(
+                field_name="dateOfBirth",
+                value=dob,
+                confidence=0.95,
+                source="derived_from_id",
+                validated=True,
+            )
 
-            # Gender (digits 7-10)
+            # Gender (digits 7-10) - ALWAYS overwrite from SA ID
             gender_digits = int(id_number[6:10])
             gender = "male" if gender_digits >= 5000 else "female"
 
-            if "gender" not in fields:
-                fields["gender"] = ExtractedField(
-                    field_name="gender",
-                    value=gender,
+            fields["gender"] = ExtractedField(
+                field_name="gender",
+                value=gender,
+                confidence=0.95,
+                source="derived_from_id",
+                validated=True,
+            )
+
+            # Citizenship indicator (digit 11): 0 = SA citizen, 1 = permanent resident
+            citizen_digit = int(id_number[10])
+            if citizen_digit == 0:
+                # SA citizen - nationality is always RSA
+                fields["nationality"] = ExtractedField(
+                    field_name="nationality",
+                    value="RSA",
                     confidence=0.95,
                     source="derived_from_id",
                     validated=True,

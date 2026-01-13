@@ -154,6 +154,11 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     passportNumber: dbStaff.passportNumber,
     passportCountry: dbStaff.passportCountry,
     passportExpiry: dbStaff.passportExpiry,
+    // Photo verification fields
+    profilePhotoUrl: dbStaff.profilePhotoUrl,
+    idPhotoUrl: dbStaff.idPhotoUrl,
+    photoMatchScore: dbStaff.photoMatchScore,
+    photoVerifiedAt: dbStaff.photoVerifiedAt ? toTimestamp(dbStaff.photoVerifiedAt) : undefined,
   };
 }
 

@@ -23,6 +23,8 @@ const logger = createLogger('StaffDocumentsUploadAPI');
 
 // Valid document types
 const VALID_DOCUMENT_TYPES: DocumentType[] = [
+  'sa_id',
+  'passport',
   'id_document',
   'drivers_license',
   'employment_contract',
@@ -270,6 +272,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       documentNumber,
       expiryDate,
       issuingAuthority,
+      fileUrl: fileUrl || fileUrlFront,
     });
 
     // PRD-033: If OCR was confirmed by user, skip webhook (already processed)
@@ -430,41 +433,42 @@ async function syncDocumentToStaff(
     documentNumber?: string;
     expiryDate?: string;
     issuingAuthority?: string;
+    fileUrl?: string;
   }
 ): Promise<void> {
   try {
     // Only sync if we have data to sync
-    if (!data.documentNumber && !data.expiryDate && !data.issuingAuthority) {
+    if (!data.documentNumber && !data.expiryDate && !data.issuingAuthority && !data.fileUrl) {
       return;
     }
 
     switch (documentType) {
-      case 'id_document':
-        // Detect if this is a SA ID (13 digits) or Passport (alphanumeric, has country)
-        const isSaId = data.documentNumber && /^\d{13}$/.test(data.documentNumber);
-        const isPassport = data.documentNumber && !isSaId && (data.issuingAuthority || data.expiryDate);
+      case 'sa_id':
+        // Sync SA ID number and ID photo to staff table
+        await sql`
+          UPDATE staff
+          SET
+            sa_id_number = COALESCE(${data.documentNumber || null}, sa_id_number),
+            id_photo_url = COALESCE(${data.fileUrl || null}, id_photo_url),
+            updated_at = NOW()
+          WHERE id = ${staffId}
+        `;
+        logger.info('Synced SA ID to staff', { staffId, saIdNumber: data.documentNumber, idPhotoUrl: data.fileUrl });
+        break;
 
-        if (isSaId) {
-          // Sync SA ID number to staff table
-          await sql`
-            UPDATE staff
-            SET sa_id_number = ${data.documentNumber}, updated_at = NOW()
-            WHERE id = ${staffId}
-          `;
-          logger.info('Synced SA ID number to staff', { staffId, saIdNumber: data.documentNumber });
-        } else if (isPassport || data.issuingAuthority) {
-          // Sync passport details to staff table
-          await sql`
-            UPDATE staff
-            SET
-              passport_number = COALESCE(${data.documentNumber || null}, passport_number),
-              passport_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, passport_expiry),
-              passport_country = COALESCE(${data.issuingAuthority || null}, passport_country),
-              updated_at = NOW()
-            WHERE id = ${staffId}
-          `;
-          logger.info('Synced passport details to staff', { staffId, documentNumber: data.documentNumber, country: data.issuingAuthority });
-        }
+      case 'passport':
+        // Sync passport details and ID photo to staff table
+        await sql`
+          UPDATE staff
+          SET
+            passport_number = COALESCE(${data.documentNumber || null}, passport_number),
+            passport_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, passport_expiry),
+            passport_country = COALESCE(${data.issuingAuthority || null}, passport_country),
+            id_photo_url = COALESCE(${data.fileUrl || null}, id_photo_url),
+            updated_at = NOW()
+          WHERE id = ${staffId}
+        `;
+        logger.info('Synced passport to staff', { staffId, documentNumber: data.documentNumber, idPhotoUrl: data.fileUrl });
         break;
 
       // Driver's license data stays in staff_documents (displayed via Vehicles tab)

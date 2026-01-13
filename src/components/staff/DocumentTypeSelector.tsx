@@ -32,6 +32,7 @@ import {
   Sparkles,
   Upload,
   Check,
+  BookOpen,
 } from 'lucide-react';
 
 interface DocumentTypeSelectorProps {
@@ -42,6 +43,7 @@ interface DocumentTypeSelectorProps {
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   IdCard: CreditCard,
+  BookOpen,
   Car,
   FileText,
   Award,
