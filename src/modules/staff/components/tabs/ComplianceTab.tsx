@@ -1,6 +1,18 @@
 'use client';
 
-import { Building2, Shield, Receipt, FileCheck, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Building2,
+  Shield,
+  Receipt,
+  FileCheck,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Upload,
+  FileWarning,
+} from 'lucide-react';
 import type { StaffMember } from '@/types/staff';
 import {
   SA_CONTRACT_CONFIG,
@@ -14,16 +26,64 @@ import {
   SAContractType,
 } from '@/types/staff/compliance.types';
 
+interface DocumentStatus {
+  type: string;
+  label: string;
+  required: boolean;
+  uploaded: boolean;
+  verified: boolean;
+  pending: boolean;
+  rejected: boolean;
+  expired: boolean;
+  documentId?: string;
+  documentNumber?: string;
+  expiryDate?: string;
+  verifiedAt?: string;
+}
+
+interface ComplianceStatus {
+  isCompliant: boolean;
+  requiredComplete: number;
+  requiredTotal: number;
+  optionalComplete: number;
+  optionalTotal: number;
+  documents: DocumentStatus[];
+}
+
 interface ComplianceTabProps {
   staff: StaffMember;
   onUploadDocument?: (documentType: string) => void;
 }
 
 export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
+  const [complianceStatus, setComplianceStatus] = useState<ComplianceStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Get contract config for dynamic field visibility
   const contractType = staff.saContractType as SAContractType | undefined;
   const contractConfig = contractType ? SA_CONTRACT_CONFIG[contractType] : null;
   const isEmployee = contractConfig?.isEmployee ?? true;
+
+  // Fetch compliance status
+  useEffect(() => {
+    const fetchComplianceStatus = async () => {
+      try {
+        const response = await fetch(`/api/staff/${staff.id}/compliance`);
+        if (response.ok) {
+          const data = await response.json();
+          setComplianceStatus(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch compliance status:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (staff.id) {
+      fetchComplianceStatus();
+    }
+  }, [staff.id]);
 
   const getStatusColor = (status: string, type: 'uif' | 'coida' | 'tax') => {
     if (type === 'uif') {
@@ -233,17 +293,76 @@ export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
         )}
       </div>
 
-      {/* Compliance Checklist */}
+      {/* Document Compliance Status */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Document Compliance</h2>
+          {complianceStatus && (
+            <div className="flex items-center gap-2">
+              {complianceStatus.isCompliant ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 text-sm rounded-full bg-green-500/20 text-green-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Fully Compliant
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-3 py-1 text-sm rounded-full bg-yellow-500/20 text-yellow-400">
+                  <AlertTriangle className="w-4 h-4" />
+                  {complianceStatus.requiredComplete}/{complianceStatus.requiredTotal} Required
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+          </div>
+        ) : complianceStatus ? (
+          <div className="space-y-3">
+            {/* Required Documents */}
+            <div className="mb-4">
+              <p className="text-sm text-[var(--ff-text-secondary)] mb-2 font-medium">Required Documents</p>
+              <div className="space-y-2">
+                {complianceStatus.documents.filter(d => d.required).map((doc) => (
+                  <DocumentStatusRow
+                    key={doc.type}
+                    doc={doc}
+                    onUpload={onUploadDocument ? () => onUploadDocument(doc.type) : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Optional Documents */}
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)] mb-2 font-medium">Optional Documents</p>
+              <div className="space-y-2">
+                {complianceStatus.documents.filter(d => !d.required).map((doc) => (
+                  <DocumentStatusRow
+                    key={doc.type}
+                    doc={doc}
+                    onUpload={onUploadDocument ? () => onUploadDocument(doc.type) : undefined}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-[var(--ff-text-secondary)]">Unable to load compliance status</p>
+        )}
+      </div>
+
+      {/* Statutory Compliance Checklist - Only for Employees */}
       {isEmployee && (
         <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Compliance Checklist</h2>
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Statutory Compliance</h2>
           <div className="space-y-2">
             {[
               { label: 'UIF Registered', done: staff.saCompliance?.uifStatus === UIFStatus.REGISTERED },
               { label: 'COIDA Coverage', done: staff.saCompliance?.coidaStatus === COIDAStatus.COVERED },
               { label: 'Tax Number Provided', done: !!staff.taxNumber },
               { label: 'Bank Details Provided', done: !!staff.bankAccountNumber },
-              { label: 'ID Document Verified', done: staff.complianceComplete },
             ].map((item) => (
               <div
                 key={item.label}
@@ -268,6 +387,113 @@ export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Document Status Row Component
+function DocumentStatusRow({
+  doc,
+  onUpload,
+}: {
+  doc: DocumentStatus;
+  onUpload?: () => void;
+}) {
+  const getStatusBadge = () => {
+    if (doc.expired) {
+      return (
+        <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+          <FileWarning className="w-3 h-3" />
+          Expired
+        </span>
+      );
+    }
+    if (doc.verified) {
+      return (
+        <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400">
+          <CheckCircle2 className="w-3 h-3" />
+          Verified
+        </span>
+      );
+    }
+    if (doc.pending) {
+      return (
+        <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
+          <Clock className="w-3 h-3" />
+          Pending Review
+        </span>
+      );
+    }
+    if (doc.rejected) {
+      return (
+        <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+          <XCircle className="w-3 h-3" />
+          Rejected
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-gray-500/20 text-gray-400">
+        Not Uploaded
+      </span>
+    );
+  };
+
+  const getBgColor = () => {
+    if (doc.verified) return 'bg-green-500/5 border-green-500/20';
+    if (doc.pending) return 'bg-yellow-500/5 border-yellow-500/20';
+    if (doc.rejected || doc.expired) return 'bg-red-500/5 border-red-500/20';
+    return 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]';
+  };
+
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-lg border ${getBgColor()}`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+          doc.verified ? 'bg-green-500/20' :
+          doc.pending ? 'bg-yellow-500/20' :
+          doc.rejected || doc.expired ? 'bg-red-500/20' :
+          'bg-gray-500/20'
+        }`}>
+          {doc.verified ? (
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+          ) : doc.pending ? (
+            <Clock className="w-4 h-4 text-yellow-400" />
+          ) : doc.rejected || doc.expired ? (
+            <XCircle className="w-4 h-4 text-red-400" />
+          ) : (
+            <FileCheck className="w-4 h-4 text-gray-400" />
+          )}
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-[var(--ff-text-primary)]">{doc.label}</p>
+            {doc.required && (
+              <span className="text-xs text-red-400">*</span>
+            )}
+          </div>
+          {doc.documentNumber && (
+            <p className="text-xs text-[var(--ff-text-secondary)] font-mono">#{doc.documentNumber}</p>
+          )}
+          {doc.expiryDate && (
+            <p className="text-xs text-[var(--ff-text-secondary)]">
+              Expires: {new Date(doc.expiryDate).toLocaleDateString('en-ZA')}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {getStatusBadge()}
+        {onUpload && !doc.verified && (
+          <button
+            onClick={onUpload}
+            className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg"
+            title="Upload document"
+          >
+            <Upload className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
