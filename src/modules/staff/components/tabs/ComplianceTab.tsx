@@ -8,12 +8,20 @@ import {
   FileCheck,
   AlertTriangle,
   CheckCircle2,
+  CheckCircle,
   Clock,
   XCircle,
   Upload,
   FileWarning,
+  CreditCard,
+  MapPin,
+  Briefcase,
+  User,
+  BadgeCheck,
 } from 'lucide-react';
 import type { StaffMember } from '@/types/staff';
+import { format } from 'date-fns';
+import { safeToDate } from '@/utils/dateHelpers';
 import {
   SA_CONTRACT_CONFIG,
   SA_CONTRACT_TYPE_LABELS,
@@ -58,6 +66,15 @@ interface ComplianceTabProps {
 export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
   const [complianceStatus, setComplianceStatus] = useState<ComplianceStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const formatDate = (date: unknown): string => {
+    if (!date) return 'N/A';
+    try {
+      return format(safeToDate(date), 'dd MMM yyyy');
+    } catch {
+      return 'Invalid Date';
+    }
+  };
 
   // Get contract config for dynamic field visibility
   const contractType = staff.saContractType as SAContractType | undefined;
@@ -243,45 +260,96 @@ export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
 
       {/* Bank Details */}
       <div>
-        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Bank Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Bank Details</h2>
+          {staff.bankDetailsVerifiedAt && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+              <BadgeCheck className="w-3 h-3" />
+              Verified
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Bank Name */}
           <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-3">
               <Building2 className="w-5 h-5 text-[var(--ff-text-muted)]" />
-              <p className="text-sm text-[var(--ff-text-secondary)]">Bank Name</p>
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Bank</p>
+                <p className={`font-medium ${staff.bankName ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-muted)]'}`}>
+                  {staff.bankName || 'Not provided'}
+                </p>
+              </div>
             </div>
-            <p className="font-medium text-[var(--ff-text-primary)]">
-              {staff.bankName || 'Not provided'}
-            </p>
           </div>
 
+          {/* Account Number */}
           <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-            <p className="text-sm text-[var(--ff-text-secondary)]">Account Number</p>
-            <p className="font-medium text-[var(--ff-text-primary)] font-mono">
-              {staff.bankAccountNumber
-                ? `****${staff.bankAccountNumber.slice(-4)}`
-                : 'Not provided'}
-            </p>
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Account Number</p>
+                <p className={`font-medium font-mono ${staff.bankAccountNumber ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-muted)]'}`}>
+                  {staff.bankAccountNumber || 'Not provided'}
+                </p>
+              </div>
+            </div>
           </div>
 
+          {/* Branch Code */}
           <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-            <p className="text-sm text-[var(--ff-text-secondary)]">Branch Code</p>
-            <p className="font-medium text-[var(--ff-text-primary)] font-mono">
-              {staff.bankBranchCode || 'Not provided'}
-            </p>
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Branch Code</p>
+                <p className={`font-medium font-mono ${staff.bankBranchCode ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-muted)]'}`}>
+                  {staff.bankBranchCode || 'Not provided'}
+                </p>
+              </div>
+            </div>
           </div>
 
+          {/* Account Type */}
           <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-            <p className="text-sm text-[var(--ff-text-secondary)]">Account Type</p>
-            <p className="font-medium text-[var(--ff-text-primary)]">
-              {staff.bankAccountType
-                ? staff.bankAccountType.charAt(0).toUpperCase() + staff.bankAccountType.slice(1)
-                : 'Not specified'}
-            </p>
+            <div className="flex items-center gap-3">
+              <Briefcase className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Account Type</p>
+                <p className={`font-medium capitalize ${staff.bankAccountType ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-muted)]'}`}>
+                  {staff.bankAccountType || 'Not provided'}
+                </p>
+              </div>
+            </div>
           </div>
+
+          {/* Account Holder */}
+          {staff.bankAccountHolder && (
+            <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <User className="w-5 h-5 text-[var(--ff-text-muted)]" />
+                <div>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Account Holder</p>
+                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.bankAccountHolder}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Verification Date */}
+          {staff.bankDetailsVerifiedAt && (
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <div>
+                  <p className="text-sm text-green-400">Verified From Document</p>
+                  <p className="font-medium text-green-300">{formatDate(staff.bankDetailsVerifiedAt)}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {onUploadDocument && (
+        {onUploadDocument && !staff.bankDetailsVerifiedAt && (
           <div className="mt-4 flex justify-end">
             <button
               onClick={() => onUploadDocument('bank_details')}

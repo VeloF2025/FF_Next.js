@@ -19,6 +19,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
 import { log } from '@/lib/logger';
 import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '@/services/vfStorageAdapter';
 
@@ -100,6 +103,16 @@ Return ONLY valid JSON, no other text.`,
 - statementDate: Statement date (YYYY-MM-DD) if visible
 Return ONLY valid JSON, no other text.`,
 
+  // Alias for bank_details document type (used in UI)
+  bank_details: `Extract key fields from this bank statement or bank confirmation letter. Return JSON with:
+- bankName: Name of the bank
+- accountHolder: Account holder name
+- accountNumber: Bank account number
+- branchCode: Branch code (if visible)
+- accountType: Type of account (savings, cheque, etc.)
+- statementDate: Statement date (YYYY-MM-DD) if visible
+Return ONLY valid JSON, no other text.`,
+
   proof_of_residence: `Extract address information from this proof of residence document. Return JSON with:
 - fullName: Name on the document
 - streetAddress: Street address
@@ -160,6 +173,15 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     accountType: 'accountType',
     statementDate: 'documentDate',
   },
+  // Alias for bank_details document type (used in UI)
+  bank_details: {
+    bankName: 'bankName',
+    accountHolder: 'accountHolder',
+    accountNumber: 'accountNumber',
+    branchCode: 'branchCode',
+    accountType: 'accountType',
+    statementDate: 'documentDate',
+  },
   proof_of_residence: {
     fullName: 'fullName',
     streetAddress: 'streetAddress',
@@ -171,6 +193,54 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     documentType: 'sourceDocumentType',
   },
 };
+
+/**
+ * Convert PDF to PNG image using pdftoppm (from poppler-utils)
+ * Returns the path to the converted image file
+ */
+async function convertPdfToImage(pdfPath: string): Promise<string> {
+  const tempDir = os.tmpdir();
+  const outputBase = path.join(tempDir, `pdf-convert-${Date.now()}`);
+
+  try {
+    // Use pdftoppm to convert first page of PDF to PNG
+    // -png: output PNG format
+    // -f 1 -l 1: only first page
+    // -r 200: 200 DPI for good quality
+    execSync(`pdftoppm -png -f 1 -l 1 -r 200 "${pdfPath}" "${outputBase}"`, {
+      timeout: 30000,
+      stdio: 'pipe',
+    });
+
+    // pdftoppm outputs file as outputBase-1.png for first page
+    const outputPath = `${outputBase}-1.png`;
+
+    if (fs.existsSync(outputPath)) {
+      log.info('PDF converted to image', { pdfPath, outputPath });
+      return outputPath;
+    }
+
+    // Sometimes pdftoppm uses different naming, check for alternatives
+    const altPath = `${outputBase}-01.png`;
+    if (fs.existsSync(altPath)) {
+      return altPath;
+    }
+
+    throw new Error('PDF conversion output file not found');
+  } catch (error: any) {
+    log.error('PDF to image conversion failed', { error: error.message, pdfPath });
+    throw new Error(`Failed to convert PDF to image: ${error.message}`);
+  }
+}
+
+/**
+ * Check if file is a PDF based on extension or mimetype
+ */
+function isPdfFile(file: formidable.File): boolean {
+  const filename = file.originalFilename?.toLowerCase() || '';
+  const mimetype = file.mimetype?.toLowerCase() || '';
+  return filename.endsWith('.pdf') || mimetype === 'application/pdf';
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -210,11 +280,14 @@ export default async function handler(
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const isPdf = isPdfFile(uploadedFile);
+
     log.info('OCR Preview request', {
       documentType,
       staffId,
       entityType,
       filename: uploadedFile.originalFilename,
+      isPdf,
     });
 
     // Check VF Storage availability
@@ -226,15 +299,20 @@ export default async function handler(
 
     const VF_STORAGE_INTERNAL_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
-    // Helper to upload file and get internal URL
-    const uploadAndGetUrl = async (file: formidable.File, suffix: string): Promise<string> => {
-      const fileBuffer = fs.readFileSync(file.filepath);
-      tempFilePaths.push(file.filepath);
+    // Helper to upload file (or converted image) and get internal URL
+    const uploadAndGetUrl = async (filePath: string, originalFilename: string, suffix: string): Promise<string> => {
+      const fileBuffer = fs.readFileSync(filePath);
+      tempFilePaths.push(filePath);
+
+      // Use .png extension for converted PDFs
+      const uploadFilename = filePath.endsWith('.png')
+        ? `ocr-preview-${suffix}-${originalFilename.replace(/\.pdf$/i, '')}.png`
+        : `ocr-preview-${suffix}-${originalFilename}`;
 
       const uploadResult = await uploadStaffDocument(
         staffId,
         fileBuffer,
-        `ocr-preview-${suffix}-${file.originalFilename || 'temp'}`,
+        uploadFilename,
         'temp_ocr'
       );
 
@@ -256,8 +334,20 @@ export default async function handler(
     const timeout = setTimeout(() => controller.abort(), 60000);
 
     try {
-      // Upload file and get URL for VLM
-      const fileUrl = await uploadAndGetUrl(uploadedFile, 'single');
+      // Convert PDF to image if necessary
+      let filePathForOcr = uploadedFile.filepath;
+      if (isPdf) {
+        log.info('Converting PDF to image for OCR', { filename: uploadedFile.originalFilename });
+        filePathForOcr = await convertPdfToImage(uploadedFile.filepath);
+        tempFilePaths.push(uploadedFile.filepath); // Add original PDF for cleanup
+      }
+
+      // Upload file (or converted image) and get URL for VLM
+      const fileUrl = await uploadAndGetUrl(
+        filePathForOcr,
+        uploadedFile.originalFilename || 'document',
+        'single'
+      );
 
       // Check if VLLM is available
       let vllmAvailable = false;

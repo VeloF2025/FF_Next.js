@@ -69,6 +69,9 @@ export interface StaffMember {
   bankName?: string;
   bankBranchCode?: string;
   bankAccountType?: 'current' | 'savings' | 'transmission';
+  bankAccountHolder?: string;
+  /** Timestamp when bank details were verified via document upload */
+  bankDetailsVerifiedAt?: Timestamp;
   salaryAmount?: number;
   benefitsPackage?: string;
   noticePeriodDays?: number;

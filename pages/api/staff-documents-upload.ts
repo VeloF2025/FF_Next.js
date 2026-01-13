@@ -71,6 +71,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const validFrom = Array.isArray(fields.validFrom) ? fields.validFrom[0] : fields.validFrom;
     const validTo = Array.isArray(fields.validTo) ? fields.validTo[0] : fields.validTo;
 
+    // Bank statement specific fields (from OCR extraction)
+    const bankName = Array.isArray(fields.bankName) ? fields.bankName[0] : fields.bankName;
+    const bankAccountNumber = Array.isArray(fields.bankAccountNumber) ? fields.bankAccountNumber[0] : fields.bankAccountNumber;
+    const bankBranchCode = Array.isArray(fields.bankBranchCode) ? fields.bankBranchCode[0] : fields.bankBranchCode;
+    const bankAccountType = Array.isArray(fields.bankAccountType) ? fields.bankAccountType[0] : fields.bankAccountType;
+    const bankAccountHolder = Array.isArray(fields.bankAccountHolder) ? fields.bankAccountHolder[0] : fields.bankAccountHolder;
+
     // Use expiryDate, or validTo for driver's licenses
     const rawExpiryDate = Array.isArray(fields.expiryDate) ? fields.expiryDate[0] : fields.expiryDate;
     const expiryDate = rawExpiryDate || validTo; // validTo is used for driver's licenses
@@ -239,6 +246,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
+    // Build OCR metadata object (synced to staff on verification only)
+    // All compulsory docs with OCR-extracted fields store data here until verified
+    const ocrMetadata: Record<string, string | undefined> = {};
+
+    // Bank details
+    if (documentType === 'bank_details' || documentType === 'bank_statement') {
+      if (bankName) ocrMetadata.bankName = bankName;
+      if (bankAccountNumber) ocrMetadata.bankAccountNumber = bankAccountNumber;
+      if (bankBranchCode) ocrMetadata.bankBranchCode = bankBranchCode;
+      if (bankAccountType) ocrMetadata.bankAccountType = bankAccountType;
+      if (bankAccountHolder) ocrMetadata.bankAccountHolder = bankAccountHolder;
+    }
+
+    // SA ID - store ID number in metadata, sync to staff on verification
+    if (documentType === 'sa_id') {
+      if (effectiveDocumentNumber) ocrMetadata.saIdNumber = effectiveDocumentNumber;
+    }
+
+    // Passport - store passport details in metadata, sync to staff on verification
+    if (documentType === 'passport') {
+      if (effectiveDocumentNumber) ocrMetadata.passportNumber = effectiveDocumentNumber;
+      if (expiryDate) ocrMetadata.passportExpiry = expiryDate;
+      if (issuingAuthority) ocrMetadata.passportCountry = issuingAuthority;
+    }
+
+    // Driver's License - store license details in metadata, sync to staff on verification
+    if (documentType === 'drivers_license') {
+      if (effectiveDocumentNumber) ocrMetadata.driversLicenseNumber = effectiveDocumentNumber;
+      if (expiryDate) ocrMetadata.driversLicenseExpiry = expiryDate;
+      if (licenseCodes) ocrMetadata.driversLicenseCodes = licenseCodes;
+    }
+
     // Save metadata to Neon
     const [document] = await sql`
       INSERT INTO staff_documents (
@@ -258,7 +297,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         document_number,
         verification_status,
         status,
-        uploaded_at
+        uploaded_at,
+        ocr_metadata
       ) VALUES (
         ${staffId},
         ${documentType},
@@ -276,7 +316,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ${effectiveDocumentNumber || null},
         ${verificationStatus},
         ${verificationStatus},
-        NOW()
+        NOW(),
+        ${Object.keys(ocrMetadata).length > 0 ? JSON.stringify(ocrMetadata) : null}
       )
       RETURNING *
     `;
@@ -294,6 +335,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Sync document data to staff table based on document type
     // This ensures OCR/manual data appears in employee details
+    // NOTE: Bank details are NOT synced here - they're synced on document verification
     await syncDocumentToStaff(staffId, documentType, {
       documentNumber: effectiveDocumentNumber,
       expiryDate,
@@ -451,7 +493,9 @@ async function triggerOcrWebhook(payload: OcrWebhookPayload): Promise<void> {
 
 /**
  * Sync document data to staff table based on document type
- * This ensures OCR-extracted or manually entered data appears in employee details
+ * NOTE: Compulsory documents (SA ID, Passport, Driver's License, Bank Details) are NOT synced here.
+ * They are stored in ocr_metadata and synced during document verification.
+ * This function is kept for any future document types that should sync immediately.
  */
 async function syncDocumentToStaff(
   staffId: string,
@@ -461,62 +505,21 @@ async function syncDocumentToStaff(
     expiryDate?: string;
     issuingAuthority?: string;
     fileUrl?: string;
-    licenseCodes?: string; // For driver's licenses
+    licenseCodes?: string;
   }
 ): Promise<void> {
   try {
-    // Only sync if we have data to sync
-    if (!data.documentNumber && !data.expiryDate && !data.issuingAuthority && !data.fileUrl && !data.licenseCodes) {
+    // Compulsory docs with OCR are synced on verification, not upload
+    // This includes: sa_id, passport, drivers_license, bank_details
+    const verificationSyncTypes = ['sa_id', 'passport', 'drivers_license', 'bank_details', 'bank_statement'];
+    if (verificationSyncTypes.includes(documentType)) {
+      logger.info('Document sync deferred to verification', { staffId, documentType });
       return;
     }
 
-    switch (documentType) {
-      case 'sa_id':
-        // Sync SA ID number to staff table (id_photo_url is set by extract-id-photo endpoint)
-        await sql`
-          UPDATE staff
-          SET
-            sa_id_number = COALESCE(${data.documentNumber || null}, sa_id_number),
-            updated_at = NOW()
-          WHERE id = ${staffId}
-        `;
-        logger.info('Synced SA ID to staff', { staffId, saIdNumber: data.documentNumber });
-        break;
-
-      case 'passport':
-        // Sync passport details to staff table (id_photo_url is set by extract-id-photo endpoint)
-        await sql`
-          UPDATE staff
-          SET
-            passport_number = COALESCE(${data.documentNumber || null}, passport_number),
-            passport_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, passport_expiry),
-            passport_country = COALESCE(${data.issuingAuthority || null}, passport_country),
-            updated_at = NOW()
-          WHERE id = ${staffId}
-        `;
-        logger.info('Synced passport to staff', { staffId, documentNumber: data.documentNumber });
-        break;
-
-      case 'drivers_license':
-        // Sync driver's license details to staff table
-        await sql`
-          UPDATE staff
-          SET
-            drivers_license_number = COALESCE(${data.documentNumber || null}, drivers_license_number),
-            drivers_license_expiry = COALESCE(${data.expiryDate ? new Date(data.expiryDate) : null}, drivers_license_expiry),
-            drivers_license_codes = COALESCE(${data.licenseCodes || null}, drivers_license_codes),
-            updated_at = NOW()
-          WHERE id = ${staffId}
-        `;
-        logger.info('Synced drivers license to staff', { staffId, documentNumber: data.documentNumber, licenseCodes: data.licenseCodes });
-        break;
-
-      // Other document types don't need staff table sync
-      default:
-        break;
-    }
+    // Other document types can sync immediately if needed in the future
+    // Currently no other types require staff table sync
   } catch (error) {
-    // Log but don't fail the upload if sync fails
     logger.warn('Failed to sync document data to staff table', {
       staffId,
       documentType,

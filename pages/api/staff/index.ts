@@ -30,7 +30,13 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
               s.id_photo_url as "idPhotoUrl",
               s.profile_photo_url as "profilePhotoUrl",
               s.photo_match_score as "photoMatchScore",
-              s.photo_verified_at as "photoVerifiedAt"
+              s.photo_verified_at as "photoVerifiedAt",
+              s.bank_name as "bankName",
+              s.bank_account_number as "bankAccountNumber",
+              s.bank_branch_code as "bankBranchCode",
+              s.bank_account_type as "bankAccountType",
+              s.bank_account_holder as "bankAccountHolder",
+              s.bank_details_verified_at as "bankDetailsVerifiedAt"
             FROM staff s
             WHERE s.id = ${id as string}
           `;

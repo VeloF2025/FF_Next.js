@@ -73,6 +73,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     logger.info('Document verification updated', { documentId, status, verifierId });
 
+    // If document is verified, sync OCR metadata to staff table
+    if (status === 'verified') {
+      await syncOcrMetadataToStaff(updated as Record<string, unknown>);
+    }
+
     // Get full document with joins
     const [document] = await sql`
       SELECT
@@ -125,4 +130,113 @@ function mapDbToDocument(row: Record<string, unknown>) {
     staff: row.staff_name ? { id: row.staff_id, name: row.staff_name } : undefined,
     verifier: row.verifier_name ? { id: row.verified_by, name: row.verifier_name } : undefined,
   };
+}
+
+/**
+ * Sync OCR metadata to staff table when document is verified
+ * This is called after successful verification to populate staff fields
+ * Compulsory docs: SA ID, Passport, Driver's License, Bank Details
+ */
+async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promise<void> {
+  const staffId = document.staff_id as string;
+  const documentType = document.document_type as string;
+  const ocrMetadata = document.ocr_metadata as Record<string, string> | null;
+
+  if (!staffId || !ocrMetadata || Object.keys(ocrMetadata).length === 0) {
+    return;
+  }
+
+  try {
+    switch (documentType) {
+      case 'sa_id':
+        // Sync SA ID number to staff table
+        const { saIdNumber } = ocrMetadata;
+        if (saIdNumber) {
+          await sql`
+            UPDATE staff
+            SET
+              sa_id_number = ${saIdNumber},
+              updated_at = NOW()
+            WHERE id = ${staffId}
+          `;
+          logger.info('Synced SA ID from verified document', { staffId, saIdNumber });
+        }
+        break;
+
+      case 'passport':
+        // Sync passport details to staff table
+        const { passportNumber, passportExpiry, passportCountry } = ocrMetadata;
+        if (passportNumber || passportExpiry || passportCountry) {
+          await sql`
+            UPDATE staff
+            SET
+              passport_number = COALESCE(${passportNumber || null}, passport_number),
+              passport_expiry = COALESCE(${passportExpiry ? new Date(passportExpiry) : null}, passport_expiry),
+              passport_country = COALESCE(${passportCountry || null}, passport_country),
+              updated_at = NOW()
+            WHERE id = ${staffId}
+          `;
+          logger.info('Synced passport from verified document', { staffId, passportNumber });
+        }
+        break;
+
+      case 'drivers_license':
+        // Sync driver's license details to staff table
+        const { driversLicenseNumber, driversLicenseExpiry, driversLicenseCodes } = ocrMetadata;
+        if (driversLicenseNumber || driversLicenseExpiry || driversLicenseCodes) {
+          await sql`
+            UPDATE staff
+            SET
+              drivers_license_number = COALESCE(${driversLicenseNumber || null}, drivers_license_number),
+              drivers_license_expiry = COALESCE(${driversLicenseExpiry ? new Date(driversLicenseExpiry) : null}, drivers_license_expiry),
+              drivers_license_codes = COALESCE(${driversLicenseCodes || null}, drivers_license_codes),
+              updated_at = NOW()
+            WHERE id = ${staffId}
+          `;
+          logger.info('Synced drivers license from verified document', {
+            staffId,
+            licenseNumber: driversLicenseNumber,
+            licenseCodes: driversLicenseCodes,
+          });
+        }
+        break;
+
+      case 'bank_details':
+      case 'bank_statement':
+        // Sync bank details to staff table
+        const { bankName, bankAccountNumber, bankBranchCode, bankAccountType, bankAccountHolder } = ocrMetadata;
+
+        if (bankName || bankAccountNumber || bankBranchCode || bankAccountType || bankAccountHolder) {
+          await sql`
+            UPDATE staff
+            SET
+              bank_name = COALESCE(${bankName || null}, bank_name),
+              bank_account_number = COALESCE(${bankAccountNumber || null}, bank_account_number),
+              bank_branch_code = COALESCE(${bankBranchCode || null}, bank_branch_code),
+              bank_account_type = COALESCE(${bankAccountType?.toLowerCase() || null}, bank_account_type),
+              bank_account_holder = COALESCE(${bankAccountHolder || null}, bank_account_holder),
+              bank_details_verified_at = NOW(),
+              updated_at = NOW()
+            WHERE id = ${staffId}
+          `;
+          logger.info('Synced bank details from verified document', {
+            staffId,
+            documentType,
+            bankName,
+            accountNumber: bankAccountNumber ? `****${bankAccountNumber.slice(-4)}` : null,
+          });
+        }
+        break;
+
+      default:
+        break;
+    }
+  } catch (error) {
+    // Log but don't fail verification if sync fails
+    logger.warn('Failed to sync OCR metadata to staff table', {
+      staffId,
+      documentType,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }

@@ -240,44 +240,62 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
         </div>
       </div>
 
-      {/* Identity Documents */}
-      {(staff.saIdNumber || staff.passportNumber) && (
-        <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Identity Documents</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {staff.saIdNumber && (
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">SA ID Number</p>
-                    <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.saIdNumber}</p>
-                  </div>
-                </div>
+      {/* Identity Documents - Always visible */}
+      <div>
+        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Identity Documents</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* SA ID */}
+          <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <CreditCard className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">SA ID Number</p>
+                <p className={`font-medium font-mono ${staff.saIdNumber ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-muted)]'}`}>
+                  {staff.saIdNumber || 'Not provided'}
+                </p>
               </div>
-            )}
-            {staff.passportNumber && (
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-[var(--ff-text-muted)]" />
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">Passport Number</p>
+            </div>
+          </div>
+
+          {/* Passport */}
+          <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Passport</p>
+                {staff.passportNumber ? (
+                  <>
                     <p className="font-medium text-[var(--ff-text-primary)] font-mono">{staff.passportNumber}</p>
                     {staff.passportCountry && (
-                      <p className="text-xs text-[var(--ff-text-secondary)]">{staff.passportCountry}</p>
+                      <p className="text-xs text-[var(--ff-text-secondary)]">Country: {staff.passportCountry}</p>
                     )}
                     {staff.passportExpiry && (
                       <p className="text-xs text-[var(--ff-text-secondary)]">
                         Expires: {formatDate(staff.passportExpiry)}
                       </p>
                     )}
-                  </div>
-                </div>
+                  </>
+                ) : (
+                  <p className="font-medium text-[var(--ff-text-muted)]">Not provided</p>
+                )}
               </div>
-            )}
+            </div>
+          </div>
+
+          {/* Nationality */}
+          <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-[var(--ff-text-muted)]" />
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Nationality</p>
+                <p className={`font-medium ${staff.nationality ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-muted)]'}`}>
+                  {staff.nationality || 'Not provided'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Emergency Contact & Next of Kin */}
       {(staff.emergencyContactName || staff.emergencyContactPhone || staff.nextOfKinName || staff.nextOfKinPhone) && (

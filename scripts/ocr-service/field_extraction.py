@@ -159,6 +159,18 @@ DOCUMENT_KEYWORDS = {
         "BESTUURSLISENSIE",
         "MOTORVOERTUIG",
         "VERKEER",
+        # Portuguese (on SA licenses)
+        "CARTA DE CONDUCAO",
+        # OCR-friendly partial matches (tesseract often garbles)
+        "LIC. NO",
+        "LIC.NO",
+        "LISENSI",
+        "GEBOORTE",  # Afrikaans for birth - unique to licenses
+        "UITREIK",   # Afrikaans for issue
+        "GELDIG",    # Afrikaans for valid
+        # SADC format markers
+        "SOUTH AFRICA",
+        "SADC",
     ],
     DocumentType.BANK_DETAILS: [
         "BANK",

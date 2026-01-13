@@ -66,6 +66,13 @@ interface DbStaff {
   nextOfKinRelationship?: string;
   nextOfKinAddress?: string;
   emergencyContactRelationship?: string;
+  // Bank details fields (camelCase from API aliases)
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankBranchCode?: string;
+  bankAccountType?: string;
+  bankAccountHolder?: string;
+  bankDetailsVerifiedAt?: string;
 }
 
 /**
@@ -188,6 +195,13 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     nextOfKinRelationship: dbStaff.nextOfKinRelationship,
     nextOfKinAddress: dbStaff.nextOfKinAddress,
     emergencyContactRelationship: dbStaff.emergencyContactRelationship,
+    // Bank details fields
+    bankName: dbStaff.bankName,
+    bankAccountNumber: dbStaff.bankAccountNumber,
+    bankBranchCode: dbStaff.bankBranchCode,
+    bankAccountType: dbStaff.bankAccountType,
+    bankAccountHolder: dbStaff.bankAccountHolder,
+    bankDetailsVerifiedAt: dbStaff.bankDetailsVerifiedAt ? toTimestamp(dbStaff.bankDetailsVerifiedAt) : undefined,
   };
 }
 

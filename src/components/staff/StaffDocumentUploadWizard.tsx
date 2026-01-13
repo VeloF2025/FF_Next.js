@@ -453,6 +453,22 @@ export function StaffDocumentUploadWizard({
         if (validTo) formData.append('validTo', validTo);
       }
 
+      // Add bank statement specific fields
+      const isBankStatement = state.selectedDocumentType === 'bank_statement' || state.selectedDocumentType === 'bank_details';
+      if (isBankStatement) {
+        const bankName = extractValue(finalFields.bankName);
+        const bankAccountNumber = extractValue(finalFields.accountNumber);
+        const bankBranchCode = extractValue(finalFields.branchCode);
+        const bankAccountType = extractValue(finalFields.accountType);
+        const bankAccountHolder = extractValue(finalFields.accountHolder);
+
+        if (bankName) formData.append('bankName', bankName);
+        if (bankAccountNumber) formData.append('bankAccountNumber', bankAccountNumber);
+        if (bankBranchCode) formData.append('bankBranchCode', bankBranchCode);
+        if (bankAccountType) formData.append('bankAccountType', bankAccountType);
+        if (bankAccountHolder) formData.append('bankAccountHolder', bankAccountHolder);
+      }
+
       // Upload document
       const response = await fetch('/api/staff-documents-upload', {
         method: 'POST',
