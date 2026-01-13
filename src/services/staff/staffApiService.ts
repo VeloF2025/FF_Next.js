@@ -172,6 +172,21 @@ function toDateString(value: unknown): string | undefined {
 }
 
 /**
+ * Convert date value to ISO string or null for database (for clearable fields)
+ * Returns null instead of undefined so the field is included in the request
+ */
+function toDateStringOrNull(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  // Handle TimestampLike object
+  if (typeof value === 'object' && value !== null && 'toDate' in value) {
+    return (value as TimestampLike).toDate().toISOString();
+  }
+  return null;
+}
+
+/**
  * Transform StaffMember to database format
  */
 function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff> {
@@ -206,6 +221,11 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
     available_nights: staff.availableNights,
     time_zone: staff.timeZone,
     experience_years: staff.experienceYears,
+    // Identity document fields - use empty string or null to allow clearing
+    saIdNumber: staff.saIdNumber ?? null,
+    passportNumber: staff.passportNumber ?? null,
+    passportCountry: staff.passportCountry ?? null,
+    passportExpiry: toDateStringOrNull(staff.passportExpiry),
   };
 }
 
