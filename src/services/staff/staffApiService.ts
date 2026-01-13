@@ -44,6 +44,11 @@ interface DbStaff {
   experience_years?: number;
   created_at?: string;
   updated_at?: string;
+  // Identity document fields (camelCase from API aliases)
+  saIdNumber?: string;
+  passportNumber?: string;
+  passportCountry?: string;
+  passportExpiry?: string;
 }
 
 /**
@@ -144,6 +149,11 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     emergencyContactPhone: dbStaff.emergency_contact_phone,
     hourlyRate: dbStaff.hourly_rate,
     salaryAmount: dbStaff.salary,
+    // Identity document fields
+    saIdNumber: dbStaff.saIdNumber,
+    passportNumber: dbStaff.passportNumber,
+    passportCountry: dbStaff.passportCountry,
+    passportExpiry: dbStaff.passportExpiry,
   };
 }
 

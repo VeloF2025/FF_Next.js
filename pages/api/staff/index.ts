@@ -22,7 +22,11 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
             SELECT
               s.*,
               CONCAT(s.first_name, ' ', s.last_name) as name,
-              CONCAT(s.first_name, ' ', s.last_name) as full_name
+              CONCAT(s.first_name, ' ', s.last_name) as full_name,
+              s.sa_id_number as "saIdNumber",
+              s.passport_number as "passportNumber",
+              s.passport_country as "passportCountry",
+              s.passport_expiry as "passportExpiry"
             FROM staff s
             WHERE s.id = ${id as string}
           `;
@@ -211,7 +215,9 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
               ${staffData.join_date || staffData.startDate || new Date().toISOString()},
               ${staffData.status || 'ACTIVE'}
             )
-            RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name
+            RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
+              sa_id_number as "saIdNumber", passport_number as "passportNumber",
+              passport_country as "passportCountry", passport_expiry as "passportExpiry"
           `;
 
           // Log successful staff creation
@@ -301,7 +307,9 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
                 exit_processed_date = NOW(),
                 updated_at = NOW()
             WHERE id = ${req.query.id as string}
-            RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name
+            RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
+              sa_id_number as "saIdNumber", passport_number as "passportNumber",
+              passport_country as "passportCountry", passport_expiry as "passportExpiry"
           `;
         } else {
           updatedStaff = await sql`
@@ -322,7 +330,9 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
                 exit_processed_by = COALESCE(${exitProcessedBy}, exit_processed_by),
                 updated_at = NOW()
             WHERE id = ${req.query.id as string}
-            RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name
+            RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
+              sa_id_number as "saIdNumber", passport_number as "passportNumber",
+              passport_country as "passportCountry", passport_expiry as "passportExpiry"
           `;
         }
 
