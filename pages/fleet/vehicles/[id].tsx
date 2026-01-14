@@ -34,6 +34,10 @@ import {
   DollarSign,
   RefreshCw,
   Loader2,
+  Gauge,
+  Camera,
+  CheckCircle,
+  TrendingUp,
 } from 'lucide-react';
 import type {
   VehicleDocument,
@@ -83,7 +87,54 @@ interface Investigation {
   createdAt: string;
 }
 
-type TabId = 'overview' | 'ownership' | 'documents' | 'insurance';
+type TabId = 'overview' | 'odometer' | 'ownership' | 'documents' | 'insurance';
+
+interface OdometerReading {
+  id: string;
+  reading: number;
+  source: 'manual' | 'vlm';
+  vlmConfidence: number | null;
+  previousReading: number | null;
+  kmSinceLast: number | null;
+  discrepancyFlag: boolean;
+  discrepancyReason: string | null;
+  recordedAt: string;
+}
+
+interface OdometerAnomaly {
+  id: string;
+  anomalyType: string;
+  odometerReading: number;
+  previousReading: number | null;
+  severity: 'warning' | 'critical';
+  resolved: boolean;
+  detectedAt: string;
+}
+
+interface AssignedDriver {
+  assignmentId: string;
+  staffId: string;
+  staffName: string;
+  staffEmail: string | null;
+  staffPhone: string | null;
+  staffPhotoUrl: string | null;
+  assignmentStart: string;
+  assignmentEnd: string | null;
+  fuelCardNumber: string | null;
+  fuelCardLimit: number | null;
+  notes: string | null;
+  hasValidLicense: boolean;
+  licenseExpiry: string | null;
+  isActive: boolean;
+}
+
+interface StaffOption {
+  id: string;
+  name: string;
+  email: string | null;
+  hasValidLicense: boolean;
+  hasVehicle: boolean;
+}
 
 const statusConfig = {
   active: { label: 'Active', color: 'bg-green-100 text-green-800', icon: Car },
@@ -1125,6 +1176,330 @@ function InsuranceTab({
   );
 }
 
+function OdometerTab({
+  vehicleId,
+  odometerHistory,
+  odometerAnomalies,
+  anomalySummary,
+  loading,
+  onRefresh,
+}: {
+  vehicleId: string;
+  odometerHistory: OdometerReading[];
+  odometerAnomalies: OdometerAnomaly[];
+  anomalySummary: { unresolved: number; criticalUnresolved: number };
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [manualReading, setManualReading] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const latestReading = odometerHistory[0];
+
+  const handleAddReading = async () => {
+    const reading = parseInt(manualReading, 10);
+    if (isNaN(reading) || reading < 0) {
+      toast.error('Please enter a valid reading');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${vehicleId}/odometer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reading, source: 'manual' }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to add reading');
+        return;
+      }
+
+      toast.success('Odometer reading added');
+      setShowAddModal(false);
+      setManualReading('');
+      onRefresh();
+    } catch (err) {
+      toast.error('Failed to add reading');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-32 bg-[var(--ff-bg-tertiary)] rounded-lg"></div>
+        <div className="h-64 bg-[var(--ff-bg-tertiary)] rounded-lg"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Card */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+            <Gauge className="w-5 h-5 text-[var(--ff-primary)]" />
+            Odometer Tracking
+          </h2>
+          <div className="flex gap-2">
+            <button
+              onClick={onRefresh}
+              className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-3 py-1.5 text-sm bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              Add Reading
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-6">
+          <div>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Current Reading</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+              {latestReading ? `${latestReading.reading.toLocaleString()} km` : '-'}
+            </p>
+            {latestReading && (
+              <p className="text-xs text-[var(--ff-text-tertiary)]">
+                {formatDate(latestReading.recordedAt)} via {latestReading.source}
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Last Trip</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+              {latestReading?.kmSinceLast !== null && latestReading?.kmSinceLast !== undefined
+                ? `${latestReading.kmSinceLast.toLocaleString()} km`
+                : '-'}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Anomalies</p>
+            <div className="flex items-center gap-2">
+              {anomalySummary.unresolved > 0 ? (
+                <>
+                  <span className={`text-2xl font-bold ${anomalySummary.criticalUnresolved > 0 ? 'text-red-600' : 'text-yellow-600'}`}>
+                    {anomalySummary.unresolved}
+                  </span>
+                  {anomalySummary.criticalUnresolved > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
+                      {anomalySummary.criticalUnresolved} critical
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-2xl font-bold text-green-600 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
+                  None
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Anomalies Alert */}
+      {odometerAnomalies.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-medium text-red-800">Unresolved Anomalies Detected</p>
+              <div className="mt-2 space-y-2">
+                {odometerAnomalies.slice(0, 3).map((anomaly) => (
+                  <div key={anomaly.id} className="text-sm text-red-700">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mr-2 ${
+                      anomaly.severity === 'critical' ? 'bg-red-200' : 'bg-yellow-200 text-yellow-800'
+                    }`}>
+                      {anomaly.anomalyType.replace('_', ' ')}
+                    </span>
+                    {anomaly.odometerReading.toLocaleString()} km
+                    {anomaly.previousReading && ` (was ${anomaly.previousReading.toLocaleString()} km)`}
+                    <span className="text-red-500 ml-2">{formatDate(anomaly.detectedAt)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Table */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+          Reading History
+        </h2>
+
+        {odometerHistory.length === 0 ? (
+          <div className="text-center py-8">
+            <Gauge className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-2" />
+            <p className="text-[var(--ff-text-secondary)]">No odometer readings recorded</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Add your first reading to start tracking</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--ff-border-light)]">
+                  <th className="text-left py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Date</th>
+                  <th className="text-right py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Reading</th>
+                  <th className="text-right py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">KM Traveled</th>
+                  <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Source</th>
+                  <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {odometerHistory.map((reading, idx) => (
+                  <tr
+                    key={reading.id}
+                    className={`border-b border-[var(--ff-border-light)] ${reading.discrepancyFlag ? 'bg-red-50' : ''}`}
+                  >
+                    <td className="py-3 px-3 text-sm text-[var(--ff-text-primary)]">
+                      {formatDate(reading.recordedAt)}
+                    </td>
+                    <td className="py-3 px-3 text-sm text-right font-mono text-[var(--ff-text-primary)]">
+                      {reading.reading.toLocaleString()} km
+                    </td>
+                    <td className="py-3 px-3 text-sm text-right text-[var(--ff-text-secondary)]">
+                      {reading.kmSinceLast !== null ? (
+                        <span className={reading.kmSinceLast < 0 ? 'text-red-600' : ''}>
+                          {reading.kmSinceLast >= 0 ? '+' : ''}{reading.kmSinceLast.toLocaleString()} km
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-sm text-center">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                        reading.source === 'vlm'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {reading.source === 'vlm' ? (
+                          <>
+                            <Camera className="w-3 h-3" />
+                            VLM
+                            {reading.vlmConfidence && (
+                              <span className="ml-1 opacity-75">
+                                ({Math.round(reading.vlmConfidence * 100)}%)
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          'Manual'
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-sm text-center">
+                      {reading.discrepancyFlag ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs">
+                          <AlertTriangle className="w-3 h-3" />
+                          {reading.discrepancyReason || 'Anomaly'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">
+                          <CheckCircle className="w-3 h-3" />
+                          OK
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add Reading Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Add Odometer Reading</h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                  Current Odometer Reading (km)
+                </label>
+                <input
+                  type="number"
+                  value={manualReading}
+                  onChange={(e) => setManualReading(e.target.value)}
+                  placeholder={latestReading ? `Last: ${latestReading.reading.toLocaleString()} km` : 'Enter reading'}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-lg font-mono"
+                  autoFocus
+                />
+              </div>
+
+              {latestReading && manualReading && (
+                <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    Distance since last reading:
+                    <span className={`ml-2 font-medium ${
+                      parseInt(manualReading) < latestReading.reading ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {parseInt(manualReading) >= latestReading.reading ? '+' : ''}
+                      {(parseInt(manualReading) - latestReading.reading).toLocaleString()} km
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddReading}
+                disabled={submitting || !manualReading}
+                className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] disabled:opacity-50 flex items-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -1158,9 +1533,25 @@ export default function VehicleDetailPage() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [loadingInsurance, setLoadingInsurance] = useState(false);
 
+  // Odometer data
+  const [odometerHistory, setOdometerHistory] = useState<OdometerReading[]>([]);
+  const [odometerAnomalies, setOdometerAnomalies] = useState<OdometerAnomaly[]>([]);
+  const [loadingOdometer, setLoadingOdometer] = useState(false);
+  const [anomalySummary, setAnomalySummary] = useState<{ unresolved: number; criticalUnresolved: number }>({ unresolved: 0, criticalUnresolved: 0 });
+
+  // Driver assignment data
+  const [assignedDriver, setAssignedDriver] = useState<AssignedDriver | null>(null);
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [availableStaff, setAvailableStaff] = useState<StaffOption[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
+  const [assigning, setAssigning] = useState(false);
+  const [unassigning, setUnassigning] = useState(false);
+
   // Set initial tab from URL
   useEffect(() => {
-    if (tab && typeof tab === 'string' && ['overview', 'ownership', 'documents', 'insurance'].includes(tab)) {
+    if (tab && typeof tab === 'string' && ['overview', 'odometer', 'ownership', 'documents', 'insurance'].includes(tab)) {
       setActiveTab(tab as TabId);
     }
   }, [tab]);
@@ -1270,11 +1661,167 @@ export default function VehicleDetailPage() {
     }
   }, [id]);
 
+  const fetchOdometerData = useCallback(async () => {
+    if (!id) return;
+    setLoadingOdometer(true);
+    try {
+      const [historyRes, anomaliesRes] = await Promise.all([
+        fetch(`/api/fleet/vehicles/${id}/odometer?limit=20`),
+        fetch(`/api/fleet/vehicles/${id}/odometer-anomalies?resolved=false&limit=10`),
+      ]);
+
+      if (historyRes.ok) {
+        const historyData = await historyRes.json();
+        setOdometerHistory(historyData.data || []);
+      }
+      if (anomaliesRes.ok) {
+        const anomaliesData = await anomaliesRes.json();
+        setOdometerAnomalies(anomaliesData.data || []);
+        if (anomaliesData.meta?.summary) {
+          setAnomalySummary({
+            unresolved: anomaliesData.meta.summary.unresolved || 0,
+            criticalUnresolved: anomaliesData.meta.summary.criticalUnresolved || 0,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch odometer data:', err);
+    } finally {
+      setLoadingOdometer(false);
+    }
+  }, [id]);
+
+  // Fetch driver assignment data
+  const fetchAssignmentData = useCallback(async () => {
+    if (!id) return;
+    setLoadingAssignment(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${id}/assignment`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.data?.assigned) {
+          setAssignedDriver(data.data.driver);
+        } else {
+          setAssignedDriver(null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch assignment data:', err);
+    } finally {
+      setLoadingAssignment(false);
+    }
+  }, [id]);
+
+  // Fetch available staff for assignment
+  const fetchAvailableStaff = useCallback(async () => {
+    setLoadingStaff(true);
+    try {
+      const res = await fetch('/api/fleet/available-drivers');
+      if (res.ok) {
+        const data = await res.json();
+        const staffList: StaffOption[] = (data.data?.drivers || []).map((s: Record<string, unknown>) => ({
+          id: s.id as string,
+          name: s.name as string,
+          email: s.email as string | null,
+          hasValidLicense: s.hasValidLicense as boolean || false,
+          hasVehicle: s.hasVehicle as boolean || false,
+        }));
+        setAvailableStaff(staffList);
+      }
+    } catch (err) {
+      console.error('Failed to fetch staff:', err);
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, []);
+
+  // Handle assigning a driver
+  const handleAssignDriver = async () => {
+    if (!selectedStaffId || !id) return;
+
+    setAssigning(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${id}/assignment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId: selectedStaffId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to assign driver');
+        return;
+      }
+
+      toast.success('Driver assigned successfully');
+      setShowAssignModal(false);
+      setSelectedStaffId('');
+      fetchAssignmentData();
+      // Update vehicle data to reflect assignment
+      if (vehicle) {
+        const staffOption = availableStaff.find(s => s.id === selectedStaffId);
+        setVehicle({ ...vehicle, assignedStaffId: selectedStaffId, assignedStaffName: staffOption?.name || null });
+      }
+    } catch (err) {
+      toast.error('Failed to assign driver');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  // Handle unassigning a driver
+  const handleUnassignDriver = async () => {
+    if (!id) return;
+
+    setUnassigning(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${id}/assignment`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to unassign driver');
+        return;
+      }
+
+      toast.success('Driver unassigned successfully');
+      setAssignedDriver(null);
+      // Update vehicle data
+      if (vehicle) {
+        setVehicle({ ...vehicle, assignedStaffId: null, assignedStaffName: null });
+      }
+    } catch (err) {
+      toast.error('Failed to unassign driver');
+    } finally {
+      setUnassigning(false);
+    }
+  };
+
+  // Fetch assignment on load
+  useEffect(() => {
+    if (vehicle) {
+      fetchAssignmentData();
+    }
+  }, [vehicle, fetchAssignmentData]);
+
+  // Fetch staff when modal opens
+  useEffect(() => {
+    if (showAssignModal) {
+      fetchAvailableStaff();
+    }
+  }, [showAssignModal, fetchAvailableStaff]);
+
   // Fetch tab data on tab change
   useEffect(() => {
     if (!vehicle) return;
 
     switch (activeTab) {
+      case 'odometer':
+        fetchOdometerData();
+        break;
       case 'ownership':
         fetchOwnershipData();
         break;
@@ -1285,7 +1832,7 @@ export default function VehicleDetailPage() {
         fetchInsuranceData();
         break;
     }
-  }, [activeTab, vehicle, fetchOwnershipData, fetchDocumentsData, fetchInsuranceData]);
+  }, [activeTab, vehicle, fetchOdometerData, fetchOwnershipData, fetchDocumentsData, fetchInsuranceData]);
 
   const handleSave = async () => {
     if (!vehicle) return;
@@ -1434,6 +1981,7 @@ export default function VehicleDetailPage() {
 
   const tabs: { id: TabId; label: string; icon: typeof Car }[] = [
     { id: 'overview', label: 'Overview', icon: Car },
+    { id: 'odometer', label: 'Odometer', icon: Gauge },
     { id: 'ownership', label: 'Ownership', icon: Building2 },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'insurance', label: 'Insurance', icon: Shield },
@@ -1649,6 +2197,16 @@ export default function VehicleDetailPage() {
                 setEditForm={setEditForm}
               />
             )}
+            {activeTab === 'odometer' && (
+              <OdometerTab
+                vehicleId={vehicle.id}
+                odometerHistory={odometerHistory}
+                odometerAnomalies={odometerAnomalies}
+                anomalySummary={anomalySummary}
+                loading={loadingOdometer}
+                onRefresh={fetchOdometerData}
+              />
+            )}
             {activeTab === 'ownership' && (
               <OwnershipTab
                 vehicle={vehicle}
@@ -1676,29 +2234,112 @@ export default function VehicleDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Assignment */}
+            {/* Driver Assignment */}
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
-              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
-                Current Assignment
-              </h2>
-              {vehicle.assignedStaffName ? (
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-full">
-                    <User className="w-6 h-6 text-[var(--ff-text-secondary)]" />
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                  Assigned Driver
+                </h2>
+                {!assignedDriver && !loadingAssignment && (
+                  <button
+                    onClick={() => setShowAssignModal(true)}
+                    className="text-sm text-[var(--ff-primary)] hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Assign
+                  </button>
+                )}
+              </div>
+              {loadingAssignment ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-6 h-6 text-[var(--ff-text-tertiary)] animate-spin" />
+                </div>
+              ) : assignedDriver ? (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    {assignedDriver.staffPhotoUrl ? (
+                      <img
+                        src={assignedDriver.staffPhotoUrl}
+                        alt={assignedDriver.staffName}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-full">
+                        <User className="w-6 h-6 text-[var(--ff-text-secondary)]" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <Link href={`/staff/${assignedDriver.staffId}`}>
+                        <p className="font-medium text-[var(--ff-text-primary)] hover:text-[var(--ff-primary)] cursor-pointer">
+                          {assignedDriver.staffName}
+                        </p>
+                      </Link>
+                      {assignedDriver.staffEmail && (
+                        <a href={`mailto:${assignedDriver.staffEmail}`} className="text-sm text-[var(--ff-text-secondary)] hover:underline flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {assignedDriver.staffEmail}
+                        </a>
+                      )}
+                      {assignedDriver.staffPhone && (
+                        <a href={`tel:${assignedDriver.staffPhone}`} className="text-sm text-[var(--ff-text-secondary)] hover:underline flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {assignedDriver.staffPhone}
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-[var(--ff-text-primary)]">
-                      {vehicle.assignedStaffName}
-                    </p>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">
-                      Assigned Driver
-                    </p>
+                  <div className="pt-2 border-t border-[var(--ff-border-light)] space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--ff-text-secondary)]">License Status</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        assignedDriver.hasValidLicense
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {assignedDriver.hasValidLicense ? 'Valid' : 'Invalid/Missing'}
+                      </span>
+                    </div>
+                    {assignedDriver.licenseExpiry && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--ff-text-secondary)]">License Expiry</span>
+                        <span className="text-[var(--ff-text-primary)]">{formatDate(assignedDriver.licenseExpiry)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[var(--ff-text-secondary)]">Assigned Since</span>
+                      <span className="text-[var(--ff-text-primary)]">{formatDate(assignedDriver.assignmentStart)}</span>
+                    </div>
+                    {assignedDriver.fuelCardNumber && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--ff-text-secondary)]">Fuel Card</span>
+                        <span className="text-[var(--ff-text-primary)] font-mono text-xs">{assignedDriver.fuelCardNumber}</span>
+                      </div>
+                    )}
                   </div>
+                  <button
+                    onClick={handleUnassignDriver}
+                    disabled={unassigning}
+                    className="w-full mt-2 px-3 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {unassigning ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                    {unassigning ? 'Unassigning...' : 'Unassign Driver'}
+                  </button>
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <User className="w-8 h-8 text-[var(--ff-text-tertiary)] mx-auto mb-2" />
-                  <p className="text-[var(--ff-text-secondary)]">Not assigned</p>
+                  <User className="w-10 h-10 text-[var(--ff-text-tertiary)] mx-auto mb-2" />
+                  <p className="text-[var(--ff-text-secondary)] mb-3">No driver assigned</p>
+                  <button
+                    onClick={() => setShowAssignModal(true)}
+                    className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors text-sm flex items-center gap-2 mx-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Assign Driver
+                  </button>
                 </div>
               )}
             </div>
@@ -1775,6 +2416,98 @@ export default function VehicleDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Assign Driver Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-6 border-b border-[var(--ff-border-light)]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                  Assign Driver to {vehicle.registration}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setSelectedStaffId('');
+                  }}
+                  className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              {loadingStaff ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                      Select Staff Member
+                    </label>
+                    <select
+                      value={selectedStaffId}
+                      onChange={(e) => setSelectedStaffId(e.target.value)}
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg focus:ring-2 focus:ring-[var(--ff-primary)] focus:border-transparent"
+                    >
+                      <option value="">Choose a staff member...</option>
+                      {availableStaff
+                        .filter(s => s.hasValidLicense)
+                        .map((staff) => (
+                          <option key={staff.id} value={staff.id}>
+                            {staff.name} {staff.hasVehicle ? '(has vehicle)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+                      Only staff with valid driver&apos;s license are shown
+                    </p>
+                  </div>
+                  {availableStaff.filter(s => !s.hasValidLicense).length > 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <p className="text-sm text-yellow-800">
+                        <AlertTriangle className="w-4 h-4 inline mr-1" />
+                        {availableStaff.filter(s => !s.hasValidLicense).length} staff member(s) hidden due to missing/invalid license
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-[var(--ff-border-light)] flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setSelectedStaffId('');
+                }}
+                className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignDriver}
+                disabled={!selectedStaffId || assigning}
+                className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {assigning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Assign Driver
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

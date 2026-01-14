@@ -137,6 +137,30 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
 
+      // Find or use provided fleet vehicle
+      let fleetVehicleId: string | null = body.fleetVehicleId || null;
+
+      if (!fleetVehicleId) {
+        // Try to find matching fleet vehicle by registration
+        const fleetMatch = await sql`
+          SELECT id FROM fleet_vehicles
+          WHERE UPPER(registration) = ${body.vehicleRegistration.toUpperCase()}
+          LIMIT 1
+        `;
+        if (fleetMatch.length > 0) {
+          fleetVehicleId = fleetMatch[0].id as string;
+        }
+      }
+
+      // If linking to fleet vehicle, deactivate existing assignments for that vehicle
+      if (fleetVehicleId) {
+        await sql`
+          UPDATE vehicle_assignments
+          SET is_active = false, assignment_end = CURRENT_DATE, updated_at = NOW()
+          WHERE fleet_vehicle_id = ${fleetVehicleId} AND is_active = true
+        `;
+      }
+
       // Deactivate any existing active assignments for this staff member
       await sql`
         UPDATE vehicle_assignments
@@ -147,6 +171,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const [created] = await sql`
         INSERT INTO vehicle_assignments (
           staff_id,
+          fleet_vehicle_id,
           vehicle_registration,
           vehicle_make,
           vehicle_model,
@@ -166,6 +191,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           is_active
         ) VALUES (
           ${staffId},
+          ${fleetVehicleId},
           ${body.vehicleRegistration.toUpperCase()},
           ${body.vehicleMake || null},
           ${body.vehicleModel || null},
@@ -196,6 +222,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         UPDATE staff SET has_company_vehicle = true, updated_at = NOW()
         WHERE id = ${staffId}
       `;
+
+      // Update fleet_vehicles.assigned_driver_id if linked
+      if (fleetVehicleId) {
+        await sql`
+          UPDATE fleet_vehicles SET assigned_driver_id = ${staffId}, updated_at = NOW()
+          WHERE id = ${fleetVehicleId}
+        `;
+      }
 
       logger.info('Vehicle assignment created', { staffId, vehicleId: created.id });
 
@@ -279,9 +313,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
-      // Verify assignment belongs to staff member
+      // Verify assignment belongs to staff member and get fleet_vehicle_id
       const [existing] = await sql`
-        SELECT id FROM vehicle_assignments
+        SELECT id, fleet_vehicle_id FROM vehicle_assignments
         WHERE id = ${id} AND staff_id = ${staffId}
       `;
 
@@ -294,6 +328,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SET is_active = false, assignment_end = CURRENT_DATE, updated_at = NOW()
         WHERE id = ${id}
       `;
+
+      // Clear fleet_vehicles.assigned_driver_id if linked
+      if (existing.fleet_vehicle_id) {
+        await sql`
+          UPDATE fleet_vehicles SET assigned_driver_id = NULL, updated_at = NOW()
+          WHERE id = ${existing.fleet_vehicle_id}
+        `;
+      }
 
       // Check if staff has any other active vehicles
       const [activeCount] = await sql`
@@ -308,7 +350,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
       }
 
-      logger.info('Vehicle assignment deactivated', { staffId, vehicleId: id });
+      logger.info('Vehicle assignment deactivated', { staffId, vehicleId: id, fleetVehicleId: existing.fleet_vehicle_id });
 
       return res.status(200).json({
         success: true,
@@ -331,6 +373,7 @@ function mapDbToVehicle(row: Record<string, unknown>, hasValidLicense: boolean):
   return {
     id: row.id as string,
     staffId: row.staff_id as string,
+    fleetVehicleId: row.fleet_vehicle_id as string | undefined,
     vehicleRegistration: row.vehicle_registration as string,
     vehicleMake: row.vehicle_make as string | undefined,
     vehicleModel: row.vehicle_model as string | undefined,

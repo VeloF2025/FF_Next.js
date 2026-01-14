@@ -9,6 +9,7 @@
 export interface VehicleAssignment {
   id: string;
   staffId: string;
+  fleetVehicleId?: string;
   vehicleRegistration: string;
   vehicleMake?: string;
   vehicleModel?: string;
@@ -58,6 +59,8 @@ export interface VehicleAssignmentCreate {
   serviceDueDate?: string;
   serviceDueKm?: number;
   notes?: string;
+  /** Optional fleet vehicle ID to link this assignment to a fleet vehicle */
+  fleetVehicleId?: string;
 }
 
 /**

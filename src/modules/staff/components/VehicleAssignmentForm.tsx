@@ -1,17 +1,31 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Calendar, Car, Fuel, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Calendar, Car, Fuel, AlertTriangle, Search, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { VehicleAssignment } from '@/types/staff';
+import type { VehicleAssignment, VehicleAssignmentCreate } from '@/types/staff';
 import { COMMON_VEHICLE_MAKES } from '@/types/staff/vehicle.types';
+import Link from 'next/link';
+
+interface FleetVehicleOption {
+  id: string;
+  registration: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  color: string | null;
+  vin: string | null;
+  status: string;
+  hasDriver: boolean;
+  driverName: string | null;
+}
 
 interface VehicleAssignmentFormProps {
   staffId: string;
   staffName: string;
   hasValidLicense: boolean;
   vehicle?: VehicleAssignment | null;
-  onSave: (vehicle: Partial<VehicleAssignment>) => Promise<void>;
+  onSave: (vehicle: Partial<VehicleAssignment> & { fleetVehicleId?: string }) => Promise<void>;
   onClose: () => void;
 }
 
@@ -23,6 +37,13 @@ export function VehicleAssignmentForm({
   onSave,
   onClose,
 }: VehicleAssignmentFormProps) {
+  // Vehicle source: 'fleet' to select from existing, 'manual' to enter details
+  const [vehicleSource, setVehicleSource] = useState<'fleet' | 'manual'>(vehicle ? 'manual' : 'fleet');
+  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicleOption[]>([]);
+  const [loadingFleet, setLoadingFleet] = useState(false);
+  const [selectedFleetVehicleId, setSelectedFleetVehicleId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+
   const [formData, setFormData] = useState({
     vehicleRegistration: vehicle?.vehicleRegistration || '',
     vehicleMake: vehicle?.vehicleMake || '',
@@ -54,12 +75,78 @@ export function VehicleAssignmentForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch fleet vehicles on mount
+  useEffect(() => {
+    const fetchFleetVehicles = async () => {
+      setLoadingFleet(true);
+      try {
+        const res = await fetch('/api/fleet/vehicles?limit=100&status=active');
+        if (res.ok) {
+          const data = await res.json();
+          const vehicles: FleetVehicleOption[] = (data.data || []).map((v: Record<string, unknown>) => ({
+            id: v.id as string,
+            registration: v.registration as string,
+            make: v.make as string | null,
+            model: v.model as string | null,
+            year: v.year as number | null,
+            color: v.color as string | null,
+            vin: v.vin as string | null,
+            status: v.status as string,
+            hasDriver: !!v.assignedStaffId,
+            driverName: v.assignedStaffName as string | null,
+          }));
+          setFleetVehicles(vehicles);
+        }
+      } catch (err) {
+        console.error('Failed to fetch fleet vehicles:', err);
+      } finally {
+        setLoadingFleet(false);
+      }
+    };
+
+    if (!vehicle) {
+      fetchFleetVehicles();
+    }
+  }, [vehicle]);
+
+  // When a fleet vehicle is selected, populate form fields
+  const handleFleetVehicleSelect = (vehicleId: string) => {
+    setSelectedFleetVehicleId(vehicleId);
+    const selected = fleetVehicles.find(v => v.id === vehicleId);
+    if (selected) {
+      setFormData(prev => ({
+        ...prev,
+        vehicleRegistration: selected.registration,
+        vehicleMake: selected.make || '',
+        vehicleModel: selected.model || '',
+        vehicleYear: selected.year?.toString() || '',
+        vehicleColor: selected.color || '',
+        vehicleVin: selected.vin || '',
+      }));
+    }
+  };
+
+  // Filter fleet vehicles by search query
+  const filteredFleetVehicles = fleetVehicles.filter(v => {
+    const query = searchQuery.toLowerCase();
+    return (
+      v.registration.toLowerCase().includes(query) ||
+      (v.make?.toLowerCase().includes(query)) ||
+      (v.model?.toLowerCase().includes(query))
+    );
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!hasValidLicense) {
       setError('Cannot assign vehicle without a valid driver\'s license on file');
+      return;
+    }
+
+    if (vehicleSource === 'fleet' && !selectedFleetVehicleId) {
+      setError('Please select a vehicle from the fleet');
       return;
     }
 
@@ -70,7 +157,7 @@ export function VehicleAssignmentForm({
 
     setSaving(true);
     try {
-      const payload: Partial<VehicleAssignment> = {
+      const payload: Partial<VehicleAssignment> & { fleetVehicleId?: string } = {
         ...(vehicle?.id && { id: vehicle.id }),
         staffId,
         vehicleRegistration: formData.vehicleRegistration.trim().toUpperCase(),
@@ -91,6 +178,8 @@ export function VehicleAssignmentForm({
         insurancePolicyNumber: formData.insurancePolicyNumber.trim() || undefined,
         notes: formData.notes.trim() || undefined,
         isActive: formData.isActive,
+        // Include fleet vehicle ID if selected
+        ...(vehicleSource === 'fleet' && selectedFleetVehicleId && { fleetVehicleId: selectedFleetVehicleId }),
       };
 
       await onSave(payload);
@@ -150,11 +239,109 @@ export function VehicleAssignmentForm({
             </div>
           )}
 
+          {/* Vehicle Source Selection (only for new assignments) */}
+          {!vehicle && (
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
+                <Car className="w-4 h-4" />
+                Select Vehicle
+              </h3>
+              <div className="flex gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVehicleSource('fleet');
+                    setSelectedFleetVehicleId('');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    vehicleSource === 'fleet'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+                  }`}
+                >
+                  From Fleet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVehicleSource('manual')}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    vehicleSource === 'manual'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+                  }`}
+                >
+                  Enter Manually
+                </button>
+              </div>
+
+              {vehicleSource === 'fleet' && (
+                <div className="space-y-3">
+                  {/* Search */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by registration, make, or model..."
+                      className="w-full pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Fleet vehicle list */}
+                  {loadingFleet ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="w-6 h-6 text-[var(--ff-text-tertiary)] animate-spin" />
+                    </div>
+                  ) : filteredFleetVehicles.length === 0 ? (
+                    <div className="text-center py-6 text-[var(--ff-text-secondary)]">
+                      {searchQuery ? 'No matching vehicles found' : 'No fleet vehicles available'}
+                      <Link href="/fleet/vehicles/new" className="block mt-2 text-blue-500 hover:underline">
+                        Create new vehicle in Fleet
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-2 border border-[var(--ff-border-light)] rounded-lg p-2">
+                      {filteredFleetVehicles.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => handleFleetVehicleSelect(v.id)}
+                          className={`w-full p-3 rounded-lg text-left transition-colors ${
+                            selectedFleetVehicleId === v.id
+                              ? 'bg-blue-600/20 border border-blue-500'
+                              : 'bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-hover)] border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-[var(--ff-text-primary)]">
+                                {v.registration}
+                              </p>
+                              <p className="text-sm text-[var(--ff-text-secondary)]">
+                                {v.make} {v.model} {v.year ? `(${v.year})` : ''}
+                              </p>
+                            </div>
+                            {v.hasDriver && (
+                              <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">
+                                Assigned to {v.driverName}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Vehicle Details */}
-          <div>
+          <div className={vehicleSource === 'fleet' && !vehicle ? 'opacity-50 pointer-events-none' : ''}>
             <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
               <Car className="w-4 h-4" />
-              Vehicle Details
+              Vehicle Details {vehicleSource === 'fleet' && !vehicle && '(auto-filled from selection)'}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div>
@@ -168,6 +355,7 @@ export function VehicleAssignmentForm({
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
                   placeholder="CA 123-456"
                   required
+                  readOnly={vehicleSource === 'fleet' && !vehicle}
                 />
               </div>
 

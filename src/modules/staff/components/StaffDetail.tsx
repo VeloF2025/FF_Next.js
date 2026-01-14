@@ -238,7 +238,7 @@ export function StaffDetail() {
   const handleRemoveVehicle = async (vehicleId: string) => {
     if (!confirm('Are you sure you want to remove this vehicle assignment?')) return;
 
-    const response = await fetch(`/api/staff/${id}/vehicles?vehicleId=${vehicleId}`, {
+    const response = await fetch(`/api/staff/${id}/vehicles?id=${vehicleId}`, {
       method: 'DELETE',
     });
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Car, Plus, AlertTriangle, Calendar, Fuel, Gauge, FileWarning, Edit, Trash2, CreditCard, CheckCircle2, Clock, XCircle, ExternalLink, Pencil, X, Save } from 'lucide-react';
+import { Car, Plus, AlertTriangle, Calendar, Fuel, Gauge, FileWarning, Edit, Trash2, CreditCard, CheckCircle2, Clock, XCircle, ExternalLink, Pencil, X, Save, Truck } from 'lucide-react';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import type { VehicleAssignment } from '@/types/staff';
 import { checkVehicleNeedsAttention, formatVehicleDisplayName } from '@/types/staff/vehicle.types';
@@ -632,6 +633,20 @@ function VehicleCard({ vehicle, attention, onEdit, onRemove }: VehicleCardProps)
         <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
           <p className="text-sm text-[var(--ff-text-secondary)]">Notes</p>
           <p className="text-sm text-[var(--ff-text-primary)] mt-1">{vehicle.notes}</p>
+        </div>
+      )}
+
+      {/* Fleet Vehicle Link */}
+      {vehicle.fleetVehicleId && (
+        <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
+          <Link
+            href={`/fleet/vehicles/${vehicle.fleetVehicleId}`}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+          >
+            <Truck className="w-4 h-4" />
+            View in Fleet Management
+            <ExternalLink className="w-3 h-3" />
+          </Link>
         </div>
       )}
     </div>
