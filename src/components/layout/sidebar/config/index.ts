@@ -10,6 +10,7 @@ export { clientsSection } from './clientsSection';
 export { procurementSection } from './procurementSection';
 export { contractorsSection } from './contractorsSection';
 export { assetsSection } from './assetsSection';
+export { fleetSection } from './fleetSection';
 export { analyticsSection } from './analyticsSection';
 export { communicationsSection } from './communicationsSection';
 export { fieldOperationsSection } from './fieldOperationsSection';
