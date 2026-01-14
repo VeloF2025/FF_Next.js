@@ -1,31 +1,71 @@
 /**
  * useCheckIn Hook
- * Manages check-in form state and submission
+ * Manages check-in form state and submission with daily/weekly modes
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import type {
   CheckTemplateWithItems,
-  CheckItem,
   CreateCheckResponseInput,
   CreateCheckRecordInput,
   CheckRecord,
   CheckPhotoType,
+  CheckType,
+  VlmPhotoResult,
+  VlmAnalysisType,
+  DAILY_REQUIRED_PHOTOS,
+  WEEKLY_REQUIRED_PHOTOS,
 } from '../../types/check-in.types';
 import { offlineStorage } from '../utils/offlineStorage';
+
+// Import the required photo configs
+const DAILY_PHOTOS = [
+  { type: 'dashboard' as CheckPhotoType, label: 'Dashboard/Odometer', required: true, vlmType: 'odometer' as VlmAnalysisType },
+  { type: 'fuel_gauge' as CheckPhotoType, label: 'Fuel Gauge', required: true, vlmType: 'fuel_gauge' as VlmAnalysisType },
+];
+
+const WEEKLY_PHOTOS = [
+  { type: 'front' as CheckPhotoType, label: 'Exterior Front (License Plate)', required: true, vlmType: 'license_plate' as VlmAnalysisType },
+  { type: 'rear' as CheckPhotoType, label: 'Exterior Rear (License Plate)', required: true, vlmType: 'license_plate' as VlmAnalysisType },
+  { type: 'dashboard' as CheckPhotoType, label: 'Dashboard/Odometer', required: true, vlmType: 'odometer' as VlmAnalysisType },
+  { type: 'fuel_gauge' as CheckPhotoType, label: 'Fuel Gauge', required: true, vlmType: 'fuel_gauge' as VlmAnalysisType },
+  { type: 'under_vehicle' as CheckPhotoType, label: 'Under Vehicle (Leaks)', required: false },
+  { type: 'license_disk' as CheckPhotoType, label: 'License Disk', required: false },
+  { type: 'damage' as CheckPhotoType, label: 'Damage Photos', required: false },
+];
+
+interface PhotoData {
+  dataUrl: string;
+  file?: File;
+}
 
 interface CheckInFormState {
   vehicleId: string;
   templateId: string | null;
+  checkType: CheckType;
   odometerReading: string;
+  fuelLevel: string;
   responses: Map<string, CreateCheckResponseInput>;
-  photos: Map<CheckPhotoType, { dataUrl: string; file?: File }>;
+  photos: Map<CheckPhotoType, PhotoData>;
+}
+
+interface VlmResult {
+  photoType: CheckPhotoType;
+  analysisType: VlmAnalysisType;
+  extractedValue: string | null;
+  extractedNumeric: number | null;
+  confidence: number;
+  plateMatches?: boolean;
+  isProcessing: boolean;
+  error?: string;
 }
 
 interface UseCheckInOptions {
   vehicleId: string;
+  vehicleRegistration?: string; // For license plate verification
   driverId: string;
   driverName: string;
+  initialCheckType?: CheckType;
 }
 
 interface UseCheckInReturn {
@@ -35,15 +75,24 @@ interface UseCheckInReturn {
   isLoading: boolean;
   isSubmitting: boolean;
   error: string | null;
+  checkType: CheckType;
+
+  // VLM state
+  vlmResults: Map<CheckPhotoType, VlmResult>;
+  isProcessingVlm: boolean;
 
   // Form handlers
+  setCheckType: (type: CheckType) => void;
   setOdometerReading: (value: string) => void;
+  setFuelLevel: (value: string) => void;
   setItemResponse: (itemId: string, isPassed: boolean, notes?: string) => void;
   setPhoto: (type: CheckPhotoType, dataUrl: string, file?: File) => void;
   removePhoto: (type: CheckPhotoType) => void;
+  overrideVlmValue: (photoType: CheckPhotoType, value: string | number) => void;
 
   // Actions
-  loadTemplate: (templateId?: string) => Promise<void>;
+  loadTemplate: (checkType?: CheckType, templateId?: string) => Promise<void>;
+  processPhotoWithVlm: (type: CheckPhotoType) => Promise<void>;
   submit: () => Promise<CheckRecord | null>;
   reset: () => void;
 
@@ -52,17 +101,23 @@ interface UseCheckInReturn {
   validationErrors: string[];
   hasCriticalFailures: boolean;
   hasMinorFailures: boolean;
+
+  // Photo requirements
+  requiredPhotos: typeof DAILY_PHOTOS | typeof WEEKLY_PHOTOS;
 }
 
 export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
-  const { vehicleId, driverId, driverName } = options;
+  const { vehicleId, vehicleRegistration, driverId, driverName, initialCheckType = 'daily' } = options;
 
   // State
   const [template, setTemplate] = useState<CheckTemplateWithItems | null>(null);
+  const [checkType, setCheckTypeState] = useState<CheckType>(initialCheckType);
   const [formState, setFormState] = useState<CheckInFormState>({
     vehicleId,
     templateId: null,
+    checkType: initialCheckType,
     odometerReading: '',
+    fuelLevel: '',
     responses: new Map(),
     photos: new Map(),
   });
@@ -70,15 +125,27 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load template
-  const loadTemplate = useCallback(async (templateId?: string) => {
+  // VLM state
+  const [vlmResults, setVlmResults] = useState<Map<CheckPhotoType, VlmResult>>(new Map());
+  const [isProcessingVlm, setIsProcessingVlm] = useState(false);
+
+  // Get required photos based on check type
+  const requiredPhotos = checkType === 'daily' ? DAILY_PHOTOS : WEEKLY_PHOTOS;
+
+  // Load template by check type
+  const loadTemplate = useCallback(async (type?: CheckType, templateId?: string) => {
     setIsLoading(true);
     setError(null);
 
+    const targetType = type || checkType;
+
     try {
-      const url = templateId
-        ? `/api/fleet/check-in/templates/${templateId}`
-        : '/api/fleet/check-in/templates?default=true';
+      let url: string;
+      if (templateId) {
+        url = `/api/fleet/check-in/templates/${templateId}`;
+      } else {
+        url = `/api/fleet/check-in/templates?default=true&checkType=${targetType}`;
+      }
 
       const response = await fetch(url);
       const data = await response.json();
@@ -92,18 +159,37 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       setFormState(prev => ({
         ...prev,
         templateId: templateData.id,
-        responses: new Map(), // Reset responses for new template
+        checkType: targetType,
+        responses: new Map(),
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load template');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [checkType]);
+
+  // Change check type
+  const setCheckType = useCallback((type: CheckType) => {
+    setCheckTypeState(type);
+    setFormState(prev => ({
+      ...prev,
+      checkType: type,
+      responses: new Map(),
+      photos: new Map(),
+    }));
+    setVlmResults(new Map());
+    // Reload template for new type
+    loadTemplate(type);
+  }, [loadTemplate]);
 
   // Form handlers
   const setOdometerReading = useCallback((value: string) => {
     setFormState(prev => ({ ...prev, odometerReading: value }));
+  }, []);
+
+  const setFuelLevel = useCallback((value: string) => {
+    setFormState(prev => ({ ...prev, fuelLevel: value }));
   }, []);
 
   const setItemResponse = useCallback((itemId: string, isPassed: boolean, notes?: string) => {
@@ -136,22 +222,170 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       newPhotos.delete(type);
       return { ...prev, photos: newPhotos };
     });
+    // Also remove VLM result
+    setVlmResults(prev => {
+      const newResults = new Map(prev);
+      newResults.delete(type);
+      return newResults;
+    });
   }, []);
+
+  // Override VLM extracted value with manual entry
+  const overrideVlmValue = useCallback((photoType: CheckPhotoType, value: string | number) => {
+    const numValue = typeof value === 'string' ? parseInt(value, 10) : value;
+
+    // Update the appropriate field
+    if (photoType === 'dashboard') {
+      setFormState(prev => ({ ...prev, odometerReading: String(numValue) }));
+    } else if (photoType === 'fuel_gauge') {
+      setFormState(prev => ({ ...prev, fuelLevel: String(numValue) }));
+    }
+
+    // Mark VLM result as overridden
+    setVlmResults(prev => {
+      const newResults = new Map(prev);
+      const existing = newResults.get(photoType);
+      if (existing) {
+        newResults.set(photoType, {
+          ...existing,
+          extractedNumeric: numValue,
+          extractedValue: String(numValue),
+        });
+      }
+      return newResults;
+    });
+  }, []);
+
+  // Process photo with VLM
+  const processPhotoWithVlm = useCallback(async (type: CheckPhotoType) => {
+    const photo = formState.photos.get(type);
+    if (!photo) return;
+
+    // Find VLM type for this photo
+    const photoConfig = requiredPhotos.find(p => p.type === type);
+    if (!photoConfig?.vlmType) return;
+
+    // Set processing state
+    setVlmResults(prev => {
+      const newResults = new Map(prev);
+      newResults.set(type, {
+        photoType: type,
+        analysisType: photoConfig.vlmType!,
+        extractedValue: null,
+        extractedNumeric: null,
+        confidence: 0,
+        isProcessing: true,
+      });
+      return newResults;
+    });
+    setIsProcessingVlm(true);
+
+    try {
+      // Extract base64 from data URL
+      const base64 = photo.dataUrl.split(',')[1];
+
+      const response = await fetch('/api/fleet/check-in/process-vlm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          photoId: `temp-${Date.now()}`, // Will be replaced after record creation
+          recordId: 'pending',
+          vehicleId,
+          analysisType: photoConfig.vlmType,
+          base64Image: base64,
+          expectedPlate: vehicleRegistration,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.result) {
+        const result = data.result;
+
+        // Update VLM result
+        setVlmResults(prev => {
+          const newResults = new Map(prev);
+          newResults.set(type, {
+            photoType: type,
+            analysisType: photoConfig.vlmType!,
+            extractedValue: result.extractedValue,
+            extractedNumeric: result.extractedNumeric,
+            confidence: result.confidence,
+            plateMatches: result.plateMatches,
+            isProcessing: false,
+            error: result.error,
+          });
+          return newResults;
+        });
+
+        // Auto-fill form fields from VLM
+        if (result.extractedNumeric !== null && result.confidence > 0.5) {
+          if (photoConfig.vlmType === 'odometer') {
+            setFormState(prev => ({ ...prev, odometerReading: String(result.extractedNumeric) }));
+          } else if (photoConfig.vlmType === 'fuel_gauge') {
+            setFormState(prev => ({ ...prev, fuelLevel: String(result.extractedNumeric) }));
+          }
+        }
+      } else {
+        // VLM processing failed
+        setVlmResults(prev => {
+          const newResults = new Map(prev);
+          newResults.set(type, {
+            photoType: type,
+            analysisType: photoConfig.vlmType!,
+            extractedValue: null,
+            extractedNumeric: null,
+            confidence: 0,
+            isProcessing: false,
+            error: data.result?.error || 'VLM processing failed',
+          });
+          return newResults;
+        });
+      }
+    } catch (err) {
+      setVlmResults(prev => {
+        const newResults = new Map(prev);
+        newResults.set(type, {
+          photoType: type,
+          analysisType: photoConfig.vlmType!,
+          extractedValue: null,
+          extractedNumeric: null,
+          confidence: 0,
+          isProcessing: false,
+          error: err instanceof Error ? err.message : 'VLM processing failed',
+        });
+        return newResults;
+      });
+    } finally {
+      setIsProcessingVlm(false);
+    }
+  }, [formState.photos, requiredPhotos, vehicleId, vehicleRegistration]);
 
   // Validation
   const validationErrors: string[] = [];
 
-  // Check all items have responses
-  const unansweredItems = template?.items.filter(item => !formState.responses.has(item.id)) || [];
-  if (unansweredItems.length > 0) {
-    validationErrors.push(`${unansweredItems.length} items not checked`);
+  // Check all items have responses (only for weekly checks with checklist items)
+  if (checkType === 'weekly' && template?.items.length) {
+    const unansweredItems = template.items.filter(item => !formState.responses.has(item.id));
+    if (unansweredItems.length > 0) {
+      validationErrors.push(`${unansweredItems.length} items not checked`);
+    }
   }
 
   // Check required photos
-  const requiredPhotos: CheckPhotoType[] = ['front', 'rear', 'dashboard'];
-  const missingPhotos = requiredPhotos.filter(type => !formState.photos.has(type));
+  const requiredPhotoTypes = requiredPhotos.filter(p => p.required).map(p => p.type);
+  const missingPhotos = requiredPhotoTypes.filter(type => !formState.photos.has(type));
   if (missingPhotos.length > 0) {
-    validationErrors.push(`Missing required photos: ${missingPhotos.join(', ')}`);
+    const labels = missingPhotos.map(type => {
+      const config = requiredPhotos.find(p => p.type === type);
+      return config?.label || type;
+    });
+    validationErrors.push(`Missing: ${labels.join(', ')}`);
+  }
+
+  // Check odometer reading (required for both daily and weekly)
+  if (!formState.odometerReading) {
+    validationErrors.push('Odometer reading required');
   }
 
   // Check failures
@@ -159,11 +393,11 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   const hasCriticalFailures = responses.some(r => !r.isPassed && r.severity === 'critical');
   const hasMinorFailures = responses.some(r => !r.isPassed && r.severity === 'minor');
 
-  const canSubmit = validationErrors.length === 0 && template !== null;
+  const canSubmit = validationErrors.length === 0;
 
   // Submit handler
   const submit = useCallback(async (): Promise<CheckRecord | null> => {
-    if (!canSubmit || !template) return null;
+    if (!canSubmit) return null;
 
     setIsSubmitting(true);
     setError(null);
@@ -175,6 +409,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       const input: CreateCheckRecordInput = {
         vehicleId: formState.vehicleId,
         templateId: formState.templateId || undefined,
+        checkType: formState.checkType,
         driverId,
         driverName,
         odometerReading: formState.odometerReading ? parseInt(formState.odometerReading, 10) : undefined,
@@ -186,6 +421,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
         const offlineRecord = await offlineStorage.saveOfflineRecord({
           vehicleId: input.vehicleId,
           templateId: input.templateId || null,
+          checkType: input.checkType,
           driverId: input.driverId,
           driverName: input.driverName,
           odometerReading: input.odometerReading || null,
@@ -207,6 +443,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
           id: offlineRecord.offlineId,
           vehicleId: input.vehicleId,
           templateId: input.templateId || null,
+          checkType: input.checkType || 'daily',
           driverId: input.driverId,
           driverName: input.driverName,
           checkDate: offlineRecord.checkDate,
@@ -262,24 +499,27 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSubmit, template, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures]);
+  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures]);
 
   // Reset form
   const reset = useCallback(() => {
     setFormState({
       vehicleId,
       templateId: template?.id || null,
+      checkType,
       odometerReading: '',
+      fuelLevel: '',
       responses: new Map(),
       photos: new Map(),
     });
+    setVlmResults(new Map());
     setError(null);
-  }, [vehicleId, template]);
+  }, [vehicleId, template, checkType]);
 
   // Load default template on mount
   useEffect(() => {
-    loadTemplate();
-  }, [loadTemplate]);
+    loadTemplate(initialCheckType);
+  }, [initialCheckType]); // Only run on mount
 
   return {
     template,
@@ -287,16 +527,24 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     isLoading,
     isSubmitting,
     error,
+    checkType,
+    vlmResults,
+    isProcessingVlm,
+    setCheckType,
     setOdometerReading,
+    setFuelLevel,
     setItemResponse,
     setPhoto,
     removePhoto,
+    overrideVlmValue,
     loadTemplate,
+    processPhotoWithVlm,
     submit,
     reset,
     canSubmit,
     validationErrors,
     hasCriticalFailures,
     hasMinorFailures,
+    requiredPhotos,
   };
 }

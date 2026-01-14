@@ -57,8 +57,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!input.driverName) {
           return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Driver name is required');
         }
-        if (!input.responses || !Array.isArray(input.responses)) {
-          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Responses array is required');
+        // Responses are required for weekly checks, optional for daily
+        if (input.checkType === 'weekly' && (!input.responses || !Array.isArray(input.responses))) {
+          return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Responses array is required for weekly checks');
+        }
+        // Ensure responses is at least an empty array
+        if (!input.responses) {
+          input.responses = [];
         }
 
         const record = await createCheckRecord(input);

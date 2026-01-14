@@ -22,13 +22,26 @@ import {
   FleetCheckRecordRow,
   FleetCheckResponseRow,
   FleetCheckPhotoRow,
+  FleetOdometerHistoryRow,
+  FleetFuelHistoryRow,
+  FleetCheckScheduleRow,
+  FleetVehicleThresholdRow,
   rowToCheckTemplate,
   rowToCheckItem,
   rowToCheckRecord,
   rowToCheckResponse,
   rowToCheckPhoto,
+  rowToOdometerHistory,
+  rowToFuelHistory,
+  rowToCheckSchedule,
+  rowToVehicleThreshold,
   CheckRecordStatus,
-  IssueSeverity,
+  CheckType,
+  OdometerHistory,
+  FuelHistory,
+  CheckSchedule,
+  VehicleThreshold,
+  OdometerSource,
 } from '../types/check-in.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -88,17 +101,46 @@ export async function getDefaultTemplate(): Promise<CheckTemplateWithItems | nul
 }
 
 /**
+ * Get default template for a specific check type (daily or weekly)
+ */
+export async function getDefaultTemplateByType(checkType: CheckType): Promise<CheckTemplateWithItems | null> {
+  const [templateRow] = await sql`
+    SELECT * FROM fleet_check_templates
+    WHERE check_type = ${checkType} AND is_default = true AND is_active = true
+    LIMIT 1
+  ` as FleetCheckTemplateRow[];
+
+  if (!templateRow) return null;
+
+  return getTemplateWithItems(templateRow.id);
+}
+
+/**
+ * Get templates by check type
+ */
+export async function getTemplatesByType(checkType: CheckType): Promise<CheckTemplate[]> {
+  const rows = await sql`
+    SELECT * FROM fleet_check_templates
+    WHERE check_type = ${checkType} AND is_active = true
+    ORDER BY is_default DESC, name ASC
+  ` as FleetCheckTemplateRow[];
+
+  return rows.map(rowToCheckTemplate);
+}
+
+/**
  * Create a new template
  */
 export async function createTemplate(input: CreateTemplateInput): Promise<CheckTemplate> {
-  // If setting as default, unset other defaults
+  // If setting as default, unset other defaults for same check_type
+  const checkType = input.checkType || 'daily';
   if (input.isDefault) {
-    await sql`UPDATE fleet_check_templates SET is_default = false WHERE is_default = true`;
+    await sql`UPDATE fleet_check_templates SET is_default = false WHERE is_default = true AND check_type = ${checkType}`;
   }
 
   const [row] = await sql`
-    INSERT INTO fleet_check_templates (name, description, is_default)
-    VALUES (${input.name}, ${input.description || null}, ${input.isDefault || false})
+    INSERT INTO fleet_check_templates (name, description, check_type, is_default)
+    VALUES (${input.name}, ${input.description || null}, ${checkType}, ${input.isDefault || false})
     RETURNING *
   ` as FleetCheckTemplateRow[];
 
@@ -245,11 +287,12 @@ export async function createCheckRecord(input: CreateCheckRecordInput): Promise<
   // Determine if there are critical or minor issues
   const hasCritical = input.responses.some(r => !r.isPassed && r.severity === 'critical');
   const hasMinor = input.responses.some(r => !r.isPassed && r.severity === 'minor');
+  const checkType = input.checkType || 'daily';
 
   // Insert the record
   const [recordRow] = await sql`
     INSERT INTO fleet_check_records (
-      vehicle_id, template_id, driver_id, driver_name,
+      vehicle_id, template_id, driver_id, driver_name, check_type,
       odometer_reading, has_critical_issues, has_minor_issues,
       offline_id, sync_status
     )
@@ -258,6 +301,7 @@ export async function createCheckRecord(input: CreateCheckRecordInput): Promise<
       ${input.templateId || null},
       ${input.driverId},
       ${input.driverName},
+      ${checkType},
       ${input.odometerReading || null},
       ${hasCritical},
       ${hasMinor},
@@ -284,6 +328,9 @@ export async function createCheckRecord(input: CreateCheckRecordInput): Promise<
       )
     `;
   }
+
+  // Update check schedule
+  await updateCheckScheduleAfterCheckIn(input.vehicleId, checkType);
 
   return rowToCheckRecord(recordRow);
 }
@@ -764,4 +811,381 @@ export async function getFleetCheckInStats(): Promise<{
     pendingApprovals: parseInt(stats?.pending_approvals || '0', 10),
     vehiclesWithCriticalIssues: parseInt(criticalStats?.count || '0', 10),
   };
+}
+
+// ============================================================================
+// Odometer History
+// ============================================================================
+
+/**
+ * Record an odometer reading
+ */
+export async function recordOdometerReading(input: {
+  vehicleId: string;
+  checkRecordId?: string;
+  reading: number;
+  source: OdometerSource;
+  vlmConfidence?: number;
+}): Promise<OdometerHistory> {
+  // Get the previous reading for comparison
+  const [previousRow] = await sql`
+    SELECT reading, recorded_at FROM fleet_odometer_history
+    WHERE vehicle_id = ${input.vehicleId}
+    ORDER BY recorded_at DESC
+    LIMIT 1
+  ` as { reading: number; recorded_at: string }[];
+
+  const previousReading = previousRow?.reading || null;
+  const kmSinceLast = previousReading !== null ? input.reading - previousReading : null;
+
+  // Check for discrepancy
+  let discrepancyFlag = false;
+  let discrepancyReason: string | null = null;
+
+  if (kmSinceLast !== null) {
+    // Get vehicle thresholds
+    const threshold = await getVehicleThreshold(input.vehicleId);
+    const dailyThreshold = threshold?.dailyKmThreshold || 500;
+
+    // Check for rollback
+    if (kmSinceLast < 0) {
+      discrepancyFlag = true;
+      discrepancyReason = `Odometer rollback: ${input.reading} km < previous ${previousReading} km`;
+    }
+    // Check for excessive km (assume 1 day between checks for now)
+    else if (kmSinceLast > dailyThreshold) {
+      discrepancyFlag = true;
+      discrepancyReason = `Excessive km: ${kmSinceLast} km exceeds ${dailyThreshold} km/day threshold`;
+    }
+  }
+
+  const [row] = await sql`
+    INSERT INTO fleet_odometer_history (
+      vehicle_id, check_record_id, reading, source, vlm_confidence,
+      previous_reading, km_since_last, discrepancy_flag, discrepancy_reason
+    )
+    VALUES (
+      ${input.vehicleId},
+      ${input.checkRecordId || null},
+      ${input.reading},
+      ${input.source},
+      ${input.vlmConfidence || null},
+      ${previousReading},
+      ${kmSinceLast},
+      ${discrepancyFlag},
+      ${discrepancyReason}
+    )
+    RETURNING *
+  ` as FleetOdometerHistoryRow[];
+
+  if (!row) {
+    throw new Error('Failed to record odometer reading');
+  }
+
+  return rowToOdometerHistory(row);
+}
+
+/**
+ * Get odometer history for a vehicle
+ */
+export async function getOdometerHistory(
+  vehicleId: string,
+  limit = 30
+): Promise<OdometerHistory[]> {
+  const rows = await sql`
+    SELECT * FROM fleet_odometer_history
+    WHERE vehicle_id = ${vehicleId}
+    ORDER BY recorded_at DESC
+    LIMIT ${limit}
+  ` as FleetOdometerHistoryRow[];
+
+  return rows.map(rowToOdometerHistory);
+}
+
+/**
+ * Get the latest odometer reading for a vehicle
+ */
+export async function getLatestOdometerReading(vehicleId: string): Promise<OdometerHistory | null> {
+  const [row] = await sql`
+    SELECT * FROM fleet_odometer_history
+    WHERE vehicle_id = ${vehicleId}
+    ORDER BY recorded_at DESC
+    LIMIT 1
+  ` as FleetOdometerHistoryRow[];
+
+  return row ? rowToOdometerHistory(row) : null;
+}
+
+// ============================================================================
+// Fuel History
+// ============================================================================
+
+/**
+ * Record a fuel level reading
+ */
+export async function recordFuelLevel(input: {
+  vehicleId: string;
+  checkRecordId?: string;
+  fuelLevel: number;
+  source: OdometerSource;
+  vlmConfidence?: number;
+}): Promise<FuelHistory> {
+  // Get the previous level for comparison
+  const [previousRow] = await sql`
+    SELECT fuel_level FROM fleet_fuel_history
+    WHERE vehicle_id = ${input.vehicleId}
+    ORDER BY recorded_at DESC
+    LIMIT 1
+  ` as { fuel_level: number }[];
+
+  const previousLevel = previousRow?.fuel_level || null;
+  const levelChange = previousLevel !== null ? input.fuelLevel - previousLevel : null;
+
+  const [row] = await sql`
+    INSERT INTO fleet_fuel_history (
+      vehicle_id, check_record_id, fuel_level, source, vlm_confidence,
+      previous_level, level_change
+    )
+    VALUES (
+      ${input.vehicleId},
+      ${input.checkRecordId || null},
+      ${input.fuelLevel},
+      ${input.source},
+      ${input.vlmConfidence || null},
+      ${previousLevel},
+      ${levelChange}
+    )
+    RETURNING *
+  ` as FleetFuelHistoryRow[];
+
+  if (!row) {
+    throw new Error('Failed to record fuel level');
+  }
+
+  return rowToFuelHistory(row);
+}
+
+/**
+ * Get fuel history for a vehicle
+ */
+export async function getFuelHistory(
+  vehicleId: string,
+  limit = 30
+): Promise<FuelHistory[]> {
+  const rows = await sql`
+    SELECT * FROM fleet_fuel_history
+    WHERE vehicle_id = ${vehicleId}
+    ORDER BY recorded_at DESC
+    LIMIT ${limit}
+  ` as FleetFuelHistoryRow[];
+
+  return rows.map(rowToFuelHistory);
+}
+
+/**
+ * Get the latest fuel level for a vehicle
+ */
+export async function getLatestFuelLevel(vehicleId: string): Promise<FuelHistory | null> {
+  const [row] = await sql`
+    SELECT * FROM fleet_fuel_history
+    WHERE vehicle_id = ${vehicleId}
+    ORDER BY recorded_at DESC
+    LIMIT 1
+  ` as FleetFuelHistoryRow[];
+
+  return row ? rowToFuelHistory(row) : null;
+}
+
+// ============================================================================
+// Check Schedule
+// ============================================================================
+
+/**
+ * Get check schedule for a vehicle
+ */
+export async function getCheckSchedule(vehicleId: string): Promise<CheckSchedule | null> {
+  const [row] = await sql`
+    SELECT * FROM fleet_check_schedule WHERE vehicle_id = ${vehicleId}
+  ` as FleetCheckScheduleRow[];
+
+  return row ? rowToCheckSchedule(row) : null;
+}
+
+/**
+ * Update check schedule after a check-in
+ */
+async function updateCheckScheduleAfterCheckIn(
+  vehicleId: string,
+  checkType: CheckType
+): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+
+  if (checkType === 'daily') {
+    await sql`
+      INSERT INTO fleet_check_schedule (vehicle_id, daily_last_check, reminder_sent_daily)
+      VALUES (${vehicleId}, ${today}, false)
+      ON CONFLICT (vehicle_id) DO UPDATE SET
+        daily_last_check = ${today},
+        reminder_sent_daily = false,
+        updated_at = NOW()
+    `;
+  } else {
+    await sql`
+      INSERT INTO fleet_check_schedule (vehicle_id, weekly_last_check, reminder_sent_weekly)
+      VALUES (${vehicleId}, ${today}, false)
+      ON CONFLICT (vehicle_id) DO UPDATE SET
+        weekly_last_check = ${today},
+        reminder_sent_weekly = false,
+        updated_at = NOW()
+    `;
+  }
+}
+
+/**
+ * Get vehicles needing daily check
+ */
+export async function getVehiclesNeedingDailyCheck(): Promise<string[]> {
+  const today = new Date().toISOString().split('T')[0];
+
+  const rows = await sql`
+    SELECT v.id
+    FROM fleet_vehicles v
+    LEFT JOIN fleet_check_schedule s ON s.vehicle_id = v.id
+    WHERE v.status = 'active'
+    AND (s.daily_last_check IS NULL OR s.daily_last_check < ${today})
+    AND (s.weekly_last_check IS NULL OR s.weekly_last_check < ${today})
+  ` as { id: string }[];
+
+  return rows.map(r => r.id);
+}
+
+/**
+ * Get vehicles needing weekly check (on Mondays)
+ */
+export async function getVehiclesNeedingWeeklyCheck(): Promise<string[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon
+
+  // Only check on Mondays
+  if (dayOfWeek !== 1) return [];
+
+  const rows = await sql`
+    SELECT v.id
+    FROM fleet_vehicles v
+    LEFT JOIN fleet_check_schedule s ON s.vehicle_id = v.id
+    WHERE v.status = 'active'
+    AND (s.weekly_last_check IS NULL OR s.weekly_last_check < ${today} - INTERVAL '6 days')
+  ` as { id: string }[];
+
+  return rows.map(r => r.id);
+}
+
+/**
+ * Mark reminder as sent for a vehicle
+ */
+export async function markReminderSent(
+  vehicleId: string,
+  checkType: CheckType
+): Promise<void> {
+  if (checkType === 'daily') {
+    await sql`
+      UPDATE fleet_check_schedule
+      SET reminder_sent_daily = true, updated_at = NOW()
+      WHERE vehicle_id = ${vehicleId}
+    `;
+  } else {
+    await sql`
+      UPDATE fleet_check_schedule
+      SET reminder_sent_weekly = true, updated_at = NOW()
+      WHERE vehicle_id = ${vehicleId}
+    `;
+  }
+}
+
+/**
+ * Reset daily reminders (called at midnight)
+ */
+export async function resetDailyReminders(): Promise<void> {
+  await sql`
+    UPDATE fleet_check_schedule
+    SET reminder_sent_daily = false, updated_at = NOW()
+  `;
+}
+
+// ============================================================================
+// Vehicle Thresholds
+// ============================================================================
+
+/**
+ * Get vehicle threshold configuration
+ */
+export async function getVehicleThreshold(vehicleId: string): Promise<VehicleThreshold | null> {
+  const [row] = await sql`
+    SELECT * FROM fleet_vehicle_thresholds WHERE vehicle_id = ${vehicleId}
+  ` as FleetVehicleThresholdRow[];
+
+  return row ? rowToVehicleThreshold(row) : null;
+}
+
+/**
+ * Update vehicle threshold configuration
+ */
+export async function updateVehicleThreshold(
+  vehicleId: string,
+  input: {
+    dailyKmThreshold?: number;
+    weeklyKmThreshold?: number;
+  }
+): Promise<VehicleThreshold> {
+  const [row] = await sql`
+    INSERT INTO fleet_vehicle_thresholds (vehicle_id, daily_km_threshold, weekly_km_threshold)
+    VALUES (
+      ${vehicleId},
+      ${input.dailyKmThreshold || 500},
+      ${input.weeklyKmThreshold || 1000}
+    )
+    ON CONFLICT (vehicle_id) DO UPDATE SET
+      daily_km_threshold = COALESCE(${input.dailyKmThreshold || null}, fleet_vehicle_thresholds.daily_km_threshold),
+      weekly_km_threshold = COALESCE(${input.weeklyKmThreshold || null}, fleet_vehicle_thresholds.weekly_km_threshold),
+      updated_at = NOW()
+    RETURNING *
+  ` as FleetVehicleThresholdRow[];
+
+  if (!row) {
+    throw new Error('Failed to update vehicle threshold');
+  }
+
+  return rowToVehicleThreshold(row);
+}
+
+/**
+ * Determine which check type is needed for a vehicle today
+ */
+export async function getRequiredCheckType(vehicleId: string): Promise<CheckType | null> {
+  const today = new Date().toISOString().split('T')[0];
+  const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon
+
+  const schedule = await getCheckSchedule(vehicleId);
+
+  // If Monday and no weekly check done this week, require weekly
+  if (dayOfWeek === 1) {
+    const weekAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const weekAgo = weekAgoDate.split('T')[0] ?? weekAgoDate.substring(0, 10);
+    if (!schedule?.weeklyLastCheck || schedule.weeklyLastCheck < weekAgo) {
+      return 'weekly';
+    }
+  }
+
+  // If weekly check done today, no daily needed
+  if (schedule?.weeklyLastCheck === today) {
+    return null;
+  }
+
+  // If daily check already done today, no check needed
+  if (schedule?.dailyLastCheck === today) {
+    return null;
+  }
+
+  // Otherwise, daily check needed
+  return 'daily';
 }

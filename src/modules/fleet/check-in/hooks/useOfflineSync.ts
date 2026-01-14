@@ -92,11 +92,13 @@ export function useOfflineSync(): UseOfflineSyncReturn {
         offlineId: record.offlineId,
         vehicleId: record.vehicleId,
         templateId: record.templateId,
+        checkType: record.checkType,
         driverId: record.driverId,
         driverName: record.driverName,
         checkDate: record.checkDate,
         checkTime: record.checkTime,
         odometerReading: record.odometerReading,
+        fuelLevel: record.fuelLevel,
         responses: record.responses,
         photos: record.photos.map(p => ({
           photoType: p.photoType,

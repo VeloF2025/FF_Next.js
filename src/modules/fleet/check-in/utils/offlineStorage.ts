@@ -9,6 +9,7 @@ import type {
   OfflinePhoto,
   CreateCheckResponseInput,
   CheckPhotoType,
+  CheckType,
 } from '../../types/check-in.types';
 
 // ============================================================================
@@ -88,9 +89,11 @@ function openDatabase(): Promise<IDBDatabase> {
 export async function saveOfflineRecord(record: {
   vehicleId: string;
   templateId: string | null;
+  checkType?: CheckType;
   driverId: string;
   driverName: string;
   odometerReading: number | null;
+  fuelLevel?: number | null;
   responses: CreateCheckResponseInput[];
 }): Promise<OfflineCheckRecord> {
   const db = await openDatabase();
@@ -100,11 +103,13 @@ export async function saveOfflineRecord(record: {
     offlineId: generateOfflineId(),
     vehicleId: record.vehicleId,
     templateId: record.templateId,
+    checkType: record.checkType || 'daily',
     driverId: record.driverId,
     driverName: record.driverName,
     checkDate: now.toISOString().split('T')[0] ?? now.toISOString().substring(0, 10),
     checkTime: now.toTimeString().split(' ')[0] ?? '00:00:00',
     odometerReading: record.odometerReading,
+    fuelLevel: record.fuelLevel ?? null,
     responses: record.responses,
     photos: [],
     createdAt: new Date().toISOString(),
