@@ -2,6 +2,13 @@
  * VLM (Vision Language Model) Integration Service
  * Connects to trained VLM at port 8100 for DR photo evaluation
  * Based on DR_PHOTO_VERIFICATION_FIBERTIME_ALIGNED.md specification
+ *
+ * @deprecated This service is deprecated as of Phase 6 Week 6.4 (January 2026).
+ * The unified DR photo review system now uses unifiedVlmService.ts which combines
+ * manual QA and AI evaluation in a single workflow.
+ * This service is kept for backward compatibility during the 2-week transition period.
+ *
+ * @see src/modules/dr-photo-unified/services/unifiedVlmService.ts
  */
 
 import { EvaluationResult } from '../types';

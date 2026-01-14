@@ -2,6 +2,13 @@
  * QA Review Card Component
  * Individual card for reviewing a drop with 14 QA checkboxes
  * Allows QA reviewers to check/uncheck steps, add comments, and mark status
+ *
+ * @deprecated This component is deprecated as of Phase 6 Week 6.4 (January 2026).
+ * The unified DR photo review system (UnifiedReviewCard) is now the default for all projects.
+ * This component is kept for backward compatibility during the 2-week transition period.
+ * Will be removed after port 8003 shutdown (2 weeks from full rollout).
+ *
+ * @see src/modules/dr-photo-unified/components/UnifiedReviewCard.tsx
  */
 
 'use client';

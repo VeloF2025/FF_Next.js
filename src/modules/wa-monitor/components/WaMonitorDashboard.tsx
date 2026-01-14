@@ -14,6 +14,8 @@ import { downloadCSV } from '../utils/waMonitorHelpers';
 import { QaReviewCard } from './QaReviewCard';
 import { WaMonitorFilters, type FilterState } from './WaMonitorFilters';
 import type { QaReviewDrop, WaMonitorSummary, DailyDropsPerProject } from '../types/wa-monitor.types';
+import { UnifiedReviewCard } from '@/modules/dr-photo-unified/components/UnifiedReviewCard';
+import { isUnifiedReviewEnabled } from '@/lib/featureFlags';
 
 const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
 const ITEMS_PER_PAGE = 20; // Show 20 drops per page
@@ -468,14 +470,26 @@ export function WaMonitorDashboard() {
       ) : (
         <>
           <Box>
-            {paginatedDrops.map((drop) => (
-              <QaReviewCard
-                key={drop.id}
-                drop={drop}
-                onUpdate={handleDropUpdate}
-                onSendFeedback={handleSendFeedback}
-              />
-            ))}
+            {paginatedDrops.map((drop) => {
+              // Phase 6: Feature flag for gradual rollout
+              const useUnifiedReview = isUnifiedReviewEnabled(drop.project);
+
+              return useUnifiedReview ? (
+                // NEW: Unified review card (Phase 6 rollout)
+                <UnifiedReviewCard
+                  key={drop.id}
+                  dropNumber={drop.dropNumber}
+                />
+              ) : (
+                // OLD: Original QA review card (legacy system)
+                <QaReviewCard
+                  key={drop.id}
+                  drop={drop}
+                  onUpdate={handleDropUpdate}
+                  onSendFeedback={handleSendFeedback}
+                />
+              );
+            })}
           </Box>
 
           {/* Pagination */}
