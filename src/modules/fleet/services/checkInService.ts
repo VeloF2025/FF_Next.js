@@ -1,0 +1,767 @@
+/**
+ * Fleet Vehicle Check-In Service
+ * Business logic for daily pre-trip inspections
+ */
+
+import { neon } from '@neondatabase/serverless';
+import {
+  CheckTemplate,
+  CheckItem,
+  CheckRecord,
+  CheckResponse,
+  CheckPhoto,
+  CheckTemplateWithItems,
+  CheckRecordWithDetails,
+  CreateCheckRecordInput,
+  CreateTemplateInput,
+  CreateCheckItemInput,
+  VehicleAvailabilityResult,
+  SyncCheckRecordRequest,
+  FleetCheckTemplateRow,
+  FleetCheckItemRow,
+  FleetCheckRecordRow,
+  FleetCheckResponseRow,
+  FleetCheckPhotoRow,
+  rowToCheckTemplate,
+  rowToCheckItem,
+  rowToCheckRecord,
+  rowToCheckResponse,
+  rowToCheckPhoto,
+  CheckRecordStatus,
+  IssueSeverity,
+} from '../types/check-in.types';
+
+const sql = neon(process.env.DATABASE_URL!);
+
+// ============================================================================
+// Templates
+// ============================================================================
+
+/**
+ * Get all active templates
+ */
+export async function getTemplates(): Promise<CheckTemplate[]> {
+  const rows = await sql`
+    SELECT * FROM fleet_check_templates
+    WHERE is_active = true
+    ORDER BY is_default DESC, name ASC
+  ` as FleetCheckTemplateRow[];
+
+  return rows.map(rowToCheckTemplate);
+}
+
+/**
+ * Get template by ID with items
+ */
+export async function getTemplateWithItems(templateId: string): Promise<CheckTemplateWithItems | null> {
+  const [templateRow] = await sql`
+    SELECT * FROM fleet_check_templates WHERE id = ${templateId}
+  ` as FleetCheckTemplateRow[];
+
+  if (!templateRow) return null;
+
+  const itemRows = await sql`
+    SELECT * FROM fleet_check_items
+    WHERE template_id = ${templateId} AND is_active = true
+    ORDER BY display_order ASC
+  ` as FleetCheckItemRow[];
+
+  return {
+    ...rowToCheckTemplate(templateRow),
+    items: itemRows.map(rowToCheckItem),
+  };
+}
+
+/**
+ * Get default template with items
+ */
+export async function getDefaultTemplate(): Promise<CheckTemplateWithItems | null> {
+  const [templateRow] = await sql`
+    SELECT * FROM fleet_check_templates
+    WHERE is_default = true AND is_active = true
+    LIMIT 1
+  ` as FleetCheckTemplateRow[];
+
+  if (!templateRow) return null;
+
+  return getTemplateWithItems(templateRow.id);
+}
+
+/**
+ * Create a new template
+ */
+export async function createTemplate(input: CreateTemplateInput): Promise<CheckTemplate> {
+  // If setting as default, unset other defaults
+  if (input.isDefault) {
+    await sql`UPDATE fleet_check_templates SET is_default = false WHERE is_default = true`;
+  }
+
+  const [row] = await sql`
+    INSERT INTO fleet_check_templates (name, description, is_default)
+    VALUES (${input.name}, ${input.description || null}, ${input.isDefault || false})
+    RETURNING *
+  ` as FleetCheckTemplateRow[];
+
+  if (!row) {
+    throw new Error('Failed to create template');
+  }
+
+  return rowToCheckTemplate(row);
+}
+
+/**
+ * Update a template
+ */
+export async function updateTemplate(
+  templateId: string,
+  input: Partial<CreateTemplateInput>
+): Promise<CheckTemplate | null> {
+  // If setting as default, unset other defaults
+  if (input.isDefault) {
+    await sql`UPDATE fleet_check_templates SET is_default = false WHERE is_default = true AND id != ${templateId}`;
+  }
+
+  const [row] = await sql`
+    UPDATE fleet_check_templates
+    SET
+      name = COALESCE(${input.name || null}, name),
+      description = COALESCE(${input.description || null}, description),
+      is_default = COALESCE(${input.isDefault ?? null}, is_default),
+      updated_at = NOW()
+    WHERE id = ${templateId}
+    RETURNING *
+  ` as FleetCheckTemplateRow[];
+
+  return row ? rowToCheckTemplate(row) : null;
+}
+
+/**
+ * Soft-delete a template
+ */
+export async function deleteTemplate(templateId: string): Promise<boolean> {
+  const result = await sql`
+    UPDATE fleet_check_templates SET is_active = false WHERE id = ${templateId} RETURNING id
+  `;
+  return result.length > 0;
+}
+
+// ============================================================================
+// Check Items
+// ============================================================================
+
+/**
+ * Get items for a template
+ */
+export async function getItemsForTemplate(templateId: string): Promise<CheckItem[]> {
+  const rows = await sql`
+    SELECT * FROM fleet_check_items
+    WHERE template_id = ${templateId} AND is_active = true
+    ORDER BY display_order ASC
+  ` as FleetCheckItemRow[];
+
+  return rows.map(rowToCheckItem);
+}
+
+/**
+ * Create a check item
+ */
+export async function createCheckItem(input: CreateCheckItemInput): Promise<CheckItem> {
+  const [row] = await sql`
+    INSERT INTO fleet_check_items (template_id, name, description, category, is_critical, display_order)
+    VALUES (
+      ${input.templateId},
+      ${input.name},
+      ${input.description || null},
+      ${input.category || null},
+      ${input.isCritical || false},
+      ${input.displayOrder || 0}
+    )
+    RETURNING *
+  ` as FleetCheckItemRow[];
+
+  if (!row) {
+    throw new Error('Failed to create check item');
+  }
+
+  return rowToCheckItem(row);
+}
+
+/**
+ * Update a check item
+ */
+export async function updateCheckItem(
+  itemId: string,
+  input: Partial<Omit<CreateCheckItemInput, 'templateId'>>
+): Promise<CheckItem | null> {
+  const [row] = await sql`
+    UPDATE fleet_check_items
+    SET
+      name = COALESCE(${input.name || null}, name),
+      description = COALESCE(${input.description || null}, description),
+      category = COALESCE(${input.category || null}, category),
+      is_critical = COALESCE(${input.isCritical ?? null}, is_critical),
+      display_order = COALESCE(${input.displayOrder ?? null}, display_order)
+    WHERE id = ${itemId}
+    RETURNING *
+  ` as FleetCheckItemRow[];
+
+  return row ? rowToCheckItem(row) : null;
+}
+
+/**
+ * Soft-delete a check item
+ */
+export async function deleteCheckItem(itemId: string): Promise<boolean> {
+  const result = await sql`
+    UPDATE fleet_check_items SET is_active = false WHERE id = ${itemId} RETURNING id
+  `;
+  return result.length > 0;
+}
+
+/**
+ * Reorder check items
+ */
+export async function reorderCheckItems(
+  templateId: string,
+  itemIds: string[]
+): Promise<void> {
+  for (let i = 0; i < itemIds.length; i++) {
+    await sql`
+      UPDATE fleet_check_items
+      SET display_order = ${i}
+      WHERE id = ${itemIds[i]} AND template_id = ${templateId}
+    `;
+  }
+}
+
+// ============================================================================
+// Check Records
+// ============================================================================
+
+/**
+ * Create a check record with responses
+ */
+export async function createCheckRecord(input: CreateCheckRecordInput): Promise<CheckRecord> {
+  // Determine if there are critical or minor issues
+  const hasCritical = input.responses.some(r => !r.isPassed && r.severity === 'critical');
+  const hasMinor = input.responses.some(r => !r.isPassed && r.severity === 'minor');
+
+  // Insert the record
+  const [recordRow] = await sql`
+    INSERT INTO fleet_check_records (
+      vehicle_id, template_id, driver_id, driver_name,
+      odometer_reading, has_critical_issues, has_minor_issues,
+      offline_id, sync_status
+    )
+    VALUES (
+      ${input.vehicleId},
+      ${input.templateId || null},
+      ${input.driverId},
+      ${input.driverName},
+      ${input.odometerReading || null},
+      ${hasCritical},
+      ${hasMinor},
+      ${input.offlineId || null},
+      ${input.offlineId ? 'synced' : 'synced'}
+    )
+    RETURNING *
+  ` as FleetCheckRecordRow[];
+
+  if (!recordRow) {
+    throw new Error('Failed to create check record');
+  }
+
+  // Insert responses
+  for (const response of input.responses) {
+    await sql`
+      INSERT INTO fleet_check_responses (record_id, item_id, is_passed, severity, notes)
+      VALUES (
+        ${recordRow.id},
+        ${response.itemId},
+        ${response.isPassed},
+        ${response.severity || null},
+        ${response.notes || null}
+      )
+    `;
+  }
+
+  return rowToCheckRecord(recordRow);
+}
+
+/**
+ * Get check record by ID with full details
+ */
+export async function getCheckRecordWithDetails(recordId: string): Promise<CheckRecordWithDetails | null> {
+  // Get record with vehicle info
+  const [recordRow] = await sql`
+    SELECT
+      r.*,
+      v.registration,
+      v.make,
+      v.model
+    FROM fleet_check_records r
+    JOIN fleet_vehicles v ON v.id = r.vehicle_id
+    WHERE r.id = ${recordId}
+  ` as (FleetCheckRecordRow & { registration: string; make: string | null; model: string | null })[];
+
+  if (!recordRow) return null;
+
+  // Get responses with item details
+  const responseRows = await sql`
+    SELECT
+      r.*,
+      i.id as item_id,
+      i.template_id as item_template_id,
+      i.name as item_name,
+      i.description as item_description,
+      i.category as item_category,
+      i.is_critical as item_is_critical,
+      i.display_order as item_display_order,
+      i.is_active as item_is_active,
+      i.created_at as item_created_at
+    FROM fleet_check_responses r
+    JOIN fleet_check_items i ON i.id = r.item_id
+    WHERE r.record_id = ${recordId}
+    ORDER BY i.display_order ASC
+  `;
+
+  // Get photos
+  const photoRows = await sql`
+    SELECT * FROM fleet_check_photos WHERE record_id = ${recordId}
+  ` as FleetCheckPhotoRow[];
+
+  return {
+    ...rowToCheckRecord(recordRow),
+    vehicle: {
+      registration: recordRow.registration,
+      make: recordRow.make,
+      model: recordRow.model,
+    },
+    responses: responseRows.map(row => ({
+      ...rowToCheckResponse(row as FleetCheckResponseRow),
+      item: {
+        id: row.item_id,
+        templateId: row.item_template_id,
+        name: row.item_name,
+        description: row.item_description,
+        category: row.item_category,
+        isCritical: row.item_is_critical,
+        displayOrder: row.item_display_order,
+        isActive: row.item_is_active,
+        createdAt: row.item_created_at,
+      },
+    })),
+    photos: photoRows.map(rowToCheckPhoto),
+  };
+}
+
+/**
+ * Get check records for a vehicle
+ */
+export async function getCheckRecordsForVehicle(
+  vehicleId: string,
+  options?: { limit?: number; offset?: number; status?: CheckRecordStatus }
+): Promise<CheckRecord[]> {
+  const limit = options?.limit || 50;
+  const offset = options?.offset || 0;
+
+  let rows: FleetCheckRecordRow[];
+
+  if (options?.status) {
+    rows = await sql`
+      SELECT * FROM fleet_check_records
+      WHERE vehicle_id = ${vehicleId} AND status = ${options.status}
+      ORDER BY check_date DESC, check_time DESC
+      LIMIT ${limit} OFFSET ${offset}
+    ` as FleetCheckRecordRow[];
+  } else {
+    rows = await sql`
+      SELECT * FROM fleet_check_records
+      WHERE vehicle_id = ${vehicleId}
+      ORDER BY check_date DESC, check_time DESC
+      LIMIT ${limit} OFFSET ${offset}
+    ` as FleetCheckRecordRow[];
+  }
+
+  return rows.map(rowToCheckRecord);
+}
+
+/**
+ * Get all check records with pagination
+ */
+export async function getCheckRecords(options?: {
+  limit?: number;
+  offset?: number;
+  status?: CheckRecordStatus;
+  driverId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}): Promise<{ records: CheckRecordWithDetails[]; total: number }> {
+  const limit = options?.limit || 50;
+  const offset = options?.offset || 0;
+
+  // Build dynamic query conditions
+  const conditions: string[] = ['1=1'];
+  if (options?.status) conditions.push(`r.status = '${options.status}'`);
+  if (options?.driverId) conditions.push(`r.driver_id = '${options.driverId}'`);
+  if (options?.dateFrom) conditions.push(`r.check_date >= '${options.dateFrom}'`);
+  if (options?.dateTo) conditions.push(`r.check_date <= '${options.dateTo}'`);
+
+  const whereClause = conditions.join(' AND ');
+
+  // Get records with vehicle info
+  const rows = await sql`
+    SELECT
+      r.*,
+      v.registration,
+      v.make,
+      v.model
+    FROM fleet_check_records r
+    JOIN fleet_vehicles v ON v.id = r.vehicle_id
+    WHERE ${sql.unsafe(whereClause)}
+    ORDER BY r.check_date DESC, r.check_time DESC
+    LIMIT ${limit} OFFSET ${offset}
+  ` as (FleetCheckRecordRow & { registration: string; make: string | null; model: string | null })[];
+
+  // Get total count
+  const countResult = await sql`
+    SELECT COUNT(*) as count FROM fleet_check_records r
+    WHERE ${sql.unsafe(whereClause)}
+  ` as { count: string }[];
+  const count = countResult[0]?.count ?? '0';
+
+  // Get responses and photos for each record
+  const records: CheckRecordWithDetails[] = [];
+  for (const row of rows) {
+    const responseRows = await sql`
+      SELECT
+        r.*,
+        i.id as item_id,
+        i.template_id as item_template_id,
+        i.name as item_name,
+        i.description as item_description,
+        i.category as item_category,
+        i.is_critical as item_is_critical,
+        i.display_order as item_display_order,
+        i.is_active as item_is_active,
+        i.created_at as item_created_at
+      FROM fleet_check_responses r
+      JOIN fleet_check_items i ON i.id = r.item_id
+      WHERE r.record_id = ${row.id}
+      ORDER BY i.display_order ASC
+    `;
+
+    const photoRows = await sql`
+      SELECT * FROM fleet_check_photos WHERE record_id = ${row.id}
+    ` as FleetCheckPhotoRow[];
+
+    records.push({
+      ...rowToCheckRecord(row),
+      vehicle: {
+        registration: row.registration,
+        make: row.make,
+        model: row.model,
+      },
+      responses: responseRows.map(r => ({
+        ...rowToCheckResponse(r as FleetCheckResponseRow),
+        item: {
+          id: r.item_id,
+          templateId: r.item_template_id,
+          name: r.item_name,
+          description: r.item_description,
+          category: r.item_category,
+          isCritical: r.item_is_critical,
+          displayOrder: r.item_display_order,
+          isActive: r.item_is_active,
+          createdAt: r.item_created_at,
+        },
+      })),
+      photos: photoRows.map(rowToCheckPhoto),
+    });
+  }
+
+  return { records, total: parseInt(count, 10) };
+}
+
+/**
+ * Approve or reject a check record
+ */
+export async function updateCheckRecordStatus(
+  recordId: string,
+  status: 'approved' | 'rejected',
+  approvedBy: string,
+  notes?: string
+): Promise<CheckRecord | null> {
+  const [row] = await sql`
+    UPDATE fleet_check_records
+    SET
+      status = ${status},
+      approved_by = ${approvedBy},
+      approved_at = NOW(),
+      approval_notes = ${notes || null},
+      updated_at = NOW()
+    WHERE id = ${recordId}
+    RETURNING *
+  ` as FleetCheckRecordRow[];
+
+  return row ? rowToCheckRecord(row) : null;
+}
+
+// ============================================================================
+// Photos
+// ============================================================================
+
+/**
+ * Add a photo to a check record
+ */
+export async function addCheckPhoto(input: {
+  recordId: string;
+  responseId?: string;
+  photoType: string;
+  isRequired: boolean;
+  fileUrl: string;
+  filePath?: string;
+  fileSize?: number;
+  latitude?: number;
+  longitude?: number;
+}): Promise<CheckPhoto> {
+  const [row] = await sql`
+    INSERT INTO fleet_check_photos (
+      record_id, response_id, photo_type, is_required,
+      file_url, file_path, file_size, latitude, longitude
+    )
+    VALUES (
+      ${input.recordId},
+      ${input.responseId || null},
+      ${input.photoType},
+      ${input.isRequired},
+      ${input.fileUrl},
+      ${input.filePath || null},
+      ${input.fileSize || null},
+      ${input.latitude || null},
+      ${input.longitude || null}
+    )
+    RETURNING *
+  ` as FleetCheckPhotoRow[];
+
+  if (!row) {
+    throw new Error('Failed to add photo');
+  }
+
+  return rowToCheckPhoto(row);
+}
+
+/**
+ * Get photos for a check record
+ */
+export async function getPhotosForRecord(recordId: string): Promise<CheckPhoto[]> {
+  const rows = await sql`
+    SELECT * FROM fleet_check_photos WHERE record_id = ${recordId}
+  ` as FleetCheckPhotoRow[];
+
+  return rows.map(rowToCheckPhoto);
+}
+
+// ============================================================================
+// Vehicle Availability
+// ============================================================================
+
+/**
+ * Check if a vehicle can be used (no critical issues in latest check-in)
+ */
+export async function checkVehicleAvailability(vehicleId: string): Promise<VehicleAvailabilityResult> {
+  // Get the most recent check-in for this vehicle
+  const [latestRecord] = await sql`
+    SELECT * FROM fleet_check_records
+    WHERE vehicle_id = ${vehicleId}
+    ORDER BY check_date DESC, check_time DESC
+    LIMIT 1
+  ` as FleetCheckRecordRow[];
+
+  if (!latestRecord) {
+    return {
+      canUse: true,
+      reason: 'No previous check-in found. Please perform a check-in before use.',
+      criticalIssues: [],
+      minorIssues: [],
+    };
+  }
+
+  // Get failed responses with item details
+  const failedResponses = await sql`
+    SELECT r.*, i.name, i.is_critical
+    FROM fleet_check_responses r
+    JOIN fleet_check_items i ON i.id = r.item_id
+    WHERE r.record_id = ${latestRecord.id} AND r.is_passed = false
+  `;
+
+  const criticalIssues: string[] = [];
+  const minorIssues: string[] = [];
+
+  for (const response of failedResponses) {
+    if (response.is_critical) {
+      criticalIssues.push(response.name);
+    } else {
+      minorIssues.push(response.name);
+    }
+  }
+
+  const canUse = criticalIssues.length === 0;
+
+  return {
+    canUse,
+    reason: canUse
+      ? minorIssues.length > 0
+        ? 'Vehicle has minor issues but can be used'
+        : 'Vehicle passed all checks'
+      : `Vehicle blocked due to critical issues: ${criticalIssues.join(', ')}`,
+    criticalIssues,
+    minorIssues,
+    lastCheckIn: {
+      id: latestRecord.id,
+      checkDate: latestRecord.check_date,
+      checkTime: latestRecord.check_time,
+      driverName: latestRecord.driver_name,
+      status: latestRecord.status as CheckRecordStatus,
+    },
+  };
+}
+
+// ============================================================================
+// Offline Sync
+// ============================================================================
+
+/**
+ * Sync an offline check record
+ */
+export async function syncOfflineCheckRecord(
+  request: SyncCheckRecordRequest
+): Promise<{ success: boolean; recordId?: string; error?: string }> {
+  try {
+    // Check if already synced (by offlineId)
+    const [existing] = await sql`
+      SELECT id FROM fleet_check_records WHERE offline_id = ${request.offlineId}
+    `;
+
+    if (existing) {
+      return { success: true, recordId: existing.id };
+    }
+
+    // Create the record
+    const record = await createCheckRecord({
+      vehicleId: request.vehicleId,
+      templateId: request.templateId || undefined,
+      driverId: request.driverId,
+      driverName: request.driverName,
+      odometerReading: request.odometerReading || undefined,
+      responses: request.responses,
+      offlineId: request.offlineId,
+    });
+
+    // Add photos (would need to handle base64 upload separately)
+    // For now, return success - photo upload handled by separate endpoint
+
+    return { success: true, recordId: record.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Check sync status for multiple offline IDs
+ */
+export async function checkSyncStatus(
+  offlineIds: string[]
+): Promise<Record<string, { synced: boolean; recordId?: string }>> {
+  if (offlineIds.length === 0) return {};
+
+  const rows = await sql`
+    SELECT id, offline_id FROM fleet_check_records
+    WHERE offline_id = ANY(${offlineIds})
+  `;
+
+  const result: Record<string, { synced: boolean; recordId?: string }> = {};
+
+  for (const id of offlineIds) {
+    const row = rows.find(r => r.offline_id === id);
+    result[id] = row
+      ? { synced: true, recordId: row.id }
+      : { synced: false };
+  }
+
+  return result;
+}
+
+// ============================================================================
+// Statistics
+// ============================================================================
+
+/**
+ * Get check-in statistics for a vehicle
+ */
+export async function getVehicleCheckInStats(vehicleId: string): Promise<{
+  totalCheckIns: number;
+  lastCheckIn: string | null;
+  criticalIssueCount: number;
+  minorIssueCount: number;
+  passRate: number;
+}> {
+  const [stats] = await sql`
+    SELECT
+      COUNT(*) as total_check_ins,
+      MAX(check_date || ' ' || check_time) as last_check_in,
+      SUM(CASE WHEN has_critical_issues THEN 1 ELSE 0 END) as critical_issue_count,
+      SUM(CASE WHEN has_minor_issues AND NOT has_critical_issues THEN 1 ELSE 0 END) as minor_issue_count,
+      ROUND(
+        100.0 * SUM(CASE WHEN NOT has_critical_issues AND NOT has_minor_issues THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0),
+        1
+      ) as pass_rate
+    FROM fleet_check_records
+    WHERE vehicle_id = ${vehicleId}
+  `;
+
+  return {
+    totalCheckIns: parseInt(stats?.total_check_ins || '0', 10),
+    lastCheckIn: stats?.last_check_in || null,
+    criticalIssueCount: parseInt(stats?.critical_issue_count || '0', 10),
+    minorIssueCount: parseInt(stats?.minor_issue_count || '0', 10),
+    passRate: parseFloat(stats?.pass_rate || '0'),
+  };
+}
+
+/**
+ * Get fleet-wide check-in statistics
+ */
+export async function getFleetCheckInStats(): Promise<{
+  totalCheckIns: number;
+  todayCheckIns: number;
+  pendingApprovals: number;
+  vehiclesWithCriticalIssues: number;
+}> {
+  const [stats] = await sql`
+    SELECT
+      COUNT(*) as total_check_ins,
+      SUM(CASE WHEN check_date = CURRENT_DATE THEN 1 ELSE 0 END) as today_check_ins,
+      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_approvals
+    FROM fleet_check_records
+  `;
+
+  const [criticalStats] = await sql`
+    SELECT COUNT(DISTINCT vehicle_id) as count
+    FROM fleet_check_records r1
+    WHERE has_critical_issues = true
+    AND check_date = (
+      SELECT MAX(check_date)
+      FROM fleet_check_records r2
+      WHERE r2.vehicle_id = r1.vehicle_id
+    )
+  `;
+
+  return {
+    totalCheckIns: parseInt(stats?.total_check_ins || '0', 10),
+    todayCheckIns: parseInt(stats?.today_check_ins || '0', 10),
+    pendingApprovals: parseInt(stats?.pending_approvals || '0', 10),
+    vehiclesWithCriticalIssues: parseInt(criticalStats?.count || '0', 10),
+  };
+}

@@ -9,6 +9,7 @@ import {
   MapPin,
   FileSearch,
   BarChart3,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -29,6 +30,13 @@ export const fleetSection: NavSection = {
       icon: Car,
       label: 'All Vehicles',
       shortLabel: 'Vehicles',
+      permissions: [],
+    },
+    {
+      to: '/fleet/check-in',
+      icon: ClipboardCheck,
+      label: 'Vehicle Check-In',
+      shortLabel: 'Check-In',
       permissions: [],
     },
     {
