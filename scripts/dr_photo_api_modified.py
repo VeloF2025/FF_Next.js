@@ -1655,7 +1655,8 @@ async def home():
             .btn-download:hover { background: #059669; transform: translateY(-1px); }
             .result { background: #16213e; padding: 25px; border-radius: 12px; margin-bottom: 20px; }
             .result h2 { color: #fff; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
-            .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+            .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+            .serial-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
             .info-item { background: #0f172a; padding: 15px; border-radius: 8px; border-left: 3px solid #667eea; transition: all 0.2s; position: relative; }
             .info-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
             .info-item label { font-size: 11px; color: #94a3b8; display: block; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
@@ -1883,6 +1884,9 @@ async def home():
                                 <label>Downloaded</label>
                                 <span>${data.local_photos ? data.local_photos.length : 0}</span>
                             </div>
+                        </div>
+
+                        <div class="serial-grid">
                             <div class="info-item serial ${data.ont_barcode ? '' : 'missing'}"
                                  style="${data.ont_barcode ? 'border-left-color: #10b981;' : 'border-left-color: #f59e0b;'}"
                                  onclick="${data.ont_barcode ? `copyToClipboard('${data.ont_barcode}', 'ONT Serial')` : ''}">
