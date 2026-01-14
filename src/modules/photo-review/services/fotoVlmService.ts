@@ -127,7 +127,7 @@ export class VlmEvaluationError extends Error {
  * @returns Array of photo URLs (direct BOSS API URLs for Ollama to access)
  */
 export async function fetchDrPhotos(drNumber: string): Promise<string[]> {
-  const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://72.61.197.178:8001';
+  const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
   try {
     log.info('VlmService', `Fetching photos from BOSS API for ${drNumber}`);

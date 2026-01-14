@@ -365,7 +365,7 @@ python autonomous_agent_demo.py \
 - Add manual photo upload option later
 
 ### Risk 2: BOSS VPS Downtime
-**Problem:** BOSS API at `72.61.197.178:8001` goes down
+**Problem:** BOSS API at `100.96.203.105:8001` goes down
 **Mitigation:**
 - Cache BOSS photo index for 5 minutes
 - Show drops even if photos fail to load

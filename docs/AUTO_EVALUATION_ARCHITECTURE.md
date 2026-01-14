@@ -21,7 +21,7 @@
 
 2. **Foto Review System** (BOSS VPS API)
    - Source: 1Map GIS → BOSS VPS scraper → FibreFlow
-   - Photos stored on: 72.61.197.178:8001
+   - Photos stored on: 100.96.203.105:8001
    - API: `GET /api/photos` (lists all DRs with photos)
    - API: `GET /api/photo/{dr}/{filename}` (serve photo)
    - Dashboard: https://app.fibreflow.app/foto-review

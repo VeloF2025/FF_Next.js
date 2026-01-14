@@ -8,7 +8,7 @@ Successfully integrated **MiniCPM-V-2_6** Vision Language Model for automated DR
 
 Created a complete VLM integration service with:
 
-- **Photo fetching** from BOSS API (http://72.61.197.178:8001)
+- **Photo fetching** from BOSS API (http://100.96.203.105:8001)
 - **Base64 encoding** (required by vLLM API)
 - **Batch processing** to handle context limits (5 photos per batch)
 - **11 QA steps evaluation** based on DR_PHOTO_VERIFICATION_FIBERTIME_ALIGNED.md
@@ -83,7 +83,7 @@ VLM_API_URL=http://100.96.203.105:8100
 VLM_MODEL=openbmb/MiniCPM-V-2_6
 
 # BOSS API (photo source)
-BOSS_VPS_API_URL=http://72.61.197.178:8001
+BOSS_VPS_API_URL=http://100.96.203.105:8001
 
 # Feature Flags
 USE_VLM_BACKEND=true              # Enable VLM (default: true)
@@ -295,7 +295,7 @@ const criticalPhotos = photoUrls.filter(url =>
 
 **Check**:
 ```bash
-curl http://72.61.197.178:8001/api/photos | jq '.drs[] | select(.dr_number == "DR1730550")'
+curl http://100.96.203.105:8001/api/photos | jq '.drs[] | select(.dr_number == "DR1730550")'
 ```
 
 ### Issue: VLM returns invalid JSON
@@ -375,7 +375,7 @@ PORT=3005 npm start
 
 - **DR Verification Manual**: `/home/louisdup/Downloads/DR_PHOTO_VERIFICATION_FIBERTIME_ALIGNED.md`
 - **VLM API Docs**: http://100.96.203.105:8100/docs
-- **BOSS API**: http://72.61.197.178:8001/docs (if available)
+- **BOSS API**: http://100.96.203.105:8001/docs (if available)
 
 ## 🎯 Next Steps
 

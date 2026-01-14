@@ -189,10 +189,10 @@ psql "postgresql://..." -c "
 ### Photos not found:
 ```bash
 # Check BOSS API
-curl http://72.61.197.178:8001/api/photos | jq '.drs[0]'
+curl http://100.96.203.105:8001/api/photos | jq '.drs[0]'
 
 # Test specific DR
-curl http://72.61.197.178:8001/api/photos | jq '.drs[] | select(.dr_number=="DR1730550")'
+curl http://100.96.203.105:8001/api/photos | jq '.drs[] | select(.dr_number=="DR1730550")'
 ```
 
 ### WhatsApp not sending:

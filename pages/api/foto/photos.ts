@@ -14,8 +14,8 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
-// BOSS VPS API base URL
-const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://72.61.197.178:8001';
+// BOSS VPS API base URL (migrated to Velocity Server)
+const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
 // Photo step label mapping (simplified from BOSS filenames)
 const STEP_LABELS: Record<string, string> = {

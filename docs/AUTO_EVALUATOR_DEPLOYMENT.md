@@ -251,7 +251,7 @@ psql "..." -c "SELECT COUNT(*) FROM qa_photo_reviews
 WHERE created_at > NOW() - INTERVAL '24 hours';"
 
 # Check if photos available
-curl http://72.61.197.178:8001/api/photos | jq '.total_drs'
+curl http://100.96.203.105:8001/api/photos | jq '.total_drs'
 
 # Check cron is running
 grep auto-evaluator /var/log/syslog

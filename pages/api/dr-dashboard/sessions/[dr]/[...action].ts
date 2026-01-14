@@ -5,8 +5,8 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-// BOSS VPS API for photos
-const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://72.61.197.178:8001';
+// BOSS VPS API for photos (migrated to Velocity Server)
+const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 // VLM API for evaluation
 const VLM_URL = process.env.VLM_API_URL || 'http://127.0.0.1:8100';
 const VLM_MODEL = process.env.VLM_MODEL || 'dr-verifier';

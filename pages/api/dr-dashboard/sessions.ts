@@ -5,8 +5,8 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-// BOSS VPS API base URL (same as foto/photos.ts)
-const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://72.61.197.178:8001';
+// BOSS VPS API base URL (migrated to Velocity Server)
+const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'GET') {

@@ -43,7 +43,7 @@ FibreFlow (Evaluation)
 | Component | Location | Port | Purpose |
 |-----------|----------|------|---------|
 | **1Map GIS** | https://1map.co.za | 443 | Source system for photos |
-| **BOSS VPS API** | 72.61.197.178 | 8001 | Photo cache & API |
+| **BOSS VPS API** | 100.96.203.105 | 8001 | Photo cache & API |
 | **FibreFlow Prod** | app.fibreflow.app | 3005 | Main evaluation system |
 | **Velocity Server** | 100.96.203.105 | 8100 | VLM AI model (Qwen3-VL) |
 
@@ -79,7 +79,7 @@ FibreFlow (Evaluation)
 ┌─────────────────────────────────────────────────────────────┐
 │       3. BOSS VPS API - Photo Scraper/Cache                  │
 ├─────────────────────────────────────────────────────────────┤
-│  Server: 72.61.197.178:8001                                 │
+│  Server: 100.96.203.105:8001                                 │
 │  Service: /opt/foto-review-api/ui-module/1map_api.py       │
 │    ↓                                                         │
 │  Browser Automation (Playwright):                           │
@@ -111,18 +111,18 @@ FibreFlow (Evaluation)
 │    ↓                                                         │
 │  fetchDrPhotos(drNumber):                                   │
 │    1. Fetch photo list from BOSS API                        │
-│       GET http://72.61.197.178:8001/api/photos             │
+│       GET http://100.96.203.105:8001/api/photos             │
 │    ↓                                                         │
 │    2. Find DR in response                                   │
 │       data.drs.find(dr => dr.dr_number === drNumber)       │
 │    ↓                                                         │
 │    3. Build photo URLs                                      │
-│       http://72.61.197.178:8001/api/photo/{dr}/{filename}  │
+│       http://100.96.203.105:8001/api/photo/{dr}/{filename}  │
 │    ↓                                                         │
 │  Returns: Array of photo URLs                               │
 │    [                                                         │
-│      "http://72.61.197.178:8001/api/photo/DR1730550/DR1730550_ph_prop_3876451.jpg",
-│      "http://72.61.197.178:8001/api/photo/DR1730550/DR1730550_ph_bl_3876912.jpg",
+│      "http://100.96.203.105:8001/api/photo/DR1730550/DR1730550_ph_prop_3876451.jpg",
+│      "http://100.96.203.105:8001/api/photo/DR1730550/DR1730550_ph_bl_3876912.jpg",
 │      ...                                                     │
 │    ]                                                         │
 └─────────────────────────────────────────────────────────────┘
@@ -220,7 +220,7 @@ FibreFlow (Evaluation)
 
 ### 3. BOSS VPS Scrapes Photos from 1Map
 
-**Location:** BOSS VPS (72.61.197.178)
+**Location:** BOSS VPS (100.96.203.105)
 **Service:** Browser Automation
 
 **Process:**
@@ -265,7 +265,7 @@ def serve_photo(dr_number, filename):
 
 ```typescript
 async function fetchDrPhotos(drNumber: string): Promise<string[]> {
-  const BOSS_API_URL = 'http://72.61.197.178:8001';
+  const BOSS_API_URL = 'http://100.96.203.105:8001';
 
   // 1. Fetch photo list
   const response = await fetch(`${BOSS_API_URL}/api/photos`);
@@ -281,8 +281,8 @@ async function fetchDrPhotos(drNumber: string): Promise<string[]> {
 
   return photoUrls;
   // Example: [
-  //   "http://72.61.197.178:8001/api/photo/DR1730550/DR1730550_ph_prop_3876451.jpg",
-  //   "http://72.61.197.178:8001/api/photo/DR1730550/DR1730550_ph_bl_3876912.jpg",
+  //   "http://100.96.203.105:8001/api/photo/DR1730550/DR1730550_ph_prop_3876451.jpg",
+  //   "http://100.96.203.105:8001/api/photo/DR1730550/DR1730550_ph_bl_3876912.jpg",
   //   ...
   // ]
 }
@@ -339,7 +339,7 @@ for (const qaStep of QA_STEPS) {
 
 ### BOSS VPS (Old VPS)
 
-**IP:** 72.61.197.178
+**IP:** 100.96.203.105
 **Location:** Hostinger VPS
 
 **Services:**
@@ -385,7 +385,7 @@ for (const qaStep of QA_STEPS) {
 
 ## API Endpoints
 
-### BOSS VPS API (72.61.197.178:8001)
+### BOSS VPS API (100.96.203.105:8001)
 
 #### Get All Photos
 ```http
@@ -517,12 +517,12 @@ Response:
 
 1. **Check BOSS API:**
    ```bash
-   curl http://72.61.197.178:8001/api/photos | jq '.drs[] | select(.dr_number=="DR1730550")'
+   curl http://100.96.203.105:8001/api/photos | jq '.drs[] | select(.dr_number=="DR1730550")'
    ```
 
 2. **Check if photos were scraped:**
    ```bash
-   ssh root@72.61.197.178
+   ssh root@100.96.203.105
    ls -la /opt/foto-review-api/1map_images/*/DR1730550/
    ```
 
@@ -541,19 +541,19 @@ Response:
 
 1. **Check BOSS API is running:**
    ```bash
-   ssh root@72.61.197.178
+   ssh root@100.96.203.105
    lsof -i:8001
    ```
 
 2. **Check photo file exists:**
    ```bash
-   curl -I http://72.61.197.178:8001/api/photo/DR1730550/DR1730550_ph_prop_3876451.jpg
+   curl -I http://100.96.203.105:8001/api/photo/DR1730550/DR1730550_ph_prop_3876451.jpg
    ```
 
 3. **Check network connectivity:**
    ```bash
-   ping 72.61.197.178
-   curl http://72.61.197.178:8001/api/photos
+   ping 100.96.203.105
+   curl http://100.96.203.105:8001/api/photos
    ```
 
 ---

@@ -7,7 +7,7 @@
 import { EvaluationResult } from '../types';
 import { log } from '@/lib/logger';
 
-const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://72.61.197.178:8001';
+const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
 export class BossEvaluationError extends Error {
     constructor(

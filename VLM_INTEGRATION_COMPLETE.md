@@ -14,7 +14,7 @@
 
 Created `/src/modules/foto-review/services/fotoVlmService.ts` with:
 
-- Photo fetching from BOSS API (http://72.61.197.178:8001)
+- Photo fetching from BOSS API (http://100.96.203.105:8001)
 - Base64 image encoding (required by vLLM)
 - Batch processing to handle context limits
 - OpenAI-compatible API integration
