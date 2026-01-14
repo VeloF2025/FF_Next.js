@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('foto-review page loads and shows images', async ({ page }) => {
-  await page.goto('http://localhost:3005/foto-review');
+  await page.goto('http://localhost:3005/photo-review');
 
   // Wait for page to load
   await page.waitForSelector('h1:has-text("Photo Review")');

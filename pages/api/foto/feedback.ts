@@ -12,8 +12,8 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getEvaluationByDR, markFeedbackSent, getDropSubmitterPhone } from '@/modules/foto-review/services/fotoDbService';
-import { validateDrNumber } from '@/modules/foto-review/utils/drValidator';
+import { getEvaluationByDR, markFeedbackSent, getDropSubmitterPhone } from '@/modules/photo-review/services/fotoDbService';
+import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 
 // Project WhatsApp group mappings (same as wa-monitor)
 const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {

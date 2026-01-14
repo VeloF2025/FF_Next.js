@@ -53,7 +53,7 @@ export const fieldOperationsSection: NavSection = {
       permissions: [],
     },
     {
-      to: '/foto-review',
+      to: '/photo-review',
       icon: Camera,
       label: 'Photo Review',
       shortLabel: 'Photos',

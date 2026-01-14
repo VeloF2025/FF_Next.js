@@ -111,3 +111,4 @@ serviceAccountKey.json
 
 # Auto Claude data directory
 .auto-claude/
+nul

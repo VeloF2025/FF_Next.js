@@ -4,8 +4,8 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getEvaluationByDR } from '@/modules/foto-review/services/fotoDbService';
-import { validateDrNumber } from '@/modules/foto-review/utils/drValidator';
+import { getEvaluationByDR } from '@/modules/photo-review/services/fotoDbService';
+import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 
 export default async function handler(
   req: NextApiRequest,

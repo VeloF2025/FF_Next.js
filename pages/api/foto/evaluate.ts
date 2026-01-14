@@ -9,21 +9,21 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { EvaluationResult } from '@/modules/foto-review/types';
-import { saveEvaluation } from '@/modules/foto-review/services/fotoDbService';
+import type { EvaluationResult } from '@/modules/photo-review/types';
+import { saveEvaluation } from '@/modules/photo-review/services/fotoDbService';
 import {
   executePythonEvaluation,
   PythonEvaluationError,
-} from '@/modules/foto-review/services/fotoPythonService';
+} from '@/modules/photo-review/services/fotoPythonService';
 import {
   executeVlmEvaluation,
   VlmEvaluationError,
-} from '@/modules/foto-review/services/fotoVlmService';
+} from '@/modules/photo-review/services/fotoVlmService';
 import {
   fetchBossEvaluation,
   BossEvaluationError,
-} from '@/modules/foto-review/services/fotoBossService';
-import { validateDrNumber } from '@/modules/foto-review/utils/drValidator';
+} from '@/modules/photo-review/services/fotoBossService';
+import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 
 // Feature flags
 const USE_BOSS_PRIMARY = process.env.USE_BOSS_PRIMARY !== 'false'; // Default: true (BOSS is primary)

@@ -1,44 +1,37 @@
+# Project Expertise - Auto-updated by expert-self-improve hook
+# Last updated: 2026-01-13T04:31:17.504Z
+# Version: 4
+
 expertise:
   project: FibreFlow Next.js
   domain: Fiber Network Project Management
-  version: 2
-  last_updated: "2026-01-09"
-
-  # Works with any agent system: PAI, BMad, Agent-OS, or vanilla Claude Code
+  version: 4
+  last_updated: 2026-01-13T04:31:17.504Z
   compatible_systems:
     - PAI: "@pai activation, skills, protocols"
-    - BMad: "/dev, /pm, /qa personas and tasks"
-    - Agent-OS: "spec-driven development, standards profiles"
-    - vanilla: "Standard Claude Code usage"
-
+    - BMad: /dev, /pm, /qa personas and tasks
+    - Agent-OS: spec-driven development, standards profiles
+    - vanilla: Standard Claude Code usage
   key_locations:
-    # Core Application
     modules: src/modules/
     components: src/components/
     services: src/services/
     lib: src/lib/
     api_routes: pages/api/
-
-    # Critical Files
     api_response: src/lib/apiResponse.ts
     logger: src/lib/logger.ts
     arcjet: src/lib/arcjet.ts
     layout: src/components/layout/AppLayout.tsx
-
-    # Database
     schema: neon/schema.sql
     migrations: neon/migrations/
-
-    # Scripts
     sow_import: scripts/sow-import/
-
-    # Configuration
     env_example: .env.example
-
-    # Documentation
     claude_md: CLAUDE.md
     wa_monitor_docs: src/modules/wa-monitor/README.md
-
+    docs: docs
+    api: pages/api
+    scripts: scripts
+    types: src/modules/wa-monitor/types
   patterns:
     - name: API Response Pattern
       when: Creating API routes
@@ -48,7 +41,6 @@ expertise:
         return apiResponse.notFound(res, 'Resource', id);
         return apiResponse.internalError(res, error);
       notes: Always use apiResponse helper, never raw res.json()
-
     - name: Logging Pattern
       when: Adding any logging
       example: |
@@ -56,7 +48,6 @@ expertise:
         log.info('message', data, 'component-name');
         log.error('failed', error, 'component-name');
       notes: Never use console.log - Zero Tolerance protocol
-
     - name: Module Structure
       when: Creating new modules
       example: |
@@ -67,7 +58,6 @@ expertise:
         ├── components/     # UI components
         └── hooks/          # Custom React hooks
       notes: Keep modules self-contained with clear boundaries
-
     - name: Page Layout
       when: Creating new pages
       example: |
@@ -76,7 +66,6 @@ expertise:
           return <AppLayout>{/* content */}</AppLayout>;
         }
       notes: Use AppLayout for sidebar pages, getLayout = (page) => page for fullscreen
-
     - name: Error Handling
       when: Try/catch blocks
       example: |
@@ -88,39 +77,31 @@ expertise:
           return apiResponse.internalError(res, error);
         }
       notes: Always type error as unknown, log before returning
-
     - name: Database Queries
       when: Querying Neon PostgreSQL
       example: |
         import { sql } from '@/lib/db';
         const result = await sql`SELECT * FROM drops WHERE id = ${id}`;
       notes: Use parameterized queries, never string concatenation
-
   anti_patterns:
     - name: console.log
       why_bad: Violates Zero Tolerance, creates noise in production
       what_to_do: Use log from @/lib/logger instead
-
     - name: Empty catch blocks
       why_bad: Silences errors, makes debugging impossible
       what_to_do: Always log error and handle appropriately
-
     - name: Nested dynamic API routes
       why_bad: Fails in Vercel production deployment
       what_to_do: Use flattened routes (contractors-stages.ts not [id]/stages.ts)
-
     - name: Raw res.json()
       why_bad: Inconsistent API responses, no standard format
       what_to_do: Use apiResponse helpers for all responses
-
     - name: Implicit any types
       why_bad: Defeats TypeScript benefits, can cause runtime errors
       what_to_do: Always provide explicit types
-
     - name: Direct Firebase imports
       why_bad: Firebase Auth removed, only Storage remains
       what_to_do: Use Clerk for auth, Firebase only for file storage
-
   commands:
     build: npm run build
     start: PORT=3005 npm start
@@ -129,9 +110,10 @@ expertise:
     test: npm test
     test_e2e: npm run test:e2e
     validate: npm run antihall
-    deploy_dev: ssh louis@100.96.203.105 "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
-    deploy_prod: ssh louis@100.96.203.105 "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
-
+    deploy_dev: ssh louis@100.96.203.105 "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart
+      fibreflow-dev"
+    deploy_prod: ssh louis@100.96.203.105 "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart
+      fibreflow-prod"
   database:
     primary_tables:
       - drops: SOW import data
@@ -140,7 +122,6 @@ expertise:
       - contractors: Contractor records
       - installations: Installation tracking
       - foto_ai_reviews: AI photo reviews
-
     environments:
       production:
         endpoint: ep-dry-night-a9qyh4sj
@@ -148,8 +129,13 @@ expertise:
       development:
         endpoint: ep-aged-poetry-a9bbd8e9
         branch: hein-dev
-
   update_history:
+    - version: 4
+      date: 2026-01-13T04:31:17.504Z
+      changes: "Added locations: types; Files modified: 16 (yaml, md, ts, js, sql, tsx)"
+    - version: 3
+      date: 2026-01-13T02:40:55.178Z
+      changes: "Added locations: docs, api, scripts; Files modified: 13 (md, ts, js, sql, tsx)"
     - version: 1
-      date: "2026-01-09"
+      date: 2026-01-09
       changes: Initial expertise file created during PAI Phase 2 integration

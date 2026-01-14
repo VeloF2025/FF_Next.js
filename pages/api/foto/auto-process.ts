@@ -14,7 +14,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { autoProcessDropsBatch, type AutoProcessorStats } from '@/modules/foto-review/services/autoEvaluator';
+import { autoProcessDropsBatch, type AutoProcessorStats } from '@/modules/photo-review/services/autoEvaluator';
 
 // ==================== CONFIGURATION ====================
 

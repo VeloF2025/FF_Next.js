@@ -100,7 +100,9 @@
       "Bash(scripts/run-field-stock-migrations.js )",
       "Bash(docs/PRDs/PRD-027-field-stock-control.md)",
       "Bash(mv:*)",
-      "Bash(rmdir:*)"
+      "Bash(rmdir:*)",
+      "WebFetch(domain:192.168.1.150)",
+      "mcp__github__get_pull_request_status"
     ],
     "deny": [],
     "ask": [],

@@ -15,11 +15,11 @@ import {
   EvaluationResults,
   FilterControls,
   type FilterOptions,
-} from '@/modules/foto-review/components';
-import { usePhotos } from '@/modules/foto-review/hooks/usePhotos';
-import { useFotoEvaluation } from '@/modules/foto-review/hooks/useFotoEvaluation';
-import type { DropRecord } from '@/modules/foto-review/types';
-import { formatRelativeTime, isWithin24Hours } from '@/modules/foto-review/utils/timeUtils';
+} from '@/modules/photo-review/components';
+import { usePhotos } from '@/modules/photo-review/hooks/usePhotos';
+import { useFotoEvaluation } from '@/modules/photo-review/hooks/useFotoEvaluation';
+import type { DropRecord } from '@/modules/photo-review/types';
+import { formatRelativeTime, isWithin24Hours } from '@/modules/photo-review/utils/timeUtils';
 
 function FotoReviewPage() {
   const router = useRouter();

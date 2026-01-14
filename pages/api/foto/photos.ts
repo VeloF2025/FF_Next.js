@@ -5,7 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { DropRecord, Photo } from '@/modules/foto-review/types';
+import type { DropRecord, Photo } from '@/modules/photo-review/types';
 import { Pool } from 'pg';
 
 // Create database connection
