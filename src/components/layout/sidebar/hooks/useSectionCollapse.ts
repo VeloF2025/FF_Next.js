@@ -116,9 +116,13 @@ export function useSectionCollapse({ sections }: UseSectionCollapseOptions): Use
 /**
  * Find the section that contains a route matching the given path
  */
-function findSectionByPath(sections: NavSection[], pathname: string): string | null {
+function findSectionByPath(sections: NavSection[], pathname: string | null): string | null {
+  // Guard against null pathname (can happen during SSR)
+  if (!pathname) return null;
+
   for (const section of sections) {
     for (const item of section.items) {
+      if (!item.to) continue; // Skip items without a path
       if (pathname === item.to || pathname.startsWith(item.to + '/')) {
         return section.sectionId;
       }

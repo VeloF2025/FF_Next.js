@@ -49,28 +49,41 @@ async function handleGet(
 ) {
   const { type, active } = req.query;
 
-  let query = `
-    SELECT *
-    FROM fleet_vehicle_documents
-    WHERE vehicle_id = $1
-  `;
-  const params: (string | boolean)[] = [vehicleId];
+  let rows: VehicleDocumentRow[];
 
-  if (type && typeof type === 'string') {
-    params.push(type);
-    query += ` AND document_type = $${params.length}`;
-  }
-
-  if (active !== undefined) {
+  // Handle different filter combinations with tagged templates
+  if (type && typeof type === 'string' && active !== undefined) {
     const isActive = active === 'true';
-    params.push(isActive);
-    query += ` AND is_active = $${params.length}`;
+    rows = await sql`
+      SELECT * FROM fleet_vehicle_documents
+      WHERE vehicle_id = ${vehicleId}
+        AND document_type = ${type}
+        AND is_active = ${isActive}
+      ORDER BY created_at DESC
+    ` as VehicleDocumentRow[];
+  } else if (type && typeof type === 'string') {
+    rows = await sql`
+      SELECT * FROM fleet_vehicle_documents
+      WHERE vehicle_id = ${vehicleId}
+        AND document_type = ${type}
+      ORDER BY created_at DESC
+    ` as VehicleDocumentRow[];
+  } else if (active !== undefined) {
+    const isActive = active === 'true';
+    rows = await sql`
+      SELECT * FROM fleet_vehicle_documents
+      WHERE vehicle_id = ${vehicleId}
+        AND is_active = ${isActive}
+      ORDER BY created_at DESC
+    ` as VehicleDocumentRow[];
+  } else {
+    rows = await sql`
+      SELECT * FROM fleet_vehicle_documents
+      WHERE vehicle_id = ${vehicleId}
+      ORDER BY created_at DESC
+    ` as VehicleDocumentRow[];
   }
 
-  query += ' ORDER BY created_at DESC';
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = (await (sql as any)(query, params)) as VehicleDocumentRow[];
   const documents: VehicleDocument[] = rows.map(rowToVehicleDocument);
 
   return apiResponse.success(res, documents);

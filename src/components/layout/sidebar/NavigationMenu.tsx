@@ -25,11 +25,20 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
   const activePathBySection = useMemo(() => {
     const result: Record<string, string | null> = {};
 
+    // Guard against null pathname (can happen during SSR)
+    if (!pathname) {
+      for (const section of visibleNavItems) {
+        result[section.sectionId] = null;
+      }
+      return result;
+    }
+
     for (const section of visibleNavItems) {
       let bestMatch: string | null = null;
       let bestMatchLength = 0;
 
       for (const item of section.items) {
+        if (!item.to) continue; // Skip items without a path
         if (pathname === item.to || pathname.startsWith(item.to + '/')) {
           // Prefer longer (more specific) matches
           if (item.to.length > bestMatchLength) {

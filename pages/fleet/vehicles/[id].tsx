@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import {
   Car,
   ArrowLeft,
@@ -31,6 +32,8 @@ import {
   Phone,
   Mail,
   DollarSign,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import type {
   VehicleDocument,
@@ -1138,7 +1141,11 @@ export default function VehicleDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<FleetVehicle>>({});
   const [saving, setSaving] = useState(false);
+  const [retireConfirm, setRetireConfirm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  const [retiring, setRetiring] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Ownership data
   const [licenseDisc, setLicenseDisc] = useState<LicenseDisc | null>(null);
@@ -1294,22 +1301,24 @@ export default function VehicleDetailPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Failed to save vehicle');
+        toast.error(data.error || 'Failed to save vehicle');
         return;
       }
 
       setVehicle({ ...vehicle, ...editForm } as FleetVehicle);
       setIsEditing(false);
+      toast.success('Vehicle updated successfully');
     } catch (err) {
-      alert('Failed to save vehicle');
+      toast.error('Failed to save vehicle');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
+  const handleRetire = async () => {
     if (!vehicle) return;
 
+    setRetiring(true);
     try {
       const res = await fetch(`/api/fleet/vehicles?id=${vehicle.id}`, {
         method: 'DELETE',
@@ -1317,13 +1326,67 @@ export default function VehicleDetailPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to delete vehicle');
+        toast.error(data.error || 'Failed to retire vehicle');
         return;
       }
 
+      setVehicle({ ...vehicle, status: 'retired' });
+      setRetireConfirm(false);
+      toast.success(`${vehicle.registration} has been retired`);
+    } catch (err) {
+      toast.error('Failed to retire vehicle');
+    } finally {
+      setRetiring(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    if (!vehicle) return;
+
+    setReactivating(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles?id=${vehicle.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'active' }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to reactivate vehicle');
+        return;
+      }
+
+      setVehicle({ ...vehicle, status: 'active' });
+      toast.success(`${vehicle.registration} is now active`);
+    } catch (err) {
+      toast.error('Failed to reactivate vehicle');
+    } finally {
+      setReactivating(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    if (!vehicle) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles?id=${vehicle.id}&permanent=true`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete vehicle');
+        return;
+      }
+
+      toast.success(`${vehicle.registration} has been permanently deleted`);
       router.push('/fleet/vehicles');
     } catch (err) {
-      alert('Failed to delete vehicle');
+      toast.error('Failed to delete vehicle');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1431,36 +1494,122 @@ export default function VehicleDetailPage() {
                   <Edit className="w-4 h-4" />
                   Edit
                 </button>
-                <button
-                  onClick={() => setDeleteConfirm(true)}
-                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
+                {vehicle.status === 'retired' ? (
+                  <>
+                    <button
+                      onClick={handleReactivate}
+                      disabled={reactivating}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {reactivating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      {reactivating ? 'Reactivating...' : 'Reactivate'}
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(true)}
+                      disabled={deleting}
+                      className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setRetireConfirm(true)}
+                    disabled={retiring}
+                    className="px-4 py-2 border border-yellow-400 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Retire
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
 
-        {/* Delete Confirmation */}
-        {deleteConfirm && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
-            <p className="text-red-800">
-              Are you sure you want to retire this vehicle? This action will mark it as retired.
-            </p>
-            <div className="flex items-center gap-2">
+        {/* Retire Confirmation */}
+        {retireConfirm && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <XCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-yellow-800 font-medium">
+                  Retire {vehicle.registration}?
+                </p>
+                <p className="text-yellow-700 text-sm mt-1">
+                  This will mark the vehicle as retired. You can reactivate it later if needed.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-4">
               <button
-                onClick={() => setDeleteConfirm(false)}
-                className="px-3 py-1.5 border border-red-300 rounded-lg hover:bg-red-100 transition-colors"
+                onClick={() => setRetireConfirm(false)}
+                disabled={retiring}
+                className="px-4 py-2 border border-yellow-300 text-yellow-700 rounded-lg hover:bg-yellow-100 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={handleDelete}
-                className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                onClick={handleRetire}
+                disabled={retiring}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
-                Yes, Retire
+                {retiring ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Retiring...
+                  </>
+                ) : (
+                  'Yes, Retire'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Permanent Delete Confirmation */}
+        {deleteConfirm && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-red-800 font-semibold">
+                  Permanently delete {vehicle.registration}?
+                </p>
+                <p className="text-red-700 text-sm mt-1">
+                  This will permanently remove the vehicle and all associated records (check-ins, documents, license discs, insurance, finance details, GPS investigations). This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePermanentDelete}
+                disabled={deleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Yes, Delete Permanently
+                  </>
+                )}
               </button>
             </div>
           </div>

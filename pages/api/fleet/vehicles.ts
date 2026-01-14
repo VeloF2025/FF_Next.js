@@ -368,6 +368,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
             year,
             color,
             vin,
+            engine_number,
             ownership_type,
             owner_name,
             fuel_rate_per_km,
@@ -383,6 +384,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
             ${year || null},
             ${body.color || null},
             ${body.vin || null},
+            ${body.engineNumber || body.engine_number || null},
             ${ownershipType},
             ${body.ownerName || body.owner_name || null},
             ${fuelRate},
@@ -397,6 +399,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
             vehicle_type as "vehicleType",
             ownership_type as "ownershipType",
             owner_name as "ownerName",
+            engine_number as "engineNumber",
             created_at as "createdAt",
             updated_at as "updatedAt"
         `;
@@ -479,6 +482,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
             year = COALESCE(${body.year ? parseInt(body.year, 10) : null}, year),
             color = COALESCE(${body.color}, color),
             vin = COALESCE(${body.vin}, vin),
+            engine_number = COALESCE(${body.engineNumber || body.engine_number}, engine_number),
             ownership_type = COALESCE(${body.ownershipType || body.ownership_type}, ownership_type),
             owner_name = COALESCE(${body.ownerName || body.owner_name}, owner_name),
             fuel_rate_per_km = COALESCE(${body.fuelRatePerKm || body.fuel_rate_per_km}, fuel_rate_per_km),
@@ -494,6 +498,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
             vehicle_type as "vehicleType",
             ownership_type as "ownershipType",
             owner_name as "ownerName",
+            engine_number as "engineNumber",
             created_at as "createdAt",
             updated_at as "updatedAt"
         `;
@@ -517,9 +522,53 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     }
 
     case 'DELETE': {
-      const { id } = req.query;
+      const { id, permanent } = req.query;
       if (!id) {
         return apiResponse.validationError(res, { id: 'Vehicle ID is required' });
+      }
+
+      // Permanent delete - actually removes from database
+      if (permanent === 'true') {
+        // First check if vehicle exists
+        const vehicle = await sql`
+          SELECT id, status, registration FROM fleet_vehicles WHERE id = ${id as string}
+        ` as Record<string, unknown>[];
+
+        if (vehicle.length === 0) {
+          return apiResponse.notFound(res, 'Vehicle', id as string);
+        }
+
+        // Delete related records first (cascade manually for safety)
+        // Order matters due to foreign key dependencies
+
+        // Check-in related (photos/responses depend on records)
+        await sql`DELETE FROM fleet_check_photos WHERE record_id IN (SELECT id FROM fleet_check_records WHERE vehicle_id = ${id as string})`;
+        await sql`DELETE FROM fleet_check_responses WHERE record_id IN (SELECT id FROM fleet_check_records WHERE vehicle_id = ${id as string})`;
+        await sql`DELETE FROM fleet_check_records WHERE vehicle_id = ${id as string}`;
+
+        // GPS jobs and trips
+        await sql`DELETE FROM fleet_gps_trips WHERE job_id IN (SELECT id FROM fleet_gps_jobs WHERE vehicle_id = ${id as string})`;
+        await sql`DELETE FROM fleet_gps_jobs WHERE vehicle_id = ${id as string}`;
+
+        // Authorized locations (if vehicle-specific)
+        await sql`DELETE FROM fleet_authorized_locations WHERE vehicle_id = ${id as string}`;
+
+        // Assignments
+        await sql`DELETE FROM vehicle_assignments WHERE fleet_vehicle_id = ${id as string}`;
+
+        // Ownership/documents
+        await sql`DELETE FROM fleet_vehicle_documents WHERE vehicle_id = ${id as string}`;
+        await sql`DELETE FROM fleet_license_disc WHERE vehicle_id = ${id as string}`;
+        await sql`DELETE FROM fleet_vehicle_finance WHERE vehicle_id = ${id as string}`;
+        await sql`DELETE FROM fleet_vehicle_lease WHERE vehicle_id = ${id as string}`;
+        await sql`DELETE FROM fleet_vehicle_insurance WHERE vehicle_id = ${id as string}`;
+
+        // Now delete the vehicle
+        const result = await sql`
+          DELETE FROM fleet_vehicles WHERE id = ${id as string} RETURNING id
+        ` as Record<string, unknown>[];
+
+        return apiResponse.success(res, { id: result[0]?.id }, 'Vehicle permanently deleted');
       }
 
       // Soft delete by setting status to 'retired'

@@ -49,27 +49,32 @@ async function handleGet(
 ) {
   const { status, current } = req.query;
 
-  let query = `
-    SELECT *
-    FROM fleet_license_disc
-    WHERE vehicle_id = $1
-  `;
-  const params: string[] = [vehicleId];
-
-  if (status && typeof status === 'string') {
-    params.push(status);
-    query += ` AND status = $${params.length}`;
-  }
+  let rows: LicenseDiscRow[];
 
   // If current=true, only get the most recent active one
   if (current === 'true') {
-    query += ` AND status = 'active' ORDER BY expiry_date DESC LIMIT 1`;
+    rows = await sql`
+      SELECT * FROM fleet_license_disc
+      WHERE vehicle_id = ${vehicleId}
+        AND status = 'active'
+      ORDER BY expiry_date DESC
+      LIMIT 1
+    ` as LicenseDiscRow[];
+  } else if (status && typeof status === 'string') {
+    rows = await sql`
+      SELECT * FROM fleet_license_disc
+      WHERE vehicle_id = ${vehicleId}
+        AND status = ${status}
+      ORDER BY expiry_date DESC
+    ` as LicenseDiscRow[];
   } else {
-    query += ' ORDER BY expiry_date DESC';
+    rows = await sql`
+      SELECT * FROM fleet_license_disc
+      WHERE vehicle_id = ${vehicleId}
+      ORDER BY expiry_date DESC
+    ` as LicenseDiscRow[];
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = (await (sql as any)(query, params)) as LicenseDiscRow[];
   const licenses: LicenseDisc[] = rows.map(rowToLicenseDisc);
 
   // If requesting current, return single object or null
