@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef, useCallback } from 'react';
 import type { NavSection, SidebarStyles } from './types';
 import type { ThemeConfig } from '@/types/theme.types';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -18,6 +18,42 @@ interface NavigationMenuProps {
 export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, themeConfig }: NavigationMenuProps) {
   const pathname = usePathname();
   const { toggleSection, isSectionExpanded } = useSectionCollapse({ sections: visibleNavItems });
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const prevPathnameRef = useRef<string | null>(null);
+
+  // Set ref for a section
+  const setSectionRef = useCallback((sectionId: string, el: HTMLDivElement | null) => {
+    sectionRefs.current[sectionId] = el;
+  }, []);
+
+  // Find active section for scrolling
+  const activeSectionId = useMemo(() => {
+    if (!pathname) return null;
+    for (const section of visibleNavItems) {
+      for (const item of section.items) {
+        if (!item.to) continue;
+        if (pathname === item.to || pathname.startsWith(item.to + '/')) {
+          return section.sectionId;
+        }
+      }
+    }
+    return null;
+  }, [pathname, visibleNavItems]);
+
+  // Scroll to active section when pathname changes - center it in the sidebar
+  useEffect(() => {
+    if (pathname !== prevPathnameRef.current && activeSectionId) {
+      prevPathnameRef.current = pathname;
+      // Small delay to allow section to expand first
+      const timer = setTimeout(() => {
+        const el = sectionRefs.current[activeSectionId];
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname, activeSectionId]);
 
   // Compute the active path for each section (most specific match wins)
   // This prevents parent routes (e.g., /ticketing) from being highlighted
@@ -64,18 +100,18 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
         const activeItemPath = activePathBySection[section.sectionId];
 
         return (
-          <CollapsibleSection
-            key={section.sectionId}
-            sectionTitle={section.section}
-            sectionId={section.sectionId}
-            isExpanded={isSectionExpanded(section.sectionId)}
-            isCollapsible={section.isCollapsible ?? true}
-            onToggle={toggleSection}
-            isCollapsed={isCollapsed}
-            sidebarStyles={sidebarStyles}
-            themeConfig={themeConfig}
-            hasActiveItem={sectionHasActiveItem(section)}
-          >
+          <div key={section.sectionId} ref={(el) => setSectionRef(section.sectionId, el)}>
+            <CollapsibleSection
+              sectionTitle={section.section}
+              sectionId={section.sectionId}
+              isExpanded={isSectionExpanded(section.sectionId)}
+              isCollapsible={section.isCollapsible ?? true}
+              onToggle={toggleSection}
+              isCollapsed={isCollapsed}
+              sidebarStyles={sidebarStyles}
+              themeConfig={themeConfig}
+              hasActiveItem={sectionHasActiveItem(section)}
+            >
             {section.items.map((item) => {
               // Only highlight the most specific match, not parent routes
               const isActive = item.to === activeItemPath;
@@ -131,7 +167,8 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
                 </Link>
               );
             })}
-          </CollapsibleSection>
+            </CollapsibleSection>
+          </div>
         );
       })}
     </>

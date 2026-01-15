@@ -62,13 +62,27 @@ export function useSectionCollapse({ sections }: UseSectionCollapseOptions): Use
     }
   }, [expandedSections]);
 
-  // Auto-expand section containing current route
+  // Auto-expand section containing current route and collapse others (accordion behavior)
   useEffect(() => {
     const activeSectionId = findSectionByPath(sections, pathname);
-    if (activeSectionId && !expandedSections.has(activeSectionId)) {
-      setExpandedSections(prev => new Set([...prev, activeSectionId]));
+    if (activeSectionId) {
+      setExpandedSections(prev => {
+        // If already expanded, no change needed
+        if (prev.has(activeSectionId) && prev.size === 1) {
+          return prev;
+        }
+        // Collapse all others, keep only defaultExpanded and active section
+        const next = new Set<string>();
+        sections.forEach(s => {
+          if (s.defaultExpanded) {
+            next.add(s.sectionId);
+          }
+        });
+        next.add(activeSectionId);
+        return next;
+      });
     }
-  }, [pathname, sections, expandedSections]);
+  }, [pathname, sections]);
 
   const toggleSection = useCallback((sectionId: string, shiftKey = false) => {
     setExpandedSections(prev => {

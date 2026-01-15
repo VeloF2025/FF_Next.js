@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { navItems } from './sidebar/navigationConfig';
@@ -5,13 +6,33 @@ import { filterNavigationItems, getSidebarStyles } from './sidebar/sidebarUtils'
 import { SidebarHeader } from './sidebar/SidebarHeader';
 import { NavigationMenu } from './sidebar/NavigationMenu';
 import { CollapseToggle } from './sidebar/CollapseToggle';
-import type { SidebarProps } from './sidebar/types';
+import { useSidebarPreferences } from './sidebar/hooks/useSidebarPreferences';
+import { buildMainSectionItems } from './sidebar/config/customizableItems';
+import type { SidebarProps, NavSection } from './sidebar/types';
 
 export function Sidebar({ isOpen, isCollapsed, onCollapse }: SidebarProps) {
   const { currentUser, hasPermission } = useAuth();
   const { themeConfig } = useTheme();
+  const { mainSectionItems } = useSidebarPreferences();
 
-  const visibleNavItems = filterNavigationItems(navItems, hasPermission);
+  // Build nav items with customized MAIN section
+  const customizedNavItems = useMemo(() => {
+    // Build the custom main section based on user preferences
+    const customMainSection: NavSection = {
+      section: 'MAIN',
+      sectionId: 'main',
+      isCollapsible: true,
+      defaultExpanded: true,
+      items: buildMainSectionItems(mainSectionItems),
+    };
+
+    // Replace the main section with the customized one
+    return navItems.map(section =>
+      section.sectionId === 'main' ? customMainSection : section
+    );
+  }, [mainSectionItems]);
+
+  const visibleNavItems = filterNavigationItems(customizedNavItems, hasPermission);
   const sidebarStyles = getSidebarStyles(themeConfig);
   
   return (

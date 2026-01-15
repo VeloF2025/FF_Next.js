@@ -4,9 +4,10 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { VFLogoUpload } from '@/components/settings/VFLogoUpload';
 // import { ServiceTemplatesTab } from '@/components/settings/ServiceTemplatesTab';
 import { RemindersTab } from '@/components/settings/RemindersTab';
-import { Palette, Moon, Sun, Settings2, GitBranch, Bell } from 'lucide-react';
+import { SidebarCustomization } from '@/components/settings/SidebarCustomization';
+import { Palette, Moon, Sun, Settings2, GitBranch, Bell, PanelLeft } from 'lucide-react';
 
-type SettingsTab = 'general' | 'workflow' | 'reminders';
+type SettingsTab = 'general' | 'sidebar' | 'workflow' | 'reminders';
 
 export function Settings() {
   const { themeConfig, setTheme, availableThemes } = useTheme();
@@ -15,6 +16,7 @@ export function Settings() {
 
   const tabs = [
     { id: 'general', label: 'General', icon: Settings2 },
+    { id: 'sidebar', label: 'Sidebar', icon: PanelLeft },
     { id: 'workflow', label: 'Workflow Management', icon: GitBranch },
     // { id: 'templates', label: 'Service Templates', icon: FileText },
     { id: 'reminders', label: 'Reminders', icon: Bell }
@@ -151,6 +153,9 @@ export function Settings() {
             </div>
           </div>
         );
+
+      case 'sidebar':
+        return <SidebarCustomization />;
 
       case 'reminders':
         return <RemindersTab />;
