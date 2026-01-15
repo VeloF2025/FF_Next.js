@@ -13,7 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/dr-photo-unified/types/unified.types';
 
@@ -181,7 +181,7 @@ async function handlePatch(
 
     if (updates.length === 1) {
       // Only updated_at, no actual changes
-      return apiResponse.badRequest(res, 'No fields to update');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'No fields to update');
     }
 
     // Add drop_number as final parameter
@@ -223,7 +223,7 @@ export default async function handler(
 
   // Validate dropNumber parameter
   if (!dropNumber || typeof dropNumber !== 'string') {
-    return apiResponse.badRequest(res, 'Invalid drop number parameter');
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid drop number parameter');
   }
 
   switch (req.method) {

@@ -76,8 +76,13 @@ export async function fetchPhotosWithFallback(
   // TODO: Implement filesystem cache fallback
   log.warn(`[UnifiedPhotoService] Local cache fallback not implemented yet for ${drNumber}`);
 
-  // All sources failed
-  const errorMessage = `All photo sources unavailable for ${drNumber}`;
-  log.error(`[UnifiedPhotoService] ${errorMessage}`);
-  throw new Error(errorMessage);
+  // All sources failed - return empty result instead of throwing
+  log.warn(`[UnifiedPhotoService] All photo sources unavailable for ${drNumber}, returning empty result`);
+
+  return {
+    source: 'local', // Mark as local since no external source worked
+    count: 0,
+    photos: [],
+    error: 'All photo sources unavailable. Photos may not have been uploaded yet.',
+  };
 }

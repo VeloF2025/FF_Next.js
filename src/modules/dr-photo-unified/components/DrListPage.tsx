@@ -361,20 +361,25 @@ export function DrListPage() {
   };
 
   // Determine active quick filter based on current date range
+  // Uses SAST timezone (UTC+2) to match handleQuickFilter()
   const getActiveQuickFilter = (): 'today' | 'yesterday' | 'last7days' | 'all' => {
     if (!dateFrom && !dateTo) return 'all';
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
+    // Get current date in SAST (UTC+2) - same calculation as handleQuickFilter
+    const now = new Date();
+    const sastOffset = 2 * 60; // SAST is UTC+2 (120 minutes)
+    const sastTime = new Date(now.getTime() + (sastOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+    const todayStr = sastTime.toISOString().split('T')[0];
 
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    // Calculate yesterday in SAST
+    const yesterdaySast = new Date(sastTime);
+    yesterdaySast.setDate(yesterdaySast.getDate() - 1);
+    const yesterdayStr = yesterdaySast.toISOString().split('T')[0];
 
-    const last7Days = new Date(today);
-    last7Days.setDate(last7Days.getDate() - 7);
-    const last7DaysStr = last7Days.toISOString().split('T')[0];
+    // Calculate 7 days ago in SAST
+    const last7DaysSast = new Date(sastTime);
+    last7DaysSast.setDate(last7DaysSast.getDate() - 7);
+    const last7DaysStr = last7DaysSast.toISOString().split('T')[0];
 
     if (dateFrom === todayStr && dateTo === todayStr) return 'today';
     if (dateFrom === yesterdayStr && dateTo === yesterdayStr) return 'yesterday';

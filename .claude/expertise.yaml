@@ -1,12 +1,12 @@
 # Project Expertise - Auto-updated by expert-self-improve hook
-# Last updated: 2026-01-13T04:31:17.504Z
-# Version: 4
+# Last updated: 2026-01-14T01:27:31.750Z
+# Version: 5
 
 expertise:
   project: FibreFlow Next.js
   domain: Fiber Network Project Management
-  version: 4
-  last_updated: 2026-01-13T04:31:17.504Z
+  version: 5
+  last_updated: 2026-01-14T01:27:31.750Z
   compatible_systems:
     - PAI: "@pai activation, skills, protocols"
     - BMad: /dev, /pm, /qa personas and tasks
@@ -32,6 +32,9 @@ expertise:
     api: pages/api
     scripts: scripts
     types: src/modules/wa-monitor/types
+    config: src/components/layout/sidebar/config
+    hooks: src/modules/photo-review/hooks
+    utils: src/modules/photo-review/utils
   patterns:
     - name: API Response Pattern
       when: Creating API routes
@@ -130,6 +133,9 @@ expertise:
         endpoint: ep-aged-poetry-a9bbd8e9
         branch: hein-dev
   update_history:
+    - version: 5
+      date: 2026-01-14T01:27:31.750Z
+      changes: "Added locations: config, hooks, utils; Files modified: 35 (yaml, json, gitignore, ts, tsx, html, md)"
     - version: 4
       date: 2026-01-13T04:31:17.504Z
       changes: "Added locations: types; Files modified: 16 (yaml, md, ts, js, sql, tsx)"

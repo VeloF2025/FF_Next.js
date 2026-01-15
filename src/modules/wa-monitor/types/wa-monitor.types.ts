@@ -135,6 +135,13 @@ export interface WaMonitorSummary {
   complete: number;
   averageFeedbackCount: number;
   totalFeedback: number;
+  dailyStats?: Array<{
+    project: string;
+    date: string;
+    total: number;
+    complete: number;
+    incomplete: number;
+  }>;
 }
 
 /**

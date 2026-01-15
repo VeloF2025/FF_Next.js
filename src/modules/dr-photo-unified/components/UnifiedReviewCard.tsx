@@ -42,8 +42,8 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading review...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading review...</p>
         </div>
       </div>
     );
@@ -51,12 +51,12 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <h3 className="text-red-800 font-semibold mb-2">Error Loading Review</h3>
-        <p className="text-red-600">{error.message}</p>
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+        <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading Review</h3>
+        <p className="text-red-600 dark:text-red-400">{error.message}</p>
         <button
           onClick={refresh}
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="mt-4 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
         >
           Retry
         </button>
@@ -66,8 +66,8 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
 
   if (!review) {
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-        <p className="text-yellow-800">Review not found for {dropNumber}</p>
+      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+        <p className="text-yellow-800 dark:text-yellow-200">Review not found for {dropNumber}</p>
       </div>
     );
   }
@@ -80,24 +80,24 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow-lg">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-900/50">
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4">
+      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{dropNumber}</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{dropNumber}</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Project: {review.project || 'N/A'}
             </p>
           </div>
           <div className="flex items-center gap-3">
             {review.locked_by && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
                 🔒 Locked by {review.locked_by}
               </span>
             )}
             {review.feedback_sent && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                 ✓ Feedback Sent
               </span>
             )}
@@ -106,7 +106,7 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="flex -mb-px">
           {tabs.map((tab) => (
             <button
@@ -116,8 +116,8 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
                 px-6 py-4 text-sm font-medium border-b-2 transition-colors
                 ${
                   activeTab === tab.key
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                    ? 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
                 }
               `}
             >
@@ -200,8 +200,8 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">12-Step Quality Checklist</h3>
-        <p className="text-sm text-gray-600">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">12-Step Quality Checklist</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Completed: {Object.values(getStepValues(review)).filter(Boolean).length}/12
         </p>
       </div>
@@ -214,7 +214,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
           const isIncorrect = incorrectSteps.has(step);
 
           return (
-            <div key={step} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <div key={step} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
               <div className="flex items-start gap-4">
                 {/* Step Checkbox */}
                 <div className="flex items-center">
@@ -223,13 +223,13 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                     checked={stepValue}
                     onChange={() => handleStepToggle(step, stepValue)}
                     disabled={isUpdating}
-                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
                   />
                 </div>
 
                 {/* Step Label */}
                 <div className="flex-1">
-                  <label className="text-sm font-medium text-gray-900">
+                  <label className="text-sm font-medium text-gray-900 dark:text-white">
                     Step {step}: {label}
                   </label>
 
@@ -239,9 +239,9 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                       type="checkbox"
                       checked={isIncorrect}
                       onChange={() => handleIncorrectToggle(step)}
-                      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500 dark:bg-gray-700"
                     />
-                    <span className="text-sm text-gray-600">Mark as incorrect</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Mark as incorrect</span>
                   </div>
 
                   {/* Comment Field */}
@@ -252,7 +252,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                         onChange={(e) => handleCommentChange(step, e.target.value)}
                         placeholder="Enter reason for marking this step as incorrect..."
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                       />
                     </div>
                   )}
@@ -261,11 +261,11 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                 {/* Status Badge */}
                 <div>
                   {stepValue ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                       ✓ Pass
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
                       Pending
                     </span>
                   )}
@@ -282,7 +282,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
           <button
             onClick={handleSaveIncorrect}
             disabled={isUpdating}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-6 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isUpdating ? 'Saving...' : `Save ${incorrectSteps.size} Incorrect Step${incorrectSteps.size > 1 ? 's' : ''}`}
           </button>
@@ -318,17 +318,17 @@ function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) 
   if (!review.ai_overall_status) {
     return (
       <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
           <span className="text-3xl">🤖</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Evaluation Not Run</h3>
-        <p className="text-gray-600 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">AI Evaluation Not Run</h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
           Trigger AI evaluation to get automated quality assessment
         </p>
         <button
           onClick={handleTriggerEvaluation}
           disabled={isEvaluating}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isEvaluating ? 'Evaluating...' : 'Evaluate with AI'}
         </button>
@@ -339,14 +339,14 @@ function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) 
   return (
     <div className="space-y-6">
       {/* AI Results Summary */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">AI Evaluation Results</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Evaluation Results</h3>
           <span
             className={`px-4 py-2 rounded-lg text-sm font-bold ${
               review.ai_overall_status === 'PASS'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-red-100 text-red-800'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
             }`}
           >
             {review.ai_overall_status}
@@ -355,8 +355,8 @@ function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) 
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Average Score</p>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Average Score</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {review.ai_average_score != null
                 ? typeof review.ai_average_score === 'number'
                   ? review.ai_average_score.toFixed(1)
@@ -365,8 +365,8 @@ function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) 
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-600 mb-1">Evaluated At</p>
-            <p className="text-sm text-gray-900">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Evaluated At</p>
+            <p className="text-sm text-gray-900 dark:text-gray-200">
               {review.ai_evaluated_at
                 ? new Date(review.ai_evaluated_at).toLocaleString()
                 : 'N/A'}
@@ -383,10 +383,10 @@ function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) 
 
       {/* AI Markdown Report */}
       {review.ai_markdown_report && (
-        <div className="border border-gray-200 rounded-lg p-6">
-          <h4 className="text-md font-semibold text-gray-900 mb-4">AI Detailed Report</h4>
-          <div className="prose prose-sm max-w-none">
-            <pre className="whitespace-pre-wrap text-sm text-gray-700">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
+          <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">AI Detailed Report</h4>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
               {review.ai_markdown_report}
             </pre>
           </div>
@@ -408,11 +408,11 @@ function PhotosTab({ review }: PhotosTabProps) {
   if (review.photo_count === 0) {
     return (
       <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
           <span className="text-3xl">📸</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Photos Available</h3>
-        <p className="text-gray-600">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Photos Available</h3>
+        <p className="text-gray-600 dark:text-gray-400">
           Photos will appear here once they are fetched from the source
         </p>
       </div>
@@ -423,27 +423,27 @@ function PhotosTab({ review }: PhotosTabProps) {
     <div className="space-y-6">
       {/* Photo Source Badge */}
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-600">Source:</span>
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+        <span className="text-sm text-gray-600 dark:text-gray-400">Source:</span>
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
           {review.photo_source?.toUpperCase() || 'Unknown'}
         </span>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-gray-400">
           {review.photo_count} photo{review.photo_count !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* Photo Gallery - Placeholder */}
-      <div className="border border-gray-200 rounded-lg p-6">
-        <p className="text-gray-600 text-sm">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
+        <p className="text-gray-600 dark:text-gray-400 text-sm">
           Photo gallery will be implemented in PhotoGalleryUnified component
         </p>
         <div className="mt-4 grid grid-cols-4 gap-4">
           {review.photos_metadata?.slice(0, 8).map((photo, index) => (
             <div
               key={index}
-              className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center"
+              className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center"
             >
-              <span className="text-gray-400 text-sm">Photo {index + 1}</span>
+              <span className="text-gray-400 dark:text-gray-500 text-sm">Photo {index + 1}</span>
             </div>
           ))}
         </div>
@@ -488,10 +488,10 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
     <div className="space-y-6">
       {/* Generate Button */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900">WhatsApp Feedback</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">WhatsApp Feedback</h3>
         <button
           onClick={handleGenerateFeedback}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 transition-colors flex items-center gap-2"
         >
           <span>✨</span>
           Generate Auto-Feedback
@@ -500,7 +500,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
 
       {/* Message Editor */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Feedback Message
         </label>
         <textarea
@@ -508,14 +508,14 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
           onChange={(e) => setMessage(e.target.value)}
           rows={10}
           placeholder="Enter feedback message or click 'Generate Auto-Feedback' to create one automatically..."
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
         />
       </div>
 
       {/* Send Button */}
       <div className="flex justify-end gap-3">
         {review.feedback_sent && (
-          <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-green-100 text-green-800">
+          <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
             ✓ Feedback Sent
             {review.feedback_sent_at && (
               <span className="ml-2 text-xs">
@@ -527,7 +527,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
         <button
           onClick={handleSendFeedback}
           disabled={isSending || !message.trim() || review.feedback_sent}
-          className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          className="px-6 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
           <span>📤</span>
           {isSending ? 'Sending...' : 'Send to WhatsApp'}

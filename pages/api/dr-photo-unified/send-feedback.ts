@@ -14,7 +14,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
@@ -54,7 +54,7 @@ async function handlePost(
     const { dropNumber, message, autoGenerate } = req.body as SendFeedbackRequest;
 
     if (!dropNumber) {
-      return apiResponse.badRequest(res, 'dropNumber is required');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
     log.info(`Sending feedback for ${dropNumber}`, { autoGenerate });
@@ -68,7 +68,7 @@ async function handlePost(
 
     // 2. Check if feedback already sent
     if (review.feedback_sent && !autoGenerate) {
-      return apiResponse.badRequest(res, 'Feedback already sent for this review. Use autoGenerate=true to resend.');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Feedback already sent for this review. Use autoGenerate=true to resend.');
     }
 
     // 3. Generate or use provided message
@@ -86,7 +86,7 @@ async function handlePost(
     const groupId = await getWhatsAppGroupId(review.project);
 
     if (!groupId) {
-      return apiResponse.badRequest(res, `No WhatsApp group configured for project: ${review.project}`);
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${review.project}`);
     }
 
     // 5. Send to WhatsApp via Bridge API

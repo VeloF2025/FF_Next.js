@@ -61,6 +61,9 @@ export interface PhotoSourceResponse {
 
   /** Array of photo metadata */
   photos: Photo[];
+
+  /** Optional error message if fetch failed */
+  error?: string;
 }
 
 /**

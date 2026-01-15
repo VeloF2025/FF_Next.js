@@ -13,7 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
@@ -62,7 +62,7 @@ async function handlePost(
     const { dropNumber } = req.body as EvaluateRequest;
 
     if (!dropNumber) {
-      return apiResponse.badRequest(res, 'dropNumber is required');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
     log.info(`Starting AI evaluation for ${dropNumber}`);
@@ -76,7 +76,7 @@ async function handlePost(
 
     // 2. Check if review is locked by another user
     if (review.locked_by && review.locked_by !== 'system') {
-      return apiResponse.badRequest(res, `Review is locked by ${review.locked_by}`);
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, `Review is locked by ${review.locked_by}`);
     }
 
     // 3. Update status to 'processing'
@@ -90,26 +90,27 @@ async function handlePost(
       log.info(`Using cached photos for ${dropNumber}`, { count: photos.length });
     } else {
       log.info(`Fetching fresh photos for ${dropNumber}`);
-      const photoResponse = await fetch(`${getBaseUrl()}/api/dr-photo-unified/fetch-photos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dropNumber }),
-      });
+      try {
+        const photoResponse = await fetch(`${getBaseUrl()}/api/dr-photo-unified/fetch-photos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dropNumber }),
+        });
 
-      if (!photoResponse.ok) {
-        throw new Error('Failed to fetch photos for evaluation');
+        if (photoResponse.ok) {
+          const photoData = await photoResponse.json();
+          photos = photoData.data?.photos || [];
+        } else {
+          log.warn(`Photo fetch failed for ${dropNumber}, proceeding with empty photos`);
+          photos = [];
+        }
+      } catch (fetchError) {
+        log.warn(`Photo fetch error for ${dropNumber}:`, fetchError);
+        photos = [];
       }
-
-      const photoData = await photoResponse.json();
-      photos = photoData.data.photos;
     }
 
-    if (photos.length === 0) {
-      await updateEvaluationStatus(dropNumber, 'failed');
-      return apiResponse.badRequest(res, 'No photos available for evaluation');
-    }
-
-    // 5. Trigger AI evaluation
+    // 5. Trigger AI evaluation (works even without photos - provides status report)
     log.info(`Evaluating ${photos.length} photos for ${dropNumber}`);
     const aiResult = await evaluateWithVLM(dropNumber, photos);
 
@@ -233,6 +234,17 @@ async function evaluateWithVLM(
   dropNumber: string,
   photos: Photo[]
 ): Promise<AIEvaluationResult> {
+  // Handle case when no photos are available
+  if (photos.length === 0) {
+    log.warn(`No photos available for ${dropNumber}, generating no-photo report`);
+    return {
+      overall_status: 'FAIL',
+      average_score: 0,
+      step_results: [],
+      markdown_report: generateNoPhotosReport(dropNumber),
+    };
+  }
+
   // Group photos by step
   const photosByStep = groupPhotosByStep(photos);
 
@@ -248,7 +260,13 @@ async function evaluateWithVLM(
     const stepPhotos = photosByStep[step] || [];
 
     if (stepPhotos.length === 0) {
-      // No photos for this step - skip
+      // No photos for this step - mark as missing
+      stepResults.push({
+        step,
+        passed: false,
+        score: 0,
+        comment: `Step ${step}: No photo available`,
+      });
       continue;
     }
 
@@ -267,8 +285,9 @@ async function evaluateWithVLM(
   }
 
   // Calculate overall status and average score
-  const totalScore = stepResults.reduce((sum, result) => sum + result.score, 0);
-  const averageScore = totalScore / stepResults.length;
+  const stepsWithPhotos = stepResults.filter((result) => result.score > 0);
+  const totalScore = stepsWithPhotos.reduce((sum, result) => sum + result.score, 0);
+  const averageScore = stepsWithPhotos.length > 0 ? totalScore / stepsWithPhotos.length : 0;
   const passedCount = stepResults.filter((result) => result.passed).length;
   const overallStatus = passedCount >= 9 ? 'PASS' : 'FAIL';
 
@@ -281,6 +300,29 @@ async function evaluateWithVLM(
     step_results: stepResults,
     markdown_report: markdownReport,
   };
+}
+
+/**
+ * Generate report when no photos are available
+ */
+function generateNoPhotosReport(dropNumber: string): string {
+  let report = `# AI Evaluation Report - ${dropNumber}\n\n`;
+  report += `**Overall Status:** FAIL\n`;
+  report += `**Average Score:** 0/10\n\n`;
+  report += `## Issue: No Photos Available\n\n`;
+  report += `Unable to perform AI evaluation because no photos were found for this DR.\n\n`;
+  report += `### Possible Causes:\n`;
+  report += `- Photos have not been uploaded yet\n`;
+  report += `- OneMap GIS API is temporarily unavailable\n`;
+  report += `- BOSS API backup service is temporarily unavailable\n\n`;
+  report += `### Recommended Actions:\n`;
+  report += `1. Check if photos have been uploaded for this DR\n`;
+  report += `2. Verify the photo services are running\n`;
+  report += `3. Try again in a few minutes\n\n`;
+  report += `---\n\n`;
+  report += `*Generated by AI Evaluation System at ${new Date().toISOString()}*\n`;
+
+  return report;
 }
 
 /**

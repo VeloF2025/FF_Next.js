@@ -13,7 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { UnifiedReview } from '@/modules/dr-photo-unified/types/unified.types';
 
@@ -56,7 +56,7 @@ async function handlePost(
     const { dropNumber, forceSource } = req.body as FetchPhotosRequest;
 
     if (!dropNumber) {
-      return apiResponse.badRequest(res, 'dropNumber is required');
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
     log.info(`Fetching photos for ${dropNumber}`, { forceSource });
@@ -106,8 +106,13 @@ async function fetchPhotosWithFallback(dropNumber: string): Promise<PhotoFetchRe
     log.info(`Trying local cache for ${dropNumber}`);
     return await fetchFromLocalCache(dropNumber);
   } catch (error) {
-    log.error(`All sources failed for ${dropNumber}`, { error });
-    throw new Error(`All photo sources unavailable for ${dropNumber}`);
+    log.warn(`All sources failed for ${dropNumber}`, { error });
+    // Return empty result instead of throwing - graceful degradation
+    return {
+      source: 'local',
+      photos: [],
+      count: 0,
+    };
   }
 }
 
@@ -130,12 +135,40 @@ async function fetchFromSpecificSource(
   }
 }
 
+const ONEMAP_HOST = 'http://192.168.1.150:8003';
+
 /**
  * Fetch from OneMap GIS API (via port 8003)
+ * If photos not found, triggers download from OneMap first
  */
 async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
   try {
-    const response = await fetch(`http://192.168.1.150:8003/api/photos/${dropNumber}`);
+    // First, try to get existing photos
+    let response = await fetch(`${ONEMAP_HOST}/api/photos/${dropNumber}`);
+
+    // If 404, try to download photos first
+    if (response.status === 404 || response.status === 422) {
+      log.info(`Photos not found for ${dropNumber}, triggering download from OneMap`);
+
+      // Trigger download from OneMap
+      const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
+        method: 'POST',
+      });
+
+      if (downloadResponse.ok) {
+        const downloadResult = await downloadResponse.json();
+        log.info(`Download triggered for ${dropNumber}`, {
+          photos_downloaded: downloadResult.photos_downloaded || downloadResult.total_photos
+        });
+
+        // Retry fetching photos after download
+        response = await fetch(`${ONEMAP_HOST}/api/photos/${dropNumber}`);
+      } else {
+        const errorText = await downloadResponse.text();
+        log.warn(`Download failed for ${dropNumber}:`, { status: downloadResponse.status, error: errorText });
+        throw new Error(`Download failed: ${downloadResponse.status}`);
+      }
+    }
 
     if (!response.ok) {
       throw new Error(`OneMap API error: ${response.status}`);
@@ -143,11 +176,21 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
 
     const data = await response.json();
 
-    // Map OneMap response to our Photo interface
+    // Check if data.photos exists
+    if (!data.photos || !Array.isArray(data.photos)) {
+      log.warn(`No photos array in response for ${dropNumber}`, { data });
+      return {
+        source: 'onemap',
+        photos: [],
+        count: 0,
+      };
+    }
+
+    // Map OneMap response to our Photo interface with full URLs
     const photos: Photo[] = data.photos.map((photo: any) => ({
       filename: photo.filename,
       step: mapPhotoTypeToStep(photo.type),
-      url: photo.url,
+      url: photo.url.startsWith('http') ? photo.url : `${ONEMAP_HOST}${photo.url}`,
       size: photo.size,
       modified: photo.modified,
     }));
@@ -207,20 +250,34 @@ async function fetchFromLocalCache(dropNumber: string): Promise<PhotoFetchResult
 
 /**
  * Map photo type to unified step number
+ * Comprehensive mapping for all OneMap photo types
  */
 function mapPhotoTypeToStep(photoType: string): number {
   const mapping: Record<string, number> = {
-    'ph_prop': 1, 'ph_sign1': 1,        // House Photo
-    'ph_pole': 2, 'ph_cbl_r': 2,        // Cable from Pole
-    'ph_entry_out': 3, 'ph_hm_ln': 3,   // Entry Outside
-    'ph_entry_in': 4, 'ph_hm_en': 4,    // Entry Inside
-    'ph_wall': 5,                        // Wall
-    'ph_ont': 6, 'ph_ont_back': 6,      // ONT Back
-    'ph_powm': 7, 'ph_powm2': 7,        // Power Meter
-    'ph_bl': 8, 'ph_barcode': 8,        // ONT Barcode
-    'ph_ups': 9,                         // UPS
-    'ph_after': 10, 'ph_final': 10,     // Final
-    'ph_lights': 11, 'ph_led': 11,      // Lights
+    // Step 1: House Photo / Property
+    'ph_prop': 1, 'ph_sign1': 1, 'ph_drop': 1, 'ph_outs': 1,
+    // Step 2: Cable from Pole
+    'ph_pole': 2, 'ph_cbl_r': 2,
+    // Step 3: Entry Outside
+    'ph_entry_out': 3, 'ph_hm_ln': 3,
+    // Step 4: Entry Inside
+    'ph_entry_in': 4, 'ph_hm_en': 4,
+    // Step 5: Wall for Installation
+    'ph_wall': 5,
+    // Step 6: ONT Back After Install
+    'ph_ont': 6, 'ph_ont_back': 6,
+    // Step 7: Power Meter Reading
+    'ph_powm': 7, 'ph_powm1': 7, 'ph_powm2': 7,
+    // Step 8: ONT Barcode
+    'ph_bl': 8, 'ph_barcode': 8,
+    // Step 9: UPS Serial Number
+    'ph_ups': 9,
+    // Step 10: Final Installation
+    'ph_after': 10, 'ph_final': 10,
+    // Step 11: Green Lights on ONT
+    'ph_lights': 11, 'ph_led': 11,
+    // Step 12: Signature
+    'ph_sign2': 12, 'ph_signature': 12,
   };
 
   return mapping[photoType] || 0;
