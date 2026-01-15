@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, status } = req.query;
+    const { id, status, limit, search, page } = req.query;
 
     // Get single drop by ID
     if (id && typeof id === 'string') {
@@ -52,16 +52,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Get all drops with summary
-    const [drops, summary] = await Promise.all([
-      getAllDrops(),
-      calculateSummary(),
-    ]);
+    let drops = await getAllDrops();
 
-    // Return with summary in response
+    // Filter by search term if provided
+    if (search && typeof search === 'string') {
+      const searchTerm = search.toLowerCase();
+      drops = drops.filter(drop =>
+        drop.dropNumber.toLowerCase().includes(searchTerm) ||
+        drop.project?.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Calculate total before pagination
+    const totalDrops = drops.length;
+
+    // Apply pagination
+    const pageSize = 1000; // Max drops per page to prevent >4MB response
+    let currentPage = 1;
+    let paginatedDrops = drops;
+
+    if (page && typeof page === 'string') {
+      currentPage = parseInt(page, 10);
+      if (!isNaN(currentPage) && currentPage > 0) {
+        const offset = (currentPage - 1) * pageSize;
+        paginatedDrops = drops.slice(offset, offset + pageSize);
+      }
+    } else if (limit && typeof limit === 'string') {
+      // Backward compatibility: support old limit parameter
+      const limitNum = parseInt(limit, 10);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        paginatedDrops = drops.slice(0, limitNum);
+      }
+    } else {
+      // Default: first page only
+      paginatedDrops = drops.slice(0, pageSize);
+    }
+
+    const summary = await calculateSummary();
+    const totalPages = Math.ceil(totalDrops / pageSize);
+
+    // Return with summary and pagination info
     return res.status(200).json({
       success: true,
-      data: drops,
+      data: paginatedDrops,
       summary,
+      pagination: {
+        currentPage,
+        pageSize,
+        totalDrops,
+        totalPages,
+        hasNextPage: currentPage < totalPages,
+        hasPreviousPage: currentPage > 1,
+      },
       meta: {
         timestamp: new Date().toISOString(),
       },

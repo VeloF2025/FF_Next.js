@@ -1,0 +1,927 @@
+/**
+ * DR List Page Component
+ * Main entry page for DR Photo Unified Review
+ * Shows list of DRs from WA Monitor (qa_photo_reviews table)
+ * Users can click a DR to review or search for specific DRs
+ */
+
+'use client';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { Search, RefreshCw, Calendar, Download, Filter, X } from 'lucide-react';
+
+interface DrListItem {
+  id: string;
+  dropNumber: string;
+  project: string | null;
+  reviewDate: string;
+  completedPhotos: number;
+  outstandingPhotos: number;
+  status: 'complete' | 'incomplete';
+  feedbackSent: string | null;
+  createdAt: string;
+  senderPhone: string | null;
+}
+
+interface DailyStat {
+  project: string;
+  date: string;
+  total: number;
+  complete: number;
+  incomplete: number;
+}
+
+interface DashboardStats {
+  totalDrops: number;
+  incomplete: number;
+  complete: number;
+  totalFeedback: number;
+}
+
+export function DrListPage() {
+  const router = useRouter();
+  const [drops, setDrops] = useState<DrListItem[]>([]);
+  const [filteredDrops, setFilteredDrops] = useState<DrListItem[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    totalDrops: 0,
+    incomplete: 0,
+    complete: 0,
+    totalFeedback: 0,
+  });
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(''); // For debounced search
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'incomplete'>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [totalDropsFromApi, setTotalDropsFromApi] = useState(0);
+
+  // Quick filter handler to set date ranges
+  // Uses SAST (Africa/Johannesburg) timezone to match server
+  const handleQuickFilter = (filter: 'today' | 'yesterday' | 'last7days' | 'all') => {
+    // Get current date in SAST (UTC+2)
+    const now = new Date();
+    const sastOffset = 2 * 60; // SAST is UTC+2 (120 minutes)
+    const sastTime = new Date(now.getTime() + (sastOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+
+    // Get today's date string in SAST
+    const todayStr = sastTime.toISOString().split('T')[0];
+
+    switch (filter) {
+      case 'today': {
+        setDateFrom(todayStr);
+        setDateTo(todayStr);
+        break;
+      }
+      case 'yesterday': {
+        // Create a new date from today's SAST date string and subtract 1 day
+        const yesterdayDate = new Date(todayStr);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+        setDateFrom(yesterdayStr);
+        setDateTo(yesterdayStr);
+        break;
+      }
+      case 'last7days': {
+        // Create a new date from today's SAST date string and subtract 7 days
+        const last7DaysDate = new Date(todayStr);
+        last7DaysDate.setDate(last7DaysDate.getDate() - 7);
+        const last7DaysStr = last7DaysDate.toISOString().split('T')[0];
+        setDateFrom(last7DaysStr);
+        setDateTo(todayStr);
+        break;
+      }
+      case 'all':
+        setDateFrom('');
+        setDateTo('');
+        break;
+    }
+  };
+
+  // Get unique projects for filter dropdown
+  const projects = Array.from(new Set(drops.map(d => d.project).filter(Boolean))) as string[];
+
+  // Calculate dashboard stats from drops
+  const calculateStats = (dropsList: DrListItem[]) => {
+    const stats = {
+      totalDrops: dropsList.length,
+      incomplete: dropsList.filter(d => d.status === 'incomplete').length,
+      complete: dropsList.filter(d => d.status === 'complete').length,
+      totalFeedback: dropsList.filter(d => d.feedbackSent).length,
+    };
+    setDashboardStats(stats);
+
+    // Calculate daily stats per project
+    const dailyMap = new Map<string, DailyStat>();
+    dropsList.forEach(drop => {
+      const date = new Date(drop.createdAt).toLocaleDateString('en-ZA');
+      const key = `${drop.project || 'Unknown'}_${date}`;
+
+      if (!dailyMap.has(key)) {
+        dailyMap.set(key, {
+          project: drop.project || 'Unknown',
+          date,
+          total: 0,
+          complete: 0,
+          incomplete: 0,
+        });
+      }
+
+      const stat = dailyMap.get(key)!;
+      stat.total++;
+      if (drop.status === 'complete') stat.complete++;
+      if (drop.status === 'incomplete') stat.incomplete++;
+    });
+
+    setDailyStats(Array.from(dailyMap.values()).sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    ));
+  };
+
+  // Fetch drops from WA Monitor API with pagination support
+  // Loads 1000 drops per page to prevent >4MB API response issue
+  const fetchDrops = async (showLoading = true, page = 1) => {
+    try {
+      if (showLoading) setIsLoading(true);
+      setError(null);
+
+      // Fetch with pagination (1000 drops per page)
+      const response = await fetch(`/api/wa-monitor-drops?page=${page}`);
+      if (!response.ok) throw new Error('Failed to fetch drops');
+
+      const data = await response.json();
+
+      if (data.success && Array.isArray(data.data)) {
+        const transformedDrops = data.data.map((drop: any) => ({
+          id: drop.id,
+          dropNumber: drop.dropNumber,
+          project: drop.project,
+          reviewDate: drop.reviewDate,
+          completedPhotos: drop.completedPhotos,
+          outstandingPhotos: drop.outstandingPhotos,
+          status: drop.status,
+          feedbackSent: drop.feedbackSent,
+          createdAt: drop.createdAt,
+          senderPhone: drop.senderPhone,
+        }));
+
+        setDrops(transformedDrops);
+        setFilteredDrops(transformedDrops);
+
+        // Update pagination state from API response
+        if (data.pagination) {
+          setCurrentPage(data.pagination.currentPage);
+          setTotalPages(data.pagination.totalPages);
+          setHasNextPage(data.pagination.hasNextPage);
+          setHasPreviousPage(data.pagination.hasPreviousPage);
+          setTotalDropsFromApi(data.pagination.totalDrops);
+        }
+
+        // Use API summary for stats (calculated from ALL drops, not just current page)
+        if (data.summary) {
+          // Set dashboard stats from API summary (all drops)
+          setDashboardStats({
+            totalDrops: data.summary.total || 0,
+            incomplete: data.summary.incomplete || 0,
+            complete: data.summary.complete || 0,
+            totalFeedback: data.summary.totalFeedback || 0,
+          });
+
+          // Set daily stats from API summary (all drops)
+          setDailyStats(data.summary.dailyStats || []);
+        } else {
+          // Fallback: calculate from displayed drops if no summary provided
+          calculateStats(transformedDrops);
+        }
+
+        setLastRefresh(new Date());
+      }
+    } catch (err) {
+      console.error('Error fetching drops:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch drops');
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  };
+
+  // Debounced search - wait 300ms after typing stops
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Initial load
+  useEffect(() => {
+    fetchDrops();
+  }, []);
+
+  // Apply all filters and update stats
+  // Note: This effect should NOT depend on `drops` to avoid resetting pagination
+  // when new data is fetched for the current page
+  useEffect(() => {
+    let filtered = [...drops];
+
+    // Search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(drop =>
+        drop.dropNumber.toLowerCase().includes(term) ||
+        drop.project?.toLowerCase().includes(term)
+      );
+    }
+
+    // Date range filter (convert to SAST timezone before comparing dates)
+    if (dateFrom) {
+      filtered = filtered.filter(drop => {
+        // Convert UTC timestamp to SAST (Africa/Johannesburg) date string
+        const dropDateUTC = new Date(drop.createdAt);
+        const sastOffset = 2 * 60; // SAST is UTC+2
+        const dropDateSAST = new Date(dropDateUTC.getTime() + (sastOffset * 60 * 1000) + (dropDateUTC.getTimezoneOffset() * 60 * 1000));
+        const dropDate = dropDateSAST.toISOString().split('T')[0];
+        return dropDate >= dateFrom;
+      });
+    }
+    if (dateTo) {
+      filtered = filtered.filter(drop => {
+        // Convert UTC timestamp to SAST (Africa/Johannesburg) date string
+        const dropDateUTC = new Date(drop.createdAt);
+        const sastOffset = 2 * 60; // SAST is UTC+2
+        const dropDateSAST = new Date(dropDateUTC.getTime() + (sastOffset * 60 * 1000) + (dropDateUTC.getTimezoneOffset() * 60 * 1000));
+        const dropDate = dropDateSAST.toISOString().split('T')[0];
+        return dropDate <= dateTo;
+      });
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(drop => drop.status === statusFilter);
+    }
+
+    // Project filter
+    if (projectFilter !== 'all') {
+      filtered = filtered.filter(drop => drop.project === projectFilter);
+    }
+
+    setFilteredDrops(filtered);
+
+    // NOTE: Dashboard stats (Total Drops, Incomplete, Complete, Total Feedback)
+    // remain unchanged - they show ALL drops from API summary.
+
+    // Calculate daily stats from filtered drops for the table
+    const dailyMap = new Map<string, DailyStat>();
+    filtered.forEach(drop => {
+      const dropDate = new Date(drop.createdAt).toISOString().split('T')[0];
+      const key = `${drop.project || 'Unknown'}_${dropDate}`;
+
+      if (!dailyMap.has(key)) {
+        dailyMap.set(key, {
+          project: drop.project || 'Unknown',
+          date: dropDate,
+          total: 0,
+          complete: 0,
+          incomplete: 0,
+        });
+      }
+
+      const stat = dailyMap.get(key)!;
+      stat.total++;
+      if (drop.status === 'complete') stat.complete++;
+      if (drop.status === 'incomplete') stat.incomplete++;
+    });
+
+    setDailyStats(Array.from(dailyMap.values()).sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    ));
+  }, [drops, searchTerm, dateFrom, dateTo, statusFilter, projectFilter]);
+
+  // Reset to page 1 only when FILTER values change, not when drops data changes
+  useEffect(() => {
+    // Only reset if we have filters active and we're not on page 1
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+      fetchDrops(true, 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, dateFrom, dateTo, statusFilter, projectFilter]);
+
+  // Handle DR selection
+  const handleSelectDr = (dropNumber: string) => {
+    router.push(`/dr-photo-unified/${dropNumber}`);
+  };
+
+  // Manual refresh
+  const handleRefresh = () => {
+    fetchDrops(true, currentPage);
+  };
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSearchInput(''); // Clear debounced search input too
+    setDateFrom('');
+    setDateTo('');
+    setStatusFilter('all');
+    setProjectFilter('all');
+    setCurrentPage(1); // Reset to first page when clearing filters
+  };
+
+  // Pagination handlers
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      fetchDrops(true, nextPage);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (hasPreviousPage) {
+      const prevPage = currentPage - 1;
+      setCurrentPage(prevPage);
+      fetchDrops(true, prevPage);
+    }
+  };
+
+  // Determine active quick filter based on current date range
+  const getActiveQuickFilter = (): 'today' | 'yesterday' | 'last7days' | 'all' => {
+    if (!dateFrom && !dateTo) return 'all';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const last7Days = new Date(today);
+    last7Days.setDate(last7Days.getDate() - 7);
+    const last7DaysStr = last7Days.toISOString().split('T')[0];
+
+    if (dateFrom === todayStr && dateTo === todayStr) return 'today';
+    if (dateFrom === yesterdayStr && dateTo === yesterdayStr) return 'yesterday';
+    if (dateFrom === last7DaysStr && dateTo === todayStr) return 'last7days';
+
+    return 'all';
+  };
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const csvRows = [];
+
+    // Headers
+    csvRows.push([
+      'DR Number',
+      'Project',
+      'Agent',
+      'Status',
+      'Completed Photos',
+      'Outstanding Photos',
+      'Feedback Sent',
+      'Created',
+    ].join(','));
+
+    // Data rows
+    filteredDrops.forEach(drop => {
+      csvRows.push([
+        drop.dropNumber,
+        drop.project || '',
+        drop.senderPhone || '',
+        drop.status,
+        drop.completedPhotos,
+        drop.outstandingPhotos,
+        drop.feedbackSent ? 'Yes' : 'No',
+        new Date(drop.createdAt).toLocaleString(),
+      ].join(','));
+    });
+
+    // Create blob and download
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dr-photo-unified-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Format phone number for display
+  const formatAgent = (phone: string | null) => {
+    if (!phone) return 'Unknown';
+    return phone.replace(/^27/, '0'); // Convert 27727655403 to 0727655403
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading DRs...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading DRs</h3>
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+            <button
+              onClick={handleRefresh}
+              className="mt-4 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const hasActiveFilters = searchTerm || dateFrom || dateTo || statusFilter !== 'all' || projectFilter !== 'all';
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              DR Photo Review
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Select a DR to review photos and quality assessments
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              title="Refresh data"
+            >
+              <RefreshCw className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              <span className="text-sm text-gray-700 dark:text-gray-300">REFRESH</span>
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              <span className="text-sm">EXPORT CSV</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Last Updated */}
+        {lastRefresh && (
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-6">
+            <Calendar className="h-4 w-4" />
+            Last updated: {lastRefresh.toLocaleString()} (Auto-refresh every 30s)
+          </div>
+        )}
+
+        {/* Search and Filters - MOVED TO TOP */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
+          <div className="flex flex-col gap-4">
+            {/* Search Bar Row */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-5 w-5" />
+                <input
+                  type="text"
+                  placeholder="Search drop number..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
+                  showFilters || hasActiveFilters
+                    ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                <Filter className="h-5 w-5" />
+                Filters
+                {hasActiveFilters && (
+                  <span className="ml-1 px-2 py-0.5 bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 rounded-full text-xs font-semibold">
+                    Active
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Filter Options */}
+            {showFilters && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                {/* From Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                {/* To Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="incomplete">Incomplete</option>
+                    <option value="complete">Complete</option>
+                  </select>
+                </div>
+
+                {/* Project Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Project
+                  </label>
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All Projects</option>
+                    {projects.map(project => (
+                      <option key={project} value={project}>{project}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                {hasActiveFilters && (
+                  <div className="md:col-span-4 flex justify-end">
+                    <button
+                      onClick={handleClearFilters}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear All Filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Dashboard Stats - AFTER FILTERS */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Drops</h3>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{dashboardStats.totalDrops}</p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Incomplete</h3>
+            </div>
+            <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-500 mt-2">{dashboardStats.incomplete}</p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Complete</h3>
+            </div>
+            <p className="text-3xl font-bold text-green-600 dark:text-green-500 mt-2">{dashboardStats.complete}</p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Feedback</h3>
+            </div>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-500 mt-2">{dashboardStats.totalFeedback}</p>
+          </div>
+        </div>
+
+        {/* Daily Stats Per Project - AFTER DASHBOARD STATS */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Numbers per Project
+              {hasActiveFilters && (
+                <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                  (Filtered Results)
+                </span>
+              )}
+            </h2>
+
+            {/* Quick Filter Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleQuickFilter('today')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  getActiveQuickFilter() === 'today'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                Today
+              </button>
+              <button
+                onClick={() => handleQuickFilter('yesterday')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  getActiveQuickFilter() === 'yesterday'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                Yesterday
+              </button>
+              <button
+                onClick={() => handleQuickFilter('last7days')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  getActiveQuickFilter() === 'last7days'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                Last 7 days
+              </button>
+              <button
+                onClick={() => handleQuickFilter('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  getActiveQuickFilter() === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                All
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Project
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Complete
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Incomplete
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {dailyStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No data available for the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  (() => {
+                    // Aggregate daily stats by project
+                    const projectTotals = dailyStats.reduce((acc, stat) => {
+                      if (!acc[stat.project]) {
+                        acc[stat.project] = { total: 0, complete: 0, incomplete: 0 };
+                      }
+                      acc[stat.project].total += stat.total;
+                      acc[stat.project].complete += stat.complete;
+                      acc[stat.project].incomplete += stat.incomplete;
+                      return acc;
+                    }, {} as Record<string, { total: number; complete: number; incomplete: number }>);
+
+                    // Calculate grand totals
+                    const grandTotal = Object.values(projectTotals).reduce(
+                      (sum, stats) => ({
+                        total: sum.total + stats.total,
+                        complete: sum.complete + stats.complete,
+                        incomplete: sum.incomplete + stats.incomplete,
+                      }),
+                      { total: 0, complete: 0, incomplete: 0 }
+                    );
+
+                    const projectRows = Object.entries(projectTotals)
+                      .sort((a, b) => b[1].total - a[1].total) // Sort by total descending
+                      .map(([project, stats]) => (
+                        <tr key={project} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {project}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {stats.total}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">
+                            {stats.complete}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">
+                            {stats.incomplete}
+                          </td>
+                        </tr>
+                      ));
+
+                    // Add summary row
+                    const summaryRow = (
+                      <tr key="summary" className="bg-gray-100 dark:bg-gray-900/80 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                          Total
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                          {grandTotal.total}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-500">
+                          {grandTotal.complete}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-600 dark:text-yellow-500">
+                          {grandTotal.incomplete}
+                        </td>
+                      </tr>
+                    );
+
+                    return [...projectRows, summaryRow];
+                  })()
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* DR List */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 overflow-hidden">
+          {/* Summary Header */}
+          <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Showing {filteredDrops.length} of {totalDropsFromApi > 0 ? totalDropsFromApi : drops.length} drops
+                {totalPages > 1 && (
+                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                    (Page {currentPage} of {totalPages})
+                  </span>
+                )}
+              </h2>
+            </div>
+          </div>
+
+          {/* List Content */}
+          {filteredDrops.length === 0 ? (
+            <div className="p-12 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
+                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                No DRs Found
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                {hasActiveFilters
+                  ? 'Try adjusting your filters to see more results.'
+                  : 'DRs will appear here once they are received from WhatsApp Monitor.'}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {filteredDrops.map((drop) => (
+                <button
+                  key={drop.id}
+                  onClick={() => handleSelectDr(drop.dropNumber)}
+                  className="w-full text-left px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    {/* DR Info */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {drop.dropNumber}
+                        </h3>
+                        {drop.feedbackSent && (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                            ✓ Feedback Sent
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <span>Project: <span className="font-medium text-gray-900 dark:text-white">{drop.project || 'Unknown'}</span></span>
+                        <span>•</span>
+                        <span>Agent: <span className="font-medium text-gray-900 dark:text-white">{formatAgent(drop.senderPhone)}</span></span>
+                        <span>•</span>
+                        <span>Created: <span className="font-medium text-gray-900 dark:text-white">{new Date(drop.createdAt).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}</span></span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        <span>
+                          Photos: {drop.completedPhotos}/{drop.completedPhotos + drop.outstandingPhotos}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div>
+                      {drop.status === 'complete' ? (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                          Complete
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                          Incomplete
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && !isLoading && (
+            <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Page {currentPage} of {totalPages} • Showing {filteredDrops.length} drops per page
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={!hasPreviousPage}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      hasPreviousPage
+                        ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={!hasNextPage}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      hasNextPage
+                        ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
