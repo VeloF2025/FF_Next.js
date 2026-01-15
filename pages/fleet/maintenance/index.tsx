@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   Wrench,
   AlertTriangle,
@@ -314,8 +315,9 @@ export default function FleetMaintenancePage() {
         const data = await res.json();
         setServices(data.data || []);
       } catch (err) {
-        console.error('Error fetching maintenance data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load data');
+        const message = err instanceof Error ? err.message : 'Failed to load data';
+        setError(message);
+        notificationService.error(`Failed to load maintenance data: ${message}`);
       } finally {
         setLoading(false);
       }
@@ -370,9 +372,18 @@ export default function FleetMaintenancePage() {
       // Success - close modal and refresh data
       setShowAddModal(false);
       setFormData(INITIAL_FORM_DATA);
-      window.location.reload(); // Simple refresh to reload data
+      notificationService.success('Service interval created successfully');
+
+      // Refresh data without full page reload
+      const res2 = await fetch(`/api/fleet/maintenance/intervals?limit=50`);
+      if (res2.ok) {
+        const data = await res2.json();
+        setIntervals(data.data?.intervals || []);
+      }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'An error occurred');
+      const message = err instanceof Error ? err.message : 'An error occurred';
+      setFormError(message);
+      notificationService.error(message);
     } finally {
       setSubmitting(false);
     }
