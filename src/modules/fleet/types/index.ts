@@ -14,3 +14,6 @@ export * from './investigation.types';
 
 // Ownership types (documents, license disc, finance, lease, insurance)
 export * from './ownership.types';
+
+// Driver types (driver listing, dashboard stats)
+export * from './driver.types';

@@ -39,8 +39,8 @@ export const fleetSection: NavSection = {
     },
     {
       to: '/fleet/drivers',
-      icon: Trophy,
-      label: 'Driver Leaderboard',
+      icon: Users,
+      label: 'Fleet Drivers',
       shortLabel: 'Drivers',
       permissions: [],
     },
