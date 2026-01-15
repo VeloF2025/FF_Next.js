@@ -12,25 +12,27 @@ interface ProjectStatusBadgesProps {
 }
 
 export function ProjectStatusBadges({ project }: ProjectStatusBadgesProps) {
+  const fallbackColors = 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]';
+
   return (
     <div className="flex items-center gap-4">
-      <span 
+      <span
         className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-          statusColors[project.status] || 'bg-gray-100 text-gray-800'
+          statusColors[project.status] || fallbackColors
         }`}
       >
         {formatStatus(project.status)}
       </span>
-      
-      <span 
+
+      <span
         className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-          priorityColors[project.priority] || 'bg-gray-100 text-gray-800'
+          priorityColors[project.priority] || fallbackColors
         }`}
       >
         {formatPriority(project.priority)}
       </span>
-      
-      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${fallbackColors}`}>
         {formatProjectType(project.projectType)}
       </span>
     </div>
