@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // DEVELOPMENT MODE: Mock user data for easier testing
   // TODO: Remove this mock data when implementing RBAC
   // Use Hein van Vuuren's staff ID from database to satisfy foreign key constraints
+  // NOTE: Using static dates to prevent SSR/CSR hydration mismatch (React error #418/#423)
   const mockUser: User = {
     id: 'ac59fe41-b52b-43f6-8b8e-a8d53c8d56f2',
     email: 'hein@velocityfibre.co.za',
@@ -65,8 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       Permission.SYSTEM_ADMIN,
     ],
     isEmailVerified: true,
-    lastLoginAt: new Date(),
-    createdAt: new Date(),
+    lastLoginAt: new Date('2025-01-01T00:00:00.000Z'),
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
   };
 
   const mockAuthUser: AuthUser = {
