@@ -27,14 +27,16 @@ const MAPPINGS = {
     tableName: 'drops',
     uniqueConstraint: ['project_id', 'drop_number'],
     fields: [
-      { headers: ['label', 'drop_number', 'drop_id', 'drop_label'], column: 'drop_number', required: true },
-      { headers: ['strtfeat', 'start_feature', 'pole_number', 'from_pole'], column: 'pole_number' },
+      { headers: ['label (drop)', 'label', 'drop_number', 'drop_id', 'drop_label'], column: 'drop_number', required: true },
+      { headers: ['strtfeat (Pole) ', 'strtfeat', 'start_feature', 'pole_number', 'from_pole'], column: 'pole_number' },
       { headers: ['strtfeat', 'start_feature', 'start_point'], column: 'start_point' },
       { headers: ['endfeat', 'end_feature', 'to_pole', 'end_point'], column: 'end_point' },
       { headers: ['type', 'cable_type'], column: 'cable_type' },
       { headers: ['spec', 'specification', 'cable_spec'], column: 'cable_spec' },
       { headers: ['dim2', 'length', 'cable_length', 'distance'], column: 'cable_length', type: 'number' },
       { headers: ['cblcpty', 'capacity', 'cable_capacity', 'fibre_count'], column: 'cable_capacity', type: 'number' },
+      { headers: ['lat', 'latitude', 'y'], column: 'latitude', type: 'number' },
+      { headers: ['lon', 'longitude', 'lng', 'x'], column: 'longitude', type: 'number' },
       { headers: ['address', 'location', 'drop_address'], column: 'address' },
       { headers: ['pon_no', 'pon', 'pon_number'], column: 'pon_no' },
       { headers: ['zone_no', 'zone', 'zone_number'], column: 'zone_no' },
@@ -45,18 +47,14 @@ const MAPPINGS = {
     tableName: 'poles',
     uniqueConstraint: ['project_id', 'pole_number'],
     fields: [
-      { headers: ['label_1', 'pole_number', 'pole_id', 'pole_label'], column: 'pole_number', required: true },
-      { headers: ['type_1', 'pole_type', 'type'], column: 'pole_type' },
-      { headers: ['spec_1', 'specification', 'spec'], column: 'specification' },
-      { headers: ['lat', 'latitude', 'y'], column: 'latitude', type: 'number' },
-      { headers: ['lon', 'longitude', 'lng', 'x'], column: 'longitude', type: 'number' },
+      { headers: ['label (Pole)', 'label_1', 'pole_number', 'pole_id', 'pole_label'], column: 'pole_number', required: true },
+      { headers: ['type', 'type_1', 'pole_type'], column: 'type' },
+      { headers: ['Planned Location (Latitude)', 'lat', 'latitude', 'y'], column: 'latitude', type: 'number' },
+      { headers: ['Planned Location (Longitude)', 'lon', 'longitude', 'lng', 'x'], column: 'longitude', type: 'number' },
       { headers: ['height', 'pole_height'], column: 'height', type: 'number' },
       { headers: ['material', 'pole_material'], column: 'material' },
       { headers: ['status', 'pole_status'], column: 'status' },
-      { headers: ['zone_no', 'zone', 'zone_number'], column: 'zone_no' },
-      { headers: ['pon_no', 'pon', 'pon_number'], column: 'pon_no' },
       { headers: ['address', 'location'], column: 'address' },
-      { headers: ['mun', 'municipality', 'city'], column: 'municipality' },
     ],
   },
   fibre: {
@@ -82,16 +80,21 @@ const MAPPINGS = {
 // Detect data type from headers
 function detectDataType(headers) {
   const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+  const originalHeaders = headers.map(h => h.trim());
 
-  // Drops: has 'label' + 'strtfeat' or 'type'/'spec' combo
-  if (lowerHeaders.includes('label') &&
-      (lowerHeaders.includes('strtfeat') || lowerHeaders.includes('type'))) {
-    return 'drops';
+  // Poles: has 'label (Pole)' or 'label_1' or 'pole_number' with latitude
+  if (originalHeaders.some(h => h.includes('label (Pole)')) ||
+      (lowerHeaders.includes('label_1') && lowerHeaders.some(h => h.includes('latitude')))) {
+    return 'poles';
+  }
+  if (lowerHeaders.includes('pole_number') && lowerHeaders.some(h => h.includes('latitude'))) {
+    return 'poles';
   }
 
-  // Poles: has 'label_1' or 'pole_number'
-  if (lowerHeaders.includes('label_1') || lowerHeaders.includes('pole_number')) {
-    return 'poles';
+  // Drops: has 'label' or 'label (drop)' with 'strtfeat' or pole reference
+  if ((lowerHeaders.includes('label') || originalHeaders.some(h => h.includes('label (drop)'))) &&
+      (lowerHeaders.some(h => h.includes('strtfeat')) || lowerHeaders.includes('type'))) {
+    return 'drops';
   }
 
   // Fibre: has 'cable size' or 'layer' with 'length'
@@ -220,12 +223,13 @@ async function main() {
 
   if (args.length < 2) {
     console.log(`
-Usage: node scripts/import-project-data.js <projectId> <filePath> [dataType]
+Usage: node scripts/import-project-data.js <projectId> <filePath> [dataType] [sheetName]
 
 Arguments:
   projectId   Project UUID to import data into
   filePath    Path to Excel file (.xlsx)
   dataType    Optional: 'drops', 'poles', or 'fibre' (auto-detected if not provided)
+  sheetName   Optional: Sheet/tab name to import (defaults to first sheet)
 
 Environment:
   DATABASE_URL  PostgreSQL connection string (required)
@@ -233,11 +237,12 @@ Environment:
 Examples:
   node scripts/import-project-data.js abc-123 ./Drops.xlsx drops
   node scripts/import-project-data.js abc-123 ./data.xlsx  # auto-detect
+  node scripts/import-project-data.js abc-123 ./data.xlsx poles Poles  # specific sheet
 `);
     process.exit(1);
   }
 
-  const [projectId, filePath, dataTypeArg] = args;
+  const [projectId, filePath, dataTypeArg, sheetNameArg] = args;
 
   // Check file exists
   const resolvedPath = path.resolve(filePath);
@@ -262,7 +267,14 @@ Examples:
   console.log('\n📊 Parsing Excel file...');
   const buffer = fs.readFileSync(resolvedPath);
   const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames[0];
+
+  // Use specified sheet or first sheet
+  let sheetName = sheetNameArg || workbook.SheetNames[0];
+  if (sheetNameArg && !workbook.SheetNames.includes(sheetNameArg)) {
+    console.error(`❌ Sheet "${sheetNameArg}" not found. Available: ${workbook.SheetNames.join(', ')}`);
+    process.exit(1);
+  }
+
   const sheet = workbook.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet);
 
