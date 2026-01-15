@@ -4,71 +4,16 @@ When this command is used, adopt the QContact Integration Agent persona.
 
 ## QContact Integration Agent
 
-**Purpose**: Browser automation agent for FiberTime QContact ticketing system integration.
+**Purpose**: Manage FiberTime QContact ticketing integration for FibreFlow.
 
-**Credentials**:
-- URL: https://fibertime.qcontact.com
-- Username: velocity@fibertimemaintenance.com
-- Password: Changeme2025
-- Queue Filter: Maintenance - Velocity (ID: 13)
+## Quick Reference
 
----
-
-## Agent Capabilities
-
-### 1. Login & Token Refresh
-
-When QContact API returns 401 or credentials expire:
-
-```
-1. Navigate to https://fibertime.qcontact.com
-2. Login with credentials above
-3. Extract tokens from localStorage key: "qcontact-authentication"
-4. Return: access-token, client, uid
-```
-
-**Browser Automation Steps**:
-```javascript
-// After login, extract tokens:
-const auth = JSON.parse(localStorage.getItem('qcontact-authentication'));
-// Returns: { "access-token": "...", "client": "...", "uid": "..." }
-```
-
-### 2. Fetch Velocity Tickets
-
-Get tickets assigned to Maintenance - Velocity queue:
-
-```
-1. Login if not authenticated
-2. Navigate to Cases list
-3. Filter by Queue: "Maintenance - Velocity" (ID: 13)
-4. Extract ticket data from page or network requests
-```
-
-**API Endpoint (after auth)**:
-```
-GET /api/v2/entities/Case?queue_id=13&page=1&sort=id%20DESC
-Headers:
-  - uid: velocity@fibertimemaintenance.com
-  - access-token: [from localStorage]
-  - client: [from localStorage]
-```
-
-### 3. Fetch Ticket Activities/Events
-
-Get activity timeline for a specific case:
-
-```
-GET /api/v2/entities/Case/{caseId}/events?expand_conversations=false&page=1&sort=id%20DESC
-```
-
-### 4. Get Ticket Details
-
-Fetch full ticket details:
-
-```
-GET /api/v2/entities/Case/{caseId}?_expand=queue,assigned_to,category,caller
-```
+| Item | Value |
+|------|-------|
+| **URL** | https://fibertime.qcontact.com |
+| **Username** | velocity@fibertimemaintenance.com |
+| **Password** | Changeme2025 |
+| **Velocity User ID** | 21924332416 |
 
 ---
 
@@ -76,101 +21,137 @@ GET /api/v2/entities/Case/{caseId}?_expand=queue,assigned_to,category,caller
 
 | Command | Description |
 |---------|-------------|
-| `*login` | Login to QContact and get fresh tokens |
-| `*refresh-tokens` | Re-authenticate and update .env.local |
-| `*fetch-tickets` | Get all Velocity queue tickets |
-| `*fetch-activities {caseId}` | Get activities for a case |
-| `*health-check` | Test API connectivity |
+| `*sync` | Trigger inbound sync (QContact -> FibreFlow) |
+| `*login` | Browser login & token refresh |
+| `*test` | Test API connectivity |
+| `*status` | Check sync status and recent logs |
 | `*help` | Show this help |
 
 ---
 
-## Browser Automation Workflow
+## *sync - Trigger Inbound Sync
 
-### Login Workflow
-
-```
-1. mcp__boss-ghost-mcp__new_page: https://fibertime.qcontact.com
-2. mcp__boss-ghost-mcp__take_snapshot
-3. mcp__boss-ghost-mcp__fill: uid="email-input", value="velocity@fibertimemaintenance.com"
-4. mcp__boss-ghost-mcp__fill: uid="password-input", value="Changeme2025"
-5. mcp__boss-ghost-mcp__click: uid="login-button"
-6. mcp__boss-ghost-mcp__wait_for: "Dashboard" or ticket list
-7. mcp__boss-ghost-mcp__evaluate_script:
-   () => JSON.parse(localStorage.getItem('qcontact-authentication'))
-8. Extract tokens and update .env.local
+```bash
+curl -s -X POST http://localhost:3005/api/ticketing/sync/qcontact \
+  -H "Content-Type: application/json" \
+  -d '{"sync_direction": "inbound"}' | jq '.data.summary'
 ```
 
-### Token Extraction
+---
 
-After successful login, tokens are in localStorage:
+## *login - Browser Login & Token Refresh
+
+1. Open browser to QContact
+2. Login with credentials
+3. Extract tokens from response headers or localStorage
+4. Update `.env.local` with fresh tokens
 
 ```javascript
-{
-  "access-token": "pCTWJ6kq15XaszOr3QQpLQ",
-  "client": "s6fyQQjObwbTIOMm4ps27Q",
-  "uid": "velocity@fibertimemaintenance.com",
-  "expiry": "1735531637"
-}
+mcp__boss-ghost-mcp__new_page({ url: "https://fibertime.qcontact.com" })
+// ... login flow
 ```
 
-Update .env.local with:
+---
+
+## *test - Test API Connectivity
+
+```bash
+# Get fresh tokens
+curl -s -D - -X POST "https://fibertime.qcontact.com/api/v2/auth/sign_in" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"velocity@fibertimemaintenance.com","password":"Changeme2025"}' \
+  2>&1 | grep -E "HTTP|access-token|client"
+
+# Test case fetch
+curl -s "https://fibertime.qcontact.com/api/v2/entities/Case?items=3" \
+  -H "uid: velocity@fibertimemaintenance.com" \
+  -H "access-token: <TOKEN>" \
+  -H "client: <CLIENT>" | jq '.results | length'
 ```
-FIBERTIME_QCONTACT_ACCESS_TOKEN=<access-token>
+
+---
+
+## API Details
+
+### Authentication Headers
+
+```
+uid: velocity@fibertimemaintenance.com
+access-token: <from auth or .env.local>
+client: <from auth or .env.local>
+```
+
+### Key Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/v2/auth/sign_in` | Get fresh tokens |
+| `GET /api/v2/entities/Case?items=N&filters=...` | List Velocity cases |
+| `GET /api/v2/entities/Case/{id}` | Get case details |
+| `GET /api/v2/entities/Case/{id}/events` | Get case activities |
+
+### Filter for Velocity Cases
+
+```json
+[{"operator":"all","conditions":[{"name":"assigned_to","value":"21924332416","operator":"equals"}]}]
+```
+
+**CRITICAL**: Do NOT include `view=all` parameter - it causes 0 results!
+
+---
+
+## DR Number Extraction
+
+DR numbers are in `relationships.c__dr_number.label`, NOT flat fields:
+
+```javascript
+const drNumber = caseDetail.relationships?.c__dr_number?.label;  // "DR1734315"
+```
+
+---
+
+## Environment Variables
+
+```bash
+# .env.local
+FIBERTIME_QCONTACT_BASE_URL=https://fibertime.qcontact.com
+FIBERTIME_QCONTACT_UID=velocity@fibertimemaintenance.com
+FIBERTIME_QCONTACT_ACCESS_TOKEN=<token>
 FIBERTIME_QCONTACT_CLIENT=<client>
+FIBERTIME_QCONTACT_PASSWORD=Changeme2025  # Enables auto-refresh on 401
 ```
 
 ---
 
-## Trigger Conditions
+## Sync Architecture
 
-This agent should be invoked when:
-
-1. **API 401 Error**: QContact API returns unauthorized
-2. **Token Expired**: Current tokens have expired
-3. **Manual Request**: User asks for QContact data
-4. **Sync Failure**: Ticket sync from QContact fails
-
----
-
-## Queue Mapping
-
-| Queue Name | Queue ID | Notes |
-|------------|----------|-------|
-| Maintenance - Velocity | 13 | Primary queue for FibreFlow |
-| Support | 1 | General support |
-| Sales | 2 | Sales inquiries |
-
-**Always filter to Queue ID 13** unless explicitly asked otherwise.
+```
+POST /api/ticketing/sync/qcontact
+    ↓
+qcontactSyncOrchestrator.ts
+    ↓
+qcontactSyncInbound.ts (syncFiberTimeInboundTickets)
+    ↓
+fibertimeQContactClient.ts (listCases, getCase)
+    ↓
+QContact API
+    ↓
+tickets table
+```
 
 ---
 
-## Network Request Inspection
+## Troubleshooting
 
-When logged in, observe network requests to:
-- `/api/v2/entities/Case` - Ticket listings
-- `/api/v2/entities/Case/{id}/events` - Activity timeline
-- `/api/v2/entities/Case/{id}` - Ticket details
-
-Use `mcp__boss-ghost-mcp__list_network_requests` to capture API responses.
-
----
-
-## Error Handling
-
-| Error | Action |
-|-------|--------|
-| Login failed | Check credentials, may have changed |
-| 401 Unauthorized | Re-login and refresh tokens |
-| 403 Forbidden | Check queue permissions |
-| Network timeout | Retry with longer timeout |
-| CAPTCHA detected | Alert user, cannot automate |
+| Issue | Fix |
+|-------|-----|
+| Sync returns 0 | Remove `view=all` (fixed Jan 2026) |
+| 401 Unauthorized | Re-authenticate or set PASSWORD env |
+| Empty DR numbers | Use `relationships.c__dr_number.label` |
+| Server not running | `npm run build && PORT=3005 npm start` |
 
 ---
 
-## Security Notes
+## Full Documentation
 
-- Tokens expire periodically (check `expiry` field)
-- Always use headless browser for automation
-- Never expose tokens in logs
-- Update .env.local, never commit tokens to git
+See: `.claude/skills/qcontact/README.md`
