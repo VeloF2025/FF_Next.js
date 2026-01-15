@@ -1,6 +1,6 @@
 /**
  * Fleet section configuration
- * Vehicle management and GPS trip investigation
+ * Vehicle management, GPS investigation, and fleet analytics
  */
 
 import {
@@ -10,6 +10,11 @@ import {
   FileSearch,
   BarChart3,
   ScanLine,
+  TrendingUp,
+  Wrench,
+  Users,
+  Fuel,
+  Trophy,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -23,6 +28,34 @@ export const fleetSection: NavSection = {
       icon: BarChart3,
       label: 'Fleet Dashboard',
       shortLabel: 'Dashboard',
+      permissions: [],
+    },
+    {
+      to: '/fleet/analytics',
+      icon: TrendingUp,
+      label: 'Fleet Analytics',
+      shortLabel: 'Analytics',
+      permissions: [],
+    },
+    {
+      to: '/fleet/drivers',
+      icon: Trophy,
+      label: 'Driver Leaderboard',
+      shortLabel: 'Drivers',
+      permissions: [],
+    },
+    {
+      to: '/fleet/fuel',
+      icon: Fuel,
+      label: 'Fuel Analytics',
+      shortLabel: 'Fuel',
+      permissions: [],
+    },
+    {
+      to: '/fleet/maintenance',
+      icon: Wrench,
+      label: 'Maintenance',
+      shortLabel: 'Maint.',
       permissions: [],
     },
     {
