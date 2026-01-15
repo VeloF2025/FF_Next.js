@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Users } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import { staffService } from '@/services/staffService';
 import { StaffImportResult } from '@/types/staff.types';
 import { log } from '@/lib/logger';
@@ -104,9 +105,10 @@ export function StaffImport({ onComplete }: StaffImportProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      notificationService.success('Staff data exported');
     } catch (error) {
       log.error('Export error:', { data: error }, 'StaffImport');
-      alert('Failed to export staff data');
+      notificationService.error('Failed to export staff data');
     }
   };
 

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { log } from '@/lib/logger';
+import { notificationService } from '@/services/core/NotificationService';
 import { StaffDocumentList } from '@/components/staff/StaffDocumentList';
 import { StaffProjectAssignment } from '@/components/staff/StaffProjectAssignment';
 import { OverviewTab } from './tabs/OverviewTab';
@@ -90,10 +91,11 @@ export function StaffDetail() {
 
     try {
       await deleteMutation.mutateAsync(id!);
+      notificationService.success('Staff member deleted');
       router.push('/app/staff');
     } catch (err) {
       log.error('Failed to delete staff member', { error: err });
-      alert('Failed to delete staff member');
+      notificationService.error('Failed to delete staff member');
     }
   };
 
@@ -109,10 +111,11 @@ export function StaffDetail() {
         throw new Error('Failed to verify document');
       }
 
+      notificationService.success(`Document ${status === 'verified' ? 'verified' : 'rejected'}`);
       router.replace(router.asPath);
     } catch (err) {
       log.error('Document verification failed', { documentId, error: err });
-      alert('Failed to verify document');
+      notificationService.error('Failed to verify document');
     }
   };
 
@@ -188,10 +191,11 @@ export function StaffDetail() {
 
     if (!response.ok) {
       const data = await response.json();
-      alert(data.error || 'Failed to compare photos');
+      notificationService.error(data.error || 'Failed to compare photos');
       return;
     }
 
+    notificationService.success('Photos compared successfully');
     refetch();
   };
 
@@ -243,10 +247,11 @@ export function StaffDetail() {
     });
 
     if (!response.ok) {
-      alert('Failed to remove vehicle assignment');
+      notificationService.error('Failed to remove vehicle assignment');
       return;
     }
 
+    notificationService.success('Vehicle assignment removed');
     router.replace(router.asPath);
   };
 

@@ -3,6 +3,7 @@
  */
 
 import { Upload } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import { FileDropZoneProps } from './StaffImportTypes';
 
 export function FileDropZone({ 
@@ -23,7 +24,7 @@ export function FileDropZone({
       ];
       
       if (!validTypes.includes(file.type)) {
-        alert('Please upload a valid CSV or Excel file');
+        notificationService.warning('Please upload a valid CSV or Excel file');
         return;
       }
       

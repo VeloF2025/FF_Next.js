@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Plus, RefreshCw, Video, Calendar, Film } from 'lucide-react';
 import Link from 'next/link';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { notificationService } from '@/services/core/NotificationService';
 import type { Meeting, UpcomingMeeting } from './types/meeting.types';
 import { MeetingStatsCards } from './components/MeetingStatsCards';
 import { MeetingsList } from './components/MeetingsList';
@@ -124,10 +125,11 @@ export function MeetingsDashboard() {
       if (data.success && data.room) {
         router.push(`/livekit/${data.room.name}`);
       } else {
-        alert('Failed to create meeting: ' + (data.error || 'Unknown error'));
+        notificationService.error('Failed to create meeting: ' + (data.error || 'Unknown error'));
       }
-    } catch (error: any) {
-      alert('Failed to create meeting: ' + error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      notificationService.error('Failed to create meeting: ' + message);
     } finally {
       setIsCreatingRoom(false);
     }

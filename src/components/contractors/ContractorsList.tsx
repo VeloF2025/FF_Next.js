@@ -9,6 +9,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Eye, Edit, Trash2 } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import type { Contractor } from '@/types/contractor.core.types';
 import { CONTRACTOR_STATUSES, COMPLIANCE_STATUSES } from '@/types/contractor.core.types';
 
@@ -59,11 +60,12 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
 
       // Remove from local state
       setContractors(contractors.filter((c) => c.id !== id));
-      alert('Contractor suspended successfully');
+      notificationService.success('Contractor suspended successfully');
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Suspend error:', error);
-      alert(error.message || 'Failed to suspend contractor');
+      const message = error instanceof Error ? error.message : 'Failed to suspend contractor';
+      notificationService.error(message);
     } finally {
       setIsDeleting(null);
     }

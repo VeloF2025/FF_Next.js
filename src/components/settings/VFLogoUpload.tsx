@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Check } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 
 export function VFLogoUpload() {
   const [currentLogo, setCurrentLogo] = useState<string | null>(
@@ -14,13 +15,13 @@ export function VFLogoUpload() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      notificationService.warning('Please upload an image file');
       return;
     }
 
     // Validate file size (max 5MB for larger logos)
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      notificationService.warning('File size must be less than 5MB');
       return;
     }
 
@@ -40,7 +41,7 @@ export function VFLogoUpload() {
     };
 
     reader.onerror = () => {
-      alert('Failed to read file');
+      notificationService.error('Failed to read file');
       setUploading(false);
     };
 

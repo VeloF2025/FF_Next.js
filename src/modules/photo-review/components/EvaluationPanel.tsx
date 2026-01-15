@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { Send, Sparkles, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import type { DropRecord, EvaluationResult } from '../types';
 
 interface EvaluationPanelProps {
@@ -95,7 +96,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
       setSending(true);
       setError(null);
       await onSendFeedback(drop.dr_number, feedbackMessage);
-      alert('Feedback sent successfully!');
+      notificationService.success('Feedback sent successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send feedback';
       setError(errorMessage);

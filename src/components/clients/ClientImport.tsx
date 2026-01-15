@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Building2 } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import { clientService } from '@/services/clientService';
 import { ClientImportResult } from '@/types/client.types';
 import {
@@ -101,9 +102,10 @@ export function ClientImport({ onComplete }: ClientImportProps = {}) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      notificationService.success('Client data exported');
     } catch (error) {
       // log.error('Export error:', { data: error }, 'ClientImport');
-      alert('Failed to export client data');
+      notificationService.error('Failed to export client data');
     }
   };
 

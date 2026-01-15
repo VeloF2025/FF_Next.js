@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Save, Building } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   SupplierStatus,
   BusinessType,
@@ -109,10 +110,11 @@ export function SupplierForm() {
         throw new Error(errorData.error || 'Failed to create supplier');
       }
 
+      notificationService.success('Supplier created successfully');
       router.push('/suppliers');
     } catch (error) {
       console.error('Failed to save supplier:', error);
-      alert(error instanceof Error ? error.message : 'Failed to create supplier. Please try again.');
+      notificationService.error(error instanceof Error ? error.message : 'Failed to create supplier. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

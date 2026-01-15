@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, FileText, RefreshCw } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument } from '@/types/contractor-document.types';
 import { DocumentCard } from './DocumentCard';
 import { DocumentUploadForm } from './DocumentUploadForm';
@@ -75,10 +76,12 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       // Remove from local state
       setDocuments(docs => docs.filter(d => d.id !== documentId));
+      notificationService.success('Document deleted');
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete error:', err);
-      alert(err.message || 'Failed to delete document');
+      const message = err instanceof Error ? err.message : 'Failed to delete document';
+      notificationService.error(message);
     }
   };
 
@@ -103,10 +106,12 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       // Refresh documents
       fetchDocuments();
+      notificationService.success(`Document ${action === 'approve' ? 'approved' : 'rejected'}`);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Verify error:', err);
-      alert(err.message || `Failed to ${action} document`);
+      const message = err instanceof Error ? err.message : `Failed to ${action} document`;
+      notificationService.error(message);
     }
   };
 

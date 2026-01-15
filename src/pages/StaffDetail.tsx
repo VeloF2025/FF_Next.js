@@ -4,6 +4,7 @@ import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
+import { notificationService } from '@/services/core/NotificationService';
 
 export function StaffDetail() {
   const navigate = useNavigate();
@@ -16,9 +17,10 @@ export function StaffDetail() {
     
     try {
       await deleteMutation.mutateAsync(id!);
+      notificationService.success('Staff member deleted');
       navigate('/app/staff');
     } catch (error) {
-      alert('Failed to delete staff member');
+      notificationService.error('Failed to delete staff member');
     }
   };
 

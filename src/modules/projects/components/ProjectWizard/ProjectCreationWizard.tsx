@@ -17,6 +17,7 @@ import { ReviewStep } from './steps/ReviewStep';
 import type { FormData } from './types';
 import { ProjectPriority } from '../../types/project.types';
 import { log } from '@/lib/logger';
+import { notificationService } from '@/services/core/NotificationService';
 
 export function ProjectCreationWizard() {
   const router = useRouter();
@@ -41,19 +42,19 @@ export function ProjectCreationWizard() {
     // Validate step 0 (Basic Info)
     if (currentStep === 0) {
       if (!formData.name) {
-        alert('Please enter a project name');
+        notificationService.warning('Please enter a project name');
         return;
       }
       if (!formData.clientId) {
-        alert('Please select a client');
+        notificationService.warning('Please select a client');
         return;
       }
     }
-    
+
     // Validate step 1 (Project Details)
     if (currentStep === 1) {
       if (!formData.projectManagerId) {
-        alert('Please select a project manager');
+        notificationService.warning('Please select a project manager');
         return;
       }
     }
@@ -75,12 +76,12 @@ export function ProjectCreationWizard() {
       
       // Validate required fields
       if (!formData.clientId) {
-        alert('Please select a client');
+        notificationService.warning('Please select a client');
         return;
       }
-      
+
       if (!formData.name) {
-        alert('Please enter a project name');
+        notificationService.warning('Please enter a project name');
         return;
       }
       
@@ -121,7 +122,7 @@ export function ProjectCreationWizard() {
     } catch (error) {
       // Error logging is already handled below with proper logging
       log.error('Failed to create project:', { data: error }, 'ProjectCreationWizard');
-      alert(`Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      notificationService.error(`Failed to create project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

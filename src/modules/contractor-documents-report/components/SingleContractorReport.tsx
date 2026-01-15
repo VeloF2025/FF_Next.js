@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { FileText, Download, Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { notificationService } from '@/services/core/NotificationService';
 import { useContractorDocumentReport } from '../hooks/useDocumentReport';
 import {
   DocumentStatusTable,
@@ -86,15 +87,16 @@ export default function SingleContractorReport({
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+      notificationService.success('CSV exported successfully');
     } catch (error) {
       console.error('CSV export failed:', error);
-      alert('Failed to export CSV');
+      notificationService.error('Failed to export CSV');
     }
   };
 
   const handleExportPDF = () => {
     // TODO: Implement PDF export
-    alert('PDF export coming soon!');
+    notificationService.info('PDF export coming soon');
   };
 
   const handlePrint = () => {

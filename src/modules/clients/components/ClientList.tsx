@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Filter } from 'lucide-react';
 import { clientService } from '@/services/clientService';
+import { notificationService } from '@/services/core/NotificationService';
 import { ClientImport } from '@/components/clients/ClientImport';
 import { ClientFilter } from '@/types/client.types';
 import { ClientListHeader } from './ClientListHeader';
@@ -37,8 +38,10 @@ export function ClientList() {
     try {
       await clientService.delete(id);
       refetch();
-    } catch (error: any) {
-      alert(error.message || 'Failed to delete client');
+      notificationService.success('Client deleted successfully');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to delete client';
+      notificationService.error(message);
     }
   };
 
@@ -53,8 +56,9 @@ export function ClientList() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      notificationService.success('Client data exported');
     } catch (error) {
-      alert('Failed to export client data');
+      notificationService.error('Failed to export client data');
     }
   };
 

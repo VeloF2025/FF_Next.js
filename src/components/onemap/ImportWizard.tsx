@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 
 interface ImportResult {
   success: boolean;
@@ -205,7 +206,7 @@ export const ImportWizard: React.FC = () => {
             <button
               onClick={() => {
                 console.log('CLI Command: node scripts/conservative-lawley-import.js');
-                alert('Run this command in terminal: node scripts/conservative-lawley-import.js');
+                notificationService.info('Run this command in terminal: node scripts/conservative-lawley-import.js');
               }}
               className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
             >

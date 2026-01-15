@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   BarChart,
   Bar,
@@ -198,7 +199,7 @@ const ReportsAnalyticsPage: React.FC = () => {
       await exportReport(activeTab, data, { format });
     } catch (error) {
       log.error('Export error:', { data: error }, 'ReportsAnalyticsPage');
-      alert('Export failed. Please try again.');
+      notificationService.error('Export failed. Please try again.');
     }
   };
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CheckCircle, Clock, AlertCircle, Calendar, User, ExternalLink } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import { ActionItem } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 
@@ -21,7 +22,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
       onItemUpdated?.();
     } catch (error) {
       console.error('Error updating action item:', error);
-      alert('Failed to update action item');
+      notificationService.error('Failed to update action item');
     } finally {
       setUpdatingId(null);
     }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { useNeonProjects } from '@/hooks/neon/useNeonProjects';
 import { projectsService } from '@/services/projectsService';
+import { notificationService } from '@/services/core/NotificationService';
 import { ProjectListHeader } from './ProjectListHeader';
 import { ProjectSummaryCards } from './ProjectSummaryCards';
 import { ProjectTable } from './ProjectTable';
@@ -43,14 +44,16 @@ export function ProjectList() {
       await projectsService.delete(id);
       // Refresh the projects list
       refetch();
-    } catch (error: any) {
-      alert(error.message || 'Failed to delete project');
+      notificationService.success('Project deleted successfully');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to delete project';
+      notificationService.error(message);
     }
   };
 
   const handleExport = async () => {
     // TODO: Implement export functionality
-    alert('Export functionality coming soon');
+    notificationService.info('Export functionality coming soon');
   };
 
   const statuses = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'];

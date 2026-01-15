@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   FolderOpen,
   Edit,
@@ -57,12 +58,13 @@ export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
 
       if (response.ok) {
         setCategories((prev) => prev.filter((c) => c.id !== id));
+        notificationService.success('Category deleted');
       } else {
         const data = await response.json();
-        alert(data.error || 'Failed to delete category');
+        notificationService.error(data.error || 'Failed to delete category');
       }
     } catch (error) {
-      alert('Failed to delete category');
+      notificationService.error('Failed to delete category');
     } finally {
       setDeleting(null);
     }

@@ -6,6 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   Package,
   ArrowRight,
@@ -144,9 +145,9 @@ export default function CheckoutPage() {
         purpose: '',
         checkoutNotes: '',
       });
-      alert('Asset checked out successfully');
+      notificationService.success('Asset checked out successfully');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Checkout failed');
+      notificationService.error(err instanceof Error ? err.message : 'Checkout failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -174,9 +175,9 @@ export default function CheckoutPage() {
         newLocation: '',
         maintenanceRequired: false,
       });
-      alert('Asset checked in successfully');
+      notificationService.success('Asset checked in successfully');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Checkin failed');
+      notificationService.error(err instanceof Error ? err.message : 'Checkin failed');
     } finally {
       setIsSubmitting(false);
     }

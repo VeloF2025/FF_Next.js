@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout';
+import { notificationService } from '@/services/core/NotificationService';
 
 interface CsvRow {
   date: string;
@@ -203,12 +204,13 @@ export function DrValidationClient() {
         throw new Error(data.error?.message || 'Failed to add drops');
       }
 
-      alert(`✅ ${data.data.inserted} drop(s) added successfully!`);
+      notificationService.success(`${data.data.inserted} drop(s) added successfully`);
 
       // Re-validate to refresh results
       handleValidate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to add drops');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to add drops';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -236,12 +238,13 @@ export function DrValidationClient() {
         throw new Error(data.error?.message || 'Failed to delete drop');
       }
 
-      alert(`✅ ${dropNumber} deleted successfully!`);
+      notificationService.success(`${dropNumber} deleted successfully`);
 
       // Re-validate to refresh results
       handleValidate();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete drop');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete drop';
+      setError(message);
     } finally {
       setLoading(false);
     }

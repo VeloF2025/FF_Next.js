@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { notificationService } from '@/services/core/NotificationService';
 import { ContractorOnboardingProgress, OnboardingProgress } from './ContractorOnboardingProgress';
 import { OnboardingStageCardEnhanced, OnboardingStage } from './OnboardingStageCardEnhanced';
 
@@ -90,15 +91,17 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
 
       // Refresh stages
       await fetchStages();
-    } catch (err: any) {
+      notificationService.success('Stage updated');
+    } catch (err: unknown) {
       console.error('Error updating stage:', err);
-      alert(`Failed to update stage: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      notificationService.error(`Failed to update stage: ${message}`);
     }
   };
 
   const handleCompleteOnboarding = async () => {
     if (!progress?.isComplete) {
-      alert('Cannot complete onboarding. Not all stages are completed.');
+      notificationService.warning('Cannot complete onboarding. Not all stages are completed.');
       return;
     }
 
@@ -118,11 +121,12 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
         throw new Error(`Failed to complete onboarding: ${response.status}`);
       }
 
-      alert('Onboarding completed successfully!');
+      notificationService.success('Onboarding completed successfully');
       await fetchStages();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error completing onboarding:', err);
-      alert(`Failed to complete onboarding: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      notificationService.error(`Failed to complete onboarding: ${message}`);
     } finally {
       setIsCompleting(false);
     }

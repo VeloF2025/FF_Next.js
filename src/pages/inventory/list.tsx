@@ -6,6 +6,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   Package,
   Plus,
@@ -83,8 +84,9 @@ export default function AssetListPage() {
     if (!confirm(`Delete asset "${asset.name}"?`)) return;
     try {
       await deleteAssetMutation.mutateAsync(asset.id);
+      notificationService.success('Asset deleted');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed');
+      notificationService.error(err instanceof Error ? err.message : 'Delete failed');
     }
   }, [deleteAssetMutation]);
 

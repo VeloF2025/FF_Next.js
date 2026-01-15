@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Building } from 'lucide-react';
 import { useClient, useDeleteClient } from '@/hooks/useClients';
+import { notificationService } from '@/services/core/NotificationService';
 
 // Import split components
 import { ClientInfoSection } from './client/ClientInfoSection';
@@ -21,9 +22,10 @@ export function ClientDetail() {
     
     try {
       await deleteMutation.mutateAsync(id!);
+      notificationService.success('Client deleted');
       navigate('/app/clients');
     } catch (error) {
-      alert('Failed to delete client');
+      notificationService.error('Failed to delete client');
     }
   };
 

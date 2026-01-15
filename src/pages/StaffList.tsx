@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { 
+import { notificationService } from '@/services/core/NotificationService';
+import {
   Users,
   Activity,
   UserCheck,
@@ -42,10 +43,9 @@ export function StaffList() {
   const handleExport = async () => {
     try {
       // TODO: Implement export functionality
-
-      alert('Export functionality not yet implemented');
+      notificationService.info('Export functionality not yet implemented');
     } catch (error) {
-      alert('Failed to export staff data');
+      notificationService.error('Failed to export staff data');
     }
   };
 

@@ -14,6 +14,7 @@
 'use client';
 
 import { useState, useEffect, memo } from 'react';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   Card,
   CardContent,
@@ -295,7 +296,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setFeedbackMessage('');
     } catch (error) {
       console.error('Error sending feedback:', error);
-      alert(`Failed to send feedback: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      notificationService.error(`Failed to send feedback: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSending(false);
     }
@@ -353,7 +354,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
   // Handle drop number edit
   const handleSaveDropNumber = async () => {
     if (!editedDropNumber.trim()) {
-      alert('Drop number cannot be empty');
+      notificationService.warning('Drop number cannot be empty');
       return;
     }
 
@@ -361,9 +362,10 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setSaving(true);
       await onUpdate(drop.id, { dropNumber: editedDropNumber.trim() });
       setIsEditingDropNumber(false);
+      notificationService.success('Drop number saved');
     } catch (error) {
       console.error('Error saving drop number:', error);
-      alert('Failed to save drop number');
+      notificationService.error('Failed to save drop number');
       // Revert to original value
       setEditedDropNumber(drop.dropNumber);
     } finally {

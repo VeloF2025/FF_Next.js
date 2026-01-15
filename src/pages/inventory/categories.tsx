@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   FolderOpen,
   Plus,
@@ -106,8 +107,9 @@ export default function CategoriesPage() {
         await createMutation.mutateAsync(data);
       }
       handleCloseModal();
+      notificationService.success(editingCategory ? 'Category updated' : 'Category created');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Operation failed');
+      notificationService.error(err instanceof Error ? err.message : 'Operation failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -117,8 +119,9 @@ export default function CategoriesPage() {
     if (!confirm(`Delete category "${category.name}"?`)) return;
     try {
       await deleteMutation.mutateAsync(category.id);
+      notificationService.success('Category deleted');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed');
+      notificationService.error(err instanceof Error ? err.message : 'Delete failed');
     }
   }, [deleteMutation]);
 
@@ -128,8 +131,9 @@ export default function CategoriesPage() {
         id: category.id,
         data: { isActive: !category.isActive },
       });
+      notificationService.success(category.isActive ? 'Category deactivated' : 'Category activated');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Update failed');
+      notificationService.error(err instanceof Error ? err.message : 'Update failed');
     }
   }, [updateMutation]);
 

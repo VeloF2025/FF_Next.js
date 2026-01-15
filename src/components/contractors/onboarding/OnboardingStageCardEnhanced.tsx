@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, CheckCircle2, XCircle, FileText, Plus } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, DocumentType } from '@/types/contractor-document.types';
 import { DocumentUploadForm } from '../DocumentUploadForm';
 
@@ -108,7 +109,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
     if (newStatus === 'completed' && stage.requiredDocuments.length > 0) {
       const missingDocs = getMissingDocuments();
       if (missingDocs.length > 0) {
-        alert(`Cannot complete stage. Missing documents:\n${missingDocs.map(d => `- ${DOCUMENT_TYPE_LABELS[d as DocumentType]}`).join('\n')}`);
+        notificationService.warning(`Cannot complete stage. Missing documents: ${missingDocs.map(d => DOCUMENT_TYPE_LABELS[d as DocumentType]).join(', ')}`);
         return;
       }
     }
