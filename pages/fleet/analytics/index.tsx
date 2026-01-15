@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   BarChart,
   Bar,
@@ -210,8 +211,9 @@ export default function FleetAnalyticsPage() {
         setTcoReport(tcoData.data);
         setCostTrends(trendsData.data);
       } catch (err) {
-        console.error('Error fetching analytics:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load analytics');
+        const message = err instanceof Error ? err.message : 'Failed to load analytics';
+        setError(message);
+        notificationService.error(`Failed to load analytics: ${message}`);
       } finally {
         setLoading(false);
       }
