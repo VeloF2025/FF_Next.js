@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   Trophy,
   Medal,
@@ -159,8 +160,9 @@ export default function DriverLeaderboardPage() {
         const data = await res.json();
         setLeaderboard(data.data);
       } catch (err) {
-        console.error('Error fetching leaderboard:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load leaderboard');
+        const message = err instanceof Error ? err.message : 'Failed to load leaderboard';
+        setError(message);
+        notificationService.error(`Failed to load leaderboard: ${message}`);
       } finally {
         setLoading(false);
       }
@@ -182,7 +184,15 @@ export default function DriverLeaderboardPage() {
       if (!res.ok) throw new Error('Failed to calculate scores');
 
       const data = await res.json();
-      alert(`Calculated scores for ${data.data.count} drivers`);
+      const count = data.data.count;
+
+      if (count === 0) {
+        notificationService.info('No drivers with activity found for this period');
+      } else if (count === 1) {
+        notificationService.success('Calculated score for 1 driver');
+      } else {
+        notificationService.success(`Calculated scores for ${count} drivers`);
+      }
 
       // Refresh leaderboard
       const refreshRes = await fetch(`/api/fleet/drivers/leaderboard?period=${period}&limit=20`);
@@ -190,9 +200,8 @@ export default function DriverLeaderboardPage() {
         const refreshData = await refreshRes.json();
         setLeaderboard(refreshData.data);
       }
-    } catch (err) {
-      console.error('Error calculating scores:', err);
-      alert('Failed to calculate scores');
+    } catch {
+      notificationService.error('Failed to calculate scores. Please try again.');
     } finally {
       setCalculating(false);
     }
