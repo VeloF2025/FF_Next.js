@@ -38,8 +38,8 @@ const MAPPINGS = {
       { headers: ['lat', 'latitude', 'y'], column: 'latitude', type: 'number' },
       { headers: ['lon', 'longitude', 'lng', 'x'], column: 'longitude', type: 'number' },
       { headers: ['address', 'location', 'drop_address'], column: 'address' },
-      { headers: ['pon_no', 'pon', 'pon_number'], column: 'pon_no' },
-      { headers: ['zone_no', 'zone', 'zone_number'], column: 'zone_no' },
+      { headers: ['pon_no', 'pon', 'pon_number'], column: 'pon_no', type: 'number' },
+      { headers: ['zone_no', 'zone', 'zone_number'], column: 'zone_no', type: 'number' },
       { headers: ['mun', 'municipality', 'city'], column: 'municipality' },
     ],
   },
@@ -313,7 +313,7 @@ Examples:
   let mappedCount = 0;
   for (const field of mapping.fields) {
     const matched = headers.find(h =>
-      field.headers.some(fh => h.toLowerCase().trim() === fh.toLowerCase())
+      field.headers.some(fh => h.toLowerCase().trim() === fh.toLowerCase().trim())
     );
     if (matched) {
       mappedCount++;
