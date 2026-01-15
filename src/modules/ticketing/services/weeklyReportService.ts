@@ -297,11 +297,13 @@ export async function importTicketsFromReport(
     errors: []
   });
 
-  // 🟢 WORKING: Process import with error tracking
+  // 🟢 WORKING: Process import with error tracking and UPSERT support
   const errors: ImportError[] = [];
   const ticketsCreated: string[] = [];
+  const ticketsUpdated: string[] = [];
   let importedCount = 0;
   let skippedCount = 0;
+  let updatedCount = 0;
   let errorCount = 0;
 
   // 🟢 WORKING: Process rows in batches for performance
@@ -312,13 +314,15 @@ export async function importTicketsFromReport(
 
     importedCount += batchResults.imported_count;
     skippedCount += batchResults.skipped_count;
+    updatedCount += batchResults.updated_count;
     errorCount += batchResults.error_count;
     errors.push(...batchResults.errors);
     ticketsCreated.push(...batchResults.tickets_created);
+    ticketsUpdated.push(...batchResults.tickets_updated);
 
     // 🟢 WORKING: Update progress periodically
     await updateWeeklyReport(reportId, {
-      imported_count: importedCount,
+      imported_count: importedCount + updatedCount, // Total processed successfully
       skipped_count: skippedCount,
       error_count: errorCount,
       errors
@@ -327,7 +331,8 @@ export async function importTicketsFromReport(
     logger.debug('Import batch processed', {
       reportId,
       batchNumber: Math.floor(i / batchSize) + 1,
-      imported: importedCount,
+      created: importedCount,
+      updated: updatedCount,
       skipped: skippedCount,
       errors: errorCount
     });
@@ -354,7 +359,8 @@ export async function importTicketsFromReport(
   logger.info('Ticket import completed', {
     reportId,
     totalRows: importRows.length,
-    imported: importedCount,
+    created: importedCount,
+    updated: updatedCount,
     skipped: skippedCount,
     errors: errorCount,
     durationSeconds,
@@ -366,16 +372,21 @@ export async function importTicketsFromReport(
     status: finalStatus,
     total_rows: importRows.length,
     imported_count: importedCount,
+    updated_count: updatedCount,
     skipped_count: skippedCount,
     error_count: errorCount,
     errors,
     duration_seconds: durationSeconds,
-    tickets_created: ticketsCreated
+    tickets_created: ticketsCreated,
+    tickets_updated: ticketsUpdated
   };
 }
 
 /**
- * Process a batch of import rows
+ * Process a batch of import rows with UPSERT logic
+ *
+ * - New tickets (no matching DR/FT Ref): CREATE
+ * - Existing tickets: UPDATE status, info, and other fields
  *
  * @param rows - Import rows to process
  * @param batchSize - Size of batch
@@ -389,40 +400,142 @@ export async function processImportBatch(
 ): Promise<{
   imported_count: number;
   skipped_count: number;
+  updated_count: number;
   error_count: number;
   errors: ImportError[];
   tickets_created: string[];
+  tickets_updated: string[];
 }> {
   const errors: ImportError[] = [];
   const ticketsCreated: string[] = [];
+  const ticketsUpdated: string[] = [];
   let importedCount = 0;
   let skippedCount = 0;
+  let updatedCount = 0;
   let errorCount = 0;
 
-  // 🟢 WORKING: Process each row in the batch
+  // 🟢 WORKING: Process each row in the batch with UPSERT
   for (const row of rows) {
     try {
-      // 🟢 WORKING: Convert ImportRow to CreateTicketPayload
-      const ticketPayload: CreateTicketPayload = {
-        source: TicketSource.WEEKLY_REPORT,
-        external_id: row.ticket_uid || `row-${row.row_number}`,
-        title: row.title,
-        description: row.description || row.fault_description,
-        ticket_type: row.ticket_type as any,
-        priority: (row.priority as any) || 'normal',
-        status: row.status as any,
-        dr_number: row.dr_number,
-        pole_number: row.pole_number,
-        pon_number: row.pon_number,
-        address: row.address,
-        fault_cause: row.fault_cause as any,
-        created_by: userId
-      };
+      // Get identifiers for matching (prefer dr_number, fallback to ft_ref/external_id)
+      const drNumber = row.dr_number?.trim();
+      const ftRef = (row as any).ft_ref?.trim() || row.ticket_uid?.trim();
 
-      // 🟢 WORKING: Create ticket
-      const ticket = await createTicket(ticketPayload);
-      ticketsCreated.push(ticket.id);
-      importedCount++;
+      if (!drNumber && !ftRef) {
+        // No identifier to match on - skip
+        errors.push({
+          row_number: row.row_number,
+          error_type: ImportErrorType.MISSING_REQUIRED_FIELD,
+          error_message: 'No DR Number or FT Ref to identify ticket',
+          field_name: 'dr_number',
+          row_data: row
+        });
+        skippedCount++;
+        continue;
+      }
+
+      // 🟢 WORKING: Check if ticket already exists by DR Number or external_id
+      const existingTicket = await queryOne<{ id: string; ticket_uid: string; status: string }>(
+        `SELECT id, ticket_uid, status FROM tickets
+         WHERE dr_number = $1 OR external_id = $2
+         LIMIT 1`,
+        [drNumber || null, ftRef || null]
+      );
+
+      if (existingTicket) {
+        // 🟢 WORKING: UPDATE existing ticket with new info
+        const updateFields: string[] = [];
+        const updateValues: any[] = [];
+        let paramIndex = 1;
+
+        // Update status if provided and different
+        const newStatus = (row as any).status?.toLowerCase();
+        if (newStatus && newStatus !== existingTicket.status) {
+          updateFields.push(`status = $${paramIndex++}`);
+          updateValues.push(newStatus);
+        }
+
+        // Update description/issue if provided
+        const issue = (row as any).issue || row.description || row.fault_description;
+        if (issue) {
+          updateFields.push(`description = $${paramIndex++}`);
+          updateValues.push(issue);
+        }
+
+        // Update title if provided
+        const title = row.title || (row as any).issue;
+        if (title) {
+          updateFields.push(`title = $${paramIndex++}`);
+          updateValues.push(title);
+        }
+
+        // Update fault cause if provided
+        if (row.fault_cause) {
+          updateFields.push(`fault_cause = $${paramIndex++}`);
+          updateValues.push(row.fault_cause);
+        }
+
+        // Update address if provided
+        if (row.address) {
+          updateFields.push(`address = $${paramIndex++}`);
+          updateValues.push(row.address);
+        }
+
+        // Always update updated_at
+        updateFields.push(`updated_at = NOW()`);
+
+        if (updateFields.length > 1) { // More than just updated_at
+          updateValues.push(existingTicket.id);
+          const updateSql = `
+            UPDATE tickets
+            SET ${updateFields.join(', ')}
+            WHERE id = $${paramIndex}
+            RETURNING id
+          `;
+
+          await query(updateSql, updateValues);
+          ticketsUpdated.push(existingTicket.id);
+          updatedCount++;
+
+          logger.info('Ticket updated', {
+            ticketId: existingTicket.id,
+            ticketUID: existingTicket.ticket_uid,
+            drNumber,
+            updatedFields: updateFields.length - 1
+          });
+        } else {
+          // No changes to make
+          skippedCount++;
+        }
+      } else {
+        // 🟢 WORKING: CREATE new ticket
+        const ticketPayload: CreateTicketPayload = {
+          source: TicketSource.WEEKLY_REPORT,
+          external_id: ftRef || `row-${row.row_number}`,
+          title: row.title || (row as any).issue || 'Imported Ticket',
+          description: row.description || row.fault_description || (row as any).issue,
+          ticket_type: row.ticket_type as any || 'maintenance',
+          priority: (row.priority as any) || 'normal',
+          status: (row as any).status?.toLowerCase() as any || 'open',
+          dr_number: drNumber,
+          pole_number: row.pole_number,
+          pon_number: row.pon_number,
+          address: row.address,
+          fault_cause: row.fault_cause as any,
+          created_by: userId
+        };
+
+        const ticket = await createTicket(ticketPayload);
+        ticketsCreated.push(ticket.id);
+        importedCount++;
+
+        logger.info('Ticket created', {
+          ticketId: ticket.id,
+          ticketUID: ticket.ticket_uid,
+          drNumber,
+          ftRef
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
@@ -465,9 +578,11 @@ export async function processImportBatch(
   return {
     imported_count: importedCount,
     skipped_count: skippedCount,
+    updated_count: updatedCount,
     error_count: errorCount,
     errors,
-    tickets_created: ticketsCreated
+    tickets_created: ticketsCreated,
+    tickets_updated: ticketsUpdated
   };
 }
 

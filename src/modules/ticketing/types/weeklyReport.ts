@@ -178,11 +178,13 @@ export interface ImportProcessResult {
   status: WeeklyReportStatus;
   total_rows: number;
   imported_count: number;
+  updated_count: number;      // Number of existing tickets updated
   skipped_count: number;
   error_count: number;
   errors: ImportError[];
   duration_seconds: number;
-  tickets_created: string[]; // Array of created ticket IDs
+  tickets_created: string[];  // Array of created ticket IDs
+  tickets_updated: string[];  // Array of updated ticket IDs
 }
 
 /**
