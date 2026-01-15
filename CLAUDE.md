@@ -34,13 +34,13 @@ All environments use branches within the **FF_React** project (sparkling-bar-472
 | **Production** | `production` | `ep-dry-night-a9qyh4sj` | `FF_Next.js` (master) |
 | **Development** | `hein-dev` | `ep-aged-poetry-a9bbd8e9` | `FF_Next.js-hein` (hein/dev) |
 
-**Connection Strings:**
+**Connection Strings (Updated Jan 2026):**
 ```bash
 # PRODUCTION (master branch) - REAL CUSTOMER DATA
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
 
 # DEVELOPMENT (hein-dev branch) - SAFE TO EXPERIMENT
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb
+DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
 ```
 
 **Sync Dev from Production (reset to fresh data):**
