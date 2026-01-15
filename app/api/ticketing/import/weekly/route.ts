@@ -1,18 +1,18 @@
 /**
  * Weekly Import API - Upload Excel File
  *
- * 🟢 WORKING: Production-ready endpoint for uploading weekly report Excel files
- *
  * POST /api/ticketing/import/weekly - Upload Excel file and create import
+ *
+ * Supports two request formats:
+ * 1. JSON body: { filename, data (byte array), user_id }
+ * 2. FormData: file, week_number, year, report_date, user_id
  *
  * Features:
  * - Excel file upload and parsing
  * - File validation (type, size)
- * - Week number validation
+ * - Auto-detects week number and year if not provided
  * - Automatic import processing
  * - Progress tracking
- * - Proper error handling with standard API responses
- * - Follows Zero Tolerance protocol (no console.log, proper error handling)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -30,50 +30,82 @@ const logger = createLogger('ticketing:api:weekly-import');
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const VALID_FILE_EXTENSIONS = ['.xlsx', '.xls'];
 
+/**
+ * Get ISO week number from date
+ */
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
 // ==================== POST /api/ticketing/import/weekly ====================
 
-/**
- * 🟢 WORKING: Upload Excel file and create weekly import
- */
 export async function POST(req: NextRequest) {
   try {
-    // Parse form data
-    const formData = await req.formData();
+    const contentType = req.headers.get('content-type') || '';
 
-    // Extract fields
-    const file = formData.get('file') as File | null;
-    const weekNumber = formData.get('week_number') as string | null;
-    const year = formData.get('year') as string | null;
-    const reportDate = formData.get('report_date') as string | null;
-    const userId = formData.get('user_id') as string | null;
+    let filename: string | null = null;
+    let buffer: Buffer | null = null;
+    let weekNumber: number | null = null;
+    let year: number | null = null;
+    let reportDate: Date | null = null;
+    let userId: string | null = null;
+
+    // Handle JSON body (from wizard)
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      filename = body.filename;
+      userId = body.user_id;
+
+      if (body.data && Array.isArray(body.data)) {
+        buffer = Buffer.from(body.data);
+      }
+
+      // Auto-detect week/year from current date
+      const now = new Date();
+      weekNumber = body.week_number || getWeekNumber(now);
+      year = body.year || now.getFullYear();
+      reportDate = body.report_date ? new Date(body.report_date) : now;
+    }
+    // Handle FormData (traditional upload)
+    else {
+      const formData = await req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (file) {
+        filename = file.name;
+        const arrayBuffer = await file.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
+      }
+
+      const weekNumStr = formData.get('week_number') as string | null;
+      const yearStr = formData.get('year') as string | null;
+      const reportDateStr = formData.get('report_date') as string | null;
+      userId = formData.get('user_id') as string | null;
+
+      // Parse or auto-detect
+      const now = new Date();
+      weekNumber = weekNumStr ? parseInt(weekNumStr, 10) : getWeekNumber(now);
+      year = yearStr ? parseInt(yearStr, 10) : now.getFullYear();
+      reportDate = reportDateStr ? new Date(reportDateStr) : now;
+    }
 
     // Validate required fields
     const errors: Record<string, string> = {};
 
-    if (!file) {
+    if (!filename || !buffer) {
       errors.file = 'File is required';
     }
 
-    if (!weekNumber) {
-      errors.week_number = 'Week number is required';
-    } else {
-      const weekNum = parseInt(weekNumber, 10);
-      if (isNaN(weekNum) || weekNum < 1 || weekNum > 53) {
-        errors.week_number = 'Week number must be between 1 and 53';
-      }
+    if (!weekNumber || weekNumber < 1 || weekNumber > 53) {
+      errors.week_number = 'Week number must be between 1 and 53';
     }
 
-    if (!year) {
-      errors.year = 'Year is required';
-    } else {
-      const yearNum = parseInt(year, 10);
-      if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
-        errors.year = 'Year must be between 2000 and 2100';
-      }
-    }
-
-    if (!reportDate) {
-      errors.report_date = 'Report date is required';
+    if (!year || year < 2000 || year > 2100) {
+      errors.year = 'Year must be between 2000 and 2100';
     }
 
     if (!userId) {
@@ -81,20 +113,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate file if provided
-    if (file) {
-      // Check file type
+    if (filename) {
       const hasValidExtension = VALID_FILE_EXTENSIONS.some((ext) =>
-        file.name.toLowerCase().endsWith(ext)
+        filename.toLowerCase().endsWith(ext)
       );
 
       if (!hasValidExtension) {
         errors.file = `Only Excel files (${VALID_FILE_EXTENSIONS.join(', ')}) are allowed`;
       }
+    }
 
-      // Check file size
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        errors.file = `File size must not exceed ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB`;
-      }
+    if (buffer && buffer.length > MAX_FILE_SIZE_BYTES) {
+      errors.file = `File size must not exceed ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB`;
     }
 
     // If validation errors, return 422
@@ -116,17 +146,14 @@ export async function POST(req: NextRequest) {
     }
 
     logger.info('Processing weekly report upload', {
-      filename: file!.name,
-      weekNumber: parseInt(weekNumber!, 10),
-      year: parseInt(year!, 10),
+      filename,
+      weekNumber,
+      year,
       userId,
     });
 
     // Parse Excel file
-    const arrayBuffer = await file!.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const parseResult = await parseExcelFile(buffer, {
+    const parseResult = await parseExcelFile(buffer!, {
       hasHeaders: true,
       skipEmptyRows: true,
       trimWhitespace: true,
@@ -135,7 +162,7 @@ export async function POST(req: NextRequest) {
     if (!parseResult.success || parseResult.errors.length > 0) {
       logger.error('Excel parsing failed', {
         errors: parseResult.errors,
-        filename: file!.name,
+        filename,
       });
 
       return NextResponse.json(
@@ -172,11 +199,11 @@ export async function POST(req: NextRequest) {
 
     // Create weekly report record
     const reportPayload: CreateWeeklyReportPayload = {
-      week_number: parseInt(weekNumber!, 10),
-      year: parseInt(year!, 10),
-      report_date: new Date(reportDate!),
-      original_filename: file!.name,
-      file_path: `/uploads/weekly/${file!.name}`, // Placeholder - would be actual storage path
+      week_number: weekNumber!,
+      year: year!,
+      report_date: reportDate!,
+      original_filename: filename!,
+      file_path: `/uploads/weekly/${filename}`,
       imported_by: userId!,
     };
 
