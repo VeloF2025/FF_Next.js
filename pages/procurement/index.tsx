@@ -50,28 +50,37 @@ export default function ProcurementPage({
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [isMounted, setIsMounted] = useState(false);
 
   // Get permissions for selected project
   const permissions = useProcurementPermissions(selectedProject?.id);
 
-  // Update URL when state changes
+  // Track when component is mounted to avoid hydration issues
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Update URL when state changes (only after mount to prevent hydration errors)
+  useEffect(() => {
+    // Skip during SSR hydration to prevent React error #418/#423
+    if (!isMounted) return;
+
     const query: any = {
       tab: activeTab,
       viewMode
     };
-    
+
     if (selectedProject) {
       query.project = selectedProject.id;
       query.projectName = selectedProject.name;
       query.projectCode = selectedProject.code;
     }
-    
+
     router.push({
       pathname: '/procurement',
       query
-    });
-  }, [activeTab, viewMode, selectedProject, router]);
+    }, undefined, { shallow: true });
+  }, [activeTab, viewMode, selectedProject, router, isMounted]);
 
   /**
    * Load aggregate metrics for "All Projects" view
