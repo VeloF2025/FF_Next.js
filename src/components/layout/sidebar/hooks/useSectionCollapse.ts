@@ -129,12 +129,20 @@ export function useSectionCollapse({ sections }: UseSectionCollapseOptions): Use
 
 /**
  * Find the section that contains a route matching the given path
+ *
+ * Prioritizes dedicated sections over MAIN (which contains shortcuts).
+ * MAIN is skipped since it's always expanded via defaultExpanded.
+ * This ensures /fleet expands FLEET section, not MAIN's Fleet shortcut.
  */
 function findSectionByPath(sections: NavSection[], pathname: string | null): string | null {
   // Guard against null pathname (can happen during SSR)
   if (!pathname) return null;
 
+  // Skip 'main' section - it's defaultExpanded and contains shortcuts
+  // that duplicate routes from dedicated sections
   for (const section of sections) {
+    if (section.sectionId === 'main') continue;
+
     for (const item of section.items) {
       if (!item.to) continue; // Skip items without a path
       if (pathname === item.to || pathname.startsWith(item.to + '/')) {
