@@ -127,7 +127,11 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to parse file');
+        // Handle nested error structure: {error: {code, message, details}}
+        const errorMsg = typeof errorData.error === 'object'
+          ? errorData.error?.message || JSON.stringify(errorData.error)
+          : errorData.error || 'Failed to parse file';
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();
@@ -174,13 +178,21 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to start import');
+        // Handle nested error structure: {error: {code, message, details}}
+        const errorMsg = typeof errorData.error === 'object'
+          ? errorData.error?.message || JSON.stringify(errorData.error)
+          : errorData.error || 'Failed to start import';
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to start import');
+        // Handle nested error structure
+        const errorMsg = typeof result.error === 'object'
+          ? result.error?.message || JSON.stringify(result.error)
+          : result.error || 'Failed to start import';
+        throw new Error(errorMsg);
       }
 
       const report: WeeklyReport = result.data;
