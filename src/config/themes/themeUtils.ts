@@ -5,8 +5,11 @@
 
 import { ThemeName, ThemeConfig } from '@/types/theme.types';
 
-export const DEFAULT_THEME: ThemeName = 'vf';
-export const AVAILABLE_THEMES: ThemeName[] = ['light', 'dark', 'vf', 'fibreflow', 'velocity'];
+export const DEFAULT_THEME: ThemeName = 'dark';
+// Only Light and Dark themes exposed in UI - other themes hidden for now
+export const AVAILABLE_THEMES: ThemeName[] = ['light', 'dark'];
+// Hidden themes (available in code but not in UI selector):
+// 'vf', 'fibreflow', 'velocity'
 
 /**
  * Get theme configuration by name
