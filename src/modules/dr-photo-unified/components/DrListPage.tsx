@@ -39,11 +39,19 @@ interface DashboardStats {
   totalFeedback: number;
 }
 
+interface ProjectStat {
+  project: string;
+  total: number;
+  complete: number;
+  incomplete: number;
+}
+
 export function DrListPage() {
   const router = useRouter();
   const [drops, setDrops] = useState<DrListItem[]>([]);
   const [filteredDrops, setFilteredDrops] = useState<DrListItem[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
+  const [projectStats, setProjectStats] = useState<ProjectStat[]>([]); // Complete stats from ALL records
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     totalDrops: 0,
     incomplete: 0,
@@ -209,6 +217,11 @@ export function DrListPage() {
           calculateStats(transformedDrops);
         }
 
+        // Set complete project stats from ALL records (not limited by pagination)
+        if (data.projectStats && Array.isArray(data.projectStats)) {
+          setProjectStats(data.projectStats);
+        }
+
         setLastRefresh(new Date());
       }
     } catch (err) {
@@ -216,6 +229,27 @@ export function DrListPage() {
       setError(err instanceof Error ? err.message : 'Failed to fetch drops');
     } finally {
       if (showLoading) setIsLoading(false);
+    }
+  };
+
+  // Fetch project stats with date filters (separate from drops to support date filtering)
+  const fetchProjectStats = async (fromDate?: string, toDate?: string) => {
+    try {
+      // Build query params for date filtering
+      const params = new URLSearchParams();
+      params.set('skipSummary', 'true'); // Only need projectStats, skip other calculations
+      if (fromDate) params.set('dateFrom', fromDate);
+      if (toDate) params.set('dateTo', toDate);
+
+      const response = await fetch(`/api/wa-monitor-drops?${params.toString()}`);
+      if (!response.ok) throw new Error('Failed to fetch project stats');
+
+      const data = await response.json();
+      if (data.projectStats && Array.isArray(data.projectStats)) {
+        setProjectStats(data.projectStats);
+      }
+    } catch (err) {
+      console.error('Error fetching project stats:', err);
     }
   };
 
@@ -232,6 +266,11 @@ export function DrListPage() {
   useEffect(() => {
     fetchDrops();
   }, []);
+
+  // Re-fetch project stats when date filters change
+  useEffect(() => {
+    fetchProjectStats(dateFrom || undefined, dateTo || undefined);
+  }, [dateFrom, dateTo]);
 
   // Apply all filters and update stats
   // Note: This effect should NOT depend on `drops` to avoid resetting pagination
@@ -726,7 +765,7 @@ export function DrListPage() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {dailyStats.length === 0 ? (
+                {projectStats.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                       No data available for the selected filters.
@@ -734,42 +773,30 @@ export function DrListPage() {
                   </tr>
                 ) : (
                   (() => {
-                    // Aggregate daily stats by project
-                    const projectTotals = dailyStats.reduce((acc, stat) => {
-                      if (!acc[stat.project]) {
-                        acc[stat.project] = { total: 0, complete: 0, incomplete: 0 };
-                      }
-                      acc[stat.project].total += stat.total;
-                      acc[stat.project].complete += stat.complete;
-                      acc[stat.project].incomplete += stat.incomplete;
-                      return acc;
-                    }, {} as Record<string, { total: number; complete: number; incomplete: number }>);
-
+                    // Use projectStats from API (complete stats from ALL records, not paginated)
                     // Calculate grand totals
-                    const grandTotal = Object.values(projectTotals).reduce(
-                      (sum, stats) => ({
-                        total: sum.total + stats.total,
-                        complete: sum.complete + stats.complete,
-                        incomplete: sum.incomplete + stats.incomplete,
+                    const grandTotal = projectStats.reduce(
+                      (sum, stat) => ({
+                        total: sum.total + stat.total,
+                        complete: sum.complete + stat.complete,
+                        incomplete: sum.incomplete + stat.incomplete,
                       }),
                       { total: 0, complete: 0, incomplete: 0 }
                     );
 
-                    const projectRows = Object.entries(projectTotals)
-                      .sort((a, b) => b[1].total - a[1].total) // Sort by total descending
-                      .map(([project, stats]) => (
-                        <tr key={project} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
+                    const projectRows = projectStats.map((stat) => (
+                        <tr key={stat.project} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {project}
+                            {stat.project}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {stats.total}
+                            {stat.total}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">
-                            {stats.complete}
+                            {stat.complete}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">
-                            {stats.incomplete}
+                            {stat.incomplete}
                           </td>
                         </tr>
                       ));

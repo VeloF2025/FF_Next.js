@@ -28,9 +28,11 @@ function getDbConnection() {
 // ==================== FETCH OPERATIONS ====================
 
 /**
- * Get all QA review drops
+ * Get all QA review drops (DEPRECATED - use getPaginatedDrops for better performance)
  * Returns all drops ordered by created_at DESC (newest first)
  * Enriched with OneMap serial data (ONT barcode, activation code, installer info)
+ *
+ * @deprecated Use getPaginatedDrops() instead - fetching all 3600+ rows is slow
  */
 export async function getAllDrops(): Promise<QaReviewDrop[]> {
   try {
@@ -99,6 +101,208 @@ export async function getAllDrops(): Promise<QaReviewDrop[]> {
     return rows.map(transformDbRowToDrop);
   } catch (error) {
     console.error('Error fetching all drops:', error);
+    throw new Error('Failed to fetch QA review drops');
+  }
+}
+
+/**
+ * Pagination result type for getPaginatedDrops
+ */
+export interface PaginatedDropsResult {
+  drops: QaReviewDrop[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalDrops: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+/**
+ * Get paginated QA review drops with server-side pagination
+ * Much faster than getAllDrops() - only fetches the requested page
+ *
+ * @param page - Page number (1-indexed)
+ * @param pageSize - Number of drops per page (max 1000)
+ * @param search - Optional search term for drop_number or project
+ * @returns Paginated drops with total count
+ */
+export async function getPaginatedDrops(
+  page: number = 1,
+  pageSize: number = 100,
+  search?: string
+): Promise<PaginatedDropsResult> {
+  try {
+    const sql = getDbConnection();
+
+    // Ensure valid pagination params
+    const validPage = Math.max(1, page);
+    const validPageSize = Math.min(1000, Math.max(1, pageSize));
+    const offset = (validPage - 1) * validPageSize;
+
+    // Get total count first (with search filter if provided)
+    let totalCount: number;
+    if (search) {
+      const searchPattern = `%${search.toLowerCase()}%`;
+      const [countResult] = await sql`
+        SELECT COUNT(*) as count
+        FROM qa_photo_reviews q
+        WHERE q.project != 'Marketing Activations'
+          AND (LOWER(q.drop_number) LIKE ${searchPattern} OR LOWER(q.project) LIKE ${searchPattern})
+      `;
+      totalCount = parseInt(countResult.count, 10);
+    } else {
+      const [countResult] = await sql`
+        SELECT COUNT(*) as count
+        FROM qa_photo_reviews q
+        WHERE q.project != 'Marketing Activations'
+      `;
+      totalCount = parseInt(countResult.count, 10);
+    }
+
+    // Get paginated data with LIMIT/OFFSET
+    let rows;
+    if (search) {
+      const searchPattern = `%${search.toLowerCase()}%`;
+      rows = await sql`
+        SELECT
+          q.id,
+          q.drop_number as "dropNumber",
+          q.review_date as "reviewDate",
+          q.user_name as "userName",
+          q.completed_photos as "completedPhotos",
+          q.outstanding_photos as "outstandingPhotos",
+          q.outstanding_photos_loaded_to_1map as "outstandingPhotosLoadedTo1map",
+          q.comment,
+          q.created_at as "createdAt",
+          q.updated_at as "updatedAt",
+          q.project,
+          q.assigned_agent as "assignedAgent",
+          q.completed,
+          q.incomplete,
+          q.feedback_sent as "feedbackSent",
+          q.sender_phone as "senderPhone",
+          q.resubmitted,
+          q.locked_by as "lockedBy",
+          q.locked_at as "lockedAt",
+          q.incorrect_steps as "incorrectSteps",
+          q.incorrect_comments as "incorrectComments",
+          q.step_01_house_photo as "step_01_house_photo",
+          q.step_02_cable_from_pole as "step_02_cable_from_pole",
+          q.step_03_cable_entry_outside as "step_03_cable_entry_outside",
+          q.step_04_cable_entry_inside as "step_04_cable_entry_inside",
+          q.step_05_wall_for_installation as "step_05_wall_for_installation",
+          q.step_06_ont_back_after_install as "step_06_ont_back_after_install",
+          q.step_07_power_meter_reading as "step_07_power_meter_reading",
+          q.step_08_ont_barcode as "step_08_ont_barcode",
+          q.step_09_ups_serial as "step_09_ups_serial",
+          q.step_10_final_installation as "step_10_final_installation",
+          q.step_11_green_lights as "step_11_green_lights",
+          q.step_12_customer_signature as "step_12_customer_signature",
+          q.ont_serial_scanned as "ontSerialScanned",
+          q.ups_serial_scanned as "upsSerialScanned",
+          q.ont_consumption_id as "ontConsumptionId",
+          q.ups_consumption_id as "upsConsumptionId",
+          q.scan_gps_lat as "scanGpsLat",
+          q.scan_gps_lng as "scanGpsLng",
+          op.ont_barcode as "onemapOntBarcode",
+          op.ont_activation_code as "onemapOntActivationCode",
+          op.ups_serial as "onemapUpsSerial",
+          op.installer_name as "onemapInstallerName",
+          op.installation_date as "onemapInstallationDate"
+        FROM qa_photo_reviews q
+        LEFT JOIN LATERAL (
+          SELECT ont_barcode, ont_activation_code, ups_serial, installer_name, installation_date
+          FROM onemap_properties
+          WHERE drop_number = q.drop_number
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+          LIMIT 1
+        ) op ON true
+        WHERE q.project != 'Marketing Activations'
+          AND (LOWER(q.drop_number) LIKE ${searchPattern} OR LOWER(q.project) LIKE ${searchPattern})
+        ORDER BY q.created_at DESC
+        LIMIT ${validPageSize}
+        OFFSET ${offset}
+      `;
+    } else {
+      rows = await sql`
+        SELECT
+          q.id,
+          q.drop_number as "dropNumber",
+          q.review_date as "reviewDate",
+          q.user_name as "userName",
+          q.completed_photos as "completedPhotos",
+          q.outstanding_photos as "outstandingPhotos",
+          q.outstanding_photos_loaded_to_1map as "outstandingPhotosLoadedTo1map",
+          q.comment,
+          q.created_at as "createdAt",
+          q.updated_at as "updatedAt",
+          q.project,
+          q.assigned_agent as "assignedAgent",
+          q.completed,
+          q.incomplete,
+          q.feedback_sent as "feedbackSent",
+          q.sender_phone as "senderPhone",
+          q.resubmitted,
+          q.locked_by as "lockedBy",
+          q.locked_at as "lockedAt",
+          q.incorrect_steps as "incorrectSteps",
+          q.incorrect_comments as "incorrectComments",
+          q.step_01_house_photo as "step_01_house_photo",
+          q.step_02_cable_from_pole as "step_02_cable_from_pole",
+          q.step_03_cable_entry_outside as "step_03_cable_entry_outside",
+          q.step_04_cable_entry_inside as "step_04_cable_entry_inside",
+          q.step_05_wall_for_installation as "step_05_wall_for_installation",
+          q.step_06_ont_back_after_install as "step_06_ont_back_after_install",
+          q.step_07_power_meter_reading as "step_07_power_meter_reading",
+          q.step_08_ont_barcode as "step_08_ont_barcode",
+          q.step_09_ups_serial as "step_09_ups_serial",
+          q.step_10_final_installation as "step_10_final_installation",
+          q.step_11_green_lights as "step_11_green_lights",
+          q.step_12_customer_signature as "step_12_customer_signature",
+          q.ont_serial_scanned as "ontSerialScanned",
+          q.ups_serial_scanned as "upsSerialScanned",
+          q.ont_consumption_id as "ontConsumptionId",
+          q.ups_consumption_id as "upsConsumptionId",
+          q.scan_gps_lat as "scanGpsLat",
+          q.scan_gps_lng as "scanGpsLng",
+          op.ont_barcode as "onemapOntBarcode",
+          op.ont_activation_code as "onemapOntActivationCode",
+          op.ups_serial as "onemapUpsSerial",
+          op.installer_name as "onemapInstallerName",
+          op.installation_date as "onemapInstallationDate"
+        FROM qa_photo_reviews q
+        LEFT JOIN LATERAL (
+          SELECT ont_barcode, ont_activation_code, ups_serial, installer_name, installation_date
+          FROM onemap_properties
+          WHERE drop_number = q.drop_number
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+          LIMIT 1
+        ) op ON true
+        WHERE q.project != 'Marketing Activations'
+        ORDER BY q.created_at DESC
+        LIMIT ${validPageSize}
+        OFFSET ${offset}
+      `;
+    }
+
+    const totalPages = Math.ceil(totalCount / validPageSize);
+
+    return {
+      drops: rows.map(transformDbRowToDrop),
+      pagination: {
+        currentPage: validPage,
+        pageSize: validPageSize,
+        totalDrops: totalCount,
+        totalPages,
+        hasNextPage: validPage < totalPages,
+        hasPreviousPage: validPage > 1,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching paginated drops:', error);
     throw new Error('Failed to fetch QA review drops');
   }
 }
@@ -207,7 +411,7 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
       WHERE project != 'Marketing Activations'
     `;
 
-    // Get daily stats grouped by project and date (for all time)
+    // Get daily stats grouped by project and date (last 30 days only for performance)
     const dailyStatsRows = await sql`
       SELECT
         COALESCE(project, 'Unknown') as project,
@@ -245,6 +449,7 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
         END) as incomplete
       FROM qa_photo_reviews
       WHERE project != 'Marketing Activations'
+        AND created_at >= NOW() - INTERVAL '30 days'
       GROUP BY project, DATE(created_at AT TIME ZONE 'Africa/Johannesburg')
       ORDER BY date DESC, project ASC
     `;
@@ -266,6 +471,133 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
   } catch (error) {
     console.error('Error calculating summary:', error);
     throw new Error('Failed to calculate summary statistics');
+  }
+}
+
+/**
+ * Fast summary calculation for initial page load
+ * Uses parallel queries and limits daily stats to last 7 days
+ * Much faster than calculateSummary() for dashboard views
+ */
+export async function calculateSummaryFast(): Promise<WaMonitorSummary> {
+  try {
+    const sql = getDbConnection();
+
+    // Run both queries in parallel for better performance
+    const [statsResult, dailyStatsResult] = await Promise.all([
+      // Basic counts - scan full table but simpler query
+      sql`
+        SELECT
+          COUNT(*) as total,
+          COUNT(CASE WHEN completed = true THEN 1 END) as complete,
+          COUNT(CASE WHEN incomplete = true THEN 1 END) as incomplete_reviewed
+        FROM qa_photo_reviews
+        WHERE project != 'Marketing Activations'
+      `,
+      // Daily stats - last 7 days only for fast dashboard
+      sql`
+        SELECT
+          COALESCE(project, 'Unknown') as project,
+          TO_CHAR(DATE(created_at AT TIME ZONE 'Africa/Johannesburg'), 'YYYY-MM-DD') as date,
+          COUNT(*) as total
+        FROM qa_photo_reviews
+        WHERE project != 'Marketing Activations'
+          AND created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY project, DATE(created_at AT TIME ZONE 'Africa/Johannesburg')
+        ORDER BY date DESC, project ASC
+      `,
+    ]);
+
+    const stats = statsResult[0];
+    const totalCount = parseInt(stats.total, 10);
+    const completeCount = parseInt(stats.complete || '0', 10);
+
+    return {
+      total: totalCount,
+      incomplete: totalCount - completeCount, // Simplified: everything not complete is incomplete
+      complete: completeCount,
+      averageFeedbackCount: 0, // Skip for fast load
+      totalFeedback: parseInt(stats.incomplete_reviewed || '0', 10),
+      dailyStats: dailyStatsResult.map(row => ({
+        project: row.project,
+        date: row.date,
+        total: parseInt(row.total, 10),
+        complete: 0, // Skip detailed stats for fast load
+        incomplete: parseInt(row.total, 10), // Assume all incomplete for fast view
+      })),
+    };
+  } catch (error) {
+    console.error('Error calculating fast summary:', error);
+    throw new Error('Failed to calculate summary statistics');
+  }
+}
+
+/**
+ * Get complete per-project statistics from ALL records
+ * Unlike calculateSummaryFast(), this queries ALL records (not limited to 7 days)
+ * and properly calculates complete vs incomplete status
+ *
+ * @param dateFrom Optional start date filter (YYYY-MM-DD format, SAST timezone)
+ * @param dateTo Optional end date filter (YYYY-MM-DD format, SAST timezone)
+ */
+export async function getCompleteProjectStats(
+  dateFrom?: string,
+  dateTo?: string
+): Promise<Array<{
+  project: string;
+  total: number;
+  complete: number;
+  incomplete: number;
+}>> {
+  const sql = getDbConnection();
+  try {
+    // Build date filter conditions
+    // Use whatsapp_message_date if available, otherwise fall back to created_at
+    let dateFilter = sql``;
+
+    if (dateFrom && dateTo) {
+      dateFilter = sql`AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') BETWEEN ${dateFrom}::date AND ${dateTo}::date`;
+    } else if (dateFrom) {
+      dateFilter = sql`AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateFrom}::date`;
+    } else if (dateTo) {
+      dateFilter = sql`AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') <= ${dateTo}::date`;
+    }
+
+    const results = await sql`
+      SELECT
+        COALESCE(project, 'Unknown') as project,
+        COUNT(DISTINCT drop_number) as total,
+        COUNT(DISTINCT CASE
+          WHEN step_01_house_photo = true
+            AND step_02_cable_from_pole = true
+            AND step_03_cable_entry_outside = true
+            AND step_04_cable_entry_inside = true
+            AND step_05_wall_for_installation = true
+            AND step_06_ont_back_after_install = true
+            AND step_07_power_meter_reading = true
+            AND step_08_ont_barcode = true
+            AND step_09_ups_serial = true
+            AND step_10_final_installation = true
+            AND step_11_green_lights = true
+            AND step_12_customer_signature = true
+          THEN drop_number
+        END) as complete
+      FROM qa_photo_reviews
+      WHERE project != 'Marketing Activations'
+        ${dateFilter}
+      GROUP BY project
+      ORDER BY total DESC
+    `;
+
+    return results.map(row => ({
+      project: row.project,
+      total: parseInt(row.total, 10),
+      complete: parseInt(row.complete, 10),
+      incomplete: parseInt(row.total, 10) - parseInt(row.complete, 10),
+    }));
+  } catch (error) {
+    console.error('Error calculating complete project stats:', error);
+    throw new Error('Failed to calculate project statistics');
   }
 }
 

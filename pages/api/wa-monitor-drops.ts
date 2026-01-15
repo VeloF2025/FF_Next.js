@@ -13,10 +13,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import {
-  getAllDrops,
+  getPaginatedDrops,
   getDropById,
   getDropsByStatus,
-  calculateSummary,
+  calculateSummaryFast,
+  getCompleteProjectStats,
 } from '@/modules/wa-monitor/services/waMonitorService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -26,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, status, limit, search, page } = req.query;
+    const { id, status, limit, search, page, skipSummary, dateFrom, dateTo } = req.query;
 
     // Get single drop by ID
     if (id && typeof id === 'string') {
@@ -51,61 +52,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.success(res, drops);
     }
 
-    // Get all drops with summary
-    let drops = await getAllDrops();
-
-    // Filter by search term if provided
-    if (search && typeof search === 'string') {
-      const searchTerm = search.toLowerCase();
-      drops = drops.filter(drop =>
-        drop.dropNumber.toLowerCase().includes(searchTerm) ||
-        drop.project?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Calculate total before pagination
-    const totalDrops = drops.length;
-
-    // Apply pagination
-    const pageSize = 1000; // Max drops per page to prevent >4MB response
+    // Parse pagination parameters
+    const pageSize = 100; // Default page size (much smaller for better performance)
     let currentPage = 1;
-    let paginatedDrops = drops;
 
     if (page && typeof page === 'string') {
-      currentPage = parseInt(page, 10);
-      if (!isNaN(currentPage) && currentPage > 0) {
-        const offset = (currentPage - 1) * pageSize;
-        paginatedDrops = drops.slice(offset, offset + pageSize);
+      const parsedPage = parseInt(page, 10);
+      if (!isNaN(parsedPage) && parsedPage > 0) {
+        currentPage = parsedPage;
       }
-    } else if (limit && typeof limit === 'string') {
-      // Backward compatibility: support old limit parameter
-      const limitNum = parseInt(limit, 10);
-      if (!isNaN(limitNum) && limitNum > 0) {
-        paginatedDrops = drops.slice(0, limitNum);
-      }
-    } else {
-      // Default: first page only
-      paginatedDrops = drops.slice(0, pageSize);
     }
 
-    const summary = await calculateSummary();
-    const totalPages = Math.ceil(totalDrops / pageSize);
+    // Handle backward compatibility with limit parameter
+    let effectivePageSize = pageSize;
+    if (limit && typeof limit === 'string') {
+      const limitNum = parseInt(limit, 10);
+      if (!isNaN(limitNum) && limitNum > 0) {
+        effectivePageSize = Math.min(limitNum, 1000); // Max 1000
+      }
+    }
+
+    // Use server-side pagination (much faster - only fetches requested page from DB)
+    const searchTerm = search && typeof search === 'string' ? search : undefined;
+    const result = await getPaginatedDrops(currentPage, effectivePageSize, searchTerm);
+
+    // Optionally skip summary for faster initial load (can be fetched separately)
+    let summary = null;
+    if (skipSummary !== 'true') {
+      summary = await calculateSummaryFast();
+    }
+
+    // Get complete project stats from ALL records (not limited by pagination)
+    // This supports date range filtering for accurate per-project reports
+    const dateFromStr = dateFrom && typeof dateFrom === 'string' ? dateFrom : undefined;
+    const dateToStr = dateTo && typeof dateTo === 'string' ? dateTo : undefined;
+    const projectStats = await getCompleteProjectStats(dateFromStr, dateToStr);
 
     // Return with summary and pagination info
     return res.status(200).json({
       success: true,
-      data: paginatedDrops,
+      data: result.drops,
       summary,
-      pagination: {
-        currentPage,
-        pageSize,
-        totalDrops,
-        totalPages,
-        hasNextPage: currentPage < totalPages,
-        hasPreviousPage: currentPage > 1,
-      },
+      projectStats, // Complete per-project stats from ALL matching records
+      pagination: result.pagination,
       meta: {
         timestamp: new Date().toISOString(),
+        dateFilter: dateFromStr || dateToStr ? { from: dateFromStr, to: dateToStr } : null,
       },
     });
 
