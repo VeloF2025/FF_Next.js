@@ -23,24 +23,28 @@ interface AppRouterLayoutProps {
 
 export function AppRouterLayout({ children }: AppRouterLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    // Load sidebar state from localStorage (only on client)
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('fibreflow-sidebar-collapsed');
-      return saved ? JSON.parse(saved) : false;
-    }
-    return false;
-  });
+  // Initialize with false to match SSR - load from localStorage in useEffect
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const pathname = usePathname();
   const { currentUser, loading } = useAuth();
 
-  // Save sidebar state to localStorage (only on client)
+  // Load sidebar state from localStorage after hydration (prevents SSR mismatch)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('fibreflow-sidebar-collapsed');
+    if (saved) {
+      setSidebarCollapsed(JSON.parse(saved));
+    }
+    setIsHydrated(true);
+  }, []);
+
+  // Save sidebar state to localStorage when it changes (only after initial hydration)
+  useEffect(() => {
+    if (isHydrated) {
       localStorage.setItem('fibreflow-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
     }
-  }, [sidebarCollapsed]);
+  }, [sidebarCollapsed, isHydrated]);
 
   // Close mobile sidebar when route changes
   useEffect(() => {
