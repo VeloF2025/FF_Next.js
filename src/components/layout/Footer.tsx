@@ -1,7 +1,13 @@
 import { Heart, Shield, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export function Footer(): JSX.Element {
-  const currentYear = new Date().getFullYear();
+  // Fix hydration: use static year on initial render, update after mount
+  const [currentYear, setCurrentYear] = useState(2026); // Static default for SSR
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   return (
     <footer className="bg-[var(--ff-surface-primary)] border-t border-[var(--ff-border-primary)] py-3 px-4 lg:px-6">

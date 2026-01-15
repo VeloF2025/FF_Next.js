@@ -3,6 +3,7 @@
  */
 
 import { RefreshCw, Download, Settings } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ActionButton {
@@ -34,7 +35,14 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const { currentUser } = useAuth();
 
+  // Fix hydration: only render time-dependent content after mount
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const getGreeting = () => {
+    if (!mounted) return 'Welcome'; // Static greeting for SSR
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
