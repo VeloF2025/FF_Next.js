@@ -155,14 +155,26 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Helper to convert empty strings to null
     const toNullIfEmpty = (val: any) => (val === '' || val === undefined) ? null : val;
 
+    // Generate project code if not provided (PRJ-XXXXXX format)
+    const generateProjectCode = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = 'PRJ-';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    };
+    const projectCode = projectData.project_code || projectData.projectCode || generateProjectCode();
+
     const newProject = await sql`
       INSERT INTO projects (
-        project_name, description, client_id, project_manager,
+        project_code, project_name, description, client_id, project_manager,
         status, priority, start_date, end_date,
         budget, actual_cost,
         location, latitude, longitude
       )
       VALUES (
+        ${projectCode},
         ${projectData.name},
         ${toNullIfEmpty(projectData.description)},
         ${toNullIfEmpty(projectData.client_id || projectData.clientId)},
