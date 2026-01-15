@@ -627,13 +627,13 @@ export async function getPendingHandovers(
         t.ont_serial,
         t.ont_rx_level,
         t.assigned_contractor_id,
-        p.name as project_name,
+        p.project_name,
         (SELECT COUNT(*) FROM ticket_attachments ta WHERE ta.ticket_id = t.id AND ta.file_type = 'photo') as photo_count,
         (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id) as verification_total,
         (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id AND vs.is_complete = true) as verification_complete,
         (SELECT hs.to_owner_type FROM handover_snapshots hs WHERE hs.ticket_id = t.id ORDER BY hs.handover_at DESC LIMIT 1) as current_owner
       FROM tickets t
-      LEFT JOIN projects p ON t.project_id = p.id
+      LEFT JOIN projects p ON t.project_id::uuid = p.id
       ${whereClause}
       ORDER BY t.updated_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
