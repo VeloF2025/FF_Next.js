@@ -523,6 +523,7 @@ export async function listAllRiskAcceptances(
     const total = parseInt(countResult?.total || '0', 10);
 
     // Fetch risks with ticket info
+    // Note: tickets.project_id is TEXT, projects.id is UUID - need cast
     const sql = `
       SELECT
         r.*,
@@ -531,7 +532,7 @@ export async function listAllRiskAcceptances(
         p.name as project_name
       FROM qa_risk_acceptances r
       LEFT JOIN tickets t ON r.ticket_id = t.id
-      LEFT JOIN projects p ON t.project_id = p.id
+      LEFT JOIN projects p ON t.project_id::uuid = p.id
       ${whereClause}
       ORDER BY
         CASE r.status
