@@ -354,14 +354,25 @@ export function createDefaultColumnMapping(headers: string[]): ExcelColumnMappin
   const mapping: ExcelColumnMapping[] = [];
 
   // Common field mappings (case-insensitive)
+  // Supports both standard ticketing format AND maintenance Excel format
   const fieldMappings: Record<string, { field: string; required: boolean }> = {
+    // Ticket UID mappings
     'ticket id': { field: 'ticket_uid', required: false },
     'ticket_uid': { field: 'ticket_uid', required: false },
-    title: { field: 'title', required: true },
+    'ft ref': { field: 'ft_ref', required: false },        // Maintenance Excel: FT Ref
+    'ft_ref': { field: 'ft_ref', required: false },
+    'ftref': { field: 'ft_ref', required: false },
+    'reference': { field: 'ft_ref', required: false },
+    // Title/Issue mappings
+    title: { field: 'title', required: false },            // Changed from required: true
+    issue: { field: 'issue', required: false },            // Maintenance Excel: Issue → title
     description: { field: 'description', required: false },
-    type: { field: 'ticket_type', required: true },
-    'ticket type': { field: 'ticket_type', required: true },
-    'ticket_type': { field: 'ticket_type', required: true },
+    // Type mappings (not required for maintenance imports)
+    type: { field: 'ticket_type', required: false },       // Changed from required: true
+    'ticket type': { field: 'ticket_type', required: false },
+    'ticket_type': { field: 'ticket_type', required: false },
+    // Area/Project mapping
+    area: { field: 'area', required: false },              // Maintenance Excel: Area → project
     priority: { field: 'priority', required: false },
     status: { field: 'status', required: false },
     'dr number': { field: 'dr_number', required: false },

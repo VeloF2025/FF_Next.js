@@ -59,7 +59,7 @@ export function ImportPreview({ preview }: ImportPreviewProps) {
         </p>
       </div>
 
-      {/* Sample Rows Table */}
+      {/* Sample Rows Table - Maps Excel columns to FibreFlow schema */}
       {preview.sample_rows.length > 0 && (
         <div className="overflow-x-auto border border-[var(--ff-border-light)] rounded-lg">
           <table className="w-full text-sm">
@@ -69,19 +69,22 @@ export function ImportPreview({ preview }: ImportPreviewProps) {
                   Row
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                  Title
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                  Type
+                  Ticket UID
+                  <span className="block text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]">FT Ref</span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                   DR Number
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                  Pole
+                  Project
+                  <span className="block text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]">Area</span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                  PON
+                  Title
+                  <span className="block text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]">Issue</span>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                  Status
                 </th>
               </tr>
             </thead>
@@ -179,21 +182,30 @@ function StatCard({
 }
 
 /**
- * 🟢 WORKING: Sample row component
+ * 🟢 WORKING: Sample row component for maintenance ticket preview
+ * Maps Excel columns to FibreFlow schema:
+ * - FT Ref → ticket_uid
+ * - DR Number → dr_number
+ * - Area → project (lookup by name)
+ * - Issue → title
+ * - Status → status
  */
 function SampleRow({ row }: { row: ImportRow }) {
+  // Access maintenance-specific fields from the dynamic row data
+  const rowData = row as unknown as Record<string, unknown>;
+
   return (
     <tr className="hover:bg-[var(--ff-bg-tertiary)] transition-colors">
       <td className="px-4 py-3 text-[var(--ff-text-tertiary)] font-mono text-xs">{row.row_number}</td>
-      <td className="px-4 py-3 text-[var(--ff-text-primary)] max-w-xs truncate">{row.title || '-'}</td>
+      <td className="px-4 py-3 text-[var(--ff-text-secondary)] font-mono text-xs">{String(rowData.ft_ref || '-')}</td>
+      <td className="px-4 py-3 text-[var(--ff-text-secondary)] font-mono text-xs">{row.dr_number || '-'}</td>
+      <td className="px-4 py-3 text-[var(--ff-text-primary)]">{String(rowData.area || '-')}</td>
+      <td className="px-4 py-3 text-[var(--ff-text-secondary)] max-w-xs truncate">{String(rowData.issue || '-')}</td>
       <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
         <span className="px-2 py-1 bg-[var(--ff-bg-tertiary)] rounded text-xs">
-          {row.ticket_type || '-'}
+          {String(rowData.status || '-')}
         </span>
       </td>
-      <td className="px-4 py-3 text-[var(--ff-text-secondary)] font-mono text-xs">{row.dr_number || '-'}</td>
-      <td className="px-4 py-3 text-[var(--ff-text-secondary)] font-mono text-xs">{row.pole_number || '-'}</td>
-      <td className="px-4 py-3 text-[var(--ff-text-secondary)] font-mono text-xs">{row.pon_number || '-'}</td>
     </tr>
   );
 }
