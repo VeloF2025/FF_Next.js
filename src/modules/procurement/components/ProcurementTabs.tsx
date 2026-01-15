@@ -10,7 +10,9 @@ import {
   MapPin,
   Truck,
   ClipboardList,
-  Lock
+  Lock,
+  FileInput,
+  PackageCheck
 } from 'lucide-react';
 import type { 
   ProcurementTab, 
@@ -53,17 +55,25 @@ export function ProcurementTabs({
   
   // Define all available tabs with enhanced configuration
   const allTabs: ProcurementTab[] = useMemo(() => [
-    { 
-      id: 'overview', 
-      label: 'Dashboard', 
-      icon: BarChart3, 
+    {
+      id: 'overview',
+      label: 'Dashboard',
+      icon: BarChart3,
       path: '/app/procurement',
       requiresProject: false
     },
-    { 
-      id: 'boq', 
-      label: 'BOQ', 
-      icon: FileText, 
+    {
+      id: 'requisitions',
+      label: 'Requisitions',
+      icon: FileInput,
+      path: '/procurement/requisitions',
+      requiresProject: false,
+      permission: 'canViewRequisitions'
+    },
+    {
+      id: 'boq',
+      label: 'BOQ',
+      icon: FileText,
       path: '/app/procurement/boq',
       requiresProject: true,
       permission: 'canViewBOQ'
@@ -84,13 +94,21 @@ export function ProcurementTabs({
       requiresProject: true,
       permission: 'canViewQuotes'
     },
-    { 
-      id: 'purchase-orders', 
-      label: 'Purchase Orders', 
-      icon: ShoppingCart, 
-      path: '/app/procurement/orders',
-      requiresProject: true,
+    {
+      id: 'purchase-orders',
+      label: 'Purchase Orders',
+      icon: ShoppingCart,
+      path: '/procurement/purchase-orders',
+      requiresProject: false,
       permission: 'canViewPurchaseOrders'
+    },
+    {
+      id: 'grn',
+      label: 'Goods Receipt',
+      icon: PackageCheck,
+      path: '/procurement/grn',
+      requiresProject: false,
+      permission: 'canViewGRN'
     },
     {
       id: 'stock',

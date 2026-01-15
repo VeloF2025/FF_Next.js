@@ -529,7 +529,7 @@ export async function listAllRiskAcceptances(
         r.*,
         t.ticket_uid,
         t.title as ticket_title,
-        p.name as project_name
+        p.project_name
       FROM qa_risk_acceptances r
       LEFT JOIN tickets t ON r.ticket_id = t.id
       LEFT JOIN projects p ON t.project_id::uuid = p.id

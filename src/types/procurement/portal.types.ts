@@ -4,10 +4,12 @@ import type { Project } from '@/types/project.types';
 
 export type ProcurementTabId =
   | 'overview'
+  | 'requisitions'
   | 'boq'
   | 'rfq'
   | 'quotes'
   | 'purchase-orders'
+  | 'grn'
   | 'stock'
   | 'field-stock'
   | 'suppliers'
@@ -62,6 +64,11 @@ export interface ProcurementPermissions {
   canEvaluateQuotes: boolean;
   canViewPurchaseOrders: boolean;
   canCreatePurchaseOrders: boolean;
+  canViewRequisitions: boolean;
+  canCreateRequisitions: boolean;
+  canApproveRequisitions: boolean;
+  canViewGRN: boolean;
+  canCreateGRN: boolean;
   canAccessStock: boolean;
   canManageStock: boolean;
   canAccessFieldStock: boolean;

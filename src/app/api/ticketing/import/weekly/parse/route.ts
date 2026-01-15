@@ -6,17 +6,28 @@
  * Accepts JSON body with:
  * - filename: string - Original filename
  * - data: number[] - File data as byte array
+ * - sheetName?: string - Optional sheet name to use
  *
- * Returns preview data for user confirmation before import.
+ * Auto-detects the best sheet with ticket data if not specified.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
+import * as XLSX from 'xlsx';
 import {
   parseExcelFile,
   generatePreview,
   createDefaultColumnMapping,
 } from '@/modules/ticketing/utils/excelParser';
+
+// Known ticket data column names (case-insensitive)
+const TICKET_COLUMNS = [
+  'dr number', 'dr_number', 'drnumber',
+  'status', 'area', 'zone',
+  'ft ref', 'ft_ref', 'ftref', 'reference',
+  'issue', 'description', 'title',
+  'date', 'date captured', 'date_captured'
+];
 
 const logger = createLogger('ticketing:api:weekly-import:parse');
 
@@ -85,11 +96,61 @@ export async function POST(req: NextRequest) {
     // Convert byte array to Buffer
     const buffer = Buffer.from(data);
 
-    // Parse Excel file
+    // Auto-detect the best sheet if not specified
+    let sheetName = body.sheetName;
+    let availableSheets: { name: string; rows: number; hasTicketColumns: boolean }[] = [];
+
+    if (!sheetName) {
+      const workbook = XLSX.read(buffer, { type: 'buffer' });
+
+      // Score each sheet
+      availableSheets = workbook.SheetNames.map(name => {
+        const sheet = workbook.Sheets[name];
+        const range = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null;
+        const rows = range ? range.e.r - range.s.r + 1 : 0;
+
+        // Get headers from first row
+        const firstRow = XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[] || [];
+        const headerLower = firstRow.map(h => String(h || '').toLowerCase());
+
+        // Check if any ticket columns exist
+        const hasTicketColumns = TICKET_COLUMNS.some(col =>
+          headerLower.some(h => h.includes(col))
+        );
+
+        return { name, rows, hasTicketColumns };
+      });
+
+      // Score sheets: prefer "ticket"/"mnt" in name, then by row count
+      const scoredSheets = availableSheets.map(s => {
+        let score = s.rows;
+        const nameLower = s.name.toLowerCase();
+        // Strong preference for sheets with "ticket" or "mnt" in name
+        if (nameLower.includes('ticket')) score += 10000;
+        if (nameLower.includes('mnt')) score += 5000;
+        if (nameLower.includes('maintenance')) score += 5000;
+        // Boost for having ticket columns
+        if (s.hasTicketColumns) score += 1000;
+        // Penalize pivot/summary sheets
+        if (nameLower.includes('pivot') || nameLower.includes('summary')) score -= 5000;
+        return { ...s, score };
+      });
+
+      // Pick highest scored sheet
+      sheetName = scoredSheets.sort((a, b) => b.score - a.score)[0]?.name;
+
+      logger.info('Auto-detected sheet', {
+        selectedSheet: sheetName,
+        availableSheets: availableSheets.map(s => `${s.name} (${s.rows} rows, ticket cols: ${s.hasTicketColumns})`),
+      });
+    }
+
+    // Parse Excel file with detected/specified sheet
     const parseResult = await parseExcelFile(buffer, {
       hasHeaders: true,
       skipEmptyRows: true,
       trimWhitespace: true,
+      sheetName,
     });
 
     if (!parseResult.success || parseResult.errors.length > 0) {
@@ -138,6 +199,8 @@ export async function POST(req: NextRequest) {
       success: true,
       data: {
         filename,
+        selected_sheet: sheetName,
+        available_sheets: availableSheets.length > 0 ? availableSheets : undefined,
         headers: parseResult.headers,
         total_rows: parseResult.total_rows,
         skipped_rows: parseResult.skipped_rows,
