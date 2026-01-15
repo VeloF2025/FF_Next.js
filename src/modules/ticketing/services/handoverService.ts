@@ -108,13 +108,14 @@ export async function validateHandoverGate(
     const warnings: string[] = [];
 
     // 🟢 WORKING: Gate 1 - AS_BUILT_CONFIRMED
+    // Note: DB columns are zone, pole_id, pon (not zone_id, pole_number, pon_number)
     const hasAllAsBuiltData = !!(
       ticket.dr_number &&
-      ticket.zone_id &&
-      ticket.pole_number &&
-      ticket.pon_number
+      ticket.zone &&
+      ticket.pole_id &&
+      ticket.pon
     );
-    const hasMinimalAsBuiltData = !!(ticket.dr_number && ticket.zone_id);
+    const hasMinimalAsBuiltData = !!(ticket.dr_number && ticket.zone);
 
     const asBuiltGate: HandoverGateCheck = {
       gate_name: HandoverGateName.AS_BUILT_CONFIRMED,
@@ -131,10 +132,10 @@ export async function validateHandoverGate(
       gatesPassed.push(asBuiltGate);
       // Add warnings for missing optional fields in non-strict mode
       if (!isStrict && !hasAllAsBuiltData) {
-        if (!ticket.pole_number) {
+        if (!ticket.pole_id) {
           warnings.push('Pole number not populated - should be completed before QA handover');
         }
-        if (!ticket.pon_number) {
+        if (!ticket.pon) {
           warnings.push('PON number not populated - should be completed before QA handover');
         }
       }
@@ -175,13 +176,14 @@ export async function validateHandoverGate(
     }
 
     // 🟢 WORKING: Gate 3 - ONT_PON_VERIFIED
+    // Note: ont_rx_level doesn't exist in DB - just check ont_serial
     const ontPonGate: HandoverGateCheck = {
       gate_name: HandoverGateName.ONT_PON_VERIFIED,
-      passed: !!(ticket.ont_serial && (ticket.ont_rx_level !== null)),
+      passed: !!ticket.ont_serial,
       required: isStrict,
-      message: ticket.ont_serial && (ticket.ont_rx_level !== null)
-        ? `ONT/PON verified (Serial: ${ticket.ont_serial}, RX: ${ticket.ont_rx_level} dBm)`
-        : 'ONT serial or RX level missing'
+      message: ticket.ont_serial
+        ? `ONT/PON verified (Serial: ${ticket.ont_serial})`
+        : 'ONT serial missing'
     };
 
     if (ontPonGate.passed) {
@@ -201,11 +203,12 @@ export async function validateHandoverGate(
     }
 
     // 🟢 WORKING: Gate 4 - CONTRACTOR_ASSIGNED
+    // Note: DB column is contractor_id (not assigned_contractor_id)
     const contractorGate: HandoverGateCheck = {
       gate_name: HandoverGateName.CONTRACTOR_ASSIGNED,
-      passed: !!ticket.assigned_contractor_id,
+      passed: !!ticket.contractor_id,
       required: isStrict,
-      message: ticket.assigned_contractor_id
+      message: ticket.contractor_id
         ? 'Contractor assigned'
         : 'No contractor assigned'
     };
@@ -621,12 +624,12 @@ export async function getPendingHandovers(
         t.title,
         t.status,
         t.dr_number,
-        t.zone_id,
-        t.pole_number,
-        t.pon_number,
+        t.zone as zone_id,
+        t.pole_id as pole_number,
+        t.pon as pon_number,
         t.ont_serial,
-        t.ont_rx_level,
-        t.assigned_contractor_id,
+        NULL::numeric as ont_rx_level,
+        t.contractor_id as assigned_contractor_id,
         p.project_name,
         (SELECT COUNT(*) FROM ticket_attachments ta WHERE ta.ticket_id = t.id AND ta.file_type = 'photo') as photo_count,
         (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id) as verification_total,

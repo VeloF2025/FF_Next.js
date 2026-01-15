@@ -124,14 +124,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
     const {
       supplierId,
+      supplierContact,
+      supplierReference,
       projectId,
       deliveryAddress,
-      deliveryDate,
+      expectedDeliveryDate,
+      shippingMethod,
       paymentTerms,
       currency = 'ZAR',
-      vatRate = 15,
-      notes,
+      taxRate = 15,
+      internalNotes,
+      supplierNotes,
       items,
+      createdBy = 'system', // Should come from auth
     } = req.body;
 
     // Validation
@@ -139,12 +144,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'Supplier is required');
     }
 
-    if (!deliveryAddress || deliveryAddress.length < 10) {
+    if (!deliveryAddress || deliveryAddress.trim().length < 10) {
       return apiResponse.badRequest(res, 'Delivery address must be at least 10 characters');
     }
 
-    if (!paymentTerms) {
-      return apiResponse.badRequest(res, 'Payment terms are required');
+    const validPaymentTerms = ['COD', 'Net 15', 'Net 30', 'Net 45', 'Net 60'];
+    if (!paymentTerms || !validPaymentTerms.includes(paymentTerms)) {
+      return apiResponse.badRequest(res, 'Valid payment terms are required');
+    }
+
+    if (taxRate < 0 || taxRate > 25) {
+      return apiResponse.badRequest(res, 'Tax rate must be between 0 and 25%');
     }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -154,88 +164,78 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Validate items
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (!item.itemDescription || item.itemDescription.length < 3) {
+      if (!item.description || item.description.trim().length < 3) {
         return apiResponse.badRequest(res, `Item ${i + 1}: Description must be at least 3 characters`);
       }
       if (!item.quantity || item.quantity <= 0) {
         return apiResponse.badRequest(res, `Item ${i + 1}: Quantity must be greater than 0`);
       }
-      if (!item.uom) {
+      if (!item.uom || item.uom.trim() === '') {
         return apiResponse.badRequest(res, `Item ${i + 1}: Unit of measure is required`);
       }
-      if (item.unitPrice === undefined || item.unitPrice < 0) {
-        return apiResponse.badRequest(res, `Item ${i + 1}: Unit price must be 0 or greater`);
+      if (item.unitPrice === undefined || item.unitPrice < 0.01) {
+        return apiResponse.badRequest(res, `Item ${i + 1}: Unit price must be at least 0.01`);
       }
     }
 
     // Calculate totals
     const subtotal = items.reduce((sum: number, item: { quantity: number; unitPrice: number }) => {
-      return sum + item.quantity * item.unitPrice;
+      return sum + Math.round(item.quantity * item.unitPrice * 100) / 100;
     }, 0);
 
-    const vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100;
-    const total = Math.round((subtotal + vatAmount) * 100) / 100;
+    const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+    const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
 
-    // Generate PO number
-    const now = new Date();
-    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-
+    // Generate PO number (PO-YYYY-NNNN format)
+    const year = new Date().getFullYear();
     const seqResult = await sql`
       SELECT COUNT(*) + 1 as seq
       FROM purchase_orders
-      WHERE po_number LIKE ${`PO-${yearMonth}-%`}
+      WHERE po_number LIKE ${`PO-${year}-%`}
     `;
-    const sequence = seqResult[0]?.seq || 1;
-    const poNumber = `PO-${yearMonth}-${String(sequence).padStart(4, '0')}`;
+    const sequence = parseInt(seqResult[0]?.seq || '1', 10);
+    const poNumber = `PO-${year}-${String(sequence).padStart(4, '0')}`;
 
-    // Insert PO
+    // Insert PO (matching actual schema columns)
     const poResult = await sql`
       INSERT INTO purchase_orders (
-        po_number, status, supplier_id, project_id, delivery_address,
-        expected_delivery_date, payment_terms, currency, tax_rate, subtotal,
-        tax_amount, total_amount, notes, created_at, updated_at
+        po_number, status, supplier_id, supplier_contact, supplier_reference,
+        project_id, delivery_address, expected_delivery_date, shipping_method,
+        payment_terms, currency, tax_rate, subtotal, tax_amount, total_amount,
+        internal_notes, supplier_notes, created_by, created_at, updated_at
       ) VALUES (
-        ${poNumber}, 'draft', ${supplierId}, ${projectId || null}, ${deliveryAddress},
-        ${deliveryDate || null}, ${paymentTerms}, ${currency}, ${vatRate}, ${subtotal},
-        ${vatAmount}, ${total}, ${notes || null}, NOW(), NOW()
+        ${poNumber}, 'draft', ${supplierId}, ${supplierContact || null}, ${supplierReference || null},
+        ${projectId || null}, ${deliveryAddress}, ${expectedDeliveryDate || null}, ${shippingMethod || null},
+        ${paymentTerms}, ${currency}, ${taxRate}, ${subtotal}, ${taxAmount}, ${totalAmount},
+        ${internalNotes || null}, ${supplierNotes || null}, ${createdBy}, NOW(), NOW()
       )
       RETURNING id, po_number
     `;
 
     const poId = poResult[0].id;
 
-    // Insert items
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    // Insert items (matching actual schema columns)
+    for (const item of items) {
       const lineTotal = Math.round(item.quantity * item.unitPrice * 100) / 100;
 
       await sql`
         INSERT INTO purchase_order_items (
-          purchase_order_id, line_number, description, item_code, quantity_ordered,
-          unit_of_measure, unit_price, line_total, quantity_received, quantity_pending,
-          notes, created_at
+          purchase_order_id, item_code, item_description, quantity_ordered,
+          quantity_received, uom, unit_price, total_price, notes, created_at
         ) VALUES (
-          ${poId}, ${i + 1}, ${item.itemDescription}, ${item.itemCode || null}, ${item.quantity},
-          ${item.uom}, ${item.unitPrice}, ${lineTotal}, 0, ${item.quantity},
-          ${item.notes || null}, NOW()
+          ${poId}, ${item.itemCode || null}, ${item.description}, ${item.quantity},
+          0, ${item.uom}, ${item.unitPrice}, ${lineTotal}, ${item.notes || null}, NOW()
         )
       `;
     }
 
-    // Add history event
-    await sql`
-      INSERT INTO purchase_order_history (
-        purchase_order_id, action, notes, created_at
-      ) VALUES (
-        ${poId}, 'created', 'Purchase order created', NOW()
-      )
-    `;
-
-    log.info('Purchase order created', { poId, poNumber });
+    log.info('Purchase order created', { poId, poNumber, totalAmount });
 
     return apiResponse.created(res, {
       id: poId,
       poNumber,
+      status: 'draft',
+      totalAmount,
     });
   } catch (error) {
     log.error('Failed to create purchase order', error);
