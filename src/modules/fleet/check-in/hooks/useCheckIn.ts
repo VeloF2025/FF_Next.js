@@ -92,7 +92,7 @@ interface UseCheckInReturn {
 
   // Actions
   loadTemplate: (checkType?: CheckType, templateId?: string) => Promise<void>;
-  processPhotoWithVlm: (type: CheckPhotoType) => Promise<void>;
+  processPhotoWithVlm: (type: CheckPhotoType, photoDataUrl?: string) => Promise<void>;
   submit: () => Promise<CheckRecord | null>;
   reset: () => void;
 
@@ -257,9 +257,11 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   }, []);
 
   // Process photo with VLM
-  const processPhotoWithVlm = useCallback(async (type: CheckPhotoType) => {
-    const photo = formState.photos.get(type);
-    if (!photo) return;
+  // photoDataUrl can be passed directly to avoid stale state issues from setTimeout
+  const processPhotoWithVlm = useCallback(async (type: CheckPhotoType, photoDataUrl?: string) => {
+    // Use passed dataUrl or fall back to state (for manual retriggers)
+    const dataUrl = photoDataUrl || formState.photos.get(type)?.dataUrl;
+    if (!dataUrl) return;
 
     // Find VLM type for this photo
     const photoConfig = requiredPhotos.find(p => p.type === type);
@@ -282,7 +284,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
 
     try {
       // Extract base64 from data URL
-      const base64 = photo.dataUrl.split(',')[1];
+      const base64 = dataUrl.split(',')[1];
 
       const response = await fetch('/api/fleet/check-in/process-vlm', {
         method: 'POST',
@@ -299,8 +301,11 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
 
       const data = await response.json();
 
-      if (data.success && data.result) {
-        const result = data.result;
+      // API wraps response in { success, data, meta } - extract the inner data
+      const vlmData = data.data || data;
+
+      if (vlmData.success && vlmData.result) {
+        const result = vlmData.result;
 
         // Update VLM result
         setVlmResults(prev => {
@@ -337,7 +342,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
             extractedNumeric: null,
             confidence: 0,
             isProcessing: false,
-            error: data.result?.error || 'VLM processing failed',
+            error: vlmData.result?.error || 'VLM processing failed',
           });
           return newResults;
         });

@@ -47,7 +47,7 @@ export type CheckItemCategory = 'safety' | 'mechanical' | 'exterior' | 'interior
 /**
  * VLM analysis types
  */
-export type VlmAnalysisType = 'odometer' | 'license_plate' | 'fuel_gauge' | 'damage';
+export type VlmAnalysisType = 'odometer' | 'license_plate' | 'fuel_gauge' | 'fuel_receipt' | 'damage';
 
 /**
  * VLM processing status
@@ -412,6 +412,42 @@ export interface FuelGaugeExtractionResult {
   level: number | null; // 0-100 percentage
   confidence: number;
   description: string; // "Empty", "Quarter", "Half", "Three-quarters", "Full"
+  error?: string;
+}
+
+/**
+ * VLM extraction result for fuel receipt OCR
+ * Extracts: amount, litres, price per litre, date, station name/location
+ */
+export interface FuelReceiptExtractionResult {
+  amountRand: number | null;
+  litres: number | null;
+  pricePerLitre: number | null;
+  date: string | null; // YYYY-MM-DD format
+  stationName: string | null;
+  stationLocation: string | null;
+  fuelType: string | null; // 93, 95, Diesel
+  confidence: number;
+  error?: string;
+}
+
+/**
+ * VLM extraction result for licence disk OCR
+ * South African licence disk contains: VIN, Engine No, Make, Description, Tare, GVM, Expiry
+ */
+export interface LicenseDiskExtractionResult {
+  registration: string | null;
+  vin: string | null;
+  engineNumber: string | null;
+  make: string | null;
+  description: string | null; // Model/description
+  year: number | null;
+  tare: number | null; // Tare mass in kg
+  gvm: number | null; // Gross Vehicle Mass in kg
+  licenseExpiry: string | null; // YYYY-MM-DD format
+  color: string | null;
+  confidence: number;
+  rawText: string;
   error?: string;
 }
 

@@ -84,8 +84,8 @@ export function CheckInForm({
     // Auto-process VLM for dashboard and fuel_gauge photos
     const photoConfig = requiredPhotos.find(p => p.type === type);
     if (photoConfig?.vlmType) {
-      // Small delay to ensure state is updated
-      setTimeout(() => processPhotoWithVlm(type), 100);
+      // Pass dataUrl directly to avoid stale state issues
+      processPhotoWithVlm(type, dataUrl);
     }
   };
 

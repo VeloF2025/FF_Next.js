@@ -38,6 +38,9 @@ import {
   Camera,
   CheckCircle,
   TrendingUp,
+  Pencil,
+  Receipt,
+  ImageIcon,
 } from 'lucide-react';
 import type {
   VehicleDocument,
@@ -87,7 +90,7 @@ interface Investigation {
   createdAt: string;
 }
 
-type TabId = 'overview' | 'odometer' | 'ownership' | 'documents' | 'insurance';
+type TabId = 'overview' | 'odometer' | 'fuel' | 'ownership' | 'documents' | 'insurance';
 
 interface OdometerReading {
   id: string;
@@ -109,6 +112,83 @@ interface OdometerAnomaly {
   severity: 'warning' | 'critical';
   resolved: boolean;
   detectedAt: string;
+}
+
+interface FuelReading {
+  id: string;
+  vehicleId: string;
+  fuelLevel: number;
+  source: 'manual' | 'vlm';
+  vlmConfidence: number | null;
+  previousLevel: number | null;
+  levelChange: number | null;
+  recordedAt: string;
+}
+
+interface FuelTransaction {
+  id: string;
+  vehicleId: string;
+  transactionDate: string;
+  amountRand: number;
+  litres: number;
+  pricePerLitre: number | null;
+  odometerReading: number | null;
+  kmSinceLastFill: number | null;
+  litresPer100km: number | null;
+  stationName: string | null;
+  stationLocation: string | null;
+  receiptPhotoUrl: string | null;
+  odometerPhotoUrl: string | null;
+  vlmExtracted: boolean;
+  vlmConfidence: number | null;
+  vlmVerified: boolean;
+  source: 'manual' | 'vlm' | 'hybrid';
+  createdAt: string;
+}
+
+interface FuelSummary {
+  totalSpent: number;
+  totalLitres: number;
+  avgConsumption: number | null;
+  transactionCount: number;
+}
+
+interface VehicleStatistics {
+  odometer: {
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    lastMonth: number;
+    total: number;
+    averagePerDay: number;
+    latestReading: number;
+    earliestReading: number;
+    readingsCount: number;
+  };
+  fuel: {
+    currentLevel: number | null;
+    averageLevel: number | null;
+    lowestLevel: number;
+    highestLevel: number;
+    readingsCount: number;
+  };
+  checkIns: {
+    totalCheckIns: number;
+    thisMonth: number;
+    lastCheckIn: string | null;
+    passRate: number;
+    criticalIssuesCount: number;
+  };
+  customRange: {
+    startDate: string;
+    endDate: string;
+    totalKm: number;
+    startReading: number;
+    endReading: number;
+    readingsCount: number;
+    daysInRange: number;
+    averagePerDay: number;
+  } | null;
 }
 
 interface AssignedDriver {
@@ -1181,6 +1261,8 @@ function OdometerTab({
   odometerHistory,
   odometerAnomalies,
   anomalySummary,
+  fuelHistory,
+  vehicleStats,
   loading,
   onRefresh,
 }: {
@@ -1188,6 +1270,8 @@ function OdometerTab({
   odometerHistory: OdometerReading[];
   odometerAnomalies: OdometerAnomaly[];
   anomalySummary: { unresolved: number; criticalUnresolved: number };
+  fuelHistory: FuelReading[];
+  vehicleStats: VehicleStatistics | null;
   loading: boolean;
   onRefresh: () => void;
 }) {
@@ -1240,6 +1324,48 @@ function OdometerTab({
 
   return (
     <div className="space-y-6">
+      {/* KM Travelled Statistics */}
+      {vehicleStats && vehicleStats.odometer.readingsCount > 0 && (
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow p-6 text-white">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" />
+            Distance Travelled
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-xs text-white/70 uppercase">Today</p>
+              <p className="text-2xl font-bold">{vehicleStats.odometer.today.toLocaleString()} km</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-xs text-white/70 uppercase">This Week</p>
+              <p className="text-2xl font-bold">{vehicleStats.odometer.thisWeek.toLocaleString()} km</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-xs text-white/70 uppercase">This Month</p>
+              <p className="text-2xl font-bold">{vehicleStats.odometer.thisMonth.toLocaleString()} km</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-xs text-white/70 uppercase">Last Month</p>
+              <p className="text-2xl font-bold">{vehicleStats.odometer.lastMonth.toLocaleString()} km</p>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-6 text-sm text-white/80">
+            <div className="flex items-center gap-2">
+              <Gauge className="w-4 h-4" />
+              <span>Latest: {vehicleStats.odometer.latestReading.toLocaleString()} km</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>Avg per day: {vehicleStats.odometer.averagePerDay.toLocaleString()} km</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              <span>{vehicleStats.checkIns.totalCheckIns} check-ins ({vehicleStats.checkIns.passRate}% pass rate)</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Card */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
         <div className="flex items-center justify-between mb-4">
@@ -1424,6 +1550,139 @@ function OdometerTab({
         )}
       </div>
 
+      {/* Fuel History Section */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4 flex items-center gap-2">
+          <Fuel className="w-5 h-5 text-amber-500" />
+          Fuel Level History
+        </h2>
+
+        {fuelHistory.length === 0 ? (
+          <div className="text-center py-8">
+            <Fuel className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-2" />
+            <p className="text-[var(--ff-text-secondary)]">No fuel readings recorded</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Fuel levels are captured during vehicle check-ins</p>
+          </div>
+        ) : (
+          <>
+            {/* Latest Fuel Summary */}
+            <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Current Level</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${
+                        fuelHistory[0].fuelLevel > 50 ? 'bg-green-500' :
+                        fuelHistory[0].fuelLevel > 25 ? 'bg-amber-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${fuelHistory[0].fuelLevel}%` }}
+                    />
+                  </div>
+                  <span className="font-bold text-[var(--ff-text-primary)] whitespace-nowrap">
+                    {fuelHistory[0].fuelLevel}%
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+                  {formatDate(fuelHistory[0].recordedAt)} via {fuelHistory[0].source}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Last Change</p>
+                <p className={`text-xl font-bold ${
+                  fuelHistory[0].levelChange !== null
+                    ? fuelHistory[0].levelChange > 0 ? 'text-green-600' :
+                      fuelHistory[0].levelChange < 0 ? 'text-red-600' : 'text-gray-600'
+                    : 'text-[var(--ff-text-tertiary)]'
+                }`}>
+                  {fuelHistory[0].levelChange !== null
+                    ? `${fuelHistory[0].levelChange > 0 ? '+' : ''}${fuelHistory[0].levelChange}%`
+                    : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-1">Readings</p>
+                <p className="text-xl font-bold text-[var(--ff-text-primary)]">
+                  {fuelHistory.length}
+                </p>
+              </div>
+            </div>
+
+            {/* Fuel History Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[var(--ff-border-light)]">
+                    <th className="text-left py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Date</th>
+                    <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Level</th>
+                    <th className="text-right py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Change</th>
+                    <th className="text-center py-2 px-3 text-sm font-medium text-[var(--ff-text-secondary)]">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fuelHistory.map((reading) => (
+                    <tr key={reading.id} className="border-b border-[var(--ff-border-light)]">
+                      <td className="py-3 px-3 text-sm text-[var(--ff-text-primary)]">
+                        {formatDate(reading.recordedAt)}
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2 justify-center">
+                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${
+                                reading.fuelLevel > 50 ? 'bg-green-500' :
+                                reading.fuelLevel > 25 ? 'bg-amber-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${reading.fuelLevel}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-[var(--ff-text-primary)]">
+                            {reading.fuelLevel}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-sm text-right">
+                        {reading.levelChange !== null ? (
+                          <span className={`font-medium ${
+                            reading.levelChange > 0 ? 'text-green-600' :
+                            reading.levelChange < 0 ? 'text-red-600' : 'text-gray-600'
+                          }`}>
+                            {reading.levelChange > 0 ? '+' : ''}{reading.levelChange}%
+                          </span>
+                        ) : (
+                          <span className="text-[var(--ff-text-tertiary)]">-</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-sm text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                          reading.source === 'vlm'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {reading.source === 'vlm' ? (
+                            <>
+                              <Camera className="w-3 h-3" />
+                              VLM
+                              {reading.vlmConfidence && (
+                                <span className="ml-1 opacity-75">
+                                  ({Math.round(reading.vlmConfidence * 100)}%)
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            'Manual'
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Add Reading Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1500,6 +1759,818 @@ function OdometerTab({
   );
 }
 
+function FuelSpendTab({
+  vehicleId,
+  transactions,
+  summary,
+  loading,
+  onRefresh,
+}: {
+  vehicleId: string;
+  transactions: FuelTransaction[];
+  summary: FuelSummary | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<FuelTransaction | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null);
+  const [receiptPhotoFile, setReceiptPhotoFile] = useState<File | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [formData, setFormData] = useState({
+    transactionDate: new Date().toISOString().split('T')[0],
+    amountRand: '',
+    litres: '',
+    pricePerLitre: '',
+    odometerReading: '',
+    stationName: '',
+  });
+  const [vlmResults, setVlmResults] = useState<{
+    receipt?: {
+      amountRand: number | null;
+      litres: number | null;
+      pricePerLitre: number | null;
+      date: string | null;
+      stationName: string | null;
+      confidence: number;
+    };
+    odometer?: {
+      reading: number | null;
+      confidence: number;
+    };
+  } | null>(null);
+
+  // Upload photo to server and get URL
+  const uploadReceiptPhoto = async (file: File): Promise<string | null> => {
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', `fleet/vehicles/${vehicleId}/fuel-receipts`);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return data.data?.url || data.url || null;
+      }
+      return null;
+    } catch (err) {
+      console.error('Upload error:', err);
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleReceiptFileSelect = async (file: File) => {
+    setReceiptPhotoFile(file);
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setReceiptPhotoUrl(previewUrl);
+  };
+
+  const handleScanReceipt = async (receiptBase64: string, odometerBase64?: string) => {
+    setScanning(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${vehicleId}/fuel-transactions?action=scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receiptPhotoBase64: receiptBase64,
+          odometerPhotoBase64: odometerBase64,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const results = data.data?.vlmResults;
+        setVlmResults(results);
+
+        // Pre-fill form with VLM results
+        if (results?.receipt) {
+          setFormData(prev => ({
+            ...prev,
+            transactionDate: results.receipt.date || prev.transactionDate,
+            amountRand: results.receipt.amountRand?.toString() || prev.amountRand,
+            litres: results.receipt.litres?.toString() || prev.litres,
+            pricePerLitre: results.receipt.pricePerLitre?.toString() || prev.pricePerLitre,
+            stationName: results.receipt.stationName || prev.stationName,
+          }));
+        }
+        if (results?.odometer?.reading) {
+          setFormData(prev => ({
+            ...prev,
+            odometerReading: results.odometer.reading.toString(),
+          }));
+        }
+        toast.success('Receipt scanned! Please review and confirm the details.');
+      } else {
+        toast.error('Failed to scan receipt');
+      }
+    } catch (err) {
+      toast.error('Failed to scan receipt');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    const amount = parseFloat(formData.amountRand);
+    const litres = parseFloat(formData.litres);
+
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    if (isNaN(litres) || litres <= 0) {
+      toast.error('Please enter valid litres');
+      return;
+    }
+
+    // For manual entries, receipt photo is required
+    if (!vlmResults && !receiptPhotoFile) {
+      toast.error('Receipt photo is required for manual entries');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Upload receipt photo if we have a file
+      let uploadedReceiptUrl = receiptPhotoUrl;
+      if (receiptPhotoFile) {
+        const uploaded = await uploadReceiptPhoto(receiptPhotoFile);
+        if (!uploaded) {
+          toast.error('Failed to upload receipt photo');
+          return;
+        }
+        uploadedReceiptUrl = uploaded;
+      }
+
+      const res = await fetch(`/api/fleet/vehicles/${vehicleId}/fuel-transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionDate: formData.transactionDate,
+          amountRand: amount,
+          litres: litres,
+          pricePerLitre: formData.pricePerLitre ? parseFloat(formData.pricePerLitre) : undefined,
+          odometerReading: formData.odometerReading ? parseInt(formData.odometerReading, 10) : undefined,
+          stationName: formData.stationName || undefined,
+          receiptPhotoUrl: uploadedReceiptUrl || undefined,
+          source: vlmResults ? 'hybrid' : 'manual',
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to add transaction');
+        return;
+      }
+
+      toast.success('Fuel transaction added');
+      resetForm();
+      onRefresh();
+    } catch (err) {
+      toast.error('Failed to add transaction');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    setEditingTransaction(null);
+    setFormData({
+      transactionDate: new Date().toISOString().split('T')[0],
+      amountRand: '',
+      litres: '',
+      pricePerLitre: '',
+      odometerReading: '',
+      stationName: '',
+    });
+    setVlmResults(null);
+    setReceiptPhotoUrl(null);
+    setReceiptPhotoFile(null);
+  };
+
+  const handleEdit = (tx: FuelTransaction) => {
+    setEditingTransaction(tx);
+    setFormData({
+      transactionDate: tx.transactionDate.split('T')[0],
+      amountRand: tx.amountRand.toString(),
+      litres: tx.litres.toString(),
+      pricePerLitre: tx.pricePerLitre?.toString() || '',
+      odometerReading: tx.odometerReading?.toString() || '',
+      stationName: tx.stationName || '',
+    });
+    setReceiptPhotoUrl(tx.receiptPhotoUrl);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateSubmit = async () => {
+    if (!editingTransaction) return;
+
+    const amount = parseFloat(formData.amountRand);
+    const litres = parseFloat(formData.litres);
+
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    if (isNaN(litres) || litres <= 0) {
+      toast.error('Please enter valid litres');
+      return;
+    }
+
+    // For manual entries without existing receipt, require upload
+    if (editingTransaction.source === 'manual' && !editingTransaction.receiptPhotoUrl && !receiptPhotoFile) {
+      toast.error('Receipt photo is required');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Upload new receipt photo if provided
+      let uploadedReceiptUrl = receiptPhotoUrl;
+      if (receiptPhotoFile) {
+        const uploaded = await uploadReceiptPhoto(receiptPhotoFile);
+        if (!uploaded) {
+          toast.error('Failed to upload receipt photo');
+          return;
+        }
+        uploadedReceiptUrl = uploaded;
+      }
+
+      const res = await fetch(`/api/fleet/vehicles/${vehicleId}/fuel-transactions`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: editingTransaction.id,
+          transactionDate: formData.transactionDate,
+          amountRand: amount,
+          litres: litres,
+          pricePerLitre: formData.pricePerLitre ? parseFloat(formData.pricePerLitre) : undefined,
+          odometerReading: formData.odometerReading ? parseInt(formData.odometerReading, 10) : undefined,
+          stationName: formData.stationName || undefined,
+          receiptPhotoUrl: uploadedReceiptUrl || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to update transaction');
+        return;
+      }
+
+      toast.success('Fuel transaction updated');
+      resetForm();
+      onRefresh();
+    } catch (err) {
+      toast.error('Failed to update transaction');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(value);
+
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-32 bg-[var(--ff-bg-tertiary)] rounded-lg"></div>
+        <div className="h-64 bg-[var(--ff-bg-tertiary)] rounded-lg"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg p-4 text-white">
+            <p className="text-xs text-white/70 uppercase">Total Spent</p>
+            <p className="text-2xl font-bold">{formatCurrency(summary.totalSpent)}</p>
+          </div>
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg p-4 text-white">
+            <p className="text-xs text-white/70 uppercase">Total Litres</p>
+            <p className="text-2xl font-bold">{summary.totalLitres.toFixed(1)} L</p>
+          </div>
+          <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg p-4 text-white">
+            <p className="text-xs text-white/70 uppercase">Avg Consumption</p>
+            <p className="text-2xl font-bold">
+              {summary.avgConsumption ? `${summary.avgConsumption.toFixed(1)} L/100km` : '-'}
+            </p>
+          </div>
+          <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg p-4 text-white">
+            <p className="text-xs text-white/70 uppercase">Transactions</p>
+            <p className="text-2xl font-bold">{summary.transactionCount}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Actions Bar */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+            <Fuel className="w-5 h-5 text-[var(--ff-primary)]" />
+            Fuel Transactions
+          </h2>
+          <div className="flex gap-2">
+            <button
+              onClick={onRefresh}
+              className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-3 py-1.5 text-sm bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              Add Fill-up
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Transactions List */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
+        {transactions.length === 0 ? (
+          <div className="text-center py-8">
+            <Fuel className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-2" />
+            <p className="text-[var(--ff-text-secondary)]">No fuel transactions recorded</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Add your first fill-up to start tracking</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--ff-border-light)]">
+                  <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Date</th>
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Amount</th>
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Litres</th>
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Price/L</th>
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Odometer</th>
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">L/100km</th>
+                  <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Station</th>
+                  <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Source</th>
+                  <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Receipt</th>
+                  <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase py-3 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx) => (
+                  <tr key={tx.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-primary)]">{formatDate(tx.transactionDate)}</td>
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-primary)] text-right font-medium">{formatCurrency(tx.amountRand)}</td>
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-primary)] text-right">{tx.litres.toFixed(2)} L</td>
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-secondary)] text-right">
+                      {tx.pricePerLitre ? `R${tx.pricePerLitre.toFixed(2)}` : '-'}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-secondary)] text-right">
+                      {tx.odometerReading ? `${tx.odometerReading.toLocaleString()} km` : '-'}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-secondary)] text-right">
+                      {tx.litresPer100km ? `${tx.litresPer100km.toFixed(1)}` : '-'}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-[var(--ff-text-secondary)]">{tx.stationName || '-'}</td>
+                    <td className="py-3 px-4 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        tx.source === 'vlm'
+                          ? 'bg-purple-100 text-purple-700'
+                          : tx.source === 'hybrid'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {tx.source === 'vlm' ? 'VLM' : tx.source === 'hybrid' ? 'VLM+Manual' : 'Manual'}
+                      </span>
+                    </td>
+                    {/* Receipt Column */}
+                    <td className="py-3 px-4 text-center">
+                      {tx.receiptPhotoUrl ? (
+                        <a
+                          href={tx.receiptPhotoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                          title="View receipt"
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center justify-center p-1.5 rounded-lg bg-gray-100 text-gray-400" title="No receipt">
+                          <ImageIcon className="w-4 h-4" />
+                        </span>
+                      )}
+                    </td>
+                    {/* Actions Column */}
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => handleEdit(tx)}
+                        className="inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)] transition-colors"
+                        title="Edit transaction"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Add Transaction Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Add Fuel Fill-up</h3>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setVlmResults(null);
+                  }}
+                  className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Photo Upload Section */}
+              <div className="mb-6 p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                <p className="text-sm font-medium text-[var(--ff-text-primary)] mb-2 flex items-center gap-2">
+                  <Camera className="w-4 h-4" />
+                  Scan Receipt (Optional)
+                </p>
+                <p className="text-xs text-[var(--ff-text-secondary)] mb-3">
+                  Upload a receipt photo to automatically extract the details using AI
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="block w-full text-sm text-[var(--ff-text-secondary)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--ff-primary)] file:text-white hover:file:bg-[var(--ff-primary-dark)]"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = async () => {
+                        const base64 = (reader.result as string).split(',')[1];
+                        await handleScanReceipt(base64);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  disabled={scanning}
+                />
+                {scanning && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-[var(--ff-primary)]">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Scanning receipt...
+                  </div>
+                )}
+                {vlmResults?.receipt && (
+                  <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded text-sm text-green-700 dark:text-green-400 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Receipt scanned ({Math.round((vlmResults.receipt.confidence || 0) * 100)}% confidence)
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Entry Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Date *</label>
+                  <input
+                    type="date"
+                    value={formData.transactionDate}
+                    onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Amount (Rand) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="850.50"
+                      value={formData.amountRand}
+                      onChange={(e) => setFormData({ ...formData, amountRand: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Litres *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="45.25"
+                      value={formData.litres}
+                      onChange={(e) => setFormData({ ...formData, litres: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Price per Litre</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="18.79"
+                      value={formData.pricePerLitre}
+                      onChange={(e) => setFormData({ ...formData, pricePerLitre: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Odometer (km)</label>
+                    <input
+                      type="number"
+                      placeholder="125000"
+                      value={formData.odometerReading}
+                      onChange={(e) => setFormData({ ...formData, odometerReading: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Station Name</label>
+                  <input
+                    type="text"
+                    placeholder="Shell, BP, Engen..."
+                    value={formData.stationName}
+                    onChange={(e) => setFormData({ ...formData, stationName: e.target.value })}
+                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+
+                {/* Receipt Upload for Manual Entries */}
+                {!vlmResults && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+                      <Receipt className="w-4 h-4" />
+                      Receipt Photo {!vlmResults ? '*' : ''}
+                    </label>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-3">
+                      Required for manual entries. Take a photo or upload an image of the receipt.
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="block w-full text-sm text-[var(--ff-text-secondary)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-500 file:text-white hover:file:bg-amber-600"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleReceiptFileSelect(file);
+                      }}
+                    />
+                    {receiptPhotoUrl && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                        <CheckCircle className="w-4 h-4" />
+                        Receipt selected
+                      </div>
+                    )}
+                    {uploadingPhoto && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setVlmResults(null);
+                  }}
+                  className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Transaction
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Transaction Modal */}
+      {showEditModal && editingTransaction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Edit Fuel Transaction</h3>
+                <button
+                  onClick={resetForm}
+                  className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Current Receipt Preview */}
+              {(editingTransaction.receiptPhotoUrl || receiptPhotoUrl) && (
+                <div className="mb-4 p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-xs text-[var(--ff-text-secondary)] mb-2">Current Receipt:</p>
+                  <a
+                    href={receiptPhotoUrl || editingTransaction.receiptPhotoUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-[var(--ff-primary)] hover:underline flex items-center gap-1"
+                  >
+                    <Receipt className="w-4 h-4" />
+                    View receipt
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
+
+              {/* Edit Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Date *</label>
+                  <input
+                    type="date"
+                    value={formData.transactionDate}
+                    onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Amount (Rand) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="850.50"
+                      value={formData.amountRand}
+                      onChange={(e) => setFormData({ ...formData, amountRand: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Litres *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="45.25"
+                      value={formData.litres}
+                      onChange={(e) => setFormData({ ...formData, litres: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Price per Litre</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="18.79"
+                      value={formData.pricePerLitre}
+                      onChange={(e) => setFormData({ ...formData, pricePerLitre: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Odometer (km)</label>
+                    <input
+                      type="number"
+                      placeholder="125000"
+                      value={formData.odometerReading}
+                      onChange={(e) => setFormData({ ...formData, odometerReading: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Station Name</label>
+                  <input
+                    type="text"
+                    placeholder="Shell, BP, Engen..."
+                    value={formData.stationName}
+                    onChange={(e) => setFormData({ ...formData, stationName: e.target.value })}
+                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+
+                {/* Upload New Receipt */}
+                {editingTransaction.source === 'manual' && (
+                  <div className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2 flex items-center gap-2">
+                      <Camera className="w-4 h-4" />
+                      {editingTransaction.receiptPhotoUrl ? 'Replace Receipt Photo' : 'Add Receipt Photo *'}
+                    </label>
+                    <p className="text-xs text-[var(--ff-text-tertiary)] mb-3">
+                      {editingTransaction.receiptPhotoUrl
+                        ? 'Upload a new photo to replace the current receipt'
+                        : 'Receipt photo is required for manual entries'}
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="block w-full text-sm text-[var(--ff-text-secondary)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--ff-primary)] file:text-white hover:file:bg-[var(--ff-primary-dark)]"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleReceiptFileSelect(file);
+                      }}
+                    />
+                    {receiptPhotoFile && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                        <CheckCircle className="w-4 h-4" />
+                        New receipt selected
+                      </div>
+                    )}
+                    {uploadingPhoto && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-[var(--ff-primary)]">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={resetForm}
+                  className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateSubmit}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] disabled:opacity-50 flex items-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Update Transaction
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -1538,6 +2609,17 @@ export default function VehicleDetailPage() {
   const [odometerAnomalies, setOdometerAnomalies] = useState<OdometerAnomaly[]>([]);
   const [loadingOdometer, setLoadingOdometer] = useState(false);
   const [anomalySummary, setAnomalySummary] = useState<{ unresolved: number; criticalUnresolved: number }>({ unresolved: 0, criticalUnresolved: 0 });
+
+  // Fuel history data
+  const [fuelHistory, setFuelHistory] = useState<FuelReading[]>([]);
+
+  // Fuel transactions data (spend tracking)
+  const [fuelTransactions, setFuelTransactions] = useState<FuelTransaction[]>([]);
+  const [fuelSummary, setFuelSummary] = useState<FuelSummary | null>(null);
+  const [fuelLoading, setFuelLoading] = useState(false);
+
+  // Vehicle statistics
+  const [vehicleStats, setVehicleStats] = useState<VehicleStatistics | null>(null);
 
   // Driver assignment data
   const [assignedDriver, setAssignedDriver] = useState<AssignedDriver | null>(null);
@@ -1665,9 +2747,11 @@ export default function VehicleDetailPage() {
     if (!id) return;
     setLoadingOdometer(true);
     try {
-      const [historyRes, anomaliesRes] = await Promise.all([
+      const [historyRes, anomaliesRes, fuelRes, statsRes] = await Promise.all([
         fetch(`/api/fleet/vehicles/${id}/odometer?limit=20`),
         fetch(`/api/fleet/vehicles/${id}/odometer-anomalies?resolved=false&limit=10`),
+        fetch(`/api/fleet/vehicles/${id}/fuel?limit=20`),
+        fetch(`/api/fleet/vehicles/${id}/stats`),
       ]);
 
       if (historyRes.ok) {
@@ -1683,6 +2767,14 @@ export default function VehicleDetailPage() {
             criticalUnresolved: anomaliesData.meta.summary.criticalUnresolved || 0,
           });
         }
+      }
+      if (fuelRes.ok) {
+        const fuelData = await fuelRes.json();
+        setFuelHistory(fuelData.data || []);
+      }
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setVehicleStats(statsData.data || null);
       }
     } catch (err) {
       console.error('Failed to fetch odometer data:', err);
@@ -1709,6 +2801,24 @@ export default function VehicleDetailPage() {
       console.error('Failed to fetch assignment data:', err);
     } finally {
       setLoadingAssignment(false);
+    }
+  }, [id]);
+
+  // Fetch fuel transaction data
+  const fetchFuelTransactions = useCallback(async () => {
+    if (!id) return;
+    setFuelLoading(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${id}/fuel-transactions?limit=50`);
+      if (res.ok) {
+        const data = await res.json();
+        setFuelTransactions(data.data?.transactions || []);
+        setFuelSummary(data.data?.summary || null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch fuel transactions:', err);
+    } finally {
+      setFuelLoading(false);
     }
   }, [id]);
 
@@ -1822,6 +2932,9 @@ export default function VehicleDetailPage() {
       case 'odometer':
         fetchOdometerData();
         break;
+      case 'fuel':
+        fetchFuelTransactions();
+        break;
       case 'ownership':
         fetchOwnershipData();
         break;
@@ -1832,7 +2945,7 @@ export default function VehicleDetailPage() {
         fetchInsuranceData();
         break;
     }
-  }, [activeTab, vehicle, fetchOdometerData, fetchOwnershipData, fetchDocumentsData, fetchInsuranceData]);
+  }, [activeTab, vehicle, fetchOdometerData, fetchFuelTransactions, fetchOwnershipData, fetchDocumentsData, fetchInsuranceData]);
 
   const handleSave = async () => {
     if (!vehicle) return;
@@ -1982,6 +3095,7 @@ export default function VehicleDetailPage() {
   const tabs: { id: TabId; label: string; icon: typeof Car }[] = [
     { id: 'overview', label: 'Overview', icon: Car },
     { id: 'odometer', label: 'Odometer', icon: Gauge },
+    { id: 'fuel', label: 'Fuel Spend', icon: Fuel },
     { id: 'ownership', label: 'Ownership', icon: Building2 },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'insurance', label: 'Insurance', icon: Shield },
@@ -2203,8 +3317,19 @@ export default function VehicleDetailPage() {
                 odometerHistory={odometerHistory}
                 odometerAnomalies={odometerAnomalies}
                 anomalySummary={anomalySummary}
+                fuelHistory={fuelHistory}
+                vehicleStats={vehicleStats}
                 loading={loadingOdometer}
                 onRefresh={fetchOdometerData}
+              />
+            )}
+            {activeTab === 'fuel' && (
+              <FuelSpendTab
+                vehicleId={vehicle.id}
+                transactions={fuelTransactions}
+                summary={fuelSummary}
+                loading={fuelLoading}
+                onRefresh={fetchFuelTransactions}
               />
             )}
             {activeTab === 'ownership' && (

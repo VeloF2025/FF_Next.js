@@ -3,16 +3,16 @@
  * Mobile-first driver check-in interface
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Car, Loader2, Search, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Car, Loader2, Search, AlertTriangle, CheckCircle, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout';
 import { CheckInForm } from '@/modules/fleet/check-in/components/CheckInForm';
 import { CheckInSummary } from '@/modules/fleet/check-in/components/CheckInSummary';
 import { OfflineIndicator } from '@/modules/fleet/check-in/components/OfflineIndicator';
-import type { CheckRecord, VehicleAvailabilityResult } from '@/modules/fleet/types/check-in.types';
+import type { CheckRecord, VehicleAvailabilityResult, CheckType } from '@/modules/fleet/types/check-in.types';
 
 interface Vehicle {
   id: string;
@@ -27,6 +27,11 @@ export default function CheckInPage() {
   const router = useRouter();
   const { currentUser } = useAuth();
 
+  // URL params - vehicle pre-selected from portal
+  const urlVehicleId = router.query.vehicleId as string | undefined;
+  const urlCheckType = router.query.type as CheckType | undefined;
+  const isVehicleLocked = Boolean(urlVehicleId); // Lock selection when coming from portal
+
   const [pageState, setPageState] = useState<PageState>('select-vehicle');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -35,8 +40,41 @@ export default function CheckInPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [checkType, setCheckType] = useState<CheckType>('daily');
 
-  // Load vehicles
+  // Auto-select vehicle from URL params
+  const autoSelectVehicle = useCallback(async (vehicleId: string) => {
+    try {
+      // Fetch vehicle details (uses query param, not path param)
+      const response = await fetch(`/api/fleet/vehicles?id=${vehicleId}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Vehicle not found');
+
+      const vehicleData = data.data;
+      const vehicle: Vehicle = {
+        id: vehicleData.id,
+        registration: vehicleData.registration,
+        make: vehicleData.make,
+        model: vehicleData.model,
+      };
+
+      setSelectedVehicle(vehicle);
+
+      // Check availability
+      const availResponse = await fetch(`/api/fleet/check-in/vehicle/${vehicleId}?availability=true`);
+      const availData = await availResponse.json();
+      if (availResponse.ok) {
+        setVehicleAvailability(availData.data);
+      }
+
+      // Go directly to check-in
+      setPageState('check-in');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load vehicle');
+    }
+  }, []);
+
+  // Load vehicles (only if not pre-selected)
   useEffect(() => {
     async function loadVehicles() {
       try {
@@ -50,8 +88,24 @@ export default function CheckInPage() {
         setIsLoading(false);
       }
     }
-    loadVehicles();
-  }, []);
+
+    // Only load vehicle list if not coming from portal
+    if (!urlVehicleId) {
+      loadVehicles();
+    } else {
+      setIsLoading(false);
+    }
+  }, [urlVehicleId]);
+
+  // Handle URL params for pre-selected vehicle
+  useEffect(() => {
+    if (urlVehicleId && !selectedVehicle) {
+      autoSelectVehicle(urlVehicleId);
+    }
+    if (urlCheckType) {
+      setCheckType(urlCheckType);
+    }
+  }, [urlVehicleId, urlCheckType, selectedVehicle, autoSelectVehicle]);
 
   // Check vehicle availability when selected
   const handleVehicleSelect = async (vehicle: Vehicle) => {
@@ -75,12 +129,17 @@ export default function CheckInPage() {
     setPageState('complete');
   };
 
-  // Handle done - go back to vehicle selection
+  // Handle done - go back to portal or vehicle selection
   const handleDone = () => {
-    setSelectedVehicle(null);
-    setVehicleAvailability(null);
-    setCompletedRecord(null);
-    setPageState('select-vehicle');
+    if (isVehicleLocked) {
+      // If came from portal, go back to portal
+      router.push('/fleet/portal');
+    } else {
+      setSelectedVehicle(null);
+      setVehicleAvailability(null);
+      setCompletedRecord(null);
+      setPageState('select-vehicle');
+    }
   };
 
   // Filter vehicles by search term
@@ -176,6 +235,22 @@ export default function CheckInPage() {
         {/* Check-in form */}
         {pageState === 'check-in' && selectedVehicle && (
           <>
+            {/* Locked vehicle indicator (from portal) */}
+            {isVehicleLocked && (
+              <div className="mx-4 mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <span className="text-sm text-green-700 dark:text-green-400">
+                    Vehicle verified: <strong>{selectedVehicle.registration}</strong>
+                    {selectedVehicle.make && ` - ${selectedVehicle.make} ${selectedVehicle.model || ''}`}
+                  </span>
+                </div>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-1 ml-6">
+                  {checkType === 'daily' ? 'Daily' : 'Weekly'} check-in • Vehicle confirmed via plate scan
+                </p>
+              </div>
+            )}
+
             {/* Previous check-in warning */}
             {vehicleAvailability && !vehicleAvailability.canUse && (
               <div className="mx-4 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -209,6 +284,7 @@ export default function CheckInPage() {
               vehicleRegistration={selectedVehicle.registration}
               driverId={driverId}
               driverName={driverName}
+              initialCheckType={checkType}
               onComplete={handleCheckInComplete}
               onCancel={handleDone}
             />

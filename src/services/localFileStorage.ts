@@ -20,6 +20,8 @@ const STORAGE_CONFIG = {
   basePath: process.env.FILE_STORAGE_PATH || '/var/www/fibreflow/uploads',
   // Base URL for serving files (nginx serves /uploads from the basePath)
   baseUrl: process.env.FILE_STORAGE_URL || '/uploads',
+  // Fallback path for local development (public/uploads in project root)
+  localFallbackPath: path.join(process.cwd(), 'public', 'uploads'),
 };
 
 export class LocalFileStorageService {
@@ -92,30 +94,45 @@ export class LocalFileStorageService {
   }
 
   /**
-   * Check if a file exists
+   * Check if a file exists (checks both server path and local fallback)
    * @param storagePath - Relative path to the file
    */
   static async fileExists(storagePath: string): Promise<boolean> {
+    // Try server path first
     try {
-      const filePath = path.join(STORAGE_CONFIG.basePath, storagePath);
-      await fs.promises.access(filePath, fs.constants.F_OK);
+      const serverPath = path.join(STORAGE_CONFIG.basePath, storagePath);
+      await fs.promises.access(serverPath, fs.constants.F_OK);
       return true;
     } catch {
-      return false;
+      // Try local fallback path (for development)
+      try {
+        const localPath = path.join(STORAGE_CONFIG.localFallbackPath, storagePath);
+        await fs.promises.access(localPath, fs.constants.F_OK);
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 
   /**
-   * Get file from local filesystem
+   * Get file from local filesystem (checks both server path and local fallback)
    * @param storagePath - Relative path to the file
    * @returns File buffer or null if not found
    */
   static async getFile(storagePath: string): Promise<Buffer | null> {
+    // Try server path first
     try {
-      const filePath = path.join(STORAGE_CONFIG.basePath, storagePath);
-      return await fs.promises.readFile(filePath);
+      const serverPath = path.join(STORAGE_CONFIG.basePath, storagePath);
+      return await fs.promises.readFile(serverPath);
     } catch {
-      return null;
+      // Try local fallback path (for development)
+      try {
+        const localPath = path.join(STORAGE_CONFIG.localFallbackPath, storagePath);
+        return await fs.promises.readFile(localPath);
+      } catch {
+        return null;
+      }
     }
   }
 

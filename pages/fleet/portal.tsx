@@ -1,0 +1,788 @@
+/**
+ * Fleet Vehicle Portal
+ * Unified entry point for all vehicle interactions
+ *
+ * Flow:
+ * 1. Driver captures license plate photo
+ * 2. VLM verifies plate and identifies vehicle
+ * 3. Driver selects action (Fuel, Daily Check-In, Weekly Check-In)
+ * 4. Appropriate form opens for selected action
+ */
+
+import React, { useState, useRef, useCallback } from 'react';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import toast from 'react-hot-toast';
+import {
+  Camera,
+  Car,
+  Fuel,
+  ClipboardCheck,
+  CalendarCheck,
+  Loader2,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Upload,
+  X,
+  Save,
+  Receipt,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+// Types
+interface Vehicle {
+  id: string;
+  registration: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  vehicleType: string;
+  color: string | null;
+  assignedStaffName: string | null;
+}
+
+interface PlateVerificationResult {
+  success: boolean;
+  extractedPlate: string;
+  confidence: number;
+  vehicle: Vehicle | null;
+  error?: string;
+}
+
+type PortalStep = 'capture' | 'verified' | 'fuel' | 'daily-check' | 'weekly-check';
+
+interface FuelFormData {
+  transactionDate: string;
+  amountRand: string;
+  litres: string;
+  pricePerLitre: string;
+  odometerReading: string;
+  stationName: string;
+}
+
+export default function VehiclePortalPage() {
+  const router = useRouter();
+  const { currentUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // State
+  const [step, setStep] = useState<PortalStep>('capture');
+  const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
+  const [platePhotoFile, setPlatePhotoFile] = useState<File | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<PlateVerificationResult | null>(null);
+  const [verifiedVehicle, setVerifiedVehicle] = useState<Vehicle | null>(null);
+
+  // Fuel form state
+  const [fuelForm, setFuelForm] = useState<FuelFormData>({
+    transactionDate: new Date().toISOString().split('T')[0],
+    amountRand: '',
+    litres: '',
+    pricePerLitre: '',
+    odometerReading: '',
+    stationName: '',
+  });
+  const [receiptPhotoFile, setReceiptPhotoFile] = useState<File | null>(null);
+  const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null);
+  const [scanningReceipt, setScanningReceipt] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Handle plate photo capture
+  const handlePlateCapture = useCallback(async (file: File) => {
+    setPlatePhotoFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setPlatePhotoUrl(previewUrl);
+
+    // Start verification
+    setVerifying(true);
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+
+        // Call VLM to verify plate
+        const response = await fetch('/api/fleet/portal/verify-plate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platePhotoBase64: base64 }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.data) {
+          setVerificationResult(data.data);
+          if (data.data.success && data.data.vehicle) {
+            setVerifiedVehicle(data.data.vehicle);
+            setStep('verified');
+            toast.success(`Vehicle verified: ${data.data.vehicle.registration}`);
+          } else {
+            toast.error(data.data.error || 'Could not verify plate');
+          }
+        } else {
+          toast.error(data.error || 'Verification failed');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      toast.error('Failed to verify plate');
+    } finally {
+      setVerifying(false);
+    }
+  }, []);
+
+  // Reset and try again
+  const handleReset = () => {
+    setStep('capture');
+    setPlatePhotoUrl(null);
+    setPlatePhotoFile(null);
+    setVerificationResult(null);
+    setVerifiedVehicle(null);
+    setFuelForm({
+      transactionDate: new Date().toISOString().split('T')[0],
+      amountRand: '',
+      litres: '',
+      pricePerLitre: '',
+      odometerReading: '',
+      stationName: '',
+    });
+    setReceiptPhotoFile(null);
+    setReceiptPhotoUrl(null);
+  };
+
+  // Handle action selection
+  const handleActionSelect = (action: 'fuel' | 'daily-check' | 'weekly-check') => {
+    setStep(action);
+  };
+
+  // Handle receipt scan with VLM
+  const handleReceiptScan = async (file: File) => {
+    setReceiptPhotoFile(file);
+    setReceiptPhotoUrl(URL.createObjectURL(file));
+    setScanningReceipt(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+
+        const response = await fetch(
+          `/api/fleet/vehicles/${verifiedVehicle?.id}/fuel-transactions?action=scan`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiptPhotoBase64: base64 }),
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const results = data.data?.vlmResults?.receipt;
+
+          if (results) {
+            setFuelForm((prev) => ({
+              ...prev,
+              transactionDate: results.date || prev.transactionDate,
+              amountRand: results.amountRand?.toString() || prev.amountRand,
+              litres: results.litres?.toString() || prev.litres,
+              pricePerLitre: results.pricePerLitre?.toString() || prev.pricePerLitre,
+              stationName: results.stationName || prev.stationName,
+            }));
+            toast.success(
+              `Receipt scanned (${Math.round((results.confidence || 0) * 100)}% confidence)`
+            );
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      toast.error('Failed to scan receipt');
+    } finally {
+      setScanningReceipt(false);
+    }
+  };
+
+  // Upload photo to server
+  const uploadPhoto = async (file: File, folder: string): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.data?.url || data.url || null;
+    }
+    return null;
+  };
+
+  // Submit fuel transaction
+  const handleFuelSubmit = async () => {
+    if (!verifiedVehicle) return;
+
+    const amount = parseFloat(fuelForm.amountRand);
+    const litres = parseFloat(fuelForm.litres);
+
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+    if (isNaN(litres) || litres <= 0) {
+      toast.error('Please enter valid litres');
+      return;
+    }
+    if (!receiptPhotoFile) {
+      toast.error('Receipt photo is required');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Upload receipt photo
+      const uploadedReceiptUrl = await uploadPhoto(
+        receiptPhotoFile,
+        `fleet/vehicles/${verifiedVehicle.id}/fuel-receipts`
+      );
+
+      if (!uploadedReceiptUrl) {
+        toast.error('Failed to upload receipt photo');
+        return;
+      }
+
+      // Create transaction
+      const response = await fetch(
+        `/api/fleet/vehicles/${verifiedVehicle.id}/fuel-transactions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transactionDate: fuelForm.transactionDate,
+            amountRand: amount,
+            litres: litres,
+            pricePerLitre: fuelForm.pricePerLitre
+              ? parseFloat(fuelForm.pricePerLitre)
+              : undefined,
+            odometerReading: fuelForm.odometerReading
+              ? parseInt(fuelForm.odometerReading, 10)
+              : undefined,
+            stationName: fuelForm.stationName || undefined,
+            receiptPhotoUrl: uploadedReceiptUrl,
+            source: 'hybrid',
+          }),
+        }
+      );
+
+      if (response.ok) {
+        toast.success('Fuel transaction recorded!');
+        handleReset();
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to save transaction');
+      }
+    } catch (err) {
+      toast.error('Failed to save transaction');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Navigate to check-in with vehicle pre-selected
+  const handleCheckInRedirect = (checkType: 'daily' | 'weekly') => {
+    if (verifiedVehicle) {
+      router.push(
+        `/fleet/check-in?vehicleId=${verifiedVehicle.id}&type=${checkType}`
+      );
+    }
+  };
+
+  return (
+    <>
+      <Head>
+        <title>Vehicle Portal | FibreFlow</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      </Head>
+
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        {/* Header */}
+        <div className="bg-white dark:bg-gray-800 shadow-sm">
+          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Car className="w-8 h-8 text-blue-600" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Vehicle Portal
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {currentUser?.displayName || 'Driver'}
+                </p>
+              </div>
+            </div>
+            {step !== 'capture' && (
+              <button
+                onClick={handleReset}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <RefreshCw className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-lg mx-auto px-4 py-6">
+          {/* Step 1: Capture Plate */}
+          {step === 'capture' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Camera className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  Scan License Plate
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Take a photo of the vehicle's license plate to get started
+                </p>
+              </div>
+
+              {/* Plate photo preview */}
+              {platePhotoUrl && (
+                <div className="relative">
+                  <img
+                    src={platePhotoUrl}
+                    alt="License plate"
+                    className="w-full h-48 object-cover rounded-xl shadow-lg"
+                  />
+                  {verifying && (
+                    <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <Loader2 className="w-10 h-10 animate-spin mx-auto mb-2" />
+                        <p>Verifying plate...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Verification error */}
+              {verificationResult && !verificationResult.success && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-red-800 dark:text-red-200">
+                        Verification Failed
+                      </p>
+                      <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                        {verificationResult.error || 'Could not identify vehicle'}
+                      </p>
+                      {verificationResult.extractedPlate && (
+                        <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                          Detected: {verificationResult.extractedPlate}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Capture buttons */}
+              <div className="space-y-3">
+                {/* Camera capture */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePlateCapture(file);
+                  }}
+                />
+                <button
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={verifying}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+                >
+                  <Camera className="w-6 h-6" />
+                  Take Photo
+                </button>
+
+                {/* File upload */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePlateCapture(file);
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={verifying}
+                  className="w-full py-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300 rounded-xl font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Upload className="w-6 h-6" />
+                  Upload from Gallery
+                </button>
+              </div>
+
+              {/* Info text */}
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                For best results, ensure the plate is clearly visible and well-lit
+              </p>
+            </div>
+          )}
+
+          {/* Step 2: Vehicle Verified - Action Selection */}
+          {step === 'verified' && verifiedVehicle && (
+            <div className="space-y-6">
+              {/* Success banner */}
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-8 h-8 text-green-500" />
+                  <div>
+                    <p className="font-bold text-green-800 dark:text-green-200 text-lg">
+                      Vehicle Verified
+                    </p>
+                    <p className="text-sm text-green-600 dark:text-green-300">
+                      {verificationResult?.confidence
+                        ? `${Math.round(verificationResult.confidence * 100)}% confidence`
+                        : 'Plate matched'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vehicle details card */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                    <Car className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {verifiedVehicle.registration}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {[verifiedVehicle.make, verifiedVehicle.model, verifiedVehicle.year]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </p>
+                    {verifiedVehicle.color && (
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+                        Color: {verifiedVehicle.color}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action selection */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  What would you like to do?
+                </h3>
+                <div className="space-y-3">
+                  {/* Fuel Fill-up */}
+                  <button
+                    onClick={() => handleActionSelect('fuel')}
+                    className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-green-400 dark:hover:border-green-500 rounded-xl flex items-center gap-4 transition-colors group"
+                  >
+                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Fuel className="w-7 h-7 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        Fuel Fill-up
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Record fuel purchase with receipt
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Daily Check-In */}
+                  <button
+                    onClick={() => handleCheckInRedirect('daily')}
+                    className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl flex items-center gap-4 transition-colors group"
+                  >
+                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <ClipboardCheck className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        Daily Check-In
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Quick pre-trip inspection
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Weekly Check-In */}
+                  <button
+                    onClick={() => handleCheckInRedirect('weekly')}
+                    className="w-full p-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-500 rounded-xl flex items-center gap-4 transition-colors group"
+                  >
+                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <CalendarCheck className="w-7 h-7 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-900 dark:text-white">
+                        Weekly Check-In
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Comprehensive weekly inspection
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Fuel Fill-up Form */}
+          {step === 'fuel' && verifiedVehicle && (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setStep('verified')}
+                  className="p-2 hover:bg-white/50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </button>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Fuel Fill-up
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {verifiedVehicle.registration}
+                  </p>
+                </div>
+              </div>
+
+              {/* Receipt scan section */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <Receipt className="w-5 h-5 text-green-600" />
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    Scan Receipt
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Take a photo of your fuel receipt to auto-fill the details
+                </p>
+
+                {receiptPhotoUrl ? (
+                  <div className="relative">
+                    <img
+                      src={receiptPhotoUrl}
+                      alt="Receipt"
+                      className="w-full h-40 object-cover rounded-lg"
+                    />
+                    {scanningReceipt && (
+                      <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                          <p className="text-sm">Scanning...</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setReceiptPhotoFile(null);
+                        setReceiptPhotoUrl(null);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      id="receipt-camera"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleReceiptScan(file);
+                      }}
+                    />
+                    <label
+                      htmlFor="receipt-camera"
+                      className="flex-1 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-5 h-5" />
+                      Camera
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="receipt-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleReceiptScan(file);
+                      }}
+                    />
+                    <label
+                      htmlFor="receipt-upload"
+                      className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Upload className="w-5 h-5" />
+                      Upload
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Form fields */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={fuelForm.transactionDate}
+                    onChange={(e) =>
+                      setFuelForm({ ...fuelForm, transactionDate: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Amount (R) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="850.50"
+                      value={fuelForm.amountRand}
+                      onChange={(e) =>
+                        setFuelForm({ ...fuelForm, amountRand: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Litres *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="45.25"
+                      value={fuelForm.litres}
+                      onChange={(e) =>
+                        setFuelForm({ ...fuelForm, litres: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Price/L
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="18.79"
+                      value={fuelForm.pricePerLitre}
+                      onChange={(e) =>
+                        setFuelForm({ ...fuelForm, pricePerLitre: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Odometer (km)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="125000"
+                      value={fuelForm.odometerReading}
+                      onChange={(e) =>
+                        setFuelForm({ ...fuelForm, odometerReading: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Station Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Shell, BP, Engen..."
+                    value={fuelForm.stationName}
+                    onChange={(e) =>
+                      setFuelForm({ ...fuelForm, stationName: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                  />
+                </div>
+              </div>
+
+              {/* Receipt required warning */}
+              {!receiptPhotoFile && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Receipt photo is required. Please scan or upload your fuel receipt above.
+                  </p>
+                </div>
+              )}
+
+              {/* Submit button */}
+              <button
+                onClick={handleFuelSubmit}
+                disabled={submitting || !receiptPhotoFile}
+                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Save Fuel Transaction
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// No layout - full-screen mobile interface
+VehiclePortalPage.getLayout = (page: React.ReactElement) => page;

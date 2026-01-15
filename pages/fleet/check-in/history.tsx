@@ -31,6 +31,17 @@ interface CheckInHistoryResponse {
   total: number;
 }
 
+/**
+ * Convert storage URL to API URL for serving files
+ * /uploads/... -> /api/uploads/...
+ */
+function getPhotoUrl(url: string): string {
+  if (url.startsWith('/uploads/')) {
+    return `/api${url}`;
+  }
+  return url;
+}
+
 export default function CheckInHistoryPage() {
   const router = useRouter();
   const { recordId } = router.query;
@@ -60,12 +71,14 @@ export default function CheckInHistoryPage() {
         if (statusFilter) params.set('status', statusFilter);
 
         const response = await fetch(`/api/fleet/check-in/records?${params}`);
-        const data = await response.json() as CheckInHistoryResponse;
+        const data = await response.json();
 
-        if (!response.ok) throw new Error(data.toString() || 'Failed to load records');
+        if (!response.ok) throw new Error(data.error || 'Failed to load records');
 
-        setRecords(data.records);
-        setTotal(data.total);
+        // API wraps response in { success, data, meta } - extract the inner data
+        const result = (data.data || data) as CheckInHistoryResponse;
+        setRecords(result.records || []);
+        setTotal(result.total || 0);
 
         // Auto-expand if recordId in query
         if (recordId && typeof recordId === 'string') {
@@ -313,7 +326,7 @@ export default function CheckInHistoryPage() {
                           {record.photos.map((photo) => (
                             <div key={photo.id} className="relative aspect-video rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
                               <img
-                                src={photo.fileUrl}
+                                src={getPhotoUrl(photo.fileUrl)}
                                 alt={photo.photoType}
                                 className="w-full h-full object-cover"
                               />

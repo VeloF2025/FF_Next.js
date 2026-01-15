@@ -13,6 +13,8 @@ import {
   OdometerExtractionResult,
   LicensePlateExtractionResult,
   FuelGaugeExtractionResult,
+  FuelReceiptExtractionResult,
+  LicenseDiskExtractionResult,
   VlmAnalysisType,
 } from '../types/check-in.types';
 
@@ -88,33 +90,142 @@ If no plate visible or unreadable:
   "visible": false
 }`;
 
-const FUEL_GAUGE_PROMPT = `You are analyzing a vehicle dashboard fuel gauge photo.
+const FUEL_GAUGE_PROMPT = `You are analyzing a vehicle dashboard photo to read the FUEL GAUGE level.
 
-TASK: Estimate the fuel level from this photo.
+TASK: Find the FUEL GAUGE (identified by ⛽ fuel pump icon) and estimate the fuel level.
 
-INSTRUCTIONS:
-1. Look for the fuel gauge indicator
-2. Estimate the fuel level as a percentage (0-100)
-3. Use these guidelines:
-   - E (Empty) = 0-10%
-   - 1/4 = 20-30%
-   - 1/2 (Half) = 45-55%
-   - 3/4 = 70-80%
-   - F (Full) = 90-100%
-4. Consider the needle position relative to the gauge markings
+CRITICAL - HOW TO IDENTIFY THE FUEL GAUGE:
+1. Look for the FUEL PUMP ICON (⛽) - a small icon that looks like a gas pump
+2. The fuel gauge is ALWAYS marked with "E" (Empty) and "F" (Full) at opposite ends
+3. DO NOT confuse with:
+   - Speedometer (shows km/h or mph, has large numbers like 0-220)
+   - Temperature gauge (has C/H or cold/hot markings, often has thermometer icon)
+   - Tachometer (shows RPM x1000)
+
+READING THE FUEL GAUGE:
+1. Locate the fuel pump icon (⛽) near the gauge
+2. Find the needle position between E (Empty) and F (Full)
+3. E is typically on the LEFT, F on the RIGHT
+4. Estimate percentage based on needle position:
+   - At or near E = 0-10%
+   - Between E and 1/4 mark = 10-25%
+   - At 1/4 mark = 25%
+   - Between 1/4 and 1/2 = 25-50%
+   - At 1/2 mark (middle) = 50%
+   - Between 1/2 and 3/4 = 50-75%
+   - At 3/4 mark = 75%
+   - Between 3/4 and F = 75-90%
+   - At or near F = 90-100%
 
 RESPONSE FORMAT (JSON only, no other text):
 {
-  "level": 75,
+  "level": 25,
   "confidence": 0.85,
-  "description": "Three-quarters full"
+  "description": "Quarter tank - needle between E and half"
 }
 
-If fuel gauge not visible:
+If fuel gauge not visible or cannot find fuel pump icon:
 {
   "level": null,
   "confidence": 0,
-  "description": "Not visible"
+  "description": "Fuel gauge not found - no fuel pump icon visible"
+}`;
+
+const FUEL_RECEIPT_PROMPT = `You are analyzing a fuel station receipt or invoice photo.
+
+TASK: Extract fuel purchase details from this receipt.
+
+INSTRUCTIONS:
+1. Find the total amount paid (in Rand/ZAR)
+2. Find the number of litres purchased
+3. Find the price per litre (if shown)
+4. Find the date of the transaction
+5. Find the station name/brand (e.g., Shell, BP, Engen, Caltex, Total)
+6. Find the station location/address if visible
+
+SOUTH AFRICAN CONTEXT:
+- Currency is ZAR/Rand, written as R or ZAR
+- Common fuel types: 93, 95 (petrol/gasoline), Diesel, 500ppm
+- Common stations: Shell, BP, Engen, Caltex, Total, Sasol
+
+RESPONSE FORMAT (JSON only, no other text):
+{
+  "amount_rand": 850.50,
+  "litres": 45.25,
+  "price_per_litre": 18.79,
+  "date": "2025-01-14",
+  "station_name": "Shell",
+  "station_location": "123 Main Road, Johannesburg",
+  "fuel_type": "95",
+  "confidence": 0.90
+}
+
+If receipt is not readable or not a fuel receipt:
+{
+  "amount_rand": null,
+  "litres": null,
+  "price_per_litre": null,
+  "date": null,
+  "station_name": null,
+  "station_location": null,
+  "fuel_type": null,
+  "confidence": 0
+}`;
+
+const LICENSE_DISK_PROMPT = `You are analyzing a South African vehicle licence disk (license disk) photo.
+
+TASK: Extract all vehicle details from this licence disk photo.
+
+CONTEXT: A South African licence disk is a circular sticker displayed on vehicle windscreens. It contains:
+- Registration number (e.g., "GP 456-789")
+- VIN (Vehicle Identification Number) - 17 characters
+- Engine number
+- Make (manufacturer)
+- Description (model/type)
+- Year of first registration
+- Tare (unladen mass in kg)
+- GVM (Gross Vehicle Mass in kg)
+- Licence expiry date
+- Colour (sometimes listed)
+
+INSTRUCTIONS:
+1. Look for all text fields on the licence disk
+2. Extract each piece of information carefully
+3. VIN is typically 17 characters long
+4. Registration follows South African format (e.g., "XX 000-000 GP" or "XX 000 GP")
+5. If you can see a date, extract it in YYYY-MM-DD format
+6. If a field is not visible or unreadable, use null
+
+RESPONSE FORMAT (JSON only, no other text):
+{
+  "registration": "GP 456-789",
+  "vin": "AHTBB3CD102123456",
+  "engine_number": "1KD1234567",
+  "make": "TOYOTA",
+  "description": "HILUX 2.4 GD-6",
+  "year": 2023,
+  "tare": 1900,
+  "gvm": 3100,
+  "license_expiry": "2025-06-30",
+  "color": "WHITE",
+  "confidence": 0.85,
+  "raw_text": "all visible text from the disk"
+}
+
+If the licence disk is not clearly visible or unreadable:
+{
+  "registration": null,
+  "vin": null,
+  "engine_number": null,
+  "make": null,
+  "description": null,
+  "year": null,
+  "tare": null,
+  "gvm": null,
+  "license_expiry": null,
+  "color": null,
+  "confidence": 0,
+  "raw_text": "unreadable"
 }`;
 
 // ============================================================================
@@ -347,6 +458,123 @@ export async function extractFuelLevel(
 }
 
 /**
+ * Extract fuel purchase details from receipt photo
+ * @param base64Image - Base64-encoded image of fuel receipt
+ * @returns Fuel receipt extraction result with amount, litres, date, station info
+ */
+export async function extractFuelReceipt(
+  base64Image: string
+): Promise<FuelReceiptExtractionResult> {
+  try {
+    log.info('FleetVlmService', 'Extracting fuel receipt data...');
+
+    const content = await callVlmApi(base64Image, FUEL_RECEIPT_PROMPT, 'fuel_receipt');
+    const result = parseVlmJson<{
+      amount_rand: number | null;
+      litres: number | null;
+      price_per_litre: number | null;
+      date: string | null;
+      station_name: string | null;
+      station_location: string | null;
+      fuel_type: string | null;
+      confidence: number;
+    }>(content);
+
+    return {
+      amountRand: result.amount_rand,
+      litres: result.litres,
+      pricePerLitre: result.price_per_litre,
+      date: result.date,
+      stationName: result.station_name,
+      stationLocation: result.station_location,
+      fuelType: result.fuel_type,
+      confidence: result.confidence || 0,
+    };
+  } catch (error) {
+    log.error('FleetVlmService', `Fuel receipt extraction failed: ${error}`);
+    return {
+      amountRand: null,
+      litres: null,
+      pricePerLitre: null,
+      date: null,
+      stationName: null,
+      stationLocation: null,
+      fuelType: null,
+      confidence: 0,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Extract vehicle details from licence disk photo
+ * @param base64Image - Base64-encoded image of the licence disk
+ * @returns Licence disk extraction result with all vehicle details
+ */
+export async function extractLicenseDiskDetails(
+  base64Image: string
+): Promise<LicenseDiskExtractionResult> {
+  try {
+    log.info('FleetVlmService', 'Extracting licence disk details...');
+
+    const content = await callVlmApi(base64Image, LICENSE_DISK_PROMPT, 'license_plate');
+    const result = parseVlmJson<{
+      registration: string | null;
+      vin: string | null;
+      engine_number: string | null;
+      make: string | null;
+      description: string | null;
+      year: number | null;
+      tare: number | null;
+      gvm: number | null;
+      license_expiry: string | null;
+      color: string | null;
+      confidence: number;
+      raw_text: string;
+    }>(content);
+
+    // Validate VIN length if present
+    let vin = result.vin;
+    if (vin && vin.length !== 17) {
+      log.warn('FleetVlmService', `VIN length invalid (${vin.length}), expected 17 characters`);
+      // Keep it but note the issue
+    }
+
+    return {
+      registration: result.registration,
+      vin: vin,
+      engineNumber: result.engine_number,
+      make: result.make?.toUpperCase() || null,
+      description: result.description,
+      year: result.year,
+      tare: result.tare,
+      gvm: result.gvm,
+      licenseExpiry: result.license_expiry,
+      color: result.color?.toUpperCase() || null,
+      confidence: result.confidence || 0,
+      rawText: result.raw_text || '',
+    };
+  } catch (error) {
+    log.error('FleetVlmService', `Licence disk extraction failed: ${error}`);
+    return {
+      registration: null,
+      vin: null,
+      engineNumber: null,
+      make: null,
+      description: null,
+      year: null,
+      tare: null,
+      gvm: null,
+      licenseExpiry: null,
+      color: null,
+      confidence: 0,
+      rawText: '',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Process a check-in photo based on its type
  * @param base64Image - Base64-encoded image
  * @param analysisType - Type of analysis to perform
@@ -357,7 +585,7 @@ export async function processCheckInPhoto(
   base64Image: string,
   analysisType: VlmAnalysisType,
   expectedPlate?: string
-): Promise<OdometerExtractionResult | LicensePlateExtractionResult | FuelGaugeExtractionResult | null> {
+): Promise<OdometerExtractionResult | LicensePlateExtractionResult | FuelGaugeExtractionResult | FuelReceiptExtractionResult | null> {
   switch (analysisType) {
     case 'odometer':
       return extractOdometerReading(base64Image);
@@ -365,6 +593,8 @@ export async function processCheckInPhoto(
       return verifyLicensePlate(base64Image, expectedPlate || '');
     case 'fuel_gauge':
       return extractFuelLevel(base64Image);
+    case 'fuel_receipt':
+      return extractFuelReceipt(base64Image);
     case 'damage':
       // Damage photos don't need VLM analysis - they're just documentation
       return null;

@@ -77,6 +77,10 @@ export default async function handler(
     const startTime = Date.now();
     log.info('FleetVlmApi', `Processing ${analysisType} for photo ${photoId}`);
 
+    // Detect preview mode early - preview uses temp IDs that aren't valid UUIDs
+    // In preview mode, we process VLM but don't persist to database
+    const isPreviewMode = photoId.startsWith('temp-') || recordId === 'pending';
+
     let result: ProcessVlmResponse['result'];
 
     switch (analysisType) {
@@ -89,8 +93,8 @@ export default async function handler(
           error: odometerResult.error,
         };
 
-        // Record odometer reading if extraction succeeded
-        if (odometerResult.reading !== null) {
+        // Only record odometer reading if not in preview mode and extraction succeeded
+        if (!isPreviewMode && odometerResult.reading !== null) {
           await recordOdometerReading({
             vehicleId,
             checkRecordId: recordId,
@@ -128,8 +132,8 @@ export default async function handler(
           error: fuelResult.error,
         };
 
-        // Record fuel level if extraction succeeded
-        if (fuelResult.level !== null) {
+        // Only record fuel level if not in preview mode and extraction succeeded
+        if (!isPreviewMode && fuelResult.level !== null) {
           await recordFuelLevel({
             vehicleId,
             checkRecordId: recordId,
@@ -158,29 +162,31 @@ export default async function handler(
 
     const processingTimeMs = Date.now() - startTime;
 
-    // Store VLM result in database
-    await sql`
-      INSERT INTO fleet_photo_vlm_results (
-        photo_id, analysis_type, extracted_value, extracted_numeric,
-        confidence, plate_matches_vehicle, expected_plate,
-        vlm_model, processing_time_ms, processing_status, error_message
-      )
-      VALUES (
-        ${photoId},
-        ${analysisType},
-        ${result.extractedValue},
-        ${result.extractedNumeric},
-        ${result.confidence},
-        ${result.plateMatches ?? null},
-        ${expectedPlate ?? null},
-        ${'Qwen/Qwen3-VL-8B-Instruct'},
-        ${processingTimeMs},
-        ${result.error ? 'failed' : 'completed'},
-        ${result.error ?? null}
-      )
-    `;
+    // Only store VLM result in database if not in preview mode
+    if (!isPreviewMode) {
+      await sql`
+        INSERT INTO fleet_photo_vlm_results (
+          photo_id, analysis_type, extracted_value, extracted_numeric,
+          confidence, plate_matches_vehicle, expected_plate,
+          vlm_model, processing_time_ms, processing_status, error_message
+        )
+        VALUES (
+          ${photoId},
+          ${analysisType},
+          ${result.extractedValue},
+          ${result.extractedNumeric},
+          ${result.confidence},
+          ${result.plateMatches ?? null},
+          ${expectedPlate ?? null},
+          ${'Qwen/Qwen3-VL-8B-Instruct'},
+          ${processingTimeMs},
+          ${result.error ? 'failed' : 'completed'},
+          ${result.error ?? null}
+        )
+      `;
+    }
 
-    log.info('FleetVlmApi', `${analysisType} processing completed in ${processingTimeMs}ms`);
+    log.info('FleetVlmApi', `${analysisType} processing completed in ${processingTimeMs}ms (preview: ${isPreviewMode})`);
 
     return apiResponse.success(res, {
       success: !result.error,
