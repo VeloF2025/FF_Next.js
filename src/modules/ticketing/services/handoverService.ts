@@ -555,6 +555,179 @@ export async function getHandoverById(
 }
 
 /**
+ * Get tickets pending handover
+ * 🟢 WORKING: Lists tickets ready for handover with gate status
+ *
+ * @param filters - Optional filters (handover_type, project_id)
+ * @param limit - Pagination limit (default: 50)
+ * @param offset - Pagination offset (default: 0)
+ * @returns Array of pending handover tickets with gate status
+ */
+export async function getPendingHandovers(
+  filters: {
+    handover_type?: HandoverType;
+    project_id?: string;
+  } = {},
+  limit: number = 50,
+  offset: number = 0
+): Promise<{
+  tickets: {
+    ticket_id: string;
+    ticket_uid: string;
+    title: string;
+    status: string;
+    project_name: string | null;
+    current_owner: OwnerType | null;
+    pending_handover_type: HandoverType;
+    gate_status: { passed: number; total: number };
+    blockers: string[];
+    can_handover: boolean;
+  }[];
+  total: number;
+}> {
+  logger.info('Fetching pending handovers', { filters, limit, offset });
+
+  try {
+    // Build conditions
+    const conditions: string[] = [];
+    const values: (string | number)[] = [];
+    let paramIndex = 1;
+
+    // Only fetch tickets in relevant statuses for handover
+    conditions.push(`t.status IN ('in_progress', 'qa_ready', 'resolved', 'closed')`);
+
+    if (filters.project_id) {
+      conditions.push(`t.project_id = $${paramIndex}`);
+      values.push(filters.project_id);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count total
+    const countSql = `
+      SELECT COUNT(*) as total
+      FROM tickets t
+      ${whereClause}
+    `;
+    const countResult = await queryOne<{ total: string }>(countSql, values);
+    const total = parseInt(countResult?.total || '0', 10);
+
+    // Fetch tickets
+    const sql = `
+      SELECT
+        t.id as ticket_id,
+        t.ticket_uid,
+        t.title,
+        t.status,
+        t.dr_number,
+        t.zone_id,
+        t.pole_number,
+        t.pon_number,
+        t.ont_serial,
+        t.ont_rx_level,
+        t.assigned_contractor_id,
+        p.name as project_name,
+        (SELECT COUNT(*) FROM ticket_attachments ta WHERE ta.ticket_id = t.id AND ta.file_type = 'photo') as photo_count,
+        (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id) as verification_total,
+        (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id AND vs.is_complete = true) as verification_complete,
+        (SELECT hs.to_owner_type FROM handover_snapshots hs WHERE hs.ticket_id = t.id ORDER BY hs.handover_at DESC LIMIT 1) as current_owner
+      FROM tickets t
+      LEFT JOIN projects p ON t.project_id = p.id
+      ${whereClause}
+      ORDER BY t.updated_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    values.push(limit, offset);
+    const tickets = await query<any>(sql, values);
+
+    // Process each ticket to determine handover readiness
+    const pendingTickets = tickets.map((ticket: any) => {
+      // Determine pending handover type based on current state
+      let pendingType: HandoverType = HandoverType.BUILD_TO_QA;
+      if (ticket.current_owner === OwnerType.QA || ticket.status === 'qa_ready') {
+        pendingType = HandoverType.QA_TO_MAINTENANCE;
+      } else if (ticket.current_owner === OwnerType.MAINTENANCE) {
+        pendingType = HandoverType.MAINTENANCE_COMPLETE;
+      }
+
+      // Apply handover_type filter
+      if (filters.handover_type && pendingType !== filters.handover_type) {
+        return null;
+      }
+
+      // Calculate gate status
+      const isStrict = pendingType === HandoverType.QA_TO_MAINTENANCE;
+      const blockers: string[] = [];
+      let gatesPassed = 0;
+      const totalGates = 5;
+
+      // Gate 1: As-built data
+      const hasAllAsBuiltData = !!(ticket.dr_number && ticket.zone_id && ticket.pole_number && ticket.pon_number);
+      const hasMinimalAsBuiltData = !!(ticket.dr_number && ticket.zone_id);
+      if (isStrict ? hasAllAsBuiltData : hasMinimalAsBuiltData) {
+        gatesPassed++;
+      } else if (isStrict) {
+        blockers.push('Missing as-built data (DR, zone, pole, PON)');
+      }
+
+      // Gate 2: Photos
+      if (ticket.photo_count > 0) {
+        gatesPassed++;
+      } else {
+        blockers.push('No photos uploaded');
+      }
+
+      // Gate 3: ONT/PON
+      if (ticket.ont_serial && ticket.ont_rx_level !== null) {
+        gatesPassed++;
+      } else if (isStrict) {
+        blockers.push('Missing ONT serial or RX level');
+      }
+
+      // Gate 4: Contractor
+      if (ticket.assigned_contractor_id) {
+        gatesPassed++;
+      } else if (isStrict) {
+        blockers.push('No contractor assigned');
+      }
+
+      // Gate 5: Verification
+      if (ticket.verification_total > 0 && ticket.verification_complete === ticket.verification_total) {
+        gatesPassed++;
+      }
+
+      return {
+        ticket_id: ticket.ticket_id,
+        ticket_uid: ticket.ticket_uid,
+        title: ticket.title,
+        status: ticket.status,
+        project_name: ticket.project_name,
+        current_owner: ticket.current_owner as OwnerType | null,
+        pending_handover_type: pendingType,
+        gate_status: { passed: gatesPassed, total: totalGates },
+        blockers,
+        can_handover: blockers.length === 0
+      };
+    }).filter(Boolean);
+
+    logger.info('Pending handovers fetched', {
+      total,
+      returned: pendingTickets.length
+    });
+
+    return { tickets: pendingTickets as any[], total };
+  } catch (error) {
+    logger.error('Failed to fetch pending handovers', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      filters
+    });
+    throw error;
+  }
+}
+
+/**
  * Check if ticket can be handed over
  * 🟢 WORKING: Quick check for handover eligibility
  *

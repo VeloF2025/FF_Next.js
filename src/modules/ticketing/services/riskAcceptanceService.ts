@@ -456,6 +456,120 @@ export async function canCloseTicket(ticketId: string): Promise<boolean> {
  * @param ticketId - Ticket UUID
  * @returns Risk summary with counts and status breakdown
  */
+/**
+ * List all risk acceptances with optional filters
+ * Used for the global Risk Acceptance Review page
+ *
+ * @param filters - Optional filters (status, expiring_within_days, project_id)
+ * @param limit - Pagination limit (default: 50)
+ * @param offset - Pagination offset (default: 0)
+ * @returns Array of risk acceptances with ticket info
+ */
+export async function listAllRiskAcceptances(
+  filters: {
+    status?: RiskAcceptanceStatus | RiskAcceptanceStatus[];
+    expiring_within_days?: number;
+    project_id?: string;
+  } = {},
+  limit: number = 50,
+  offset: number = 0
+): Promise<{ risks: (QARiskAcceptance & { ticket_uid?: string; ticket_title?: string; project_name?: string })[]; total: number }> {
+  logger.debug('Listing all risk acceptances', { filters, limit, offset });
+
+  try {
+    // Build dynamic WHERE clauses
+    const conditions: string[] = [];
+    const values: (string | number | Date | string[])[] = [];
+    let paramIndex = 1;
+
+    // Status filter (can be single or array)
+    if (filters.status) {
+      if (Array.isArray(filters.status)) {
+        conditions.push(`r.status = ANY($${paramIndex}::text[])`);
+        values.push(filters.status);
+      } else {
+        conditions.push(`r.status = $${paramIndex}`);
+        values.push(filters.status);
+      }
+      paramIndex++;
+    }
+
+    // Expiring within days filter
+    if (filters.expiring_within_days !== undefined) {
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + filters.expiring_within_days);
+      conditions.push(`r.status = 'active' AND r.risk_expiry_date IS NOT NULL AND r.risk_expiry_date <= $${paramIndex}`);
+      values.push(expiryDate);
+      paramIndex++;
+    }
+
+    // Project filter
+    if (filters.project_id) {
+      conditions.push(`t.project_id = $${paramIndex}`);
+      values.push(filters.project_id);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count total
+    const countSql = `
+      SELECT COUNT(*) as total
+      FROM qa_risk_acceptances r
+      LEFT JOIN tickets t ON r.ticket_id = t.id
+      ${whereClause}
+    `;
+    const countResult = await queryOne<{ total: string }>(countSql, values);
+    const total = parseInt(countResult?.total || '0', 10);
+
+    // Fetch risks with ticket info
+    const sql = `
+      SELECT
+        r.*,
+        t.ticket_uid,
+        t.title as ticket_title,
+        p.name as project_name
+      FROM qa_risk_acceptances r
+      LEFT JOIN tickets t ON r.ticket_id = t.id
+      LEFT JOIN projects p ON t.project_id = p.id
+      ${whereClause}
+      ORDER BY
+        CASE r.status
+          WHEN 'active' THEN 1
+          WHEN 'expired' THEN 2
+          WHEN 'escalated' THEN 3
+          WHEN 'resolved' THEN 4
+        END,
+        r.risk_expiry_date ASC NULLS LAST,
+        r.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    values.push(limit, offset);
+    const risks = await query<QARiskAcceptance & { ticket_uid?: string; ticket_title?: string; project_name?: string }>(sql, values);
+
+    logger.info('Listed all risk acceptances', {
+      total,
+      returned: risks.length,
+      filters
+    });
+
+    return { risks, total };
+  } catch (error) {
+    logger.error('Failed to list all risk acceptances', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      filters
+    });
+    throw error;
+  }
+}
+
+/**
+ * Get comprehensive risk summary for a ticket
+ *
+ * @param ticketId - Ticket UUID
+ * @returns Risk summary with counts and status breakdown
+ */
 export async function getTicketRiskSummary(ticketId: string): Promise<TicketRiskSummary> {
   logger.debug('Getting risk summary for ticket', { ticket_id: ticketId });
 

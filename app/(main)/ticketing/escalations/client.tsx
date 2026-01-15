@@ -131,7 +131,7 @@ export default function EscalationsPageClient() {
       ) : (
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 border border-[var(--ff-border-light)]">
           <h2 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">Repeat Fault Patterns</h2>
-          <RepeatFaultMap />
+          <RepeatFaultMap escalations={escalations} />
         </div>
       )}
     </div>
