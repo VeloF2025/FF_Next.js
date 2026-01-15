@@ -147,11 +147,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
     const projectData = req.body;
     
-    // Validate required fields
-    if (!projectData.name) {
+    // Validate required fields - accept both 'name' and 'project_name' from frontend
+    const projectName = projectData.name || projectData.project_name;
+    if (!projectName) {
       return res.status(400).json({ error: 'Project name is required' });
     }
-    
+
     // Helper to convert empty strings to null
     const toNullIfEmpty = (val: any) => (val === '' || val === undefined) ? null : val;
 
@@ -166,6 +167,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     };
     const projectCode = projectData.project_code || projectData.projectCode || generateProjectCode();
 
+    // Handle location object from frontend (nested structure)
+    const locationObj = projectData.location || {};
+    const coords = locationObj.coordinates || {};
+    const latitude = projectData.gps_latitude || projectData.gpsLatitude || projectData.latitude || coords.latitude;
+    const longitude = projectData.gps_longitude || projectData.gpsLongitude || projectData.longitude || coords.longitude;
+    const locationStr = projectData.municipal_district || projectData.municipalDistrict ||
+                       (locationObj.city && locationObj.province ? `${locationObj.city}, ${locationObj.province}` : null);
+
     const newProject = await sql`
       INSERT INTO projects (
         project_code, project_name, description, client_id, project_manager,
@@ -175,19 +184,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       )
       VALUES (
         ${projectCode},
-        ${projectData.name},
+        ${projectName},
         ${toNullIfEmpty(projectData.description)},
         ${toNullIfEmpty(projectData.client_id || projectData.clientId)},
         ${toNullIfEmpty(projectData.project_manager_id || projectData.projectManagerId || projectData.project_manager)},
-        ${projectData.status || 'PLANNING'},
-        ${projectData.priority || 'MEDIUM'},
+        ${(projectData.status || 'PLANNING').toUpperCase()},
+        ${(projectData.priority || 'MEDIUM').toUpperCase()},
         ${toNullIfEmpty(projectData.start_date || projectData.startDate) || new Date().toISOString()},
         ${toNullIfEmpty(projectData.end_date || projectData.endDate)},
         ${projectData.budget_allocated || projectData.budgetAllocated || projectData.budget || 0},
         ${projectData.budget_spent || projectData.budgetSpent || projectData.actual_cost || 0},
-        ${toNullIfEmpty(projectData.municipal_district || projectData.municipalDistrict || projectData.location)},
-        ${toNullIfEmpty(projectData.gps_latitude || projectData.gpsLatitude || projectData.latitude)},
-        ${toNullIfEmpty(projectData.gps_longitude || projectData.gpsLongitude || projectData.longitude)}
+        ${toNullIfEmpty(locationStr)},
+        ${toNullIfEmpty(latitude)},
+        ${toNullIfEmpty(longitude)}
       )
       RETURNING *
     `;
