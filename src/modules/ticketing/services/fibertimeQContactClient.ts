@@ -542,7 +542,6 @@ export class FiberTimeQContactClient {
     const params: Record<string, string> = {
       sort: '',
       page: String(options.page || 1),
-      view: 'all',
       items: String(options.pageSize || 50),
       filters,
     };
