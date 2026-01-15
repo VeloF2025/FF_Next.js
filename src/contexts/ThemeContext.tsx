@@ -45,14 +45,17 @@ export function ThemeProvider({
     try {
       const stored = localStorage.getItem(THEME_STORAGE_KEY);
       if (!stored) return null;
-      
+
       const preference: ThemePreference = JSON.parse(stored);
-      
-      // Validate stored theme
+
+      // Migrate invalid themes to DEFAULT_THEME (prevents hydration mismatch)
       if (!AVAILABLE_THEMES.includes(preference.theme)) {
+        log.info(`Migrating invalid theme '${preference.theme}' to '${DEFAULT_THEME}'`, undefined, 'ThemeContext');
+        // Clear invalid preference and return null to use default
+        localStorage.removeItem(THEME_STORAGE_KEY);
         return null;
       }
-      
+
       return preference;
     } catch (error) {
       log.warn('Failed to load theme preference:', { data: error }, 'ThemeContext');
@@ -199,7 +202,7 @@ export function ThemeProvider({
   // Initialize theme on mount
   useEffect(() => {
     const preference = loadThemePreference();
-    
+
     if (preference) {
       if (preference.useSystemTheme && enableSystemTheme) {
         resetToSystemTheme();
@@ -207,21 +210,19 @@ export function ThemeProvider({
         setCurrentTheme(preference.theme);
         applyCSSVariables(preference.theme);
       }
-    } else if (enableSystemTheme) {
-      // No saved preference, use system theme
-      resetToSystemTheme();
     } else {
-      // Use default theme
+      // No saved preference - use DEFAULT_THEME to match SSR (prevents hydration mismatch)
+      // User can manually switch to system theme if they prefer
       applyCSSVariables(defaultTheme);
     }
 
     // Update system theme state
     setSystemTheme(getSystemTheme());
   }, [
-    loadThemePreference, 
-    resetToSystemTheme, 
-    applyCSSVariables, 
-    defaultTheme, 
+    loadThemePreference,
+    resetToSystemTheme,
+    applyCSSVariables,
+    defaultTheme,
     enableSystemTheme,
     getSystemTheme
   ]);
