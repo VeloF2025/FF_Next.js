@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { notificationService } from '@/services/core/NotificationService';
 import {
   Car,
   Plus,
@@ -234,7 +235,7 @@ export default function FleetVehiclesPage() {
 
   const handleAddVehicle = async () => {
     if (!newVehicleForm.registration.trim()) {
-      alert('Registration is required');
+      notificationService.warning('Registration is required');
       return;
     }
 
@@ -260,7 +261,7 @@ export default function FleetVehiclesPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || 'Failed to add vehicle');
+        notificationService.error(data.error || 'Failed to add vehicle');
         return;
       }
 
@@ -273,6 +274,8 @@ export default function FleetVehiclesPage() {
       setOcrError(null);
       setShowAddModal(false);
 
+      notificationService.success('Vehicle added successfully');
+
       // Refresh vehicles list
       fetchVehicles();
 
@@ -280,8 +283,8 @@ export default function FleetVehiclesPage() {
       if (vehicleId) {
         router.push(`/fleet/vehicles/${vehicleId}`);
       }
-    } catch (err) {
-      alert('Failed to add vehicle');
+    } catch {
+      notificationService.error('Failed to add vehicle');
     } finally {
       setSaving(false);
     }
@@ -502,7 +505,7 @@ export default function FleetVehiclesPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   // TODO: Add delete confirmation
-                                  alert('Delete functionality coming soon');
+                                  notificationService.info('Delete functionality coming soon');
                                 }}
                               >
                                 <Trash2 className="w-4 h-4" />

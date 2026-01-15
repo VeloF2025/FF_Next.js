@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { notificationService } from '@/services/core/NotificationService';
 
 export default function NewProjectTestPage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function NewProjectTestPage() {
       const data = await response.json();
 
       if (data.success) {
-        alert('Project created successfully!');
+        notificationService.success('Project created successfully');
         router.push('/projects');
       } else {
         // Handle error object properly

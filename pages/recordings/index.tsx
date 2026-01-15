@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { notificationService } from '@/services/core/NotificationService';
 import {
     Play,
     Pause,
@@ -74,12 +75,14 @@ export default function RecordingsPage() {
                 if (selectedRecording?.id === recording.id) {
                     setSelectedRecording(null);
                 }
+                notificationService.success('Recording deleted');
             } else {
                 const data = await response.json();
-                alert(data.error || 'Failed to delete recording');
+                notificationService.error(data.error || 'Failed to delete recording');
             }
-        } catch (err: any) {
-            alert(err.message || 'Failed to delete recording');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Failed to delete recording';
+            notificationService.error(message);
         } finally {
             setDeleting(null);
         }

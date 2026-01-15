@@ -10,6 +10,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
+import { notificationService } from '@/services/core/NotificationService';
 
 interface LogEntry {
   type: 'log' | 'error' | 'start' | 'complete';
@@ -85,7 +86,7 @@ export default function QFieldSyncPage() {
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
-      alert('Project name is required');
+      notificationService.warning('Project name is required');
       return;
     }
 
@@ -112,9 +113,10 @@ export default function QFieldSyncPage() {
       setShowCreateForm(false);
       setNewProjectName('');
       setNewProjectDesc('');
-      alert(`✅ Project "${newProjectName}" created successfully!`);
-    } catch (err: any) {
-      alert(`❌ Failed to create project: ${err.message}`);
+      notificationService.success(`Project "${newProjectName}" created successfully`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      notificationService.error(`Failed to create project: ${message}`);
     } finally {
       setCreatingProject(false);
     }
@@ -182,7 +184,7 @@ export default function QFieldSyncPage() {
   // Run OES sync
   const handleSync = async () => {
     if (!selectedProjectId) {
-      alert('Please select a destination project first');
+      notificationService.warning('Please select a destination project first');
       return;
     }
 
