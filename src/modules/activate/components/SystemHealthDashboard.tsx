@@ -174,7 +174,7 @@ export function SystemHealthDashboard({
 
   const services = [
     { key: 'database', label: 'Database', icon: '🗄️', ...health.services.database },
-    { key: 'onemap', label: 'OneMap', icon: '🗺️', ...health.services.onemap },
+    { key: 'onemap', label: '1Map', icon: '🗺️', ...health.services.onemap },
     { key: 'vlm', label: 'VLM (AI)', icon: '🤖', ...health.services.vlm },
     { key: 'whatsappBridge', label: 'WA Bridge', icon: '💬', ...health.services.whatsappBridge },
     ...(health.services.whatsappSender ? [{ key: 'whatsappSender', label: 'WA Sender', icon: '📤', ...health.services.whatsappSender }] : []),
