@@ -202,13 +202,13 @@ module-name/
 
 **"Send Feedback" button not working:**
 ```bash
-ssh louis@100.96.203.105
-systemctl restart whatsapp-bridge-prod
+ssh velo@100.96.203.105  # Password: velo2026
+echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge-prod
 ```
 
 **Add new WhatsApp group (5 minutes):**
 ```bash
-ssh louis@100.96.203.105
+ssh velo@100.96.203.105  # Password: velo2026
 nano /opt/wa-monitor/prod/config/projects.yaml
 # Add group in YAML format
 /opt/wa-monitor/prod/restart-monitor.sh  # ✅ Use safe restart
@@ -311,8 +311,8 @@ src/modules/dr-photo-unified/
 curl http://100.96.203.105:8081/health
 
 # Restart if needed
-ssh louis@100.96.203.105
-sudo systemctl restart whatsapp-sender
+ssh velo@100.96.203.105  # Password: velo2026
+echo 'velo2026' | sudo -S systemctl restart whatsapp-sender
 ```
 
 **Group Mapping:**
@@ -337,7 +337,7 @@ sudo systemctl restart whatsapp-sender
 
 **VLM not responding:**
 ```bash
-ssh louis@100.96.203.105
+ssh velo@100.96.203.105  # Password: velo2026
 docker ps | grep vllm
 docker logs vllm-qwen3
 ```
@@ -369,11 +369,16 @@ export default withArcjetProtection(handler, aj);
 ## Deployment Architecture
 
 ### 🚀 Velocity Server (New Infrastructure)
-**Server Access:**
+**Server Access (Updated Jan 2026):**
 ```bash
-ssh louis@100.96.203.105    # via Tailscale (recommended)
-ssh louis@192.168.1.150     # via LAN (same network)
-# Password: VeloAdmin2025! (or use SSH key)
+# Primary access (use velo user)
+ssh velo@100.96.203.105     # via Tailscale (recommended)
+ssh velo@192.168.1.150      # via LAN (same network)
+# Password: velo2026
+
+# Legacy access (louis user - deprecated)
+ssh louis@100.96.203.105
+# Password: VeloAdmin2025!
 ```
 
 **Server Specs:**
@@ -384,10 +389,10 @@ ssh louis@192.168.1.150     # via LAN (same network)
 - **Tailnet:** velof2025.github
 
 ### Dual Environment Setup
-| Environment | URL | Branch | Port | PM2 Process |
-|------------|-----|--------|------|-------------|
-| **Production** | app.fibreflow.app | `master` | 3005 | `fibreflow-prod` |
-| **Development** | dev.fibreflow.app | `develop` | 3006 | `fibreflow-dev` |
+| Environment | URL | Branch | Port | Service |
+|------------|-----|--------|------|---------|
+| **Production** | app.fibreflow.app | `master` | 3005 | `fibreflow.service` |
+| **Development** | dev.fibreflow.app | `develop` | 3006 | `fibreflow-dev.service` |
 
 ### Deployment Workflow
 1. **Local:** Create feature branch from develop
@@ -395,23 +400,23 @@ ssh louis@192.168.1.150     # via LAN (same network)
 3. **Test:** Verify on dev environment
 4. **Prod:** Merge to master → Deploy to app.fibreflow.app
 
-### Deployment Commands
+### Deployment Commands (Updated Jan 2026)
 ```bash
-# Deploy to DEV (test first!)
-ssh louis@100.96.203.105 \
-  "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
+# Deploy to PRODUCTION (systemd service)
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow && git pull && npm ci && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
 
-# Deploy to PRODUCTION (after dev testing)
-ssh louis@100.96.203.105 \
-  "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
+# Check deployment status
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "echo 'velo2026' | sudo -S systemctl status fibreflow.service"
 ```
 
 ### Server Quick Reference
 ```bash
-ssh louis@100.96.203.105
-pm2 list                          # View processes
-pm2 logs fibreflow-prod          # View logs
-pm2 restart fibreflow-prod       # Restart production
+ssh velo@100.96.203.105           # Connect to server
+echo 'velo2026' | sudo -S systemctl status fibreflow.service   # Check status
+echo 'velo2026' | sudo -S systemctl restart fibreflow.service  # Restart
+echo 'velo2026' | sudo -S journalctl -u fibreflow.service -f   # View logs
 ```
 
 ### Additional Services
@@ -424,12 +429,12 @@ pm2 restart fibreflow-prod       # Restart production
 
 ### Rollback Process
 ```bash
-ssh louis@100.96.203.105
-cd /var/www/fibreflow
+ssh velo@100.96.203.105
+cd /home/velo/fibreflow
 git log --oneline -5
 git reset --hard <commit-hash>
 npm ci && npm run build
-pm2 restart fibreflow-prod
+echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 ```
 
 ## Important Notes
