@@ -118,7 +118,24 @@
       "Bash(ssh-add:*)",
       "Bash(PGPASSWORD='npg_MIUZXrg1tEY0' psql:*)",
       "Bash(PGPASSWORD=npg_MIUZXrg1tEY0 psql:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(done)",
+      "Bash(TOOL_INPUT=\"sshpass -p ''velo2026'' ssh velo@100.96.203.105 \"\"sed -i ''s/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g'' .env.production\"\"\" npx ts-node .claude/hooks/staging-fix-logger.ts)",
+      "Bash(/usr/bin/psql:*)",
+      "Bash(/usr/local/bin/psql:*)",
+      "Bash(dpkg:*)",
+      "Bash(TOOL_INPUT=\"sshpass -p ''velo2026'' ssh velo@100.96.203.105 \"\"sed -i ''s/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g'' .env.production\"\"\" node .claude/hooks/staging-fix-logger.js)",
+      "Bash(base64:*)",
+      "Bash(gzip:*)",
+      "Bash(split:*)",
+      "Bash(pip3 show:*)",
+      "Bash(pip3 install:*)",
+      "Bash(/tmp/sync_venv/bin/pip install:*)",
+      "Bash(/tmp/sync_venv/bin/python:*)",
+      "Bash(for i in 1 2 3 4 5 6 7 8 9 10)",
+      "Bash(do)",
+      "Bash(for i in 1 2 3 4 5 6)",
+      "Bash(for i in 1 2 3 4 5 6 7 8)"
     ],
     "deny": [],
     "ask": [],
@@ -158,6 +175,17 @@
             "command": "npx ts-node .claude/hooks/token-tracker.ts 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Tracking tokens..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$TOOL_INPUT\" | grep -qE '100.96.203.105|fibreflow.service|/home/louis/apps/fibreflow'; then TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/staging-fix-logger.js 2>/dev/null || true; fi",
+            "timeout": 5,
+            "statusMessage": "Logging staging fix..."
           }
         ]
       }

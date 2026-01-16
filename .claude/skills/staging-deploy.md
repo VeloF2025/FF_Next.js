@@ -301,32 +301,220 @@ After deploying, Claude should:
 
 ## Troubleshooting
 
-### "Permission denied"
+### Quick Diagnosis Command
 ```bash
-# Ensure SSH key is set up or use sshpass
-sshpass -p 'VeloAdmin2025!' ssh hein@100.96.203.105
+# Run this first to diagnose most issues:
+sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo '=== Git ===' && git log -1 --oneline && echo '=== DB Password ===' && grep DATABASE_URL .env.production | grep -o 'npg_[^@]*' && echo '=== Service Dir ===' && grep WorkingDirectory /etc/systemd/system/fibreflow.service && echo '=== Logs ===' && tail -20 /var/log/fibreflow.error.log 2>/dev/null"
 ```
 
-### "Service won't start"
+---
+
+### ISSUE: Database Authentication Failed (500 errors)
+
+**Symptoms:**
+- 500 Internal Server Error on API calls
+- Log shows: `password authentication failed for user 'neondb_owner'`
+- Console shows: `NeonDbError: password authentication failed`
+
+**Root Cause:**
+The `.env.production` file has the wrong database password. This happens when:
+1. Git pull overwrites with old password from an outdated branch
+2. Someone manually edited the file incorrectly
+
+**Correct Password:** `npg_MIUZXrg1tEY0`
+**Wrong Password:** `npg_aRNLhZc1G2CD` (old/revoked)
+
+**Fix:**
 ```bash
-ssh hein@100.96.203.105
-sudo journalctl -u fibreflow.service -n 100
-# Check for build errors
+# Check current password
+sshpass -p '0203' ssh hein@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production"
+
+# Fix if wrong
+sshpass -p '0203' ssh hein@100.96.203.105 "sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' /home/louis/apps/fibreflow/.env.production"
+
+# Restart service
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
 ```
 
-### "Site returning 502"
+**Prevention:**
+- The correct password is committed in master branch
+- Always deploy from latest master: `git reset --hard origin/master`
+
+---
+
+### ISSUE: Wrong Systemd WorkingDirectory (404 on all routes)
+
+**Symptoms:**
+- All API routes return 404
+- Site loads but nothing works
+- Build ID in response doesn't match `.next/BUILD_ID`
+
+**Root Cause:**
+The systemd service is pointing to the wrong directory (e.g., `fibreflow-production` instead of `fibreflow`).
+
+**Diagnosis:**
 ```bash
-# Service likely crashed
-sudo systemctl status fibreflow.service
-sudo systemctl restart fibreflow.service
+sshpass -p '0203' ssh hein@100.96.203.105 "grep WorkingDirectory /etc/systemd/system/fibreflow.service"
 ```
 
-### "Build failed"
+**Expected:** `WorkingDirectory=/home/louis/apps/fibreflow`
+**Wrong:** `WorkingDirectory=/home/louis/apps/fibreflow-production`
+
+**Fix:**
 ```bash
-# Check npm/build output
-cd /home/louis/apps/fibreflow
-npm run build 2>&1 | tail -50
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S sed -i 's|fibreflow-production|fibreflow|g' /etc/systemd/system/fibreflow.service && sudo systemctl daemon-reload && sudo systemctl restart fibreflow.service"
 ```
+
+---
+
+### ISSUE: Git Branch Diverged / Old Commit
+
+**Symptoms:**
+- Features missing on staging
+- Old bugs reappearing
+- `.env.production` keeps reverting
+
+**Diagnosis:**
+```bash
+# Check current commit vs master
+sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Local:' && git log -1 --oneline && echo 'Remote:' && git fetch origin && git log -1 --oneline origin/master"
+```
+
+**Fix:**
+```bash
+# Force reset to origin/master (discards local changes)
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'chown -R louis:louis /home/louis/apps/fibreflow/.git && su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout master && git reset --hard origin/master\"'"
+
+# Then rebuild
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && npm install && npm run build\"'"
+
+# Restart
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+```
+
+---
+
+### ISSUE: Git Permission Errors
+
+**Symptoms:**
+- `error: cannot open '.git/FETCH_HEAD': Permission denied`
+- `insufficient permission for adding an object to repository database`
+
+**Root Cause:**
+Mixed file ownership in `.git` directory (some files owned by velo, some by louis).
+
+**Fix:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S chown -R louis:louis /home/louis/apps/fibreflow/.git"
+```
+
+---
+
+### ISSUE: Local Changes Blocking Checkout
+
+**Symptoms:**
+- `error: Your local changes to the following files would be overwritten by checkout`
+
+**Fix:**
+```bash
+# Discard local changes and checkout master
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && git checkout -- . && git checkout master && git reset --hard origin/master\"'"
+```
+
+---
+
+### ISSUE: Service Won't Start / Crashes
+
+**Diagnosis:**
+```bash
+# Check service status
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl status fibreflow.service"
+
+# View logs
+sshpass -p '0203' ssh hein@100.96.203.105 "tail -50 /var/log/fibreflow.error.log"
+
+# View journald logs
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 100"
+```
+
+**Common Causes:**
+1. Build errors - rebuild with `npm run build`
+2. Missing dependencies - run `npm install`
+3. Database connection issues - check `.env.production`
+4. Port already in use - check with `lsof -i :3006`
+
+---
+
+### ISSUE: Site Returning 502 Bad Gateway
+
+**Root Cause:**
+Cloudflare tunnel can't reach the service.
+
+**Fix:**
+```bash
+# Check if service is running
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl is-active fibreflow.service"
+
+# Restart if not active
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+
+# Verify local response
+sshpass -p '0203' ssh hein@100.96.203.105 "curl -s -o /dev/null -w '%{http_code}' http://localhost:3006"
+```
+
+---
+
+### ISSUE: Build Failed
+
+**Diagnosis:**
+```bash
+sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && npm run build 2>&1 | tail -100"
+```
+
+**Common Fixes:**
+1. TypeScript errors - fix in local repo and push
+2. Missing modules - `npm install`
+3. Out of memory - check with `free -h`
+
+---
+
+## Quick Recovery Checklist
+
+When staging is broken, run these in order:
+
+```bash
+# 1. Check what's wrong
+sshpass -p '0203' ssh hein@100.96.203.105 "tail -30 /var/log/fibreflow.error.log"
+
+# 2. Fix permissions if needed
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S chown -R louis:louis /home/louis/apps/fibreflow/.git"
+
+# 3. Reset to master
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout -- . && git reset --hard origin/master\"'"
+
+# 4. Rebuild
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && npm install && npm run build\"'"
+
+# 5. Restart service
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+
+# 6. Verify
+curl -s "https://vf.fibreflow.app/api/ticketing/tickets?pageSize=1" | jq -r '.success'
+```
+
+---
+
+## Issue Log (Self-Improving)
+
+| Date | Issue | Root Cause | Fix Applied |
+|------|-------|------------|-------------|
+| 2026-01-16 | 500 errors on all APIs | Wrong DB password in `.env.production` | `sed -i` to fix password |
+| 2026-01-16 | 404 on all routes | Systemd pointing to wrong directory | Fixed WorkingDirectory |
+| 2026-01-16 | Password kept reverting | Old commit with wrong password | Reset to origin/master |
+| 2026-01-16 | Database authentication failed | Wrong DB password in `.env.production` | Updated DATABASE_URL password via sed |
+| 2026-01-16 | Git permission denied | Mixed file ownership | `chown -R louis:louis .git` |
+
+**Add new issues here as they're discovered and fixed.**
 
 ## Success Criteria
 

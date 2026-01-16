@@ -121,7 +121,8 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       }
 
       setImportResult(result);
-      onImportComplete?.();
+      // Don't call onImportComplete here - let user see results first
+      // Will be called when user clicks "Import Another File"
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
     } finally {
@@ -133,11 +134,14 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
     e.preventDefault();
   };
 
-  const resetForm = () => {
+  const resetForm = (triggerRefresh = false) => {
     setFile(null);
     setPreviewData([]);
     setImportResult(null);
     setError(null);
+    if (triggerRefresh) {
+      onImportComplete?.();
+    }
   };
 
   return (
@@ -381,7 +385,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                 </div>
               )}
               <button
-                onClick={resetForm}
+                onClick={() => resetForm(true)}
                 className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
               >
                 Import Another File

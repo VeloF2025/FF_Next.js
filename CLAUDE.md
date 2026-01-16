@@ -437,6 +437,32 @@ npm ci && npm run build
 echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 ```
 
+### Staging Troubleshooting (vf.fibreflow.app)
+
+**Full troubleshooting guide:** `.claude/skills/staging-deploy.md`
+
+**Quick Fixes for Common Issues:**
+
+| Issue | Symptom | Quick Fix |
+|-------|---------|-----------|
+| **DB Auth Failed** | 500 errors, "password authentication failed" | `sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' .env.production` |
+| **Wrong Directory** | 404 on all routes | Fix `WorkingDirectory` in `/etc/systemd/system/fibreflow.service` |
+| **Old Commit** | Missing features, reverted settings | `git reset --hard origin/master` |
+| **Git Permission** | "Permission denied" on git ops | `chown -R louis:louis .git` |
+
+**Staging Server Details:**
+- **URL:** https://vf.fibreflow.app
+- **Port:** 3006
+- **Service:** `fibreflow.service`
+- **Location:** `/home/louis/apps/fibreflow`
+- **Correct DB Password:** `npg_MIUZXrg1tEY0`
+
+**Quick Recovery:**
+```bash
+# Full reset and rebuild
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'chown -R louis:louis /home/louis/apps/fibreflow/.git && su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout -- . && git reset --hard origin/master && npm install && npm run build\"' && sudo systemctl restart fibreflow.service"
+```
+
 ## Important Notes
 
 - **Server**: Now hosted on Velocity Server (migrated from old VPS)
