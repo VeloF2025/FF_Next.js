@@ -70,7 +70,7 @@ export function DrListPage() {
   const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'incomplete'>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true); // Show filters by default
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -269,8 +269,18 @@ export function DrListPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Initial load
+  // Initial load - set "Today" filter by default
   useEffect(() => {
+    // Calculate today's date in SAST (same logic as handleQuickFilter)
+    const now = new Date();
+    const sastOffset = 2 * 60; // SAST is UTC+2
+    const sastTime = new Date(now.getTime() + (sastOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+    const todayStr = sastTime.toISOString().split('T')[0];
+
+    // Set "Today" as default filter
+    setDateFrom(todayStr);
+    setDateTo(todayStr);
+
     fetchDrops();
   }, []);
 
