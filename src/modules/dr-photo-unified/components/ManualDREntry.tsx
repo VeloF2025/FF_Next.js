@@ -13,10 +13,20 @@ interface ManualDREntryProps {
   onDRsAdded?: (count: number) => void;
 }
 
+interface PreviousSubmission {
+  submission_number: number;
+  snapshot_at: string;
+  photo_count: number;
+  feedback_sent: boolean;
+}
+
 interface ProcessingResult {
   dropNumber: string;
-  status: 'success' | 'error' | 'exists';
+  status: 'success' | 'error' | 'resubmission';
   message: string;
+  isResubmission?: boolean;
+  submissionCount?: number;
+  previousSubmission?: PreviousSubmission | null;
 }
 
 export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
@@ -67,10 +77,25 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
         const data = await response.json();
 
         if (data.success) {
+          const responseData = data.data;
+          const isResubmission = responseData.isResubmission || false;
+          const prevSub = responseData.previousSubmission;
+
+          let message = `${responseData.photosDownloaded} photos, ${responseData.categorizationStatus}`;
+          if (isResubmission && prevSub) {
+            message += ` (Resubmission #${responseData.submissionCount})`;
+            if (prevSub.feedback_sent) {
+              message += ' - Previous had feedback';
+            }
+          }
+
           newResults.push({
             dropNumber,
-            status: 'success',
-            message: `${data.data.photosDownloaded} photos, ${data.data.categorizationStatus}`,
+            status: isResubmission ? 'resubmission' : 'success',
+            message,
+            isResubmission,
+            submissionCount: responseData.submissionCount,
+            previousSubmission: prevSub,
           });
         } else {
           newResults.push({
@@ -94,7 +119,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
     setIsProcessing(false);
     setInput('');
 
-    const successCount = newResults.filter((r) => r.status === 'success').length;
+    const successCount = newResults.filter((r) => r.status === 'success' || r.status === 'resubmission').length;
     if (successCount > 0) {
       onDRsAdded?.(successCount);
     }
@@ -220,16 +245,31 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
             {results.map((result) => (
               <div
                 key={result.dropNumber}
-                className={`flex items-center justify-between px-3 py-2 rounded text-sm ${
+                className={`px-3 py-2 rounded text-sm ${
                   result.status === 'success'
                     ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                    : result.status === 'exists'
-                    ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                    : result.status === 'resubmission'
+                    ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                     : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
                 }`}
               >
-                <span className="font-mono">{result.dropNumber}</span>
-                <span>{result.message}</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-medium">{result.dropNumber}</span>
+                  <span className="text-xs">{result.message}</span>
+                </div>
+                {result.status === 'resubmission' && result.previousSubmission && (
+                  <div className="mt-1 pt-1 border-t border-amber-200 dark:border-amber-700 text-xs opacity-80">
+                    <span>Previous: {result.previousSubmission.photo_count} photos</span>
+                    {result.previousSubmission.feedback_sent && (
+                      <span className="ml-2 px-1.5 py-0.5 bg-amber-200 dark:bg-amber-800 rounded">
+                        Had feedback
+                      </span>
+                    )}
+                    <span className="ml-2">
+                      ({new Date(result.previousSubmission.snapshot_at).toLocaleDateString()})
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
