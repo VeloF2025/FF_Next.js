@@ -151,7 +151,7 @@ async function checkExistingQARecord(dropNumber: string, project?: string): Prom
 
   const placeholders = projectsToCheck.map((_, i) => `$${i + 2}`).join(',');
   const result = await pool.query(
-    `SELECT id, drop_number, project, feedback_sent, created_at, whatsapp_message_date
+    `SELECT id, drop_number, project, feedback_sent, created_at, whatsapp_message_date, sender_phone
      FROM qa_photo_reviews
      WHERE drop_number = $1 AND project IN (${placeholders})`,
     [dropNumber, ...projectsToCheck]
@@ -268,17 +268,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
-           drop_number, project, submission_count, submitted_date, created_at, updated_at,
+           drop_number, project, submission_count, submitted_date, sender_phone, created_at, updated_at,
            submission_history
-         ) VALUES ($1, $2, 1, $3, NOW(), NOW(), $4)`,
+         ) VALUES ($1, $2, 1, $3, $4, NOW(), NOW(), $5)`,
         [
           dropNumber,
           project || existingQA.project,
           qaSubmittedDateStr, // Use WhatsApp message date instead of user-provided date
+          existingQA.sender_phone || null, // Copy sender phone from WA Monitor
           JSON.stringify([{
             submission_number: 0,
             snapshot_at: existingQA.created_at,
             whatsapp_message_date: existingQA.whatsapp_message_date,
+            sender_phone: existingQA.sender_phone || null,
             photo_count: 0,
             photos_metadata: [],
             vlm_categorization_status: null,

@@ -200,7 +200,7 @@ export function DrListPage() {
           status: drop.is_complete ? 'complete' : 'incomplete',
           feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
           createdAt: drop.created_at,
-          senderPhone: null, // Not tracked in unified table
+          senderPhone: drop.sender_phone || null, // From WA Monitor via unified table
         }));
 
         setDrops(transformedDrops);
