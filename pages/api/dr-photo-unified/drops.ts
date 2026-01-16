@@ -249,13 +249,13 @@ async function getProjectStats(dateFrom?: string, dateTo?: string): Promise<Proj
   const params: any[] = [];
 
   if (dateFrom && dateTo) {
-    whereClause = 'WHERE created_at >= $1 AND created_at < $2 + INTERVAL \'1 day\'';
+    whereClause = 'WHERE created_at >= $1::DATE AND created_at < ($2::DATE + INTERVAL \'1 day\')';
     params.push(dateFrom, dateTo);
   } else if (dateFrom) {
-    whereClause = 'WHERE created_at >= $1';
+    whereClause = 'WHERE created_at >= $1::DATE';
     params.push(dateFrom);
   } else if (dateTo) {
-    whereClause = 'WHERE created_at < $1 + INTERVAL \'1 day\'';
+    whereClause = 'WHERE created_at < ($1::DATE + INTERVAL \'1 day\')';
     params.push(dateTo);
   }
 
