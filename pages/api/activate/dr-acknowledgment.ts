@@ -33,6 +33,28 @@ interface OneMapRecordResponse {
 }
 
 /**
+ * Extract ONT serial from barcode scan data
+ * Barcode format: (S)SERIAL(23S)CODE(20S)CODE(U)user(P)pass(ID)id(KY)key(N)model
+ * We want just the serial after (S) and before the next (
+ */
+function extractOntSerial(barcodeData: string | null): string | null {
+  if (!barcodeData) return null;
+
+  // Look for (S) pattern and extract the value after it
+  const serialMatch = barcodeData.match(/\(S\)([^(]+)/);
+  if (serialMatch && serialMatch[1]) {
+    return serialMatch[1].trim();
+  }
+
+  // If no (S) pattern, check if it's just a plain serial (no parentheses)
+  if (!barcodeData.includes('(')) {
+    return barcodeData.trim();
+  }
+
+  return null;
+}
+
+/**
  * Generate WhatsApp acknowledgment message
  */
 function generateAckMessage(
@@ -103,7 +125,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         const data = (await response.json()) as OneMapRecordResponse;
         found = true;
         photoCount = data.photo_count || data.local_photos?.length || 0;
-        ontSerial = data.ont_barcode || null;
+        ontSerial = extractOntSerial(data.ont_barcode);
         upsSerial = data.ups_serial || null;
 
         log.info('DrAcknowledgment', `OneMap data for ${dropNumber}`, {
