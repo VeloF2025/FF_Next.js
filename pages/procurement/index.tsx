@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
 import type { GetServerSideProps } from 'next';
 import type { Project } from '../../src/types/project.types';
 import { ProjectType, ProjectStatus, Priority } from '../../src/types/project.types';
@@ -21,10 +22,11 @@ import {
   ClipboardList,
   BarChart3,
   MapPin,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
-import type { 
-  ProcurementTabId, 
+import type {
+  ProcurementTabId,
   ProcurementViewMode,
   AggregateProjectMetrics,
   ProjectSummary
@@ -87,7 +89,7 @@ export default function ProcurementPage({
       return;
     }
 
-    const query: any = {
+    const query: Record<string, string> = {
       tab: activeTab,
       viewMode
     };
@@ -103,6 +105,20 @@ export default function ProcurementPage({
       query
     }, undefined, { shallow: true });
   }, [activeTab, viewMode, selectedProject, router, isMounted]);
+
+  // Show loading state during hydration to prevent mismatch
+  if (!isMounted) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-500 mx-auto mb-2" />
+            <p className="text-[var(--ff-text-secondary)]">Loading procurement portal...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   /**
    * Load aggregate metrics for "All Projects" view
