@@ -29,14 +29,16 @@ interface FetchPhotosRequest {
   dropNumber: string;
   forceSource?: 'onemap' | 'boss' | 'local'; // Optional: force specific source for testing
   force?: boolean; // Force re-fetch even if already fetched
+  skipCategorization?: boolean; // If true, return photos without step mapping (for VLM categorization)
 }
 
 interface Photo {
   filename: string;
-  step: number;
+  step: number | null; // null when skipCategorization is true
   url: string;
   size?: number;
   modified?: number;
+  original_type?: string; // Original OneMap type (for VLM categorization reference)
 }
 
 interface PhotoFetchResult {
@@ -57,13 +59,13 @@ async function handlePost(
   res: NextApiResponse
 ): Promise<void> {
   try {
-    const { dropNumber, forceSource, force } = req.body as FetchPhotosRequest;
+    const { dropNumber, forceSource, force, skipCategorization } = req.body as FetchPhotosRequest;
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info(`Fetching photos for ${dropNumber}`, { forceSource, force });
+    log.info(`Fetching photos for ${dropNumber}`, { forceSource, force, skipCategorization });
 
     // Check if already fetched (skip unless forced)
     if (!force) {
@@ -94,8 +96,8 @@ async function handlePost(
 
     // Fetch photos with multi-source fallback
     const result = forceSource
-      ? await fetchFromSpecificSource(dropNumber, forceSource)
-      : await fetchPhotosWithFallback(dropNumber);
+      ? await fetchFromSpecificSource(dropNumber, forceSource, skipCategorization)
+      : await fetchPhotosWithFallback(dropNumber, skipCategorization);
 
     // Update unified review with photo metadata and serial numbers
     await updateReviewWithPhotos(dropNumber, result);
@@ -116,12 +118,16 @@ async function handlePost(
 
 /**
  * Fetch photos with multi-source fallback (OneMap → BOSS → Local)
+ * @param skipCategorization - If true, return photos with step=null (for VLM categorization)
  */
-async function fetchPhotosWithFallback(dropNumber: string): Promise<PhotoFetchResult> {
+async function fetchPhotosWithFallback(
+  dropNumber: string,
+  skipCategorization?: boolean
+): Promise<PhotoFetchResult> {
   // Try OneMap first (most reliable)
   try {
     log.info(`Trying OneMap for ${dropNumber}`);
-    return await fetchFromOneMap(dropNumber);
+    return await fetchFromOneMap(dropNumber, skipCategorization);
   } catch (error) {
     log.warn(`OneMap failed for ${dropNumber}`, { error });
   }
@@ -129,7 +135,7 @@ async function fetchPhotosWithFallback(dropNumber: string): Promise<PhotoFetchRe
   // Fallback to BOSS API
   try {
     log.info(`Trying BOSS API for ${dropNumber}`);
-    return await fetchFromBossApi(dropNumber);
+    return await fetchFromBossApi(dropNumber, skipCategorization);
   } catch (error) {
     log.warn(`BOSS API failed for ${dropNumber}`, { error });
   }
@@ -151,16 +157,18 @@ async function fetchPhotosWithFallback(dropNumber: string): Promise<PhotoFetchRe
 
 /**
  * Fetch from specific source (for testing)
+ * @param skipCategorization - If true, return photos with step=null (for VLM categorization)
  */
 async function fetchFromSpecificSource(
   dropNumber: string,
-  source: 'onemap' | 'boss' | 'local'
+  source: 'onemap' | 'boss' | 'local',
+  skipCategorization?: boolean
 ): Promise<PhotoFetchResult> {
   switch (source) {
     case 'onemap':
-      return await fetchFromOneMap(dropNumber);
+      return await fetchFromOneMap(dropNumber, skipCategorization);
     case 'boss':
-      return await fetchFromBossApi(dropNumber);
+      return await fetchFromBossApi(dropNumber, skipCategorization);
     case 'local':
       return await fetchFromLocalCache(dropNumber);
     default:
@@ -174,8 +182,12 @@ const ONEMAP_HOST = 'http://192.168.1.150:8003';
  * Fetch from OneMap GIS API (via port 8003)
  * Uses /api/record/ endpoint which includes photos AND serial numbers
  * If photos not found, triggers download from OneMap first
+ * @param skipCategorization - If true, return step=null to let VLM categorize
  */
-async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
+async function fetchFromOneMap(
+  dropNumber: string,
+  skipCategorization?: boolean
+): Promise<PhotoFetchResult> {
   try {
     // First, try to get the full record (includes photos + serial numbers)
     let response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
@@ -248,12 +260,14 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
     // Use our proxy endpoint instead of internal IP to avoid:
     // 1. LAN IP not accessible from internet
     // 2. Mixed content (HTTPS -> HTTP) blocking
+    // If skipCategorization is true, return step=null so VLM can categorize
     const photos: Photo[] = localPhotos.map((photo: any) => ({
       filename: photo.filename,
-      step: mapPhotoTypeToStep(photo.type),
+      step: skipCategorization ? null : mapPhotoTypeToStep(photo.type),
       url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
       size: photo.size,
       modified: photo.modified,
+      original_type: photo.type, // Store original OneMap type for VLM reference
     }));
 
     log.info(`Fetched record for ${dropNumber}`, {
@@ -277,8 +291,12 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
 
 /**
  * Fetch from BOSS VPS API (port 8001)
+ * @param skipCategorization - If true, return step=null to let VLM categorize
  */
-async function fetchFromBossApi(dropNumber: string): Promise<PhotoFetchResult> {
+async function fetchFromBossApi(
+  dropNumber: string,
+  skipCategorization?: boolean
+): Promise<PhotoFetchResult> {
   try {
     const response = await fetch(`http://192.168.1.150:8001/api/photos/${dropNumber}`);
 
@@ -289,12 +307,14 @@ async function fetchFromBossApi(dropNumber: string): Promise<PhotoFetchResult> {
     const data = await response.json();
 
     // Map BOSS response to our Photo interface
+    // If skipCategorization is true, return step=null so VLM can categorize
     const photos: Photo[] = data.photos.map((photo: any) => ({
       filename: photo.filename,
-      step: mapPhotoTypeToStep(photo.type),
+      step: skipCategorization ? null : mapPhotoTypeToStep(photo.type),
       url: photo.url,
       size: photo.size,
       modified: photo.modified,
+      original_type: photo.type, // Store original type for VLM reference
     }));
 
     return {

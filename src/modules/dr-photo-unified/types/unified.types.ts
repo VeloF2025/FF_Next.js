@@ -256,3 +256,121 @@ export interface BossAPIResponse {
     }>;
   }>;
 }
+
+// ============================================================================
+// VLM CATEGORIZATION TYPES
+// ============================================================================
+
+/**
+ * VLM Categorization status
+ */
+export type VlmCategorizationStatus = 'pending' | 'processing' | 'categorized' | 'approved' | 'failed';
+
+/**
+ * VLM categorization result for a single photo
+ */
+export interface VlmCategorizationResult {
+  /** Photo filename */
+  photo_filename: string;
+
+  /** Original type from OneMap (e.g., 'ph_prop') */
+  original_type: string | null;
+
+  /** Original step based on OneMap type */
+  original_step: number | null;
+
+  /** VLM predicted category name */
+  vlm_predicted_category: string;
+
+  /** VLM predicted step number (1-10) */
+  vlm_predicted_step: number;
+
+  /** VLM confidence score (0.0 - 1.0) */
+  vlm_confidence: number;
+
+  /** What the VLM identified in the photo */
+  vlm_identified_as: string;
+
+  /** VLM reasoning for the classification */
+  vlm_reasoning: string;
+
+  /** Has human approved this categorization? */
+  human_approved: boolean | null;
+
+  /** Human override step if they disagreed */
+  human_override_step: number | null;
+
+  /** Human reason for override */
+  human_override_reason: string | null;
+}
+
+/**
+ * VLM batch categorization response
+ */
+export interface VlmBatchCategorizationResponse {
+  categorizations: Array<{
+    photo_index: number;
+    identified_as: string;
+    predicted_category: string;
+    predicted_step: number;
+    confidence: number;
+    reasoning: string;
+  }>;
+}
+
+/**
+ * Categorize photos request
+ */
+export interface CategorizePhotosRequest {
+  dropNumber: string;
+  force?: boolean;
+  batchSize?: number;
+}
+
+/**
+ * Categorize photos response
+ */
+export interface CategorizePhotosResponse {
+  dropNumber: string;
+  status: 'processing' | 'categorized' | 'failed';
+  photoCount: number;
+  categorizations: VlmCategorizationResult[];
+  processingTimeMs: number;
+  error?: string;
+}
+
+/**
+ * Approve categorization request
+ */
+export interface ApproveCategorizeRequest {
+  dropNumber: string;
+  approvals: Array<{
+    photo_filename: string;
+    approved: boolean;
+    override_step?: number;
+    override_reason?: string;
+  }>;
+  approve_all?: boolean;
+}
+
+/**
+ * Approve categorization response
+ */
+export interface ApproveCategorizeResponse {
+  dropNumber: string;
+  status: 'approved' | 'partial';
+  approved_count: number;
+  overridden_count: number;
+  photos_metadata: Photo[];
+}
+
+/**
+ * Extended UnifiedReview with VLM categorization fields
+ */
+export interface UnifiedReviewWithCategorization extends UnifiedReview {
+  vlm_categorization_status: VlmCategorizationStatus;
+  vlm_categorization_results: VlmCategorizationResult[];
+  vlm_categorized_at: Date | null;
+  vlm_approved_by: string | null;
+  vlm_approved_at: Date | null;
+}

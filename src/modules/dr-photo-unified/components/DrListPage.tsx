@@ -9,7 +9,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, Calendar, Download, Filter, X } from 'lucide-react';
+import { Search, RefreshCw, Calendar, Download, Filter, X, List, PlusCircle } from 'lucide-react';
+import { SystemHealthDashboard } from './SystemHealthDashboard';
+import { ManualDREntry } from './ManualDREntry';
+
+type TabType = 'list' | 'manual-entry';
 
 interface DrListItem {
   id: string;
@@ -71,6 +75,9 @@ export function DrListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // Active tab state
+  const [activeTab, setActiveTab] = useState<TabType>('list');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -539,14 +546,63 @@ export function DrListPage() {
           </div>
         </div>
 
-        {/* Last Updated */}
-        {lastRefresh && (
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-6">
-            <Calendar className="h-4 w-4" />
-            Last updated: {lastRefresh.toLocaleString()} (Auto-refresh every 30s)
+        {/* System Health Status */}
+        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">System Status:</span>
+              <SystemHealthDashboard compact autoRefresh refreshInterval={60} />
+            </div>
+            {lastRefresh && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <Calendar className="h-4 w-4" />
+                Last updated: {lastRefresh.toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('list')}
+              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+                activeTab === 'list'
+                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <List className="h-4 w-4" />
+              DR List
+            </button>
+            <button
+              onClick={() => setActiveTab('manual-entry')}
+              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+                activeTab === 'manual-entry'
+                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <PlusCircle className="h-4 w-4" />
+              Manual Entry
+            </button>
+          </div>
+        </div>
+
+        {/* Manual Entry Tab Content */}
+        {activeTab === 'manual-entry' && (
+          <div className="mb-6">
+            <ManualDREntry onDRsAdded={(count) => {
+              fetchDrops(true, 1);
+              setActiveTab('list'); // Switch back to list after adding
+            }} />
           </div>
         )}
 
+        {/* List Tab Content */}
+        {activeTab === 'list' && (
+          <>
         {/* Search and Filters - MOVED TO TOP */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
           <div className="flex flex-col gap-4">
@@ -953,6 +1009,8 @@ export function DrListPage() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );

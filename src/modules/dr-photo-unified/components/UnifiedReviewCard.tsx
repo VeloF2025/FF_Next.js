@@ -1,11 +1,12 @@
 /**
  * UnifiedReviewCard Component
  *
- * Main component for unified DR photo review with 4 tabs:
+ * Main component for unified DR photo review with 5 tabs:
  * 1. Manual QA - 10-step checklist with incorrect marking
- * 2. AI Evaluation - Trigger evaluation, show results, comparison
- * 3. Photos - Photo gallery with step grouping
- * 4. Feedback - Generate and send WhatsApp feedback
+ * 2. AI Categorization - VLM photo categorization with human approval
+ * 3. AI Evaluation - Trigger evaluation, show results, comparison
+ * 4. Photos - Photo gallery with step grouping
+ * 5. Feedback - Generate and send WhatsApp feedback
  *
  * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
  * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
@@ -21,12 +22,13 @@ import { STEP_LABELS } from '../types/unified.types';
 import type { UnifiedReview } from '../types/unified.types';
 import { ComparisonTable } from './ComparisonTable';
 import { PhotoGalleryUnified } from './PhotoGalleryUnified';
+import { AICategorizationTab } from './AICategorizationTab';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
 }
 
-type TabKey = 'qa' | 'ai' | 'photos' | 'feedback';
+type TabKey = 'qa' | 'categorization' | 'ai' | 'photos' | 'feedback';
 
 export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('qa');
@@ -78,6 +80,7 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
 
   const tabs = [
     { key: 'qa' as const, label: 'Manual QA', icon: '📋' },
+    { key: 'categorization' as const, label: 'AI Categorization', icon: '🏷️' },
     { key: 'ai' as const, label: 'AI Evaluation', icon: '🤖' },
     { key: 'photos' as const, label: `Photos (${review.photo_count})`, icon: '📸' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
@@ -135,6 +138,13 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
       {/* Tab Content */}
       <div className="p-6">
         {activeTab === 'qa' && <ManualQATab review={review} updateStep={updateStep} markIncorrect={markIncorrect} />}
+        {activeTab === 'categorization' && (
+          <AICategorizationTab
+            dropNumber={dropNumber}
+            photoCount={review.photo_count || 0}
+            onCategorizationApproved={refresh}
+          />
+        )}
         {activeTab === 'ai' && <AIEvaluationTab review={review} triggerAiEvaluation={triggerAiEvaluation} />}
         {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
         {activeTab === 'feedback' && <FeedbackTab review={review} generateFeedback={generateFeedback} sendFeedback={sendFeedback} />}
