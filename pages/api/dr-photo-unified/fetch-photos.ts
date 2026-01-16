@@ -186,11 +186,14 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
       };
     }
 
-    // Map OneMap response to our Photo interface with full URLs
+    // Map OneMap response to our Photo interface with PROXY URLs
+    // Use our proxy endpoint instead of internal IP to avoid:
+    // 1. LAN IP not accessible from internet
+    // 2. Mixed content (HTTPS -> HTTP) blocking
     const photos: Photo[] = data.photos.map((photo: any) => ({
       filename: photo.filename,
       step: mapPhotoTypeToStep(photo.type),
-      url: photo.url.startsWith('http') ? photo.url : `${ONEMAP_HOST}${photo.url}`,
+      url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
       size: photo.size,
       modified: photo.modified,
     }));
