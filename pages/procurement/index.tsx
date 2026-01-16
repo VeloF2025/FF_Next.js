@@ -78,48 +78,6 @@ export default function ProcurementPage({
     setIsMounted(true);
   }, []);
 
-  // Update URL when state changes (only after user interaction, not on initial mount)
-  useEffect(() => {
-    // Skip during SSR hydration to prevent React error #418/#423
-    if (!isMounted) return;
-
-    // Skip the first render after mount to prevent hydration errors
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const query: Record<string, string> = {
-      tab: activeTab,
-      viewMode
-    };
-
-    if (selectedProject) {
-      query.project = selectedProject.id;
-      query.projectName = selectedProject.name;
-      query.projectCode = selectedProject.code;
-    }
-
-    router.push({
-      pathname: '/procurement',
-      query
-    }, undefined, { shallow: true });
-  }, [activeTab, viewMode, selectedProject, router, isMounted]);
-
-  // Show loading state during hydration to prevent mismatch
-  if (!isMounted) {
-    return (
-      <AppLayout>
-        <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-purple-500 mx-auto mb-2" />
-            <p className="text-[var(--ff-text-secondary)]">Loading procurement portal...</p>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
   /**
    * Load aggregate metrics for "All Projects" view
    */
@@ -176,13 +134,56 @@ export default function ProcurementPage({
     }
   };
 
-  // Load data based on view mode
+  // Update URL when state changes (only after user interaction, not on initial mount)
   useEffect(() => {
+    // Skip during SSR hydration to prevent React error #418/#423
+    if (!isMounted) return;
+
+    // Skip the first render after mount to prevent hydration errors
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const query: Record<string, string> = {
+      tab: activeTab,
+      viewMode
+    };
+
+    if (selectedProject) {
+      query.project = selectedProject.id;
+      query.projectName = selectedProject.name;
+      query.projectCode = selectedProject.code;
+    }
+
+    router.push({
+      pathname: '/procurement',
+      query
+    }, undefined, { shallow: true });
+  }, [activeTab, viewMode, selectedProject, router, isMounted]);
+
+  // Load data based on view mode (only after mount)
+  useEffect(() => {
+    if (!isMounted) return;
     if (viewMode === 'all') {
       loadAggregateMetrics();
       loadProjectSummaries();
     }
-  }, [viewMode]);
+  }, [viewMode, isMounted]);
+
+  // Show loading state during hydration to prevent mismatch
+  if (!isMounted) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-500 mx-auto mb-2" />
+            <p className="text-[var(--ff-text-secondary)]">Loading procurement portal...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   const contextValue = {
     project: selectedProject,
