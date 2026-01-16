@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/categorize-photos
+ * API Route: /api/activate/categorize-photos
  *
  * Purpose: Run VLM categorization on photos for a DR
  * Method: POST
@@ -18,13 +18,13 @@ import { log } from '@/lib/logger';
 import {
   categorizePhotos,
   PhotoInput,
-} from '@/modules/dr-photo-unified/services/categorizationVlmService';
+} from '@/modules/activate/services/categorizationVlmService';
 import {
   CategorizePhotosRequest,
   CategorizePhotosResponse,
   VlmCategorizationResult,
-} from '@/modules/dr-photo-unified/types/unified.types';
-import { photoTypeToStep } from '@/modules/dr-photo-unified/utils/stepMapper';
+} from '@/modules/activate/types/unified.types';
+import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -73,7 +73,7 @@ async function fetchRawPhotos(
   // Map to PhotoInput format (raw, for categorization)
   const photos: PhotoInput[] = localPhotos.map((photo: any) => ({
     filename: photo.filename,
-    url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
+    url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
     original_type: photo.type || null,
     original_step: photo.type ? photoTypeToStep(photo.type) : null,
   }));
@@ -86,7 +86,7 @@ async function fetchRawPhotos(
 }
 
 /**
- * POST /api/dr-photo-unified/categorize-photos
+ * POST /api/activate/categorize-photos
  * Run VLM categorization on photos
  */
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
@@ -210,7 +210,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 }
 
 /**
- * GET /api/dr-photo-unified/categorize-photos?dropNumber=XXX
+ * GET /api/activate/categorize-photos?dropNumber=XXX
  * Get existing categorization results
  */
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {

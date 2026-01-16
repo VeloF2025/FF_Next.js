@@ -51,7 +51,7 @@ export function RolloutMonitoringDashboard() {
       setError(null);
 
       // TODO: Replace with actual API call
-      // const response = await fetch('/api/dr-photo-unified/metrics');
+      // const response = await fetch('/api/activate/metrics');
       // const data = await response.json();
 
       // Demo data for now

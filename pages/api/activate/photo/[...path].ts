@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/photo/[drNumber]/[filename]
+ * API Route: /api/activate/photo/[drNumber]/[filename]
  *
  * Purpose: Proxy photos from internal dr-photo-api to external clients
  * Method: GET

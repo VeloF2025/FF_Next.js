@@ -6,7 +6,7 @@
  */
 
 import { AppLayout } from '@/components/layout';
-import { SystemHealthDashboard } from '@/modules/dr-photo-unified/components/SystemHealthDashboard';
+import { SystemHealthDashboard } from '@/modules/activate/components/SystemHealthDashboard';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export default function DrPhotoUnifiedMonitoringPage() {
         {/* Header with back navigation */}
         <div className="mb-6 flex items-center gap-4">
           <Link
-            href="/dr-photo-unified"
+            href="/activate"
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <ArrowLeft className="h-5 w-5" />

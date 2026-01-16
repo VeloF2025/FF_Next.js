@@ -76,7 +76,7 @@ export function AICategorizationTab({
     setIsCheckingForNewPhotos(true);
     try {
       // Fetch current photo count from OneMap (via our fetch-photos endpoint with force=false)
-      const response = await fetch('/api/dr-photo-unified/fetch-photos', {
+      const response = await fetch('/api/activate/fetch-photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber, force: false }),
@@ -105,7 +105,7 @@ export function AICategorizationTab({
     setIsLoading(true);
     setNewPhotosDetected(false);
     try {
-      const response = await fetch(`/api/dr-photo-unified/categorize-photos?dropNumber=${dropNumber}`);
+      const response = await fetch(`/api/activate/categorize-photos?dropNumber=${dropNumber}`);
       const data = await response.json();
 
       if (data.success) {
@@ -142,7 +142,7 @@ export function AICategorizationTab({
     setIsProcessing(true);
     setError(null);
     try {
-      const response = await fetch('/api/dr-photo-unified/categorize-photos', {
+      const response = await fetch('/api/activate/categorize-photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber, force: true }),
@@ -173,7 +173,7 @@ export function AICategorizationTab({
     setIsProcessing(true);
     setError(null);
     try {
-      const response = await fetch('/api/dr-photo-unified/approve-categorization', {
+      const response = await fetch('/api/activate/approve-categorization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber, approve_all: true }),
@@ -213,7 +213,7 @@ export function AICategorizationTab({
     });
 
     try {
-      const response = await fetch('/api/dr-photo-unified/approve-categorization', {
+      const response = await fetch('/api/activate/approve-categorization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber, approvals: approvalList }),
@@ -473,7 +473,7 @@ export function AICategorizationTab({
               <div className="flex gap-4">
                 <div className="flex-shrink-0">
                   <img
-                    src={`/api/dr-photo-unified/photo/${dropNumber}/${result.photo_filename}`}
+                    src={`/api/activate/photo/${dropNumber}/${result.photo_filename}`}
                     alt={result.photo_filename}
                     className="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
                   />

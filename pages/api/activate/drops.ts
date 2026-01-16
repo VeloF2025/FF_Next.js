@@ -1,11 +1,11 @@
 /**
  * DR Photo Unified Drops API
- * GET /api/dr-photo-unified/drops
+ * GET /api/activate/drops
  *
  * Endpoints:
- * - GET /api/dr-photo-unified/drops - Get all drops with summary
- * - GET /api/dr-photo-unified/drops?id={id} - Get single drop by ID
- * - GET /api/dr-photo-unified/drops?dropNumber={dropNumber} - Get drop by drop number
+ * - GET /api/activate/drops - Get all drops with summary
+ * - GET /api/activate/drops?id={id} - Get single drop by ID
+ * - GET /api/activate/drops?dropNumber={dropNumber} - Get drop by drop number
  *
  * Returns unified DR photo review data from Neon PostgreSQL
  */

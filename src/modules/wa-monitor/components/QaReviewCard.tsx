@@ -8,7 +8,7 @@
  * This component is kept for backward compatibility during the 2-week transition period.
  * Will be removed after port 8003 shutdown (2 weeks from full rollout).
  *
- * @see src/modules/dr-photo-unified/components/UnifiedReviewCard.tsx
+ * @see src/modules/activate/components/UnifiedReviewCard.tsx
  */
 
 'use client';

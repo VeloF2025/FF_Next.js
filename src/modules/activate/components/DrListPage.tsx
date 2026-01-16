@@ -186,7 +186,7 @@ export function DrListPage() {
       setError(null);
 
       // Fetch with pagination from unified reviews table
-      const response = await fetch(`/api/dr-photo-unified/drops?page=${page}`);
+      const response = await fetch(`/api/activate/drops?page=${page}`);
       if (!response.ok) throw new Error('Failed to fetch drops');
 
       const data = await response.json();
@@ -258,7 +258,7 @@ export function DrListPage() {
       if (fromDate) params.set('dateFrom', fromDate);
       if (toDate) params.set('dateTo', toDate);
 
-      const response = await fetch(`/api/dr-photo-unified/drops?${params.toString()}`);
+      const response = await fetch(`/api/activate/drops?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch project stats');
 
       const data = await response.json();
@@ -384,7 +384,7 @@ export function DrListPage() {
 
   // Handle DR selection
   const handleSelectDr = (dropNumber: string) => {
-    router.push(`/dr-photo-unified/${dropNumber}`);
+    router.push(`/activate/${dropNumber}`);
   };
 
   // Manual refresh
@@ -483,7 +483,7 @@ export function DrListPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `dr-photo-unified-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `activations-export-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

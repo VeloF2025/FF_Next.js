@@ -100,6 +100,29 @@ const nextConfig = {
     ];
   },
 
+  // Redirects for backwards compatibility (dr-photo-unified → activate)
+  async redirects() {
+    return [
+      // Page redirects
+      {
+        source: '/dr-photo-unified',
+        destination: '/activate',
+        permanent: true,
+      },
+      {
+        source: '/dr-photo-unified/:path*',
+        destination: '/activate/:path*',
+        permanent: true,
+      },
+      // API redirects
+      {
+        source: '/api/dr-photo-unified/:path*',
+        destination: '/api/activate/:path*',
+        permanent: true,
+      },
+    ];
+  },
+
   // Proxy /poles to Poles Sync Module on port 3001
   async rewrites() {
     return [

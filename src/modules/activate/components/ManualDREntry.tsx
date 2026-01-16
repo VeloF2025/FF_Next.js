@@ -70,7 +70,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
 
     for (const dropNumber of drNumbers) {
       try {
-        const response = await fetch('/api/dr-photo-unified/process-new-dr', {
+        const response = await fetch('/api/activate/process-new-dr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

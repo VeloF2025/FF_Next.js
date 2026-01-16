@@ -77,7 +77,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       formData.append('file', file);
       formData.append('action', 'preview');
 
-      const response = await fetch('/api/dr-photo-unified/import-oes', {
+      const response = await fetch('/api/activate/import-oes', {
         method: 'POST',
         body: formData,
       });
@@ -109,7 +109,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       formData.append('action', 'import');
       formData.append('reportDate', reportDate);
 
-      const response = await fetch('/api/dr-photo-unified/import-oes', {
+      const response = await fetch('/api/activate/import-oes', {
         method: 'POST',
         body: formData,
       });

@@ -437,7 +437,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
     setFetchError(null);
 
     try {
-      const response = await fetch('/api/dr-photo-unified/fetch-photos', {
+      const response = await fetch('/api/activate/fetch-photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber: review.drop_number, force: true }),

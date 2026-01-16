@@ -4,7 +4,7 @@
  * Users can click a DR to review or search for specific DRs
  */
 
-import { DrListPage } from '@/modules/dr-photo-unified/components/DrListPage';
+import { DrListPage } from '@/modules/activate/components/DrListPage';
 import type { ReactElement } from 'react';
 import type { NextPageWithLayout } from '@/pages/_app';
 

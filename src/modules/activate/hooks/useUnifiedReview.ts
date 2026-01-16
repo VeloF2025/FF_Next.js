@@ -57,7 +57,7 @@ export function useUnifiedReview({
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/dr-photo-unified/${dropNumber}`);
+      const response = await fetch(`/api/activate/${dropNumber}`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -92,7 +92,7 @@ export function useUnifiedReview({
           [stepField]: value,
         };
 
-        const response = await fetch(`/api/dr-photo-unified/${dropNumber}`, {
+        const response = await fetch(`/api/activate/${dropNumber}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -130,7 +130,7 @@ export function useUnifiedReview({
           incorrect_comments: comments,
         };
 
-        const response = await fetch(`/api/dr-photo-unified/${dropNumber}`, {
+        const response = await fetch(`/api/activate/${dropNumber}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -164,7 +164,7 @@ export function useUnifiedReview({
     try {
       log.info(`Triggering AI evaluation for ${dropNumber}`);
 
-      const response = await fetch(`/api/dr-photo-unified/evaluate`, {
+      const response = await fetch(`/api/activate/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber }),
@@ -230,7 +230,7 @@ export function useUnifiedReview({
       try {
         log.info(`Sending feedback for ${dropNumber}`);
 
-        const response = await fetch(`/api/dr-photo-unified/send-feedback`, {
+        const response = await fetch(`/api/activate/send-feedback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dropNumber, message }),
@@ -266,7 +266,7 @@ export function useUnifiedReview({
         // locked_by will be set server-side based on auth
       };
 
-      const response = await fetch(`/api/dr-photo-unified/${dropNumber}/lock`, {
+      const response = await fetch(`/api/activate/${dropNumber}/lock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -295,7 +295,7 @@ export function useUnifiedReview({
     }
 
     try {
-      const response = await fetch(`/api/dr-photo-unified/${dropNumber}/unlock`, {
+      const response = await fetch(`/api/activate/${dropNumber}/unlock`, {
         method: 'POST',
       });
 

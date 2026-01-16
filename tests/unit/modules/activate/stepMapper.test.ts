@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { photoTypeToStep, stepToPhotoTypes, PHOTO_TYPE_TO_STEP, STEP_TO_PHOTO_TYPES } from '@/modules/dr-photo-unified/utils/stepMapper';
+import { photoTypeToStep, stepToPhotoTypes, PHOTO_TYPE_TO_STEP, STEP_TO_PHOTO_TYPES } from '@/modules/activate/utils/stepMapper';
 
 /**
  * Test Suite: Step Mapping Utility

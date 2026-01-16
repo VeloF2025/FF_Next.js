@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/retry-failed
+ * API Route: /api/activate/retry-failed
  *
  * Purpose: Retry failed VLM categorizations
  * Method: POST (retry specific DR or all eligible), GET (list failed DRs)
@@ -45,7 +45,7 @@ interface RetryResult {
 }
 
 /**
- * GET /api/dr-photo-unified/retry-failed
+ * GET /api/activate/retry-failed
  *
  * List all failed categorizations that are eligible for retry
  */
@@ -93,7 +93,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 }
 
 /**
- * POST /api/dr-photo-unified/retry-failed
+ * POST /api/activate/retry-failed
  *
  * Retry failed categorizations
  * Body: { dropNumber?: string, limit?: number }
@@ -149,7 +149,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         );
 
         // Call process-new-dr endpoint internally
-        const response = await fetch(`${API_BASE}/api/dr-photo-unified/process-new-dr`, {
+        const response = await fetch(`${API_BASE}/api/activate/process-new-dr`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dropNumber: dr }),

@@ -52,7 +52,7 @@ export function SystemHealthDashboard({
 
   async function fetchHealth() {
     try {
-      const response = await fetch('/api/dr-photo-unified/health-check');
+      const response = await fetch('/api/activate/health-check');
       const data = await response.json();
 
       if (data.success) {
@@ -73,7 +73,7 @@ export function SystemHealthDashboard({
     setIsRetrying(true);
     setRetryResult(null);
     try {
-      const response = await fetch('/api/dr-photo-unified/admin/retry-failed', {
+      const response = await fetch('/api/activate/admin/retry-failed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 5 }),

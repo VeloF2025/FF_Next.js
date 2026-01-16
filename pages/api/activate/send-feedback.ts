@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/send-feedback
+ * API Route: /api/activate/send-feedback
  *
  * Purpose: Generate and send WhatsApp feedback for a unified review
  * Method: POST
@@ -43,7 +43,7 @@ interface UnifiedReview {
 }
 
 /**
- * POST /api/dr-photo-unified/send-feedback
+ * POST /api/activate/send-feedback
  * Send feedback to WhatsApp group
  */
 async function handlePost(

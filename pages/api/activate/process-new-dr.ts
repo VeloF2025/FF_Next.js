@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/process-new-dr
+ * API Route: /api/activate/process-new-dr
  *
  * Purpose: Webhook endpoint for automatic photo fetch + VLM categorization
  * Method: POST
@@ -23,8 +23,8 @@ import { log } from '@/lib/logger';
 import {
   categorizePhotos,
   PhotoInput,
-} from '@/modules/dr-photo-unified/services/categorizationVlmService';
-import { photoTypeToStep } from '@/modules/dr-photo-unified/utils/stepMapper';
+} from '@/modules/activate/services/categorizationVlmService';
+import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -150,7 +150,7 @@ async function fetchPhotosFromOneMap(dropNumber: string): Promise<{
   // Map to PhotoInput format (raw, for categorization)
   const photos: PhotoInput[] = localPhotos.map((photo: any) => ({
     filename: photo.filename,
-    url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
+    url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
     original_type: photo.type || null,
     original_step: photo.type ? photoTypeToStep(photo.type) : null,
   }));
@@ -235,7 +235,7 @@ function createSubmissionSnapshot(record: any, submissionNumber: number): Previo
 }
 
 /**
- * POST /api/dr-photo-unified/process-new-dr
+ * POST /api/activate/process-new-dr
  *
  * Webhook for automatic processing of new DRs.
  * Called by WA Monitor after creating a DR record, or via Manual Entry.

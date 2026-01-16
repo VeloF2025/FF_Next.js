@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/fetch-photos
+ * API Route: /api/activate/fetch-photos
  *
  * Purpose: Fetch photos for a DR using multi-source fallback strategy
  * Method: POST
@@ -15,7 +15,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import type { UnifiedReview } from '@/modules/dr-photo-unified/types/unified.types';
+import type { UnifiedReview } from '@/modules/activate/types/unified.types';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -51,7 +51,7 @@ interface PhotoFetchResult {
 }
 
 /**
- * POST /api/dr-photo-unified/fetch-photos
+ * POST /api/activate/fetch-photos
  * Fetch photos using multi-source fallback strategy
  */
 async function handlePost(
@@ -264,7 +264,7 @@ async function fetchFromOneMap(
     const photos: Photo[] = localPhotos.map((photo: any) => ({
       filename: photo.filename,
       step: skipCategorization ? null : mapPhotoTypeToStep(photo.type),
-      url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
+      url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
       size: photo.size,
       modified: photo.modified,
       original_type: photo.type, // Store original OneMap type for VLM reference

@@ -322,10 +322,10 @@ const projectName = (project || 'NULL').padEnd(21);
    - ComparisonTable.tsx (manual vs AI side-by-side)
 
 3. **API Endpoints** (Week 4)
-   - `/api/dr-photo-unified/fetch-photos` - Photo fetch endpoint
-   - `/api/dr-photo-unified/review/[dropNumber]` - Review CRUD
-   - `/api/dr-photo-unified/evaluate` - AI evaluation trigger
-   - `/api/dr-photo-unified/send-feedback` - WhatsApp feedback
+   - `/api/activate/fetch-photos` - Photo fetch endpoint
+   - `/api/activate/review/[dropNumber]` - Review CRUD
+   - `/api/activate/evaluate` - AI evaluation trigger
+   - `/api/activate/send-feedback` - WhatsApp feedback
 
 4. **Testing** (Week 5)
    - Parallel operation (old system + new system)

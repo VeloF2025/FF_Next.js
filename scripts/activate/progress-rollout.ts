@@ -4,9 +4,9 @@
  * Phase 6: Progress through rollout stages
  *
  * Usage:
- *   npx tsx scripts/dr-photo-unified/progress-rollout.ts 6.1  # Pilot (Velo Test)
- *   npx tsx scripts/dr-photo-unified/progress-rollout.ts 6.3  # Partial (4 projects)
- *   npx tsx scripts/dr-photo-unified/progress-rollout.ts 6.4  # Full (all projects)
+ *   npx tsx scripts/activate/progress-rollout.ts 6.1  # Pilot (Velo Test)
+ *   npx tsx scripts/activate/progress-rollout.ts 6.3  # Partial (4 projects)
+ *   npx tsx scripts/activate/progress-rollout.ts 6.4  # Full (all projects)
  */
 
 import { progressRollout, getEnabledProjects, getUnifiedReviewRolloutStage } from '../../src/lib/featureFlags';
@@ -15,7 +15,7 @@ const args = process.argv.slice(2);
 const week = args[0] as '6.1' | '6.3' | '6.4';
 
 if (!week || !['6.1', '6.3', '6.4'].includes(week)) {
-  console.error('❌ Invalid week. Usage: npx tsx scripts/dr-photo-unified/progress-rollout.ts [6.1|6.3|6.4]');
+  console.error('❌ Invalid week. Usage: npx tsx scripts/activate/progress-rollout.ts [6.1|6.3|6.4]');
   process.exit(1);
 }
 
@@ -38,7 +38,7 @@ console.log(`   Enabled Projects: ${getEnabledProjects().join(', ')}\n`);
 console.log('📝 Next Steps:');
 if (week === '6.1') {
   console.log('   1. Monitor Velo Test project for 1 week');
-  console.log('   2. Track metrics at /dr-photo-unified/monitoring');
+  console.log('   2. Track metrics at /activate/monitoring');
   console.log('   3. Gather user feedback');
   console.log('   4. If stable, progress to Week 6.3\n');
 } else if (week === '6.3') {

@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/health-check
+ * API Route: /api/activate/health-check
  *
  * Purpose: Check health of all DR Photo Unified system components
  * Method: GET
@@ -273,7 +273,7 @@ async function getRecentActivity() {
 }
 
 /**
- * GET /api/dr-photo-unified/health-check
+ * GET /api/activate/health-check
  */
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {

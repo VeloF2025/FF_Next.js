@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchPhotosWithFallback } from '@/modules/dr-photo-unified/services/unifiedPhotoService';
-import * as oneMapService from '@/modules/dr-photo-unified/services/oneMapIntegrationService';
-import type { PhotoSource, Photo } from '@/modules/dr-photo-unified/types/unified.types';
+import { fetchPhotosWithFallback } from '@/modules/activate/services/unifiedPhotoService';
+import * as oneMapService from '@/modules/activate/services/oneMapIntegrationService';
+import type { PhotoSource, Photo } from '@/modules/activate/types/unified.types';
 
 /**
  * Test Suite: Unified Photo Service

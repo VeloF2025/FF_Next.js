@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/approve-categorization
+ * API Route: /api/activate/approve-categorization
  *
  * Purpose: Human approval/override of VLM photo categorizations
  * Method: POST
@@ -21,7 +21,7 @@ import {
   ApproveCategorizeResponse,
   VlmCategorizationResult,
   Photo,
-} from '@/modules/dr-photo-unified/types/unified.types';
+} from '@/modules/activate/types/unified.types';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -33,7 +33,7 @@ const pool = new Pool({
 });
 
 /**
- * POST /api/dr-photo-unified/approve-categorization
+ * POST /api/activate/approve-categorization
  * Approve or override VLM categorizations
  */
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
@@ -159,7 +159,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
               catResult.human_override_step !== null
                 ? catResult.human_override_step
                 : catResult.vlm_predicted_step,
-            url: `/api/dr-photo-unified/photo/${dropNumber}/${catResult.photo_filename}`,
+            url: `/api/activate/photo/${dropNumber}/${catResult.photo_filename}`,
             original_type: catResult.original_type,
           }));
 

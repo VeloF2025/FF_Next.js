@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/evaluate
+ * API Route: /api/activate/evaluate
  *
  * Purpose: Trigger AI evaluation for a unified review
  * Method: POST
@@ -51,7 +51,7 @@ interface AIEvaluationResult {
 }
 
 /**
- * POST /api/dr-photo-unified/evaluate
+ * POST /api/activate/evaluate
  * Trigger AI evaluation for a unified review
  */
 async function handlePost(
@@ -91,7 +91,7 @@ async function handlePost(
     } else {
       log.info(`Fetching fresh photos for ${dropNumber}`);
       try {
-        const photoResponse = await fetch(`${getBaseUrl()}/api/dr-photo-unified/fetch-photos`, {
+        const photoResponse = await fetch(`${getBaseUrl()}/api/activate/fetch-photos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dropNumber }),

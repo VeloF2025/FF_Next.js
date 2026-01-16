@@ -21,8 +21,8 @@ The unified DR photo review system is now **fully rolled out** to all projects a
 - **Reason:** Functionality integrated into unified photo service with multi-source fallback
 
 **Replacement:**
-- `src/modules/dr-photo-unified/services/unifiedPhotoService.ts`
-- `src/modules/dr-photo-unified/services/oneMapIntegrationService.ts`
+- `src/modules/activate/services/unifiedPhotoService.ts`
+- `src/modules/activate/services/oneMapIntegrationService.ts`
 
 ### 2. WA Monitor QaReviewCard Component
 - **Status:** ⚠️ DEPRECATED
@@ -30,7 +30,7 @@ The unified DR photo review system is now **fully rolled out** to all projects a
 - **Reason:** Replaced by unified review card with combined manual + AI evaluation
 
 **Replacement:**
-- `src/modules/dr-photo-unified/components/UnifiedReviewCard.tsx`
+- `src/modules/activate/components/UnifiedReviewCard.tsx`
 
 ### 3. Foto Review VLM Service
 - **Status:** ⚠️ DEPRECATED
@@ -38,7 +38,7 @@ The unified DR photo review system is now **fully rolled out** to all projects a
 - **Reason:** AI evaluation now integrated into unified workflow
 
 **Replacement:**
-- `src/modules/dr-photo-unified/services/unifiedVlmService.ts`
+- `src/modules/activate/services/unifiedVlmService.ts`
 
 ---
 
@@ -126,10 +126,10 @@ UNIFIED_DR_REVIEW: {
 - `/api/foto/evaluate` - Old AI evaluation endpoint
 
 ### New Unified APIs
-- `/api/dr-photo-unified/fetch-photos` - Multi-source photo fetching
-- `/api/dr-photo-unified/review/[dropNumber]` - Unified review CRUD
-- `/api/dr-photo-unified/evaluate` - Integrated AI evaluation
-- `/api/dr-photo-unified/send-feedback` - WhatsApp feedback delivery
+- `/api/activate/fetch-photos` - Multi-source photo fetching
+- `/api/activate/review/[dropNumber]` - Unified review CRUD
+- `/api/activate/evaluate` - Integrated AI evaluation
+- `/api/activate/send-feedback` - WhatsApp feedback delivery
 
 ---
 
@@ -207,9 +207,9 @@ UNIFIED_DR_REVIEW: {
 - Week 6.4: (pending commit) - Phase 6 Week 6.4 full rollout
 
 **Related Services:**
-- Unified Photo Service: `src/modules/dr-photo-unified/services/unifiedPhotoService.ts`
-- Unified VLM Service: `src/modules/dr-photo-unified/services/unifiedVlmService.ts`
-- Unified Review Card: `src/modules/dr-photo-unified/components/UnifiedReviewCard.tsx`
+- Unified Photo Service: `src/modules/activate/services/unifiedPhotoService.ts`
+- Unified VLM Service: `src/modules/activate/services/unifiedVlmService.ts`
+- Unified Review Card: `src/modules/activate/components/UnifiedReviewCard.tsx`
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/[dropNumber]
+ * API Route: /api/activate/[dropNumber]
  *
  * Purpose: Fetch a single unified review by drop number
  * Methods: GET, PATCH
@@ -15,7 +15,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/dr-photo-unified/types/unified.types';
+import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/activate/types/unified.types';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 
@@ -28,7 +28,7 @@ const pool = new Pool({
 });
 
 /**
- * GET /api/dr-photo-unified/[dropNumber]
+ * GET /api/activate/[dropNumber]
  * Fetch a single unified review (creates on-demand if not exists but DR is in qa_photo_reviews)
  */
 async function handleGet(
@@ -177,7 +177,7 @@ async function handleGet(
 }
 
 /**
- * PATCH /api/dr-photo-unified/[dropNumber]
+ * PATCH /api/activate/[dropNumber]
  * Update a unified review (manual QA steps, incorrect tracking, etc.)
  */
 async function handlePatch(
@@ -381,7 +381,7 @@ async function fetchFromOneMapRecord(dropNumber: string): Promise<{
     const photos = localPhotos.map((photo: { filename: string; type: string; size?: number }) => ({
       filename: photo.filename,
       step: mapPhotoTypeToStep(photo.type),
-      url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
+      url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
       size: photo.size,
     }));
 

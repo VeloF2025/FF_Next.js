@@ -66,7 +66,7 @@ async function createUnifiedReview(dropNumber, project) {
  */
 async function triggerCategorization(dropNumber, project) {
   return new Promise((resolve, reject) => {
-    const url = new URL(`${API_BASE}/api/dr-photo-unified/process-new-dr`);
+    const url = new URL(`${API_BASE}/api/activate/process-new-dr`);
 
     const payload = JSON.stringify({
       dropNumber,
