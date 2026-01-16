@@ -86,8 +86,8 @@ export default function ProjectBudgetPage() {
         categories: budgetExists
           ? (budgetData.data.categories || [])
           : (categoriesRes.ok && Array.isArray(categoriesData.data) ? categoriesData.data : []),
-        alerts: alertsRes.ok && Array.isArray(alertsData.data) ? alertsData.data : [],
-        transactions: transactionsRes.ok && Array.isArray(transactionsData.data) ? transactionsData.data : [],
+        alerts: alertsRes.ok && alertsData.data?.alerts ? alertsData.data.alerts : [],
+        transactions: transactionsRes.ok && transactionsData.data?.transactions ? transactionsData.data.transactions : [],
         project: projectRes.ok ? projectData.data : null,
       });
     } catch (err) {
