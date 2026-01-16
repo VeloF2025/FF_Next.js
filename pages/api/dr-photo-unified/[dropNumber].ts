@@ -27,7 +27,7 @@ const pool = new Pool({
 
 /**
  * GET /api/dr-photo-unified/[dropNumber]
- * Fetch a single unified review
+ * Fetch a single unified review (creates on-demand if not exists but DR is in qa_photo_reviews)
  */
 async function handleGet(
   req: NextApiRequest,
@@ -37,7 +37,8 @@ async function handleGet(
   try {
     log.info(`Fetching unified review for ${dropNumber}`);
 
-    const result = await pool.query<UnifiedReview>(
+    // First, try to get from dr_photo_unified_reviews
+    let result = await pool.query<UnifiedReview>(
       `
       SELECT
         id,
@@ -84,9 +85,43 @@ async function handleGet(
       [dropNumber]
     );
 
+    // If not found, check qa_photo_reviews and create on-demand
     if (result.rows.length === 0) {
-      log.warn(`Unified review not found: ${dropNumber}`);
-      return apiResponse.notFound(res, 'Unified Review', dropNumber);
+      log.info(`Unified review not found, checking qa_photo_reviews for ${dropNumber}`);
+
+      const qaResult = await pool.query(
+        `SELECT drop_number, project FROM qa_photo_reviews WHERE drop_number = $1 LIMIT 1`,
+        [dropNumber]
+      );
+
+      if (qaResult.rows.length === 0) {
+        log.warn(`DR not found in any table: ${dropNumber}`);
+        return apiResponse.notFound(res, 'Unified Review', dropNumber);
+      }
+
+      // Create unified review record from qa_photo_reviews data
+      const qaData = qaResult.rows[0];
+      log.info(`Creating unified review on-demand for ${dropNumber}`);
+
+      result = await pool.query<UnifiedReview>(
+        `
+        INSERT INTO dr_photo_unified_reviews (
+          drop_number,
+          project,
+          photo_source,
+          photo_count,
+          photos_metadata,
+          incorrect_steps,
+          incorrect_comments,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, NULL, 0, '[]'::jsonb, '{}', '{}'::jsonb, NOW(), NOW())
+        RETURNING *;
+        `,
+        [dropNumber, qaData.project]
+      );
+
+      log.info(`Created unified review for ${dropNumber}`);
     }
 
     const review = result.rows[0];
