@@ -43,6 +43,7 @@ interface ProcessNewDrRequest {
   project?: string;
   submittedDate?: string; // Date when DR was submitted (YYYY-MM-DD), defaults to today
   skipCategorization?: boolean; // Optional: only fetch photos, don't categorize
+  senderPhone?: string; // Phone number of sender (from WA Monitor)
 }
 
 interface PreviousSubmission {
@@ -65,6 +66,51 @@ interface ProcessNewDrResponse {
   isResubmission?: boolean;
   submissionCount?: number;
   previousSubmission?: PreviousSubmission | null;
+  dropsTableMatch?: boolean;
+  projectMismatch?: boolean;
+  expectedProject?: string | null;
+}
+
+interface DropsTableRecord {
+  id: string;
+  drop_number: string;
+  project_id: string;
+  project_name: string;
+}
+
+/**
+ * Check if DR exists in the drops table and get project info
+ * Returns null if not found, or the record with project name
+ */
+async function checkDropsTable(dropNumber: string): Promise<DropsTableRecord | null> {
+  const result = await pool.query(
+    `SELECT d.id, d.drop_number, d.project_id, p.project_name
+     FROM drops d
+     LEFT JOIN projects p ON d.project_id = p.id
+     WHERE d.drop_number = $1`,
+    [dropNumber]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+/**
+ * Mark DR as site submitted in the drops table
+ */
+async function markSiteSubmitted(
+  dropNumber: string,
+  senderPhone: string | null,
+  waProject: string
+): Promise<void> {
+  await pool.query(
+    `UPDATE drops
+     SET
+       site_submitted = true,
+       site_submitted_at = NOW(),
+       site_submitted_by = $1,
+       site_submitted_project = $2
+     WHERE drop_number = $3`,
+    [senderPhone, waProject, dropNumber]
+  );
 }
 
 /**
@@ -203,7 +249,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
   const startTime = Date.now();
 
   try {
-    const { dropNumber, project, submittedDate, skipCategorization } = req.body as ProcessNewDrRequest;
+    const { dropNumber, project, submittedDate, skipCategorization, senderPhone } = req.body as ProcessNewDrRequest;
 
     // Parse submitted date or default to today
     const submittedDateValue = submittedDate ? new Date(submittedDate) : new Date();
@@ -213,7 +259,45 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('ProcessNewDr', `Processing DR: ${dropNumber}`, { project, submittedDate: submittedDateStr, skipCategorization });
+    log.info('ProcessNewDr', `Processing DR: ${dropNumber}`, { project, submittedDate: submittedDateStr, skipCategorization, senderPhone });
+
+    // === SITE SUBMISSION TRACKING ===
+    // Check if DR exists in drops table and validate project ownership
+    const dropsRecord = await checkDropsTable(dropNumber);
+    let dropsTableMatch = false;
+    let projectMismatch = false;
+    let expectedProject: string | null = null;
+
+    if (dropsRecord) {
+      dropsTableMatch = true;
+      expectedProject = dropsRecord.project_name;
+
+      // Validate project ownership if project is provided (from WA Monitor)
+      if (project && expectedProject && project.toLowerCase() !== expectedProject.toLowerCase()) {
+        projectMismatch = true;
+        log.warn('ProcessNewDr', `Project mismatch for ${dropNumber}`, {
+          expectedProject,
+          submittedTo: project,
+          senderPhone,
+        });
+
+        // BLOCK: Return error - DR submitted to wrong WhatsApp group
+        return res.status(400).json({
+          success: false,
+          error: 'PROJECT_MISMATCH',
+          message: `${dropNumber} belongs to ${expectedProject}, please resubmit to the correct group`,
+          dropNumber,
+          expectedProject,
+          submittedTo: project,
+        });
+      }
+
+      // Mark as site submitted in drops table
+      await markSiteSubmitted(dropNumber, senderPhone || null, project || expectedProject);
+      log.info('ProcessNewDr', `Marked ${dropNumber} as site submitted`, { expectedProject });
+    } else {
+      log.info('ProcessNewDr', `DR ${dropNumber} not found in drops table (continuing)`);
+    }
 
     // Check for existing records in both tables
     const existingUnified = await checkExistingUnifiedRecord(dropNumber);
@@ -327,6 +411,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         isResubmission,
         submissionCount,
         previousSubmission,
+        dropsTableMatch,
+        projectMismatch,
+        expectedProject,
       } as ProcessNewDrResponse);
     }
 
@@ -365,6 +452,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         isResubmission,
         submissionCount,
         previousSubmission,
+        dropsTableMatch,
+        projectMismatch,
+        expectedProject,
       } as ProcessNewDrResponse);
     }
 
@@ -406,6 +496,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         isResubmission,
         submissionCount,
         previousSubmission,
+        dropsTableMatch,
+        projectMismatch,
+        expectedProject,
       } as ProcessNewDrResponse);
     } catch (catError) {
       log.error('ProcessNewDr', `Categorization failed for ${dropNumber}`, catError);
@@ -432,6 +525,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         isResubmission,
         submissionCount,
         previousSubmission,
+        dropsTableMatch,
+        projectMismatch,
+        expectedProject,
       } as ProcessNewDrResponse);
     }
   } catch (error) {

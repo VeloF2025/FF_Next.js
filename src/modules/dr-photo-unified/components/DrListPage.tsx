@@ -9,11 +9,12 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, Calendar, Download, Filter, X, List, PlusCircle } from 'lucide-react';
+import { Search, RefreshCw, Calendar, Download, Filter, X, List, PlusCircle, FileSpreadsheet } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
+import { OESImportTab } from './OESImportTab';
 
-type TabType = 'list' | 'manual-entry';
+type TabType = 'list' | 'manual-entry' | 'oes-import';
 
 interface DrListItem {
   id: string;
@@ -600,6 +601,17 @@ export function DrListPage() {
               <PlusCircle className="h-4 w-4" />
               Manual Entry
             </button>
+            <button
+              onClick={() => setActiveTab('oes-import')}
+              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+                activeTab === 'oes-import'
+                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              OES Import
+            </button>
           </div>
         </div>
 
@@ -609,6 +621,15 @@ export function DrListPage() {
             <ManualDREntry onDRsAdded={(count) => {
               fetchDrops(true, 1);
               setActiveTab('list'); // Switch back to list after adding
+            }} />
+          </div>
+        )}
+
+        {/* OES Import Tab Content */}
+        {activeTab === 'oes-import' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
+            <OESImportTab onImportComplete={() => {
+              fetchDrops(true, 1);
             }} />
           </div>
         )}
