@@ -41,6 +41,7 @@ const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 interface ProcessNewDrRequest {
   dropNumber: string;
   project?: string;
+  submittedDate?: string; // Date when DR was submitted (YYYY-MM-DD), defaults to today
   skipCategorization?: boolean; // Optional: only fetch photos, don't categorize
 }
 
@@ -128,7 +129,7 @@ async function checkExistingUnifiedRecord(dropNumber: string): Promise<any | nul
        step_01_house_photo, step_02_cable_from_pole, step_03_entry_outside,
        step_04_entry_inside, step_05_wall, step_06_ont_back,
        step_07_power_meter, step_08_final_installation, step_09_green_lights,
-       step_10_signature, created_at
+       step_10_signature, submitted_date, created_at
      FROM dr_photo_unified_reviews
      WHERE drop_number = $1`,
     [dropNumber]
@@ -139,6 +140,7 @@ async function checkExistingUnifiedRecord(dropNumber: string): Promise<any | nul
 /**
  * Check if DR exists in qa_photo_reviews table (WA Monitor table)
  * Used for cross-table duplicate detection
+ * Also retrieves whatsapp_message_date for accurate submission date tracking
  */
 async function checkExistingQARecord(dropNumber: string, project?: string): Promise<any | null> {
   // Check across shared projects (Lawley, Mohadin, Mamelodi) or just the specific project
@@ -149,7 +151,7 @@ async function checkExistingQARecord(dropNumber: string, project?: string): Prom
 
   const placeholders = projectsToCheck.map((_, i) => `$${i + 2}`).join(',');
   const result = await pool.query(
-    `SELECT id, drop_number, project, feedback_sent, created_at
+    `SELECT id, drop_number, project, feedback_sent, created_at, whatsapp_message_date
      FROM qa_photo_reviews
      WHERE drop_number = $1 AND project IN (${placeholders})`,
     [dropNumber, ...projectsToCheck]
@@ -160,10 +162,11 @@ async function checkExistingQARecord(dropNumber: string, project?: string): Prom
 /**
  * Create a snapshot of the current submission for history
  */
-function createSubmissionSnapshot(record: any, submissionNumber: number): PreviousSubmission {
+function createSubmissionSnapshot(record: any, submissionNumber: number): PreviousSubmission & { submitted_date?: string } {
   return {
     submission_number: submissionNumber,
     snapshot_at: new Date().toISOString(),
+    submitted_date: record.submitted_date || null, // Track when this submission was dated
     photo_count: record.photo_count || 0,
     photos_metadata: record.photos_metadata || [],
     vlm_categorization_status: record.vlm_categorization_status,
@@ -200,13 +203,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
   const startTime = Date.now();
 
   try {
-    const { dropNumber, project, skipCategorization } = req.body as ProcessNewDrRequest;
+    const { dropNumber, project, submittedDate, skipCategorization } = req.body as ProcessNewDrRequest;
+
+    // Parse submitted date or default to today
+    const submittedDateValue = submittedDate ? new Date(submittedDate) : new Date();
+    const submittedDateStr = submittedDateValue.toISOString().split('T')[0]; // YYYY-MM-DD
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('ProcessNewDr', `Processing DR: ${dropNumber}`, { project, skipCategorization });
+    log.info('ProcessNewDr', `Processing DR: ${dropNumber}`, { project, submittedDate: submittedDateStr, skipCategorization });
 
     // Check for existing records in both tables
     const existingUnified = await checkExistingUnifiedRecord(dropNumber);
@@ -229,6 +236,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       const updatedHistory = [...currentHistory, previousSubmission];
 
       // Update record with new submission info and preserved history
+      // Note: submitted_date is preserved from original submission, not overwritten
       await pool.query(
         `UPDATE dr_photo_unified_reviews
          SET
@@ -249,19 +257,28 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       });
     } else if (existingQA) {
       // DR exists in QA table but not unified - create unified record noting the QA reference
-      log.info('ProcessNewDr', `Found existing QA record for ${dropNumber} in ${existingQA.project}`);
+      // Use whatsapp_message_date if available (actual WhatsApp submission time)
+      const qaSubmittedDate = existingQA.whatsapp_message_date || existingQA.created_at;
+      const qaSubmittedDateStr = new Date(qaSubmittedDate).toISOString().split('T')[0];
+
+      log.info('ProcessNewDr', `Found existing QA record for ${dropNumber} in ${existingQA.project}`, {
+        whatsapp_message_date: existingQA.whatsapp_message_date,
+        using_date: qaSubmittedDateStr,
+      });
 
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
-           drop_number, project, submission_count, created_at, updated_at,
+           drop_number, project, submission_count, submitted_date, created_at, updated_at,
            submission_history
-         ) VALUES ($1, $2, 1, NOW(), NOW(), $3)`,
+         ) VALUES ($1, $2, 1, $3, NOW(), NOW(), $4)`,
         [
           dropNumber,
           project || existingQA.project,
+          qaSubmittedDateStr, // Use WhatsApp message date instead of user-provided date
           JSON.stringify([{
             submission_number: 0,
             snapshot_at: existingQA.created_at,
+            whatsapp_message_date: existingQA.whatsapp_message_date,
             photo_count: 0,
             photos_metadata: [],
             vlm_categorization_status: null,
@@ -279,9 +296,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     } else {
       // Brand new DR - create fresh record
       await pool.query(
-        `INSERT INTO dr_photo_unified_reviews (drop_number, project, submission_count, created_at, updated_at)
-         VALUES ($1, $2, 1, NOW(), NOW())`,
-        [dropNumber, project || null]
+        `INSERT INTO dr_photo_unified_reviews (drop_number, project, submission_count, submitted_date, created_at, updated_at)
+         VALUES ($1, $2, 1, $3, NOW(), NOW())`,
+        [dropNumber, project || null, submittedDateStr]
       );
       log.info('ProcessNewDr', `Created new record for ${dropNumber}`);
     }

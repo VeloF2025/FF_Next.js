@@ -32,6 +32,10 @@ interface ProcessingResult {
 export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
   const [input, setInput] = useState('');
   const [project, setProject] = useState('');
+  const [submittedDate, setSubmittedDate] = useState(() => {
+    // Default to today in YYYY-MM-DD format
+    return new Date().toISOString().split('T')[0];
+  });
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ProcessingResult[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +75,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
           body: JSON.stringify({
             dropNumber,
             project: project.trim(),
+            submittedDate,
           }),
         });
 
@@ -170,6 +175,23 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
           <option value="Velo Test">Velo Test</option>
           <option value="Marketing Activations">Marketing Activations</option>
         </select>
+      </div>
+
+      {/* Submitted Date */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Date Submitted
+        </label>
+        <input
+          type="date"
+          value={submittedDate}
+          onChange={(e) => setSubmittedDate(e.target.value)}
+          max={new Date().toISOString().split('T')[0]}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          When was this DR originally submitted? Defaults to today.
+        </p>
       </div>
 
       {/* Text Input */}
