@@ -287,6 +287,12 @@ export function DrListPage() {
     fetchDrops(true, 1, getCurrentFilters());
   }, []);
 
+  // Re-fetch when any filter changes (server-side filtering)
+  useEffect(() => {
+    // Skip initial render (handled by the effect above)
+    fetchDrops(true, 1, getCurrentFilters());
+  }, [dateFrom, dateTo, projectFilter, statusFilter]);
+
   // Apply all filters and update stats
   // Note: This effect should NOT depend on `drops` to avoid resetting pagination
   // when new data is fetched for the current page
