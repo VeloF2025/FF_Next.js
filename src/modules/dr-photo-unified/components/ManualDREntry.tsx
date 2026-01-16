@@ -8,6 +8,7 @@
 'use client';
 
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 
 interface ManualDREntryProps {
   onDRsAdded?: (count: number) => void;
@@ -124,9 +125,27 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
     setIsProcessing(false);
     setInput('');
 
-    const successCount = newResults.filter((r) => r.status === 'success' || r.status === 'resubmission').length;
-    if (successCount > 0) {
-      onDRsAdded?.(successCount);
+    const successCount = newResults.filter((r) => r.status === 'success').length;
+    const resubmissionCount = newResults.filter((r) => r.status === 'resubmission').length;
+    const errorCount = newResults.filter((r) => r.status === 'error').length;
+
+    // Show toast notification based on results
+    if (errorCount === newResults.length) {
+      toast.error(`Failed to process ${errorCount} DR${errorCount > 1 ? 's' : ''}`);
+    } else if (errorCount > 0) {
+      toast(`Processed ${successCount + resubmissionCount} DR${successCount + resubmissionCount > 1 ? 's' : ''}, ${errorCount} failed`, {
+        icon: '⚠️',
+      });
+    } else if (resubmissionCount > 0 && successCount === 0) {
+      toast.success(`${resubmissionCount} DR${resubmissionCount > 1 ? 's' : ''} resubmitted successfully`);
+    } else if (resubmissionCount > 0) {
+      toast.success(`${successCount} new + ${resubmissionCount} resubmission${resubmissionCount > 1 ? 's' : ''} processed`);
+    } else {
+      toast.success(`${successCount} DR${successCount > 1 ? 's' : ''} processed successfully`);
+    }
+
+    if (successCount + resubmissionCount > 0) {
+      onDRsAdded?.(successCount + resubmissionCount);
     }
   }
 
