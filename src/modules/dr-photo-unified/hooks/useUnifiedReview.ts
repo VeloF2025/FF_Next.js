@@ -352,8 +352,11 @@ export function useUnifiedReview({
 }
 
 /**
- * Helper: Get step field suffix based on step number
+ * Helper: Get step field suffix based on step number (10 steps)
  * Maps step numbers to their database column name suffixes
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+ * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
  */
 function getStepFieldSuffix(step: number): string {
   const suffixes: Record<number, string> = {
@@ -364,11 +367,9 @@ function getStepFieldSuffix(step: number): string {
     5: 'wall',
     6: 'ont_back',
     7: 'power_meter',
-    8: 'ont_barcode',
-    9: 'ups_serial',
-    10: 'final_installation',
-    11: 'green_lights',
-    12: 'signature',
+    8: 'final_installation',
+    9: 'green_lights',
+    10: 'signature',
   };
 
   return suffixes[step] || '';

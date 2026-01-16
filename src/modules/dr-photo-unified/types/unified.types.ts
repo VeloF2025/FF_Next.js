@@ -36,7 +36,7 @@ export interface Photo {
   /** Photo filename (e.g., DR1730550_ph_prop_001.jpg) */
   filename: string;
 
-  /** Unified step number (1-12) or null if unmapped */
+  /** Unified step number (1-10) or null if unmapped */
   step: number | null;
 
   /** Full URL to photo (absolute or proxy URL) */
@@ -70,7 +70,7 @@ export interface PhotoSourceResponse {
  * AI step evaluation result
  */
 export interface AIStepResult {
-  /** Step number (1-12) */
+  /** Step number (1-10) */
   step: number;
 
   /** Step label (e.g., "House Photo") */
@@ -106,7 +106,9 @@ export interface UnifiedReview {
   photo_count: number;
   photos_metadata: Photo[];
 
-  // 12 unified QA steps (manual review)
+  // 10 unified QA steps (manual review)
+  // NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+  // barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields
   step_01_house_photo: boolean;
   step_02_cable_from_pole: boolean;
   step_03_entry_outside: boolean;
@@ -114,11 +116,9 @@ export interface UnifiedReview {
   step_05_wall: boolean;
   step_06_ont_back: boolean;
   step_07_power_meter: boolean;
-  step_08_ont_barcode: boolean;
-  step_09_ups_serial: boolean;
-  step_10_final_installation: boolean;
-  step_11_green_lights: boolean;
-  step_12_signature: boolean;
+  step_08_final_installation: boolean;
+  step_09_green_lights: boolean;
+  step_10_signature: boolean;
 
   // Incorrect tracking (manual review)
   incorrect_steps: string[]; // Array of step numbers marked as incorrect
@@ -154,6 +154,9 @@ export interface UnifiedReview {
 
 /**
  * Step label mapping (for UI display)
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+ * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
  */
 export const STEP_LABELS: Record<number, string> = {
   1: 'House Photo',
@@ -163,11 +166,9 @@ export const STEP_LABELS: Record<number, string> = {
   5: 'Wall for Installation',
   6: 'ONT Back After Install',
   7: 'Power Meter Reading',
-  8: 'ONT Barcode',
-  9: 'UPS Serial Number',
-  10: 'Final Installation',
-  11: 'Green Lights on ONT',
-  12: 'Signature',
+  8: 'Final Installation',
+  9: 'Green Lights on ONT',
+  10: 'Signature',
 };
 
 /**
@@ -182,7 +183,7 @@ export interface CreateUnifiedReviewPayload {
  * Update unified review payload (for API)
  */
 export interface UpdateUnifiedReviewPayload {
-  // Manual QA step updates
+  // Manual QA step updates (10 photo steps)
   step_01_house_photo?: boolean;
   step_02_cable_from_pole?: boolean;
   step_03_entry_outside?: boolean;
@@ -190,11 +191,9 @@ export interface UpdateUnifiedReviewPayload {
   step_05_wall?: boolean;
   step_06_ont_back?: boolean;
   step_07_power_meter?: boolean;
-  step_08_ont_barcode?: boolean;
-  step_09_ups_serial?: boolean;
-  step_10_final_installation?: boolean;
-  step_11_green_lights?: boolean;
-  step_12_signature?: boolean;
+  step_08_final_installation?: boolean;
+  step_09_green_lights?: boolean;
+  step_10_signature?: boolean;
 
   // Incorrect tracking
   incorrect_steps?: string[];

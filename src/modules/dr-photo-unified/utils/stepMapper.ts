@@ -1,7 +1,7 @@
 /**
  * Step Mapper Utility
  *
- * Purpose: Bidirectional mapping between photo types (port 8003) and unified 12 steps
+ * Purpose: Bidirectional mapping between photo types (port 8003) and unified 10 steps
  * Status: WORKING - GREEN phase implementation
  *
  * Following PAI principles:
@@ -12,12 +12,15 @@
  * NLNH Confidence: HIGH
  * - Mappings verified against port 8003 photo types
  * - Test coverage ensures bidirectional consistency
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+ * barcodes stored directly in the database (ont_serial_scanned, ups_serial_scanned)
  */
 
 /**
  * Photo Type to Step Mapping
  *
- * Maps 20 photo types from port 8003 to unified 12 steps.
+ * Maps photo types from port 8003 to unified 10 steps.
  * Multiple photo types can map to the same step (alternates).
  *
  * Source: Port 8003 photo naming convention (ph_prop, ph_pole, etc.)
@@ -26,6 +29,8 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 1: House Photo
   'ph_prop': 1,
   'ph_sign1': 1,
+  'ph_drop': 1,
+  'ph_outs': 1,
 
   // Step 2: Cable from Pole
   'ph_pole': 2,
@@ -48,47 +53,39 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
 
   // Step 7: Power Meter Reading
   'ph_powm': 7,
+  'ph_powm1': 7,
   'ph_powm2': 7,
 
-  // Step 8: ONT Barcode
-  'ph_bl': 8,
-  'ph_barcode': 8,
+  // Step 8: Final Installation (was step 10)
+  'ph_after': 8,
+  'ph_final': 8,
 
-  // Step 9: UPS Serial Number
-  'ph_ups': 9,
+  // Step 9: Green Lights on ONT (was step 11)
+  'ph_lights': 9,
+  'ph_led': 9,
 
-  // Step 10: Final Installation
-  'ph_after': 10,
-  'ph_final': 10,
-
-  // Step 11: Green Lights on ONT
-  'ph_lights': 11,
-  'ph_led': 11,
-
-  // Step 12: Signature - no photo type (handled by stepToPhotoTypes)
+  // Step 10: Signature (was step 12)
+  'ph_sign2': 10,
+  'ph_signature': 10,
 };
 
 /**
  * Step to Photo Types Mapping
  *
- * Maps unified 12 steps to arrays of photo types.
+ * Maps unified 10 steps to arrays of photo types.
  * Used for reverse lookup and validation.
- *
- * Note: Step 12 (Signature) has no associated photo type.
  */
 export const STEP_TO_PHOTO_TYPES: Record<number, string[]> = {
-  1: ['ph_prop', 'ph_sign1'],
+  1: ['ph_prop', 'ph_sign1', 'ph_drop', 'ph_outs'],
   2: ['ph_pole', 'ph_cbl_r'],
   3: ['ph_entry_out', 'ph_hm_ln'],
   4: ['ph_entry_in', 'ph_hm_en'],
   5: ['ph_wall'],
   6: ['ph_ont', 'ph_ont_back'],
-  7: ['ph_powm', 'ph_powm2'],
-  8: ['ph_bl', 'ph_barcode'],
-  9: ['ph_ups'],
-  10: ['ph_after', 'ph_final'],
-  11: ['ph_lights', 'ph_led'],
-  12: [], // Signature - no photo type
+  7: ['ph_powm', 'ph_powm1', 'ph_powm2'],
+  8: ['ph_after', 'ph_final'],
+  9: ['ph_lights', 'ph_led'],
+  10: ['ph_sign2', 'ph_signature'],
 };
 
 /**

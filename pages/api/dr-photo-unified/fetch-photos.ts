@@ -318,8 +318,10 @@ async function fetchFromLocalCache(dropNumber: string): Promise<PhotoFetchResult
 }
 
 /**
- * Map photo type to unified step number
- * Comprehensive mapping for all OneMap photo types
+ * Map photo type to unified step number (10 steps)
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+ * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
  */
 function mapPhotoTypeToStep(photoType: string): number {
   const mapping: Record<string, number> = {
@@ -337,16 +339,12 @@ function mapPhotoTypeToStep(photoType: string): number {
     'ph_ont': 6, 'ph_ont_back': 6,
     // Step 7: Power Meter Reading
     'ph_powm': 7, 'ph_powm1': 7, 'ph_powm2': 7,
-    // Step 8: ONT Barcode
-    'ph_bl': 8, 'ph_barcode': 8,
-    // Step 9: UPS Serial Number
-    'ph_ups': 9,
-    // Step 10: Final Installation
-    'ph_after': 10, 'ph_final': 10,
-    // Step 11: Green Lights on ONT
-    'ph_lights': 11, 'ph_led': 11,
-    // Step 12: Signature
-    'ph_sign2': 12, 'ph_signature': 12,
+    // Step 8: Final Installation (was step 10)
+    'ph_after': 8, 'ph_final': 8,
+    // Step 9: Green Lights on ONT (was step 11)
+    'ph_lights': 9, 'ph_led': 9,
+    // Step 10: Signature (was step 12)
+    'ph_sign2': 10, 'ph_signature': 10,
   };
 
   return mapping[photoType] || 0;

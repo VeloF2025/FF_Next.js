@@ -56,11 +56,9 @@ async function handleGet(
         step_05_wall,
         step_06_ont_back,
         step_07_power_meter,
-        step_08_ont_barcode,
-        step_09_ups_serial,
-        step_10_final_installation,
-        step_11_green_lights,
-        step_12_signature,
+        step_08_final_installation,
+        step_09_green_lights,
+        step_10_signature,
         incorrect_steps,
         incorrect_comments,
         ai_evaluation_status,
@@ -197,7 +195,7 @@ async function handlePatch(
     const values: unknown[] = [];
     let paramIndex = 1;
 
-    // Manual QA steps
+    // Manual QA steps (10 photo steps)
     const stepFields: (keyof UpdateUnifiedReviewPayload)[] = [
       'step_01_house_photo',
       'step_02_cable_from_pole',
@@ -206,11 +204,9 @@ async function handlePatch(
       'step_05_wall',
       'step_06_ont_back',
       'step_07_power_meter',
-      'step_08_ont_barcode',
-      'step_09_ups_serial',
-      'step_10_final_installation',
-      'step_11_green_lights',
-      'step_12_signature',
+      'step_08_final_installation',
+      'step_09_green_lights',
+      'step_10_signature',
     ];
 
     stepFields.forEach((field) => {
@@ -292,22 +288,33 @@ async function handlePatch(
 }
 
 /**
- * Map photo type to unified step number
+ * Map photo type to unified step number (10 steps)
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+ * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
  */
 function mapPhotoTypeToStep(photoType: string): number {
   const mapping: Record<string, number> = {
+    // Step 1: House Photo
     'ph_prop': 1, 'ph_sign1': 1, 'ph_drop': 1, 'ph_outs': 1,
+    // Step 2: Cable from Pole
     'ph_pole': 2, 'ph_cbl_r': 2,
+    // Step 3: Entry Outside
     'ph_entry_out': 3, 'ph_hm_ln': 3,
+    // Step 4: Entry Inside
     'ph_entry_in': 4, 'ph_hm_en': 4,
+    // Step 5: Wall for Installation
     'ph_wall': 5,
+    // Step 6: ONT Back After Install
     'ph_ont': 6, 'ph_ont_back': 6,
+    // Step 7: Power Meter Reading
     'ph_powm': 7, 'ph_powm1': 7, 'ph_powm2': 7,
-    'ph_bl': 8, 'ph_barcode': 8,
-    'ph_ups': 9,
-    'ph_after': 10, 'ph_final': 10,
-    'ph_lights': 11, 'ph_led': 11,
-    'ph_sign2': 12, 'ph_signature': 12,
+    // Step 8: Final Installation (was step 10)
+    'ph_after': 8, 'ph_final': 8,
+    // Step 9: Green Lights on ONT (was step 11)
+    'ph_lights': 9, 'ph_led': 9,
+    // Step 10: Signature (was step 12)
+    'ph_sign2': 10, 'ph_signature': 10,
   };
   return mapping[photoType] || 0;
 }

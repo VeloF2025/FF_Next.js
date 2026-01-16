@@ -2,10 +2,13 @@
  * UnifiedReviewCard Component
  *
  * Main component for unified DR photo review with 4 tabs:
- * 1. Manual QA - 12-step checklist with incorrect marking
+ * 1. Manual QA - 10-step checklist with incorrect marking
  * 2. AI Evaluation - Trigger evaluation, show results, comparison
  * 3. Photos - Photo gallery with step grouping
  * 4. Feedback - Generate and send WhatsApp feedback
+ *
+ * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
+ * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
  *
  * Following FibreFlow UI/UX patterns with TailwindCSS
  */
@@ -142,7 +145,7 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
 
 /**
  * Tab 1: Manual QA
- * 12-step checklist with incorrect marking
+ * 10-step checklist with incorrect marking
  */
 interface ManualQATabProps {
   review: UnifiedReview;
@@ -201,9 +204,9 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">12-Step Quality Checklist</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">10-Step Quality Checklist</h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Completed: {Object.values(getStepValues(review)).filter(Boolean).length}/12
+          Completed: {Object.values(getStepValues(review)).filter(Boolean).length}/10
         </p>
       </div>
 
@@ -598,6 +601,8 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
 
 /**
  * Helper: Get step value from review object
+ * NOTE: Steps 8, 9, 10 are now Final Installation, Green Lights, Signature
+ * (ONT Barcode and UPS Serial are NOT photo steps)
  */
 function getStepValue(review: UnifiedReview, step: number): boolean {
   const stepFields: Record<number, keyof UnifiedReview> = {
@@ -608,11 +613,9 @@ function getStepValue(review: UnifiedReview, step: number): boolean {
     5: 'step_05_wall',
     6: 'step_06_ont_back',
     7: 'step_07_power_meter',
-    8: 'step_08_ont_barcode',
-    9: 'step_09_ups_serial',
-    10: 'step_10_final_installation',
-    11: 'step_11_green_lights',
-    12: 'step_12_signature',
+    8: 'step_08_final_installation',
+    9: 'step_09_green_lights',
+    10: 'step_10_signature',
   };
 
   return review[stepFields[step]] as boolean || false;
@@ -623,7 +626,7 @@ function getStepValue(review: UnifiedReview, step: number): boolean {
  */
 function getStepValues(review: UnifiedReview): Record<number, boolean> {
   const values: Record<number, boolean> = {};
-  for (let i = 1; i <= 12; i++) {
+  for (let i = 1; i <= 10; i++) {
     values[i] = getStepValue(review, i);
   }
   return values;
@@ -635,7 +638,7 @@ function getStepValues(review: UnifiedReview): Record<number, boolean> {
 function getManualSteps(review: UnifiedReview): Array<{ step: number; passed: boolean; label: string }> {
   const steps: Array<{ step: number; passed: boolean; label: string }> = [];
 
-  for (let i = 1; i <= 12; i++) {
+  for (let i = 1; i <= 10; i++) {
     steps.push({
       step: i,
       passed: getStepValue(review, i),
