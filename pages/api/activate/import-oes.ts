@@ -1,5 +1,5 @@
 /**
- * API Route: /api/dr-photo-unified/import-oes
+ * API Route: /api/activate/import-oes
  *
  * Purpose: Import Nokia OES activation reports
  * Method: POST (multipart/form-data)
@@ -177,10 +177,15 @@ export default async function handler(
       const dropsMap = new Map(dropsResult.rows.map(d => [d.drop_number, d.id]));
       log.info('OESImport', `Found ${dropsMap.size} matching drops`);
 
-      // Step 2: Batch upsert OES activations (in chunks of 500)
+      // Step 2: Count existing records before import
+      const countBefore = await pool.query(
+        `SELECT COUNT(*) as count FROM oes_activations`
+      );
+      const existingCount = parseInt(countBefore.rows[0].count, 10);
+      log.info('OESImport', `Existing OES records: ${existingCount}`);
+
+      // Step 3: Batch upsert OES activations (in chunks of 500)
       const BATCH_SIZE = 500;
-      let inserted = 0;
-      let updated = 0;
       const errors: string[] = [];
 
       for (let i = 0; i < oesRows.length; i += BATCH_SIZE) {
@@ -214,7 +219,7 @@ export default async function handler(
         });
 
         try {
-          const result = await pool.query(
+          await pool.query(
             `INSERT INTO oes_activations (
                drop_number, drop_id, serial_number, activation_date, olt_address,
                ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
@@ -235,19 +240,9 @@ export default async function handler(
                current_ont_rx = EXCLUDED.current_ont_rx,
                team = EXCLUDED.team,
                import_batch_id = EXCLUDED.import_batch_id,
-               updated_at = NOW()
-             RETURNING (xmax = 0) AS is_insert`,
+               updated_at = NOW()`,
             values
           );
-
-          // Count actual inserts vs updates from RETURNING clause
-          for (const row of result.rows) {
-            if (row.is_insert) {
-              inserted++;
-            } else {
-              updated++;
-            }
-          }
         } catch (chunkError) {
           const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
           errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
@@ -257,7 +252,16 @@ export default async function handler(
         log.info('OESImport', `Processed ${Math.min(i + BATCH_SIZE, oesRows.length)}/${oesRows.length}`);
       }
 
-      // Step 3: Bulk update drops table to mark OES confirmed
+      // Step 4: Count records after import to calculate inserted vs updated
+      const countAfter = await pool.query(
+        `SELECT COUNT(*) as count FROM oes_activations`
+      );
+      const newCount = parseInt(countAfter.rows[0].count, 10);
+      const inserted = newCount - existingCount;
+      const updated = Math.max(0, oesRows.length - inserted); // Rows not inserted were updated
+      log.info('OESImport', `After import: ${newCount} records (${inserted} new, ${updated} updated)`);
+
+      // Step 5: Bulk update drops table to mark OES confirmed
       const matchedDropNumbers = oesRows
         .filter(r => dropsMap.has(r.drop_number))
         .map(r => r.drop_number);
