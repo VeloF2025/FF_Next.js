@@ -1,6 +1,6 @@
 /**
- * DR List Page Component
- * Main entry page for DR Photo Unified Review
+ * Activate Dashboard Component
+ * Main entry page for Activate module (formerly DR Photo Unified)
  * Shows list of DRs from dr_photo_unified_reviews table
  * Users can click a DR to review or search for specific DRs
  */
@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, Calendar, Download, Filter, X, List, PlusCircle, FileSpreadsheet } from 'lucide-react';
+import { Search, RefreshCw, Calendar, Download, Filter, X, LayoutDashboard, PlusCircle, FileSpreadsheet } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
@@ -587,8 +587,8 @@ export function DrListPage() {
                   : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
-              <List className="h-4 w-4" />
-              DR List
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
             </button>
             <button
               onClick={() => setActiveTab('manual-entry')}
