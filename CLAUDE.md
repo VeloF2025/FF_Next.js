@@ -10,12 +10,13 @@
 ## Essential Directory Structure
 ```
 src/
-├── modules/        # Modular features (Lego blocks)
-│   ├── wa-monitor/ # WhatsApp monitor (fully isolated)
-│   └── rag/        # Contractor health monitoring
-├── components/     # Shared UI (AppLayout is standard)
-├── services/       # API services
-└── lib/           # Utilities
+├── modules/           # Modular features (Lego blocks)
+│   ├── wa-monitor/    # WhatsApp monitor (fully isolated)
+│   ├── dr-photo-unified/ # AI photo review with VLM
+│   └── rag/           # Contractor health monitoring
+├── components/        # Shared UI (AppLayout is standard)
+├── services/          # API services
+└── lib/              # Utilities
 
 scripts/           # Build scripts & database tools
 SOW/              # Statement of Work import
@@ -228,6 +229,131 @@ nano /opt/wa-monitor/prod/config/projects.yaml
 **Full Documentation:**
 - `src/modules/wa-monitor/README.md`
 - `src/modules/wa-monitor/TROUBLESHOOTING.md`
+
+## DR Photo Unified (AI Photo Review)
+
+**Status:** ✅ ACTIVE MODULE - VLM-powered photo categorization
+
+### Overview
+Unified system for DR (Drop Receipt) photo review with AI-powered categorization using Qwen3 VLM running on the Velocity Server.
+
+### Quick Reference
+- **Dashboard:** `/dr-photo-unified`
+- **Monitoring:** `/dr-photo-unified/monitoring`
+- **Review Page:** `/dr-photo-unified/[dropNumber]`
+- **API Prefix:** `/api/dr-photo-unified/*`
+- **Table:** `foto_ai_reviews`
+- **VLM:** Qwen3 via VLLM on 100.96.203.105:8000
+
+### Key Features
+1. **AI Categorization:** Qwen3 VLM analyzes photos against 10-step checklist
+2. **Tab-Based UI:** DR List tab + Manual Entry tab
+3. **System Health Dashboard:** Monitors DB, OneMap, VLM, WhatsApp services
+4. **WhatsApp Feedback:** Send review results to project WhatsApp groups
+5. **Retry Queue:** Failed categorizations auto-queue for retry
+
+### API Endpoints
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/dr-photo-unified/health-check` | GET | Service health status |
+| `/api/dr-photo-unified/admin/retry-failed` | GET/POST | Manage failed retries |
+| `/api/dr-photo-unified/categorize-photos` | POST | Trigger VLM categorization |
+| `/api/dr-photo-unified/approve-categorization` | POST | Approve AI results |
+| `/api/dr-photo-unified/process-new-dr` | POST | Process new DR from WA |
+| `/api/dr-photo-unified/fetch-photos` | GET | Fetch photos for DR |
+| `/api/dr-photo-unified/send-feedback` | POST | Send WhatsApp feedback |
+
+### Database Tables
+```sql
+-- Main review table
+CREATE TABLE foto_ai_reviews (
+  id UUID PRIMARY KEY,
+  dr_number TEXT NOT NULL,
+  project TEXT,
+  photos JSONB,
+  vlm_categorization JSONB,
+  vlm_status TEXT DEFAULT 'pending',
+  vlm_error TEXT,
+  retry_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+
+-- Migration: scripts/migrations/055_vlm_categorization.sql
+```
+
+### VLM Status Values
+- `pending` - Awaiting categorization
+- `processing` - Currently being analyzed
+- `completed` - Successfully categorized
+- `failed` - Error occurred (check vlm_error)
+- `approved` - Human-approved results
+
+### Key Components
+```
+src/modules/dr-photo-unified/
+├── components/
+│   ├── DrListPage.tsx           # Main page with tabs
+│   ├── UnifiedReviewCard.tsx    # Individual DR review
+│   ├── ManualDREntry.tsx        # Manual DR addition
+│   ├── SystemHealthDashboard.tsx # Health monitoring
+│   └── AICategorizationTab.tsx  # AI results display
+├── services/
+│   └── categorizationVlmService.ts # VLM API calls
+└── types/
+    └── unified.types.ts         # TypeScript interfaces
+```
+
+### WhatsApp Integration
+**Sender Service:** Port 8081 on 100.96.203.105
+```bash
+# Check service status
+curl http://100.96.203.105:8081/health
+
+# Restart if needed
+ssh louis@100.96.203.105
+sudo systemctl restart whatsapp-sender
+```
+
+**Group Mapping:**
+- Lawley: `120363418298130331@g.us`
+- Mohadin: `120363421532174586@g.us`
+- Velo Test: `120363421664266245@g.us`
+- Mamelodi: `120363408849234743@g.us`
+
+### 10-Step Photo Checklist
+1. `cable_placement` - Cable correctly placed
+2. `splicing_complete` - Splicing work completed
+3. `enclosure_sealed` - Enclosure properly sealed
+4. `labels_visible` - Labels clearly visible
+5. `fiber_protection` - Fiber protection in place
+6. `nbn_compliance` - NBN compliance met
+7. `documentation` - Documentation complete
+8. `site_cleanup` - Site cleaned up
+9. `safety_measures` - Safety measures followed
+10. `quality_check` - Final quality check passed
+
+### Troubleshooting
+
+**VLM not responding:**
+```bash
+ssh louis@100.96.203.105
+docker ps | grep vllm
+docker logs vllm-qwen3
+```
+
+**Photos not categorizing:**
+1. Check health dashboard: `/dr-photo-unified/monitoring`
+2. Review failed queue via admin/retry-failed API
+3. Check vlm_error in foto_ai_reviews table
+
+**Routing Issues:**
+- Dynamic route `[dropNumber].tsx` may catch static routes
+- Always create explicit Pages Router files for static routes (like monitoring.tsx)
+
+**Full Documentation:**
+- `/home/hein/Downloads/DR_PHOTO_UNIFIED_WA_INTEGRATION.md`
+- `src/modules/dr-photo-unified/README.md`
 
 ## Arcjet Security
 
