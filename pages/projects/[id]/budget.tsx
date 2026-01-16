@@ -14,8 +14,10 @@ import {
   CategoryBreakdownTable,
   BudgetAlertsPanel,
   BudgetAdjustmentModal,
+  BudgetItemsTable,
 } from '@/components/budget';
-import { ArrowLeft, Plus, RefreshCw, History, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, RefreshCw, History, AlertCircle, Upload, Package, X, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import type { BudgetItemWithCategory, BOQImportResult } from '@/types/procurement/material-catalog.types';
 import type {
   ProjectBudget,
   BudgetCategory,
@@ -30,6 +32,7 @@ interface BudgetPageData {
   categories: BudgetCategory[];
   alerts: BudgetAlert[];
   transactions: BudgetTransaction[];
+  budgetItems: BudgetItemWithCategory[];
   project: {
     id: string;
     name: string;
@@ -46,14 +49,16 @@ export default function ProjectBudgetPage() {
     categories: [],
     alerts: [],
     transactions: [],
+    budgetItems: [],
     project: null,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'transactions'>('overview');
 
   // Fetch budget data
   const fetchBudgetData = useCallback(async () => {
@@ -63,13 +68,14 @@ export default function ProjectBudgetPage() {
     setError(null);
 
     try {
-      // Fetch budget, categories, and alerts in parallel
-      const [budgetRes, categoriesRes, alertsRes, transactionsRes, projectRes] = await Promise.all([
+      // Fetch budget, categories, alerts, items in parallel
+      const [budgetRes, categoriesRes, alertsRes, transactionsRes, projectRes, itemsRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/budget`),
         fetch(`/api/projects/${projectId}/budget/categories`),
         fetch(`/api/projects/${projectId}/budget/alerts`),
         fetch(`/api/projects/${projectId}/budget/transactions?limit=10`),
         fetch(`/api/projects/${projectId}`),
+        fetch(`/api/projects/${projectId}/budget/items`),
       ]);
 
       const budgetData = await budgetRes.json();
@@ -77,6 +83,7 @@ export default function ProjectBudgetPage() {
       const alertsData = await alertsRes.json();
       const transactionsData = await transactionsRes.json();
       const projectData = await projectRes.json();
+      const itemsData = await itemsRes.json();
 
       // Budget API returns { exists: false } or { exists: true, budget, categories, summary }
       const budgetExists = budgetRes.ok && budgetData.data?.exists === true;
@@ -88,6 +95,7 @@ export default function ProjectBudgetPage() {
           : (categoriesRes.ok && Array.isArray(categoriesData.data) ? categoriesData.data : []),
         alerts: alertsRes.ok && alertsData.data?.alerts ? alertsData.data.alerts : [],
         transactions: transactionsRes.ok && transactionsData.data?.transactions ? transactionsData.data.transactions : [],
+        budgetItems: itemsRes.ok && itemsData.data?.items ? itemsData.data.items : [],
         project: projectRes.ok ? projectData.data : null,
       });
     } catch (err) {
@@ -309,7 +317,7 @@ export default function ProjectBudgetPage() {
               <RefreshCw className={`h-4 w-4 ${actionLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            {noBudget && (
+            {noBudget ? (
               <button
                 onClick={() => setCreateModalOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
@@ -317,6 +325,14 @@ export default function ProjectBudgetPage() {
               >
                 <Plus className="h-4 w-4" />
                 Create Budget
+              </button>
+            ) : (
+              <button
+                onClick={() => setImportModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+              >
+                <Upload className="h-4 w-4" />
+                Import BOQ
               </button>
             )}
           </div>
@@ -372,6 +388,22 @@ export default function ProjectBudgetPage() {
                 Overview
               </button>
               <button
+                onClick={() => setActiveTab('items')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${
+                  activeTab === 'items'
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Package className="h-4 w-4" />
+                Budget Items
+                {data.budgetItems.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded-full">
+                    {data.budgetItems.length}
+                  </span>
+                )}
+              </button>
+              <button
                 onClick={() => setActiveTab('transactions')}
                 className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px flex items-center gap-2 ${
                   activeTab === 'transactions'
@@ -420,6 +452,14 @@ export default function ProjectBudgetPage() {
                   />
                 </div>
               </div>
+            )}
+
+            {activeTab === 'items' && (
+              <BudgetItemsTable
+                items={data.budgetItems}
+                currency={budget.currency}
+                loading={loading}
+              />
             )}
 
             {activeTab === 'transactions' && (
@@ -503,6 +543,19 @@ export default function ProjectBudgetPage() {
             open={createModalOpen}
             onClose={() => setCreateModalOpen(false)}
             onSubmit={handleCreateBudget}
+            projectId={projectId as string}
+          />
+        )}
+
+        {/* BOQ Import Modal */}
+        {importModalOpen && (
+          <BOQImportModal
+            open={importModalOpen}
+            onClose={() => setImportModalOpen(false)}
+            onComplete={() => {
+              setImportModalOpen(false);
+              fetchBudgetData();
+            }}
             projectId={projectId as string}
           />
         )}
@@ -683,6 +736,290 @@ function BudgetCreateModal({ open, onClose, onSubmit, projectId }: BudgetCreateM
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// BOQ Import Modal Component
+interface BOQImportModalProps {
+  open: boolean;
+  onClose: () => void;
+  onComplete: () => void;
+  projectId: string;
+}
+
+function BOQImportModal({ open, onClose, onComplete, projectId }: BOQImportModalProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<BOQImportResult | null>(null);
+  const [options, setOptions] = useState({
+    createBudgetItems: true,
+    createMaterials: true,
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      // Validate file type
+      const validTypes = ['.xlsx', '.xls', '.csv'];
+      const ext = selectedFile.name.toLowerCase().slice(selectedFile.name.lastIndexOf('.'));
+      if (!validTypes.includes(ext)) {
+        setError('Please select an Excel file (.xlsx, .xls) or CSV file');
+        return;
+      }
+      setFile(selectedFile);
+      setError(null);
+      setResult(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      const ext = droppedFile.name.toLowerCase().slice(droppedFile.name.lastIndexOf('.'));
+      if (!['.xlsx', '.xls', '.csv'].includes(ext)) {
+        setError('Please select an Excel file (.xlsx, .xls) or CSV file');
+        return;
+      }
+      setFile(droppedFile);
+      setError(null);
+      setResult(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!file) return;
+
+    setLoading(true);
+    setProgress('Uploading file...');
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('projectId', projectId);
+      formData.append('createBudgetItems', String(options.createBudgetItems));
+      formData.append('createMaterials', String(options.createMaterials));
+
+      const response = await fetch('/api/procurement/boq/import-enhanced', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Import failed');
+      }
+
+      setResult(data.data);
+      setProgress('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed');
+      setProgress('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (result) {
+      onComplete();
+    } else {
+      onClose();
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Import BOQ</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Upload an Excel file to import materials and budget items
+            </p>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Result Display */}
+          {result && (
+            <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span className="font-medium text-green-700 dark:text-green-400">Import Complete!</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Items Processed:</span> {result.itemsProcessed}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Materials Matched:</span> {result.materialsMatched}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Materials Created:</span> {result.materialsCreated}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Budget Items Created:</span> {result.budgetItemsCreated}
+                </div>
+                <div className="col-span-2 text-gray-700 dark:text-gray-300">
+                  <span className="font-medium">Total Budget Amount:</span>{' '}
+                  {new Intl.NumberFormat('en-ZA', {
+                    style: 'currency',
+                    currency: 'ZAR',
+                    minimumFractionDigits: 0,
+                  }).format(result.totalBudgetAmount)}
+                </div>
+              </div>
+
+              {result.categoryBreakdown && result.categoryBreakdown.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-700">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">By Category:</p>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    {result.categoryBreakdown.slice(0, 6).map((cat) => (
+                      <div key={cat.code} className="flex justify-between text-gray-600 dark:text-gray-400">
+                        <span>{cat.name}</span>
+                        <span className="text-gray-800 dark:text-gray-300">
+                          R{cat.totalAmount.toLocaleString('en-ZA', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* File Upload Area */}
+          {!result && (
+            <>
+              <div
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  file
+                    ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
+                }`}
+              >
+                {file ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <FileSpreadsheet className="h-10 w-10 text-green-500" />
+                    <div className="text-left">
+                      <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setFile(null)}
+                      className="p-1 text-gray-400 hover:text-red-500"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-10 w-10 mx-auto text-gray-400 dark:text-gray-500 mb-3" />
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">
+                      Drag and drop your BOQ file here, or
+                    </p>
+                    <label className="cursor-pointer">
+                      <span className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
+                        Browse Files
+                      </span>
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-3">
+                      Supported formats: Excel (.xlsx, .xls) or CSV
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* Import Options */}
+              <div className="space-y-3 pt-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Import Options</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={options.createBudgetItems}
+                    onChange={(e) => setOptions(prev => ({ ...prev, createBudgetItems: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Create budget items for tracking
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={options.createMaterials}
+                    onChange={(e) => setOptions(prev => ({ ...prev, createMaterials: e.target.checked }))}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Add new materials to catalog
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* Progress */}
+          {loading && progress && (
+            <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+              <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />
+              <span className="text-sm text-blue-700 dark:text-blue-400">{progress}</span>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-lg">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+          >
+            {result ? 'Close' : 'Cancel'}
+          </button>
+          {!result && (
+            <button
+              onClick={handleImport}
+              disabled={!file || loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Importing...' : 'Import BOQ'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

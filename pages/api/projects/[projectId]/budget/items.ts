@@ -46,7 +46,8 @@ export default async function handler(
 async function handleGet(
   req: NextApiRequest,
   res: NextApiResponse,
-  sql: ReturnType<typeof neon>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sql: any,
   projectId: string
 ) {
   try {
@@ -134,9 +135,10 @@ async function handleGet(
       WHERE project_budget_id = $1
     `;
     const totalsResult = await sql.unsafe(totalsQuery, [projectBudgetId]);
-    const totals = totalsResult[0];
+    const totals = totalsResult[0] || {};
 
-    const mappedItems: BudgetItemWithCategory[] = items.map(row => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mappedItems: BudgetItemWithCategory[] = items.map((row: any) => ({
       id: row.id,
       projectBudgetId: row.project_budget_id,
       budgetCategoryId: row.budget_category_id,
@@ -188,7 +190,8 @@ async function handleGet(
 async function handlePost(
   req: NextApiRequest,
   res: NextApiResponse,
-  sql: ReturnType<typeof neon>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sql: any,
   projectId: string
 ) {
   try {

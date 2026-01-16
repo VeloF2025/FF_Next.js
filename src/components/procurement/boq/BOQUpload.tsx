@@ -14,10 +14,26 @@ import { BOQUploadDropzone } from './upload/BOQUploadDropzone';
 import { BOQUploadConfig } from './upload/BOQUploadConfig';
 import { BOQUploadProgress } from './upload/BOQUploadProgress';
 
+interface EnhancedImportResult {
+  boqId: string;
+  itemsCreated: number;
+  exceptionsCreated: number;
+  materialsMatched?: number;
+  materialsCreated?: number;
+  budgetItemsCreated?: number;
+  totalBudgetAmount?: number;
+}
+
 interface BOQUploadProps {
-  onUploadComplete?: (result: { boqId: string; itemsCreated: number; exceptionsCreated: number }) => void;
+  onUploadComplete?: (result: EnhancedImportResult) => void;
   onUploadError?: (error: string) => void;
   className?: string;
+  /** Enable enhanced import with material catalog and budget item creation */
+  enableEnhancedImport?: boolean;
+  /** Create budget items when using enhanced import (default: true) */
+  createBudgetItems?: boolean;
+  /** Create new materials in catalog when using enhanced import (default: true) */
+  createMaterials?: boolean;
 }
 
 interface UploadState {
@@ -46,13 +62,20 @@ const INITIAL_STATE: UploadState = {
   }
 };
 
-export default function BOQUpload({ onUploadComplete, onUploadError, className }: BOQUploadProps) {
+export default function BOQUpload({
+  onUploadComplete,
+  onUploadError,
+  className,
+  enableEnhancedImport = false,
+  createBudgetItems = true,
+  createMaterials = true,
+}: BOQUploadProps) {
   const { context } = useProcurementContext();
   const [state, setState] = useState<UploadState>(INITIAL_STATE);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const progressRef = useRef<HTMLDivElement>(null);
-  
-  // Create service instance
+
+  // Create service instance for legacy import
   const boqImportService = new BOQImportService();
 
   const handleFileSelect = useCallback((file: File) => {
@@ -83,9 +106,15 @@ export default function BOQUpload({ onUploadComplete, onUploadError, className }
     setState(prev => ({ ...prev, isUploading: true, progress: 0, stage: 'Starting...', message: '' }));
 
     try {
-      // Generate a temporary BOQ ID if context doesn't have one
+      // Use enhanced import if enabled
+      if (enableEnhancedImport) {
+        await startEnhancedUpload();
+        return;
+      }
+
+      // Legacy import using local service
       const boqId = context.projectId || `temp-${Date.now()}`;
-      
+
       const job = await boqImportService.startImport(
         boqId,
         state.file,
@@ -99,7 +128,6 @@ export default function BOQUpload({ onUploadComplete, onUploadError, className }
               message: progress.message || ''
             }));
 
-            // Animate progress bar
             if (progressRef.current) {
               progressRef.current.style.width = `${progress.progress}%`;
             }
@@ -107,15 +135,13 @@ export default function BOQUpload({ onUploadComplete, onUploadError, className }
         }
       );
 
-      // Update state with job
       setState(prev => ({ ...prev, job }));
 
-      // Poll for job completion
       const pollJob = setInterval(() => {
         const currentJob = boqImportService.getJob(job.id);
         if (currentJob) {
           setState(prev => ({ ...prev, job: currentJob }));
-          
+
           if (currentJob.status === 'completed' && currentJob.result) {
             clearInterval(pollJob);
             setTimeout(() => {
@@ -136,9 +162,68 @@ export default function BOQUpload({ onUploadComplete, onUploadError, className }
           }
         }
       }, 1000);
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      toast.error(errorMessage);
+      onUploadError?.(errorMessage);
+      setState(prev => ({ ...prev, isUploading: false }));
+    }
+  };
+
+  /**
+   * Enhanced upload using server-side API with material matching
+   */
+  const startEnhancedUpload = async () => {
+    if (!state.file || !context?.projectId) {
+      toast.error('Please select a file and ensure project context is available');
+      setState(prev => ({ ...prev, isUploading: false }));
+      return;
+    }
+
+    setState(prev => ({ ...prev, stage: 'Uploading file...', progress: 10 }));
+
+    try {
+      const formData = new FormData();
+      formData.append('file', state.file);
+      formData.append('projectId', context.projectId);
+      formData.append('createBudgetItems', String(createBudgetItems));
+      formData.append('createMaterials', String(createMaterials));
+
+      const response = await fetch('/api/procurement/boq/import-enhanced', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Import failed');
+      }
+
+      const result = data.data;
+
+      // Show success with enhanced details
+      const details = [];
+      if (result.materialsCreated > 0) details.push(`${result.materialsCreated} materials added`);
+      if (result.budgetItemsCreated > 0) details.push(`${result.budgetItemsCreated} budget items`);
+
+      toast.success(
+        `BOQ imported! ${result.itemsProcessed} items processed${details.length ? ` (${details.join(', ')})` : ''}`
+      );
+
+      onUploadComplete?.({
+        boqId: result.boqId,
+        itemsCreated: result.itemsProcessed,
+        exceptionsCreated: result.errors?.length || 0,
+        materialsMatched: result.materialsMatched,
+        materialsCreated: result.materialsCreated,
+        budgetItemsCreated: result.budgetItemsCreated,
+        totalBudgetAmount: result.totalBudgetAmount,
+      });
+
+      setState(INITIAL_STATE);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Enhanced import failed';
       toast.error(errorMessage);
       onUploadError?.(errorMessage);
       setState(prev => ({ ...prev, isUploading: false }));

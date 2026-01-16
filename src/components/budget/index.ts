@@ -8,3 +8,4 @@ export { CategoryBreakdownTable } from './CategoryBreakdownTable';
 export { BudgetAlertsPanel } from './BudgetAlertsPanel';
 export { BudgetAdjustmentModal } from './BudgetAdjustmentModal';
 export { BudgetDashboardWidget, BudgetDashboardWidgetEmpty } from './BudgetDashboardWidget';
+export { BudgetItemsTable } from './BudgetItemsTable';
