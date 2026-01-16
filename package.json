@@ -113,6 +113,7 @@
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
+    "ws": "^8.19.0",
     "xlsx": "^0.18.5",
     "zod": "^3.22.0",
     "zustand": "^5.0.7"
@@ -128,6 +129,7 @@
     "@types/react-dom": "^18.2.0",
     "@types/socket.io": "^3.0.2",
     "@types/socket.io-client": "^3.0.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "@vitest/coverage-v8": "^0.34.0",

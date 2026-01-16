@@ -247,6 +247,26 @@ export class ApiResponseHelper {
   }
 
   /**
+   * Send bad request error response
+   */
+  static badRequest(
+    res: NextApiResponse,
+    message = 'Bad request'
+  ): void {
+    this.error(res, ErrorCode.BAD_REQUEST, message);
+  }
+
+  /**
+   * Send conflict error response
+   */
+  static conflict(
+    res: NextApiResponse,
+    message = 'Resource already exists'
+  ): void {
+    this.error(res, ErrorCode.CONFLICT, message);
+  }
+
+  /**
    * Send method not allowed error response
    */
   static methodNotAllowed(
@@ -338,6 +358,8 @@ export const apiResponse = {
   notFound: ApiResponseHelper.notFound.bind(ApiResponseHelper),
   unauthorized: ApiResponseHelper.unauthorized.bind(ApiResponseHelper),
   forbidden: ApiResponseHelper.forbidden.bind(ApiResponseHelper),
+  badRequest: ApiResponseHelper.badRequest.bind(ApiResponseHelper),
+  conflict: ApiResponseHelper.conflict.bind(ApiResponseHelper),
   methodNotAllowed: ApiResponseHelper.methodNotAllowed.bind(ApiResponseHelper),
   internalError: ApiResponseHelper.internalError.bind(ApiResponseHelper),
   databaseError: ApiResponseHelper.databaseError.bind(ApiResponseHelper),
