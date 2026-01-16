@@ -232,10 +232,8 @@ export function DrListPage() {
           calculateStats(transformedDrops);
         }
 
-        // Set complete project stats from ALL records (not limited by pagination)
-        if (data.projectStats && Array.isArray(data.projectStats)) {
-          setProjectStats(data.projectStats);
-        }
+        // NOTE: projectStats is handled by fetchProjectStats() which respects date filters
+        // Don't set projectStats here as it would overwrite filtered results
 
         setLastRefresh(new Date());
       }
