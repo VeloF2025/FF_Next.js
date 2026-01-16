@@ -1,5 +1,6 @@
 // 🟢 WORKING: Comprehensive procurement tabs with badges and state management
 import { useMemo } from 'react';
+import { useRouter } from 'next/router';
 import {
   BarChart3,
   FileText,
@@ -38,6 +39,8 @@ export function ProcurementTabs({
   permissions: propPermissions,
   isLoading: propIsLoading = false
 }: ProcurementTabsProps = {}) {
+  const router = useRouter();
+
   // Try to get from context first, fallback to props
   let context: any = null;
   try {
@@ -166,18 +169,26 @@ export function ProcurementTabs({
     }));
   }, [allTabs, selectedProject, tabBadges, permissions]);
 
-  // Handle tab click with validation
+  // Handle tab click with validation and navigation
   const handleTabClick = (tab: ProcurementTab) => {
     // Don't allow tab change if loading
     if (isLoading) return;
-    
+
     // Check if project is required but not selected
     if (tab.requiresProject && !selectedProject) {
       // Could show a toast or modal here
       return;
     }
 
+    // Call the tab change callback (for context-based usage)
     onTabChange(tab.id);
+
+    // Navigate to the tab's path if it exists and differs from current path
+    // Use /procurement as base for 'overview' tab, otherwise use tab.path
+    const targetPath = tab.id === 'overview' ? '/procurement' : tab.path;
+    if (targetPath && !targetPath.startsWith('/app/') && router.pathname !== targetPath) {
+      router.push(targetPath);
+    }
   };
 
   // Get tab display state
