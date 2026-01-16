@@ -3,8 +3,8 @@
 # Detailed profiles in individual .md files
 
 version: 1
-last_updated: "2026-01-09"
-total_modules: 34
+last_updated: "2026-01-16"
+total_modules: 35
 
 # Module Categories
 categories:
@@ -18,7 +18,7 @@ categories:
 
   monitoring:
     description: "QA and progress monitoring"
-    modules: [wa-monitor, foto-review, dr-photo-review, rag, daily-progress]
+    modules: [wa-monitor, foto-review, dr-photo-review, dr-photo-unified, rag, daily-progress]
 
   reporting:
     description: "Analytics and reporting"
@@ -107,6 +107,12 @@ modules:
     purpose: "Drop photo review workflow"
     complexity: medium
     profile: dr-photo-review.md
+
+  dr-photo-unified:
+    category: monitoring
+    purpose: "Unified DR photo review with VLM AI categorization"
+    complexity: high
+    profile: dr-photo-unified.md
 
   field-app:
     category: operations
@@ -250,7 +256,7 @@ modules:
 database_mapping:
   drops: [sow, wa-monitor]
   qa_photo_reviews: [wa-monitor, dr-photo-review]
-  foto_ai_reviews: [foto-review]
+  foto_ai_reviews: [foto-review, dr-photo-unified]
   projects: [projects, sow, installations]
   contractors: [onboarding, rag, staff]
   installations: [installations, workflow]
@@ -265,6 +271,7 @@ isolation:
     - wa-monitor  # Zero external FF dependencies
   mostly_isolated:
     - foto-review
+    - dr-photo-unified
     - ticketing
   tightly_coupled:
     - workflow

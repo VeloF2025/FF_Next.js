@@ -79,7 +79,7 @@ Show database tables and queries for a module.
 |----------|---------|-------------|
 | **core** | projects, clients, sow, installations, workflow, tasks, ticketing | Core business functionality |
 | **procurement** | procurement, assets, suppliers | Procurement and inventory |
-| **monitoring** | wa-monitor, foto-review, dr-photo-review, rag, daily-progress | QA and progress monitoring |
+| **monitoring** | wa-monitor, foto-review, dr-photo-review, dr-photo-unified, rag, daily-progress | QA and progress monitoring |
 | **reporting** | analytics, kpi-dashboard, kpis, reports | Analytics and reporting |
 | **operations** | field-app, qfield-sync, barcode-scanner, nokia-equipment, onemap | Field operations |
 | **communication** | communications, meetings, livekit | Communication tools |
