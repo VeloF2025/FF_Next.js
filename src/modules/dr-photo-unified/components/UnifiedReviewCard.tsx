@@ -133,7 +133,7 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
       <div className="p-6">
         {activeTab === 'qa' && <ManualQATab review={review} updateStep={updateStep} markIncorrect={markIncorrect} />}
         {activeTab === 'ai' && <AIEvaluationTab review={review} triggerAiEvaluation={triggerAiEvaluation} />}
-        {activeTab === 'photos' && <PhotosTab review={review} />}
+        {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
         {activeTab === 'feedback' && <FeedbackTab review={review} generateFeedback={generateFeedback} sendFeedback={sendFeedback} />}
       </div>
     </div>
@@ -399,13 +399,17 @@ function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) 
 
 /**
  * Tab 3: Photos
- * Photo gallery with step grouping
+ * Photo gallery with step grouping and fetch capability
  */
 interface PhotosTabProps {
   review: UnifiedReview;
+  onRefresh?: () => void;
 }
 
-function PhotosTab({ review }: PhotosTabProps) {
+function PhotosTab({ review, onRefresh }: PhotosTabProps) {
+  const [isFetching, setIsFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   // Convert photos_metadata to Photo[] format for PhotoGalleryUnified
   const photos = (review.photos_metadata || []).map((photo: any) => ({
     filename: photo.filename,
@@ -415,12 +419,73 @@ function PhotosTab({ review }: PhotosTabProps) {
     modified: photo.modified,
   }));
 
+  const handleFetchPhotos = async () => {
+    setIsFetching(true);
+    setFetchError(null);
+
+    try {
+      const response = await fetch('/api/dr-photo-unified/fetch-photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dropNumber: review.drop_number }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || 'Failed to fetch photos');
+      }
+
+      // Refresh the review to get updated photos_metadata
+      onRefresh?.();
+    } catch (error) {
+      setFetchError(error instanceof Error ? error.message : 'Failed to fetch photos');
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
   return (
-    <PhotoGalleryUnified
-      photos={photos}
-      source={review.photo_source as any}
-      groupByStep={true}
-    />
+    <div className="space-y-4">
+      {/* Fetch Photos Header */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {photos.length > 0
+            ? `${photos.length} photos loaded from ${review.photo_source || 'unknown source'}`
+            : 'No photos loaded yet'}
+        </div>
+        <button
+          onClick={handleFetchPhotos}
+          disabled={isFetching}
+          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+        >
+          {isFetching ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Fetching...</span>
+            </>
+          ) : (
+            <>
+              <span>🔄</span>
+              <span>Fetch from OneMap</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Error Message */}
+      {fetchError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+          <p className="text-red-600 dark:text-red-400 text-sm">{fetchError}</p>
+        </div>
+      )}
+
+      {/* Photo Gallery */}
+      <PhotoGalleryUnified
+        photos={photos}
+        source={review.photo_source as any}
+        groupByStep={true}
+      />
+    </div>
   );
 }
 
