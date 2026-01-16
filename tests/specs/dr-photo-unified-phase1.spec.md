@@ -1,6 +1,6 @@
 # DR Photo Unified - Phase 1 Test Specification
 
-**Feature Branch**: `feature/dr-photo-unified`
+**Feature Branch**: `feature/activate`
 **Phase**: 1 - Foundation & Database (Week 1)
 **Date**: 2026-01-14
 **Status**: Test Specification (BEFORE Implementation)
@@ -24,8 +24,8 @@ This test specification defines the behavioral requirements for Phase 1, Week 1 
 **Purpose**: Provide bidirectional mapping between photo types (port 8003) and unified 12-step system
 
 **Files to Create**:
-- `src/modules/dr-photo-unified/utils/stepMapper.ts`
-- `tests/unit/modules/dr-photo-unified/stepMapper.test.ts`
+- `src/modules/activate/utils/stepMapper.ts`
+- `tests/unit/modules/activate/stepMapper.test.ts`
 
 ### Test Cases
 
@@ -149,9 +149,9 @@ expect(photoTypes).toContain(photoType); // ✅ Consistency verified
 **Purpose**: Fetch photos with intelligent fallback across multiple sources
 
 **Files to Create**:
-- `src/modules/dr-photo-unified/services/unifiedPhotoService.ts`
-- `src/modules/dr-photo-unified/services/oneMapIntegrationService.ts`
-- `tests/unit/modules/dr-photo-unified/unifiedPhotoService.test.ts`
+- `src/modules/activate/services/unifiedPhotoService.ts`
+- `src/modules/activate/services/oneMapIntegrationService.ts`
+- `tests/unit/modules/activate/unifiedPhotoService.test.ts`
 
 ### Test Cases
 
@@ -297,8 +297,8 @@ result.photos.forEach(photo => {
 **Purpose**: Determine which photo source to use based on availability and configuration
 
 **Files to Create**:
-- `src/modules/dr-photo-unified/utils/photoSourceResolver.ts`
-- `tests/unit/modules/dr-photo-unified/photoSourceResolver.test.ts`
+- `src/modules/activate/utils/photoSourceResolver.ts`
+- `tests/unit/modules/activate/photoSourceResolver.test.ts`
 
 ### Test Cases
 
@@ -339,8 +339,8 @@ result.photos.forEach(photo => {
 **Purpose**: Provide type safety for unified photo review system
 
 **Files to Create**:
-- `src/modules/dr-photo-unified/types/unified.types.ts`
-- `tests/unit/modules/dr-photo-unified/unified.types.test.ts`
+- `src/modules/activate/types/unified.types.ts`
+- `tests/unit/modules/activate/unified.types.test.ts`
 
 ### Test Cases
 
@@ -462,11 +462,11 @@ After implementation, these commands should all pass:
 
 ```bash
 # Run unit tests (should FAIL initially in RED phase)
-npm test tests/unit/modules/dr-photo-unified/
+npm test tests/unit/modules/activate/
 
 # Implement code until tests PASS (GREEN phase)
-npm test tests/unit/modules/dr-photo-unified/stepMapper.test.ts
-npm test tests/unit/modules/dr-photo-unified/unifiedPhotoService.test.ts
+npm test tests/unit/modules/activate/stepMapper.test.ts
+npm test tests/unit/modules/activate/unifiedPhotoService.test.ts
 
 # Run full test suite
 npm test

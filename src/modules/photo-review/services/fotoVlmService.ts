@@ -8,7 +8,7 @@
  * manual QA and AI evaluation in a single workflow.
  * This service is kept for backward compatibility during the 2-week transition period.
  *
- * @see src/modules/dr-photo-unified/services/unifiedVlmService.ts
+ * @see src/modules/activate/services/unifiedVlmService.ts
  */
 
 import { EvaluationResult } from '../types';

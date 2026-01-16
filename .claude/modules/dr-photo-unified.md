@@ -1,4 +1,4 @@
-# Module: dr-photo-unified
+# Module: activate
 
 ## Overview
 | Property | Value |
@@ -55,21 +55,21 @@ SELECT project, vlm_status, COUNT(*) FROM foto_ai_reviews GROUP BY project, vlm_
 ## API Endpoints
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/dr-photo-unified/health-check` | Service health status |
-| GET | `/api/dr-photo-unified/admin/retry-failed` | List failed DRs |
-| POST | `/api/dr-photo-unified/admin/retry-failed` | Retry failed categorizations |
-| POST | `/api/dr-photo-unified/categorize-photos` | Trigger VLM categorization |
-| POST | `/api/dr-photo-unified/approve-categorization` | Approve AI results |
-| POST | `/api/dr-photo-unified/process-new-dr` | Process new DR from WA |
-| GET | `/api/dr-photo-unified/fetch-photos` | Fetch photos for DR |
-| POST | `/api/dr-photo-unified/send-feedback` | Send WhatsApp feedback |
+| GET | `/api/activate/health-check` | Service health status |
+| GET | `/api/activate/admin/retry-failed` | List failed DRs |
+| POST | `/api/activate/admin/retry-failed` | Retry failed categorizations |
+| POST | `/api/activate/categorize-photos` | Trigger VLM categorization |
+| POST | `/api/activate/approve-categorization` | Approve AI results |
+| POST | `/api/activate/process-new-dr` | Process new DR from WA |
+| GET | `/api/activate/fetch-photos` | Fetch photos for DR |
+| POST | `/api/activate/send-feedback` | Send WhatsApp feedback |
 
 ## Pages
 | Route | Description |
 |-------|-------------|
-| `/dr-photo-unified` | Main dashboard with DR list and Manual Entry tabs |
-| `/dr-photo-unified/monitoring` | Full system health dashboard |
-| `/dr-photo-unified/[dropNumber]` | Individual DR review page |
+| `/activate` | Main dashboard with DR list and Manual Entry tabs |
+| `/activate/monitoring` | Full system health dashboard |
+| `/activate/[dropNumber]` | Individual DR review page |
 
 ## Services
 
@@ -158,7 +158,7 @@ docker logs vllm-qwen3
 ```
 
 ### Photos Not Categorizing
-1. Check health dashboard: `/dr-photo-unified/monitoring`
+1. Check health dashboard: `/activate/monitoring`
 2. Review retry queue via admin/retry-failed API
 3. Check vlm_error in foto_ai_reviews table
 
@@ -175,7 +175,7 @@ sudo systemctl restart whatsapp-sender
 
 ## File Structure
 ```
-src/modules/dr-photo-unified/
+src/modules/activate/
 ├── components/
 │   ├── DrListPage.tsx
 │   ├── UnifiedReviewCard.tsx
@@ -187,12 +187,12 @@ src/modules/dr-photo-unified/
 └── types/
     └── unified.types.ts
 
-pages/dr-photo-unified/
+pages/activate/
 ├── index.tsx
 ├── monitoring.tsx
 └── [dropNumber].tsx
 
-pages/api/dr-photo-unified/
+pages/api/activate/
 ├── health-check.ts
 ├── fetch-photos.ts
 ├── categorize-photos.ts

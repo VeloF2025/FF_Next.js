@@ -230,7 +230,7 @@ nano /opt/wa-monitor/prod/config/projects.yaml
 - `src/modules/wa-monitor/README.md`
 - `src/modules/wa-monitor/TROUBLESHOOTING.md`
 
-## DR Photo Unified (AI Photo Review)
+## Activate Module (Activations Hub)
 
 **Status:** ✅ ACTIVE MODULE - VLM-powered photo categorization
 
@@ -238,10 +238,10 @@ nano /opt/wa-monitor/prod/config/projects.yaml
 Unified system for DR (Drop Receipt) photo review with AI-powered categorization using Qwen3 VLM running on the Velocity Server.
 
 ### Quick Reference
-- **Dashboard:** `/dr-photo-unified`
-- **Monitoring:** `/dr-photo-unified/monitoring`
-- **Review Page:** `/dr-photo-unified/[dropNumber]`
-- **API Prefix:** `/api/dr-photo-unified/*`
+- **Dashboard:** `/activate`
+- **Monitoring:** `/activate/monitoring`
+- **Review Page:** `/activate/[dropNumber]`
+- **API Prefix:** `/api/activate/*`
 - **Table:** `foto_ai_reviews`
 - **VLM:** Qwen3 via VLLM on 100.96.203.105:8000
 
@@ -255,13 +255,13 @@ Unified system for DR (Drop Receipt) photo review with AI-powered categorization
 ### API Endpoints
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/dr-photo-unified/health-check` | GET | Service health status |
-| `/api/dr-photo-unified/admin/retry-failed` | GET/POST | Manage failed retries |
-| `/api/dr-photo-unified/categorize-photos` | POST | Trigger VLM categorization |
-| `/api/dr-photo-unified/approve-categorization` | POST | Approve AI results |
-| `/api/dr-photo-unified/process-new-dr` | POST | Process new DR from WA |
-| `/api/dr-photo-unified/fetch-photos` | GET | Fetch photos for DR |
-| `/api/dr-photo-unified/send-feedback` | POST | Send WhatsApp feedback |
+| `/api/activate/health-check` | GET | Service health status |
+| `/api/activate/admin/retry-failed` | GET/POST | Manage failed retries |
+| `/api/activate/categorize-photos` | POST | Trigger VLM categorization |
+| `/api/activate/approve-categorization` | POST | Approve AI results |
+| `/api/activate/process-new-dr` | POST | Process new DR from WA |
+| `/api/activate/fetch-photos` | GET | Fetch photos for DR |
+| `/api/activate/send-feedback` | POST | Send WhatsApp feedback |
 
 ### Database Tables
 ```sql
@@ -291,7 +291,7 @@ CREATE TABLE foto_ai_reviews (
 
 ### Key Components
 ```
-src/modules/dr-photo-unified/
+src/modules/activate/
 ├── components/
 │   ├── DrListPage.tsx           # Main page with tabs
 │   ├── UnifiedReviewCard.tsx    # Individual DR review
@@ -343,7 +343,7 @@ docker logs vllm-qwen3
 ```
 
 **Photos not categorizing:**
-1. Check health dashboard: `/dr-photo-unified/monitoring`
+1. Check health dashboard: `/activate/monitoring`
 2. Review failed queue via admin/retry-failed API
 3. Check vlm_error in foto_ai_reviews table
 
@@ -353,7 +353,7 @@ docker logs vllm-qwen3
 
 **Full Documentation:**
 - `/home/hein/Downloads/DR_PHOTO_UNIFIED_WA_INTEGRATION.md`
-- `src/modules/dr-photo-unified/README.md`
+- `src/modules/activate/README.md`
 
 ## Arcjet Security
 

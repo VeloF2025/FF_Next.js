@@ -150,7 +150,7 @@ One-click feedback generation and WhatsApp delivery
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  src/modules/dr-photo-unified/  (NEW ORCHESTRATION)     │
+│  src/modules/activate/  (NEW ORCHESTRATION)     │
 │  ────────────────────────────────────────────────────────│
 │  • UnifiedReviewCard.tsx (manual + AI combined)         │
 │  • unifiedPhotoService.ts (multi-source coordination)    │
@@ -638,12 +638,12 @@ Next Steps:
 
 **New Endpoints:**
 ```
-GET  /api/dr-photo-unified/review/[dropNumber]  # Get unified review
-POST /api/dr-photo-unified/review/[dropNumber]  # Create/update review
-POST /api/dr-photo-unified/fetch-photos         # Trigger photo download
-POST /api/dr-photo-unified/evaluate             # Trigger AI evaluation
-POST /api/dr-photo-unified/send-feedback        # Send WhatsApp feedback
-GET  /api/dr-photo-unified/reviews              # List all reviews (with filters)
+GET  /api/activate/review/[dropNumber]  # Get unified review
+POST /api/activate/review/[dropNumber]  # Create/update review
+POST /api/activate/fetch-photos         # Trigger photo download
+POST /api/activate/evaluate             # Trigger AI evaluation
+POST /api/activate/send-feedback        # Send WhatsApp feedback
+GET  /api/activate/reviews              # List all reviews (with filters)
 ```
 
 **External API Integration:**
@@ -710,9 +710,9 @@ See Feature 5 for complete schema.
 ### Integration Tests
 
 **API Routes:**
-- `POST /api/dr-photo-unified/fetch-photos`: Test OneMap → BOSS → Local fallback
-- `POST /api/dr-photo-unified/evaluate`: Test VLM integration
-- `POST /api/dr-photo-unified/send-feedback`: Test WhatsApp delivery
+- `POST /api/activate/fetch-photos`: Test OneMap → BOSS → Local fallback
+- `POST /api/activate/evaluate`: Test VLM integration
+- `POST /api/activate/send-feedback`: Test WhatsApp delivery
 
 **Database:**
 - Migration script: Verify data integrity (0 data loss)
@@ -775,7 +775,7 @@ See Feature 5 for complete schema.
 ### Phase 1: Foundation & Database (Week 1)
 
 **Deliverables:**
-- Create `src/modules/dr-photo-unified/` module structure
+- Create `src/modules/activate/` module structure
 - Run migration 033 (dr_photo_unified_reviews table)
 - Build `unifiedPhotoService.ts` (multi-source fetching)
 - Build `stepMapper.ts` (12-step harmonization)
@@ -811,10 +811,10 @@ See Feature 5 for complete schema.
 ### Phase 4: API Endpoints & AI Integration (Week 4)
 
 **Deliverables:**
-- `/api/dr-photo-unified/fetch-photos` endpoint
-- `/api/dr-photo-unified/review/[dropNumber]` CRUD
-- `/api/dr-photo-unified/evaluate` (AI evaluation)
-- `/api/dr-photo-unified/send-feedback` (WhatsApp)
+- `/api/activate/fetch-photos` endpoint
+- `/api/activate/review/[dropNumber]` CRUD
+- `/api/activate/evaluate` (AI evaluation)
+- `/api/activate/send-feedback` (WhatsApp)
 - VLM integration with unified service
 
 **Effort:** 5 days
@@ -848,8 +848,8 @@ See Feature 5 for complete schema.
 - ✅ Feature flag system implemented (`src/lib/featureFlags.ts`)
 - ✅ Project-based conditional rendering in WaMonitorDashboard
 - ✅ Unified system enabled for "Velo Test" project only
-- ✅ Monitoring dashboard created (`/dr-photo-unified/monitoring`)
-- ✅ Rollout progression script (`scripts/dr-photo-unified/progress-rollout.ts`)
+- ✅ Monitoring dashboard created (`/activate/monitoring`)
+- ✅ Rollout progression script (`scripts/activate/progress-rollout.ts`)
 - ✅ Committed: 7a436de6 - Phase 6 Week 6.1 pilot rollout
 
 **Week 6.3 Progress (COMPLETED):**
@@ -1081,7 +1081,7 @@ See Feature 5 for complete schema.
 
 **Files to Create:**
 1. `docs/DR_PHOTO_UNIFIED_GUIDE.md` - User guide for QA Reviewers
-2. `src/modules/dr-photo-unified/README.md` - Technical documentation
+2. `src/modules/activate/README.md` - Technical documentation
 3. `docs/DR_PHOTO_MIGRATION_GUIDE.md` - Migration process for admins
 4. `docs/API_DR_PHOTO_UNIFIED.md` - API reference
 
