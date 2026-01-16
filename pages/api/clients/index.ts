@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '../../../lib/db.mjs';
 import { safeArrayQuery } from '../../../lib/safe-query';
-import { apiLogger } from '../../../lib/logger';
+import { apiLogger } from '@/lib/logger';
 import { withErrorHandler } from '../../../lib/api-error-handler';
 
 export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {

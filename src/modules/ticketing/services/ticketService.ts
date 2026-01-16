@@ -125,12 +125,12 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         status,
         dr_number,
         project_id,
-        zone_id,
-        pole_number,
-        pon_number,
+        zone,
+        pole_id,
+        pon,
         address,
         assigned_to,
-        assigned_contractor_id,
+        contractor_id,
         assigned_team,
         created_by
       ) VALUES (
