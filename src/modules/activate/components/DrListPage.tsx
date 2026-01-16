@@ -282,15 +282,12 @@ export function DrListPage() {
     status: statusFilter !== 'all' ? statusFilter : undefined,
   });
 
-  // Initial load - dates already initialized to today via useState
+  // Fetch drops when filters change (includes initial load since state is initialized with values)
   useEffect(() => {
-    fetchDrops(true, 1, getCurrentFilters());
-  }, []);
-
-  // Re-fetch when any filter changes (server-side filtering)
-  useEffect(() => {
-    // Skip initial render (handled by the effect above)
-    fetchDrops(true, 1, getCurrentFilters());
+    // Only fetch if we have valid date filters (prevents empty initial call)
+    if (dateFrom && dateTo) {
+      fetchDrops(true, 1, getCurrentFilters());
+    }
   }, [dateFrom, dateTo, projectFilter, statusFilter]);
 
   // Apply all filters and update stats

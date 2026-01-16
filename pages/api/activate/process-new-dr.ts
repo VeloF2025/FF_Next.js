@@ -285,10 +285,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         return res.status(400).json({
           success: false,
           error: 'PROJECT_MISMATCH',
-          message: `${dropNumber} belongs to ${expectedProject}, please resubmit to the correct group`,
+          message: `${dropNumber} belongs to ${expectedProject}, not ${project}. Please resubmit to the correct group.`,
           dropNumber,
           expectedProject,
           submittedTo: project,
+          notifyUser: true,
         });
       }
 
@@ -296,7 +297,20 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       await markSiteSubmitted(dropNumber, senderPhone || null, project || expectedProject);
       log.info('ProcessNewDr', `Marked ${dropNumber} as site submitted`, { expectedProject });
     } else {
-      log.info('ProcessNewDr', `DR ${dropNumber} not found in drops table (continuing)`);
+      // STRICT MODE: Block DRs not found in drops table
+      log.warn('ProcessNewDr', `DR ${dropNumber} not found in drops table - REJECTING`, {
+        submittedTo: project,
+        senderPhone,
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: 'DR_NOT_FOUND',
+        message: `${dropNumber} not found in ${project || 'system'}. Please verify the DR number is correct.`,
+        dropNumber,
+        submittedTo: project,
+        notifyUser: true,
+      });
     }
 
     // Check for existing records in both tables
