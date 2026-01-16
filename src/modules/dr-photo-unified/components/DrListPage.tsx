@@ -25,6 +25,7 @@ interface DrListItem {
   status: 'complete' | 'incomplete';
   feedbackSent: string | null;
   createdAt: string;
+  submittedDate: string | null; // Date DR was submitted (for filtering)
   senderPhone: string | null;
 }
 
@@ -149,10 +150,11 @@ export function DrListPage() {
     };
     setDashboardStats(stats);
 
-    // Calculate daily stats per project
+    // Calculate daily stats per project (using submitted_date)
     const dailyMap = new Map<string, DailyStat>();
     dropsList.forEach(drop => {
-      const date = new Date(drop.createdAt).toLocaleDateString('en-ZA');
+      const dateStr = drop.submittedDate || drop.createdAt;
+      const date = new Date(dateStr).toLocaleDateString('en-ZA');
       const key = `${drop.project || 'Unknown'}_${date}`;
 
       if (!dailyMap.has(key)) {
@@ -200,6 +202,7 @@ export function DrListPage() {
           status: drop.is_complete ? 'complete' : 'incomplete',
           feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
           createdAt: drop.created_at,
+          submittedDate: drop.submitted_date || null, // Date DR was submitted
           senderPhone: drop.sender_phone || null, // From WA Monitor via unified table
         }));
 
@@ -300,24 +303,20 @@ export function DrListPage() {
       );
     }
 
-    // Date range filter (convert to SAST timezone before comparing dates)
+    // Date range filter using submitted_date (the date DR was actually submitted)
     if (dateFrom) {
       filtered = filtered.filter(drop => {
-        // Convert UTC timestamp to SAST (Africa/Johannesburg) date string
-        const dropDateUTC = new Date(drop.createdAt);
-        const sastOffset = 2 * 60; // SAST is UTC+2
-        const dropDateSAST = new Date(dropDateUTC.getTime() + (sastOffset * 60 * 1000) + (dropDateUTC.getTimezoneOffset() * 60 * 1000));
-        const dropDate = dropDateSAST.toISOString().split('T')[0];
+        if (!drop.submittedDate) return false;
+        // submitted_date is stored as DATE in DB, comes as ISO string
+        const dropDate = new Date(drop.submittedDate).toISOString().split('T')[0];
         return dropDate >= dateFrom;
       });
     }
     if (dateTo) {
       filtered = filtered.filter(drop => {
-        // Convert UTC timestamp to SAST (Africa/Johannesburg) date string
-        const dropDateUTC = new Date(drop.createdAt);
-        const sastOffset = 2 * 60; // SAST is UTC+2
-        const dropDateSAST = new Date(dropDateUTC.getTime() + (sastOffset * 60 * 1000) + (dropDateUTC.getTimezoneOffset() * 60 * 1000));
-        const dropDate = dropDateSAST.toISOString().split('T')[0];
+        if (!drop.submittedDate) return false;
+        // submitted_date is stored as DATE in DB, comes as ISO string
+        const dropDate = new Date(drop.submittedDate).toISOString().split('T')[0];
         return dropDate <= dateTo;
       });
     }
@@ -340,7 +339,10 @@ export function DrListPage() {
     // Calculate daily stats from filtered drops for the table
     const dailyMap = new Map<string, DailyStat>();
     filtered.forEach(drop => {
-      const dropDate = new Date(drop.createdAt).toISOString().split('T')[0];
+      // Use submitted_date for grouping (the date DR was submitted, not created in system)
+      const dropDate = drop.submittedDate
+        ? new Date(drop.submittedDate).toISOString().split('T')[0]
+        : new Date(drop.createdAt).toISOString().split('T')[0];
       const key = `${drop.project || 'Unknown'}_${dropDate}`;
 
       if (!dailyMap.has(key)) {
