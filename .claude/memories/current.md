@@ -1,11 +1,18 @@
 # FibreFlow Current Session Progress
 
-**Last Updated**: 2026-01-16
-**Session Type**: DR Acknowledgment System for Activate Module
+**Last Updated**: 2026-01-17
+**Session Type**: DR Acknowledgment System + Health Check Fixes
 
 ---
 
 ## Completed This Session
+
+### Health Check Fixes (Jan 17, 2026)
+- [x] Fixed WhatsApp Bridge check querying wrong table (`qa_photo_reviews` → `dr_photo_unified_reviews`)
+- [x] Fixed query logic to get MAX(created_at) from ALL records, not just last hour
+- [x] Added WhatsApp Sender service to health check
+- [x] Fixed OneMap health endpoint (`/api/health` → `/health`)
+- [x] Verified "All systems operational" displays correctly in UI
 
 ### DR Acknowledgment System (Jan 2026)
 - [x] Created `/api/activate/dr-acknowledgment` API endpoint
@@ -26,6 +33,7 @@
 
 | File | Change |
 |------|--------|
+| `pages/api/activate/health-check.ts` | Fixed table name, query logic, added WA Sender |
 | `pages/api/activate/dr-acknowledgment.ts` | NEW - Lightweight API for acknowledgment data |
 | `/home/louis/whatsapp-bridge-go/main.go` | Added reply-to support with QuotedMessage |
 | `whatsapp-bridge.service` | Restarted with updated binary |
@@ -102,10 +110,11 @@ Reply threading works with LID when QuotedMessage is included.
 ## Current State
 
 - **Branch**: master
+- **Health Check**: ✅ All 5 services monitored (DB, OneMap, VLM, WA Bridge, WA Sender)
 - **DR Acknowledgment**: ✅ Working with threaded replies
 - **DR Validation**: ✅ Working (DR_NOT_FOUND + PROJECT_MISMATCH)
 - **Go Bridge**: ✅ Updated on Velocity Server
-- **Staging**: vf.fibreflow.app (active)
+- **Staging**: vf.fibreflow.app (active, all systems operational)
 
 ---
 
