@@ -1,7 +1,7 @@
 /**
  * DR List Page Component
  * Main entry page for DR Photo Unified Review
- * Shows list of DRs from WA Monitor (qa_photo_reviews table)
+ * Shows list of DRs from dr_photo_unified_reviews table
  * Users can click a DR to review or search for specific DRs
  */
 
@@ -176,31 +176,31 @@ export function DrListPage() {
     ));
   };
 
-  // Fetch drops from WA Monitor API with pagination support
-  // Loads 1000 drops per page to prevent >4MB API response issue
+  // Fetch drops from DR Photo Unified API with pagination support
   const fetchDrops = async (showLoading = true, page = 1) => {
     try {
       if (showLoading) setIsLoading(true);
       setError(null);
 
-      // Fetch with pagination (1000 drops per page)
-      const response = await fetch(`/api/wa-monitor-drops?page=${page}`);
+      // Fetch with pagination from unified reviews table
+      const response = await fetch(`/api/dr-photo-unified/drops?page=${page}`);
       if (!response.ok) throw new Error('Failed to fetch drops');
 
       const data = await response.json();
 
       if (data.success && Array.isArray(data.data)) {
+        // Transform API response to match DrListItem interface
         const transformedDrops = data.data.map((drop: any) => ({
           id: drop.id,
-          dropNumber: drop.dropNumber,
+          dropNumber: drop.drop_number,
           project: drop.project,
-          reviewDate: drop.reviewDate,
-          completedPhotos: drop.completedPhotos,
-          outstandingPhotos: drop.outstandingPhotos,
-          status: drop.status,
-          feedbackSent: drop.feedbackSent,
-          createdAt: drop.createdAt,
-          senderPhone: drop.senderPhone,
+          reviewDate: drop.updated_at,
+          completedPhotos: drop.steps_completed || 0,
+          outstandingPhotos: (drop.steps_total || 10) - (drop.steps_completed || 0),
+          status: drop.is_complete ? 'complete' : 'incomplete',
+          feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
+          createdAt: drop.created_at,
+          senderPhone: null, // Not tracked in unified table
         }));
 
         setDrops(transformedDrops);
@@ -212,17 +212,17 @@ export function DrListPage() {
           setTotalPages(data.pagination.totalPages);
           setHasNextPage(data.pagination.hasNextPage);
           setHasPreviousPage(data.pagination.hasPreviousPage);
-          setTotalDropsFromApi(data.pagination.totalDrops);
+          setTotalDropsFromApi(data.pagination.totalCount);
         }
 
         // Use API summary for stats (calculated from ALL drops, not just current page)
         if (data.summary) {
           // Set dashboard stats from API summary (all drops)
           setDashboardStats({
-            totalDrops: data.summary.total || 0,
+            totalDrops: data.summary.total_drops || 0,
             incomplete: data.summary.incomplete || 0,
             complete: data.summary.complete || 0,
-            totalFeedback: data.summary.totalFeedback || 0,
+            totalFeedback: data.summary.feedback_sent || 0,
           });
 
           // Set daily stats from API summary (all drops)
@@ -254,7 +254,7 @@ export function DrListPage() {
       if (fromDate) params.set('dateFrom', fromDate);
       if (toDate) params.set('dateTo', toDate);
 
-      const response = await fetch(`/api/wa-monitor-drops?${params.toString()}`);
+      const response = await fetch(`/api/dr-photo-unified/drops?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch project stats');
 
       const data = await response.json();
