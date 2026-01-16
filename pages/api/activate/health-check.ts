@@ -97,14 +97,14 @@ async function checkOneMap(): Promise<ServiceStatus> {
       return {
         status: 'healthy',
         latencyMs: Date.now() - start,
-        message: '1Map responding',
+        message: '1M responding',
         lastCheck: new Date().toISOString(),
       };
     } else {
       return {
         status: 'degraded',
         latencyMs: Date.now() - start,
-        message: `1Map returned ${response.status}`,
+        message: `1M returned ${response.status}`,
         lastCheck: new Date().toISOString(),
       };
     }
@@ -112,7 +112,7 @@ async function checkOneMap(): Promise<ServiceStatus> {
     return {
       status: 'down',
       latencyMs: Date.now() - start,
-      message: `1Map unreachable: ${error instanceof Error ? error.message : 'Unknown'}`,
+      message: `1M unreachable: ${error instanceof Error ? error.message : 'Unknown'}`,
       lastCheck: new Date().toISOString(),
     };
   }
