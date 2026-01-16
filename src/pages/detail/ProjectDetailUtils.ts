@@ -64,4 +64,5 @@ export const getTabConfig = () => [
   { id: 'hierarchy', label: 'Project Hierarchy' },
   { id: 'sow', label: 'SOW Data' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'budget', label: 'Budget' },
 ];

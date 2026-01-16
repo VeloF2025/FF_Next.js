@@ -5,7 +5,7 @@
 
 import { getTabConfig } from './ProjectDetailUtils';
 
-type TabId = 'overview' | 'hierarchy' | 'sow' | 'timeline';
+type TabId = 'overview' | 'hierarchy' | 'sow' | 'timeline' | 'budget';
 
 interface ProjectTabsProps {
   activeTab: TabId;
