@@ -218,12 +218,13 @@ async function calculateSummary(filters?: {
   let paramIndex = 1;
 
   if (filters?.dateFrom) {
-    conditions.push(`submitted_date >= $${paramIndex}::DATE`);
+    // Use COALESCE to fall back to created_at if submitted_date is null
+    conditions.push(`COALESCE(submitted_date, created_at::DATE) >= $${paramIndex}::DATE`);
     params.push(filters.dateFrom);
     paramIndex++;
   }
   if (filters?.dateTo) {
-    conditions.push(`submitted_date <= $${paramIndex}::DATE`);
+    conditions.push(`COALESCE(submitted_date, created_at::DATE) <= $${paramIndex}::DATE`);
     params.push(filters.dateTo);
     paramIndex++;
   }
@@ -298,12 +299,13 @@ async function getProjectStats(filters?: {
   let paramIndex = 1;
 
   if (filters?.dateFrom) {
-    conditions.push(`submitted_date >= $${paramIndex}::DATE`);
+    // Use COALESCE to fall back to created_at if submitted_date is null
+    conditions.push(`COALESCE(submitted_date, created_at::DATE) >= $${paramIndex}::DATE`);
     params.push(filters.dateFrom);
     paramIndex++;
   }
   if (filters?.dateTo) {
-    conditions.push(`submitted_date <= $${paramIndex}::DATE`);
+    conditions.push(`COALESCE(submitted_date, created_at::DATE) <= $${paramIndex}::DATE`);
     params.push(filters.dateTo);
     paramIndex++;
   }
