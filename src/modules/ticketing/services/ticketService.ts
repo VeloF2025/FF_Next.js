@@ -120,7 +120,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         external_id,
         title,
         description,
-        ticket_type,
+        type,
         priority,
         status,
         dr_number,
