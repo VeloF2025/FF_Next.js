@@ -62,7 +62,7 @@ export function ClientSummaryCards({ summary }: ClientSummaryCardsProps) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-[var(--ff-text-secondary)]">Total Value</p>
-            <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">{formatCurrency(summary.totalProjectValue)}</p>
+            <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">{formatCurrency(summary.totalProjectValue || 0)}</p>
           </div>
           <DollarSign className="h-8 w-8 text-purple-400" />
         </div>
