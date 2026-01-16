@@ -13,7 +13,7 @@ Import and manage Nokia OES activation reports.
 
 ## Quick Start
 
-**Import URL**: `http://100.96.203.105:3006/activate` (staging)
+**Import URL**: `https://vf.fibreflow.app/activate` (staging)
 
 1. Navigate to URL
 2. Click "OES Import" tab

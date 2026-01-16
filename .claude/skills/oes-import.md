@@ -15,7 +15,7 @@ Handle daily OES (Optical Equipment Supplier) report imports by:
 
 | Setting | Value |
 |---------|-------|
-| **UI URL** | `http://100.96.203.105:3006/activate` (staging) |
+| **UI URL** | `https://vf.fibreflow.app/activate` (staging) |
 | **Production** | `https://app.fibreflow.app/activate` |
 | **API Endpoint** | `/api/activate/import-oes` |
 | **Database Table** | `oes_activations` |
@@ -223,7 +223,7 @@ CREATE TABLE oes_import_batches (
 ### Standard Import Flow
 
 ```
-1. Navigate to: http://100.96.203.105:3006/activate
+1. Navigate to: https://vf.fibreflow.app/activate
    (or production: https://app.fibreflow.app/activate)
 
 2. Click "OES Import" tab
