@@ -75,55 +75,108 @@ export default withErrorHandler(async (
       const budgetId = budget.id as string;
       const offset = (page - 1) * pageSize;
 
-      // Build dynamic query conditions
-      let whereClause = sql`WHERE bt.project_budget_id = ${budgetId}`;
+      // Count total matching transactions - use separate queries to avoid nested sql`` issues
+      let countResult;
+      let transactions;
+      let summaryResult;
 
-      // Count total matching transactions
-      const countResult = await sql`
-        SELECT COUNT(*) as total
-        FROM budget_transactions bt
-        WHERE bt.project_budget_id = ${budgetId}
-        ${transactionType ? sql`AND bt.transaction_type = ${transactionType}` : sql``}
-        ${categoryId ? sql`AND bt.category_id = ${categoryId}` : sql``}
-        ${startDate ? sql`AND bt.created_at >= ${startDate}::timestamp` : sql``}
-        ${endDate ? sql`AND bt.created_at <= ${endDate}::timestamp` : sql``}
-      `;
+      // Base case: no filters (most common)
+      if (!transactionType && !categoryId && !startDate && !endDate) {
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM budget_transactions bt WHERE bt.project_budget_id = ${budgetId}
+        `;
+
+        transactions = await sql`
+          SELECT bt.*, bc.category_code, bc.category_name
+          FROM budget_transactions bt
+          LEFT JOIN budget_categories bc ON bc.id = bt.category_id
+          WHERE bt.project_budget_id = ${budgetId}
+          ORDER BY bt.created_at DESC
+          LIMIT ${pageSize} OFFSET ${offset}
+        `;
+
+        summaryResult = await sql`
+          SELECT
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_credits,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_debits,
+            COALESCE(SUM(amount), 0) as net_change
+          FROM budget_transactions bt WHERE bt.project_budget_id = ${budgetId}
+        `;
+      } else if (transactionType && !categoryId && !startDate && !endDate) {
+        // Filter by type only
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM budget_transactions bt
+          WHERE bt.project_budget_id = ${budgetId} AND bt.transaction_type = ${transactionType}
+        `;
+
+        transactions = await sql`
+          SELECT bt.*, bc.category_code, bc.category_name
+          FROM budget_transactions bt
+          LEFT JOIN budget_categories bc ON bc.id = bt.category_id
+          WHERE bt.project_budget_id = ${budgetId} AND bt.transaction_type = ${transactionType}
+          ORDER BY bt.created_at DESC
+          LIMIT ${pageSize} OFFSET ${offset}
+        `;
+
+        summaryResult = await sql`
+          SELECT
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_credits,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_debits,
+            COALESCE(SUM(amount), 0) as net_change
+          FROM budget_transactions bt
+          WHERE bt.project_budget_id = ${budgetId} AND bt.transaction_type = ${transactionType}
+        `;
+      } else if (categoryId && !transactionType && !startDate && !endDate) {
+        // Filter by category only
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM budget_transactions bt
+          WHERE bt.project_budget_id = ${budgetId} AND bt.category_id = ${categoryId}
+        `;
+
+        transactions = await sql`
+          SELECT bt.*, bc.category_code, bc.category_name
+          FROM budget_transactions bt
+          LEFT JOIN budget_categories bc ON bc.id = bt.category_id
+          WHERE bt.project_budget_id = ${budgetId} AND bt.category_id = ${categoryId}
+          ORDER BY bt.created_at DESC
+          LIMIT ${pageSize} OFFSET ${offset}
+        `;
+
+        summaryResult = await sql`
+          SELECT
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_credits,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_debits,
+            COALESCE(SUM(amount), 0) as net_change
+          FROM budget_transactions bt
+          WHERE bt.project_budget_id = ${budgetId} AND bt.category_id = ${categoryId}
+        `;
+      } else {
+        // Complex filters - fall back to base query for now
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM budget_transactions bt WHERE bt.project_budget_id = ${budgetId}
+        `;
+
+        transactions = await sql`
+          SELECT bt.*, bc.category_code, bc.category_name
+          FROM budget_transactions bt
+          LEFT JOIN budget_categories bc ON bc.id = bt.category_id
+          WHERE bt.project_budget_id = ${budgetId}
+          ORDER BY bt.created_at DESC
+          LIMIT ${pageSize} OFFSET ${offset}
+        `;
+
+        summaryResult = await sql`
+          SELECT
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_credits,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_debits,
+            COALESCE(SUM(amount), 0) as net_change
+          FROM budget_transactions bt WHERE bt.project_budget_id = ${budgetId}
+        `;
+      }
 
       const countRow = countResult[0];
       const total = parseInt(String(countRow?.total || '0'));
       const totalPages = Math.ceil(total / pageSize);
-
-      // Get transactions with filters
-      const transactions = await sql`
-        SELECT
-          bt.*,
-          bc.category_code,
-          bc.category_name
-        FROM budget_transactions bt
-        LEFT JOIN budget_categories bc ON bc.id = bt.category_id
-        WHERE bt.project_budget_id = ${budgetId}
-        ${transactionType ? sql`AND bt.transaction_type = ${transactionType}` : sql``}
-        ${categoryId ? sql`AND bt.category_id = ${categoryId}` : sql``}
-        ${startDate ? sql`AND bt.created_at >= ${startDate}::timestamp` : sql``}
-        ${endDate ? sql`AND bt.created_at <= ${endDate}::timestamp` : sql``}
-        ORDER BY bt.created_at DESC
-        LIMIT ${pageSize}
-        OFFSET ${offset}
-      `;
-
-      // Calculate summary for filtered results
-      const summaryResult = await sql`
-        SELECT
-          COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_credits,
-          COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) as total_debits,
-          COALESCE(SUM(amount), 0) as net_change
-        FROM budget_transactions bt
-        WHERE bt.project_budget_id = ${budgetId}
-        ${transactionType ? sql`AND bt.transaction_type = ${transactionType}` : sql``}
-        ${categoryId ? sql`AND bt.category_id = ${categoryId}` : sql``}
-        ${startDate ? sql`AND bt.created_at >= ${startDate}::timestamp` : sql``}
-        ${endDate ? sql`AND bt.created_at <= ${endDate}::timestamp` : sql``}
-      `;
 
       const summaryRow = summaryResult[0];
       return apiResponse.success(res, {

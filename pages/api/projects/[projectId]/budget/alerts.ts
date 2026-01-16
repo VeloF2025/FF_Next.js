@@ -73,22 +73,52 @@ export default withErrorHandler(async (
       }
       const budgetId = budget.id;
 
-      // Get alerts
-      const alerts = await sql`
-        SELECT *
-        FROM budget_alerts
-        WHERE project_budget_id = ${budgetId}
-        ${status ? sql`AND status = ${status}` : sql``}
-        ${severity ? sql`AND severity = ${severity}` : sql``}
-        ${!includeResolved && !status ? sql`AND status != 'resolved'` : sql``}
-        ORDER BY
-          CASE severity
-            WHEN 'critical' THEN 1
-            WHEN 'warning' THEN 2
-            WHEN 'info' THEN 3
-          END,
-          created_at DESC
-      `;
+      // Get alerts - use separate queries to avoid nested sql`` issues with db-logger proxy
+      let alerts;
+      if (status && severity) {
+        alerts = await sql`
+          SELECT * FROM budget_alerts
+          WHERE project_budget_id = ${budgetId}
+            AND status = ${status}
+            AND severity = ${severity}
+          ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
+        `;
+      } else if (status) {
+        alerts = await sql`
+          SELECT * FROM budget_alerts
+          WHERE project_budget_id = ${budgetId}
+            AND status = ${status}
+          ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
+        `;
+      } else if (severity && !includeResolved) {
+        alerts = await sql`
+          SELECT * FROM budget_alerts
+          WHERE project_budget_id = ${budgetId}
+            AND severity = ${severity}
+            AND status != 'resolved'
+          ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
+        `;
+      } else if (severity) {
+        alerts = await sql`
+          SELECT * FROM budget_alerts
+          WHERE project_budget_id = ${budgetId}
+            AND severity = ${severity}
+          ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
+        `;
+      } else if (includeResolved) {
+        alerts = await sql`
+          SELECT * FROM budget_alerts
+          WHERE project_budget_id = ${budgetId}
+          ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
+        `;
+      } else {
+        alerts = await sql`
+          SELECT * FROM budget_alerts
+          WHERE project_budget_id = ${budgetId}
+            AND status != 'resolved'
+          ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
+        `;
+      }
 
       // Get summary counts
       const summaryResult = await sql`
