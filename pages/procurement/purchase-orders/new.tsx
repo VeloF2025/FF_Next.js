@@ -26,8 +26,8 @@ interface POItem {
 }
 
 interface Supplier {
-  id: number;
-  company_name: string;
+  id: string;
+  companyName: string;
 }
 
 interface Project {
@@ -275,7 +275,7 @@ export default function NewPurchaseOrderPage() {
                   <option value="">Select a supplier</option>
                   {suppliers.map((supplier) => (
                     <option key={supplier.id} value={supplier.id}>
-                      {supplier.company_name}
+                      {supplier.companyName}
                     </option>
                   ))}
                 </select>

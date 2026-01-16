@@ -122,22 +122,24 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const {
-      supplierId,
-      supplierContact,
-      supplierReference,
-      projectId,
-      deliveryAddress,
-      expectedDeliveryDate,
-      shippingMethod,
-      paymentTerms,
-      currency = 'ZAR',
-      taxRate = 15,
-      internalNotes,
-      supplierNotes,
-      items,
-      createdBy = 'system', // Should come from auth
-    } = req.body;
+    const body = req.body;
+    const supplierId = body.supplierId;
+    const supplierContact = body.supplierContact;
+    const supplierReference = body.supplierReference;
+    const projectId = body.projectId;
+    const deliveryAddress = body.deliveryAddress;
+    // Accept both field names for delivery date
+    const expectedDeliveryDate = body.expectedDeliveryDate || body.deliveryDate;
+    const shippingMethod = body.shippingMethod;
+    const paymentTerms = body.paymentTerms;
+    const currency = body.currency || 'ZAR';
+    // Accept both vatRate and taxRate
+    const taxRate = body.taxRate ?? body.vatRate ?? 15;
+    // Accept both note field names
+    const internalNotes = body.internalNotes || body.notes;
+    const supplierNotes = body.supplierNotes;
+    const items = body.items;
+    const createdBy = body.createdBy || 'system';
 
     // Validation
     if (!supplierId) {
@@ -148,9 +150,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'Delivery address must be at least 10 characters');
     }
 
-    const validPaymentTerms = ['COD', 'Net 15', 'Net 30', 'Net 45', 'Net 60'];
-    if (!paymentTerms || !validPaymentTerms.includes(paymentTerms)) {
-      return apiResponse.badRequest(res, 'Valid payment terms are required');
+    // Normalize payment terms - accept various formats
+    const paymentTermsMap: Record<string, string> = {
+      'cod': 'COD', 'COD': 'COD',
+      'net7': 'Net 7', 'Net 7': 'Net 7', 'net 7': 'Net 7',
+      'net14': 'Net 14', 'Net 14': 'Net 14', 'net 14': 'Net 14',
+      'net15': 'Net 15', 'Net 15': 'Net 15', 'net 15': 'Net 15',
+      'net30': 'Net 30', 'Net 30': 'Net 30', 'net 30': 'Net 30',
+      'net45': 'Net 45', 'Net 45': 'Net 45', 'net 45': 'Net 45',
+      'net60': 'Net 60', 'Net 60': 'Net 60', 'net 60': 'Net 60',
+      'eom': 'EOM', 'EOM': 'EOM',
+      'prepaid': 'Prepaid', 'Prepaid': 'Prepaid',
+    };
+    const normalizedPaymentTerms = paymentTermsMap[paymentTerms];
+    if (!paymentTerms || !normalizedPaymentTerms) {
+      return apiResponse.badRequest(res, 'Valid payment terms are required (e.g., Net 30, COD)');
     }
 
     if (taxRate < 0 || taxRate > 25) {
@@ -161,10 +175,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'At least one item is required');
     }
 
-    // Validate items
+    // Validate items - accept both description and itemDescription
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (!item.description || item.description.trim().length < 3) {
+      const description = item.description || item.itemDescription;
+      if (!description || description.trim().length < 3) {
         return apiResponse.badRequest(res, `Item ${i + 1}: Description must be at least 3 characters`);
       }
       if (!item.quantity || item.quantity <= 0) {
@@ -196,35 +211,58 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const sequence = parseInt(seqResult[0]?.seq || '1', 10);
     const poNumber = `PO-${year}-${String(sequence).padStart(4, '0')}`;
 
-    // Insert PO (matching actual schema columns)
-    const poResult = await sql`
+    // Insert PO using explicit query method
+    const insertQuery = `
       INSERT INTO purchase_orders (
         po_number, status, supplier_id, supplier_contact, supplier_reference,
         project_id, delivery_address, expected_delivery_date, shipping_method,
         payment_terms, currency, tax_rate, subtotal, tax_amount, total_amount,
         internal_notes, supplier_notes, created_by, created_at, updated_at
       ) VALUES (
-        ${poNumber}, 'draft', ${supplierId}, ${supplierContact || null}, ${supplierReference || null},
-        ${projectId || null}, ${deliveryAddress}, ${expectedDeliveryDate || null}, ${shippingMethod || null},
-        ${paymentTerms}, ${currency}, ${taxRate}, ${subtotal}, ${taxAmount}, ${totalAmount},
-        ${internalNotes || null}, ${supplierNotes || null}, ${createdBy}, NOW(), NOW()
+        $1, 'draft', $2, $3, $4,
+        $5, $6, $7, $8,
+        $9, $10, $11, $12, $13, $14,
+        $15, $16, $17, NOW(), NOW()
       )
       RETURNING id, po_number
     `;
 
+    const poResult = await sql.query(insertQuery, [
+      poNumber,
+      supplierId,
+      supplierContact || null,
+      supplierReference || null,
+      projectId || null,
+      deliveryAddress,
+      expectedDeliveryDate || null,
+      shippingMethod || null,
+      normalizedPaymentTerms,
+      currency,
+      taxRate,
+      subtotal,
+      taxAmount,
+      totalAmount,
+      internalNotes || null,
+      supplierNotes || null,
+      createdBy
+    ]);
+
     const poId = poResult[0].id;
 
     // Insert items (matching actual schema columns)
+    // Note: trigger tr_poi_totals recalculates PO totals from item tax_amounts
     for (const item of items) {
       const lineTotal = Math.round(item.quantity * item.unitPrice * 100) / 100;
+      const itemTaxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
+      const itemDescription = item.description || item.itemDescription;
 
       await sql`
         INSERT INTO purchase_order_items (
           purchase_order_id, item_code, item_description, quantity_ordered,
-          quantity_received, uom, unit_price, total_price, notes, created_at
+          quantity_received, uom, unit_price, tax_rate, tax_amount, total_price, notes, created_at
         ) VALUES (
-          ${poId}, ${item.itemCode || null}, ${item.description}, ${item.quantity},
-          0, ${item.uom}, ${item.unitPrice}, ${lineTotal}, ${item.notes || null}, NOW()
+          ${poId}, ${item.itemCode || null}, ${itemDescription}, ${item.quantity},
+          0, ${item.uom}, ${item.unitPrice}, ${taxRate}, ${itemTaxAmount}, ${lineTotal}, ${item.notes || null}, NOW()
         )
       `;
     }
