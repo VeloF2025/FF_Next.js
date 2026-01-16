@@ -180,13 +180,26 @@ export function DrListPage() {
   };
 
   // Fetch drops from DR Photo Unified API with pagination support
-  const fetchDrops = async (showLoading = true, page = 1) => {
+  const fetchDrops = async (showLoading = true, page = 1, filters?: {
+    dateFrom?: string;
+    dateTo?: string;
+    project?: string;
+    status?: string;
+  }) => {
     try {
       if (showLoading) setIsLoading(true);
       setError(null);
 
-      // Fetch with pagination from unified reviews table
-      const response = await fetch(`/api/activate/drops?page=${page}`);
+      // Build query params with all filters
+      const params = new URLSearchParams();
+      params.set('page', page.toString());
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters?.project && filters.project !== 'all') params.set('project', filters.project);
+      if (filters?.status && filters.status !== 'all') params.set('status', filters.status);
+
+      // Fetch with pagination and filters from unified reviews table
+      const response = await fetch(`/api/activate/drops?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch drops');
 
       const data = await response.json();
@@ -236,8 +249,10 @@ export function DrListPage() {
           calculateStats(transformedDrops);
         }
 
-        // NOTE: projectStats is handled by fetchProjectStats() which respects date filters
-        // Don't set projectStats here as it would overwrite filtered results
+        // Set projectStats from API (now includes all filters)
+        if (data.projectStats && Array.isArray(data.projectStats)) {
+          setProjectStats(data.projectStats);
+        }
 
         setLastRefresh(new Date());
       }
@@ -249,26 +264,6 @@ export function DrListPage() {
     }
   };
 
-  // Fetch project stats with date filters (separate from drops to support date filtering)
-  const fetchProjectStats = async (fromDate?: string, toDate?: string) => {
-    try {
-      // Build query params for date filtering
-      const params = new URLSearchParams();
-      params.set('skipSummary', 'true'); // Only need projectStats, skip other calculations
-      if (fromDate) params.set('dateFrom', fromDate);
-      if (toDate) params.set('dateTo', toDate);
-
-      const response = await fetch(`/api/activate/drops?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch project stats');
-
-      const data = await response.json();
-      if (data.projectStats && Array.isArray(data.projectStats)) {
-        setProjectStats(data.projectStats);
-      }
-    } catch (err) {
-      console.error('Error fetching project stats:', err);
-    }
-  };
 
   // Debounced search - wait 300ms after typing stops
   useEffect(() => {
@@ -279,15 +274,18 @@ export function DrListPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // Get current filters for API calls
+  const getCurrentFilters = () => ({
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    project: projectFilter !== 'all' ? projectFilter : undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+  });
+
   // Initial load - dates already initialized to today via useState
   useEffect(() => {
-    fetchDrops();
+    fetchDrops(true, 1, getCurrentFilters());
   }, []);
-
-  // Re-fetch project stats when date filters change
-  useEffect(() => {
-    fetchProjectStats(dateFrom || undefined, dateTo || undefined);
-  }, [dateFrom, dateTo]);
 
   // Apply all filters and update stats
   // Note: This effect should NOT depend on `drops` to avoid resetting pagination
@@ -338,15 +336,8 @@ export function DrListPage() {
 
     setFilteredDrops(filtered);
 
-    // Update dashboard stats based on filtered drops when filters are active
-    if (hasActiveFilters) {
-      setDashboardStats({
-        totalDrops: filtered.length,
-        incomplete: filtered.filter(d => d.status === 'incomplete').length,
-        complete: filtered.filter(d => d.status === 'complete').length,
-        totalFeedback: filtered.filter(d => d.feedbackSent).length,
-      });
-    }
+    // NOTE: Dashboard stats are now calculated server-side with filters
+    // Client-side filtering only applies search term to the paginated results
 
     // Calculate daily stats from filtered drops for the table
     const dailyMap = new Map<string, DailyStat>();
@@ -379,15 +370,13 @@ export function DrListPage() {
     ));
   }, [drops, searchTerm, dateFrom, dateTo, statusFilter, projectFilter]);
 
-  // Reset to page 1 only when FILTER values change, not when drops data changes
+  // Re-fetch when FILTER values change
   useEffect(() => {
-    // Only reset if we have filters active and we're not on page 1
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-      fetchDrops(true, 1);
-    }
+    // Fetch with new filters, reset to page 1
+    setCurrentPage(1);
+    fetchDrops(true, 1, getCurrentFilters());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, dateFrom, dateTo, statusFilter, projectFilter]);
+  }, [dateFrom, dateTo, statusFilter, projectFilter]);
 
   // Handle DR selection
   const handleSelectDr = (dropNumber: string) => {
@@ -396,7 +385,7 @@ export function DrListPage() {
 
   // Manual refresh
   const handleRefresh = () => {
-    fetchDrops(true, currentPage);
+    fetchDrops(true, currentPage, getCurrentFilters());
   };
 
   // Clear all filters
@@ -415,7 +404,7 @@ export function DrListPage() {
     if (hasNextPage) {
       const nextPage = currentPage + 1;
       setCurrentPage(nextPage);
-      fetchDrops(true, nextPage);
+      fetchDrops(true, nextPage, getCurrentFilters());
     }
   };
 
@@ -423,7 +412,7 @@ export function DrListPage() {
     if (hasPreviousPage) {
       const prevPage = currentPage - 1;
       setCurrentPage(prevPage);
-      fetchDrops(true, prevPage);
+      fetchDrops(true, prevPage, getCurrentFilters());
     }
   };
 
@@ -626,7 +615,7 @@ export function DrListPage() {
         {activeTab === 'manual-entry' && (
           <div className="mb-6">
             <ManualDREntry onDRsAdded={(count) => {
-              fetchDrops(true, 1);
+              fetchDrops(true, 1, getCurrentFilters());
               setActiveTab('list'); // Switch back to list after adding
             }} />
           </div>
@@ -636,7 +625,7 @@ export function DrListPage() {
         {activeTab === 'oes-import' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
             <OESImportTab onImportComplete={() => {
-              fetchDrops(true, 1);
+              fetchDrops(true, 1, getCurrentFilters());
             }} />
           </div>
         )}

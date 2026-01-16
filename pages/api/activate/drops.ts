@@ -205,34 +205,77 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
 }
 
 /**
- * Calculate summary statistics
+ * Calculate summary statistics with optional filters
  */
-async function calculateSummary(): Promise<Summary> {
-  const result = await pool.query(`
+async function calculateSummary(filters?: {
+  dateFrom?: string;
+  dateTo?: string;
+  project?: string;
+  status?: string;
+}): Promise<Summary> {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  let paramIndex = 1;
+
+  if (filters?.dateFrom) {
+    conditions.push(`submitted_date >= $${paramIndex}::DATE`);
+    params.push(filters.dateFrom);
+    paramIndex++;
+  }
+  if (filters?.dateTo) {
+    conditions.push(`submitted_date <= $${paramIndex}::DATE`);
+    params.push(filters.dateTo);
+    paramIndex++;
+  }
+  if (filters?.project && filters.project !== 'all') {
+    conditions.push(`project = $${paramIndex}`);
+    params.push(filters.project);
+    paramIndex++;
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // For status filter, we need to adjust the counts
+  const isCompleteCondition = `
+    step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
+    step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
+    step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
+    step_10_signature
+  `;
+
+  let query = `
     SELECT
       COUNT(*) as total_drops,
-      COUNT(*) FILTER (WHERE
-        step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
-        step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
-        step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
-        step_10_signature
-      ) as complete,
+      COUNT(*) FILTER (WHERE ${isCompleteCondition}) as complete,
       COUNT(*) FILTER (WHERE feedback_sent = true) as feedback_sent,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'pending' OR vlm_categorization_status IS NULL) as vlm_pending,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'processing') as vlm_processing,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'categorized' OR vlm_categorization_status = 'approved') as vlm_categorized,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'failed') as vlm_failed
     FROM dr_photo_unified_reviews
-  `);
+    ${whereClause}
+  `;
+
+  const result = await pool.query(query, params);
 
   const row = result.rows[0];
-  const total = parseInt(row.total_drops, 10);
-  const complete = parseInt(row.complete, 10);
+  let total = parseInt(row.total_drops, 10);
+  let complete = parseInt(row.complete, 10);
+  let incomplete = total - complete;
+
+  // Apply status filter to the results
+  if (filters?.status === 'complete') {
+    total = complete;
+    incomplete = 0;
+  } else if (filters?.status === 'incomplete') {
+    total = incomplete;
+    complete = 0;
+  }
 
   return {
     total_drops: total,
     complete,
-    incomplete: total - complete,
+    incomplete: filters?.status === 'complete' ? 0 : (filters?.status === 'incomplete' ? total : incomplete),
     feedback_sent: parseInt(row.feedback_sent, 10),
     vlm_pending: parseInt(row.vlm_pending, 10),
     vlm_processing: parseInt(row.vlm_processing, 10),
@@ -242,33 +285,55 @@ async function calculateSummary(): Promise<Summary> {
 }
 
 /**
- * Get project statistics with optional date filtering
+ * Get project statistics with optional filtering
  */
-async function getProjectStats(dateFrom?: string, dateTo?: string): Promise<ProjectStats[]> {
-  let whereClause = '';
+async function getProjectStats(filters?: {
+  dateFrom?: string;
+  dateTo?: string;
+  project?: string;
+  status?: string;
+}): Promise<ProjectStats[]> {
+  const conditions: string[] = [];
   const params: any[] = [];
+  let paramIndex = 1;
 
-  if (dateFrom && dateTo) {
-    whereClause = 'WHERE submitted_date >= $1::DATE AND submitted_date <= $2::DATE';
-    params.push(dateFrom, dateTo);
-  } else if (dateFrom) {
-    whereClause = 'WHERE submitted_date >= $1::DATE';
-    params.push(dateFrom);
-  } else if (dateTo) {
-    whereClause = 'WHERE submitted_date <= $1::DATE';
-    params.push(dateTo);
+  if (filters?.dateFrom) {
+    conditions.push(`submitted_date >= $${paramIndex}::DATE`);
+    params.push(filters.dateFrom);
+    paramIndex++;
   }
+  if (filters?.dateTo) {
+    conditions.push(`submitted_date <= $${paramIndex}::DATE`);
+    params.push(filters.dateTo);
+    paramIndex++;
+  }
+  if (filters?.project && filters.project !== 'all') {
+    conditions.push(`project = $${paramIndex}`);
+    params.push(filters.project);
+    paramIndex++;
+  }
+
+  // Add status filter to the WHERE clause
+  const isCompleteCondition = `
+    step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
+    step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
+    step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
+    step_10_signature
+  `;
+
+  if (filters?.status === 'complete') {
+    conditions.push(`(${isCompleteCondition})`);
+  } else if (filters?.status === 'incomplete') {
+    conditions.push(`NOT (${isCompleteCondition})`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const query = `
     SELECT
       COALESCE(project, 'Unknown') as project,
       COUNT(*) as total,
-      COUNT(*) FILTER (WHERE
-        step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
-        step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
-        step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
-        step_10_signature
-      ) as complete
+      COUNT(*) FILTER (WHERE ${isCompleteCondition}) as complete
     FROM dr_photo_unified_reviews
     ${whereClause}
     GROUP BY COALESCE(project, 'Unknown')
@@ -292,7 +357,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo } = req.query;
+    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status } = req.query;
 
     // Get single drop by ID
     if (id && typeof id === 'string') {
@@ -331,16 +396,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const searchTerm = search && typeof search === 'string' ? search : undefined;
     const result = await getPaginatedDrops(currentPage, pageSize, searchTerm);
 
+    // Parse filter parameters
+    const filters = {
+      dateFrom: dateFrom && typeof dateFrom === 'string' ? dateFrom : undefined,
+      dateTo: dateTo && typeof dateTo === 'string' ? dateTo : undefined,
+      project: project && typeof project === 'string' ? project : undefined,
+      status: status && typeof status === 'string' ? status : undefined,
+    };
+
     // Optionally skip summary for faster initial load
     let summary = null;
     if (skipSummary !== 'true') {
-      summary = await calculateSummary();
+      summary = await calculateSummary(filters);
     }
 
-    // Get project stats with date filtering
-    const dateFromStr = dateFrom && typeof dateFrom === 'string' ? dateFrom : undefined;
-    const dateToStr = dateTo && typeof dateTo === 'string' ? dateTo : undefined;
-    const projectStats = await getProjectStats(dateFromStr, dateToStr);
+    // Get project stats with all filters
+    const projectStats = await getProjectStats(filters);
 
     log.info('DrPhotoUnifiedDropsAPI', `Fetched ${result.drops.length} drops`, {
       page: currentPage,
@@ -355,7 +426,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pagination: result.pagination,
       meta: {
         timestamp: new Date().toISOString(),
-        dateFilter: dateFromStr || dateToStr ? { from: dateFromStr, to: dateToStr } : null,
+        filters: (filters.dateFrom || filters.dateTo || filters.project || filters.status) ? filters : null,
       },
     });
   } catch (error: any) {
