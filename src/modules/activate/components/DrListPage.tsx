@@ -76,8 +76,8 @@ export function DrListPage() {
   // Filter states - default to today's date
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState(''); // For debounced search
-  const [dateFrom, setDateFrom] = useState(getTodaySAST);
-  const [dateTo, setDateTo] = useState(getTodaySAST);
+  const [dateFrom, setDateFrom] = useState(() => getTodaySAST());
+  const [dateTo, setDateTo] = useState(() => getTodaySAST());
   const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'incomplete'>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
