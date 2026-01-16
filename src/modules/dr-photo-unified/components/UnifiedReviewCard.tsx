@@ -446,6 +446,28 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
 
   return (
     <div className="space-y-4">
+      {/* Serial Numbers from OneMap */}
+      {(review.ont_serial_scanned || review.ups_serial_scanned) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+              ONT Barcode
+            </label>
+            <p className="text-lg font-mono font-semibold text-gray-900 dark:text-white">
+              {review.ont_serial_scanned || <span className="text-gray-400 dark:text-gray-500">—</span>}
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+              UPS Serial
+            </label>
+            <p className="text-lg font-mono font-semibold text-gray-900 dark:text-white">
+              {review.ups_serial_scanned || <span className="text-gray-400 dark:text-gray-500">—</span>}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Fetch Photos Header */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600 dark:text-gray-400">

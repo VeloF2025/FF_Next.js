@@ -17,6 +17,8 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/dr-photo-unified/types/unified.types';
 
+const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
 
@@ -122,6 +124,48 @@ async function handleGet(
       );
 
       log.info(`Created unified review for ${dropNumber}`);
+
+      // Auto-fetch photos from OneMap after creating the record
+      try {
+        log.info(`Auto-fetching photos from OneMap for new record: ${dropNumber}`);
+        const oneMapData = await fetchFromOneMapRecord(dropNumber);
+
+        if (oneMapData) {
+          // Update the record with photos and serial data
+          await pool.query(
+            `UPDATE dr_photo_unified_reviews
+             SET photo_source = $1,
+                 photo_count = $2,
+                 photos_metadata = $3,
+                 ont_serial_scanned = $4,
+                 ups_serial_scanned = $5,
+                 updated_at = NOW()
+             WHERE drop_number = $6`,
+            [
+              'onemap',
+              oneMapData.photos.length,
+              JSON.stringify(oneMapData.photos),
+              oneMapData.ont_barcode || null,
+              oneMapData.ups_serial || null,
+              dropNumber
+            ]
+          );
+
+          // Re-fetch the updated record
+          result = await pool.query<UnifiedReview>(
+            `SELECT * FROM dr_photo_unified_reviews WHERE drop_number = $1`,
+            [dropNumber]
+          );
+
+          log.info(`Auto-fetched ${oneMapData.photos.length} photos for ${dropNumber}`, {
+            ont_barcode: oneMapData.ont_barcode,
+            ups_serial: oneMapData.ups_serial,
+          });
+        }
+      } catch (fetchError) {
+        log.warn(`Auto-fetch failed for ${dropNumber}, will require manual fetch`, { error: fetchError });
+        // Don't fail the request - just continue with the empty record
+      }
     }
 
     const review = result.rows[0];
@@ -244,6 +288,83 @@ async function handlePatch(
   } catch (error) {
     log.error('Error updating unified review:', error);
     return apiResponse.internalError(res, error);
+  }
+}
+
+/**
+ * Map photo type to unified step number
+ */
+function mapPhotoTypeToStep(photoType: string): number {
+  const mapping: Record<string, number> = {
+    'ph_prop': 1, 'ph_sign1': 1, 'ph_drop': 1, 'ph_outs': 1,
+    'ph_pole': 2, 'ph_cbl_r': 2,
+    'ph_entry_out': 3, 'ph_hm_ln': 3,
+    'ph_entry_in': 4, 'ph_hm_en': 4,
+    'ph_wall': 5,
+    'ph_ont': 6, 'ph_ont_back': 6,
+    'ph_powm': 7, 'ph_powm1': 7, 'ph_powm2': 7,
+    'ph_bl': 8, 'ph_barcode': 8,
+    'ph_ups': 9,
+    'ph_after': 10, 'ph_final': 10,
+    'ph_lights': 11, 'ph_led': 11,
+    'ph_sign2': 12, 'ph_signature': 12,
+  };
+  return mapping[photoType] || 0;
+}
+
+/**
+ * Fetch DR record from OneMap API (includes photos + serial numbers)
+ */
+async function fetchFromOneMapRecord(dropNumber: string): Promise<{
+  photos: Array<{ filename: string; step: number; url: string; size?: number }>;
+  ont_barcode: string | null;
+  ups_serial: string | null;
+} | null> {
+  try {
+    // Try to get the full record
+    let response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
+
+    // If 404, try to download first
+    if (response.status === 404 || response.status === 422) {
+      log.info(`Record not found for ${dropNumber}, triggering download`);
+
+      const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
+        method: 'POST',
+      });
+
+      if (downloadResponse.ok) {
+        // Retry after download
+        response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
+      } else {
+        log.warn(`Download failed for ${dropNumber}`);
+        return null;
+      }
+    }
+
+    if (!response.ok) {
+      log.warn(`OneMap API error for ${dropNumber}: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const localPhotos = data.local_photos || [];
+
+    // Map photos with proxy URLs
+    const photos = localPhotos.map((photo: { filename: string; type: string; size?: number }) => ({
+      filename: photo.filename,
+      step: mapPhotoTypeToStep(photo.type),
+      url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
+      size: photo.size,
+    }));
+
+    return {
+      photos,
+      ont_barcode: data.ont_barcode || null,
+      ups_serial: data.ups_serial || null,
+    };
+  } catch (error) {
+    log.error(`Failed to fetch from OneMap for ${dropNumber}`, { error });
+    return null;
   }
 }
 

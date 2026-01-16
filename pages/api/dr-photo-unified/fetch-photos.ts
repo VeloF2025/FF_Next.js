@@ -28,6 +28,7 @@ const pool = new Pool({
 interface FetchPhotosRequest {
   dropNumber: string;
   forceSource?: 'onemap' | 'boss' | 'local'; // Optional: force specific source for testing
+  force?: boolean; // Force re-fetch even if already fetched
 }
 
 interface Photo {
@@ -42,6 +43,9 @@ interface PhotoFetchResult {
   source: 'onemap' | 'boss' | 'local';
   photos: Photo[];
   count: number;
+  ont_barcode?: string | null;
+  ups_serial?: string | null;
+  skipped?: boolean; // True if already fetched and not forced
 }
 
 /**
@@ -53,25 +57,54 @@ async function handlePost(
   res: NextApiResponse
 ): Promise<void> {
   try {
-    const { dropNumber, forceSource } = req.body as FetchPhotosRequest;
+    const { dropNumber, forceSource, force } = req.body as FetchPhotosRequest;
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info(`Fetching photos for ${dropNumber}`, { forceSource });
+    log.info(`Fetching photos for ${dropNumber}`, { forceSource, force });
+
+    // Check if already fetched (skip unless forced)
+    if (!force) {
+      const existingResult = await pool.query(
+        `SELECT photo_source, photo_count, photos_metadata, ont_serial_scanned, ups_serial_scanned
+         FROM dr_photo_unified_reviews
+         WHERE drop_number = $1 AND photo_source IS NOT NULL`,
+        [dropNumber]
+      );
+
+      if (existingResult.rows.length > 0) {
+        const existing = existingResult.rows[0];
+        log.info(`Photos already fetched for ${dropNumber}, skipping`, {
+          source: existing.photo_source,
+          count: existing.photo_count,
+        });
+
+        return apiResponse.success(res, {
+          source: existing.photo_source,
+          photos: existing.photos_metadata || [],
+          count: existing.photo_count || 0,
+          ont_barcode: existing.ont_serial_scanned,
+          ups_serial: existing.ups_serial_scanned,
+          skipped: true,
+        });
+      }
+    }
 
     // Fetch photos with multi-source fallback
     const result = forceSource
       ? await fetchFromSpecificSource(dropNumber, forceSource)
       : await fetchPhotosWithFallback(dropNumber);
 
-    // Update unified review with photo metadata
+    // Update unified review with photo metadata and serial numbers
     await updateReviewWithPhotos(dropNumber, result);
 
     log.info(`Successfully fetched photos for ${dropNumber}`, {
       source: result.source,
       count: result.count,
+      ont_barcode: result.ont_barcode,
+      ups_serial: result.ups_serial,
     });
 
     return apiResponse.success(res, result);
@@ -139,16 +172,17 @@ const ONEMAP_HOST = 'http://192.168.1.150:8003';
 
 /**
  * Fetch from OneMap GIS API (via port 8003)
+ * Uses /api/record/ endpoint which includes photos AND serial numbers
  * If photos not found, triggers download from OneMap first
  */
 async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
   try {
-    // First, try to get existing photos
-    let response = await fetch(`${ONEMAP_HOST}/api/photos/${dropNumber}`);
+    // First, try to get the full record (includes photos + serial numbers)
+    let response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
 
     // If 404, try to download photos first
     if (response.status === 404 || response.status === 422) {
-      log.info(`Photos not found for ${dropNumber}, triggering download from OneMap`);
+      log.info(`Record not found for ${dropNumber}, triggering download from OneMap`);
 
       // Trigger download from OneMap
       const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
@@ -161,8 +195,8 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
           photos_downloaded: downloadResult.photos_downloaded || downloadResult.total_photos
         });
 
-        // Retry fetching photos after download
-        response = await fetch(`${ONEMAP_HOST}/api/photos/${dropNumber}`);
+        // Retry fetching record after download
+        response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
       } else {
         const errorText = await downloadResponse.text();
         log.warn(`Download failed for ${dropNumber}:`, { status: downloadResponse.status, error: errorText });
@@ -176,13 +210,16 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
 
     const data = await response.json();
 
-    // Check if data.photos exists
-    if (!data.photos || !Array.isArray(data.photos)) {
-      log.warn(`No photos array in response for ${dropNumber}`, { data });
+    // Check if local_photos exists (full record response)
+    const localPhotos = data.local_photos || [];
+    if (!Array.isArray(localPhotos)) {
+      log.warn(`No local_photos array in response for ${dropNumber}`, { data });
       return {
         source: 'onemap',
         photos: [],
         count: 0,
+        ont_barcode: data.ont_barcode || null,
+        ups_serial: data.ups_serial || null,
       };
     }
 
@@ -190,7 +227,7 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
     // Use our proxy endpoint instead of internal IP to avoid:
     // 1. LAN IP not accessible from internet
     // 2. Mixed content (HTTPS -> HTTP) blocking
-    const photos: Photo[] = data.photos.map((photo: any) => ({
+    const photos: Photo[] = localPhotos.map((photo: any) => ({
       filename: photo.filename,
       step: mapPhotoTypeToStep(photo.type),
       url: `/api/dr-photo-unified/photo/${dropNumber}/${photo.filename}`,
@@ -198,10 +235,18 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
       modified: photo.modified,
     }));
 
+    log.info(`Fetched record for ${dropNumber}`, {
+      photo_count: photos.length,
+      ont_barcode: data.ont_barcode,
+      ups_serial: data.ups_serial,
+    });
+
     return {
       source: 'onemap',
       photos,
       count: photos.length,
+      ont_barcode: data.ont_barcode || null,
+      ups_serial: data.ups_serial || null,
     };
   } catch (error) {
     log.error('OneMap fetch failed', { dropNumber, error });
@@ -287,7 +332,7 @@ function mapPhotoTypeToStep(photoType: string): number {
 }
 
 /**
- * Update unified review with photo metadata
+ * Update unified review with photo metadata and serial numbers
  */
 async function updateReviewWithPhotos(
   dropNumber: string,
@@ -301,13 +346,25 @@ async function updateReviewWithPhotos(
         photo_source = $1,
         photo_count = $2,
         photos_metadata = $3,
+        ont_serial_scanned = COALESCE($4, ont_serial_scanned),
+        ups_serial_scanned = COALESCE($5, ups_serial_scanned),
         updated_at = NOW()
-      WHERE drop_number = $4;
+      WHERE drop_number = $6;
       `,
-      [result.source, result.count, JSON.stringify(result.photos), dropNumber]
+      [
+        result.source,
+        result.count,
+        JSON.stringify(result.photos),
+        result.ont_barcode || null,
+        result.ups_serial || null,
+        dropNumber
+      ]
     );
 
-    log.info(`Updated review with photo metadata for ${dropNumber}`);
+    log.info(`Updated review with photo metadata and serials for ${dropNumber}`, {
+      ont_barcode: result.ont_barcode,
+      ups_serial: result.ups_serial,
+    });
   } catch (error) {
     log.error('Failed to update review with photos', { dropNumber, error });
     // Don't throw - we still want to return the photos even if DB update fails
