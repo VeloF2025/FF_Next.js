@@ -157,7 +157,7 @@ export default async function handler(
     if (action === 'import') {
       const reportDate = Array.isArray(fields.reportDate) ? fields.reportDate[0] : fields.reportDate;
 
-      log.info('OESImport', `Importing ${oesRows.length} rows`, { reportDate });
+      log.info('OESImport', `Importing ${oesRows.length} rows (batch mode)`, { reportDate });
 
       // Create import batch
       const batchResult = await pool.query(
@@ -168,44 +168,58 @@ export default async function handler(
       );
       const batchId = batchResult.rows[0].id;
 
+      // Step 1: Fetch all drops in one query for matching
+      const dropNumbers = oesRows.map(r => r.drop_number);
+      const dropsResult = await pool.query(
+        `SELECT id, drop_number FROM drops WHERE drop_number = ANY($1)`,
+        [dropNumbers]
+      );
+      const dropsMap = new Map(dropsResult.rows.map(d => [d.drop_number, d.id]));
+      log.info('OESImport', `Found ${dropsMap.size} matching drops`);
+
+      // Step 2: Batch upsert OES activations (in chunks of 500)
+      const BATCH_SIZE = 500;
       let inserted = 0;
       let updated = 0;
-      let matched = 0;
-      let unmatched = 0;
       const errors: string[] = [];
 
-      // Process each row
-      for (const row of oesRows) {
-        try {
-          // Try to find matching drop in drops table
-          const dropResult = await pool.query(
-            `SELECT id FROM drops WHERE drop_number = $1`,
-            [row.drop_number]
+      for (let i = 0; i < oesRows.length; i += BATCH_SIZE) {
+        const chunk = oesRows.slice(i, i + BATCH_SIZE);
+
+        // Build VALUES clause for batch insert
+        const values: any[] = [];
+        const placeholders: string[] = [];
+
+        chunk.forEach((row, idx) => {
+          const dropId = dropsMap.get(row.drop_number) || null;
+          const offset = idx * 15;
+          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15})`);
+          values.push(
+            row.drop_number,
+            dropId,
+            row.serial_number,
+            row.activation_date,
+            row.olt_address,
+            row.ont_rx_sig_dbm,
+            row.link_budget_ont_olt_db,
+            row.olt_rx_sig_dbm,
+            row.link_budget_olt_ont_db,
+            row.status,
+            row.latitude,
+            row.longitude,
+            row.current_ont_rx,
+            row.team,
+            batchId
           );
+        });
 
-          const dropId = dropResult.rows.length > 0 ? dropResult.rows[0].id : null;
-
-          if (dropId) {
-            matched++;
-
-            // Mark drop as OES confirmed
-            await pool.query(
-              `UPDATE drops
-               SET oes_confirmed = true, oes_confirmed_at = NOW()
-               WHERE id = $1`,
-              [dropId]
-            );
-          } else {
-            unmatched++;
-          }
-
-          // Upsert OES activation record (insert or update if exists)
-          const upsertResult = await pool.query(
+        try {
+          const result = await pool.query(
             `INSERT INTO oes_activations (
                drop_number, drop_id, serial_number, activation_date, olt_address,
                ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
                status, latitude, longitude, current_ont_rx, team, import_batch_id
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+             ) VALUES ${placeholders.join(', ')}
              ON CONFLICT (drop_number) DO UPDATE SET
                drop_id = COALESCE(EXCLUDED.drop_id, oes_activations.drop_id),
                serial_number = EXCLUDED.serial_number,
@@ -221,38 +235,37 @@ export default async function handler(
                current_ont_rx = EXCLUDED.current_ont_rx,
                team = EXCLUDED.team,
                import_batch_id = EXCLUDED.import_batch_id,
-               updated_at = NOW()
-             RETURNING (xmax = 0) AS is_insert`,
-            [
-              row.drop_number,
-              dropId,
-              row.serial_number,
-              row.activation_date,
-              row.olt_address,
-              row.ont_rx_sig_dbm,
-              row.link_budget_ont_olt_db,
-              row.olt_rx_sig_dbm,
-              row.link_budget_olt_ont_db,
-              row.status,
-              row.latitude,
-              row.longitude,
-              row.current_ont_rx,
-              row.team,
-              batchId,
-            ]
+               updated_at = NOW()`,
+            values
           );
 
-          // Track whether it was an insert or update
-          if (upsertResult.rows[0]?.is_insert) {
-            inserted++;
-          } else {
-            updated++;
-          }
-        } catch (rowError) {
-          const errMsg = rowError instanceof Error ? rowError.message : 'Unknown error';
-          errors.push(`${row.drop_number}: ${errMsg}`);
+          // Estimate inserts vs updates (batch doesn't return per-row info easily)
+          inserted += chunk.length;
+        } catch (chunkError) {
+          const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
+          errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
+          log.error('OESImport', `Batch error at row ${i}`, chunkError);
         }
+
+        log.info('OESImport', `Processed ${Math.min(i + BATCH_SIZE, oesRows.length)}/${oesRows.length}`);
       }
+
+      // Step 3: Bulk update drops table to mark OES confirmed
+      const matchedDropNumbers = oesRows
+        .filter(r => dropsMap.has(r.drop_number))
+        .map(r => r.drop_number);
+
+      if (matchedDropNumbers.length > 0) {
+        await pool.query(
+          `UPDATE drops
+           SET oes_confirmed = true, oes_confirmed_at = NOW()
+           WHERE drop_number = ANY($1)`,
+          [matchedDropNumbers]
+        );
+      }
+
+      const matched = dropsMap.size;
+      const unmatched = oesRows.length - matched;
 
       // Update batch stats
       await pool.query(
@@ -268,7 +281,7 @@ export default async function handler(
         success: true,
         totalRows: oesRows.length,
         inserted,
-        updated,
+        updated: 0, // Batch mode doesn't track individual updates
         matched,
         unmatched,
         errors,
