@@ -1,153 +1,141 @@
 # FibreFlow Current Session Progress
 
-**Last Updated**: 2026-01-10
-**Session Type**: Field Stock Control + Dark Mode Complete + Navigation Fix
+**Last Updated**: 2026-01-16
+**Session Type**: DR Acknowledgment System for Activate Module
 
 ---
 
 ## Completed This Session
 
-### Field Stock Control (PRD-027)
-- [x] Full implementation of field stock tracking system
-- [x] 7 tabs: Overview, Stock Items, Transactions, Requisitions, Returns, Transfers, Settings
-- [x] Database migrations: 027-031 (core, transactions, returns, drops columns, fixes)
-- [x] API endpoints: `/api/procurement/field-stock/*`
-- [x] E2E tests for all 7 tabs
-- [x] Fixed infinite loop bugs in 5 React hooks using `useRef` pattern
+### DR Acknowledgment System (Jan 2026)
+- [x] Created `/api/activate/dr-acknowledgment` API endpoint
+- [x] Added `sendWhatsAppReply()` function for threaded replies in Go bridge
+- [x] Added `sendDRAcknowledgment()` function in Go bridge
+- [x] Updated `processDropNumbers` to pass `messageID` and `senderJID`
+- [x] Added `QuotedMessage` support for proper reply threading
+- [x] Fixed ONT serial extraction from barcode scan data
+- [x] Tested with multiple DRs (DR1733657, DR1749887, DR1750922)
 
-### Dark Mode Complete (Phase 6)
-- [x] Converted 314 files to CSS variable system
-- [x] All pages/directory files converted
-- [x] All src/components/ converted
-- [x] All src/modules/ (34 modules) converted
-- [x] WA Monitor MUI components updated
-- [x] PR #33 merged with squash
-
-### Sidebar Navigation Fix
-- [x] Fixed navigation not working on /staff and /clients pages
-- [x] Root cause: `NavigationMenu.tsx` using App Router API in Pages Router app
-- [x] Changed `usePathname` (next/navigation) → `useRouter` (next/router)
-- [x] Removed `legacyBehavior` and nested `<a>` tag pattern
-- [x] Commit: `28d90f6`
-
-### Suppliers Page Fix
-- [x] Fixed /suppliers page crashing with "useNavigate() may be used only in context of <Router>"
-- [x] Root cause: `SupplierCard.tsx` using `useNavigate` from `react-router-dom`
-- [x] Changed to `useRouter` from `next/router` and `router.push()`
-- [x] Commit: `e943696`
+### DR Validation System (Previous Session)
+- [x] `DR_NOT_FOUND` and `PROJECT_MISMATCH` validation working
+- [x] Go bridge sends rejection notifications
 
 ---
 
-## Key Commits
+## Key Changes
 
-| Commit | Description |
-|--------|-------------|
-| `e943696` | fix(suppliers): replace react-router useNavigate with Next.js useRouter |
-| `c926f8f` | feat(nav): add Field Stock Control to sidebar menu |
-| `28d90f6` | fix(sidebar): fix navigation by using Pages Router API |
-| `f125029` | feat: Field Stock Control (PRD-027) + Complete Dark Mode |
+| File | Change |
+|------|--------|
+| `pages/api/activate/dr-acknowledgment.ts` | NEW - Lightweight API for acknowledgment data |
+| `/home/louis/whatsapp-bridge-go/main.go` | Added reply-to support with QuotedMessage |
+| `whatsapp-bridge.service` | Restarted with updated binary |
 
 ---
 
-## Files Created/Modified
+## DR Acknowledgment Flow
 
-### Field Stock Control
 ```
-pages/api/procurement/field-stock/
-├── dashboard/
-├── items/
-├── transactions/
-├── requisitions/
-├── returns/
-└── transfers/
-
-pages/procurement/field-stock/
-├── index.tsx
-└── [tab].tsx
-
-src/modules/procurement/field-stock/
-├── components/
-├── hooks/
-├── services/
-└── types/
-
-scripts/migrations/
-├── 027_field_stock_core.sql
-├── 028_field_stock_transactions.sql
-├── 029_field_stock_returns.sql
-├── 030_drops_stock_columns.sql
-└── 031_field_stock_fixes.sql
+User sends "DR123456" to WhatsApp Group
+    ↓
+Go Bridge detects DR pattern
+    ↓
+createQAPhotoReview() → Creates DB record
+    ↓
+sendDRAcknowledgment() (async goroutine)
+    ↓
+POST /api/activate/dr-acknowledgment
+    ↓
+Query OneMap /api/record/DR123456
+    ↓
+Extract ONT serial from barcode data
+    ↓
+sendWhatsAppReply() with ContextInfo + QuotedMessage
+    ↓
+User sees threaded reply to their original message
 ```
 
-### Navigation Fix
-```
-src/components/layout/sidebar/NavigationMenu.tsx
+---
+
+## API Response Format
+
+```json
+{
+  "success": true,
+  "data": {
+    "dropNumber": "DR1750922",
+    "found": true,
+    "photoCount": 6,
+    "ontSerial": "ALCLB46BE62E",
+    "upsSerial": "GU18W12V2562847",
+    "message": "📸 *DR1750922 Received!*\n\n✅ Photos: 6\n✅ ONT Serial: ALCLB46BE62E\n✅ UPS Serial: GU18W12V2562847\n\nThank you! QA review will follow shortly."
+  }
+}
 ```
 
 ---
 
 ## Lessons Learned
 
-### React Hooks Infinite Loop Prevention
-When using `useEffect` with callback functions that change on every render:
-```tsx
-// ❌ BAD - causes infinite loop
-useEffect(() => {
-  onSelectionChange?.(selected);
-}, [selected, onSelectionChange]);
+### ONT Barcode Parsing
+OneMap returns full barcode scan data, not just serial:
+```
+(S)ALCLB46BE62E(23S)E03DA68BD340(20S)M022515ALU00136108(U)userAdmin(P)pass...
+```
+Extract serial with regex: `/\(S\)([^(]+)/`
 
-// ✅ GOOD - use useRef to prevent re-triggers
-const onSelectionChangeRef = useRef(onSelectionChange);
-onSelectionChangeRef.current = onSelectionChange;
-
-useEffect(() => {
-  onSelectionChangeRef.current?.(selected);
-}, [selected]);
+### WhatsApp Reply Threading
+For proper threaded replies, need ALL of:
+```go
+ContextInfo: &waProto.ContextInfo{
+    StanzaID:      proto.String(replyToID),      // Original message ID
+    Participant:   proto.String(senderJID),       // Original sender
+    QuotedMessage: quotedMsg,                     // Original message content
+}
 ```
 
-### Next.js Pages Router vs App Router
-- Pages Router: Use `useRouter` from `next/router`
-- App Router: Use `usePathname` from `next/navigation`
-- Don't mix them! Causes navigation and hydration issues.
-
-### Next.js Link Component
-```tsx
-// ❌ OLD (legacyBehavior) - can cause issues
-<Link href="/page" legacyBehavior passHref>
-  <a className="...">Text</a>
-</Link>
-
-// ✅ MODERN - apply styles directly to Link
-<Link href="/page" className="...">
-  Text
-</Link>
-```
+### LID vs Phone JID
+WhatsApp now uses LID format (`155228775178345@lid`) instead of phone format.
+Reply threading works with LID when QuotedMessage is included.
 
 ---
 
 ## Current State
 
 - **Branch**: master
-- **Build**: ✅ Passing
-- **Dark Mode**: ✅ Complete (all 314 files converted)
-- **Field Stock**: ✅ Implemented and tested
-- **Navigation**: ✅ Fixed and working
+- **DR Acknowledgment**: ✅ Working with threaded replies
+- **DR Validation**: ✅ Working (DR_NOT_FOUND + PROJECT_MISMATCH)
+- **Go Bridge**: ✅ Updated on Velocity Server
+- **Staging**: vf.fibreflow.app (active)
 
 ---
 
-## Next Steps
+## Files Reference
 
-- [ ] Deploy to production server
-- [ ] Monitor for any dark mode edge cases
-- [ ] Continue with next feature/PRD
+### FibreFlow API
+```
+pages/api/activate/dr-acknowledgment.ts  # Acknowledgment data endpoint
+pages/api/activate/process-new-dr.ts     # DR validation & processing
+```
+
+### Go Bridge (Velocity Server)
+```
+/home/louis/whatsapp-bridge-go/main.go   # WhatsApp bridge with reply support
+```
+
+### Patch Scripts (for reference)
+```
+.claude/go_ack_patch.py     # Initial acknowledgment patch
+.claude/reply_fix.py        # QuotedMessage fix for threading
+```
 
 ---
 
 ## Context for Next Session
 
-All major work completed:
-1. Field Stock Control fully implemented with E2E tests
-2. Dark Mode converted across entire codebase (CSS variable system)
-3. Sidebar navigation fixed for Pages Router compatibility
+DR Acknowledgment system implemented:
+1. When user sends DR to WhatsApp group, immediate threaded reply sent
+2. Reply shows photo count, ONT serial, UPS serial from OneMap
+3. Missing items shown with ⚠️ warning to upload to 1Map
+4. Uses whatsmeow ContextInfo with QuotedMessage for proper threading
 
-System is stable and ready for production deployment.
+See: `.claude/memories/dr-acknowledgment-system.md` for full details.

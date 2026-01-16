@@ -148,9 +148,12 @@ const pathname = usePathname();
 - DR lookup service recently modified
 - Integration with QContact
 
-### foto-review
-- AI-powered photo review
-- Integration with foto_ai_reviews table
+### activate (formerly dr-photo-unified)
+- AI-powered photo review with VLM categorization
+- DR validation against `drops` table with WhatsApp notifications
+- See: `activate-dr-validation.md` for validation system details
+- API: `/api/activate/*`
+- Table: `foto_ai_reviews`
 
 ---
 

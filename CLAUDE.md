@@ -260,6 +260,7 @@ Unified system for DR (Drop Receipt) photo review with AI-powered categorization
 | `/api/activate/categorize-photos` | POST | Trigger VLM categorization |
 | `/api/activate/approve-categorization` | POST | Approve AI results |
 | `/api/activate/process-new-dr` | POST | Process new DR from WA |
+| `/api/activate/dr-acknowledgment` | POST | Get instant acknowledgment data for WA reply |
 | `/api/activate/fetch-photos` | GET | Fetch photos for DR |
 | `/api/activate/send-feedback` | POST | Send WhatsApp feedback |
 
@@ -305,13 +306,31 @@ src/modules/activate/
 ```
 
 ### WhatsApp Integration
-**Sender Service:** Port 8081 on 100.96.203.105
-```bash
-# Check service status
-curl http://100.96.203.105:8081/health
 
-# Restart if needed
+**Go WhatsApp Bridge:** Main service for DR processing and acknowledgments
+```bash
+# Service location
+/home/louis/whatsapp-bridge-go/main.go
+/home/louis/whatsapp-bridge-go/whatsapp-bridge  # Binary
+
+# Logs
+tail -f /home/louis/whatsapp-bridge-go/bridge.log
+
+# Restart
 ssh velo@100.96.203.105  # Password: velo2026
+echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+```
+
+**DR Acknowledgment Flow:**
+When user sends DR to WhatsApp group:
+1. Go bridge detects DR pattern
+2. Calls `/api/activate/dr-acknowledgment` for photo/serial data
+3. Sends threaded reply with photo count, ONT serial, UPS serial
+4. Uses `ContextInfo.QuotedMessage` for proper threading
+
+**Sender Service:** Port 8081 on 100.96.203.105 (for feedback messages)
+```bash
+curl http://100.96.203.105:8081/health
 echo 'velo2026' | sudo -S systemctl restart whatsapp-sender
 ```
 
