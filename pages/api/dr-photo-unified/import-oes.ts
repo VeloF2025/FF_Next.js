@@ -168,26 +168,16 @@ export default async function handler(
       );
       const batchId = batchResult.rows[0].id;
 
+      let inserted = 0;
+      let updated = 0;
       let matched = 0;
       let unmatched = 0;
-      let alreadyImported = 0;
       const errors: string[] = [];
 
       // Process each row
       for (const row of oesRows) {
         try {
-          // Check if already imported
-          const existingResult = await pool.query(
-            `SELECT id FROM oes_activations WHERE drop_number = $1 AND activation_date = $2`,
-            [row.drop_number, row.activation_date]
-          );
-
-          if (existingResult.rows.length > 0) {
-            alreadyImported++;
-            continue;
-          }
-
-          // Try to find matching drop
+          // Try to find matching drop in drops table
           const dropResult = await pool.query(
             `SELECT id FROM drops WHERE drop_number = $1`,
             [row.drop_number]
@@ -209,13 +199,30 @@ export default async function handler(
             unmatched++;
           }
 
-          // Insert OES activation record
-          await pool.query(
+          // Upsert OES activation record (insert or update if exists)
+          const upsertResult = await pool.query(
             `INSERT INTO oes_activations (
                drop_number, drop_id, serial_number, activation_date, olt_address,
                ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
                status, latitude, longitude, current_ont_rx, team, import_batch_id
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+             ON CONFLICT (drop_number) DO UPDATE SET
+               drop_id = COALESCE(EXCLUDED.drop_id, oes_activations.drop_id),
+               serial_number = EXCLUDED.serial_number,
+               activation_date = EXCLUDED.activation_date,
+               olt_address = EXCLUDED.olt_address,
+               ont_rx_sig_dbm = EXCLUDED.ont_rx_sig_dbm,
+               link_budget_ont_olt_db = EXCLUDED.link_budget_ont_olt_db,
+               olt_rx_sig_dbm = EXCLUDED.olt_rx_sig_dbm,
+               link_budget_olt_ont_db = EXCLUDED.link_budget_olt_ont_db,
+               status = EXCLUDED.status,
+               latitude = EXCLUDED.latitude,
+               longitude = EXCLUDED.longitude,
+               current_ont_rx = EXCLUDED.current_ont_rx,
+               team = EXCLUDED.team,
+               import_batch_id = EXCLUDED.import_batch_id,
+               updated_at = NOW()
+             RETURNING (xmax = 0) AS is_insert`,
             [
               row.drop_number,
               dropId,
@@ -234,6 +241,13 @@ export default async function handler(
               batchId,
             ]
           );
+
+          // Track whether it was an insert or update
+          if (upsertResult.rows[0]?.is_insert) {
+            inserted++;
+          } else {
+            updated++;
+          }
         } catch (rowError) {
           const errMsg = rowError instanceof Error ? rowError.message : 'Unknown error';
           errors.push(`${row.drop_number}: ${errMsg}`);
@@ -248,14 +262,15 @@ export default async function handler(
         [matched, unmatched, batchId]
       );
 
-      log.info('OESImport', 'Import complete', { matched, unmatched, alreadyImported, errors: errors.length });
+      log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, errors: errors.length });
 
       return res.status(200).json({
         success: true,
         totalRows: oesRows.length,
+        inserted,
+        updated,
         matched,
         unmatched,
-        alreadyImported,
         errors,
         batchId,
       });

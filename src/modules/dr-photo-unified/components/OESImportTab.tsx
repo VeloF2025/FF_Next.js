@@ -21,9 +21,10 @@ interface OESRow {
 
 interface ImportResult {
   totalRows: number;
+  inserted: number;
+  updated: number;
   matched: number;
   unmatched: number;
-  alreadyImported: number;
   errors: string[];
 }
 
@@ -331,7 +332,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
               <h3 className="font-semibold text-green-800 dark:text-green-300 text-lg">
                 Import Complete
               </h3>
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-4">
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {importResult.totalRows}
@@ -340,21 +341,27 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">
+                    {importResult.inserted}
+                  </p>
+                  <p className="text-sm text-gray-500">New Inserts</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {importResult.updated}
+                  </p>
+                  <p className="text-sm text-gray-500">Updated</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-emerald-600">
                     {importResult.matched}
                   </p>
-                  <p className="text-sm text-gray-500">Matched</p>
+                  <p className="text-sm text-gray-500">Matched Drops</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-yellow-600">
                     {importResult.unmatched}
                   </p>
                   <p className="text-sm text-gray-500">Not in Drops</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-600">
-                    {importResult.alreadyImported}
-                  </p>
-                  <p className="text-sm text-gray-500">Already Imported</p>
                 </div>
               </div>
               {importResult.errors.length > 0 && (
