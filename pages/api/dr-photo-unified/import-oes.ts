@@ -235,12 +235,19 @@ export default async function handler(
                current_ont_rx = EXCLUDED.current_ont_rx,
                team = EXCLUDED.team,
                import_batch_id = EXCLUDED.import_batch_id,
-               updated_at = NOW()`,
+               updated_at = NOW()
+             RETURNING (xmax = 0) AS is_insert`,
             values
           );
 
-          // Estimate inserts vs updates (batch doesn't return per-row info easily)
-          inserted += chunk.length;
+          // Count actual inserts vs updates from RETURNING clause
+          for (const row of result.rows) {
+            if (row.is_insert) {
+              inserted++;
+            } else {
+              updated++;
+            }
+          }
         } catch (chunkError) {
           const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
           errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
@@ -281,7 +288,7 @@ export default async function handler(
         success: true,
         totalRows: oesRows.length,
         inserted,
-        updated: 0, // Batch mode doesn't track individual updates
+        updated,
         matched,
         unmatched,
         errors,
