@@ -167,12 +167,11 @@ async function checkWhatsAppBridge(): Promise<ServiceStatus> {
   const start = Date.now();
   try {
     // Check for recent DR submissions in dr_photo_unified_reviews (the active table)
+    // Use subqueries to get both last hour count AND overall last submission
     const result = await pool.query(`
       SELECT
-        COUNT(*) as recent_count,
-        MAX(created_at) as last_submission
-      FROM dr_photo_unified_reviews
-      WHERE created_at > NOW() - INTERVAL '1 hour'
+        (SELECT COUNT(*) FROM dr_photo_unified_reviews WHERE created_at > NOW() - INTERVAL '1 hour') as recent_count,
+        (SELECT MAX(created_at) FROM dr_photo_unified_reviews) as last_submission
     `);
 
     const recentCount = parseInt(result.rows[0]?.recent_count || '0');
