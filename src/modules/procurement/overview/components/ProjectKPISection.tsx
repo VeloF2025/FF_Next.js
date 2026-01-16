@@ -1,6 +1,6 @@
 // ============= Project KPI Section Component =============
 
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import type { ProjectStats } from '../types/types';
 
 interface ProjectKPISectionProps {

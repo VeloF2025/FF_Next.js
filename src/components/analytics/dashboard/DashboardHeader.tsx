@@ -3,7 +3,7 @@
  */
 
 import { Loader2, RefreshCw } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { DashboardHeaderProps } from './AnalyticsDashboardTypes';
 
 export function DashboardHeader({ lastSyncTime, onSync, syncing }: DashboardHeaderProps) {

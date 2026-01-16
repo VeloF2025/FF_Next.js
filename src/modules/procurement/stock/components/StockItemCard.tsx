@@ -1,6 +1,6 @@
 import React from 'react';
 import { Eye, Tag, MapPin, Truck, Calendar, ArrowRight, Plus } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { StatusBadge } from './StatusBadge';
 import type { StockItemData } from '../types/stock.types';
 

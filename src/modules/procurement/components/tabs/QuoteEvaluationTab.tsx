@@ -1,7 +1,7 @@
 // 🟢 WORKING: Quote Evaluation tab with comparison and decision tracking
 import { useEffect, useState } from 'react';
 import { Quote, Search, Filter, Award, Clock, CheckCircle } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 
 export function QuoteEvaluationTab() {

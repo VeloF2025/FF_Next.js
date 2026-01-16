@@ -3,7 +3,7 @@
  */
 
 import { Loader2, Database, RefreshCw } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 
 interface DashboardLoadingStateProps {
   loading: boolean;

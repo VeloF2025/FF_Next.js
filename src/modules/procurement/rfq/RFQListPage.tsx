@@ -3,7 +3,7 @@ import { Plus, Send, Search, TrendingUp } from 'lucide-react';
 import { useRFQs } from '../hooks/useRFQ';
 import { RFQStatus } from '@/types/procurement.types';
 import { RFQCard } from '../components/RFQCard';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { useNavigate } from 'react-router-dom';
 

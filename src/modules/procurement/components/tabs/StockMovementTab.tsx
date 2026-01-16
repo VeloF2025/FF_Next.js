@@ -1,7 +1,7 @@
 // 🟢 WORKING: Stock Movement tab with inventory tracking and project allocation
 import { useEffect, useState } from 'react';
 import { Package, Search, Filter, TrendingUp, TrendingDown, AlertTriangle, Plus } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 import StockManagement from '../../stock/StockManagement';
 

@@ -1,7 +1,7 @@
 // 🟢 WORKING: Purchase Orders tab with comprehensive order management
 import React, { useEffect, useState } from 'react';
 import { Plus, ShoppingCart, Search, Filter, Clock, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 
 export function PurchaseOrdersTab() {

@@ -1,7 +1,7 @@
 // ============= Module Card Component =============
 
 import { ArrowRight } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import type { ModuleCard as ModuleCardType, QuickAction } from '../types/types';
 
 interface ModuleCardProps {

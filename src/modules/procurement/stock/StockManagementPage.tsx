@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { Package, Plus, BarChart3, AlertTriangle } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import type { ProcurementPortalContext } from '@/types/procurement/portal.types';
 import {
   StockStatsCards,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, Filter, ArrowRight, ArrowLeft } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import type { StockFilter, StockSortBy } from '../types/stock.types';
 
 interface StockFiltersProps {

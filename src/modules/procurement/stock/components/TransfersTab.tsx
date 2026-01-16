@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Package } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import type { StockMovementData } from '../types/stock.types';
 
 interface TransfersTabProps {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Search, Building2, X, Globe, Loader2 } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { ProjectQueryService } from '@/services/projects/core/projectQueryService';
 import type { ProcurementViewMode } from '@/types/procurement/portal.types';
 import type { Project } from '@/types/project.types';

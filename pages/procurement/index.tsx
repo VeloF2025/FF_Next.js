@@ -10,6 +10,19 @@ import { ProjectFilter } from '../../src/modules/procurement/components/ProjectF
 import { ProcurementPortalProvider } from '../../src/modules/procurement/context/ProcurementPortalProvider';
 import { useProcurementPermissions } from '../../src/modules/procurement/hooks/useProcurementPermissions';
 import { log } from '../../src/lib/logger';
+import Link from 'next/link';
+import {
+  FileText,
+  Send,
+  Quote,
+  ShoppingCart,
+  Package,
+  Truck,
+  ClipboardList,
+  BarChart3,
+  MapPin,
+  ArrowRight
+} from 'lucide-react';
 import type { 
   ProcurementTabId, 
   ProcurementViewMode,
@@ -199,13 +212,193 @@ export default function ProcurementPage({
                 </div>
               )}
 
-              {/* Main Content */}
+              {/* Tab Navigation */}
               <ProcurementTabs />
+
+              {/* Tab Content */}
+              <div className="mt-6">
+                {activeTab === 'overview' && <DashboardTabContent project={selectedProject} />}
+                {activeTab === 'boq' && <PlaceholderTab title="Bill of Quantities" icon={FileText} description="Manage project BOQ items" />}
+                {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
+                {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
+                {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
+                {activeTab === 'stock' && <PlaceholderTab title="Stock Movement" icon={Package} description="Track inventory movements" />}
+                {activeTab === 'field-stock' && <FieldStockTabContent />}
+                {activeTab === 'suppliers' && <SuppliersTabContent />}
+                {activeTab === 'reports' && <PlaceholderTab title="Procurement Reports" icon={ClipboardList} description="Generate and view reports" />}
+              </div>
             </div>
           </div>
         </div>
       </ProcurementPortalProvider>
     </AppLayout>
+  );
+}
+
+// =====================================================
+// Inline Tab Content Components (avoid server-side deps)
+// =====================================================
+
+interface PlaceholderTabProps {
+  title: string;
+  icon: React.ElementType;
+  description: string;
+}
+
+function PlaceholderTab({ title, icon: Icon, description }: PlaceholderTabProps) {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-8">
+      <div className="text-center">
+        <Icon className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">{title}</h3>
+        <p className="text-[var(--ff-text-secondary)] mb-4">{description}</p>
+        <p className="text-sm text-[var(--ff-text-tertiary)]">
+          This feature is coming soon. Use the dedicated pages for full functionality.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function DashboardTabContent({ project }: { project?: Project }) {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+      <div className="flex items-center gap-3 mb-6">
+        <BarChart3 className="h-6 w-6 text-purple-500" />
+        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">
+          {project ? `${project.name} Overview` : 'Procurement Overview'}
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <QuickLinkCard
+          title="Requisitions"
+          href="/procurement/requisitions"
+          icon={FileText}
+          description="Create and manage purchase requisitions"
+        />
+        <QuickLinkCard
+          title="Purchase Orders"
+          href="/procurement/purchase-orders"
+          icon={ShoppingCart}
+          description="View and track purchase orders"
+        />
+        <QuickLinkCard
+          title="Goods Receipt"
+          href="/procurement/grn"
+          icon={Package}
+          description="Record goods received"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <QuickLinkCard
+          title="Approvals"
+          href="/procurement/approvals"
+          icon={ClipboardList}
+          description="Review pending approvals"
+        />
+        <QuickLinkCard
+          title="Suppliers"
+          href="/suppliers"
+          icon={Truck}
+          description="Manage supplier database"
+        />
+        <QuickLinkCard
+          title="Field Stock"
+          href="/procurement/field-stock"
+          icon={MapPin}
+          description="Track field inventory"
+        />
+      </div>
+    </div>
+  );
+}
+
+function QuickLinkCard({ title, href, icon: Icon, description }: {
+  title: string;
+  href: string;
+  icon: React.ElementType;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border)] p-4 hover:border-purple-500 transition-colors group"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <Icon className="h-5 w-5 text-purple-500" />
+        <ArrowRight className="h-4 w-4 text-[var(--ff-text-tertiary)] group-hover:text-purple-500 transition-colors" />
+      </div>
+      <h4 className="font-medium text-[var(--ff-text-primary)] mb-1">{title}</h4>
+      <p className="text-sm text-[var(--ff-text-secondary)]">{description}</p>
+    </Link>
+  );
+}
+
+function PurchaseOrdersTabContent() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <ShoppingCart className="h-6 w-6 text-purple-500" />
+          <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">Purchase Orders</h3>
+        </div>
+        <Link
+          href="/procurement/purchase-orders"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          View All <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <p className="text-[var(--ff-text-secondary)]">
+        View and manage purchase orders. Click &quot;View All&quot; to access the full Purchase Orders page.
+      </p>
+    </div>
+  );
+}
+
+function FieldStockTabContent() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <MapPin className="h-6 w-6 text-purple-500" />
+          <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">Field Stock Control</h3>
+        </div>
+        <Link
+          href="/procurement/field-stock"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          Open Field Stock <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <p className="text-[var(--ff-text-secondary)]">
+        Track and manage inventory in the field. Click &quot;Open Field Stock&quot; to access the full control panel.
+      </p>
+    </div>
+  );
+}
+
+function SuppliersTabContent() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Truck className="h-6 w-6 text-purple-500" />
+          <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">Suppliers</h3>
+        </div>
+        <Link
+          href="/suppliers"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          Manage Suppliers <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <p className="text-[var(--ff-text-secondary)]">
+        View and manage your supplier database. Click &quot;Manage Suppliers&quot; to access the full Suppliers Portal.
+      </p>
+    </div>
   );
 }
 

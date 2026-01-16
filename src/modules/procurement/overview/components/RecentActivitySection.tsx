@@ -1,7 +1,7 @@
 // ============= Recent Activity Section Component =============
 
 import { FileText, Send, ShoppingCart, Package } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import type { BOQItem, RFQItem } from '../types/types';
 
 interface RecentActivitySectionProps {

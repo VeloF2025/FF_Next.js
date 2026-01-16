@@ -29,7 +29,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/Card';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { procurementReportsService } from '@/services/procurement/reports/procurementReportsService';
 import { exportReport } from './utils/exportUtils';
 import { SupplierPerformanceReport } from './components/SupplierPerformanceReport';

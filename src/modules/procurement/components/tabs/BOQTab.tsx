@@ -1,7 +1,7 @@
 // 🟢 WORKING: BOQ tab component with project filtering and integration
 import { useEffect, useState } from 'react';
 import { Plus, FileText, Search, Filter, Download, Upload } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 import { BOQDashboard } from '../../boq/components/BOQDashboard';
 import { BOQCreate } from '../../boq/components/BOQCreate';

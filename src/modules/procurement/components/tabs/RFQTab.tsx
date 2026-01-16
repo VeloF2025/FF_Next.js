@@ -1,7 +1,7 @@
 // 🟢 WORKING: RFQ tab component with project filtering and workflow management
 import { useEffect, useState } from 'react';
 import { Plus, Send, Search, Filter, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Button } from '@/src/shared/components/ui/Button';
+import { Button } from '@/shared/components/ui/Button';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 import { RFQDashboard } from '../../rfq/components/RFQDashboard';
 
