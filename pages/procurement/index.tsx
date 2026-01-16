@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import type { Project } from '../../src/types/project.types';
@@ -65,6 +65,9 @@ export default function ProcurementPage({
   const [error, setError] = useState<string | undefined>();
   const [isMounted, setIsMounted] = useState(false);
 
+  // Track if this is the initial mount to prevent URL update on first render
+  const isInitialMount = useRef(true);
+
   // Get permissions for selected project
   const permissions = useProcurementPermissions(selectedProject?.id);
 
@@ -73,10 +76,16 @@ export default function ProcurementPage({
     setIsMounted(true);
   }, []);
 
-  // Update URL when state changes (only after mount to prevent hydration errors)
+  // Update URL when state changes (only after user interaction, not on initial mount)
   useEffect(() => {
     // Skip during SSR hydration to prevent React error #418/#423
     if (!isMounted) return;
+
+    // Skip the first render after mount to prevent hydration errors
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
 
     const query: any = {
       tab: activeTab,
