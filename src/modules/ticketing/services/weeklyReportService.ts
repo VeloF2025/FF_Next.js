@@ -224,12 +224,14 @@ export async function updateWeeklyReport(
   }
 
   if (payload.errors !== undefined) {
-    updates.push(`errors = $${paramIndex++}`);
+    // Table uses error_message (TEXT) not errors (JSONB)
+    updates.push(`error_message = $${paramIndex++}`);
     values.push(JSON.stringify(payload.errors));
   }
 
   if (payload.imported_at !== undefined) {
-    updates.push(`imported_at = $${paramIndex++}`);
+    // Table uses completed_at not imported_at
+    updates.push(`completed_at = $${paramIndex++}`);
     values.push(payload.imported_at);
   }
 
