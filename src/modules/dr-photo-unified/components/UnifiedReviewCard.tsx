@@ -17,6 +17,7 @@ import { useUnifiedReview } from '../hooks/useUnifiedReview';
 import { STEP_LABELS } from '../types/unified.types';
 import type { UnifiedReview } from '../types/unified.types';
 import { ComparisonTable } from './ComparisonTable';
+import { PhotoGalleryUnified } from './PhotoGalleryUnified';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
@@ -405,50 +406,21 @@ interface PhotosTabProps {
 }
 
 function PhotosTab({ review }: PhotosTabProps) {
-  if (review.photo_count === 0) {
-    return (
-      <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
-          <span className="text-3xl">📸</span>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Photos Available</h3>
-        <p className="text-gray-600 dark:text-gray-400">
-          Photos will appear here once they are fetched from the source
-        </p>
-      </div>
-    );
-  }
+  // Convert photos_metadata to Photo[] format for PhotoGalleryUnified
+  const photos = (review.photos_metadata || []).map((photo: any) => ({
+    filename: photo.filename,
+    step: photo.step || 0,
+    url: photo.url,
+    size: photo.size,
+    modified: photo.modified,
+  }));
 
   return (
-    <div className="space-y-6">
-      {/* Photo Source Badge */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-600 dark:text-gray-400">Source:</span>
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-          {review.photo_source?.toUpperCase() || 'Unknown'}
-        </span>
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          {review.photo_count} photo{review.photo_count !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* Photo Gallery - Placeholder */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
-        <p className="text-gray-600 dark:text-gray-400 text-sm">
-          Photo gallery will be implemented in PhotoGalleryUnified component
-        </p>
-        <div className="mt-4 grid grid-cols-4 gap-4">
-          {review.photos_metadata?.slice(0, 8).map((photo, index) => (
-            <div
-              key={index}
-              className="aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center"
-            >
-              <span className="text-gray-400 dark:text-gray-500 text-sm">Photo {index + 1}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <PhotoGalleryUnified
+      photos={photos}
+      source={review.photo_source as any}
+      groupByStep={true}
+    />
   );
 }
 
