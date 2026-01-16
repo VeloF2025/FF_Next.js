@@ -38,7 +38,7 @@ interface UnifiedDrop {
   feedback_sent: boolean;
   created_at: string;
   updated_at: string;
-  // Step completion status
+  // Step completion status (10 steps after migration 054)
   step_01_house_photo: boolean;
   step_02_cable_from_pole: boolean;
   step_03_entry_outside: boolean;
@@ -46,9 +46,9 @@ interface UnifiedDrop {
   step_05_wall: boolean;
   step_06_ont_back: boolean;
   step_07_power_meter: boolean;
-  step_08_ont_barcode: boolean;
-  step_09_ups_serial: boolean;
-  step_10_final_installation: boolean;
+  step_08_final_installation: boolean;
+  step_09_green_lights: boolean;
+  step_10_signature: boolean;
   // Calculated fields
   is_complete: boolean;
   steps_completed: number;
@@ -75,6 +75,7 @@ interface Summary {
 
 /**
  * Calculate if a drop is complete (all 10 steps done)
+ * Step names after migration 054
  */
 function isDropComplete(drop: any): boolean {
   return (
@@ -85,14 +86,14 @@ function isDropComplete(drop: any): boolean {
     drop.step_05_wall &&
     drop.step_06_ont_back &&
     drop.step_07_power_meter &&
-    drop.step_08_ont_barcode &&
-    drop.step_09_ups_serial &&
-    drop.step_10_final_installation
+    drop.step_08_final_installation &&
+    drop.step_09_green_lights &&
+    drop.step_10_signature
   );
 }
 
 /**
- * Count completed steps
+ * Count completed steps (10 steps after migration 054)
  */
 function countCompletedSteps(drop: any): number {
   let count = 0;
@@ -103,9 +104,9 @@ function countCompletedSteps(drop: any): number {
   if (drop.step_05_wall) count++;
   if (drop.step_06_ont_back) count++;
   if (drop.step_07_power_meter) count++;
-  if (drop.step_08_ont_barcode) count++;
-  if (drop.step_09_ups_serial) count++;
-  if (drop.step_10_final_installation) count++;
+  if (drop.step_08_final_installation) count++;
+  if (drop.step_09_green_lights) count++;
+  if (drop.step_10_signature) count++;
   return count;
 }
 
@@ -213,8 +214,8 @@ async function calculateSummary(): Promise<Summary> {
       COUNT(*) FILTER (WHERE
         step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
         step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
-        step_07_power_meter AND step_08_ont_barcode AND step_09_ups_serial AND
-        step_10_final_installation
+        step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
+        step_10_signature
       ) as complete,
       COUNT(*) FILTER (WHERE feedback_sent = true) as feedback_sent,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'pending' OR vlm_categorization_status IS NULL) as vlm_pending,
@@ -265,8 +266,8 @@ async function getProjectStats(dateFrom?: string, dateTo?: string): Promise<Proj
       COUNT(*) FILTER (WHERE
         step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
         step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
-        step_07_power_meter AND step_08_ont_barcode AND step_09_ups_serial AND
-        step_10_final_installation
+        step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
+        step_10_signature
       ) as complete
     FROM dr_photo_unified_reviews
     ${whereClause}
