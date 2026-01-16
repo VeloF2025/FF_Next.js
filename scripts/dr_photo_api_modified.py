@@ -1204,70 +1204,36 @@ Provide JSON response:
     "summary": "<summary>"
 }""",
 
-            # Step 8: ONT Barcode/Serial - Critical
-            "ph_bl": """Analyze this ONT SERIAL NUMBER photo (Step 8 - CRITICAL).
+            # NOTE: ONT Barcode (ph_bl) and UPS Serial (ph_ups) are NO LONGER photo steps
+            # They are scanned barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields
+            # If these photo types are received, map them to Step 6 (ONT Back) evaluation
+            "ph_bl": """Analyze this ONT BACK/BARCODE photo (Step 6 - supplementary).
 
-This shows the barcode/serial label on the ONT (usually on back or side).
+This shows the back of the ONT device, possibly including the serial label.
 
-Required:
-1. Barcode or serial number label clearly visible
-2. Serial number text readable
-3. This must be the ONT device, NOT the UPS/GIZZU
+Check for:
+1. ONT back panel visible
+2. Fiber cable connection visible
+3. Power cable connection visible
+4. If barcode/serial visible, note it (not required for pass)
 
-EXTRACT the serial number if visible.
-
-Rate on 0-100:
-- Label visible (30 points)
-- Serial number readable (70 points)
-
-Provide JSON response:
-{
-    "score": <0-100>,
-    "status": "<pass|fail|needs_review>",
-    "confidence": <0.0-1.0>,
-    "label_visible": <true|false>,
-    "serial_readable": <true|false>,
-    "serial_number": "<extracted serial number>",
-    "device_type": "<ONT|UPS|unknown>",
-    "issues": [],
-    "summary": "<summary>",
-    "recommendations": "<improvements>"
-}
-
-IMPORTANT: If this shows a GIZZU/UPS label instead of ONT, set device_type="UPS" and fail.""",
-
-            # Step 9: UPS Serial - Critical
-            "ph_ups": """Analyze this UPS/GIZZU SERIAL NUMBER photo (Step 9 - CRITICAL).
-
-This shows the serial number label on the UPS/GIZZU device.
-
-GIZZU is a Mini DC UPS combined with a router - it IS the UPS.
-
-Required:
-1. UPS/GIZZU serial label visible
-2. Serial number readable
-
-EXTRACT the serial number.
-
-Rate on 0-100:
-- Label visible (30 points)
-- Serial number readable (70 points)
+Rate on 0-100 based on ONT back panel visibility.
 
 Provide JSON response:
 {
     "score": <0-100>,
     "status": "<pass|fail|needs_review>",
     "confidence": <0.0-1.0>,
-    "label_visible": <true|false>,
-    "serial_readable": <true|false>,
-    "serial_number": "<extracted serial number>",
-    "device_type": "<UPS|GIZZU|unknown>",
+    "ont_back_visible": <true|false>,
+    "fiber_connection_visible": <true|false>,
+    "power_connection_visible": <true|false>,
+    "serial_number": "<extracted if visible, else null>",
     "issues": [],
     "summary": "<summary>"
 }""",
 
-            # Step 10: Final Installation - Critical
-            "ph_after": """Analyze this FINAL INSTALLATION photo (Step 10 - CRITICAL).
+            # Step 8: Final Installation - Critical (was Step 10)
+            "ph_after": """Analyze this FINAL INSTALLATION photo (Step 8 - CRITICAL).
 
 This is a wide shot of the COMPLETE installation with ALL equipment.
 
@@ -1301,10 +1267,10 @@ Provide JSON response:
 }
 
 EXCEPTION: drop_label is NOT a required element - set status=pass even if drop_label_visible=false.
-Drop label is checked in Step 11 instead.""",
+Drop label is checked in Step 9 (Green Lights) instead.""",
 
-            # Step 11: Green Lights - Critical
-            "ph_lights": """Analyze this GREEN LIGHTS photo (Step 11 - CRITICAL).
+            # Step 9: Green Lights - Critical (was Step 11)
+            "ph_lights": """Analyze this GREEN LIGHTS photo (Step 9 - CRITICAL).
 
 This shows the ONT/Router front panel with indicator lights.
 
@@ -1333,7 +1299,67 @@ Provide JSON response:
     "summary": "<X lights are ON: POWER, LINK, etc.>"
 }
 
-IMPORTANT: Count only ILLUMINATED lights, not all positions on the device."""
+IMPORTANT: Count only ILLUMINATED lights, not all positions on the device.""",
+
+            # Step 10: Signature - Customer sign-off
+            "ph_sign2": """Analyze this CUSTOMER SIGNATURE photo (Step 10 - FINAL).
+
+This shows the customer's signature confirming installation completion.
+
+Required:
+1. Signature clearly visible on form/document
+2. Signature appears to be handwritten (not printed)
+3. Form/document is legible
+
+Rate on 0-100:
+- Signature visible (50 points)
+- Form legible (30 points)
+- Signature appears genuine/handwritten (20 points)
+
+Provide JSON response:
+{
+    "score": <0-100>,
+    "status": "<pass|fail|needs_review>",
+    "confidence": <0.0-1.0>,
+    "signature_visible": <true|false>,
+    "form_legible": <true|false>,
+    "signature_handwritten": <true|false>,
+    "issues": [],
+    "summary": "<summary>",
+    "recommendations": "<improvements>"
+}
+
+NOTE: This is the final step confirming customer acceptance of the installation.""",
+
+            # Map ph_signature to the same prompt as ph_sign2
+            "ph_signature": """Analyze this CUSTOMER SIGNATURE photo (Step 10 - FINAL).
+
+This shows the customer's signature confirming installation completion.
+
+Required:
+1. Signature clearly visible on form/document
+2. Signature appears to be handwritten (not printed)
+3. Form/document is legible
+
+Rate on 0-100:
+- Signature visible (50 points)
+- Form legible (30 points)
+- Signature appears genuine/handwritten (20 points)
+
+Provide JSON response:
+{
+    "score": <0-100>,
+    "status": "<pass|fail|needs_review>",
+    "confidence": <0.0-1.0>,
+    "signature_visible": <true|false>,
+    "form_legible": <true|false>,
+    "signature_handwritten": <true|false>,
+    "issues": [],
+    "summary": "<summary>",
+    "recommendations": "<improvements>"
+}
+
+NOTE: This is the final step confirming customer acceptance of the installation."""
         }
 
         # Map photo types to prompts with fallbacks

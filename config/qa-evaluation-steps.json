@@ -1,67 +1,78 @@
 {
-  "version": "1.0",
-  "updated": "2025-12-23",
-  "description": "QA evaluation steps for DR photo verification using VLM AI",
+  "version": "2.0",
+  "updated": "2026-01-16",
+  "description": "QA evaluation steps for DR photo verification using VLM AI (10 steps - ONT/UPS barcodes are scanned, not photographed)",
+  "note": "ONT and UPS serial numbers are captured via barcode scanning and stored in ont_serial_scanned and ups_serial_scanned fields",
   "steps": [
     {
       "step_number": 1,
       "step_name": "house_photo",
       "step_label": "House Photo",
-      "criteria": "Clear photo of the house."
+      "photo_types": ["ph_prop", "ph_sign1", "ph_drop", "ph_outs"],
+      "criteria": "Clear photo of the house/property for location verification"
     },
     {
       "step_number": 2,
-      "step_name": "cable_span",
-      "step_label": "Cable Span from Pole",
-      "criteria": "Photo showing cable span from pole to house"
+      "step_name": "cable_from_pole",
+      "step_label": "Cable from Pole",
+      "photo_types": ["ph_pole", "ph_cbl_r"],
+      "criteria": "Photo showing cable span from utility pole to house"
     },
     {
       "step_number": 3,
       "step_name": "cable_entry_outside",
       "step_label": "Cable Entry Outside",
-      "criteria": "Outside view of cable entry point into house"
+      "photo_types": ["ph_entry_out", "ph_hm_ln"],
+      "criteria": "Close-up of cable entry point from exterior (CRITICAL - 70% field failure rate)"
     },
     {
       "step_number": 4,
       "step_name": "cable_entry_inside",
       "step_label": "Cable Entry Inside",
-      "criteria": "Inside view of cable entry, showing clean installation"
+      "photo_types": ["ph_entry_in", "ph_hm_en"],
+      "criteria": "Inside view of cable entry and routing toward ONT area"
     },
     {
       "step_number": 5,
       "step_name": "wall_installation",
       "step_label": "Wall for Installation",
-      "criteria": "Photo of wall where ONT will be/is installed"
+      "photo_types": ["ph_wall"],
+      "criteria": "Wall with mounting bracket and power outlet visible"
     },
     {
       "step_number": 6,
-      "step_name": "ont_back_and_barcode",
-      "step_label": "ONT Back & Barcode",
-      "criteria": "Back of ONT showing cable connections AND ONT barcode/serial number clearly visible and readable"
+      "step_name": "ont_back",
+      "step_label": "ONT Back After Install",
+      "photo_types": ["ph_ont", "ph_ont_back", "ph_bl"],
+      "criteria": "Back of ONT showing fiber and power connections"
     },
     {
       "step_number": 7,
       "step_name": "power_meter",
       "step_label": "Power Meter Reading",
-      "criteria": "Clear photo of power meter showing reading"
+      "photo_types": ["ph_powm", "ph_powm1", "ph_powm2"],
+      "criteria": "Clear power meter display showing dBm reading (must be under -24 dBm)"
     },
     {
       "step_number": 8,
-      "step_name": "ups_serial",
-      "step_label": "UPS Serial Number",
-      "criteria": "UPS serial number clearly visible and readable"
+      "step_name": "final_installation",
+      "step_label": "Final Installation",
+      "photo_types": ["ph_after", "ph_final"],
+      "criteria": "Wide shot showing ONT mounted, GIZZU/UPS connected, neat cable management"
     },
     {
       "step_number": 9,
-      "step_name": "final_installation",
-      "step_label": "Final Installation",
-      "criteria": "Complete installation showing ONT and cables neatly installed"
+      "step_name": "green_lights",
+      "step_label": "Green Lights on ONT",
+      "photo_types": ["ph_lights", "ph_led"],
+      "criteria": "ONT front panel with at least 4 indicator lights illuminated"
     },
     {
       "step_number": 10,
-      "step_name": "ont_lights_and_dr_label",
-      "step_label": "Green Lights & DR Label",
-      "criteria": "ONT with green lights indicating successful connection AND DR number label clearly visible on device or nearby"
+      "step_name": "signature",
+      "step_label": "Signature",
+      "photo_types": ["ph_sign2", "ph_signature"],
+      "criteria": "Customer signature on completion form"
     }
   ]
 }

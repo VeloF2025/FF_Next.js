@@ -349,7 +349,7 @@ function mapRowToUnifiedReview(row: any): UnifiedReview {
     photo_count: row.photo_count,
     photos_metadata: row.photos_metadata || [],
 
-    // 12 unified QA steps
+    // 10 unified QA steps (ONT/UPS barcodes are scanned, not photographed)
     step_01_house_photo: row.step_01_house_photo,
     step_02_cable_from_pole: row.step_02_cable_from_pole,
     step_03_entry_outside: row.step_03_entry_outside,
@@ -357,11 +357,9 @@ function mapRowToUnifiedReview(row: any): UnifiedReview {
     step_05_wall: row.step_05_wall,
     step_06_ont_back: row.step_06_ont_back,
     step_07_power_meter: row.step_07_power_meter,
-    step_08_ont_barcode: row.step_08_ont_barcode,
-    step_09_ups_serial: row.step_09_ups_serial,
-    step_10_final_installation: row.step_10_final_installation,
-    step_11_green_lights: row.step_11_green_lights,
-    step_12_signature: row.step_12_signature,
+    step_08_final_installation: row.step_08_final_installation,
+    step_09_green_lights: row.step_09_green_lights,
+    step_10_signature: row.step_10_signature,
 
     // Incorrect tracking
     incorrect_steps: row.incorrect_steps || [],
