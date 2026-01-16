@@ -23,6 +23,7 @@ interface HealthData {
     onemap: ServiceStatus;
     vlm: ServiceStatus;
     whatsappBridge: ServiceStatus;
+    whatsappSender?: ServiceStatus;
   };
   recentActivity: {
     lastDRProcessed: string | null;
@@ -49,6 +50,7 @@ export function SystemHealthDashboard({
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryResult, setRetryResult] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   async function fetchHealth() {
     try {
@@ -174,26 +176,57 @@ export function SystemHealthDashboard({
     { key: 'database', label: 'Database', icon: '🗄️', ...health.services.database },
     { key: 'onemap', label: 'OneMap', icon: '🗺️', ...health.services.onemap },
     { key: 'vlm', label: 'VLM (AI)', icon: '🤖', ...health.services.vlm },
-    { key: 'whatsappBridge', label: 'WhatsApp', icon: '💬', ...health.services.whatsappBridge },
+    { key: 'whatsappBridge', label: 'WA Bridge', icon: '💬', ...health.services.whatsappBridge },
+    ...(health.services.whatsappSender ? [{ key: 'whatsappSender', label: 'WA Sender', icon: '📤', ...health.services.whatsappSender }] : []),
   ];
 
   // Compact view for header/navbar
   if (compact) {
     return (
-      <div className="flex items-center gap-2">
-        <div className={`w-2 h-2 rounded-full ${getStatusColor(health.overall === 'healthy' ? 'healthy' : health.overall === 'degraded' ? 'degraded' : 'down')}`} />
-        <span className="text-xs text-gray-600 dark:text-gray-400">
-          {health.overall === 'healthy' ? 'All systems operational' :
-           health.overall === 'degraded' ? 'Some issues detected' :
-           'System issues'}
-        </span>
-        {services.some(s => s.status !== 'healthy') && (
-          <div className="flex gap-1">
-            {services.filter(s => s.status !== 'healthy').map(s => (
-              <span key={s.key} title={`${s.label}: ${s.message}`} className="text-xs">
-                {s.icon}
-              </span>
-            ))}
+      <div className="relative">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded-md transition-colors"
+        >
+          <div className={`w-2 h-2 rounded-full ${getStatusColor(health.overall === 'healthy' ? 'healthy' : health.overall === 'degraded' ? 'degraded' : 'down')}`} />
+          <span className="text-xs text-gray-600 dark:text-gray-400">
+            {health.overall === 'healthy' ? 'All systems operational' :
+             health.overall === 'degraded' ? 'Some issues detected' :
+             'System issues'}
+          </span>
+          <span className="text-xs text-gray-400">{isExpanded ? '▲' : '▼'}</span>
+        </button>
+
+        {/* Expanded dropdown */}
+        {isExpanded && (
+          <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 min-w-[280px]">
+            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">Service Status</div>
+            <div className="space-y-2">
+              {services.map(s => (
+                <div key={s.key} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span>{s.icon}</span>
+                    <span className="text-gray-700 dark:text-gray-300">{s.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${
+                      s.status === 'healthy' ? 'text-green-600 dark:text-green-400' :
+                      s.status === 'degraded' ? 'text-yellow-600 dark:text-yellow-400' :
+                      s.status === 'down' ? 'text-red-600 dark:text-red-400' :
+                      'text-gray-500'
+                    }`}>
+                      {s.message}
+                    </span>
+                    <div className={`w-2 h-2 rounded-full ${getStatusColor(s.status)}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {lastRefresh && (
+              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                Last updated: {lastRefresh.toLocaleTimeString()}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -229,7 +262,7 @@ export function SystemHealthDashboard({
       </div>
 
       {/* Service Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {services.map((service) => (
           <div
             key={service.key}
