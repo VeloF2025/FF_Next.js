@@ -344,22 +344,26 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Use whatsapp_message_date if available (actual WhatsApp submission time)
       const qaSubmittedDate = existingQA.whatsapp_message_date || existingQA.created_at;
       const qaSubmittedDateStr = new Date(qaSubmittedDate).toISOString().split('T')[0];
+      // Preserve original created_at timestamp from qa_photo_reviews
+      const originalCreatedAt = existingQA.created_at;
 
       log.info('ProcessNewDr', `Found existing QA record for ${dropNumber} in ${existingQA.project}`, {
         whatsapp_message_date: existingQA.whatsapp_message_date,
         using_date: qaSubmittedDateStr,
+        original_created_at: originalCreatedAt,
       });
 
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date, sender_phone, created_at, updated_at,
            submission_history
-         ) VALUES ($1, $2, 1, $3, $4, NOW(), NOW(), $5)`,
+         ) VALUES ($1, $2, 1, $3, $4, $5, $5, $6)`,
         [
           dropNumber,
           project || existingQA.project,
           qaSubmittedDateStr, // Use WhatsApp message date instead of user-provided date
-          existingQA.sender_phone || null, // Copy sender phone from WA Monitor
+          existingQA.sender_phone || senderPhone || null, // Copy sender phone from WA Monitor
+          originalCreatedAt, // Preserve original timestamp from qa_photo_reviews
           JSON.stringify([{
             submission_number: 0,
             snapshot_at: existingQA.created_at,
