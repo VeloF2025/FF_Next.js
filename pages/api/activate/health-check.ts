@@ -166,12 +166,12 @@ async function checkVLM(): Promise<ServiceStatus> {
 async function checkWhatsAppBridge(): Promise<ServiceStatus> {
   const start = Date.now();
   try {
-    // Check for recent DR submissions in qa_photo_reviews
+    // Check for recent DR submissions in dr_photo_unified_reviews (the active table)
     const result = await pool.query(`
       SELECT
         COUNT(*) as recent_count,
         MAX(created_at) as last_submission
-      FROM qa_photo_reviews
+      FROM dr_photo_unified_reviews
       WHERE created_at > NOW() - INTERVAL '1 hour'
     `);
 
