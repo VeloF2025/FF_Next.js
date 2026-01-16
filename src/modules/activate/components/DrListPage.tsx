@@ -338,8 +338,15 @@ export function DrListPage() {
 
     setFilteredDrops(filtered);
 
-    // NOTE: Dashboard stats (Total Drops, Incomplete, Complete, Total Feedback)
-    // remain unchanged - they show ALL drops from API summary.
+    // Update dashboard stats based on filtered drops when filters are active
+    if (hasActiveFilters) {
+      setDashboardStats({
+        totalDrops: filtered.length,
+        incomplete: filtered.filter(d => d.status === 'incomplete').length,
+        complete: filtered.filter(d => d.status === 'complete').length,
+        totalFeedback: filtered.filter(d => d.feedbackSent).length,
+      });
+    }
 
     // Calculate daily stats from filtered drops for the table
     const dailyMap = new Map<string, DailyStat>();
@@ -863,9 +870,13 @@ export function DrListPage() {
                   </tr>
                 ) : (
                   (() => {
-                    // Use projectStats from API (complete stats from ALL records, not paginated)
-                    // Calculate grand totals
-                    const grandTotal = projectStats.reduce(
+                    // Filter projectStats by project filter if active
+                    const filteredProjectStats = projectFilter !== 'all'
+                      ? projectStats.filter(stat => stat.project === projectFilter)
+                      : projectStats;
+
+                    // Calculate grand totals from filtered stats
+                    const grandTotal = filteredProjectStats.reduce(
                       (sum, stat) => ({
                         total: sum.total + stat.total,
                         complete: sum.complete + stat.complete,
@@ -874,7 +885,7 @@ export function DrListPage() {
                       { total: 0, complete: 0, incomplete: 0 }
                     );
 
-                    const projectRows = projectStats.map((stat) => (
+                    const projectRows = filteredProjectStats.map((stat) => (
                         <tr key={stat.project} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             {stat.project}
