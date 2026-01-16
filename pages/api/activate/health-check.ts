@@ -85,7 +85,7 @@ async function checkOneMap(): Promise<ServiceStatus> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(`${ONEMAP_HOST}/api/health`, {
+    const response = await fetch(`${ONEMAP_HOST}/health`, {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
