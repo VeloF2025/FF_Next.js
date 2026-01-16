@@ -304,19 +304,23 @@ export function DrListPage() {
     }
 
     // Date range filter using submitted_date (the date DR was actually submitted)
+    // Note: submitted_date comes as UTC timestamp (e.g., '2026-01-15T22:00:00.000Z' for Jan 16 SAST)
+    // We need to parse it in local timezone to get the correct date
     if (dateFrom) {
       filtered = filtered.filter(drop => {
         if (!drop.submittedDate) return false;
-        // submitted_date is stored as DATE in DB, comes as ISO string
-        const dropDate = new Date(drop.submittedDate).toISOString().split('T')[0];
+        // Parse as local date to handle timezone correctly
+        const d = new Date(drop.submittedDate);
+        const dropDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return dropDate >= dateFrom;
       });
     }
     if (dateTo) {
       filtered = filtered.filter(drop => {
         if (!drop.submittedDate) return false;
-        // submitted_date is stored as DATE in DB, comes as ISO string
-        const dropDate = new Date(drop.submittedDate).toISOString().split('T')[0];
+        // Parse as local date to handle timezone correctly
+        const d = new Date(drop.submittedDate);
+        const dropDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         return dropDate <= dateTo;
       });
     }
@@ -340,9 +344,10 @@ export function DrListPage() {
     const dailyMap = new Map<string, DailyStat>();
     filtered.forEach(drop => {
       // Use submitted_date for grouping (the date DR was submitted, not created in system)
-      const dropDate = drop.submittedDate
-        ? new Date(drop.submittedDate).toISOString().split('T')[0]
-        : new Date(drop.createdAt).toISOString().split('T')[0];
+      // Parse in local timezone to handle UTC offset correctly
+      const dateStr = drop.submittedDate || drop.createdAt;
+      const d = new Date(dateStr);
+      const dropDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const key = `${drop.project || 'Unknown'}_${dropDate}`;
 
       if (!dailyMap.has(key)) {

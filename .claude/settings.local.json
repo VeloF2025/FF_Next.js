@@ -116,7 +116,9 @@
       "Bash(package-lock.json)",
       "Bash(ssh:*)",
       "Bash(ssh-add:*)",
-      "Bash(PGPASSWORD='npg_MIUZXrg1tEY0' psql:*)"
+      "Bash(PGPASSWORD='npg_MIUZXrg1tEY0' psql:*)",
+      "Bash(PGPASSWORD=npg_MIUZXrg1tEY0 psql:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": [],
