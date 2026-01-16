@@ -17,7 +17,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
+import * as XLSX from 'xlsx';
 import { parseExcelFile } from '@/modules/ticketing/utils/excelParser';
+
+// Known ticket data column names for auto-detection
+const TICKET_COLUMNS = [
+  'dr number', 'dr_number', 'drnumber',
+  'status', 'area', 'zone',
+  'ft ref', 'ft_ref', 'ftref', 'reference',
+  'issue', 'description', 'title',
+];
 import {
   createWeeklyReport,
   importTicketsFromReport,
@@ -152,11 +161,49 @@ export async function POST(req: NextRequest) {
       userId,
     });
 
-    // Parse Excel file
+    // Auto-detect best sheet (same logic as parse endpoint)
+    let sheetName: string | undefined;
+    const workbook = XLSX.read(buffer!, { type: 'buffer' });
+
+    const scoredSheets = workbook.SheetNames.map((name) => {
+      const sheet = workbook.Sheets[name];
+      const range = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null;
+      const rows = range ? range.e.r - range.s.r + 1 : 0;
+
+      // Get headers from first row
+      const firstRow = (XLSX.utils.sheet_to_json(sheet, { header: 1 })[0] as string[]) || [];
+      const headerLower = firstRow.map((h) => String(h || '').toLowerCase());
+
+      // Check if any ticket columns exist
+      const hasTicketColumns = TICKET_COLUMNS.some((col) =>
+        headerLower.some((h) => h.includes(col))
+      );
+
+      // Score: prefer "ticket"/"mnt" in name, then by row count
+      let score = rows;
+      const nameLower = name.toLowerCase();
+      if (nameLower.includes('ticket')) score += 10000;
+      if (nameLower.includes('mnt')) score += 5000;
+      if (nameLower.includes('maintenance')) score += 5000;
+      if (hasTicketColumns) score += 1000;
+      if (nameLower.includes('pivot') || nameLower.includes('summary')) score -= 5000;
+
+      return { name, rows, score };
+    });
+
+    sheetName = scoredSheets.sort((a, b) => b.score - a.score)[0]?.name;
+
+    logger.info('Auto-detected sheet', {
+      selectedSheet: sheetName,
+      sheets: scoredSheets.map((s) => `${s.name} (${s.rows} rows, score: ${s.score})`),
+    });
+
+    // Parse Excel file with detected sheet
     const parseResult = await parseExcelFile(buffer!, {
       hasHeaders: true,
       skipEmptyRows: true,
       trimWhitespace: true,
+      sheetName,
     });
 
     if (!parseResult.success || parseResult.errors.length > 0) {
@@ -251,7 +298,13 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    logger.error('Error processing weekly import', { error });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    logger.error('Error processing weekly import', {
+      error: errorMessage,
+      stack: errorStack,
+    });
 
     return NextResponse.json(
       {
@@ -259,6 +312,7 @@ export async function POST(req: NextRequest) {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'Failed to process weekly import',
+          details: errorMessage, // Include error details for debugging
         },
         meta: {
           timestamp: new Date().toISOString(),
