@@ -184,13 +184,15 @@ export function ProcurementTabs({
   const getTabState = (tab: ProcurementTab) => {
     const isActive = activeTab === tab.id;
     const isDisabled = tab.requiresProject && !selectedProject;
-    const hasPermission = !tab.permission || (permissions && permissions[tab.permission as keyof ProcurementPermissions]) || false;
-    
+    // If permissions not loaded (undefined), allow access by default
+    // Only restrict if permissions IS loaded AND specific permission is false
+    const hasPermission = !tab.permission || !permissions || Boolean(permissions[tab.permission as keyof ProcurementPermissions]);
+
     return {
       isActive,
       isDisabled,
       hasPermission,
-      showLock: !hasPermission
+      showLock: permissions !== undefined && !hasPermission
     };
   };
 

@@ -21,6 +21,7 @@ import {
   Calendar,
   Building,
   FolderOpen,
+  Loader2,
 } from 'lucide-react';
 import type {
   RequisitionStatus,
@@ -116,6 +117,19 @@ export default function RequisitionDetailPage() {
   const [activeTab, setActiveTab] = useState<TabId>('details');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Convert to PO modal state
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [suppliers, setSuppliers] = useState<{ id: string; companyName: string }[]>([]);
+  const [convertForm, setConvertForm] = useState({
+    supplierId: '',
+    deliveryAddress: '',
+    expectedDeliveryDate: '',
+    paymentTerms: 'Net 30',
+    notes: '',
+  });
+  const [convertLoading, setConvertLoading] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+
   // TODO: Get from auth context
   const currentUserId = 'current-user';
   const isCreator = requisition?.requestedBy === currentUserId;
@@ -126,6 +140,22 @@ export default function RequisitionDetailPage() {
       fetchRequisition();
     }
   }, [id]);
+
+  // Fetch suppliers for conversion
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const response = await fetch('/api/suppliers?page=1&pageSize=100');
+        const data = await response.json();
+        if (data.success && data.data) {
+          setSuppliers(data.data);
+        }
+      } catch (err) {
+        log.error('Failed to fetch suppliers', err);
+      }
+    };
+    fetchSuppliers();
+  }, []);
 
   const fetchRequisition = async () => {
     try {
@@ -160,6 +190,17 @@ export default function RequisitionDetailPage() {
         return;
       }
 
+      if (action === 'convert_po') {
+        setShowConvertModal(true);
+        setActionLoading(null);
+        return;
+      }
+
+      if (action === 'convert_rfq') {
+        router.push(`/procurement/rfq/new?requisitionId=${id}`);
+        return;
+      }
+
       if (action === 'delete') {
         if (!confirm('Are you sure you want to delete this requisition?')) {
           setActionLoading(null);
@@ -167,8 +208,8 @@ export default function RequisitionDetailPage() {
         }
       }
 
-      const response = await fetch(`/api/procurement/requisitions/${id}/status`, {
-        method: 'PATCH',
+      const response = await fetch(`/api/procurement/requisitions/${id}/submit`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
@@ -189,6 +230,45 @@ export default function RequisitionDetailPage() {
       setError(`Failed to ${action} requisition`);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleConvertToPO = async () => {
+    if (!convertForm.supplierId || !convertForm.deliveryAddress) {
+      setConvertError('Supplier and delivery address are required');
+      return;
+    }
+
+    try {
+      setConvertLoading(true);
+      setConvertError(null);
+
+      const response = await fetch(`/api/procurement/requisitions/${id}/convert-to-po`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplierId: parseInt(convertForm.supplierId, 10),
+          deliveryAddress: convertForm.deliveryAddress,
+          expectedDeliveryDate: convertForm.expectedDeliveryDate || null,
+          paymentTerms: convertForm.paymentTerms,
+          notes: convertForm.notes,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setShowConvertModal(false);
+        // Navigate to the new PO
+        router.push(`/procurement/purchase-orders/${data.data.purchaseOrder.id}`);
+      } else {
+        setConvertError(data.error?.message || 'Failed to convert to PO');
+      }
+    } catch (err) {
+      log.error('Failed to convert to PO', err);
+      setConvertError('Failed to convert to PO');
+    } finally {
+      setConvertLoading(false);
     }
   };
 
@@ -604,6 +684,129 @@ export default function RequisitionDetailPage() {
             </>
           ) : null}
         </div>
+
+        {/* Convert to PO Modal */}
+        {showConvertModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6 max-w-lg w-full mx-4">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
+                Convert to Purchase Order
+              </h3>
+              <p className="text-sm text-[var(--ff-text-secondary)] mb-6">
+                Create a Purchase Order from this requisition. All items will be included.
+              </p>
+
+              {convertError && (
+                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                  {convertError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                    Supplier <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={convertForm.supplierId}
+                    onChange={(e) => setConvertForm({ ...convertForm, supplierId: e.target.value })}
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  >
+                    <option value="">Select supplier...</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.companyName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                    Delivery Address <span className="text-red-400">*</span>
+                  </label>
+                  <textarea
+                    value={convertForm.deliveryAddress}
+                    onChange={(e) => setConvertForm({ ...convertForm, deliveryAddress: e.target.value })}
+                    rows={3}
+                    placeholder="Enter delivery address (minimum 10 characters)"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                      Expected Delivery Date
+                    </label>
+                    <input
+                      type="date"
+                      value={convertForm.expectedDeliveryDate}
+                      onChange={(e) => setConvertForm({ ...convertForm, expectedDeliveryDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                      Payment Terms
+                    </label>
+                    <select
+                      value={convertForm.paymentTerms}
+                      onChange={(e) => setConvertForm({ ...convertForm, paymentTerms: e.target.value })}
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    >
+                      <option value="COD">COD</option>
+                      <option value="Net 7">Net 7</option>
+                      <option value="Net 14">Net 14</option>
+                      <option value="Net 30">Net 30</option>
+                      <option value="Net 45">Net 45</option>
+                      <option value="Net 60">Net 60</option>
+                      <option value="Prepaid">Prepaid</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    value={convertForm.notes}
+                    onChange={(e) => setConvertForm({ ...convertForm, notes: e.target.value })}
+                    rows={2}
+                    placeholder="Any additional notes for the PO"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowConvertModal(false);
+                    setConvertError(null);
+                  }}
+                  disabled={convertLoading}
+                  className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConvertToPO}
+                  disabled={convertLoading || !convertForm.supplierId || convertForm.deliveryAddress.length < 10}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {convertLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShoppingCart className="h-4 w-4" />
+                  )}
+                  Create Purchase Order
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
