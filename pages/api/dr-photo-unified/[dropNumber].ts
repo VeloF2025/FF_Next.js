@@ -346,8 +346,29 @@ async function fetchFromOneMapRecord(dropNumber: string): Promise<{
       return null;
     }
 
-    const data = await response.json();
-    const localPhotos = data.local_photos || [];
+    let data = await response.json();
+    let localPhotos = data.local_photos || [];
+
+    // If record exists but local_photos is empty, try downloading
+    if (localPhotos.length === 0 && data.photo_count > 0) {
+      log.info(`Record exists but no local photos for ${dropNumber}, triggering download`);
+
+      const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
+        method: 'POST',
+      });
+
+      if (downloadResponse.ok) {
+        // Re-fetch record after download
+        const retryResponse = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
+        if (retryResponse.ok) {
+          data = await retryResponse.json();
+          localPhotos = data.local_photos || [];
+          log.info(`Downloaded ${localPhotos.length} photos for ${dropNumber}`);
+        }
+      } else {
+        log.warn(`Download failed for ${dropNumber}`);
+      }
+    }
 
     // Map photos with proxy URLs
     const photos = localPhotos.map((photo: { filename: string; type: string; size?: number }) => ({

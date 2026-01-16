@@ -208,10 +208,10 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
       throw new Error(`OneMap API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    let data = await response.json();
 
     // Check if local_photos exists (full record response)
-    const localPhotos = data.local_photos || [];
+    let localPhotos = data.local_photos || [];
     if (!Array.isArray(localPhotos)) {
       log.warn(`No local_photos array in response for ${dropNumber}`, { data });
       return {
@@ -221,6 +221,27 @@ async function fetchFromOneMap(dropNumber: string): Promise<PhotoFetchResult> {
         ont_barcode: data.ont_barcode || null,
         ups_serial: data.ups_serial || null,
       };
+    }
+
+    // If record exists but local_photos is empty, try downloading
+    if (localPhotos.length === 0 && data.photo_count > 0) {
+      log.info(`Record exists but no local photos for ${dropNumber}, triggering download`);
+
+      const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
+        method: 'POST',
+      });
+
+      if (downloadResponse.ok) {
+        // Re-fetch record after download
+        const retryResponse = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
+        if (retryResponse.ok) {
+          data = await retryResponse.json();
+          localPhotos = data.local_photos || [];
+          log.info(`Downloaded ${localPhotos.length} photos for ${dropNumber}`);
+        }
+      } else {
+        log.warn(`Download failed for ${dropNumber}`);
+      }
     }
 
     // Map OneMap response to our Photo interface with PROXY URLs
