@@ -32,6 +32,74 @@ interface TicketActivity {
 }
 
 /**
+ * Cache QContact activities locally for persistence
+ * Uses UPSERT to avoid duplicates based on external_id
+ */
+async function cacheQContactActivities(
+  ticketId: string,
+  activities: QContactActivity[]
+): Promise<void> {
+  if (activities.length === 0) return;
+
+  logger.debug('Caching QContact activities', { ticketId, count: activities.length });
+
+  for (const activity of activities) {
+    try {
+      // Use external_id to detect duplicates
+      const externalId = `qc-${activity.id}`;
+
+      // Check if already cached
+      const existing = await sql`
+        SELECT id FROM ticket_activities
+        WHERE ticket_id = ${ticketId} AND external_id = ${externalId}
+      `;
+
+      if (existing.length > 0) {
+        // Already cached, skip
+        continue;
+      }
+
+      // Insert new activity
+      await sql`
+        INSERT INTO ticket_activities (
+          id,
+          ticket_id,
+          external_id,
+          activity_type,
+          description,
+          field_changes,
+          created_by_name,
+          created_by_email,
+          source,
+          external_timestamp,
+          created_at
+        ) VALUES (
+          gen_random_uuid(),
+          ${ticketId},
+          ${externalId},
+          ${activity.type},
+          ${activity.description},
+          ${activity.field_changes ? JSON.stringify(activity.field_changes) : null}::jsonb,
+          ${activity.created_by?.name || null},
+          ${activity.created_by?.email || null},
+          'qcontact',
+          ${activity.created_at}::timestamptz,
+          NOW()
+        )
+      `;
+    } catch (err) {
+      logger.warn('Failed to cache individual activity', {
+        ticketId,
+        activityId: activity.id,
+        error: err instanceof Error ? err.message : 'Unknown',
+      });
+    }
+  }
+
+  logger.info('Cached QContact activities', { ticketId, count: activities.length });
+}
+
+/**
  * GET /api/ticketing/tickets/[id]/activities
  * Fetch all activities for a ticket from both QContact and local database
  */
@@ -70,6 +138,8 @@ export async function GET(
 
     // Fetch QContact activities if this is a QContact ticket with external_id
     const qcontactCaseId = ticket.source === 'qcontact' ? ticket.external_id : null;
+    let qcontactActivitiesFetched = false;
+
     if (qcontactCaseId && qcontactConfig.accessToken) {
       try {
         const qcontactClient = new FiberTimeQContactClient(qcontactConfig);
@@ -85,48 +155,83 @@ export async function GET(
           });
         }
 
+        qcontactActivitiesFetched = true;
+
+        // Cache QContact activities locally for persistence
+        // This runs in background to not slow down response
+        cacheQContactActivities(ticketId, qcontactResponse.activities).catch((err) => {
+          logger.warn('Failed to cache QContact activities', {
+            ticketId,
+            error: err instanceof Error ? err.message : 'Unknown error',
+          });
+        });
+
         logger.debug('Fetched QContact activities', {
           ticketId,
           count: qcontactResponse.activities.length,
         });
       } catch (error) {
-        logger.warn('Failed to fetch QContact activities', {
+        logger.warn('Failed to fetch QContact activities, will use cached data', {
           ticketId,
           qcontactCaseId,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        // Continue with local activities even if QContact fails
+        // Continue with local cached activities
       }
     }
 
     // Fetch local activities from database
+    // If QContact was fetched successfully, only load non-QContact local activities (to avoid duplicates)
+    // If QContact failed, load ALL local activities (including cached QContact ones)
     try {
-      const localActivities = await sql`
-        SELECT
-          id,
-          type,
-          description,
-          field_changes,
-          created_by,
-          created_at,
-          is_private,
-          is_pinned
-        FROM ticket_activities
-        WHERE ticket_id = ${ticketId}
-        ORDER BY created_at DESC
-      `;
+      const localActivities = qcontactActivitiesFetched
+        ? await sql`
+            SELECT
+              id,
+              external_id,
+              activity_type,
+              description,
+              field_changes,
+              created_by_name,
+              created_by_email,
+              source,
+              external_timestamp,
+              created_at
+            FROM ticket_activities
+            WHERE ticket_id = ${ticketId}
+              AND (source IS NULL OR source != 'qcontact')
+            ORDER BY COALESCE(external_timestamp, created_at) DESC
+          `
+        : await sql`
+            SELECT
+              id,
+              external_id,
+              activity_type,
+              description,
+              field_changes,
+              created_by_name,
+              created_by_email,
+              source,
+              external_timestamp,
+              created_at
+            FROM ticket_activities
+            WHERE ticket_id = ${ticketId}
+            ORDER BY COALESCE(external_timestamp, created_at) DESC
+          `;
 
       for (const activity of localActivities) {
         activities.push({
           id: activity.id,
-          type: activity.type || 'note',
+          type: (activity.activity_type || 'note') as TicketActivity['type'],
           description: activity.description,
           field_changes: activity.field_changes,
-          created_by: activity.created_by,
-          created_at: activity.created_at,
-          source: 'fibreflow' as const,
-          is_private: activity.is_private || false,
-          is_pinned: activity.is_pinned || false,
+          created_by: activity.created_by_name
+            ? { name: activity.created_by_name, email: activity.created_by_email }
+            : null,
+          created_at: activity.external_timestamp || activity.created_at,
+          source: (activity.source || 'fibreflow') as 'qcontact' | 'fibreflow',
+          is_private: false,
+          is_pinned: false,
         });
       }
 

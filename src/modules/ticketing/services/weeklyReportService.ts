@@ -524,7 +524,9 @@ export async function processImportBatch(
           pon_number: row.pon_number,
           address: row.address,
           fault_cause: row.fault_cause as any,
-          created_by: userId
+          // Note: Set to null for imports since userId may not exist in users table
+          // The source: WEEKLY_REPORT identifies these as imported tickets
+          created_by: null
         };
 
         const ticket = await createTicket(ticketPayload);
@@ -679,12 +681,12 @@ export async function listWeeklyReports(
   }
 
   if (filters.imported_after) {
-    conditions.push(`imported_at >= $${paramIndex++}`);
+    conditions.push(`started_at >= $${paramIndex++}`);
     values.push(filters.imported_after);
   }
 
   if (filters.imported_before) {
-    conditions.push(`imported_at <= $${paramIndex++}`);
+    conditions.push(`completed_at <= $${paramIndex++}`);
     values.push(filters.imported_before);
   }
 
@@ -735,7 +737,7 @@ export async function getWeeklyReportStats(): Promise<WeeklyReportStats> {
       COUNT(*) FILTER (WHERE status = 'failed') as failed_imports,
       COALESCE(SUM(imported_count), 0) as total_tickets_imported,
       COALESCE(AVG(imported_count), 0) as avg_tickets_per_import,
-      MAX(imported_at) as last_import_date
+      MAX(completed_at) as last_import_date
     FROM weekly_reports`
   );
 

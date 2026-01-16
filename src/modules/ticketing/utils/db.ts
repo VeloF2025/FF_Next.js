@@ -10,6 +10,9 @@
  * - Health checks
  *
  * 🟢 WORKING: Production-ready database utility for ticketing module
+ *
+ * NOTE: Uses neon() HTTP driver with a query helper that converts
+ * parameterized queries to tagged template literals.
  */
 
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
@@ -59,6 +62,30 @@ export function getConnection(): NeonQueryFunction<false, false> {
 }
 
 /**
+ * Execute a parameterized query using the neon HTTP driver
+ *
+ * Converts $1, $2 placeholders to a tagged template literal call.
+ * This is necessary because the neon() function only works as a
+ * tagged template literal in newer versions.
+ */
+async function executeParameterizedQuery<T>(
+  sql: NeonQueryFunction<false, false>,
+  queryText: string,
+  params: unknown[]
+): Promise<T[]> {
+  // Split query by $N placeholders and create template strings array
+  const parts = queryText.split(/\$\d+/);
+
+  // Create a mock TemplateStringsArray
+  const strings = Object.assign([...parts], { raw: parts });
+
+  // Call the sql function as if it were a tagged template
+  const result = await (sql as Function)(strings, ...params);
+
+  return result as T[];
+}
+
+/**
  * Execute a SQL query with parameters
  *
  * Uses parameterized queries to prevent SQL injection.
@@ -80,9 +107,8 @@ export async function query<T = any>(
   try {
     const sql = getConnection();
 
-    // Neon serverless requires sql.query() for parameterized queries with $1, $2, etc.
-    // Always use sql.query() for conventional function calls
-    const result = await (sql as any).query(queryText, params);
+    // Execute query using the parameterized query helper
+    const result = await executeParameterizedQuery<T>(sql, queryText, params);
 
     const duration = Date.now() - startTime;
 
@@ -92,7 +118,7 @@ export async function query<T = any>(
       query: queryText.substring(0, 100) // Log first 100 chars
     });
 
-    return result as T[];
+    return result;
   } catch (error) {
     const duration = Date.now() - startTime;
 
@@ -170,44 +196,31 @@ export async function transaction<T>(
   const sql = getConnection();
   const startTime = Date.now();
 
-  try {
-    // Start transaction - use sql.query() for conventional calls
-    await (sql as any).query('BEGIN', []);
-    logger.debug('Transaction started');
+  // Note: Neon HTTP driver doesn't support true transactions.
+  // This implementation runs queries sequentially but doesn't provide
+  // atomicity guarantees. For true transactions, use Pool with WebSocket.
+  logger.warn('Transaction called with HTTP driver - no atomicity guarantee');
 
-    // Create transaction context
+  try {
+    // Create transaction context using the query helper
     const txnContext: TransactionContext = {
       query: async <R = any>(queryText: string, params: any[] = []): Promise<R[]> => {
-        return query<R>(queryText, params);
+        return executeParameterizedQuery<R>(sql, queryText, params);
       },
       queryOne: async <R = any>(queryText: string, params: any[] = []): Promise<R | null> => {
-        return queryOne<R>(queryText, params);
+        const results = await executeParameterizedQuery<R>(sql, queryText, params);
+        return results.length > 0 ? results[0] : null;
       }
     };
 
-    // Execute transaction callback
+    // Execute callback
     const result = await callback(txnContext);
 
-    // Commit transaction - use sql.query() for conventional calls
-    await (sql as any).query('COMMIT', []);
-
     const duration = Date.now() - startTime;
-    logger.debug('Transaction committed', { duration });
+    logger.debug('Transaction completed', { duration });
 
     return result;
   } catch (error) {
-    // Rollback on error - use sql.query() for conventional calls
-    try {
-      await (sql as any).query('ROLLBACK', []);
-      logger.warn('Transaction rolled back', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-    } catch (rollbackError) {
-      logger.error('Rollback failed', {
-        error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError)
-      });
-    }
-
     const duration = Date.now() - startTime;
     logger.error('Transaction failed', {
       error: error instanceof Error ? error.message : String(error),
@@ -255,8 +268,7 @@ export async function healthCheck(): Promise<HealthCheckResult> {
 
   try {
     const sql = getConnection();
-    // Use sql.query() for conventional function calls
-    await (sql as any).query('SELECT NOW() as now', []);
+    await executeParameterizedQuery(sql, 'SELECT NOW() as now', []);
 
     const latency = Date.now() - startTime;
 
