@@ -128,12 +128,8 @@ async function getPaginatedDrops(
     params.push(`%${searchTerm}%`);
   }
 
-  // Get total count
+  // Build queries
   const countQuery = `SELECT COUNT(*) FROM dr_photo_unified_reviews ${whereClause}`;
-  const countResult = await pool.query(countQuery, params);
-  const totalCount = parseInt(countResult.rows[0].count, 10);
-
-  // Get paginated data
   const dataQuery = `
     SELECT * FROM dr_photo_unified_reviews
     ${whereClause}
@@ -141,7 +137,14 @@ async function getPaginatedDrops(
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `;
   const dataParams = [...params, pageSize, offset];
-  const dataResult = await pool.query(dataQuery, dataParams);
+
+  // Run count and data queries in parallel for faster response
+  const [countResult, dataResult] = await Promise.all([
+    pool.query(countQuery, params),
+    pool.query(dataQuery, dataParams),
+  ]);
+
+  const totalCount = parseInt(countResult.rows[0].count, 10);
 
   // Transform rows with calculated fields
   const drops = dataResult.rows.map((row: any) => ({
@@ -394,11 +397,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Get paginated drops
-    const searchTerm = search && typeof search === 'string' ? search : undefined;
-    const result = await getPaginatedDrops(currentPage, pageSize, searchTerm);
-
-    // Parse filter parameters
+    // Parse filter parameters first (needed for parallel queries)
     const filters = {
       dateFrom: dateFrom && typeof dateFrom === 'string' ? dateFrom : undefined,
       dateTo: dateTo && typeof dateTo === 'string' ? dateTo : undefined,
@@ -406,14 +405,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: status && typeof status === 'string' ? status : undefined,
     };
 
-    // Optionally skip summary for faster initial load
-    let summary = null;
-    if (skipSummary !== 'true') {
-      summary = await calculateSummary(filters);
-    }
+    const searchTerm = search && typeof search === 'string' ? search : undefined;
 
-    // Get project stats with all filters
-    const projectStats = await getProjectStats(filters);
+    // Run all queries in parallel for faster response
+    const [result, summary, projectStats] = await Promise.all([
+      getPaginatedDrops(currentPage, pageSize, searchTerm),
+      skipSummary === 'true' ? Promise.resolve(null) : calculateSummary(filters),
+      getProjectStats(filters),
+    ]);
 
     log.info('DrPhotoUnifiedDropsAPI', `Fetched ${result.drops.length} drops`, {
       page: currentPage,

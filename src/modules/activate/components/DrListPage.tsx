@@ -80,7 +80,7 @@ export function DrListPage() {
   const [dateTo, setDateTo] = useState(() => getTodaySAST());
   const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'incomplete'>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true); // Default to visible
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -286,8 +286,10 @@ export function DrListPage() {
   useEffect(() => {
     // Only fetch if we have valid date filters (prevents empty initial call)
     if (dateFrom && dateTo) {
+      setCurrentPage(1); // Reset to page 1 on filter change
       fetchDrops(true, 1, getCurrentFilters());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, projectFilter, statusFilter]);
 
   // Apply all filters and update stats
@@ -373,13 +375,6 @@ export function DrListPage() {
     ));
   }, [drops, searchTerm, dateFrom, dateTo, statusFilter, projectFilter]);
 
-  // Re-fetch when FILTER values change
-  useEffect(() => {
-    // Fetch with new filters, reset to page 1
-    setCurrentPage(1);
-    fetchDrops(true, 1, getCurrentFilters());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, statusFilter, projectFilter]);
 
   // Handle DR selection
   const handleSelectDr = (dropNumber: string) => {
@@ -495,16 +490,10 @@ export function DrListPage() {
     return phone.replace(/^27/, '0'); // Convert 27727655403 to 0727655403
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading DRs...</p>
-        </div>
-      </div>
-    );
-  }
+  // Skeleton component for loading states
+  const Skeleton = ({ className }: { className?: string }) => (
+    <div className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className || ''}`} />
+  );
 
   if (error) {
     return (
@@ -753,29 +742,46 @@ export function DrListPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Drops</h3>
+              {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400" />}
             </div>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{dashboardStats.totalDrops}</p>
+            {isLoading ? (
+              <Skeleton className="h-9 w-20 mt-2" />
+            ) : (
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{dashboardStats.totalDrops}</p>
+            )}
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Incomplete</h3>
             </div>
-            <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-500 mt-2">{dashboardStats.incomplete}</p>
+            {isLoading ? (
+              <Skeleton className="h-9 w-16 mt-2" />
+            ) : (
+              <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-500 mt-2">{dashboardStats.incomplete}</p>
+            )}
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Complete</h3>
             </div>
-            <p className="text-3xl font-bold text-green-600 dark:text-green-500 mt-2">{dashboardStats.complete}</p>
+            {isLoading ? (
+              <Skeleton className="h-9 w-16 mt-2" />
+            ) : (
+              <p className="text-3xl font-bold text-green-600 dark:text-green-500 mt-2">{dashboardStats.complete}</p>
+            )}
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Feedback</h3>
             </div>
-            <p className="text-3xl font-bold text-blue-600 dark:text-blue-500 mt-2">{dashboardStats.totalFeedback}</p>
+            {isLoading ? (
+              <Skeleton className="h-9 w-12 mt-2" />
+            ) : (
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-500 mt-2">{dashboardStats.totalFeedback}</p>
+            )}
           </div>
         </div>
 
@@ -854,7 +860,17 @@ export function DrListPage() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {projectStats.length === 0 ? (
+                {isLoading ? (
+                  // Skeleton rows while loading
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={`skeleton-${i}`}>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-24" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-12" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-12" /></td>
+                      <td className="px-6 py-4"><Skeleton className="h-5 w-12" /></td>
+                    </tr>
+                  ))
+                ) : projectStats.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                       No data available for the selected filters.
@@ -937,7 +953,28 @@ export function DrListPage() {
           </div>
 
           {/* List Content */}
-          {filteredDrops.length === 0 ? (
+          {isLoading ? (
+            // Skeleton list while loading
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={`dr-skeleton-${i}`} className="px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Skeleton className="h-6 w-32" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-36" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredDrops.length === 0 ? (
             <div className="p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
                 <Search className="h-8 w-8 text-gray-400 dark:text-gray-500" />
