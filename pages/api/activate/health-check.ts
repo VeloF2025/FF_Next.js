@@ -9,6 +9,7 @@
  * - OneMap API (photo storage)
  * - VLM Server (Qwen3 for categorization)
  * - WhatsApp Bridge (via recent activity)
+ * - WhatsApp Sender (for Send Feedback feature)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -29,6 +30,7 @@ const pool = new Pool({
 // Service endpoints
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
+const WA_SENDER_URL = process.env.WA_SENDER_URL || 'http://100.96.203.105:8081';
 
 interface ServiceStatus {
   status: 'healthy' | 'degraded' | 'down' | 'unknown';
@@ -44,6 +46,7 @@ interface HealthCheckResponse {
     onemap: ServiceStatus;
     vlm: ServiceStatus;
     whatsappBridge: ServiceStatus;
+    whatsappSender: ServiceStatus;
   };
   recentActivity: {
     lastDRProcessed: string | null;
@@ -227,6 +230,47 @@ async function checkWhatsAppBridge(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check WhatsApp Sender API (for Send Feedback feature)
+ */
+async function checkWhatsAppSender(): Promise<ServiceStatus> {
+  const start = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(`${WA_SENDER_URL}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      const connected = data.connected === true;
+      return {
+        status: connected ? 'healthy' : 'degraded',
+        latencyMs: Date.now() - start,
+        message: connected ? 'WhatsApp Sender connected' : 'Sender not connected to WhatsApp',
+        lastCheck: new Date().toISOString(),
+      };
+    } else {
+      return {
+        status: 'degraded',
+        latencyMs: Date.now() - start,
+        message: `Sender returned ${response.status}`,
+        lastCheck: new Date().toISOString(),
+      };
+    }
+  } catch (error) {
+    return {
+      status: 'down',
+      latencyMs: Date.now() - start,
+      message: `Sender unreachable: ${error instanceof Error ? error.message : 'Unknown'}`,
+      lastCheck: new Date().toISOString(),
+    };
+  }
+}
+
+/**
  * Get recent activity stats
  */
 async function getRecentActivity() {
@@ -278,16 +322,17 @@ async function getRecentActivity() {
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {
     // Run all checks in parallel
-    const [database, onemap, vlm, whatsappBridge, recentActivity] = await Promise.all([
+    const [database, onemap, vlm, whatsappBridge, whatsappSender, recentActivity] = await Promise.all([
       checkDatabase(),
       checkOneMap(),
       checkVLM(),
       checkWhatsAppBridge(),
+      checkWhatsAppSender(),
       getRecentActivity(),
     ]);
 
     // Determine overall health
-    const statuses = [database.status, onemap.status, vlm.status, whatsappBridge.status];
+    const statuses = [database.status, onemap.status, vlm.status, whatsappBridge.status, whatsappSender.status];
     let overall: 'healthy' | 'degraded' | 'down';
 
     if (statuses.every((s) => s === 'healthy')) {
@@ -305,6 +350,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
         onemap,
         vlm,
         whatsappBridge,
+        whatsappSender,
       },
       recentActivity,
     };
