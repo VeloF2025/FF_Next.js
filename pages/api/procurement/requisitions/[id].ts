@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { PurchaseRequisition } from '@/types/procurement/requisition.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { createLoggedSql, logUpdate, logDelete } from '@/lib/db-logger';
+import { neon } from '@neondatabase/serverless';
+import { logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 
-const sql = createLoggedSql(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
 
 export default withErrorHandler(async (
   req: NextApiRequest,
@@ -22,7 +23,7 @@ export default withErrorHandler(async (
       const [requisition] = await sql`
         SELECT
           pr.*,
-          p.name as project_name
+          p.project_name as project_name
         FROM purchase_requisitions pr
         LEFT JOIN projects p ON pr.project_id = p.id
         WHERE pr.id = ${id}
