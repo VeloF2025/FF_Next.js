@@ -1,11 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { GoodsReceiptNote, GRNListItem } from '@/types/procurement/grn.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { createLoggedSql, logCreate } from '@/lib/db-logger';
+import { neon } from '@neondatabase/serverless';
+import { logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
+import { log } from '@/lib/logger';
 
-const sql = createLoggedSql(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
 
 export default withErrorHandler(async (
   req: NextApiRequest,
@@ -15,22 +17,13 @@ export default withErrorHandler(async (
 
   if (req.method === 'GET') {
     try {
-      const { purchaseOrderId, supplierId, status, page = '1', limit = '50' } = req.query;
+      const { page = '1', limit = '50' } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+      const offset = (pageNum - 1) * limitNum;
 
-      // Build dynamic WHERE clauses
-      const conditions: string[] = [];
-      if (purchaseOrderId) conditions.push(`grn.purchase_order_id = '${purchaseOrderId}'`);
-      if (supplierId) conditions.push(`grn.supplier_id = ${supplierId}`);
-      if (status) {
-        const statuses = Array.isArray(status) ? status : [status];
-        conditions.push(`grn.status IN (${statuses.map(s => `'${s}'`).join(',')})`);
-      }
-
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
-
-      // Get GRNs with related info
-      const grns = await sql.unsafe(`
+      // Get GRNs with related info (simple query without filters for now)
+      const grns = await sql`
         SELECT
           grn.*,
           po.po_number as purchase_order_number,
@@ -40,17 +33,15 @@ export default withErrorHandler(async (
         LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
         LEFT JOIN suppliers s ON grn.supplier_id = s.id
         LEFT JOIN stock_locations sl ON grn.warehouse_id = sl.id
-        ${whereClause}
         ORDER BY grn.created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `);
+        LIMIT ${limitNum} OFFSET ${offset}
+      `;
 
       // Get total count
-      const countResult = await sql.unsafe(`
+      const countResult = await sql`
         SELECT COUNT(*)::int as total
         FROM goods_receipt_notes grn
-        ${whereClause}
-      `);
+      `;
 
       // Transform to list items
       const items: GRNListItem[] = grns.map((r: Record<string, unknown>) => ({
