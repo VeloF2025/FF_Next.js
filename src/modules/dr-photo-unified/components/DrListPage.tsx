@@ -63,11 +63,19 @@ export function DrListPage() {
     totalFeedback: 0,
   });
 
-  // Filter states
+  // Helper to get today's date in SAST format
+  const getTodaySAST = () => {
+    const now = new Date();
+    const sastOffset = 2 * 60; // SAST is UTC+2
+    const sastTime = new Date(now.getTime() + (sastOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
+    return sastTime.toISOString().split('T')[0];
+  };
+
+  // Filter states - default to today's date
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState(''); // For debounced search
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(getTodaySAST);
+  const [dateTo, setDateTo] = useState(getTodaySAST);
   const [statusFilter, setStatusFilter] = useState<'all' | 'complete' | 'incomplete'>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -269,18 +277,8 @@ export function DrListPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Initial load - set "Today" filter by default
+  // Initial load - dates already initialized to today via useState
   useEffect(() => {
-    // Calculate today's date in SAST (same logic as handleQuickFilter)
-    const now = new Date();
-    const sastOffset = 2 * 60; // SAST is UTC+2
-    const sastTime = new Date(now.getTime() + (sastOffset * 60 * 1000) + (now.getTimezoneOffset() * 60 * 1000));
-    const todayStr = sastTime.toISOString().split('T')[0];
-
-    // Set "Today" as default filter
-    setDateFrom(todayStr);
-    setDateTo(todayStr);
-
     fetchDrops();
   }, []);
 
