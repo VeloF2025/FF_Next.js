@@ -7,6 +7,10 @@
 -- 1. Add Basic Auth columns to sage_api_config
 -- ============================================
 
+-- Add api_key column (SA Sage uses API Key, not client_id naming)
+ALTER TABLE sage_api_config
+ADD COLUMN IF NOT EXISTS api_key TEXT;
+
 -- Add username for Basic Auth
 ALTER TABLE sage_api_config
 ADD COLUMN IF NOT EXISTS username TEXT;
@@ -14,6 +18,10 @@ ADD COLUMN IF NOT EXISTS username TEXT;
 -- Add password for Basic Auth (encrypted at application layer)
 ALTER TABLE sage_api_config
 ADD COLUMN IF NOT EXISTS password TEXT;
+
+-- Add last_connection_error for tracking test failures
+ALTER TABLE sage_api_config
+ADD COLUMN IF NOT EXISTS last_connection_error TEXT;
 
 -- Add auth_type to distinguish between OAuth and Basic Auth
 ALTER TABLE sage_api_config
