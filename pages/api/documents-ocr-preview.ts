@@ -22,8 +22,13 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
+import sharp from 'sharp';
 import { log } from '@/lib/logger';
 import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '@/services/vfStorageAdapter';
+
+// Max image dimensions for VLM (to stay under token limit)
+const MAX_IMAGE_WIDTH = 1280;
+const MAX_IMAGE_HEIGHT = 960;
 
 // VLLM endpoint for Qwen3-VL
 const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
@@ -195,6 +200,51 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
 };
 
 /**
+ * Resize image to fit within VLM token limits
+ * Returns path to resized image (or original if no resize needed)
+ */
+async function resizeImageForVlm(imagePath: string): Promise<string> {
+  const inputBuffer = fs.readFileSync(imagePath);
+  const metadata = await sharp(inputBuffer).metadata();
+  const { width = 0, height = 0 } = metadata;
+
+  // Only resize if image is too large
+  if (width <= MAX_IMAGE_WIDTH && height <= MAX_IMAGE_HEIGHT) {
+    log.info('Image within limits, no resize needed', { width, height });
+    return imagePath;
+  }
+
+  log.info('Resizing large image for VLM OCR', {
+    originalWidth: width,
+    originalHeight: height,
+    targetMax: `${MAX_IMAGE_WIDTH}x${MAX_IMAGE_HEIGHT}`
+  });
+
+  // Create temp file for resized image
+  const tempDir = os.tmpdir();
+  const resizedPath = path.join(tempDir, `resized-${Date.now()}.jpg`);
+
+  // Resize maintaining aspect ratio
+  await sharp(inputBuffer)
+    .resize(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 90 })
+    .toFile(resizedPath);
+
+  const newMetadata = await sharp(fs.readFileSync(resizedPath)).metadata();
+  log.info('Image resized for OCR', {
+    newWidth: newMetadata.width,
+    newHeight: newMetadata.height,
+    originalSize: inputBuffer.length,
+    newSize: fs.statSync(resizedPath).size
+  });
+
+  return resizedPath;
+}
+
+/**
  * Convert PDF to PNG image using pdftoppm (from poppler-utils)
  * Returns the path to the converted image file
  */
@@ -340,6 +390,13 @@ export default async function handler(
         log.info('Converting PDF to image for OCR', { filename: uploadedFile.originalFilename });
         filePathForOcr = await convertPdfToImage(uploadedFile.filepath);
         tempFilePaths.push(uploadedFile.filepath); // Add original PDF for cleanup
+      }
+
+      // Resize image to fit VLM token limits (high-res photos can exceed limits)
+      const originalPath = filePathForOcr;
+      filePathForOcr = await resizeImageForVlm(filePathForOcr);
+      if (filePathForOcr !== originalPath) {
+        tempFilePaths.push(filePathForOcr); // Add resized image for cleanup
       }
 
       // Upload file (or converted image) and get URL for VLM
