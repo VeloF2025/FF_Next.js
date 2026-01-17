@@ -209,7 +209,10 @@ function generateMissingPhotosWarning(missingSteps: number[]): string {
  * Generate auto-feedback based on review results
  */
 function generateAutoFeedback(review: UnifiedReview): string {
-  const incorrectCount = review.incorrect_steps.length;
+  // Safely handle null arrays from database
+  const incorrectSteps = review.incorrect_steps || [];
+  const incorrectComments = review.incorrect_comments || {};
+  const incorrectCount = incorrectSteps.length;
   const aiPassed = review.ai_overall_status === 'PASS';
   const aiScore = review.ai_average_score || 0;
 
@@ -245,9 +248,9 @@ function generateAutoFeedback(review: UnifiedReview): string {
 
     message += `Please address the following:\n\n`;
 
-    review.incorrect_steps.forEach((stepStr) => {
+    incorrectSteps.forEach((stepStr) => {
       const step = parseInt(stepStr);
-      const comment = review.incorrect_comments[stepStr] || 'No comment provided';
+      const comment = incorrectComments[stepStr] || 'No comment provided';
       message += `*Step ${step}:* ${comment}\n`;
     });
 
