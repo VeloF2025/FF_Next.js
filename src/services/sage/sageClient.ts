@@ -1,9 +1,9 @@
 /**
- * Sage Business Cloud Accounting API Client
+ * Sage Business Cloud Accounting API Client (South Africa)
  *
- * OAuth 2.0 authenticated client for SageOne API v2.0.0 (South Africa)
- * Handles authentication, token refresh, and API requests.
+ * Basic Authentication + API Key client for SageOne API v2.0.0 (South Africa)
  *
+ * Authentication: Basic Auth (username:password) + API key query parameter
  * API Docs: https://accounting.sageone.co.za/api/2.0.0/
  * Base URL: https://accounting.sageone.co.za
  */
@@ -17,11 +17,24 @@ const logger = createLogger({ module: 'sageClient' });
 // ============================================================================
 
 export interface SageClientConfig {
-  clientId: string;
-  clientSecret: string;
+  apiKey: string;
+  username: string;
+  password: string;
   companyId: string;
   baseUrl?: string;
   apiVersion?: string;
+}
+
+// Legacy config interface for backwards compatibility
+export interface SageClientConfigLegacy {
+  clientId: string;      // Maps to apiKey
+  clientSecret: string;  // Not used in Basic Auth
+  companyId: string;
+  baseUrl?: string;
+  apiVersion?: string;
+  // Basic Auth credentials
+  username?: string;
+  password?: string;
 }
 
 export interface SageTokens {
@@ -227,162 +240,49 @@ export interface SageApiError {
 }
 
 // ============================================================================
-// Sage Client Class
+// Sage Client Class - Basic Auth
 // ============================================================================
 
 export class SageClient {
   private baseUrl: string;
   private apiVersion: string;
-  private clientId: string;
-  private clientSecret: string;
+  private apiKey: string;
+  private username: string;
+  private password: string;
   private companyId: string;
-  private tokens: SageTokens | null = null;
+  private authHeader: string;
 
   constructor(config: SageClientConfig) {
-    this.clientId = config.clientId;
-    this.clientSecret = config.clientSecret;
+    this.apiKey = config.apiKey;
+    this.username = config.username;
+    this.password = config.password;
     this.companyId = config.companyId;
     this.baseUrl = config.baseUrl || 'https://accounting.sageone.co.za';
     this.apiVersion = config.apiVersion || '2.0.0';
+
+    // Pre-compute Basic Auth header
+    const credentials = `${this.username}:${this.password}`;
+    this.authHeader = `Basic ${Buffer.from(credentials).toString('base64')}`;
   }
 
   // ==========================================================================
-  // Authentication
+  // Authentication (Basic Auth - no token refresh needed)
   // ==========================================================================
 
   /**
-   * Get OAuth authorization URL for user consent
-   */
-  getAuthorizationUrl(redirectUri: string, state?: string): string {
-    const params = new URLSearchParams({
-      client_id: this.clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'full_access',
-    });
-
-    if (state) {
-      params.append('state', state);
-    }
-
-    return `${this.baseUrl}/oauth/authorize?${params.toString()}`;
-  }
-
-  /**
-   * Exchange authorization code for tokens
-   */
-  async exchangeCodeForTokens(code: string, redirectUri: string): Promise<SageTokens> {
-    logger.info('Exchanging authorization code for tokens');
-
-    const response = await fetch(`${this.baseUrl}/oauth/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: redirectUri,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-      }).toString(),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('Token exchange failed', { status: response.status, error });
-      throw new Error(`Token exchange failed: ${error}`);
-    }
-
-    const data = await response.json();
-
-    this.tokens = {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresAt: new Date(Date.now() + data.expires_in * 1000),
-      tokenType: data.token_type || 'Bearer',
-    };
-
-    logger.info('Token exchange successful', { expiresAt: this.tokens.expiresAt });
-    return this.tokens;
-  }
-
-  /**
-   * Refresh access token using refresh token
-   */
-  async refreshAccessToken(): Promise<SageTokens> {
-    if (!this.tokens?.refreshToken) {
-      throw new Error('No refresh token available');
-    }
-
-    logger.info('Refreshing access token');
-
-    const response = await fetch(`${this.baseUrl}/oauth/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: this.tokens.refreshToken,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-      }).toString(),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error('Token refresh failed', { status: response.status, error });
-      throw new Error(`Token refresh failed: ${error}`);
-    }
-
-    const data = await response.json();
-
-    this.tokens = {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || this.tokens.refreshToken,
-      expiresAt: new Date(Date.now() + data.expires_in * 1000),
-      tokenType: data.token_type || 'Bearer',
-    };
-
-    logger.info('Token refresh successful', { expiresAt: this.tokens.expiresAt });
-    return this.tokens;
-  }
-
-  /**
-   * Set tokens directly (e.g., from database)
-   */
-  setTokens(tokens: SageTokens): void {
-    this.tokens = tokens;
-  }
-
-  /**
-   * Get current tokens
+   * Get tokens - returns null for Basic Auth (no tokens used)
+   * Kept for backwards compatibility
    */
   getTokens(): SageTokens | null {
-    return this.tokens;
+    return null;
   }
 
   /**
-   * Check if tokens need refresh (5 minute buffer)
+   * Set tokens - no-op for Basic Auth
+   * Kept for backwards compatibility
    */
-  private isTokenExpired(): boolean {
-    if (!this.tokens) return true;
-    const buffer = 5 * 60 * 1000; // 5 minutes
-    return new Date() >= new Date(this.tokens.expiresAt.getTime() - buffer);
-  }
-
-  /**
-   * Ensure we have valid tokens, refresh if needed
-   */
-  private async ensureValidToken(): Promise<void> {
-    if (!this.tokens) {
-      throw new Error('Not authenticated. Call exchangeCodeForTokens or setTokens first.');
-    }
-
-    if (this.isTokenExpired()) {
-      await this.refreshAccessToken();
-    }
+  setTokens(_tokens: SageTokens): void {
+    // No-op - Basic Auth doesn't use tokens
   }
 
   // ==========================================================================
@@ -390,28 +290,23 @@ export class SageClient {
   // ==========================================================================
 
   /**
-   * Make authenticated API request
+   * Make authenticated API request using Basic Auth + API Key
    */
   private async request<T>(
     method: string,
     endpoint: string,
-    body?: unknown,
-    retryOnAuth = true
+    body?: unknown
   ): Promise<T> {
-    await this.ensureValidToken();
-
-    const url = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
+    // Build URL with API key
+    const baseEndpoint = `${this.baseUrl}/api/${this.apiVersion}/${endpoint}`;
+    const separator = endpoint.includes('?') ? '&' : '?';
+    const url = `${baseEndpoint}${separator}apikey=${encodeURIComponent(this.apiKey)}`;
 
     const headers: Record<string, string> = {
-      'Authorization': `${this.tokens!.tokenType} ${this.tokens!.accessToken}`,
+      'Authorization': this.authHeader,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-
-    // Add company ID header if required
-    if (this.companyId) {
-      headers['X-Company-Id'] = this.companyId;
-    }
 
     logger.debug('Sage API request', { method, endpoint });
 
@@ -429,11 +324,10 @@ export class SageClient {
       throw new Error(`Rate limited. Retry after ${waitTime}ms`);
     }
 
-    // Handle auth errors with retry
-    if (response.status === 401 && retryOnAuth) {
-      logger.warn('Auth failed, attempting token refresh');
-      await this.refreshAccessToken();
-      return this.request<T>(method, endpoint, body, false);
+    // Handle auth errors
+    if (response.status === 401) {
+      logger.error('Sage authentication failed - check username/password/API key');
+      throw new Error('Authentication failed. Please verify your Sage credentials.');
     }
 
     if (!response.ok) {
@@ -568,11 +462,14 @@ export class SageClient {
     skip?: number;
     take?: number;
     filter?: string;
+    pageSize?: number;
+    fromDate?: string;
   }): Promise<SageApiResponse<SageSupplierPayment>> {
     const params = new URLSearchParams();
     if (options?.skip) params.append('$skip', String(options.skip));
-    if (options?.take) params.append('$top', String(options.take));
+    if (options?.take || options?.pageSize) params.append('$top', String(options.take || options.pageSize));
     if (options?.filter) params.append('$filter', options.filter);
+    if (options?.fromDate) params.append('$filter', `Date ge datetime'${options.fromDate}'`);
 
     const query = params.toString();
     const endpoint = `SupplierPayment/Get${query ? `?${query}` : ''}`;
@@ -680,14 +577,12 @@ export class SageClient {
    */
   async testConnection(): Promise<{ success: boolean; message: string; companyId?: string }> {
     try {
-      await this.ensureValidToken();
-
-      // Try to fetch company info or a simple endpoint
+      // Try to fetch suppliers to verify connection
       const suppliers = await this.getSuppliers({ take: 1 });
 
       return {
         success: true,
-        message: 'Connection successful',
+        message: `Connection successful. Found ${suppliers.TotalResults || 0} suppliers.`,
         companyId: this.companyId,
       };
     } catch (error) {
@@ -704,37 +599,39 @@ export class SageClient {
   /**
    * Get API info for debugging
    */
-  getApiInfo(): { baseUrl: string; apiVersion: string; companyId: string; hasTokens: boolean } {
+  getApiInfo(): { baseUrl: string; apiVersion: string; companyId: string; authType: string } {
     return {
       baseUrl: this.baseUrl,
       apiVersion: this.apiVersion,
       companyId: this.companyId,
-      hasTokens: !!this.tokens,
+      authType: 'Basic',
     };
   }
 }
 
 // ============================================================================
-// Factory Function
+// Factory Functions
 // ============================================================================
 
 /**
  * Create SageClient from environment variables
  */
 export function createSageClient(): SageClient {
-  const clientId = process.env.SAGE_CLIENT_ID;
-  const clientSecret = process.env.SAGE_CLIENT_SECRET;
+  const apiKey = process.env.SAGE_API_KEY || process.env.SAGE_CLIENT_ID;
+  const username = process.env.SAGE_USERNAME;
+  const password = process.env.SAGE_PASSWORD;
   const companyId = process.env.SAGE_COMPANY_ID;
 
-  if (!clientId || !clientSecret || !companyId) {
+  if (!apiKey || !username || !password || !companyId) {
     throw new Error(
-      'SAGE_CLIENT_ID, SAGE_CLIENT_SECRET, and SAGE_COMPANY_ID environment variables required'
+      'SAGE_API_KEY, SAGE_USERNAME, SAGE_PASSWORD, and SAGE_COMPANY_ID environment variables required'
     );
   }
 
   return new SageClient({
-    clientId,
-    clientSecret,
+    apiKey,
+    username,
+    password,
     companyId,
     baseUrl: process.env.SAGE_BASE_URL,
     apiVersion: process.env.SAGE_API_VERSION,
@@ -742,33 +639,36 @@ export function createSageClient(): SageClient {
 }
 
 /**
- * Create SageClient from database config
+ * Create SageClient from database config (Basic Auth)
  */
 export function createSageClientFromConfig(config: {
-  clientId: string;
-  clientSecret: string;
+  clientId?: string;  // Legacy - maps to apiKey
+  apiKey?: string;
+  clientSecret?: string;  // Unused in Basic Auth
+  username: string;
+  password: string;
   companyId: string;
   baseUrl?: string;
+  // Legacy OAuth fields - ignored
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: Date;
 }): SageClient {
-  const client = new SageClient({
-    clientId: config.clientId,
-    clientSecret: config.clientSecret,
+  const apiKey = config.apiKey || config.clientId;
+
+  if (!apiKey) {
+    throw new Error('API key (clientId or apiKey) is required');
+  }
+
+  if (!config.username || !config.password) {
+    throw new Error('Username and password are required for Basic Auth');
+  }
+
+  return new SageClient({
+    apiKey,
+    username: config.username,
+    password: config.password,
     companyId: config.companyId,
     baseUrl: config.baseUrl,
   });
-
-  // Set tokens if available
-  if (config.accessToken && config.refreshToken && config.expiresAt) {
-    client.setTokens({
-      accessToken: config.accessToken,
-      refreshToken: config.refreshToken,
-      expiresAt: config.expiresAt,
-      tokenType: 'Bearer',
-    });
-  }
-
-  return client;
 }

@@ -3,7 +3,9 @@
  *
  * POST - Test connection to Sage API with stored credentials
  *
- * Tests OAuth authentication and API access.
+ * South African Sage uses Basic Auth + API Key:
+ * - API Key as query parameter
+ * - Basic Auth header with username:password
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -34,6 +36,9 @@ export default async function handler(
         company_id,
         base_url,
         api_version,
+        auth_type,
+        username,
+        password,
         access_token,
         refresh_token,
         token_expires_at
@@ -47,8 +52,60 @@ export default async function handler(
     }
 
     const config = configResult[0];
+    const authType = config.auth_type || 'basic';
 
-    // Check if we have OAuth tokens
+    // For Basic Auth, check if we have username and password
+    if (authType === 'basic') {
+      if (!config.username || !config.password) {
+        return apiResponse.success(res, {
+          success: false,
+          message: 'Basic Auth credentials not complete. Please add username and password.',
+          needsCredentials: true,
+        });
+      }
+
+      if (!config.client_id) {
+        return apiResponse.success(res, {
+          success: false,
+          message: 'API Key (client_id) is required.',
+          needsCredentials: true,
+        });
+      }
+
+      // Create client with Basic Auth and test connection
+      const client = createSageClientFromConfig({
+        apiKey: config.client_id,
+        username: config.username,
+        password: config.password,
+        companyId: config.company_id,
+        baseUrl: config.base_url,
+      });
+
+      const testResult = await client.testConnection();
+
+      // Update connection status in database
+      await sql`
+        UPDATE sage_api_config
+        SET
+          is_connected = ${testResult.success},
+          last_connection_test_at = NOW(),
+          last_connection_error = ${testResult.success ? null : testResult.message},
+          updated_at = NOW()
+        WHERE id = ${config.id}
+      `;
+
+      logger.info('Sage Basic Auth connection test completed', { success: testResult.success });
+
+      return apiResponse.success(res, {
+        success: testResult.success,
+        message: testResult.message,
+        companyId: testResult.companyId,
+        authType: 'basic',
+        testedAt: new Date().toISOString(),
+      });
+    }
+
+    // OAuth flow (legacy/international)
     if (!config.access_token || !config.refresh_token) {
       return apiResponse.success(res, {
         success: false,
@@ -58,7 +115,7 @@ export default async function handler(
       });
     }
 
-    // Create client and test connection
+    // Create client with OAuth and test connection
     const client = createSageClientFromConfig({
       clientId: config.client_id,
       clientSecret: config.client_secret,
@@ -67,6 +124,8 @@ export default async function handler(
       accessToken: config.access_token,
       refreshToken: config.refresh_token,
       expiresAt: config.token_expires_at ? new Date(config.token_expires_at) : undefined,
+      username: '', // Not used for OAuth
+      password: '', // Not used for OAuth
     });
 
     const testResult = await client.testConnection();
@@ -82,27 +141,13 @@ export default async function handler(
       WHERE id = ${config.id}
     `;
 
-    // If token was refreshed, save new tokens
-    const tokens = client.getTokens();
-    if (tokens && tokens.accessToken !== config.access_token) {
-      await sql`
-        UPDATE sage_api_config
-        SET
-          access_token = ${tokens.accessToken},
-          refresh_token = ${tokens.refreshToken},
-          token_expires_at = ${tokens.expiresAt.toISOString()},
-          updated_at = NOW()
-        WHERE id = ${config.id}
-      `;
-      logger.info('Sage tokens refreshed and saved');
-    }
-
-    logger.info('Sage connection test completed', { success: testResult.success });
+    logger.info('Sage OAuth connection test completed', { success: testResult.success });
 
     return apiResponse.success(res, {
       success: testResult.success,
       message: testResult.message,
       companyId: testResult.companyId,
+      authType: 'oauth',
       testedAt: new Date().toISOString(),
     });
   } catch (error) {

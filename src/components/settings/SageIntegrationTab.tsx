@@ -2,10 +2,13 @@
  * Sage Integration Settings Tab
  *
  * Allows configuring Sage Business Cloud Accounting integration:
- * - Enter API credentials (Client ID, Client Secret, Company ID)
- * - Initiate OAuth authorization
- * - Test connection
+ * - Enter API credentials (API Key, Username, Password, Company ID)
+ * - Test connection using Basic Auth
  * - View sync status
+ *
+ * South African Sage API uses Basic Auth + API Key:
+ * - API Key as query parameter: ?apikey=xxx
+ * - Basic Auth header: Authorization: Basic base64(username:password)
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -14,12 +17,14 @@ import {
   Check,
   X,
   RefreshCw,
-  ExternalLink,
   Eye,
   EyeOff,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Key,
+  User,
+  Lock
 } from 'lucide-react';
 
 interface SageConfig {
@@ -31,6 +36,9 @@ interface SageConfig {
   is_connected: boolean;
   last_connection_test_at: string | null;
   last_sync_at: string | null;
+  auth_type: 'oauth' | 'basic';
+  username: string | null;
+  password_masked: string | null;
 }
 
 interface ConnectionTestResult {
@@ -38,8 +46,8 @@ interface ConnectionTestResult {
   message: string;
   companyId?: string;
   testedAt: string;
-  needsAuthorization?: boolean;
-  authorizationUrl?: string;
+  authType?: string;
+  needsCredentials?: boolean;
 }
 
 export function SageIntegrationTab() {
@@ -49,17 +57,15 @@ export function SageIntegrationTab() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<ConnectionTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showSecret, setShowSecret] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
-    clientId: '',
-    clientSecret: '',
+    clientId: '',      // API Key
     companyId: '',
+    username: '',      // Sage account email
+    password: '',      // Sage account password
     baseUrl: 'https://accounting.sageone.co.za',
-    redirectUri: typeof window !== 'undefined'
-      ? `${window.location.origin}/api/sage/oauth/callback`
-      : '',
   });
 
   const fetchConfig = useCallback(async () => {
@@ -74,8 +80,8 @@ export function SageIntegrationTab() {
           ...prev,
           clientId: data.data.config.client_id || '',
           companyId: data.data.config.company_id || '',
+          username: data.data.config.username || '',
           baseUrl: data.data.config.base_url || 'https://accounting.sageone.co.za',
-          redirectUri: data.data.config.redirect_uri || prev.redirectUri,
         }));
       }
     } catch (err) {
@@ -99,10 +105,11 @@ export function SageIntegrationTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           client_id: formData.clientId,
-          client_secret: formData.clientSecret || undefined,
           company_id: formData.companyId,
+          username: formData.username || undefined,
+          password: formData.password || undefined,
           base_url: formData.baseUrl,
-          redirect_uri: formData.redirectUri,
+          auth_type: 'basic',
         }),
       });
 
@@ -114,7 +121,7 @@ export function SageIntegrationTab() {
 
       // Refresh config
       await fetchConfig();
-      setFormData(prev => ({ ...prev, clientSecret: '' }));
+      setFormData(prev => ({ ...prev, password: '' }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -135,19 +142,13 @@ export function SageIntegrationTab() {
       const data = await response.json();
       setTestResult(data.data || data);
 
-      if (data.data?.needsAuthorization || data.needsAuthorization) {
-        // Need to authorize with Sage
-      }
+      // Refresh config to get updated connection status
+      await fetchConfig();
     } catch (err) {
       setError('Connection test failed');
     } finally {
       setTesting(false);
     }
-  };
-
-  const handleAuthorize = () => {
-    // Redirect to Sage OAuth
-    window.location.href = '/api/sage/oauth/authorize';
   };
 
   if (loading) {
@@ -186,7 +187,7 @@ export function SageIntegrationTab() {
             ) : config ? (
               <span className="flex items-center text-yellow-500 text-sm">
                 <AlertCircle className="w-4 h-4 mr-1" />
-                Not Authorized
+                Not Connected
               </span>
             ) : (
               <span className="flex items-center text-[var(--ff-text-tertiary)] text-sm">
@@ -233,29 +234,25 @@ export function SageIntegrationTab() {
         <div className={`rounded-lg p-4 flex items-start ${
           testResult.success
             ? 'bg-green-500/10 border border-green-500/30'
-            : testResult.needsAuthorization
+            : testResult.needsCredentials
               ? 'bg-yellow-500/10 border border-yellow-500/30'
               : 'bg-red-500/10 border border-red-500/30'
         }`}>
           {testResult.success ? (
             <CheckCircle2 className="w-5 h-5 text-green-500 mr-2 mt-0.5" />
-          ) : testResult.needsAuthorization ? (
+          ) : testResult.needsCredentials ? (
             <AlertCircle className="w-5 h-5 text-yellow-500 mr-2 mt-0.5" />
           ) : (
             <X className="w-5 h-5 text-red-500 mr-2 mt-0.5" />
           )}
           <div>
-            <p className={testResult.success ? 'text-green-400' : testResult.needsAuthorization ? 'text-yellow-400' : 'text-red-400'}>
+            <p className={testResult.success ? 'text-green-400' : testResult.needsCredentials ? 'text-yellow-400' : 'text-red-400'}>
               {testResult.message}
             </p>
-            {testResult.needsAuthorization && (
-              <button
-                onClick={handleAuthorize}
-                className="mt-2 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Authorize with Sage
-              </button>
+            {testResult.companyId && (
+              <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">
+                Company ID: {testResult.companyId}
+              </p>
             )}
           </div>
         </div>
@@ -264,64 +261,96 @@ export function SageIntegrationTab() {
       {/* Configuration Form */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border)]">
         <h4 className="text-md font-semibold text-[var(--ff-text-primary)] mb-4">
-          API Credentials
+          API Credentials (Basic Auth)
         </h4>
 
         <div className="space-y-4">
-          {/* Client ID */}
+          {/* API Key (Client ID) */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-              Client ID
+              <Key className="w-4 h-4 inline mr-1" />
+              API Key
             </label>
             <input
               type="text"
               value={formData.clientId}
               onChange={(e) => setFormData(prev => ({ ...prev, clientId: e.target.value }))}
-              placeholder="Enter your Sage Client ID"
+              placeholder="Enter your Sage API Key"
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
             />
-          </div>
-
-          {/* Client Secret */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-              Client Secret
-              {config?.client_secret_masked && (
-                <span className="ml-2 text-xs text-[var(--ff-text-tertiary)]">
-                  (Currently set: {config.client_secret_masked})
-                </span>
-              )}
-            </label>
-            <div className="relative">
-              <input
-                type={showSecret ? 'text' : 'password'}
-                value={formData.clientSecret}
-                onChange={(e) => setFormData(prev => ({ ...prev, clientSecret: e.target.value }))}
-                placeholder={config?.clientSecretMasked ? 'Leave blank to keep current' : 'Enter your Sage Client Secret'}
-                className="w-full px-3 py-2 pr-10 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
-              />
-              <button
-                type="button"
-                onClick={() => setShowSecret(!showSecret)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
-              >
-                {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+              From Sage Developer Portal - used as query parameter
+            </p>
           </div>
 
           {/* Company ID */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-              Company ID
+              Company ID (GUID)
             </label>
             <input
               type="text"
               value={formData.companyId}
               onChange={(e) => setFormData(prev => ({ ...prev, companyId: e.target.value }))}
-              placeholder="Enter your Sage Company ID"
+              placeholder="e.g., e2991403-d705-4013-b76d-6f45a75b133a"
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
             />
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[var(--ff-border)] pt-4 mt-4">
+            <p className="text-sm text-[var(--ff-text-tertiary)] mb-4">
+              Basic Authentication - Your Sage account credentials
+            </p>
+          </div>
+
+          {/* Username (Email) */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              <User className="w-4 h-4 inline mr-1" />
+              Username (Email)
+              {config?.username && (
+                <span className="ml-2 text-xs text-[var(--ff-text-tertiary)]">
+                  (Current: {config.username})
+                </span>
+              )}
+            </label>
+            <input
+              type="email"
+              value={formData.username}
+              onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+              placeholder="Enter your Sage account email"
+              className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
+            />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              <Lock className="w-4 h-4 inline mr-1" />
+              Password
+              {config?.password_masked && (
+                <span className="ml-2 text-xs text-[var(--ff-text-tertiary)]">
+                  (Currently set: {config.password_masked})
+                </span>
+              )}
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                placeholder={config?.password_masked ? 'Leave blank to keep current' : 'Enter your Sage account password'}
+                className="w-full px-3 py-2 pr-10 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           {/* Base URL */}
@@ -335,19 +364,6 @@ export function SageIntegrationTab() {
               onChange={(e) => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
               placeholder="https://accounting.sageone.co.za"
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
-            />
-          </div>
-
-          {/* Redirect URI (read-only) */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-              Redirect URI <span className="text-xs text-[var(--ff-text-tertiary)]">(for Sage developer portal)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.redirectUri}
-              readOnly
-              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border)] rounded-lg text-[var(--ff-text-tertiary)] cursor-not-allowed"
             />
           </div>
         </div>
@@ -391,32 +407,29 @@ export function SageIntegrationTab() {
               )}
             </button>
           </div>
-
-          {config && !config.is_connected && (
-            <button
-              onClick={handleAuthorize}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Authorize with Sage
-            </button>
-          )}
         </div>
       </div>
 
       {/* Help Section */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border)]">
         <h4 className="text-md font-semibold text-[var(--ff-text-primary)] mb-3">
-          Setup Instructions
+          Setup Instructions (South Africa)
         </h4>
         <ol className="list-decimal list-inside space-y-2 text-sm text-[var(--ff-text-secondary)]">
           <li>Register at the <a href="https://developer.sage.com/" target="_blank" rel="noopener noreferrer" className="text-[var(--ff-accent)] hover:underline">Sage Developer Portal</a></li>
           <li>Create a new application for Sage Business Cloud Accounting (South Africa)</li>
-          <li>Copy your Client ID and Client Secret</li>
-          <li>Set the Redirect URI in Sage to: <code className="bg-[var(--ff-bg-tertiary)] px-2 py-0.5 rounded text-xs">{formData.redirectUri}</code></li>
-          <li>Enter your credentials above and click &quot;Save Credentials&quot;</li>
-          <li>Click &quot;Authorize with Sage&quot; to complete the OAuth flow</li>
+          <li>Copy your <strong>API Key</strong> from the developer portal</li>
+          <li>Get your <strong>Company ID</strong> (GUID) from Sage Settings → Company Details</li>
+          <li>Enter your Sage account <strong>email and password</strong> for Basic Authentication</li>
+          <li>Click &quot;Save Credentials&quot; then &quot;Test Connection&quot;</li>
         </ol>
+
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <p className="text-sm text-blue-400">
+            <strong>Note:</strong> South African Sage API uses Basic Authentication (username/password)
+            combined with an API key, not OAuth 2.0.
+          </p>
+        </div>
       </div>
     </div>
   );
