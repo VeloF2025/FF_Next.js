@@ -4,6 +4,7 @@
  * GET - Handle OAuth callback from Sage
  *
  * Receives authorization code and exchanges it for tokens.
+ * Uses OAuth 2.0 Authorization Code Flow for South African Sage API.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -26,12 +27,12 @@ export default async function handler(
   // Handle OAuth errors from Sage
   if (error) {
     logger.error('OAuth error from Sage', { error, error_description });
-    return res.redirect(`/home?sage_error=${encodeURIComponent(String(error_description || error))}`);
+    return res.redirect(`/settings?tab=integrations&sage_error=${encodeURIComponent(String(error_description || error))}`);
   }
 
   if (!code || !state) {
     logger.error('Missing code or state in OAuth callback');
-    return res.redirect('/home?sage_error=Missing authorization code');
+    return res.redirect('/settings?tab=integrations&sage_error=Missing authorization code');
   }
 
   const sql = neon(process.env.DATABASE_URL!);
@@ -55,7 +56,7 @@ export default async function handler(
 
     if (configResult.length === 0) {
       logger.error('No Sage config found during OAuth callback');
-      return res.redirect('/home?sage_error=Configuration not found');
+      return res.redirect('/settings?tab=integrations&sage_error=Configuration not found');
     }
 
     const config = configResult[0];
@@ -66,24 +67,28 @@ export default async function handler(
         expected: config.oauth_state?.substring(0, 8) + '...',
         received: String(state).substring(0, 8) + '...',
       });
-      return res.redirect('/home?sage_error=Invalid state token');
+      return res.redirect('/settings?tab=integrations&sage_error=Invalid state token');
     }
 
     // Check if state has expired
     if (config.oauth_state_expires_at && new Date(config.oauth_state_expires_at) < new Date()) {
       logger.error('OAuth state has expired');
-      return res.redirect('/home?sage_error=Authorization expired. Please try again.');
+      return res.redirect('/settings?tab=integrations&sage_error=Authorization expired. Please try again.');
     }
+
+    // Determine redirect URI (must match the one used in authorization)
+    const redirectUri = config.redirect_uri ||
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app'}/api/sage/oauth/callback`;
 
     // Exchange code for tokens
     const client = new SageClient({
       clientId: config.client_id,
       clientSecret: config.client_secret,
-      companyId: config.company_id,
+      companyId: config.company_id || '',
       baseUrl: config.base_url,
     });
 
-    const tokens = await client.exchangeCodeForTokens(String(code), config.redirect_uri);
+    const tokens = await client.exchangeCodeForTokens(String(code), redirectUri);
 
     // Save tokens to database
     await sql`
@@ -96,6 +101,7 @@ export default async function handler(
         oauth_state = NULL,
         oauth_state_expires_at = NULL,
         last_token_refresh_at = NOW(),
+        auth_type = 'oauth',
         updated_at = NOW()
       WHERE id = ${config.id}
     `;
@@ -119,8 +125,8 @@ export default async function handler(
 
     logger.info('Sage OAuth completed successfully', { configId: config.id });
 
-    // Redirect to home page with success message
-    return res.redirect('/home?sage=connected');
+    // Redirect to settings page with success message
+    return res.redirect('/settings?tab=integrations&sage=connected');
   } catch (error) {
     logger.error('OAuth callback failed', { error });
 
@@ -147,6 +153,6 @@ export default async function handler(
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Authorization failed';
-    return res.redirect(`/home?sage_error=${encodeURIComponent(errorMessage)}`);
+    return res.redirect(`/settings?tab=integrations&sage_error=${encodeURIComponent(errorMessage)}`);
   }
 }

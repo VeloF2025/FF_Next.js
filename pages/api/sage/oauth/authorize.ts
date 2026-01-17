@@ -4,6 +4,7 @@
  * GET - Redirect to Sage OAuth authorization page
  *
  * Starts the OAuth flow by redirecting the user to Sage for consent.
+ * Uses OAuth 2.0 Authorization Code Flow for South African Sage API.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -46,8 +47,16 @@ export default async function handler(
 
     const config = configResult[0];
 
+    if (!config.client_id || !config.client_secret) {
+      return apiResponse.badRequest(res, 'Sage Client ID and Client Secret are required for OAuth.');
+    }
+
     // Generate state token for CSRF protection
     const state = randomBytes(32).toString('hex');
+
+    // Determine redirect URI
+    const redirectUri = config.redirect_uri ||
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app'}/api/sage/oauth/callback`;
 
     // Store state in database for verification
     await sql`
@@ -63,13 +72,16 @@ export default async function handler(
     const client = new SageClient({
       clientId: config.client_id,
       clientSecret: config.client_secret,
-      companyId: config.company_id,
+      companyId: config.company_id || '',
       baseUrl: config.base_url,
     });
 
-    const authUrl = client.getAuthorizationUrl(config.redirect_uri, state);
+    const authUrl = client.getAuthorizationUrl(redirectUri, state);
 
-    logger.info('Redirecting to Sage OAuth', { state: state.substring(0, 8) + '...' });
+    logger.info('Redirecting to Sage OAuth', {
+      state: state.substring(0, 8) + '...',
+      redirectUri,
+    });
 
     // Redirect to Sage authorization page
     res.redirect(302, authUrl);
