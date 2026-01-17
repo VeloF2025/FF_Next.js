@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
+import { AppLayout } from '@/components/layout';
 import BOQList from '../../../src/components/procurement/boq/BOQList';
 import type { BOQItem } from '../../../src/types/procurement/boq.types';
 
@@ -44,27 +45,29 @@ export default function BOQPage({ projectId, projectName, initialData = [] }: BO
 
 
   return (
-    <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Bill of Quantities</h1>
-          {projectName && (
-            <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
+    <AppLayout>
+      <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Bill of Quantities</h1>
+            {projectName && (
+              <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
+            )}
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-[var(--ff-text-secondary)]">Loading BOQs...</div>
+            </div>
+          ) : (
+            <BOQList
+              onCreateBOQ={handleCreateBOQ}
+              className="mt-6"
+            />
           )}
         </div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-[var(--ff-text-secondary)]">Loading BOQ data...</div>
-          </div>
-        ) : (
-          <BOQList
-            onCreateBOQ={handleCreateBOQ}
-            className="mt-6"
-          />
-        )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 

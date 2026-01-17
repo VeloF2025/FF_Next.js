@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
+import { AppLayout } from '@/components/layout';
 import RFQList from '../../../src/components/procurement/rfq/RFQList';
 
 interface RFQ {
@@ -62,30 +63,32 @@ export default function RFQPage({ projectId, projectName, initialData = [] }: RF
   };
 
   return (
-    <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Request for Quotations</h1>
-          {projectName && (
-            <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
+    <AppLayout>
+      <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Request for Quotations</h1>
+            {projectName && (
+              <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
+            )}
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-[var(--ff-text-secondary)]">Loading RFQs...</div>
+            </div>
+          ) : (
+            <RFQList
+              rfqs={rfqs}
+              onCreateRFQ={handleCreateRFQ}
+              onView={handleViewRFQ}
+              onEdit={handleEditRFQ}
+              className="mt-6"
+            />
           )}
         </div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="text-[var(--ff-text-secondary)]">Loading RFQ data...</div>
-          </div>
-        ) : (
-          <RFQList
-            rfqs={rfqs}
-            onCreateRFQ={handleCreateRFQ}
-            onView={handleViewRFQ}
-            onEdit={handleEditRFQ}
-            className="mt-6"
-          />
-        )}
       </div>
-    </div>
+    </AppLayout>
   );
 }
 
