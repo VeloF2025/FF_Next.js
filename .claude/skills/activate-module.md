@@ -9,19 +9,29 @@ Handle all Activate module operations:
 2. System health monitoring (5 services)
 3. WhatsApp acknowledgments and feedback
 4. OES import integration
-5. Troubleshooting and diagnostics
+5. **Reporting** - Daily counts, discrepancy, serial validation, user attribution
+6. Troubleshooting and diagnostics
 
 ## Quick Reference
 
 | Setting | Value |
 |---------|-------|
+| **Navigation** | Sidebar → FIELD OPERATIONS → Activate (first item, ✨ sparkles icon) |
 | **Dashboard URL** | `https://vf.fibreflow.app/activate` |
 | **Production URL** | `https://app.fibreflow.app/activate` |
 | **API Prefix** | `/api/activate/*` |
-| **Database Table** | `dr_photo_unified_reviews` |
+| **Database Tables** | `qa_photo_reviews`, `dr_photo_unified_reviews`, `oes_activations` |
 | **VLM Server** | `http://100.96.203.105:8100` (Qwen3) |
 | **WA Sender** | `http://100.96.203.105:8081` |
 | **Go Bridge** | `/home/louis/whatsapp-bridge-go/` |
+
+### Tab-Based UI
+| Tab | Purpose |
+|-----|---------|
+| **Dashboard** | DR list with filters, stats, project breakdown |
+| **Manual Entry** | Add DRs manually |
+| **OES Import** | Import OES Excel activation reports |
+| **Reports** | Daily counts, discrepancy, serial validation, user attribution |
 
 ## Slash Commands
 
@@ -282,6 +292,60 @@ Extract serial with: `/\(S\)([^(]+)/`
 | `/api/activate/process-new-dr` | POST | Validate & process new DR |
 | `/api/activate/admin/retry-failed` | POST | Retry failed categorizations |
 | `/api/activate/import-oes` | POST | Import OES Excel data |
+| `/api/activate/reporting/daily-counts` | GET | Daily DR counts with zone/PON breakdown |
+| `/api/activate/reporting/discrepancy` | GET | WhatsApp vs OES comparison |
+| `/api/activate/reporting/serial-validation` | GET | ONT/UPS serial matching |
+| `/api/activate/reporting/user-attribution` | GET | User/team performance metrics |
+
+## Reports Tab (4 Report Types)
+
+### 🚨 CRITICAL: Reporting Terminology
+
+**MUST use consistent terminology across ALL reports:**
+
+| Term | Definition | Database Logic | Color |
+|------|------------|----------------|-------|
+| **INSTALLED** | DR submitted via WhatsApp (installation was done) | Record exists in `qa_photo_reviews` | Blue (`text-blue-600`) |
+| **COMPLETE** | All required steps/photos verified by QA | `vlm_categorization_status = 'approved'` | Green (`text-green-600`) |
+| **INCOMPLETE** | Missing steps/photos OR not verified by QA | NOT complete (inverse) | Yellow (`text-yellow-600`) |
+| **ACTIVATED** | DR confirmed as active on OES report | Record exists in `oes_activations` | Purple (`text-purple-600`) |
+
+### Report Types
+
+#### 1. Daily Counts Report
+- **Purpose**: Zone/PON breakdown per project
+- **UI**: Expandable accordion (Project → Zone → PON)
+- **Metrics**: Installed/Complete/Incomplete/Activated per level
+- **API**: `GET /api/activate/reporting/daily-counts?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD`
+
+#### 2. Discrepancy Report
+- **Purpose**: Compare WhatsApp submissions vs OES activations
+- **Categories**:
+  - **Matched**: Present in both WhatsApp and OES
+  - **WA Only**: Submitted but not yet activated
+  - **OES Only**: In OES but not from WhatsApp (manual install?)
+- **API**: `GET /api/activate/reporting/discrepancy?waDate=YYYY-MM-DD`
+
+#### 3. Serial Validation Report
+- **Purpose**: ONT/UPS serial matching between WhatsApp and OES
+- **Status Values**: Match, Mismatch, Missing WA, Missing OES, Both Missing
+- **Critical**: Mismatches indicate wrong ONT installed
+- **API**: `GET /api/activate/reporting/serial-validation?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD`
+
+#### 4. User/Team Attribution Report
+- **Purpose**: Performance metrics per installer/team
+- **Per-user**: Installed, Complete, Completion %, Serial %, Activation %
+- **Per-team**: Total activations, WA match rate
+- **API**: `GET /api/activate/reporting/user-attribution?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD`
+
+### Reporting Components
+
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/components/reporting/ReportsTab.tsx` | Main reports container with sub-navigation |
+| `src/modules/activate/services/reportingService.ts` | Database queries for all reports |
+| `src/modules/activate/types/reporting.types.ts` | TypeScript interfaces |
+| `pages/api/activate/reporting/*.ts` | API endpoints |
 
 ## Database Schema
 
@@ -467,10 +531,17 @@ FROM dr_photo_unified_reviews;
 | `src/modules/activate/components/SystemHealthDashboard.tsx` | Health monitoring UI |
 | `src/modules/activate/components/OESImportTab.tsx` | OES import UI |
 | `src/modules/activate/components/ManualDREntry.tsx` | Manual DR addition |
+| `src/modules/activate/components/reporting/ReportsTab.tsx` | Reports tab with 4 report types |
+| `src/modules/activate/services/reportingService.ts` | Reporting database queries |
+| `src/modules/activate/types/reporting.types.ts` | Reporting TypeScript interfaces |
 | `pages/api/activate/health-check.ts` | Health check API |
 | `pages/api/activate/dr-acknowledgment.ts` | Acknowledgment data API |
 | `pages/api/activate/process-new-dr.ts` | DR validation & processing |
 | `pages/api/activate/import-oes.ts` | OES import API |
+| `pages/api/activate/reporting/daily-counts.ts` | Daily counts report API |
+| `pages/api/activate/reporting/discrepancy.ts` | Discrepancy report API |
+| `pages/api/activate/reporting/serial-validation.ts` | Serial validation API |
+| `pages/api/activate/reporting/user-attribution.ts` | User attribution API |
 
 ## WhatsApp Group Mapping
 
