@@ -443,44 +443,58 @@ function DrListPageContent() {
               </div>
             </div>
 
-            {/* Dashboard Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
+            {/* Dashboard Stats - Order: Total, Installed, Activated, Incomplete, Complete */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              {/* Total Drops */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Drops</h3>
-                  {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400" />}
+                  <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Total Drops</h3>
+                  {isLoading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400" />}
                 </div>
                 {isLoading ? (
-                  <Skeleton className="h-9 w-20 mt-2" />
+                  <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{dashboardStats.totalDrops}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{dashboardStats.totalDrops}</p>
                 )}
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Incomplete</h3>
+              {/* Installed - DRs from WhatsApp */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Installed</h3>
                 {isLoading ? (
-                  <Skeleton className="h-9 w-16 mt-2" />
+                  <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-500 mt-2">{dashboardStats.incomplete}</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{dashboardStats.installed}</p>
                 )}
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Complete</h3>
+              {/* Activated - DRs in OES report */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Activated</h3>
                 {isLoading ? (
-                  <Skeleton className="h-9 w-16 mt-2" />
+                  <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-500 mt-2">{dashboardStats.complete}</p>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">{dashboardStats.activated}</p>
                 )}
               </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Feedback</h3>
+              {/* Incomplete - Not yet QA reviewed */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Incomplete</h3>
                 {isLoading ? (
-                  <Skeleton className="h-9 w-12 mt-2" />
+                  <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-500 mt-2">{dashboardStats.totalFeedback}</p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500 mt-1">{dashboardStats.incomplete}</p>
+                )}
+              </div>
+
+              {/* Complete - QA reviewed complete */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Complete</h3>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16 mt-2" />
+                ) : (
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{dashboardStats.complete}</p>
                 )}
               </div>
             </div>
@@ -518,25 +532,29 @@ function DrListPageContent() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Project</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Complete</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Incomplete</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Project</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Installed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Activated</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wider">Incomplete</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wider">Complete</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <tr key={`skeleton-${i}`}>
-                          <td className="px-6 py-4"><Skeleton className="h-5 w-24" /></td>
-                          <td className="px-6 py-4"><Skeleton className="h-5 w-12" /></td>
-                          <td className="px-6 py-4"><Skeleton className="h-5 w-12" /></td>
-                          <td className="px-6 py-4"><Skeleton className="h-5 w-12" /></td>
+                          <td className="px-4 py-4"><Skeleton className="h-5 w-24" /></td>
+                          <td className="px-4 py-4"><Skeleton className="h-5 w-12" /></td>
+                          <td className="px-4 py-4"><Skeleton className="h-5 w-12" /></td>
+                          <td className="px-4 py-4"><Skeleton className="h-5 w-12" /></td>
+                          <td className="px-4 py-4"><Skeleton className="h-5 w-12" /></td>
+                          <td className="px-4 py-4"><Skeleton className="h-5 w-12" /></td>
                         </tr>
                       ))
                     ) : projectStats.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                           No data available for the selected filters.
                         </td>
                       </tr>
@@ -547,32 +565,46 @@ function DrListPageContent() {
                           : projectStats
                         ).map((stat) => (
                           <tr key={stat.project} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{stat.project}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{stat.total}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.complete}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.incomplete}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{stat.project}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{stat.total}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">{stat.installed ?? 0}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 dark:text-purple-400">{stat.activated ?? 0}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.incomplete}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.complete}</td>
                           </tr>
                         ))}
                         {/* Summary Row */}
                         <tr className="bg-gray-100 dark:bg-gray-900/80 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">Total</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">Total</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
                             ).reduce((sum, s) => sum + s.total, 0)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600 dark:text-blue-400">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
-                            ).reduce((sum, s) => sum + s.complete, 0)}
+                            ).reduce((sum, s) => sum + (s.installed ?? 0), 0)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-yellow-600 dark:text-yellow-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-purple-600 dark:text-purple-400">
+                            {(filters.projectFilter !== 'all'
+                              ? projectStats.filter(s => s.project === filters.projectFilter)
+                              : projectStats
+                            ).reduce((sum, s) => sum + (s.activated ?? 0), 0)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-yellow-600 dark:text-yellow-500">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
                             ).reduce((sum, s) => sum + s.incomplete, 0)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-500">
+                            {(filters.projectFilter !== 'all'
+                              ? projectStats.filter(s => s.project === filters.projectFilter)
+                              : projectStats
+                            ).reduce((sum, s) => sum + s.complete, 0)}
                           </td>
                         </tr>
                       </>

@@ -58,14 +58,26 @@ interface UnifiedDrop {
 interface ProjectStats {
   project: string;
   total: number;
+  installed: number;
+  activated: number;
   complete: number;
   incomplete: number;
 }
 
 interface Summary {
-  total_drops: number;
-  complete: number;
+  /** Total unique drops (counted once at first install) */
+  totalDrops: number;
+  /** Unique valid DRs from WhatsApp */
+  installed: number;
+  /** DRs present in OES activation report */
+  activated: number;
+  /** DRs not yet fully QA reviewed */
   incomplete: number;
+  /** DRs marked complete by HITL/AI */
+  complete: number;
+  /** DRs with feedback sent */
+  totalFeedback: number;
+  // Legacy fields for backward compatibility
   feedback_sent: number;
   vlm_pending: number;
   vlm_processing: number;
@@ -209,6 +221,13 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
 
 /**
  * Calculate summary statistics with optional filters
+ *
+ * Terminology:
+ * - totalDrops: Total unique drops (counted once at first install)
+ * - installed: Unique valid DRs from WhatsApp (qa_photo_reviews)
+ * - activated: DRs present in OES activation report (oes_activations)
+ * - incomplete: DRs not yet fully QA reviewed
+ * - complete: DRs marked complete by HITL/AI
  */
 async function calculateSummary(filters?: {
   dateFrom?: string;
@@ -216,30 +235,45 @@ async function calculateSummary(filters?: {
   project?: string;
   status?: string;
 }): Promise<Summary> {
-  const conditions: string[] = [];
-  const params: any[] = [];
-  let paramIndex = 1;
+  // Build date conditions for each table
+  const buildConditions = (dateCol: string, projectCol: string) => {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
-  if (filters?.dateFrom) {
-    // Use COALESCE to fall back to created_at if submitted_date is null
-    conditions.push(`COALESCE(submitted_date, created_at::DATE) >= $${paramIndex}::DATE`);
-    params.push(filters.dateFrom);
-    paramIndex++;
-  }
-  if (filters?.dateTo) {
-    conditions.push(`COALESCE(submitted_date, created_at::DATE) <= $${paramIndex}::DATE`);
-    params.push(filters.dateTo);
-    paramIndex++;
-  }
-  if (filters?.project && filters.project !== 'all') {
-    conditions.push(`project = $${paramIndex}`);
-    params.push(filters.project);
-    paramIndex++;
-  }
+    if (filters?.dateFrom) {
+      conditions.push(`${dateCol} >= $${paramIndex}::DATE`);
+      params.push(filters.dateFrom);
+      paramIndex++;
+    }
+    if (filters?.dateTo) {
+      conditions.push(`${dateCol} <= $${paramIndex}::DATE`);
+      params.push(filters.dateTo);
+      paramIndex++;
+    }
+    if (filters?.project && filters.project !== 'all') {
+      conditions.push(`${projectCol} = $${paramIndex}`);
+      params.push(filters.project);
+      paramIndex++;
+    }
+    return { conditions, params, whereClause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' };
+  };
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  // Conditions for dr_photo_unified_reviews
+  const unifiedCond = buildConditions(
+    'COALESCE(submitted_date, created_at::DATE)',
+    'project'
+  );
 
-  // For status filter, we need to adjust the counts
+  // Conditions for qa_photo_reviews (WhatsApp installed)
+  const qaCond = buildConditions(
+    'COALESCE(whatsapp_message_date, created_at)::DATE',
+    'project'
+  );
+
+  // Conditions for oes_activations
+  const oesCond = buildConditions('activation_date', 'project');
+
   const isCompleteCondition = `
     step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
     step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
@@ -247,7 +281,8 @@ async function calculateSummary(filters?: {
     step_10_signature
   `;
 
-  let query = `
+  // Query 1: Complete/Incomplete from dr_photo_unified_reviews
+  const unifiedQuery = `
     SELECT
       COUNT(*) as total_drops,
       COUNT(*) FILTER (WHERE ${isCompleteCondition}) as complete,
@@ -257,15 +292,38 @@ async function calculateSummary(filters?: {
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'categorized' OR vlm_categorization_status = 'approved') as vlm_categorized,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'failed') as vlm_failed
     FROM dr_photo_unified_reviews
-    ${whereClause}
+    ${unifiedCond.whereClause}
   `;
 
-  const result = await pool.query(query, params);
+  // Query 2: Installed count from qa_photo_reviews (unique DRs from WhatsApp)
+  const installedQuery = `
+    SELECT COUNT(DISTINCT drop_number) as installed
+    FROM qa_photo_reviews
+    ${qaCond.whereClause}
+  `;
 
-  const row = result.rows[0];
-  let total = parseInt(row.total_drops, 10);
-  let complete = parseInt(row.complete, 10);
+  // Query 3: Activated count from oes_activations
+  const activatedQuery = `
+    SELECT COUNT(DISTINCT drop_number) as activated
+    FROM oes_activations
+    ${oesCond.whereClause}
+  `;
+
+  // Run all queries in parallel
+  const [unifiedResult, installedResult, activatedResult] = await Promise.all([
+    pool.query(unifiedQuery, unifiedCond.params),
+    pool.query(installedQuery, qaCond.params),
+    pool.query(activatedQuery, oesCond.params),
+  ]);
+
+  const unifiedRow = unifiedResult.rows[0];
+  const installed = parseInt(installedResult.rows[0]?.installed || '0', 10);
+  const activated = parseInt(activatedResult.rows[0]?.activated || '0', 10);
+
+  let total = parseInt(unifiedRow.total_drops, 10);
+  let complete = parseInt(unifiedRow.complete, 10);
   let incomplete = total - complete;
+  const feedbackSent = parseInt(unifiedRow.feedback_sent, 10);
 
   // Apply status filter to the results
   if (filters?.status === 'complete') {
@@ -277,19 +335,30 @@ async function calculateSummary(filters?: {
   }
 
   return {
-    total_drops: total,
-    complete,
+    totalDrops: total,
+    installed,
+    activated,
     incomplete: filters?.status === 'complete' ? 0 : (filters?.status === 'incomplete' ? total : incomplete),
-    feedback_sent: parseInt(row.feedback_sent, 10),
-    vlm_pending: parseInt(row.vlm_pending, 10),
-    vlm_processing: parseInt(row.vlm_processing, 10),
-    vlm_categorized: parseInt(row.vlm_categorized, 10),
-    vlm_failed: parseInt(row.vlm_failed, 10),
+    complete,
+    totalFeedback: feedbackSent,
+    // Legacy fields
+    feedback_sent: feedbackSent,
+    vlm_pending: parseInt(unifiedRow.vlm_pending, 10),
+    vlm_processing: parseInt(unifiedRow.vlm_processing, 10),
+    vlm_categorized: parseInt(unifiedRow.vlm_categorized, 10),
+    vlm_failed: parseInt(unifiedRow.vlm_failed, 10),
   };
 }
 
 /**
  * Get project statistics with optional filtering
+ *
+ * Returns per-project stats including:
+ * - total: Total unique drops
+ * - installed: Unique DRs from WhatsApp
+ * - activated: DRs in OES report
+ * - complete: QA reviewed complete
+ * - incomplete: Not yet QA complete
  */
 async function getProjectStats(filters?: {
   dateFrom?: string;
@@ -297,28 +366,30 @@ async function getProjectStats(filters?: {
   project?: string;
   status?: string;
 }): Promise<ProjectStats[]> {
-  const conditions: string[] = [];
-  const params: any[] = [];
-  let paramIndex = 1;
+  // Build conditions for each table type
+  const buildConditions = (dateCol: string, projectCol: string) => {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
 
-  if (filters?.dateFrom) {
-    // Use COALESCE to fall back to created_at if submitted_date is null
-    conditions.push(`COALESCE(submitted_date, created_at::DATE) >= $${paramIndex}::DATE`);
-    params.push(filters.dateFrom);
-    paramIndex++;
-  }
-  if (filters?.dateTo) {
-    conditions.push(`COALESCE(submitted_date, created_at::DATE) <= $${paramIndex}::DATE`);
-    params.push(filters.dateTo);
-    paramIndex++;
-  }
-  if (filters?.project && filters.project !== 'all') {
-    conditions.push(`project = $${paramIndex}`);
-    params.push(filters.project);
-    paramIndex++;
-  }
+    if (filters?.dateFrom) {
+      conditions.push(`${dateCol} >= $${paramIndex}::DATE`);
+      params.push(filters.dateFrom);
+      paramIndex++;
+    }
+    if (filters?.dateTo) {
+      conditions.push(`${dateCol} <= $${paramIndex}::DATE`);
+      params.push(filters.dateTo);
+      paramIndex++;
+    }
+    if (filters?.project && filters.project !== 'all') {
+      conditions.push(`${projectCol} = $${paramIndex}`);
+      params.push(filters.project);
+      paramIndex++;
+    }
+    return { conditions, params, whereClause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' };
+  };
 
-  // Add status filter to the WHERE clause
   const isCompleteCondition = `
     step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
     step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
@@ -326,33 +397,119 @@ async function getProjectStats(filters?: {
     step_10_signature
   `;
 
-  if (filters?.status === 'complete') {
-    conditions.push(`(${isCompleteCondition})`);
-  } else if (filters?.status === 'incomplete') {
-    conditions.push(`NOT (${isCompleteCondition})`);
-  }
+  // Conditions for each table
+  const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
+  const qaCond = buildConditions('COALESCE(whatsapp_message_date, created_at)::DATE', 'project');
+  const oesCond = buildConditions('activation_date', 'project');
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  const query = `
+  // Query 1: Complete/Incomplete from dr_photo_unified_reviews grouped by project
+  const unifiedQuery = `
     SELECT
       COALESCE(project, 'Unknown') as project,
       COUNT(*) as total,
       COUNT(*) FILTER (WHERE ${isCompleteCondition}) as complete
     FROM dr_photo_unified_reviews
-    ${whereClause}
+    ${unifiedCond.whereClause}
     GROUP BY COALESCE(project, 'Unknown')
-    ORDER BY total DESC
   `;
 
-  const result = await pool.query(query, params);
+  // Query 2: Installed from qa_photo_reviews grouped by project
+  const installedQuery = `
+    SELECT
+      COALESCE(project, 'Unknown') as project,
+      COUNT(DISTINCT drop_number) as installed
+    FROM qa_photo_reviews
+    ${qaCond.whereClause}
+    GROUP BY COALESCE(project, 'Unknown')
+  `;
 
-  return result.rows.map((row: any) => ({
-    project: row.project,
-    total: parseInt(row.total, 10),
-    complete: parseInt(row.complete, 10),
-    incomplete: parseInt(row.total, 10) - parseInt(row.complete, 10),
-  }));
+  // Query 3: Activated from oes_activations grouped by project
+  // Note: oes_activations may not have project, so we join with qa_photo_reviews
+  const activatedQuery = `
+    SELECT
+      COALESCE(qpr.project, 'Unknown') as project,
+      COUNT(DISTINCT oes.drop_number) as activated
+    FROM oes_activations oes
+    LEFT JOIN qa_photo_reviews qpr ON qpr.drop_number = oes.drop_number
+    ${oesCond.whereClause.replace('activation_date', 'oes.activation_date').replace('project', 'qpr.project')}
+    GROUP BY COALESCE(qpr.project, 'Unknown')
+  `;
+
+  // Run all queries in parallel
+  const [unifiedResult, installedResult, activatedResult] = await Promise.all([
+    pool.query(unifiedQuery, unifiedCond.params),
+    pool.query(installedQuery, qaCond.params),
+    pool.query(activatedQuery, oesCond.params),
+  ]);
+
+  // Merge results by project
+  const projectMap = new Map<string, ProjectStats>();
+
+  // Initialize from unified results (total, complete, incomplete)
+  for (const row of unifiedResult.rows) {
+    const total = parseInt(row.total, 10);
+    const complete = parseInt(row.complete, 10);
+    projectMap.set(row.project, {
+      project: row.project,
+      total,
+      installed: 0,
+      activated: 0,
+      complete,
+      incomplete: total - complete,
+    });
+  }
+
+  // Add installed counts
+  for (const row of installedResult.rows) {
+    const existing = projectMap.get(row.project);
+    if (existing) {
+      existing.installed = parseInt(row.installed, 10);
+    } else {
+      projectMap.set(row.project, {
+        project: row.project,
+        total: 0,
+        installed: parseInt(row.installed, 10),
+        activated: 0,
+        complete: 0,
+        incomplete: 0,
+      });
+    }
+  }
+
+  // Add activated counts
+  for (const row of activatedResult.rows) {
+    const existing = projectMap.get(row.project);
+    if (existing) {
+      existing.activated = parseInt(row.activated, 10);
+    } else {
+      projectMap.set(row.project, {
+        project: row.project,
+        total: 0,
+        installed: 0,
+        activated: parseInt(row.activated, 10),
+        complete: 0,
+        incomplete: 0,
+      });
+    }
+  }
+
+  // Convert to array and sort by total descending
+  const stats = Array.from(projectMap.values());
+
+  // Apply status filter
+  if (filters?.status === 'complete') {
+    return stats
+      .filter((s) => s.complete > 0)
+      .map((s) => ({ ...s, total: s.complete, incomplete: 0 }))
+      .sort((a, b) => b.total - a.total);
+  } else if (filters?.status === 'incomplete') {
+    return stats
+      .filter((s) => s.incomplete > 0)
+      .map((s) => ({ ...s, total: s.incomplete, complete: 0 }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  return stats.sort((a, b) => b.total - a.total);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

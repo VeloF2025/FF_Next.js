@@ -444,20 +444,16 @@ function DailyCountsContent({
             Grand Total
           </span>
           <div className="flex gap-4 text-sm">
+            <span className="text-gray-600 dark:text-gray-400">
+              Total:{' '}
+              <span className="font-semibold">
+                {data.grand_total.total}
+              </span>
+            </span>
             <span className="text-blue-600 dark:text-blue-400">
               Installed:{' '}
               <span className="font-semibold">
                 {data.grand_total.installed}
-              </span>
-            </span>
-            <span className="text-green-600 dark:text-green-500">
-              Complete:{' '}
-              <span className="font-semibold">{data.grand_total.complete}</span>
-            </span>
-            <span className="text-yellow-600 dark:text-yellow-500">
-              Incomplete:{' '}
-              <span className="font-semibold">
-                {data.grand_total.incomplete}
               </span>
             </span>
             <span className="text-purple-600 dark:text-purple-400">
@@ -465,6 +461,16 @@ function DailyCountsContent({
               <span className="font-semibold">
                 {data.grand_total.activated}
               </span>
+            </span>
+            <span className="text-yellow-600 dark:text-yellow-500">
+              Incomplete:{' '}
+              <span className="font-semibold">
+                {data.grand_total.incomplete}
+              </span>
+            </span>
+            <span className="text-green-600 dark:text-green-500">
+              Complete:{' '}
+              <span className="font-semibold">{data.grand_total.complete}</span>
             </span>
           </div>
         </div>
@@ -518,22 +524,28 @@ function ProjectAccordion({
           </span>
         </div>
         <div className="flex gap-4 text-sm">
+          <span className="text-gray-600 dark:text-gray-400">
+            Total:{' '}
+            <span className="font-semibold">
+              {project.total}
+            </span>
+          </span>
           <span className="text-blue-600 dark:text-blue-400">
             Installed:{' '}
             <span className="font-semibold">
               {project.installed}
             </span>
           </span>
-          <span className="text-green-600 dark:text-green-500">
-            Complete: <span className="font-semibold">{project.complete}</span>
+          <span className="text-purple-600 dark:text-purple-400">
+            Activated:{' '}
+            <span className="font-semibold">{project.activated}</span>
           </span>
           <span className="text-yellow-600 dark:text-yellow-500">
             Incomplete:{' '}
             <span className="font-semibold">{project.incomplete}</span>
           </span>
-          <span className="text-purple-600 dark:text-purple-400">
-            Activated:{' '}
-            <span className="font-semibold">{project.activated}</span>
+          <span className="text-green-600 dark:text-green-500">
+            Complete: <span className="font-semibold">{project.complete}</span>
           </span>
         </div>
       </button>
@@ -591,20 +603,23 @@ function ZoneAccordion({
           </span>
         </div>
         <div className="flex gap-4 text-sm">
-          <span className="text-blue-600 dark:text-blue-400">
-            Installed:{' '}
+          <span className="text-gray-500 dark:text-gray-400">
+            Total:{' '}
             <span className="font-medium">
-              {zone.installed}
+              {zone.total}
             </span>
           </span>
-          <span className="text-green-600 dark:text-green-500">
-            Complete: {zone.complete}
+          <span className="text-blue-600 dark:text-blue-400">
+            Installed: {zone.installed}
+          </span>
+          <span className="text-purple-600 dark:text-purple-400">
+            Activated: {zone.activated}
           </span>
           <span className="text-yellow-600 dark:text-yellow-500">
             Incomplete: {zone.incomplete}
           </span>
-          <span className="text-purple-600 dark:text-purple-400">
-            Activated: {zone.activated}
+          <span className="text-green-600 dark:text-green-500">
+            Complete: {zone.complete}
           </span>
         </div>
       </button>
@@ -621,17 +636,20 @@ function ZoneAccordion({
                 {pon.pon_name}
               </span>
               <div className="flex gap-4 text-sm">
+                <span className="text-gray-500 dark:text-gray-400">
+                  {pon.total}
+                </span>
                 <span className="text-blue-600 dark:text-blue-400">
                   {pon.installed}
                 </span>
-                <span className="text-green-600 dark:text-green-500">
-                  {pon.complete}
+                <span className="text-purple-600 dark:text-purple-400">
+                  {pon.activated}
                 </span>
                 <span className="text-yellow-600 dark:text-yellow-500">
                   {pon.incomplete}
                 </span>
-                <span className="text-purple-600 dark:text-purple-400">
-                  {pon.activated}
+                <span className="text-green-600 dark:text-green-500">
+                  {pon.complete}
                 </span>
               </div>
             </div>

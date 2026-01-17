@@ -29,14 +29,16 @@ export interface PonBreakdown {
   pon_no: number;
   /** PON display name (e.g., "PON 1.1") */
   pon_name: string;
+  /** Total unique drops (counted once at first install/activation) */
+  total: number;
   /** DRs submitted via WhatsApp (installation done) */
   installed: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
   /** Confirmed active on OES report */
   activated: number;
+  /** Missing steps/photos OR not verified by QA */
+  incomplete: number;
+  /** All steps/photos submitted AND verified by QA */
+  complete: number;
 }
 
 /**
@@ -49,14 +51,16 @@ export interface ZoneBreakdown {
   zone_name: string;
   /** PON breakdowns within this zone */
   pons: PonBreakdown[];
+  /** Total unique drops (counted once at first install/activation) */
+  total: number;
   /** DRs submitted via WhatsApp (installation done) */
   installed: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
   /** Confirmed active on OES report */
   activated: number;
+  /** Missing steps/photos OR not verified by QA */
+  incomplete: number;
+  /** All steps/photos submitted AND verified by QA */
+  complete: number;
 }
 
 /**
@@ -67,14 +71,16 @@ export interface ProjectDailyCount {
   project: string;
   /** Date (YYYY-MM-DD) */
   date: string;
+  /** Total unique drops (counted once at first install/activation) */
+  total: number;
   /** DRs submitted via WhatsApp (installation done) */
   installed: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
   /** Confirmed active on OES report */
   activated: number;
+  /** Missing steps/photos OR not verified by QA */
+  incomplete: number;
+  /** All steps/photos submitted AND verified by QA */
+  complete: number;
   /** Zone breakdowns (expanded when clicked) */
   zones: ZoneBreakdown[];
 }
@@ -92,14 +98,16 @@ export interface DailyCountsResponse {
   projects: ProjectDailyCount[];
   /** Grand total across all projects */
   grand_total: {
+    /** Total unique drops (counted once at first install/activation) */
+    total: number;
     /** DRs submitted via WhatsApp (installation done) */
     installed: number;
-    /** All steps/photos submitted AND verified by QA */
-    complete: number;
-    /** Missing steps/photos OR not verified by QA */
-    incomplete: number;
     /** Confirmed active on OES report */
     activated: number;
+    /** Missing steps/photos OR not verified by QA */
+    incomplete: number;
+    /** All steps/photos submitted AND verified by QA */
+    complete: number;
   };
 }
 

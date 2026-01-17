@@ -126,24 +126,26 @@ export async function getDailyCountsWithBreakdown(
         projectMap.set(projectName, {
           project: projectName,
           date: dateFrom === dateTo ? dateFrom : `${dateFrom} to ${dateTo}`,
+          total: 0,
           installed: 0,
-          complete: 0,
-          incomplete: 0,
           activated: 0,
+          incomplete: 0,
+          complete: 0,
           zones: [],
         });
       }
       const projectData = projectMap.get(projectName)!;
 
       // Update project totals
+      projectData.total++;
       projectData.installed++;
+      if (isActivated) {
+        projectData.activated++;
+      }
       if (isComplete) {
         projectData.complete++;
       } else {
         projectData.incomplete++;
-      }
-      if (isActivated) {
-        projectData.activated++;
       }
 
       // Find or create zone
@@ -153,23 +155,25 @@ export async function getDailyCountsWithBreakdown(
           zone_no: zoneNo,
           zone_name: zoneNo === 0 ? 'Unknown Zone' : `Zone ${zoneNo}`,
           pons: [],
+          total: 0,
           installed: 0,
-          complete: 0,
-          incomplete: 0,
           activated: 0,
+          incomplete: 0,
+          complete: 0,
         };
         projectData.zones.push(zone);
       }
 
       // Update zone totals
+      zone.total++;
       zone.installed++;
+      if (isActivated) {
+        zone.activated++;
+      }
       if (isComplete) {
         zone.complete++;
       } else {
         zone.incomplete++;
-      }
-      if (isActivated) {
-        zone.activated++;
       }
 
       // Find or create PON
@@ -178,23 +182,25 @@ export async function getDailyCountsWithBreakdown(
         pon = {
           pon_no: ponNo,
           pon_name: ponNo === 0 ? 'Unknown PON' : `PON ${zoneNo}.${ponNo}`,
+          total: 0,
           installed: 0,
-          complete: 0,
-          incomplete: 0,
           activated: 0,
+          incomplete: 0,
+          complete: 0,
         };
         zone.pons.push(pon);
       }
 
       // Update PON totals
+      pon.total++;
       pon.installed++;
+      if (isActivated) {
+        pon.activated++;
+      }
       if (isComplete) {
         pon.complete++;
       } else {
         pon.incomplete++;
-      }
-      if (isActivated) {
-        pon.activated++;
       }
     }
 
@@ -210,12 +216,13 @@ export async function getDailyCountsWithBreakdown(
     const projects = Array.from(projectMap.values());
     const grandTotal = projects.reduce(
       (acc, p) => ({
+        total: acc.total + p.total,
         installed: acc.installed + p.installed,
-        complete: acc.complete + p.complete,
-        incomplete: acc.incomplete + p.incomplete,
         activated: acc.activated + p.activated,
+        incomplete: acc.incomplete + p.incomplete,
+        complete: acc.complete + p.complete,
       }),
-      { installed: 0, complete: 0, incomplete: 0, activated: 0 }
+      { total: 0, installed: 0, activated: 0, incomplete: 0, complete: 0 }
     );
 
     return {

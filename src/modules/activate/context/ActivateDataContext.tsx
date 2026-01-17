@@ -95,6 +95,8 @@ const defaultFilters: ActivateFilters = {
 
 const defaultDashboardStats: DashboardStats = {
   totalDrops: 0,
+  installed: 0,
+  activated: 0,
   incomplete: 0,
   complete: 0,
   totalFeedback: 0,
@@ -183,6 +185,8 @@ export function ActivateDataProvider({
         setDrops(response.data);
         setDashboardStats({
           totalDrops: response.summary.totalDrops,
+          installed: response.summary.installed ?? 0,
+          activated: response.summary.activated ?? 0,
           incomplete: response.summary.incomplete,
           complete: response.summary.complete,
           totalFeedback: response.summary.totalFeedback,

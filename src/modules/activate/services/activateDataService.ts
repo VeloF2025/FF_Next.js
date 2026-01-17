@@ -31,25 +31,42 @@ export interface DrListItem {
 }
 
 export interface DashboardStats {
+  /** Total unique drops (counted once at first install/activation) */
   totalDrops: number;
+  /** Unique valid DRs from WhatsApp in active projects */
+  installed: number;
+  /** DRs present in OES activation report (1-day lag) */
+  activated: number;
+  /** DRs not yet fully QA reviewed */
   incomplete: number;
+  /** DRs marked complete by HITL or AI */
   complete: number;
+  /** DRs with feedback sent (legacy) */
   totalFeedback: number;
 }
 
 export interface ProjectStat {
   project: string;
+  /** Total unique drops for this project */
   total: number;
-  complete: number;
+  /** Unique valid DRs from WhatsApp */
+  installed: number;
+  /** DRs in OES activation report */
+  activated: number;
+  /** Not yet QA reviewed */
   incomplete: number;
+  /** Marked complete by HITL/AI */
+  complete: number;
 }
 
 export interface DailyStat {
   project: string;
   date: string;
   total: number;
-  complete: number;
+  installed: number;
+  activated: number;
   incomplete: number;
+  complete: number;
 }
 
 export interface PaginationInfo {
