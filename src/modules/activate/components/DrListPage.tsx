@@ -9,12 +9,13 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, Calendar, Download, Filter, X, LayoutDashboard, PlusCircle, FileSpreadsheet } from 'lucide-react';
+import { Search, RefreshCw, Calendar, Download, Filter, X, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3 } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
+import { ReportsTab } from './reporting/ReportsTab';
 
-type TabType = 'list' | 'manual-entry' | 'oes-import';
+type TabType = 'list' | 'manual-entry' | 'oes-import' | 'reports';
 
 interface DrListItem {
   id: string;
@@ -600,6 +601,17 @@ export function DrListPage() {
               <FileSpreadsheet className="h-4 w-4" />
               OES Import
             </button>
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+                activeTab === 'reports'
+                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Reports
+            </button>
           </div>
         </div>
 
@@ -620,6 +632,11 @@ export function DrListPage() {
               fetchDrops(true, 1, getCurrentFilters());
             }} />
           </div>
+        )}
+
+        {/* Reports Tab Content */}
+        {activeTab === 'reports' && (
+          <ReportsTab />
         )}
 
         {/* List Tab Content */}
