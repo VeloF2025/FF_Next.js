@@ -74,6 +74,7 @@ export async function getDailyCountsWithBreakdown(
     });
 
     // Query to get all DRs with their zone/pon data and completion status
+    // NOTE: Completion is based on photo_count >= 10 (step booleans aren't being populated)
     const result = await pool.query(
       `
       SELECT
@@ -81,18 +82,9 @@ export async function getDailyCountsWithBreakdown(
         qpr.project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
+        COALESCE(upr.photo_count, 0) as photo_count,
         CASE
-          WHEN upr.step_01_house_photo IS TRUE
-            AND upr.step_02_cable_from_pole IS TRUE
-            AND upr.step_03_entry_outside IS TRUE
-            AND upr.step_04_entry_inside IS TRUE
-            AND upr.step_05_wall IS TRUE
-            AND upr.step_06_ont_back IS TRUE
-            AND upr.step_07_power_meter IS TRUE
-            AND upr.step_08_final_installation IS TRUE
-            AND upr.step_09_green_lights IS TRUE
-            AND upr.step_10_signature IS TRUE
-          THEN true
+          WHEN COALESCE(upr.photo_count, 0) >= 10 THEN true
           ELSE false
         END as is_complete
       FROM qa_photo_reviews qpr
@@ -451,6 +443,7 @@ export async function getUserTeamAttributionReport(
     });
 
     // Query for user performance
+    // NOTE: Completion is based on photo_count >= 10 (step booleans aren't being populated)
     const userResult = await pool.query(
       `
       SELECT
@@ -458,18 +451,7 @@ export async function getUserTeamAttributionReport(
         qpr.sender_phone,
         qpr.project,
         COUNT(*) as total_submissions,
-        COUNT(*) FILTER (WHERE
-          upr.step_01_house_photo IS TRUE
-          AND upr.step_02_cable_from_pole IS TRUE
-          AND upr.step_03_entry_outside IS TRUE
-          AND upr.step_04_entry_inside IS TRUE
-          AND upr.step_05_wall IS TRUE
-          AND upr.step_06_ont_back IS TRUE
-          AND upr.step_07_power_meter IS TRUE
-          AND upr.step_08_final_installation IS TRUE
-          AND upr.step_09_green_lights IS TRUE
-          AND upr.step_10_signature IS TRUE
-        ) as complete,
+        COUNT(*) FILTER (WHERE COALESCE(upr.photo_count, 0) >= 10) as complete,
         COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as ont_scanned,
         COUNT(*) FILTER (WHERE upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned != '') as ups_scanned,
         COUNT(*) FILTER (WHERE oes.drop_number IS NOT NULL) as oes_matched
