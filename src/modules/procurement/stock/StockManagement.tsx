@@ -4,8 +4,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { 
+import { useRouter } from 'next/router';
+import {
   Package,
   TrendingUp,
   AlertTriangle,
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 // import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/Tabs';
-import type { ProcurementPortalContext } from '@/types/procurement/portal.types';
+import type { StockItem } from '@/types/procurement/stock.types';
 import { log } from '@/lib/logger';
 
 // Component imports - TODO: Implement these components
@@ -36,13 +36,18 @@ interface StockMetrics {
   warehouseUtilization: number;
 }
 
-export default function StockManagement() {
-  const [searchParams] = useSearchParams();
-  const portalContext = useOutletContext<ProcurementPortalContext>();
-  const { selectedProject, permissions } = portalContext || {};
+interface StockManagementProps {
+  projectId?: string;
+  projectName?: string;
+  stockItems?: StockItem[];
+}
+
+export default function StockManagement({ projectId, projectName, stockItems = [] }: StockManagementProps) {
+  const router = useRouter();
+  const { tab } = router.query;
 
   // State
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || 'dashboard');
+  const [activeTab, setActiveTab] = useState<string>((tab as string) || 'dashboard');
   const [, setIsLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<StockMetrics>({
@@ -58,16 +63,14 @@ export default function StockManagement() {
 
   // Load stock metrics
   useEffect(() => {
-    if (!selectedProject) return;
-
     const loadMetrics = async () => {
       try {
         setIsLoading(true);
-        
+
         // TODO: Replace with actual API call
-        // Mock data for now
+        // Mock data for now - use stockItems if available
         const mockMetrics: StockMetrics = {
-          totalItems: 147,
+          totalItems: stockItems.length || 147,
           totalValue: 2847593.45,
           lowStockItems: 8,
           outOfStockItems: 3,
@@ -79,7 +82,7 @@ export default function StockManagement() {
 
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         setMetrics(mockMetrics);
         setError(null);
       } catch (err) {
@@ -91,7 +94,7 @@ export default function StockManagement() {
     };
 
     loadMetrics();
-  }, [selectedProject]);
+  }, [projectId, stockItems]);
 
 
   // Refresh data
@@ -100,39 +103,19 @@ export default function StockManagement() {
     window.dispatchEvent(new CustomEvent('stockDataRefresh'));
   };
 
-  if (!selectedProject) {
-    return (
-      <div className="p-6">
-        <div className="text-center py-12">
-          <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Project</h3>
-          <p className="text-gray-500">Choose a project to access stock management features.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!permissions?.canAccessStock) {
-    return (
-      <div className="p-6">
-        <div className="text-center py-12">
-          <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
-          <p className="text-gray-500">You don't have permission to access stock management features.</p>
-        </div>
-      </div>
-    );
-  }
+  // Note: Permission checks are now handled at the page level
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Comprehensive inventory control for {selectedProject.name}
-          </p>
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Stock Management</h1>
+          {projectName && (
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+              Comprehensive inventory control for {projectName}
+            </p>
+          )}
         </div>
         
         <div className="flex items-center gap-3">

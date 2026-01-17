@@ -90,6 +90,7 @@ export default function StockPage({ projectId, projectName, initialData = [] }: 
           ) : (
             <StockManagement
               projectId={projectId}
+              projectName={projectName}
               stockItems={stockItems}
             />
           )}
