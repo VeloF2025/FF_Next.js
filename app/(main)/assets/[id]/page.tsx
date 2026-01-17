@@ -89,7 +89,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
       {/* Header */}
       <div className="mb-6">
         <Link
-          href="/inventory/list"
+          href="/assets/list"
           className="inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
@@ -110,7 +110,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
 
           <div className="flex space-x-3">
             <Link
-              href={`/inventory/${id}/edit`}
+              href={`/assets/${id}/edit`}
               className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             >
               <Edit className="h-4 w-4 mr-2" />
@@ -118,7 +118,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
             </Link>
             {asset.status === 'available' && (
               <Link
-                href={`/inventory/checkout?assetId=${id}`}
+                href={`/assets/checkout?assetId=${id}`}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Check Out

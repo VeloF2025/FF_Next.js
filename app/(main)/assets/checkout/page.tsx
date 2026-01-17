@@ -71,7 +71,7 @@ export default async function CheckoutPage({ searchParams }: PageProps) {
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/inventory/list"
+          href="/assets/list"
           className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />

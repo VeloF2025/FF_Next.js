@@ -83,7 +83,7 @@ export function AssetFormClient({ categories }: AssetFormClientProps) {
         throw new Error(data.error || 'Failed to create asset');
       }
 
-      router.push(`/inventory/${data.data.id}`);
+      router.push(`/assets/${data.data.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

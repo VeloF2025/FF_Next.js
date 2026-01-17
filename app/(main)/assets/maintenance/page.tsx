@@ -90,7 +90,7 @@ export default async function MaintenancePage() {
           <p className="text-gray-600 dark:text-gray-400">Track and manage asset maintenance</p>
         </div>
         <Link
-          href="/inventory/maintenance/new"
+          href="/assets/maintenance/new"
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="h-5 w-5 mr-2" />
@@ -130,7 +130,7 @@ export default async function MaintenancePage() {
               overdue.map((record) => (
                 <Link
                   key={record.id}
-                  href={`/inventory/${record.assetId}`}
+                  href={`/assets/${record.assetId}`}
                   className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   <div className="flex items-start justify-between">
@@ -173,7 +173,7 @@ export default async function MaintenancePage() {
               upcoming.map((record) => (
                 <Link
                   key={record.id}
-                  href={`/inventory/${record.assetId}`}
+                  href={`/assets/${record.assetId}`}
                   className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   <div className="flex items-start justify-between">

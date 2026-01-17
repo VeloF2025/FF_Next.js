@@ -78,7 +78,7 @@ export default async function AssetDashboardPage() {
           <p className="text-gray-600 dark:text-gray-400">Overview of company assets</p>
         </div>
         <Link
-          href="/inventory/new"
+          href="/assets/new"
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm"
         >
           <Plus className="h-5 w-5 mr-2" />
@@ -93,28 +93,28 @@ export default async function AssetDashboardPage() {
           value={stats?.assets?.totalAssets || 0}
           icon={Package}
           color="border-blue-500"
-          href="/inventory/list"
+          href="/assets/list"
         />
         <StatCard
           title="Available"
           value={stats?.assets?.availableAssets || 0}
           icon={CheckCircle}
           color="border-green-500"
-          href="/inventory/list?status=available"
+          href="/assets/list?status=available"
         />
         <StatCard
           title="Assigned"
           value={stats?.assets?.assignedAssets || 0}
           icon={Package}
           color="border-yellow-500"
-          href="/inventory/list?status=assigned"
+          href="/assets/list?status=assigned"
         />
         <StatCard
           title="In Maintenance"
           value={stats?.assets?.inMaintenanceAssets || 0}
           icon={Wrench}
           color="border-orange-500"
-          href="/inventory/maintenance"
+          href="/assets/maintenance"
         />
       </div>
 
@@ -140,7 +140,7 @@ export default async function AssetDashboardPage() {
             </div>
           </div>
           <Link
-            href="/inventory/calibration"
+            href="/assets/calibration"
             className="mt-4 inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             View calibration schedule <ArrowRight className="ml-1 h-4 w-4" />
@@ -173,7 +173,7 @@ export default async function AssetDashboardPage() {
             </div>
           </div>
           <Link
-            href="/inventory/maintenance"
+            href="/assets/maintenance"
             className="mt-4 inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             View maintenance schedule <ArrowRight className="ml-1 h-4 w-4" />
@@ -186,28 +186,28 @@ export default async function AssetDashboardPage() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Link
-            href="/inventory/checkout"
+            href="/assets/checkout"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-center transition-colors"
           >
             <Package className="h-8 w-8 mx-auto text-blue-500 mb-2" />
             <span className="text-sm font-medium text-gray-900 dark:text-white">Check Out Asset</span>
           </Link>
           <Link
-            href="/inventory/checkout?mode=checkin"
+            href="/assets/checkout?mode=checkin"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-center transition-colors"
           >
             <CheckCircle className="h-8 w-8 mx-auto text-green-500 mb-2" />
             <span className="text-sm font-medium text-gray-900 dark:text-white">Check In Asset</span>
           </Link>
           <Link
-            href="/inventory/maintenance"
+            href="/assets/maintenance"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-center transition-colors"
           >
             <Wrench className="h-8 w-8 mx-auto text-orange-500 mb-2" />
             <span className="text-sm font-medium text-gray-900 dark:text-white">Schedule Maintenance</span>
           </Link>
           <Link
-            href="/inventory/new"
+            href="/assets/new"
             className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-center transition-colors"
           >
             <Plus className="h-8 w-8 mx-auto text-purple-500 mb-2" />

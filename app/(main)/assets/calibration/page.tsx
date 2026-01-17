@@ -110,7 +110,7 @@ export default async function CalibrationPage() {
           <p className="text-gray-600 dark:text-gray-400">Monitor and schedule equipment calibrations</p>
         </div>
         <Link
-          href="/inventory/maintenance/new?type=calibration"
+          href="/assets/maintenance/new?type=calibration"
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="h-5 w-5 mr-2" />
@@ -205,7 +205,7 @@ export default async function CalibrationPage() {
                   {overdue.map((asset) => (
                     <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
-                        <Link href={`/inventory/${asset.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+                        <Link href={`/assets/${asset.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
                           <p className="font-medium text-gray-900 dark:text-white">{asset.name}</p>
                           <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{asset.assetNumber}</p>
                         </Link>
@@ -232,7 +232,7 @@ export default async function CalibrationPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/inventory/maintenance/new?assetId=${asset.id}&type=calibration`}
+                          href={`/assets/maintenance/new?assetId=${asset.id}&type=calibration`}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
                         >
                           Schedule
@@ -271,7 +271,7 @@ export default async function CalibrationPage() {
                   {dueSoon.map((asset) => (
                     <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
-                        <Link href={`/inventory/${asset.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+                        <Link href={`/assets/${asset.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
                           <p className="font-medium text-gray-900 dark:text-white">{asset.name}</p>
                           <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{asset.assetNumber}</p>
                         </Link>
@@ -296,7 +296,7 @@ export default async function CalibrationPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <Link
-                          href={`/inventory/maintenance/new?assetId=${asset.id}&type=calibration`}
+                          href={`/assets/maintenance/new?assetId=${asset.id}&type=calibration`}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
                         >
                           Schedule
@@ -341,7 +341,7 @@ export default async function CalibrationPage() {
                     return (
                       <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4">
-                          <Link href={`/inventory/${asset.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+                          <Link href={`/assets/${asset.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
                             <p className="font-medium text-gray-900 dark:text-white">{asset.name}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                               {asset.manufacturer} {asset.model}

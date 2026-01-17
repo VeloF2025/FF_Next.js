@@ -89,7 +89,7 @@ export function EditAssetClient({ asset, categories }: EditAssetClientProps) {
         throw new Error(data.error || 'Failed to update asset');
       }
 
-      router.push(`/inventory/${asset.id}`);
+      router.push(`/assets/${asset.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

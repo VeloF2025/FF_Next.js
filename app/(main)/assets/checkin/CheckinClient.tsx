@@ -90,7 +90,7 @@ export function CheckinClient({ assets, preselectedAssetId }: CheckinClientProps
         throw new Error(data.error || 'Failed to check in asset');
       }
 
-      router.push(`/inventory/${formData.assetId}`);
+      router.push(`/assets/${formData.assetId}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

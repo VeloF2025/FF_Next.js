@@ -139,7 +139,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
         throw new Error(data.error || 'Failed to check out asset');
       }
 
-      router.push(`/inventory/${formData.assetId}`);
+      router.push(`/assets/${formData.assetId}`);
     } catch (err: any) {
       setError(err.message);
     } finally {

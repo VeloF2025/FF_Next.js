@@ -82,7 +82,7 @@ export function AssetListClient() {
       params.delete('search');
     }
     params.set('page', '1');
-    router.push(`/inventory/list?${params.toString()}`);
+    router.push(`/assets/list?${params.toString()}`);
   }
 
   function handleStatusChange(status: string) {
@@ -94,13 +94,13 @@ export function AssetListClient() {
     }
     params.set('page', '1');
     setStatusFilter(status);
-    router.push(`/inventory/list?${params.toString()}`);
+    router.push(`/assets/list?${params.toString()}`);
   }
 
   function handlePageChange(page: number) {
     const params = new URLSearchParams(searchParams?.toString() || '');
     params.set('page', page.toString());
-    router.push(`/inventory/list?${params.toString()}`);
+    router.push(`/assets/list?${params.toString()}`);
   }
 
   function getStatusBadge(status: string) {
@@ -165,7 +165,7 @@ export function AssetListClient() {
             <Package className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-500 dark:text-gray-400">No assets found</p>
             <Link
-              href="/inventory/new"
+              href="/assets/new"
               className="mt-4 inline-flex items-center text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
             >
               Add your first asset
@@ -234,13 +234,13 @@ export function AssetListClient() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
-                      href={`/inventory/${asset.id}`}
+                      href={`/assets/${asset.id}`}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4"
                     >
                       <Eye className="h-4 w-4 inline" />
                     </Link>
                     <Link
-                      href={`/inventory/${asset.id}/edit`}
+                      href={`/assets/${asset.id}/edit`}
                       className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                     >
                       <Edit className="h-4 w-4 inline" />

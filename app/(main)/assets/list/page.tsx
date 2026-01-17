@@ -25,7 +25,7 @@ export default async function AssetsListPage() {
           <p className="text-gray-600">Manage all company assets</p>
         </div>
         <Link
-          href="/inventory/new"
+          href="/assets/new"
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           <Plus className="h-5 w-5 mr-2" />

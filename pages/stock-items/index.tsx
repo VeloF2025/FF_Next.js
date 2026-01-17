@@ -1,19 +1,15 @@
-import type { NextPage } from 'next';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { StockItemsPage } from '@/modules/stock-items';
+/**
+ * Redirect from old /stock-items route to new /procurement/stock-items
+ */
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 
-const StockItemsIndexPage: NextPage = () => {
-  return (
-    <AppLayout>
-      <StockItemsPage />
-    </AppLayout>
-  );
-};
+export default function StockItemsRedirect() {
+  const router = useRouter();
 
-export default StockItemsIndexPage;
+  useEffect(() => {
+    router.replace('/procurement/stock-items');
+  }, [router]);
 
-export const getServerSideProps = async () => {
-  return {
-    props: {},
-  };
-};
+  return null;
+}

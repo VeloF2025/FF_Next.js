@@ -98,7 +98,7 @@ export function MaintenanceFormClient({
         throw new Error(data.error || 'Failed to schedule maintenance');
       }
 
-      router.push('/inventory/maintenance');
+      router.push('/assets/maintenance');
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -39,7 +39,7 @@ export default async function NewMaintenancePage({ searchParams }: PageProps) {
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link
-          href="/inventory/maintenance"
+          href="/assets/maintenance"
           className="inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
