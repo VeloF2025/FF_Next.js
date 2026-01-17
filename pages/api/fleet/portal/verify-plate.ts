@@ -13,8 +13,13 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { verifyLicensePlate } from '@/modules/fleet/services/fleetVlmService';
+import fs from 'fs';
+import path from 'path';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+// Debug folder for saving plate photos
+const DEBUG_PHOTO_DIR = '/tmp/fleet-plate-debug';
 
 interface VerifyPlateRequest {
   platePhotoBase64: string;
@@ -72,6 +77,27 @@ export default async function handler(
     let confidence: number;
 
     try {
+      // Log incoming request details for debugging
+      const imageSize = body.platePhotoBase64?.length || 0;
+      log.info('Plate verification request', {
+        imageSize,
+        imageSizeKb: Math.round(imageSize / 1024),
+      });
+
+      // Save debug photo to disk for troubleshooting
+      try {
+        if (!fs.existsSync(DEBUG_PHOTO_DIR)) {
+          fs.mkdirSync(DEBUG_PHOTO_DIR, { recursive: true });
+        }
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const debugFilePath = path.join(DEBUG_PHOTO_DIR, `plate-${timestamp}.jpg`);
+        const imageBuffer = Buffer.from(body.platePhotoBase64, 'base64');
+        fs.writeFileSync(debugFilePath, imageBuffer);
+        log.info('Debug photo saved', { path: debugFilePath, size: imageBuffer.length });
+      } catch (saveErr) {
+        log.warn('Failed to save debug photo', { error: saveErr });
+      }
+
       // Use the VLM service to extract plate
       const vlmResult = await verifyLicensePlate(body.platePhotoBase64, '');
       extractedPlate = vlmResult.plateText || '';
@@ -80,25 +106,49 @@ export default async function handler(
       log.info('VLM plate extraction result', {
         extractedPlate,
         confidence,
+        hasError: !!vlmResult.error,
+        error: vlmResult.error,
       });
 
       if (!extractedPlate || extractedPlate.length < 3) {
+        log.warn('Plate extraction failed - invalid result', {
+          extractedPlate,
+          confidence,
+          vlmError: vlmResult.error,
+          rawResponse: JSON.stringify(vlmResult).substring(0, 500),
+        });
+
+        // Rename debug file to indicate failure
+        try {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const failedPath = path.join(DEBUG_PHOTO_DIR, `FAILED-plate-${timestamp}.jpg`);
+          const imageBuffer = Buffer.from(body.platePhotoBase64, 'base64');
+          fs.writeFileSync(failedPath, imageBuffer);
+          log.info('Failed extraction photo saved', { path: failedPath });
+        } catch (saveErr) {
+          // Ignore save errors
+        }
+
         return apiResponse.success(res, {
           success: false,
           extractedPlate: extractedPlate || '',
           confidence,
           vehicle: null,
-          error: 'Could not extract a valid license plate from the image',
+          error: vlmResult.error || 'Could not extract a valid license plate from the image',
         });
       }
     } catch (vlmError) {
-      log.error('VLM plate extraction failed', { error: vlmError });
+      const errorMessage = vlmError instanceof Error ? vlmError.message : 'Unknown error';
+      log.error('VLM plate extraction failed', {
+        error: errorMessage,
+        stack: vlmError instanceof Error ? vlmError.stack : undefined,
+      });
       return apiResponse.success(res, {
         success: false,
         extractedPlate: '',
         confidence: 0,
         vehicle: null,
-        error: 'Failed to process plate image',
+        error: `Failed to process plate image: ${errorMessage}`,
       });
     }
 
