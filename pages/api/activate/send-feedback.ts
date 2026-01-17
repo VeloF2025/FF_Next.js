@@ -81,14 +81,23 @@ async function handlePost(
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info(`Sending feedback for ${dropNumber}`, { autoGenerate });
+    log.info(`[send-feedback] Starting for ${dropNumber}`, { autoGenerate });
 
     // 1. Get unified review from database
+    log.info(`[send-feedback] Step 1: Getting review from database`);
     const review = await getUnifiedReview(dropNumber);
 
     if (!review) {
+      log.warn(`[send-feedback] Review not found: ${dropNumber}`);
       return apiResponse.notFound(res, 'Unified review', dropNumber);
     }
+
+    log.info(`[send-feedback] Step 1 complete: Got review for ${dropNumber}`, {
+      project: review.project,
+      photo_count: review.photo_count,
+      ai_status: review.ai_overall_status,
+      incorrect_steps: review.incorrect_steps,
+    });
 
     // 2. Check if feedback already sent
     if (review.feedback_sent && !autoGenerate) {
@@ -96,34 +105,46 @@ async function handlePost(
     }
 
     // 3. Generate or use provided message
+    log.info(`[send-feedback] Step 3: Generating feedback message`);
     let feedbackMessage: string;
 
     if (message && !autoGenerate) {
       feedbackMessage = message;
-      log.info(`Using provided feedback message for ${dropNumber}`);
+      log.info(`[send-feedback] Using provided feedback message for ${dropNumber}`);
     } else {
       feedbackMessage = generateAutoFeedback(review);
-      log.info(`Auto-generated feedback message for ${dropNumber}`);
+      log.info(`[send-feedback] Step 3 complete: Auto-generated feedback`, {
+        messageLength: feedbackMessage.length,
+      });
     }
 
     // 4. Get WhatsApp group ID for project
+    log.info(`[send-feedback] Step 4: Getting WhatsApp group ID for project: ${review.project}`);
     const groupId = await getWhatsAppGroupId(review.project);
 
     if (!groupId) {
+      log.warn(`[send-feedback] No group ID for project: ${review.project}`);
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${review.project}`);
     }
 
+    log.info(`[send-feedback] Step 4 complete: Group ID = ${groupId}`);
+
     // 5. Send to WhatsApp via Bridge API
+    log.info(`[send-feedback] Step 5: Sending to WhatsApp bridge`);
     const sent = await sendToWhatsApp(groupId, feedbackMessage);
 
     if (!sent) {
+      log.error(`[send-feedback] WhatsApp send failed`);
       throw new Error('Failed to send message via WhatsApp Bridge');
     }
 
+    log.info(`[send-feedback] Step 5 complete: Message sent`);
+
     // 6. Update database with feedback status
+    log.info(`[send-feedback] Step 6: Updating database`);
     await updateFeedbackStatus(dropNumber, feedbackMessage);
 
-    log.info(`Feedback sent successfully for ${dropNumber}`);
+    log.info(`[send-feedback] Complete: Feedback sent successfully for ${dropNumber}`);
 
     return apiResponse.success(res, {
       dropNumber,
@@ -132,7 +153,9 @@ async function handlePost(
       sentAt: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('Error sending feedback:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    log.error(`[send-feedback] ERROR: ${errorMessage}`, { stack: errorStack });
     return apiResponse.internalError(res, error);
   }
 }
