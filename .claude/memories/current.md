@@ -1,11 +1,23 @@
 # FibreFlow Current Session Progress
 
 **Last Updated**: 2026-01-17
-**Session Type**: DR Acknowledgment System + Health Check Fixes
+**Session Type**: Skills Creation + Code Review
 
 ---
 
 ## Completed This Session
+
+### Skills Created (Jan 17, 2026)
+- [x] Created `activate-module.md` - comprehensive Activate/DR Photo Unified skill
+- [x] Created `go-bridge.md` - WhatsApp Go bridge reference skill
+- [x] Conducted full code review of last 3 days (30 commits)
+- [x] Identified and filled skill gaps
+
+### Health Dashboard UI (Jan 17, 2026)
+- [x] Made compact status bar clickable with expandable dropdown
+- [x] Added click-outside to close dropdown
+- [x] Renamed "OneMap" to "1M" in health check
+- [x] Added WhatsApp Sender to services list
 
 ### Health Check Fixes (Jan 17, 2026)
 - [x] Fixed WhatsApp Bridge check querying wrong table (`qa_photo_reviews` → `dr_photo_unified_reviews`)
@@ -33,6 +45,9 @@
 
 | File | Change |
 |------|--------|
+| `.claude/skills/activate-module.md` | NEW - Comprehensive Activate module skill |
+| `.claude/skills/go-bridge.md` | NEW - WhatsApp Go bridge reference skill |
+| `src/modules/activate/components/SystemHealthDashboard.tsx` | Expandable dropdown, click-outside, renamed to 1M |
 | `pages/api/activate/health-check.ts` | Fixed table name, query logic, added WA Sender |
 | `pages/api/activate/dr-acknowledgment.ts` | NEW - Lightweight API for acknowledgment data |
 | `/home/louis/whatsapp-bridge-go/main.go` | Added reply-to support with QuotedMessage |
@@ -141,10 +156,30 @@ pages/api/activate/process-new-dr.ts     # DR validation & processing
 
 ## Context for Next Session
 
-DR Acknowledgment system implemented:
+### New Skills Created
+1. **`activate-module.md`** - Comprehensive skill covering:
+   - 5-service health check (DB, 1M, VLM, WA Bridge, WA Sender)
+   - DR acknowledgment flow
+   - 10-step photo checklist
+   - All API endpoints and troubleshooting
+
+2. **`go-bridge.md`** - WhatsApp Go bridge reference:
+   - DR validation types (NOT_FOUND, PROJECT_MISMATCH)
+   - Threaded reply implementation
+   - LID format handling
+   - Log analysis patterns
+
+### DR Acknowledgment System
 1. When user sends DR to WhatsApp group, immediate threaded reply sent
 2. Reply shows photo count, ONT serial, UPS serial from OneMap
 3. Missing items shown with ⚠️ warning to upload to 1Map
 4. Uses whatsmeow ContextInfo with QuotedMessage for proper threading
 
-See: `.claude/memories/dr-acknowledgment-system.md` for full details.
+### Existing Skills Reference
+- `/activate` - Activate module operations
+- `/go-bridge` - Go bridge troubleshooting
+- `/oes` - OES import
+- `/deploy` - Staging deployment
+- `/wa-monitor` - WA Monitor issues
+
+See: `.claude/memories/dr-acknowledgment-system.md` for full acknowledgment details.

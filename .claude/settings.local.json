@@ -139,7 +139,8 @@
       "Bash(git mv:*)",
       "Bash(tee:*)",
       "Bash(pip3 list:*)",
-      "Skill(Createskill)"
+      "Skill(Createskill)",
+      "WebFetch(domain:accounting.sageone.co.za)"
     ],
     "deny": [],
     "ask": [],
