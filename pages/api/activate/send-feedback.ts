@@ -120,7 +120,7 @@ async function handlePost(
 
     // 4. Get WhatsApp group ID for project
     log.info(`[send-feedback] Step 4: Getting WhatsApp group ID for project: ${review.project}`);
-    const groupId = await getWhatsAppGroupId(review.project);
+    const groupId = getWhatsAppGroupId(review.project);
 
     if (!groupId) {
       log.warn(`[send-feedback] No group ID for project: ${review.project}`);
@@ -290,32 +290,18 @@ function generateAutoFeedback(review: UnifiedReview): string {
 
 /**
  * Get WhatsApp group ID for a project
+ * Note: Using hardcoded mappings from WA Monitor configuration
+ * These match the groups configured in /opt/wa-monitor/prod/config/projects.yaml
  */
-async function getWhatsAppGroupId(project: string): Promise<string | null> {
-  // Query the database for WhatsApp group configuration
-  const result = await pool.query(
-    `
-    SELECT whatsapp_group_id
-    FROM qa_photo_reviews
-    WHERE project = $1
-    LIMIT 1;
-    `,
-    [project]
-  );
+function getWhatsAppGroupId(project: string): string | null {
+  const groupMappings: Record<string, string> = {
+    'Lawley': '120363418298130331@g.us',
+    'Mohadin': '120363421532174586@g.us',
+    'Velo Test': '120363421664266245@g.us',
+    'Mamelodi': '120363408849234743@g.us',
+  };
 
-  if (result.rows.length === 0) {
-    // Fallback to hardcoded mappings (from WA Monitor configuration)
-    const groupMappings: Record<string, string> = {
-      'Lawley': '120363418298130331@g.us',
-      'Mohadin': '120363421532174586@g.us',
-      'Velo Test': '120363421664266245@g.us',
-      'Mamelodi': '120363408849234743@g.us',
-    };
-
-    return groupMappings[project] || null;
-  }
-
-  return result.rows[0].whatsapp_group_id;
+  return groupMappings[project] || null;
 }
 
 /**
