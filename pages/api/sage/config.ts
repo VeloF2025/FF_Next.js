@@ -6,10 +6,10 @@
  *
  * Stores credentials in sage_api_config table.
  *
- * South African Sage API uses OAuth 2.0:
- * - client_id = OAuth Client ID
- * - client_secret = OAuth Client Secret
- * - OAuth tokens stored after authorization flow
+ * South African Sage API v2.0.0 uses Basic Auth:
+ * - api_key = API Key from Sage Developer Portal
+ * - username = Sage account email
+ * - password = Sage account password
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21,30 +21,29 @@ const logger = createLogger({ module: 'api:sage:config' });
 
 interface SageConfig {
   id: string;
-  client_id: string;
-  client_secret_masked: string;
+  api_key_masked: string;
+  username: string;
+  password_masked: string;
   company_id: string;
   base_url: string;
   api_version: string;
-  redirect_uri: string;
   is_connected: boolean;
   last_connection_test_at: string | null;
   last_sync_at: string | null;
   sync_enabled: boolean;
   sync_interval_minutes: number;
-  auth_type: 'oauth' | 'basic';
-  has_tokens: boolean;
+  auth_type: string;
   created_at: string;
   updated_at: string;
 }
 
 interface SageConfigInput {
-  client_id: string;
-  client_secret?: string;
-  company_id: string;
+  api_key?: string;
+  username: string;
+  password?: string;
+  company_id?: string;
   base_url?: string;
   api_version?: string;
-  redirect_uri?: string;
   sync_enabled?: boolean;
   sync_interval_minutes?: number;
 }
@@ -61,22 +60,24 @@ export default async function handler(
       const result = await sql`
         SELECT
           id,
-          client_id,
-          CASE WHEN client_secret IS NOT NULL AND LENGTH(client_secret) > 8
-            THEN CONCAT(LEFT(client_secret, 4), '****', RIGHT(client_secret, 4))
+          CASE WHEN api_key IS NOT NULL AND LENGTH(api_key) > 8
+            THEN CONCAT(LEFT(api_key, 4), '****', RIGHT(api_key, 4))
             ELSE NULL
-          END as client_secret_masked,
+          END as api_key_masked,
+          username,
+          CASE WHEN password IS NOT NULL AND LENGTH(password) > 4
+            THEN CONCAT(LEFT(password, 2), '****')
+            ELSE NULL
+          END as password_masked,
           company_id,
           base_url,
           api_version,
-          redirect_uri,
           is_connected,
           last_connection_test_at,
           last_sync_at,
           sync_enabled,
           sync_interval_minutes,
           auth_type,
-          (access_token IS NOT NULL AND refresh_token IS NOT NULL) as has_tokens,
           created_at,
           updated_at
         FROM sage_api_config
@@ -101,8 +102,8 @@ export default async function handler(
       const input = req.body as SageConfigInput;
 
       // Validate required fields
-      if (!input.client_id) {
-        return apiResponse.badRequest(res, 'Client ID is required');
+      if (!input.username) {
+        return apiResponse.badRequest(res, 'Username is required');
       }
 
       // Check if config exists
@@ -110,42 +111,42 @@ export default async function handler(
         SELECT id FROM sage_api_config WHERE is_active = true LIMIT 1
       `;
 
-      const defaultRedirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app'}/api/sage/oauth/callback`;
-
       if (existing.length > 0) {
-        // Update existing config - preserve tokens if they exist
+        // Update existing config
         const result = await sql`
           UPDATE sage_api_config
           SET
-            client_id = ${input.client_id},
-            client_secret = COALESCE(${input.client_secret || null}, client_secret),
+            api_key = COALESCE(${input.api_key || null}, api_key),
+            username = ${input.username},
+            password = COALESCE(${input.password || null}, password),
             company_id = COALESCE(${input.company_id || null}, company_id),
-            auth_type = 'oauth',
+            auth_type = 'basic',
             base_url = ${input.base_url || 'https://accounting.sageone.co.za'},
             api_version = ${input.api_version || '2.0.0'},
-            redirect_uri = ${input.redirect_uri || defaultRedirectUri},
             sync_enabled = ${input.sync_enabled ?? true},
             sync_interval_minutes = ${input.sync_interval_minutes ?? 15},
             updated_at = NOW()
           WHERE id = ${existing[0].id}
           RETURNING
             id,
-            client_id,
-            CASE WHEN client_secret IS NOT NULL AND LENGTH(client_secret) > 8
-              THEN CONCAT(LEFT(client_secret, 4), '****', RIGHT(client_secret, 4))
+            CASE WHEN api_key IS NOT NULL AND LENGTH(api_key) > 8
+              THEN CONCAT(LEFT(api_key, 4), '****', RIGHT(api_key, 4))
               ELSE NULL
-            END as client_secret_masked,
+            END as api_key_masked,
+            username,
+            CASE WHEN password IS NOT NULL AND LENGTH(password) > 4
+              THEN CONCAT(LEFT(password, 2), '****')
+              ELSE NULL
+            END as password_masked,
             company_id,
             base_url,
             api_version,
-            redirect_uri,
             is_connected,
             last_connection_test_at,
             last_sync_at,
             sync_enabled,
             sync_interval_minutes,
             auth_type,
-            (access_token IS NOT NULL AND refresh_token IS NOT NULL) as has_tokens,
             created_at,
             updated_at
         `;
@@ -160,44 +161,46 @@ export default async function handler(
         // Create new config
         const result = await sql`
           INSERT INTO sage_api_config (
-            client_id,
-            client_secret,
+            api_key,
+            username,
+            password,
             company_id,
             auth_type,
             base_url,
             api_version,
-            redirect_uri,
             sync_enabled,
             sync_interval_minutes
           ) VALUES (
-            ${input.client_id},
-            ${input.client_secret || null},
+            ${input.api_key || null},
+            ${input.username},
+            ${input.password || null},
             ${input.company_id || null},
-            'oauth',
+            'basic',
             ${input.base_url || 'https://accounting.sageone.co.za'},
             ${input.api_version || '2.0.0'},
-            ${input.redirect_uri || defaultRedirectUri},
             ${input.sync_enabled ?? true},
             ${input.sync_interval_minutes ?? 15}
           )
           RETURNING
             id,
-            client_id,
-            CASE WHEN client_secret IS NOT NULL AND LENGTH(client_secret) > 8
-              THEN CONCAT(LEFT(client_secret, 4), '****', RIGHT(client_secret, 4))
+            CASE WHEN api_key IS NOT NULL AND LENGTH(api_key) > 8
+              THEN CONCAT(LEFT(api_key, 4), '****', RIGHT(api_key, 4))
               ELSE NULL
-            END as client_secret_masked,
+            END as api_key_masked,
+            username,
+            CASE WHEN password IS NOT NULL AND LENGTH(password) > 4
+              THEN CONCAT(LEFT(password, 2), '****')
+              ELSE NULL
+            END as password_masked,
             company_id,
             base_url,
             api_version,
-            redirect_uri,
             is_connected,
             last_connection_test_at,
             last_sync_at,
             sync_enabled,
             sync_interval_minutes,
             auth_type,
-            (access_token IS NOT NULL AND refresh_token IS NOT NULL) as has_tokens,
             created_at,
             updated_at
         `;

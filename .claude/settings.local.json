@@ -140,7 +140,13 @@
       "Bash(tee:*)",
       "Bash(pip3 list:*)",
       "Skill(Createskill)",
-      "WebFetch(domain:accounting.sageone.co.za)"
+      "WebFetch(domain:accounting.sageone.co.za)",
+      "Bash(required\" validation error when saving Sage credentials.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:pietervdw.github.io)",
+      "WebFetch(domain:communityhub.sage.com)",
+      "WebFetch(domain:developer-community.sage.com)",
+      "WebFetch(domain:developer.sage.com)",
+      "WebFetch(domain:www.sage.com)"
     ],
     "deny": [],
     "ask": [],

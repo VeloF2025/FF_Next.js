@@ -3,11 +3,8 @@
  *
  * POST - Test connection to Sage API with stored credentials
  *
- * South African Sage uses OAuth 2.0:
- * - Authorization Code Flow
- * - Bearer token authentication
- * - Access tokens expire in 5 minutes
- * - Refresh tokens expire in 31 days
+ * South African Sage API v2.0.0 uses Basic Auth:
+ * - API Key + Username + Password
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -33,15 +30,12 @@ export default async function handler(
     const configResult = await sql`
       SELECT
         id,
-        client_id,
-        client_secret,
+        api_key,
+        username,
+        password,
         company_id,
         base_url,
-        api_version,
-        auth_type,
-        access_token,
-        refresh_token,
-        token_expires_at
+        api_version
       FROM sage_api_config
       WHERE is_active = true
       LIMIT 1
@@ -53,41 +47,23 @@ export default async function handler(
 
     const config = configResult[0];
 
-    // Check if OAuth flow has been completed
-    if (!config.access_token || !config.refresh_token) {
-      return apiResponse.success(res, {
-        success: false,
-        message: 'OAuth not completed. Please authorize with Sage first.',
-        needsAuthorization: true,
-        authorizationUrl: `/api/sage/oauth/authorize`,
-      });
+    // Check required credentials
+    if (!config.api_key) {
+      return apiResponse.badRequest(res, 'API Key is required. Please update your Sage configuration.');
     }
 
-    // Create client with OAuth tokens
+    if (!config.username || !config.password) {
+      return apiResponse.badRequest(res, 'Username and password are required. Please update your Sage configuration.');
+    }
+
+    // Create client with Basic Auth
     const client = createSageClientFromConfig({
-      clientId: config.client_id,
-      clientSecret: config.client_secret,
+      apiKey: config.api_key,
+      username: config.username,
+      password: config.password,
       companyId: config.company_id,
       baseUrl: config.base_url,
       apiVersion: config.api_version,
-      accessToken: config.access_token,
-      refreshToken: config.refresh_token,
-      expiresAt: config.token_expires_at ? new Date(config.token_expires_at) : undefined,
-    });
-
-    // Set up callback to persist refreshed tokens
-    client.setTokenRefreshCallback(async (tokens) => {
-      logger.info('Persisting refreshed tokens to database');
-      await sql`
-        UPDATE sage_api_config
-        SET
-          access_token = ${tokens.accessToken},
-          refresh_token = ${tokens.refreshToken},
-          token_expires_at = ${tokens.expiresAt.toISOString()},
-          last_token_refresh_at = NOW(),
-          updated_at = NOW()
-        WHERE id = ${config.id}
-      `;
     });
 
     // Test connection
@@ -104,13 +80,13 @@ export default async function handler(
       WHERE id = ${config.id}
     `;
 
-    logger.info('Sage OAuth connection test completed', { success: testResult.success });
+    logger.info('Sage connection test completed', { success: testResult.success });
 
     return apiResponse.success(res, {
       success: testResult.success,
       message: testResult.message,
-      companyId: testResult.companyId,
-      authType: 'oauth',
+      companyName: testResult.companyName,
+      authType: 'basic',
       testedAt: new Date().toISOString(),
     });
   } catch (error) {
