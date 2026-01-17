@@ -23,14 +23,14 @@ import {
 } from 'lucide-react';
 
 interface SageConfig {
-  clientId: string;
-  clientSecretMasked: string;
-  companyId: string;
-  baseUrl: string;
-  redirectUri: string;
-  isConnected: boolean;
-  lastConnectionTestAt: string | null;
-  lastSyncAt: string | null;
+  client_id: string;
+  client_secret_masked: string;
+  company_id: string;
+  base_url: string;
+  redirect_uri: string;
+  is_connected: boolean;
+  last_connection_test_at: string | null;
+  last_sync_at: string | null;
 }
 
 interface ConnectionTestResult {
@@ -72,10 +72,10 @@ export function SageIntegrationTab() {
         setConfig(data.data.config);
         setFormData(prev => ({
           ...prev,
-          clientId: data.data.config.clientId || '',
-          companyId: data.data.config.companyId || '',
-          baseUrl: data.data.config.baseUrl || 'https://accounting.sageone.co.za',
-          redirectUri: data.data.config.redirectUri || prev.redirectUri,
+          clientId: data.data.config.client_id || '',
+          companyId: data.data.config.company_id || '',
+          baseUrl: data.data.config.base_url || 'https://accounting.sageone.co.za',
+          redirectUri: data.data.config.redirect_uri || prev.redirectUri,
         }));
       }
     } catch (err) {
@@ -98,11 +98,11 @@ export function SageIntegrationTab() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientId: formData.clientId,
-          clientSecret: formData.clientSecret || undefined,
-          companyId: formData.companyId,
-          baseUrl: formData.baseUrl,
-          redirectUri: formData.redirectUri,
+          client_id: formData.clientId,
+          client_secret: formData.clientSecret || undefined,
+          company_id: formData.companyId,
+          base_url: formData.baseUrl,
+          redirect_uri: formData.redirectUri,
         }),
       });
 
@@ -178,7 +178,7 @@ export function SageIntegrationTab() {
             </div>
           </div>
           <div className="flex items-center">
-            {config?.isConnected ? (
+            {config?.is_connected ? (
               <span className="flex items-center text-green-500 text-sm">
                 <CheckCircle2 className="w-4 h-4 mr-1" />
                 Connected
@@ -203,16 +203,16 @@ export function SageIntegrationTab() {
             <div>
               <span className="text-[var(--ff-text-tertiary)]">Last Connection Test:</span>
               <span className="ml-2 text-[var(--ff-text-secondary)]">
-                {config.lastConnectionTestAt
-                  ? new Date(config.lastConnectionTestAt).toLocaleString()
+                {config.last_connection_test_at
+                  ? new Date(config.last_connection_test_at).toLocaleString()
                   : 'Never'}
               </span>
             </div>
             <div>
               <span className="text-[var(--ff-text-tertiary)]">Last Sync:</span>
               <span className="ml-2 text-[var(--ff-text-secondary)]">
-                {config.lastSyncAt
-                  ? new Date(config.lastSyncAt).toLocaleString()
+                {config.last_sync_at
+                  ? new Date(config.last_sync_at).toLocaleString()
                   : 'Never'}
               </span>
             </div>
@@ -286,9 +286,9 @@ export function SageIntegrationTab() {
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
               Client Secret
-              {config?.clientSecretMasked && (
+              {config?.client_secret_masked && (
                 <span className="ml-2 text-xs text-[var(--ff-text-tertiary)]">
-                  (Currently set: {config.clientSecretMasked})
+                  (Currently set: {config.client_secret_masked})
                 </span>
               )}
             </label>
@@ -392,7 +392,7 @@ export function SageIntegrationTab() {
             </button>
           </div>
 
-          {config && !config.isConnected && (
+          {config && !config.is_connected && (
             <button
               onClick={handleAuthorize}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"
