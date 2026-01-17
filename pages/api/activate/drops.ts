@@ -295,25 +295,33 @@ async function calculateSummary(filters?: {
     ${unifiedCond.whereClause}
   `;
 
-  // Query 2: Installed count from qa_photo_reviews (unique DRs from WhatsApp)
+  // Query 2: Installed count - DRs whose FIRST submission (submitted_date) is in date range
+  // Uses unified table to avoid counting resubmissions from qa_photo_reviews
+  // Only counts DRs that exist in qa_photo_reviews (confirmed from WhatsApp)
   const installedQuery = `
     SELECT COUNT(DISTINCT drop_number) as installed
-    FROM qa_photo_reviews
-    ${qaCond.whereClause}
+    FROM dr_photo_unified_reviews
+    WHERE EXISTS (SELECT 1 FROM qa_photo_reviews qpr WHERE qpr.drop_number = dr_photo_unified_reviews.drop_number)
+    ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
   `;
 
-  // Query 3: Activated count from oes_activations
+  // Query 3: Activated count - DRs in OES whose unified submitted_date is in date range
+  // Only counts if the DR exists in unified (valid DR with first submission in range)
   const activatedQuery = `
-    SELECT COUNT(DISTINCT drop_number) as activated
-    FROM oes_activations
-    ${oesCond.whereClause}
+    SELECT COUNT(DISTINCT oes.drop_number) as activated
+    FROM oes_activations oes
+    WHERE EXISTS (
+      SELECT 1 FROM dr_photo_unified_reviews upr
+      WHERE upr.drop_number = oes.drop_number
+      ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
+    )
   `;
 
   // Run all queries in parallel
   const [unifiedResult, installedResult, activatedResult] = await Promise.all([
     pool.query(unifiedQuery, unifiedCond.params),
-    pool.query(installedQuery, qaCond.params),
-    pool.query(activatedQuery, oesCond.params),
+    pool.query(installedQuery, unifiedCond.params),
+    pool.query(activatedQuery, unifiedCond.params),
   ]);
 
   const unifiedRow = unifiedResult.rows[0];
@@ -397,10 +405,8 @@ async function getProjectStats(filters?: {
     step_10_signature
   `;
 
-  // Conditions for each table
+  // Conditions based on unified table's submitted_date (first submission)
   const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
-  const qaCond = buildConditions('COALESCE(whatsapp_message_date, created_at)::DATE', 'project');
-  const oesCond = buildConditions('activation_date', 'project');
 
   // Query 1: Complete/Incomplete from dr_photo_unified_reviews grouped by project
   const unifiedQuery = `
@@ -413,33 +419,33 @@ async function getProjectStats(filters?: {
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
-  // Query 2: Installed from qa_photo_reviews grouped by project
+  // Query 2: Installed from unified - DRs with first submission in date range that exist in qa_photo_reviews
   const installedQuery = `
     SELECT
       COALESCE(project, 'Unknown') as project,
       COUNT(DISTINCT drop_number) as installed
-    FROM qa_photo_reviews
-    ${qaCond.whereClause}
+    FROM dr_photo_unified_reviews
+    WHERE EXISTS (SELECT 1 FROM qa_photo_reviews qpr WHERE qpr.drop_number = dr_photo_unified_reviews.drop_number)
+    ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
-  // Query 3: Activated from oes_activations grouped by project
-  // Note: oes_activations may not have project, so we join with qa_photo_reviews
+  // Query 3: Activated - DRs in OES whose unified submitted_date is in date range
   const activatedQuery = `
     SELECT
-      COALESCE(qpr.project, 'Unknown') as project,
+      COALESCE(upr.project, 'Unknown') as project,
       COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
-    LEFT JOIN qa_photo_reviews qpr ON qpr.drop_number = oes.drop_number
-    ${oesCond.whereClause.replace('activation_date', 'oes.activation_date').replace('project', 'qpr.project')}
-    GROUP BY COALESCE(qpr.project, 'Unknown')
+    INNER JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    ${unifiedCond.conditions.length > 0 ? 'WHERE ' + unifiedCond.conditions.join(' AND ') : ''}
+    GROUP BY COALESCE(upr.project, 'Unknown')
   `;
 
   // Run all queries in parallel
   const [unifiedResult, installedResult, activatedResult] = await Promise.all([
     pool.query(unifiedQuery, unifiedCond.params),
-    pool.query(installedQuery, qaCond.params),
-    pool.query(activatedQuery, oesCond.params),
+    pool.query(installedQuery, unifiedCond.params),
+    pool.query(activatedQuery, unifiedCond.params),
   ]);
 
   // Merge results by project
