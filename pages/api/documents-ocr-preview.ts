@@ -86,6 +86,17 @@ Return ONLY valid JSON, no other text.`,
 - countryOfBirth: Country of birth
 Return ONLY valid JSON, no other text.`,
 
+  // Alias for sa_id document type (used in UI)
+  sa_id: `Extract all fields from this South African ID document (Smart ID card or green ID book). Return JSON with:
+- idNumber: The 13-digit SA ID number
+- surname: Surname/Last name
+- firstName: First names
+- dateOfBirth: Date of birth (YYYY-MM-DD format)
+- gender: Gender (Male/Female)
+- citizenship: Citizenship status
+- countryOfBirth: Country of birth
+Return ONLY valid JSON, no other text.`,
+
   passport: `Extract all fields from this passport. Return JSON with:
 - passportNumber: The passport number
 - surname: Surname/Last name
@@ -150,6 +161,16 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     restrictions: 'restrictions',
   },
   id_document: {
+    idNumber: 'documentNumber',
+    surname: 'surname',
+    firstName: 'firstName',
+    dateOfBirth: 'dateOfBirth',
+    gender: 'gender',
+    citizenship: 'citizenship',
+    countryOfBirth: 'countryOfBirth',
+  },
+  // Alias for sa_id document type (used in UI)
+  sa_id: {
     idNumber: 'documentNumber',
     surname: 'surname',
     firstName: 'firstName',
