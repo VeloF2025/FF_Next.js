@@ -11,6 +11,13 @@ export const fieldOperationsSection: NavSection = {
   isCollapsible: true,
   items: [
     {
+      to: '/activate',
+      icon: Sparkles,
+      label: 'Activate',
+      shortLabel: 'Activate',
+      permissions: [],
+    },
+    {
       to: '/field',
       icon: Smartphone,
       label: 'Field App Portal',
