@@ -23,36 +23,21 @@ async function cleanup() {
   // Delete all related records
   console.log('\nDeleting related records:');
 
-  const tables = [
-    'vehicle_assignments',
-    'fleet_gps_jobs',
-    'fleet_service_logs',
-    'fleet_odometer_history',
-  ];
+  // vehicle_assignments uses fleet_vehicle_id
+  await sql`DELETE FROM vehicle_assignments WHERE fleet_vehicle_id = ${vehicleId}::uuid`;
+  console.log('  - vehicle_assignments cleared');
 
-  for (const table of tables) {
-    try {
-      const result = await sql`
-        DELETE FROM ${sql(table)}
-        WHERE vehicle_id = ${vehicleId}::uuid
-        OR fleet_vehicle_id = ${vehicleId}::uuid
-      `;
-      console.log('  -', table, '- cleared');
-    } catch {
-      // Column might not exist in this table
-      try {
-        await sql`DELETE FROM ${sql(table)} WHERE vehicle_id = ${vehicleId}::uuid`;
-        console.log('  -', table, '- cleared (vehicle_id)');
-      } catch {
-        try {
-          await sql`DELETE FROM ${sql(table)} WHERE fleet_vehicle_id = ${vehicleId}::uuid`;
-          console.log('  -', table, '- cleared (fleet_vehicle_id)');
-        } catch {
-          console.log('  -', table, '- skipped (no matching column)');
-        }
-      }
-    }
-  }
+  // fleet_gps_jobs uses vehicle_id
+  await sql`DELETE FROM fleet_gps_jobs WHERE vehicle_id = ${vehicleId}::uuid`;
+  console.log('  - fleet_gps_jobs cleared');
+
+  // fleet_service_logs uses vehicle_id
+  await sql`DELETE FROM fleet_service_logs WHERE vehicle_id = ${vehicleId}::uuid`;
+  console.log('  - fleet_service_logs cleared');
+
+  // fleet_odometer_history uses vehicle_id
+  await sql`DELETE FROM fleet_odometer_history WHERE vehicle_id = ${vehicleId}::uuid`;
+  console.log('  - fleet_odometer_history cleared');
 
   // Now delete the vehicle
   console.log('\nDeleting Hilux seed vehicle...');

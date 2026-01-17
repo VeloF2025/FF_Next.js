@@ -82,7 +82,7 @@ export interface OdooPurchaseOrderLine {
   product_id: [number, string] | false;
   name: string;
   product_qty: number;
-  product_uom: [number, string] | false;
+  product_uom_id: [number, string] | false;
   price_unit: number;
   price_subtotal: number;
   price_total: number;
@@ -411,7 +411,7 @@ export class OdooClient {
     const fields = options.fields || [
       'id', 'name', 'partner_id', 'date_order', 'date_approve', 'state',
       'amount_total', 'amount_tax', 'amount_untaxed', 'currency_id',
-      'picking_type_id', 'order_line', 'origin', 'notes',
+      'picking_type_id', 'order_line', 'origin',
     ];
 
     return this.searchRead<OdooPurchaseOrder>('purchase.order', {
@@ -427,7 +427,7 @@ export class OdooClient {
     const results = await this.read<OdooPurchaseOrder>('purchase.order', [id], [
       'id', 'name', 'partner_id', 'date_order', 'date_approve', 'state',
       'amount_total', 'amount_tax', 'amount_untaxed', 'currency_id',
-      'picking_type_id', 'order_line', 'origin', 'notes',
+      'picking_type_id', 'order_line', 'origin',
     ]);
     return results[0] || null;
   }
@@ -437,7 +437,7 @@ export class OdooClient {
    */
   async getPurchaseOrderLines(lineIds: number[]): Promise<OdooPurchaseOrderLine[]> {
     return this.read<OdooPurchaseOrderLine>('purchase.order.line', lineIds, [
-      'id', 'order_id', 'product_id', 'name', 'product_qty', 'product_uom',
+      'id', 'order_id', 'product_id', 'name', 'product_qty', 'product_uom_id',
       'price_unit', 'price_subtotal', 'price_total', 'qty_received', 'qty_invoiced',
     ]);
   }
@@ -453,7 +453,7 @@ export class OdooClient {
     const fields = options.fields || [
       'id', 'name', 'license_plate', 'vin_sn', 'model_id', 'brand_id',
       'state_id', 'driver_id', 'odometer', 'odometer_unit',
-      'acquisition_date', 'first_contract_date', 'car_value', 'net_car_value',
+      'acquisition_date', 'car_value', 'net_car_value',
       'residual_value', 'active',
     ];
 

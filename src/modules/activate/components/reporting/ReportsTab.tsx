@@ -9,11 +9,13 @@
  * - Discrepancy: WhatsApp vs OES comparison
  * - Serial Validation: ONT/UPS serial matching
  * - User/Team Attribution: Performance metrics
+ *
+ * Uses shared context for filter synchronization with Dashboard tab
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import {
   BarChart3,
   AlertTriangle,
@@ -35,35 +37,30 @@ import type {
   ProjectDailyCount,
   ZoneBreakdown,
 } from '../../types/reporting.types';
-
-// Helper to get today's date in SAST format
-const getTodaySAST = (): string => {
-  const now = new Date();
-  const sastOffset = 2 * 60; // SAST is UTC+2
-  const sastTime = new Date(
-    now.getTime() + sastOffset * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000
-  );
-  return sastTime.toISOString().split('T')[0] as string;
-};
-
-// Helper to get yesterday's date in SAST format
-const getYesterdaySAST = (): string => {
-  const today = getTodaySAST();
-  const yesterdayDate = new Date(today);
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  return yesterdayDate.toISOString().split('T')[0] as string;
-};
+import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
 
 export function ReportsTab() {
+  // Get shared filters from context
+  const { filters: sharedFilters, lastRefreshAt } = useActivateData();
+
   // Active report type
   const [activeReport, setActiveReport] = useState<ReportType>('daily-counts');
 
-  // Filters
+  // Local filters - synced with shared context
   const [filters, setFilters] = useState<ReportFilters>({
-    dateFrom: getTodaySAST(),
-    dateTo: getTodaySAST(),
-    project: undefined,
+    dateFrom: sharedFilters.dateFrom || getTodaySAST(),
+    dateTo: sharedFilters.dateTo || getTodaySAST(),
+    project: sharedFilters.projectFilter !== 'all' ? sharedFilters.projectFilter : undefined,
   });
+
+  // Sync filters when shared context changes
+  useEffect(() => {
+    setFilters({
+      dateFrom: sharedFilters.dateFrom || getTodaySAST(),
+      dateTo: sharedFilters.dateTo || getTodaySAST(),
+      project: sharedFilters.projectFilter !== 'all' ? sharedFilters.projectFilter : undefined,
+    });
+  }, [sharedFilters.dateFrom, sharedFilters.dateTo, sharedFilters.projectFilter]);
 
   // Loading and error states
   const [isLoading, setIsLoading] = useState(false);
@@ -85,14 +82,27 @@ export function ReportsTab() {
   );
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
 
+  // Track last refresh to trigger re-fetch on background refresh
+  const [lastContextRefresh, setLastContextRefresh] = useState<Date | null>(null);
+
+  // Trigger refetch when context does background refresh
+  useEffect(() => {
+    if (lastRefreshAt && lastContextRefresh && lastRefreshAt > lastContextRefresh) {
+      // Background refresh happened, refetch report data silently
+      fetchReportData(true);
+    }
+    setLastContextRefresh(lastRefreshAt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastRefreshAt]);
+
   // Fetch report data when filters or report type changes
   useEffect(() => {
     fetchReportData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeReport, filters]);
 
-  const fetchReportData = async () => {
-    setIsLoading(true);
+  const fetchReportData = async (silent = false) => {
+    if (!silent) setIsLoading(true);
     setError(null);
 
     try {
@@ -140,9 +150,11 @@ export function ReportsTab() {
           break;
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch report');
+      if (!silent) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch report');
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
