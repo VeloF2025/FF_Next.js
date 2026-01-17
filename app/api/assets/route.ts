@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assetService } from '@/modules/assets/services';
 import { AssetFilterSchema, CreateAssetSchema } from '@/modules/assets/utils/schemas';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 // ==================== GET /api/assets ====================
 
@@ -52,7 +55,7 @@ export async function GET(req: NextRequest) {
       pagination: result.pagination,
     });
   } catch (error) {
-    console.error('Error fetching assets:', error);
+    log.error('Error fetching assets:', { data: error }, 'assets:list');
     return NextResponse.json(
       { error: 'Failed to fetch assets' },
       { status: 500 }
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error) {
-    console.error('Error creating asset:', error);
+    log.error('Error creating asset:', { data: error }, 'assets:create');
     return NextResponse.json(
       { error: 'Failed to create asset' },
       { status: 500 }

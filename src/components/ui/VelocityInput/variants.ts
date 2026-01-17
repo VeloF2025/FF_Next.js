@@ -7,7 +7,7 @@ import { cva } from 'class-variance-authority';
 
 export const velocityInputVariants = cva(
   // Base styles with VELOCITY enhancements
-  'w-full rounded-lg border-0 bg-transparent px-4 py-3 text-base placeholder-transparent transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:outline-none focus:ring-0 resize-none',
+  'w-full rounded-lg border-0 bg-transparent px-4 py-3 text-base placeholder-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-0 resize-none',
   {
     variants: {
       variant: {

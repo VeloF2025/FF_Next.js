@@ -3,6 +3,8 @@
  * Shows maintenance schedule and records
  */
 
+export const dynamic = 'force-dynamic';
+
 import Link from 'next/link';
 import {
   Wrench,

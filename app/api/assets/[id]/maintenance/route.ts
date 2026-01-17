@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
 import { ScheduleMaintenanceSchema, MaintenanceFilterSchema } from '@/modules/assets/utils/schemas';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching maintenance records:', error);
+    log.error('Error fetching maintenance records:', { data: error }, 'assets:id:maintenance');
     return NextResponse.json(
       { error: 'Failed to fetch maintenance records' },
       { status: 500 }
@@ -78,7 +81,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error) {
-    console.error('Error scheduling maintenance:', error);
+    log.error('Error scheduling maintenance:', { data: error }, 'assets:id:maintenance');
     return NextResponse.json(
       { error: 'Failed to schedule maintenance' },
       { status: 500 }

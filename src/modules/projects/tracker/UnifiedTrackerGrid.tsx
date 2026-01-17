@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Download, RefreshCw, Grid3X3 } from 'lucide-react';
+import { Download, RefreshCw, Grid3x3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTrackerData } from './hooks/useTrackerData';
 import { TrackerStats } from './components/TrackerStats';
@@ -158,7 +158,7 @@ export function UnifiedTrackerGrid() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Grid3X3 className="w-6 h-6" />
+            <Grid3x3 className="w-6 h-6" />
             Unified Tracker Grid
           </h1>
           <p className="text-gray-600 mt-1">Track all poles, drops, and fiber sections in one place</p>

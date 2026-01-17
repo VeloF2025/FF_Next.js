@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { categoryService } from '@/modules/assets/services';
 import { CategorySchema } from '@/modules/assets/utils/schemas';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 // ==================== GET /api/assets/categories ====================
 
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    log.error('Error fetching categories:', { data: error }, 'assets:categories');
     return NextResponse.json(
       { error: 'Failed to fetch categories' },
       { status: 500 }
@@ -70,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error) {
-    console.error('Error creating category:', error);
+    log.error('Error creating category:', { data: error }, 'assets:categories');
     return NextResponse.json(
       { error: 'Failed to create category' },
       { status: 500 }

@@ -5,6 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 // ==================== GET /api/assets/maintenance/upcoming ====================
 
@@ -22,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching upcoming maintenance:', error);
+    log.error('Error fetching upcoming maintenance:', { data: error }, 'assets:maintenance:upcoming');
     return NextResponse.json(
       { error: 'Failed to fetch upcoming maintenance' },
       { status: 500 }

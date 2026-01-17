@@ -1,7 +1,7 @@
 // ============= Stats Cards Component =============
 
 import { Paper, Typography } from '@mui/material';
-import { Grid3X3, Cable, MapPin, Link } from 'lucide-react';
+import { Grid3x3, Cable, MapPin, Link } from 'lucide-react';
 
 interface StatsCardsProps {
   polesCount: number;
@@ -56,7 +56,7 @@ export function StatsCards({
             <Typography variant="h6">{onemapCount}</Typography>
             <Typography variant="body2" color="textSecondary">OneMap Records</Typography>
           </div>
-          <Grid3X3 className="h-8 w-8 text-purple-500" />
+          <Grid3x3 className="h-8 w-8 text-purple-500" />
         </div>
       </Paper>
 

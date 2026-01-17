@@ -3,6 +3,8 @@
  * Manage asset categories
  */
 
+export const dynamic = 'force-dynamic';
+
 import Link from 'next/link';
 import { Plus, FolderOpen, Edit, Trash2 } from 'lucide-react';
 import type { AssetCategory } from '@/modules/assets/types';

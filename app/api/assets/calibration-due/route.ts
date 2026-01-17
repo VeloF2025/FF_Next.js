@@ -5,6 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { assetService } from '@/modules/assets/services';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
@@ -46,7 +49,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching calibration due assets:', error);
+    log.error('Error fetching calibration due assets:', { data: error }, 'assets:calibration-due');
     return NextResponse.json(
       { error: 'Failed to fetch calibration due assets' },
       { status: 500 }

@@ -8,6 +8,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
 import { CompleteMaintenanceSchema } from '@/modules/assets/utils/schemas';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -31,7 +34,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching maintenance:', error);
+    log.error('Error fetching maintenance:', { data: error }, 'assets:maintenance:id');
     return NextResponse.json(
       { error: 'Failed to fetch maintenance record' },
       { status: 500 }
@@ -72,7 +75,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error completing maintenance:', error);
+    log.error('Error completing maintenance:', { data: error }, 'assets:maintenance:id');
     return NextResponse.json(
       { error: 'Failed to complete maintenance' },
       { status: 500 }
@@ -102,7 +105,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error cancelling maintenance:', error);
+    log.error('Error cancelling maintenance:', { data: error }, 'assets:maintenance:id');
     return NextResponse.json(
       { error: 'Failed to cancel maintenance' },
       { status: 500 }

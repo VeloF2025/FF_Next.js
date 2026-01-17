@@ -5,6 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { assetService, maintenanceService } from '@/modules/assets/services';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 // ==================== GET /api/assets/dashboard ====================
 
@@ -31,7 +34,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    log.error('Error fetching dashboard stats:', { data: error }, 'assets:dashboard');
     return NextResponse.json(
       { error: 'Failed to fetch dashboard statistics' },
       { status: 500 }

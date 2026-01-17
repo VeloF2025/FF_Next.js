@@ -1,10 +1,10 @@
 // 🟢 WORKING: Main Workflow Editor component with canvas layout
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { 
-  Save, 
-  ZoomIn, 
-  ZoomOut, 
-  Grid3X3, 
+import {
+  Save,
+  ZoomIn,
+  ZoomOut,
+  Grid3x3,
   AlertTriangle,
   Check,
   Eye,
@@ -221,7 +221,7 @@ export function WorkflowEditor({ templateId, className = '' }: WorkflowEditorPro
               }`}
               title="Toggle Grid"
             >
-              <Grid3X3 className="w-4 h-4" />
+              <Grid3x3 className="w-4 h-4" />
             </button>
 
             {/* Minimap Toggle */}

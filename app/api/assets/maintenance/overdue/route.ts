@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 // ==================== GET /api/assets/maintenance/overdue ====================
 
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: result.data });
   } catch (error) {
-    console.error('Error fetching overdue maintenance:', error);
+    log.error('Error fetching overdue maintenance:', { data: error }, 'assets:maintenance:overdue');
     return NextResponse.json(
       { error: 'Failed to fetch overdue maintenance' },
       { status: 500 }
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
       data: result.data,
     });
   } catch (error) {
-    console.error('Error updating overdue status:', error);
+    log.error('Error updating overdue status:', { data: error }, 'assets:maintenance:overdue');
     return NextResponse.json(
       { error: 'Failed to update overdue status' },
       { status: 500 }

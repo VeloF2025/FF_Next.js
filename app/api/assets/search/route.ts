@@ -5,6 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { assetService } from '@/modules/assets/services';
+import { log } from '@/lib/logger';
+
+export const dynamic = 'force-dynamic';
 
 // ==================== GET /api/assets/search ====================
 
@@ -61,7 +64,7 @@ export async function GET(req: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
-    console.error('Error searching assets:', error);
+    log.error('Error searching assets:', { data: error }, 'assets:search');
     return NextResponse.json(
       { error: 'Failed to search assets' },
       { status: 500 }

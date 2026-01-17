@@ -1,7 +1,7 @@
 // ============= Header Section Component =============
 
 import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
-import { Grid3X3 } from 'lucide-react';
+import { Grid3x3 } from 'lucide-react';
 import type { Project, MatchingMode } from '../types/types';
 
 interface HeaderSectionProps {
@@ -22,7 +22,7 @@ export function HeaderSection({
   return (
     <div className="flex justify-between items-center mb-8">
       <div className="flex items-center">
-        <Grid3X3 className="h-8 w-8 text-blue-600 mr-3" />
+        <Grid3x3 className="h-8 w-8 text-blue-600 mr-3" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Imports Data Grid</h1>
           <p className="text-gray-600">View SOW and OneMap field data imports</p>

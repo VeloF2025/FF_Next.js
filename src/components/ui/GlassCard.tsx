@@ -149,7 +149,7 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
     const baseClasses = cn(
       glassCardVariants({ variant, blur, elevation, rounded, padding }),
       // Enhanced animation classes
-      animated && 'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+      animated && 'transition-all duration-300 ease-in-out',
       // Enhanced hover effects with VELOCITY transforms
       hover && 'hover:scale-[1.02] hover:-translate-y-1',
       // Loading shimmer effect
