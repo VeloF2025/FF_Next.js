@@ -297,16 +297,16 @@ async function getWhatsAppGroupId(project: string): Promise<string | null> {
  */
 async function sendToWhatsApp(groupId: string, message: string): Promise<boolean> {
   try {
-    // WhatsApp Bridge API endpoint (running on Velocity Server)
-    const bridgeUrl = process.env.WHATSAPP_BRIDGE_URL || 'http://192.168.1.150:8080';
+    // WhatsApp Bridge API endpoint (running on Velocity Server port 8083)
+    const bridgeUrl = process.env.WHATSAPP_BRIDGE_URL || 'http://192.168.1.150:8083';
 
-    const response = await fetch(`${bridgeUrl}/api/send-message`, {
+    const response = await fetch(`${bridgeUrl}/api/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        chatId: groupId,
+        recipient: groupId,
         message: message,
       }),
     });
