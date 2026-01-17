@@ -97,7 +97,7 @@ export const STEP_DESCRIPTIONS: Record<number, string> = {
   6: 'ONT device back view',
   7: 'Power meter reading',
   8: 'Completed installation',
-  9: 'Green lights on ONT',
+  9: 'Green lights on ONT with labels',
   10: 'Customer signature',
 };
 
