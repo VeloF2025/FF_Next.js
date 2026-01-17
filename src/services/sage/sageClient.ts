@@ -345,7 +345,17 @@ export class SageClient {
         error: errorData
       });
 
-      throw new Error(`Sage API error: ${errorData.Message}`);
+      // Provide more helpful error messages
+      const errorMessage = errorData.Message || errorData.message || 'Unknown error';
+
+      if (response.status === 403) {
+        if (errorMessage.includes('Forbidden')) {
+          throw new Error('Access denied. Please verify your API key is active and has the correct permissions. Contact Sage support if the issue persists.');
+        }
+        throw new Error(`Access denied: ${errorMessage}`);
+      }
+
+      throw new Error(`Sage API error (${response.status}): ${errorMessage}`);
     }
 
     const data = await response.json();
