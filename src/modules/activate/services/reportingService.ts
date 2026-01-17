@@ -58,7 +58,13 @@ export function getPool(): Pool {
 /**
  * Get daily DR counts with zone/PON breakdown
  *
- * Joins qa_photo_reviews with drops table to get zone/pon data
+ * TERMINOLOGY:
+ * - INSTALLED: DR submitted via WhatsApp (installation was done)
+ * - COMPLETE: All steps/photos submitted AND verified by QA (vlm_categorization_status = 'approved')
+ * - INCOMPLETE: Missing steps/photos OR not verified by QA
+ * - ACTIVATED: DR confirmed as active on OES report
+ *
+ * Joins qa_photo_reviews with drops and oes_activations for zone/pon and activation data
  * Groups hierarchically: Project -> Zone -> PON
  */
 export async function getDailyCountsWithBreakdown(
@@ -73,8 +79,7 @@ export async function getDailyCountsWithBreakdown(
       project,
     });
 
-    // Query to get all DRs with their zone/pon data and completion status
-    // NOTE: Completion is based on photo_count >= 10 (step booleans aren't being populated)
+    // Query to get all DRs with their zone/pon data, QA status, and activation status
     const result = await pool.query(
       `
       SELECT
@@ -82,14 +87,20 @@ export async function getDailyCountsWithBreakdown(
         qpr.project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
-        COALESCE(upr.photo_count, 0) as photo_count,
+        -- Complete = verified by QA (vlm_categorization_status = 'approved')
         CASE
-          WHEN COALESCE(upr.photo_count, 0) >= 10 THEN true
+          WHEN upr.vlm_categorization_status = 'approved' THEN true
           ELSE false
-        END as is_complete
+        END as is_complete,
+        -- Activated = exists in OES activations
+        CASE
+          WHEN oes.drop_number IS NOT NULL THEN true
+          ELSE false
+        END as is_activated
       FROM qa_photo_reviews qpr
       LEFT JOIN drops d ON d.drop_number = qpr.drop_number
       LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = qpr.drop_number
+      LEFT JOIN oes_activations oes ON oes.drop_number = qpr.drop_number
       WHERE (
         COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE >= $1::DATE
         AND COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE <= $2::DATE
@@ -108,26 +119,31 @@ export async function getDailyCountsWithBreakdown(
       const zoneNo = row.zone_no || 0;
       const ponNo = row.pon_no || 0;
       const isComplete = row.is_complete === true;
+      const isActivated = row.is_activated === true;
 
       // Get or create project
       if (!projectMap.has(projectName)) {
         projectMap.set(projectName, {
           project: projectName,
           date: dateFrom === dateTo ? dateFrom : `${dateFrom} to ${dateTo}`,
-          total_drs: 0,
+          installed: 0,
           complete: 0,
           incomplete: 0,
+          activated: 0,
           zones: [],
         });
       }
       const projectData = projectMap.get(projectName)!;
 
       // Update project totals
-      projectData.total_drs++;
+      projectData.installed++;
       if (isComplete) {
         projectData.complete++;
       } else {
         projectData.incomplete++;
+      }
+      if (isActivated) {
+        projectData.activated++;
       }
 
       // Find or create zone
@@ -137,19 +153,23 @@ export async function getDailyCountsWithBreakdown(
           zone_no: zoneNo,
           zone_name: zoneNo === 0 ? 'Unknown Zone' : `Zone ${zoneNo}`,
           pons: [],
-          total_drs: 0,
+          installed: 0,
           complete: 0,
           incomplete: 0,
+          activated: 0,
         };
         projectData.zones.push(zone);
       }
 
       // Update zone totals
-      zone.total_drs++;
+      zone.installed++;
       if (isComplete) {
         zone.complete++;
       } else {
         zone.incomplete++;
+      }
+      if (isActivated) {
+        zone.activated++;
       }
 
       // Find or create PON
@@ -158,19 +178,23 @@ export async function getDailyCountsWithBreakdown(
         pon = {
           pon_no: ponNo,
           pon_name: ponNo === 0 ? 'Unknown PON' : `PON ${zoneNo}.${ponNo}`,
-          total_drs: 0,
+          installed: 0,
           complete: 0,
           incomplete: 0,
+          activated: 0,
         };
         zone.pons.push(pon);
       }
 
       // Update PON totals
-      pon.total_drs++;
+      pon.installed++;
       if (isComplete) {
         pon.complete++;
       } else {
         pon.incomplete++;
+      }
+      if (isActivated) {
+        pon.activated++;
       }
     }
 
@@ -186,16 +210,17 @@ export async function getDailyCountsWithBreakdown(
     const projects = Array.from(projectMap.values());
     const grandTotal = projects.reduce(
       (acc, p) => ({
-        total_drs: acc.total_drs + p.total_drs,
+        installed: acc.installed + p.installed,
         complete: acc.complete + p.complete,
         incomplete: acc.incomplete + p.incomplete,
+        activated: acc.activated + p.activated,
       }),
-      { total_drs: 0, complete: 0, incomplete: 0 }
+      { installed: 0, complete: 0, incomplete: 0, activated: 0 }
     );
 
     return {
       date_range: { from: dateFrom, to: dateTo },
-      projects: projects.sort((a, b) => b.total_drs - a.total_drs),
+      projects: projects.sort((a, b) => b.installed - a.installed),
       grand_total: grandTotal,
     };
   } catch (error) {
@@ -426,6 +451,12 @@ export async function getSerialValidationReport(
 /**
  * Get user/team attribution report
  *
+ * TERMINOLOGY:
+ * - INSTALLED: DR submitted via WhatsApp (installation was done)
+ * - COMPLETE: All steps/photos submitted AND verified by QA (vlm_categorization_status = 'approved')
+ * - INCOMPLETE: Missing steps/photos OR not verified by QA
+ * - ACTIVATED: DR confirmed as active on OES report
+ *
  * Shows performance metrics for:
  * - Users who submitted DRs via WhatsApp
  * - Teams who installed (from OES)
@@ -442,19 +473,18 @@ export async function getUserTeamAttributionReport(
       project,
     });
 
-    // Query for user performance
-    // NOTE: Completion is based on photo_count >= 10 (step booleans aren't being populated)
+    // Query for user performance with consistent terminology
     const userResult = await pool.query(
       `
       SELECT
         qpr.user_name,
         qpr.sender_phone,
         qpr.project,
-        COUNT(*) as total_submissions,
-        COUNT(*) FILTER (WHERE COALESCE(upr.photo_count, 0) >= 10) as complete,
+        COUNT(*) as installed,
+        COUNT(*) FILTER (WHERE upr.vlm_categorization_status = 'approved') as complete,
+        COUNT(*) FILTER (WHERE oes.drop_number IS NOT NULL) as activated,
         COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as ont_scanned,
-        COUNT(*) FILTER (WHERE upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned != '') as ups_scanned,
-        COUNT(*) FILTER (WHERE oes.drop_number IS NOT NULL) as oes_matched
+        COUNT(*) FILTER (WHERE upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned != '') as ups_scanned
       FROM qa_photo_reviews qpr
       LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
       LEFT JOIN oes_activations oes ON qpr.drop_number = oes.drop_number
@@ -462,33 +492,33 @@ export async function getUserTeamAttributionReport(
         AND COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE <= $2::DATE
         AND ($3::TEXT IS NULL OR qpr.project = $3)
       GROUP BY qpr.user_name, qpr.sender_phone, qpr.project
-      ORDER BY total_submissions DESC
+      ORDER BY installed DESC
       `,
       [dateFrom, dateTo, project || null]
     );
 
-    // Map user performance
+    // Map user performance with consistent terminology
     const users: UserPerformance[] = userResult.rows.map((row) => {
-      const total = parseInt(row.total_submissions, 10) || 0;
+      const installed = parseInt(row.installed, 10) || 0;
       const complete = parseInt(row.complete, 10) || 0;
+      const activated = parseInt(row.activated, 10) || 0;
       const ontScanned = parseInt(row.ont_scanned, 10) || 0;
       const upsScanned = parseInt(row.ups_scanned, 10) || 0;
-      const oesMatched = parseInt(row.oes_matched, 10) || 0;
 
       return {
         user_name: row.user_name,
         sender_phone: row.sender_phone,
         project: row.project || 'Unknown',
-        total_submissions: total,
+        installed,
         complete,
-        incomplete: total - complete,
-        completion_rate: total > 0 ? Math.round((complete / total) * 100) : 0,
+        incomplete: installed - complete,
+        activated,
+        completion_rate: installed > 0 ? Math.round((complete / installed) * 100) : 0,
+        activation_rate: installed > 0 ? Math.round((activated / installed) * 100) : 0,
         ont_scanned: ontScanned,
         ups_scanned: upsScanned,
         serial_compliance_rate:
-          total > 0 ? Math.round((ontScanned / total) * 100) : 0,
-        oes_matched: oesMatched,
-        oes_match_rate: total > 0 ? Math.round((oesMatched / total) * 100) : 0,
+          installed > 0 ? Math.round((ontScanned / installed) * 100) : 0,
       };
     });
 

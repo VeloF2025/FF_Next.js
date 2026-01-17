@@ -4,6 +4,12 @@
  * Purpose: TypeScript interfaces for the reporting system
  * Status: WORKING - Core types for reporting implementation
  *
+ * TERMINOLOGY (consistent across all reports):
+ * - INSTALLED: DR submitted via WhatsApp (installation was done)
+ * - COMPLETE: All required steps/photos submitted AND verified by QA
+ * - INCOMPLETE: Missing steps/photos OR not verified by QA
+ * - ACTIVATED: DR confirmed as active on OES report
+ *
  * Following PAI principles:
  * - TYPE_SAFETY: 100% TypeScript coverage
  * - Null safety with explicit | null unions
@@ -23,12 +29,14 @@ export interface PonBreakdown {
   pon_no: number;
   /** PON display name (e.g., "PON 1.1") */
   pon_name: string;
-  /** Total DRs in this PON */
-  total_drs: number;
-  /** Complete DRs */
+  /** DRs submitted via WhatsApp (installation done) */
+  installed: number;
+  /** All steps/photos submitted AND verified by QA */
   complete: number;
-  /** Incomplete DRs */
+  /** Missing steps/photos OR not verified by QA */
   incomplete: number;
+  /** Confirmed active on OES report */
+  activated: number;
 }
 
 /**
@@ -41,12 +49,14 @@ export interface ZoneBreakdown {
   zone_name: string;
   /** PON breakdowns within this zone */
   pons: PonBreakdown[];
-  /** Total DRs in this zone */
-  total_drs: number;
-  /** Complete DRs */
+  /** DRs submitted via WhatsApp (installation done) */
+  installed: number;
+  /** All steps/photos submitted AND verified by QA */
   complete: number;
-  /** Incomplete DRs */
+  /** Missing steps/photos OR not verified by QA */
   incomplete: number;
+  /** Confirmed active on OES report */
+  activated: number;
 }
 
 /**
@@ -57,12 +67,14 @@ export interface ProjectDailyCount {
   project: string;
   /** Date (YYYY-MM-DD) */
   date: string;
-  /** Total DRs submitted */
-  total_drs: number;
-  /** Complete DRs */
+  /** DRs submitted via WhatsApp (installation done) */
+  installed: number;
+  /** All steps/photos submitted AND verified by QA */
   complete: number;
-  /** Incomplete DRs */
+  /** Missing steps/photos OR not verified by QA */
   incomplete: number;
+  /** Confirmed active on OES report */
+  activated: number;
   /** Zone breakdowns (expanded when clicked) */
   zones: ZoneBreakdown[];
 }
@@ -80,9 +92,14 @@ export interface DailyCountsResponse {
   projects: ProjectDailyCount[];
   /** Grand total across all projects */
   grand_total: {
-    total_drs: number;
+    /** DRs submitted via WhatsApp (installation done) */
+    installed: number;
+    /** All steps/photos submitted AND verified by QA */
     complete: number;
+    /** Missing steps/photos OR not verified by QA */
     incomplete: number;
+    /** Confirmed active on OES report */
+    activated: number;
   };
 }
 
@@ -246,15 +263,19 @@ export interface UserPerformance {
   /** Project name */
   project: string;
 
-  // Counts
-  /** Total DRs submitted */
-  total_submissions: number;
-  /** Complete DRs */
+  // Counts (using consistent terminology)
+  /** DRs submitted via WhatsApp (installation done) */
+  installed: number;
+  /** All steps/photos submitted AND verified by QA */
   complete: number;
-  /** Incomplete DRs */
+  /** Missing steps/photos OR not verified by QA */
   incomplete: number;
+  /** Confirmed active on OES report */
+  activated: number;
   /** Completion rate (0-100) */
   completion_rate: number;
+  /** Activation rate (0-100) */
+  activation_rate: number;
 
   // Serial compliance
   /** DRs with ONT serial scanned */
@@ -263,12 +284,6 @@ export interface UserPerformance {
   ups_scanned: number;
   /** Serial compliance rate (0-100) */
   serial_compliance_rate: number;
-
-  // OES match rate
-  /** DRs matched to OES */
-  oes_matched: number;
-  /** OES match rate (0-100) */
-  oes_match_rate: number;
 }
 
 /**

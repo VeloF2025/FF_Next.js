@@ -431,11 +431,11 @@ function DailyCountsContent({
           <span className="font-bold text-gray-900 dark:text-white">
             Grand Total
           </span>
-          <div className="flex gap-6 text-sm">
-            <span className="text-gray-600 dark:text-gray-400">
-              Total:{' '}
-              <span className="font-semibold text-gray-900 dark:text-white">
-                {data.grand_total.total_drs}
+          <div className="flex gap-4 text-sm">
+            <span className="text-blue-600 dark:text-blue-400">
+              Installed:{' '}
+              <span className="font-semibold">
+                {data.grand_total.installed}
               </span>
             </span>
             <span className="text-green-600 dark:text-green-500">
@@ -446,6 +446,12 @@ function DailyCountsContent({
               Incomplete:{' '}
               <span className="font-semibold">
                 {data.grand_total.incomplete}
+              </span>
+            </span>
+            <span className="text-purple-600 dark:text-purple-400">
+              Activated:{' '}
+              <span className="font-semibold">
+                {data.grand_total.activated}
               </span>
             </span>
           </div>
@@ -499,11 +505,11 @@ function ProjectAccordion({
             {project.project}
           </span>
         </div>
-        <div className="flex gap-6 text-sm">
-          <span className="text-gray-600 dark:text-gray-400">
-            Total:{' '}
-            <span className="font-semibold text-gray-900 dark:text-white">
-              {project.total_drs}
+        <div className="flex gap-4 text-sm">
+          <span className="text-blue-600 dark:text-blue-400">
+            Installed:{' '}
+            <span className="font-semibold">
+              {project.installed}
             </span>
           </span>
           <span className="text-green-600 dark:text-green-500">
@@ -512,6 +518,10 @@ function ProjectAccordion({
           <span className="text-yellow-600 dark:text-yellow-500">
             Incomplete:{' '}
             <span className="font-semibold">{project.incomplete}</span>
+          </span>
+          <span className="text-purple-600 dark:text-purple-400">
+            Activated:{' '}
+            <span className="font-semibold">{project.activated}</span>
           </span>
         </div>
       </button>
@@ -569,17 +579,20 @@ function ZoneAccordion({
           </span>
         </div>
         <div className="flex gap-4 text-sm">
-          <span className="text-gray-600 dark:text-gray-400">
-            Total:{' '}
-            <span className="font-medium text-gray-900 dark:text-white">
-              {zone.total_drs}
+          <span className="text-blue-600 dark:text-blue-400">
+            Installed:{' '}
+            <span className="font-medium">
+              {zone.installed}
             </span>
           </span>
           <span className="text-green-600 dark:text-green-500">
-            {zone.complete}
+            Complete: {zone.complete}
           </span>
           <span className="text-yellow-600 dark:text-yellow-500">
-            {zone.incomplete}
+            Incomplete: {zone.incomplete}
+          </span>
+          <span className="text-purple-600 dark:text-purple-400">
+            Activated: {zone.activated}
           </span>
         </div>
       </button>
@@ -596,14 +609,17 @@ function ZoneAccordion({
                 {pon.pon_name}
               </span>
               <div className="flex gap-4 text-sm">
-                <span className="text-gray-600 dark:text-gray-400">
-                  {pon.total_drs}
+                <span className="text-blue-600 dark:text-blue-400">
+                  {pon.installed}
                 </span>
                 <span className="text-green-600 dark:text-green-500">
                   {pon.complete}
                 </span>
                 <span className="text-yellow-600 dark:text-yellow-500">
                   {pon.incomplete}
+                </span>
+                <span className="text-purple-600 dark:text-purple-400">
+                  {pon.activated}
                 </span>
               </div>
             </div>
@@ -1030,7 +1046,7 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
                   Project
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Total
+                  Installed
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Complete
@@ -1042,7 +1058,7 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
                   Serial %
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  OES Match %
+                  Activated %
                 </th>
               </tr>
             </thead>
@@ -1062,8 +1078,8 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                     {user.project}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                    {user.total_submissions}
+                  <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
+                    {user.installed}
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 dark:text-green-500">
                     {user.complete}
@@ -1094,8 +1110,8 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
                       {user.serial_compliance_rate}%
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                    {user.oes_match_rate}%
+                  <td className="px-4 py-3 text-sm text-purple-600 dark:text-purple-400">
+                    {user.activation_rate}%
                   </td>
                 </tr>
               ))}
