@@ -31,7 +31,10 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void) => {
   }, [context]);
 
   const loadBOQs = useCallback(async () => {
-    if (!context) return;
+    if (!context) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);

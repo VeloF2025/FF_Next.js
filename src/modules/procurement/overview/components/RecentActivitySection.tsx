@@ -1,6 +1,6 @@
 // ============= Recent Activity Section Component =============
 
-import { FileText, Send, ShoppingCart, Package } from 'lucide-react';
+import { FileText, Send } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import type { BOQItem, RFQItem } from '../types/types';
 
@@ -59,7 +59,7 @@ export function RecentActivitySection({ boqs, rfqs, onNavigate }: RecentActivity
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-900">{rfq.title}</p>
-                <p className="text-xs text-gray-500">RFQ {rfq.rfqNumber} - Sent 1 day ago</p>
+                <p className="text-xs text-gray-500">RFQ {rfq.rfqNumber}</p>
               </div>
             </div>
             <div className="text-right">
@@ -71,38 +71,12 @@ export function RecentActivitySection({ boqs, rfqs, onNavigate }: RecentActivity
           </div>
         ))}
 
-        {/* Mock additional activities */}
-        <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <ShoppingCart className="h-4 w-4 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">PO-2024-045 Created</p>
-              <p className="text-xs text-gray-500">Fiber Optic Cables - Pending approval</p>
-            </div>
+        {/* Show message when no activities */}
+        {(!boqs || boqs.length === 0) && (!rfqs || rfqs.length === 0) && (
+          <div className="text-center py-4 text-gray-500">
+            No recent procurement activity
           </div>
-          <div className="text-right">
-            <span className="text-sm font-medium text-gray-900">R 25,000</span>
-            <div className="text-xs text-gray-500">Amount</div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <Package className="h-4 w-4 text-indigo-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">Stock Received</p>
-              <p className="text-xs text-gray-500">GRN-2024-123 - 500m Cable Drum</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-green-600 font-medium">Completed</span>
-            <div className="text-xs text-gray-500">Status</div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

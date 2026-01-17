@@ -52,32 +52,26 @@ export default function RFQList({
   const loadRFQs = async () => {
     setIsLoading(true);
     try {
-      // Mock data for now - replace with actual API call
-      const mockRfqs: RFQ[] = [
-        {
-          id: '1',
-          title: 'Network Equipment RFQ',
-          description: 'Request for fiber optic equipment and cables',
-          status: 'active',
-          createdAt: '2024-01-15T10:00:00Z',
-          dueDate: '2024-02-15T23:59:59Z',
-          supplierCount: 5,
-          responseCount: 3
-        },
-        {
-          id: '2',
-          title: 'Installation Services RFQ',
-          description: 'Professional installation services for fiber network',
-          status: 'draft',
-          createdAt: '2024-01-10T14:30:00Z',
-          dueDate: '2024-03-01T23:59:59Z',
-          supplierCount: 3,
-          responseCount: 0
-        }
-      ];
-      
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-      setRfqs(mockRfqs);
+      const response = await fetch('/api/procurement/rfq');
+      if (!response.ok) {
+        throw new Error('Failed to fetch RFQs');
+      }
+      const data = await response.json();
+
+      // Transform API response to match component's RFQ interface
+      const transformedRfqs: RFQ[] = (data.rfqs || []).map((rfq: any) => ({
+        id: rfq.id,
+        title: rfq.title,
+        description: rfq.description || '',
+        status: rfq.status === 'open' ? 'active' : rfq.status,
+        createdAt: rfq.createdDate || rfq.createdAt,
+        dueDate: rfq.dueDate,
+        projectId: rfq.projectId,
+        supplierCount: rfq.suppliers?.length || 0,
+        responseCount: rfq.quotesReceived || 0
+      }));
+
+      setRfqs(transformedRfqs);
     } catch (error) {
       console.error('Error loading RFQs:', error);
       setRfqs([]);

@@ -61,32 +61,50 @@ export default function StockManagement({ projectId, projectName, stockItems = [
     warehouseUtilization: 0
   });
 
-  // Load stock metrics
+  // Load stock metrics from real API
   useEffect(() => {
     const loadMetrics = async () => {
       try {
         setIsLoading(true);
 
-        // TODO: Replace with actual API call
-        // Mock data for now - use stockItems if available
-        const mockMetrics: StockMetrics = {
-          totalItems: stockItems.length || 147,
-          totalValue: 2847593.45,
-          lowStockItems: 8,
-          outOfStockItems: 3,
-          pendingReceipts: 12,
-          pendingIssues: 5,
-          stockTurnover: 3.2,
-          warehouseUtilization: 78.5
+        // Fetch real stock data from API
+        const response = await fetch('/api/procurement/stock');
+        if (!response.ok) {
+          throw new Error('Failed to fetch stock metrics');
+        }
+        const data = await response.json();
+
+        // Calculate metrics from real data
+        const items = data.items || [];
+        const realMetrics: StockMetrics = {
+          totalItems: items.length,
+          totalValue: items.reduce((sum: number, item: any) =>
+            sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0),
+          lowStockItems: items.filter((item: any) =>
+            item.quantity > 0 && item.quantity <= (item.minStockLevel || 10)).length,
+          outOfStockItems: items.filter((item: any) =>
+            !item.quantity || item.quantity <= 0).length,
+          pendingReceipts: 0, // Would need GRN API data
+          pendingIssues: 0,   // Would need issues API data
+          stockTurnover: 0,   // Would need historical data
+          warehouseUtilization: 0 // Would need warehouse capacity data
         };
 
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        setMetrics(mockMetrics);
+        setMetrics(realMetrics);
         setError(null);
       } catch (err) {
         log.error('Failed to load stock metrics:', { data: err }, 'StockManagement');
+        // Show zeros rather than fake numbers on error
+        setMetrics({
+          totalItems: stockItems.length,
+          totalValue: 0,
+          lowStockItems: 0,
+          outOfStockItems: 0,
+          pendingReceipts: 0,
+          pendingIssues: 0,
+          stockTurnover: 0,
+          warehouseUtilization: 0
+        });
         setError('Failed to load stock data. Please try again.');
       } finally {
         setIsLoading(false);
