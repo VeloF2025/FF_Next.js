@@ -13,6 +13,7 @@ export { assetsSection } from './assetsSection';
 export { fleetSection } from './fleetSection';
 export { analyticsSection } from './analyticsSection';
 export { communicationsSection } from './communicationsSection';
+export { activateSection } from './activateSection';
 export { fieldOperationsSection } from './fieldOperationsSection';
 export { systemSection } from './systemSection';
 export * from './types';

@@ -2,7 +2,7 @@
  * Field Operations section configuration
  */
 
-import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck, Sparkles } from 'lucide-react';
+import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const fieldOperationsSection: NavSection = {
@@ -10,13 +10,6 @@ export const fieldOperationsSection: NavSection = {
   sectionId: 'field-ops',
   isCollapsible: true,
   items: [
-    {
-      to: '/activate',
-      icon: Sparkles,
-      label: 'Activate',
-      shortLabel: 'Activate',
-      permissions: [],
-    },
     {
       to: '/field',
       icon: Smartphone,

@@ -146,7 +146,13 @@
       "WebFetch(domain:communityhub.sage.com)",
       "WebFetch(domain:developer-community.sage.com)",
       "WebFetch(domain:developer.sage.com)",
-      "WebFetch(domain:www.sage.com)"
+      "WebFetch(domain:www.sage.com)",
+      "Bash(tree:*)",
+      "Bash(for page in \"procurement/index.tsx\" \"suppliers/index.tsx\" \"procurement/boq/index.tsx\" \"procurement/rfq/index.tsx\" \"procurement/requisitions/index.tsx\" \"procurement/purchase-orders/index.tsx\" \"procurement/grn/index.tsx\" \"procurement/approvals/index.tsx\" \"procurement/stock/index.tsx\" \"procurement/field-stock/index.tsx\")",
+      "Bash(do if [ -f \"/home/hein/Workspace/FF_Next.js/pages/$page\" ])",
+      "Bash(then echo \"✅ pages/$page\")",
+      "Bash(else echo \"❌ pages/$page NOT FOUND\")",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": [],

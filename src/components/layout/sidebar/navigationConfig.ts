@@ -11,6 +11,7 @@ import {
   fleetSection,
   analyticsSection,
   communicationsSection,
+  activateSection,
   fieldOperationsSection,
   systemSection,
 } from './config';
@@ -27,6 +28,7 @@ export const navItems: NavSection[] = [
   fleetSection,
   analyticsSection,
   communicationsSection,
+  activateSection,
   fieldOperationsSection,
   systemSection,
 ];
