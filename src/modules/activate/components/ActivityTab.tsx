@@ -1,18 +1,51 @@
 /**
  * ActivityTab Component
  *
- * Shows QA review history, comments, and activity timeline for a DR.
+ * Shows activity timeline and QA review history for a DR.
  * Data sources:
+ * - dr_activity_log table (new - Phase 3 workflow events)
  * - qa_review_history table (imported from Excel)
  * - dr_photo_unified_reviews.feedback_sent_at
  *
- * Following FibreFlow UI/UX patterns with TailwindCSS
+ * Following PAI 3-Phase QA Workflow (wobbly-leaping-sparkle.md)
  */
 
 'use client';
 
 import { useState, useEffect } from 'react';
 import { STEP_LABELS } from '../types/unified.types';
+
+// ============================================================================
+// ACTIVITY TIMELINE TYPES
+// ============================================================================
+
+interface TimelineEntry {
+  id: string;
+  timestamp: string;
+  eventType: string;
+  title: string;
+  description: string;
+  icon: string;
+  iconColor: string;
+  actorType: 'system' | 'user' | 'vlm';
+  actorId: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+interface ActivitySummary {
+  drNumber: string;
+  totalEvents: number;
+  currentPhase: 'submitted' | 'categorizing' | 'qa_validation' | 'human_review' | 'complete';
+  phaseTimestamps: {
+    submitted?: string;
+    categorized?: string;
+    qaStarted?: string;
+    qaCompleted?: string;
+    reviewStarted?: string;
+    reviewCompleted?: string;
+    feedbackSent?: string;
+  };
+}
 
 interface QAReviewHistory {
   id: string;
@@ -46,23 +79,53 @@ interface ActivityTabProps {
   feedbackSentAt?: string | null;
 }
 
+type ViewMode = 'timeline' | 'history';
+
 export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('timeline');
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [summary, setSummary] = useState<ActivitySummary | null>(null);
   const [reviews, setReviews] = useState<QAReviewHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedReviews, setExpandedReviews] = useState<Set<string>>(new Set());
 
+  // Fetch both timeline and history
   useEffect(() => {
-    async function fetchHistory() {
+    async function fetchData() {
       setIsLoading(true);
       setError(null);
+
       try {
-        const res = await fetch(`/api/qa-review-history?dropNumber=${dropNumber}`);
-        const data = await res.json();
-        if (data.success) {
-          setReviews(data.reviews);
-        } else {
-          setError(data.error || 'Failed to fetch history');
+        // Fetch timeline and history in parallel
+        const [timelineRes, summaryRes, historyRes] = await Promise.all([
+          fetch(`/api/activate/activity-log?dropNumber=${dropNumber}`),
+          fetch(`/api/activate/activity-log?dropNumber=${dropNumber}&summary=true`),
+          fetch(`/api/qa-review-history?dropNumber=${dropNumber}`),
+        ]);
+
+        // Process timeline
+        if (timelineRes.ok) {
+          const timelineData = await timelineRes.json();
+          if (timelineData.success) {
+            setTimeline(timelineData.data?.timeline || []);
+          }
+        }
+
+        // Process summary
+        if (summaryRes.ok) {
+          const summaryData = await summaryRes.json();
+          if (summaryData.success) {
+            setSummary(summaryData.data);
+          }
+        }
+
+        // Process history
+        if (historyRes.ok) {
+          const historyData = await historyRes.json();
+          if (historyData.success) {
+            setReviews(historyData.reviews || []);
+          }
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -70,7 +133,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
         setIsLoading(false);
       }
     }
-    fetchHistory();
+    fetchData();
   }, [dropNumber]);
 
   const toggleExpand = (id: string) => {
@@ -98,6 +161,20 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
     }
   };
 
+  const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleString('en-ZA', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -115,39 +192,162 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
     );
   }
 
+  // Phase labels for summary
+  const phaseLabels: Record<string, string> = {
+    submitted: 'Submitted',
+    categorizing: 'Categorizing',
+    qa_validation: 'QA Validation',
+    human_review: 'Human Review',
+    complete: 'Complete',
+  };
+
   return (
     <div className="space-y-6">
-      {/* Summary */}
-      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Review History
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {reviews.length} review{reviews.length !== 1 ? 's' : ''} found
+      {/* Phase Progress (if summary available) */}
+      {summary && (
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900 dark:text-white">Current Phase</h4>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              summary.currentPhase === 'complete'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+            }`}>
+              {phaseLabels[summary.currentPhase] || summary.currentPhase}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {['submitted', 'categorizing', 'qa_validation', 'human_review', 'complete'].map((phase, index) => {
+              const isActive = summary.currentPhase === phase;
+              const isPast = ['submitted', 'categorizing', 'qa_validation', 'human_review', 'complete']
+                .indexOf(summary.currentPhase) > index;
+              return (
+                <div key={phase} className="flex-1 flex items-center">
+                  <div
+                    className={`w-full h-2 rounded-full ${
+                      isActive
+                        ? 'bg-blue-500 dark:bg-blue-400'
+                        : isPast
+                        ? 'bg-green-500 dark:bg-green-400'
+                        : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <span>Submitted</span>
+            <span>Complete</span>
+          </div>
+        </div>
+      )}
+
+      {/* View Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+          <button
+            onClick={() => setViewMode('timeline')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'timeline'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            📅 Timeline
+          </button>
+          <button
+            onClick={() => setViewMode('history')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'history'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            📋 QA History ({reviews.length})
+          </button>
+        </div>
+        {feedbackSentAt && (
+          <div className="text-right">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+              ✓ Feedback Sent
+            </span>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {formatDate(feedbackSentAt)}
             </p>
           </div>
-          {feedbackSentAt && (
-            <div className="text-right">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                ✓ Feedback Sent
-              </span>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {formatDate(feedbackSentAt)}
-              </p>
+        )}
+      </div>
+
+      {/* Timeline View */}
+      {viewMode === 'timeline' && (
+        <div className="space-y-4">
+          {timeline.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <span className="text-4xl mb-4 block">📅</span>
+              <p>No activity recorded yet</p>
+            </div>
+          ) : (
+            <div className="relative">
+              {/* Timeline Line */}
+              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
+
+              {/* Timeline Events */}
+              {timeline.map((entry, index) => (
+                <div key={entry.id} className="relative pl-10 pb-6">
+                  {/* Timeline Dot */}
+                  <div className={`absolute left-2 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs ${
+                    entry.eventType === 'error'
+                      ? 'bg-red-500'
+                      : entry.eventType.includes('completed') || entry.eventType.includes('approved')
+                      ? 'bg-green-500'
+                      : entry.eventType.includes('started') || entry.eventType.includes('processing')
+                      ? 'bg-blue-500'
+                      : 'bg-gray-400'
+                  }`}>
+                    <span className="text-white">{entry.icon}</span>
+                  </div>
+
+                  {/* Event Card */}
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h5 className="font-medium text-gray-900 dark:text-white">
+                          {entry.title}
+                        </h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {entry.description}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatDateTime(entry.timestamp)}
+                        </span>
+                        {entry.actorId && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            by {entry.actorId}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </div>
-
-      {/* No reviews */}
-      {reviews.length === 0 && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <span className="text-4xl mb-4 block">📋</span>
-          <p>No review history found for this DR</p>
-        </div>
       )}
+
+      {/* History View */}
+      {viewMode === 'history' && (
+        <>
+          {/* No reviews */}
+          {reviews.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <span className="text-4xl mb-4 block">📋</span>
+              <p>No review history found for this DR</p>
+            </div>
+          )}
 
       {/* Review Timeline */}
       <div className="space-y-4">
@@ -278,7 +478,9 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
             </div>
           );
         })}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
