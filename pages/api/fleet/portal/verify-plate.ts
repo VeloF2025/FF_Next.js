@@ -15,11 +15,59 @@ import { log } from '@/lib/logger';
 import { verifyLicensePlate } from '@/modules/fleet/services/fleetVlmService';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // Debug folder for saving plate photos
 const DEBUG_PHOTO_DIR = '/tmp/fleet-plate-debug';
+
+// Max image dimensions for VLM (to stay under token limit)
+const MAX_IMAGE_WIDTH = 1024;
+const MAX_IMAGE_HEIGHT = 768;
+
+/**
+ * Resize image to fit within VLM token limits
+ * iPhone photos can be 4000x3000 which exceeds the model's context
+ */
+async function resizeImageForVlm(base64Image: string): Promise<string> {
+  const inputBuffer = Buffer.from(base64Image, 'base64');
+
+  // Get image metadata
+  const metadata = await sharp(inputBuffer).metadata();
+  const { width = 0, height = 0 } = metadata;
+
+  // Only resize if image is too large
+  if (width <= MAX_IMAGE_WIDTH && height <= MAX_IMAGE_HEIGHT) {
+    log.info('Image within limits, no resize needed', { width, height });
+    return base64Image;
+  }
+
+  log.info('Resizing large image for VLM', {
+    originalWidth: width,
+    originalHeight: height,
+    targetMax: `${MAX_IMAGE_WIDTH}x${MAX_IMAGE_HEIGHT}`
+  });
+
+  // Resize maintaining aspect ratio
+  const resizedBuffer = await sharp(inputBuffer)
+    .resize(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 85 })
+    .toBuffer();
+
+  const newMetadata = await sharp(resizedBuffer).metadata();
+  log.info('Image resized', {
+    newWidth: newMetadata.width,
+    newHeight: newMetadata.height,
+    originalSize: inputBuffer.length,
+    newSize: resizedBuffer.length
+  });
+
+  return resizedBuffer.toString('base64');
+}
 
 interface VerifyPlateRequest {
   platePhotoBase64: string;
@@ -98,8 +146,11 @@ export default async function handler(
         log.warn('Failed to save debug photo', { error: saveErr });
       }
 
+      // Resize image to fit VLM token limits (iPhone photos can be huge)
+      const resizedBase64 = await resizeImageForVlm(body.platePhotoBase64);
+
       // Use the VLM service to extract plate
-      const vlmResult = await verifyLicensePlate(body.platePhotoBase64, '');
+      const vlmResult = await verifyLicensePlate(resizedBase64, '');
       extractedPlate = vlmResult.plateText || '';
       confidence = vlmResult.confidence || 0;
 
