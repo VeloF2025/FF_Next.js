@@ -264,15 +264,11 @@ async function calculateSummary(filters?: {
     'COALESCE(submitted_date, created_at::DATE)',
     'project'
   );
-
-  // Conditions for qa_photo_reviews (WhatsApp installed)
-  const qaCond = buildConditions(
-    'COALESCE(whatsapp_message_date, created_at)::DATE',
-    'project'
+  // Conditions with upr. prefix for EXISTS subqueries (avoids ambiguous column reference)
+  const unifiedCondWithAlias = buildConditions(
+    'COALESCE(upr.submitted_date, upr.created_at::DATE)',
+    'upr.project'
   );
-
-  // Conditions for oes_activations
-  const oesCond = buildConditions('activation_date', 'project');
 
   const isCompleteCondition = `
     step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
@@ -313,7 +309,7 @@ async function calculateSummary(filters?: {
     WHERE EXISTS (
       SELECT 1 FROM dr_photo_unified_reviews upr
       WHERE upr.drop_number = oes.drop_number
-      ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
+      ${unifiedCondWithAlias.conditions.length > 0 ? 'AND ' + unifiedCondWithAlias.conditions.join(' AND ') : ''}
     )
   `;
 
@@ -321,7 +317,7 @@ async function calculateSummary(filters?: {
   const [unifiedResult, installedResult, activatedResult] = await Promise.all([
     pool.query(unifiedQuery, unifiedCond.params),
     pool.query(installedQuery, unifiedCond.params),
-    pool.query(activatedQuery, unifiedCond.params),
+    pool.query(activatedQuery, unifiedCondWithAlias.params),
   ]);
 
   const unifiedRow = unifiedResult.rows[0];
@@ -407,6 +403,8 @@ async function getProjectStats(filters?: {
 
   // Conditions based on unified table's submitted_date (first submission)
   const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
+  // Conditions with upr. prefix for JOIN queries (avoids ambiguous column reference)
+  const unifiedCondWithAlias = buildConditions('COALESCE(upr.submitted_date, upr.created_at::DATE)', 'upr.project');
 
   // Query 1: Complete/Incomplete from dr_photo_unified_reviews grouped by project
   const unifiedQuery = `
@@ -437,7 +435,7 @@ async function getProjectStats(filters?: {
       COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
     INNER JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
-    ${unifiedCond.conditions.length > 0 ? 'WHERE ' + unifiedCond.conditions.join(' AND ') : ''}
+    ${unifiedCondWithAlias.conditions.length > 0 ? 'WHERE ' + unifiedCondWithAlias.conditions.join(' AND ') : ''}
     GROUP BY COALESCE(upr.project, 'Unknown')
   `;
 
@@ -445,7 +443,7 @@ async function getProjectStats(filters?: {
   const [unifiedResult, installedResult, activatedResult] = await Promise.all([
     pool.query(unifiedQuery, unifiedCond.params),
     pool.query(installedQuery, unifiedCond.params),
-    pool.query(activatedQuery, unifiedCond.params),
+    pool.query(activatedQuery, unifiedCondWithAlias.params),
   ]);
 
   // Merge results by project
