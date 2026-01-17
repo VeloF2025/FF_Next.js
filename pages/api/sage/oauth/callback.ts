@@ -26,12 +26,12 @@ export default async function handler(
   // Handle OAuth errors from Sage
   if (error) {
     logger.error('OAuth error from Sage', { error, error_description });
-    return res.redirect(`/settings/integrations?error=${encodeURIComponent(String(error_description || error))}`);
+    return res.redirect(`/home?sage_error=${encodeURIComponent(String(error_description || error))}`);
   }
 
   if (!code || !state) {
     logger.error('Missing code or state in OAuth callback');
-    return res.redirect('/settings/integrations?error=Missing authorization code');
+    return res.redirect('/home?sage_error=Missing authorization code');
   }
 
   const sql = neon(process.env.DATABASE_URL!);
@@ -55,7 +55,7 @@ export default async function handler(
 
     if (configResult.length === 0) {
       logger.error('No Sage config found during OAuth callback');
-      return res.redirect('/settings/integrations?error=Configuration not found');
+      return res.redirect('/home?sage_error=Configuration not found');
     }
 
     const config = configResult[0];
@@ -66,13 +66,13 @@ export default async function handler(
         expected: config.oauth_state?.substring(0, 8) + '...',
         received: String(state).substring(0, 8) + '...',
       });
-      return res.redirect('/settings/integrations?error=Invalid state token');
+      return res.redirect('/home?sage_error=Invalid state token');
     }
 
     // Check if state has expired
     if (config.oauth_state_expires_at && new Date(config.oauth_state_expires_at) < new Date()) {
       logger.error('OAuth state has expired');
-      return res.redirect('/settings/integrations?error=Authorization expired. Please try again.');
+      return res.redirect('/home?sage_error=Authorization expired. Please try again.');
     }
 
     // Exchange code for tokens
@@ -119,8 +119,8 @@ export default async function handler(
 
     logger.info('Sage OAuth completed successfully', { configId: config.id });
 
-    // Redirect to settings page with success message
-    return res.redirect('/settings/integrations?sage=connected');
+    // Redirect to home page with success message
+    return res.redirect('/home?sage=connected');
   } catch (error) {
     logger.error('OAuth callback failed', { error });
 
@@ -147,6 +147,6 @@ export default async function handler(
     }
 
     const errorMessage = error instanceof Error ? error.message : 'Authorization failed';
-    return res.redirect(`/settings/integrations?error=${encodeURIComponent(errorMessage)}`);
+    return res.redirect(`/home?sage_error=${encodeURIComponent(errorMessage)}`);
   }
 }
