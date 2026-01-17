@@ -50,6 +50,8 @@ interface UnifiedReview {
   feedback_message: string | null;
   photos_metadata: Photo[] | null;
   photo_count: number;
+  ont_serial_scanned: string | null;
+  ups_serial_scanned: string | null;
 }
 
 // STEP_LABELS imported from stepMapper.ts
@@ -141,7 +143,9 @@ async function getUnifiedReview(dropNumber: string): Promise<UnifiedReview | nul
       feedback_sent,
       feedback_message,
       photos_metadata,
-      photo_count
+      photo_count,
+      ont_serial_scanned,
+      ups_serial_scanned
     FROM dr_photo_unified_reviews
     WHERE drop_number = $1;
     `,
@@ -222,63 +226,46 @@ function generateMissingPhotosWarning(missingSteps: number[]): string {
 }
 
 /**
- * Generate auto-feedback based on review results
+ * Generate receipt acknowledgment message
+ * Note: This is just a receipt - QA review (AI + human) will come later
  */
 function generateAutoFeedback(review: UnifiedReview): string {
-  // Safely handle null arrays from database
-  const incorrectSteps = review.incorrect_steps || [];
-  const incorrectComments = review.incorrect_comments || {};
-  const incorrectCount = incorrectSteps.length;
-  const aiPassed = review.ai_overall_status === 'PASS';
-  const aiScore = review.ai_average_score || 0;
-
-  // Detect missing photo steps
+  const photoCount = review.photo_count || 0;
   const missingSteps = detectMissingSteps(review.photos_metadata);
-  const missingPhotosWarning = generateMissingPhotosWarning(missingSteps);
+  const stepsReceived = 10 - missingSteps.length;
 
-  // Submission received - AI initial check passed
-  if (incorrectCount === 0 && aiPassed) {
-    let message = `📥 *${review.drop_number} - Submission received*\n\n` +
-      `AI Pre-check: *PASS* (${aiScore.toFixed(1)}/10)\n\n` +
-      `Photos submitted. Pending QA verification.`;
+  // Build message
+  let message = `📥 *${review.drop_number} - Received*\n\n`;
 
-    message += missingPhotosWarning;
+  // Photo summary
+  message += `📷 *${photoCount} photos* (${stepsReceived}/10 steps)\n`;
 
-    return message;
+  // Serial numbers
+  if (review.ont_serial_scanned) {
+    message += `🔌 ONT: ${review.ont_serial_scanned}\n`;
+  } else {
+    message += `🔌 ONT: _Not scanned_\n`;
   }
 
-  // Submission received - AI flagged potential issues
-  if (incorrectCount === 0 && !aiPassed) {
-    let message = `📥 *${review.drop_number} - Submission received*\n\n` +
-      `AI Pre-check: *NEEDS REVIEW* (${aiScore.toFixed(1)}/10)\n\n` +
-      `Photos submitted but AI flagged potential issues. QA will review.`;
-
-    message += missingPhotosWarning;
-
-    return message;
+  if (review.ups_serial_scanned) {
+    message += `🔋 UPS: ${review.ups_serial_scanned}\n`;
+  } else {
+    message += `🔋 UPS: _Not scanned_\n`;
   }
 
-  // QA review found issues - needs resubmission
-  if (incorrectCount > 0) {
-    let message = `❌ *${review.drop_number} - ${incorrectCount} issue${incorrectCount > 1 ? 's' : ''} found*\n\n`;
-
-    message += `Please address the following:\n\n`;
-
-    incorrectSteps.forEach((stepStr) => {
-      const step = parseInt(stepStr);
-      const comment = incorrectComments[stepStr] || 'No comment provided';
-      message += `*Step ${step}:* ${comment}\n`;
-    });
-
-    message += missingPhotosWarning;
-
-    message += `\nPlease fix and resubmit.`;
-
-    return message;
+  // Missing photos
+  if (missingSteps.length > 0 && missingSteps.length < 10) {
+    message += `\n⚠️ *Missing:*\n`;
+    for (const step of missingSteps) {
+      message += `• Step ${step} (${STEP_LABELS[step]})\n`;
+    }
+    message += `\nPlease upload missing photos.`;
   }
 
-  // Fallback (should not happen)
-  return `*${review.drop_number}* - Submission received. Pending QA review.${missingPhotosWarning}`;
+  // Footer
+  message += `\n\n_QA review to follow._`;
+
+  return message;
 }
 
 /**
