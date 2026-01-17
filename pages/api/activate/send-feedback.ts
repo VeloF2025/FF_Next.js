@@ -16,7 +16,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { PHOTO_TYPE_TO_STEP, STEP_LABELS } from '@/modules/activate/utils/stepMapper';
+import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -257,7 +257,7 @@ function generateAutoFeedback(review: UnifiedReview): string {
   if (missingSteps.length > 0 && missingSteps.length < 10) {
     message += `\n⚠️ *Missing:*\n`;
     for (const step of missingSteps) {
-      message += `• Step ${step} (${STEP_LABELS[step]})\n`;
+      message += `• ${STEP_DESCRIPTIONS[step]}\n`;
     }
     message += `\nPlease upload missing photos.`;
   }

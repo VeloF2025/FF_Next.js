@@ -70,7 +70,7 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
 };
 
 /**
- * Step Labels for Human-Readable Display
+ * Step Labels for Human-Readable Display (short)
  */
 export const STEP_LABELS: Record<number, string> = {
   1: 'House Photo',
@@ -83,6 +83,22 @@ export const STEP_LABELS: Record<number, string> = {
   8: 'Final Installation',
   9: 'Green Lights',
   10: 'Signature',
+};
+
+/**
+ * Step Descriptions for Friendly Feedback Messages
+ */
+export const STEP_DESCRIPTIONS: Record<number, string> = {
+  1: 'Photo of the house/property',
+  2: 'Cable running from the pole',
+  3: 'Cable entry point outside',
+  4: 'Cable entry point inside',
+  5: 'Wall installation area',
+  6: 'ONT device back view',
+  7: 'Power meter reading',
+  8: 'Completed installation',
+  9: 'Green lights on ONT',
+  10: 'Customer signature',
 };
 
 /**
