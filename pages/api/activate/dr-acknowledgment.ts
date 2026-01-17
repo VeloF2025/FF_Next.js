@@ -56,6 +56,7 @@ function extractOntSerial(barcodeData: string | null): string | null {
 
 /**
  * Generate WhatsApp acknowledgment message
+ * Returns empty string if DR not found - Go bridge will skip sending
  */
 function generateAckMessage(
   dropNumber: string,
@@ -64,13 +65,11 @@ function generateAckMessage(
   ontSerial: string | null,
   upsSerial: string | null
 ): string {
+  // If DR not found in 1Map, return empty string
+  // Go bridge checks for empty message and won't send anything
+  // This prevents confusing "Received!" messages for invalid DRs
   if (!found) {
-    return (
-      `📸 *${dropNumber} Received!*\n\n` +
-      `⏳ Photos not yet available in 1Map.\n` +
-      `Please ensure photos are uploaded to OneMap.\n\n` +
-      `Thank you! We'll process your submission shortly.`
-    );
+    return '';
   }
 
   const photoLine =
@@ -150,7 +149,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const message = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial);
     const duration = Date.now() - startTime;
 
-    log.info('DrAcknowledgment', `Acknowledgment ready for ${dropNumber} in ${duration}ms`);
+    if (!found) {
+      log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map - returning empty message (no ack will be sent)`);
+    } else {
+      log.info('DrAcknowledgment', `Acknowledgment ready for ${dropNumber} in ${duration}ms`);
+    }
 
     return apiResponse.success(res, {
       dropNumber,
