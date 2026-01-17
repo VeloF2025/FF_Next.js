@@ -19,3 +19,22 @@ export {
   type SageApiResponse,
   type SageApiError,
 } from './sageClient';
+
+// Sync services
+export {
+  pullSuppliersFromSage,
+  getUnmatchedSuppliers,
+  manuallyMapSupplier,
+  getSupplierMapping,
+} from './entities/supplierSync';
+
+export {
+  pullInvoicesFromSage,
+  getUnmatchedInvoices,
+  manuallyMatchInvoice,
+} from './entities/invoiceSync';
+
+export {
+  pullPaymentsFromSage,
+  getPOPaymentSummary,
+} from './entities/paymentSync';
