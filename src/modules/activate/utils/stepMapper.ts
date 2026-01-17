@@ -28,13 +28,10 @@
 export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 1: House Photo
   'ph_prop': 1,
-  'ph_sign1': 1,
-  'ph_drop': 1,
-  'ph_outs': 1,
 
   // Step 2: Cable from Pole
   'ph_pole': 2,
-  'ph_cbl_r': 2,
+  'ph_outs': 2,
 
   // Step 3: Cable Entry Outside
   'ph_entry_out': 3,
@@ -50,23 +47,42 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 6: ONT Back After Install
   'ph_ont': 6,
   'ph_ont_back': 6,
+  'ph_drop': 6,
+  'ph_cbl_r': 6,
+  'ph_bl': 6,
 
   // Step 7: Power Meter Reading
   'ph_powm': 7,
   'ph_powm1': 7,
   'ph_powm2': 7,
 
-  // Step 8: Final Installation (was step 10)
+  // Step 8: Final Installation
   'ph_after': 8,
   'ph_final': 8,
 
-  // Step 9: Green Lights on ONT (was step 11)
+  // Step 9: Green Lights on ONT
   'ph_lights': 9,
   'ph_led': 9,
 
-  // Step 10: Signature (was step 12)
+  // Step 10: Signature
   'ph_sign2': 10,
   'ph_signature': 10,
+};
+
+/**
+ * Step Labels for Human-Readable Display
+ */
+export const STEP_LABELS: Record<number, string> = {
+  1: 'House Photo',
+  2: 'Cable from Pole',
+  3: 'Entry Outside',
+  4: 'Entry Inside',
+  5: 'Wall',
+  6: 'ONT Back',
+  7: 'Power Meter',
+  8: 'Final Installation',
+  9: 'Green Lights',
+  10: 'Signature',
 };
 
 /**
@@ -76,12 +92,12 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
  * Used for reverse lookup and validation.
  */
 export const STEP_TO_PHOTO_TYPES: Record<number, string[]> = {
-  1: ['ph_prop', 'ph_sign1', 'ph_drop', 'ph_outs'],
-  2: ['ph_pole', 'ph_cbl_r'],
+  1: ['ph_prop'],
+  2: ['ph_pole', 'ph_outs'],
   3: ['ph_entry_out', 'ph_hm_ln'],
   4: ['ph_entry_in', 'ph_hm_en'],
   5: ['ph_wall'],
-  6: ['ph_ont', 'ph_ont_back'],
+  6: ['ph_ont', 'ph_ont_back', 'ph_drop', 'ph_cbl_r', 'ph_bl'],
   7: ['ph_powm', 'ph_powm1', 'ph_powm2'],
   8: ['ph_after', 'ph_final'],
   9: ['ph_lights', 'ph_led'],

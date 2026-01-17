@@ -16,6 +16,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { PHOTO_TYPE_TO_STEP, STEP_LABELS } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -35,6 +36,7 @@ interface Photo {
   filename: string;
   step: number | null;
   url: string;
+  original_type?: string;
 }
 
 interface UnifiedReview {
@@ -50,21 +52,7 @@ interface UnifiedReview {
   photo_count: number;
 }
 
-/**
- * Step labels for feedback messages
- */
-const STEP_LABELS: Record<number, string> = {
-  1: 'House Photo',
-  2: 'Cable from Pole',
-  3: 'Entry Outside',
-  4: 'Entry Inside',
-  5: 'Wall',
-  6: 'ONT Back',
-  7: 'Power Meter',
-  8: 'Final Installation',
-  9: 'Green Lights',
-  10: 'Signature',
-};
+// STEP_LABELS imported from stepMapper.ts
 
 /**
  * POST /api/activate/send-feedback
@@ -164,7 +152,23 @@ async function getUnifiedReview(dropNumber: string): Promise<UnifiedReview | nul
 }
 
 /**
+ * Extract photo type from a photo object
+ * Prefers original_type field, falls back to parsing filename
+ */
+function extractPhotoType(photo: Photo): string | null {
+  // Prefer original_type if available
+  if (photo.original_type) {
+    return photo.original_type;
+  }
+
+  // Fallback: parse from filename (DR1234_ph_prop_001.jpg)
+  const match = photo.filename.match(/DR\d+_([a-z_]+\d*)_\d+\./i);
+  return match ? match[1] : null;
+}
+
+/**
  * Detect which steps are missing photos
+ * Dynamically maps photo types to steps using PHOTO_TYPE_TO_STEP
  * Returns array of missing step numbers (1-10)
  */
 function detectMissingSteps(photos: Photo[] | null): number[] {
@@ -173,9 +177,21 @@ function detectMissingSteps(photos: Photo[] | null): number[] {
   }
 
   const stepsWithPhotos = new Set<number>();
+
   for (const photo of photos) {
+    // First try pre-computed step
     if (photo.step && photo.step >= 1 && photo.step <= 10) {
       stepsWithPhotos.add(photo.step);
+      continue;
+    }
+
+    // Fallback: extract type and map to step dynamically
+    const photoType = extractPhotoType(photo);
+    if (photoType) {
+      const step = PHOTO_TYPE_TO_STEP[photoType];
+      if (step && step >= 1 && step <= 10) {
+        stepsWithPhotos.add(step);
+      }
     }
   }
 
