@@ -61,7 +61,7 @@ interface VehicleInfo {
 
 export default function VehicleCheckInHistoryPage() {
   const router = useRouter();
-  const { vehicleId } = router.query;
+  const { id: vehicleId } = router.query;
 
   const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
   const [records, setRecords] = useState<CheckRecord[]>([]);

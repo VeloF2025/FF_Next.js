@@ -1,6 +1,6 @@
 /**
  * API: Vehicle Check-In Records
- * GET /api/fleet/vehicles/[vehicleId]/check-records - List check-in records for a vehicle
+ * GET /api/fleet/vehicles/[id]/check-records - List check-in records for a vehicle
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -9,7 +9,7 @@ import { getCheckRecords } from '@/modules/fleet/services/checkInService';
 import type { CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { vehicleId, limit, offset, status } = req.query;
+  const { id: vehicleId, limit, offset, status } = req.query;
 
   if (!vehicleId || typeof vehicleId !== 'string') {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Vehicle ID is required');
