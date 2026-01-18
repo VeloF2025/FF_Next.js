@@ -38,16 +38,51 @@ sudo nvidia-smi -c 3  # Exclusive_Process
 | 1 | ~80,000 | Maximum context |
 
 ## Image Size Limits
-**CRITICAL:** Resize images before sending to VLM
-- Max: 1024x768 for plates, 1280x960 for documents
-- Use `sharp` library:
+**CRITICAL:** Resize images before sending to VLM - 4K images cause misreads!
+
+### The Problem (Jan 2026)
+4K smartphone images (4032×3024, ~1.3MB) cause VLM to:
+- **Drop digits:** Odometer 167,443 → reads as 47,457 (missing leading digits)
+- **Misread gauges:** Fuel at 75% → reads as 25%
+- **Exceed token limits:** 400 errors with "decoder prompt is longer than maximum model length"
+
+### The Solution
+Resize to max **1280×960** before VLM processing:
 ```typescript
 import sharp from 'sharp';
-const resized = await sharp(buffer)
-  .resize(1024, 768, { fit: 'inside', withoutEnlargement: true })
-  .jpeg({ quality: 85 })
-  .toBuffer();
+
+const VLM_MAX_WIDTH = 1280;
+const VLM_MAX_HEIGHT = 960;
+const VLM_JPEG_QUALITY = 85;
+
+async function resizeImageForVlm(base64Image: string): Promise<string> {
+  const inputBuffer = Buffer.from(base64Image, 'base64');
+  const metadata = await sharp(inputBuffer).metadata();
+
+  // Skip if already small enough
+  if ((metadata.width || 0) <= VLM_MAX_WIDTH && (metadata.height || 0) <= VLM_MAX_HEIGHT) {
+    return base64Image;
+  }
+
+  const resizedBuffer = await sharp(inputBuffer)
+    .resize(VLM_MAX_WIDTH, VLM_MAX_HEIGHT, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: VLM_JPEG_QUALITY })
+    .toBuffer();
+
+  return resizedBuffer.toString('base64');
+}
 ```
+
+### Results After Fix
+| Image | Original | Resized | Size Reduction |
+|-------|----------|---------|----------------|
+| Dashboard | 4032×3024 (1296KB) | 1280×960 (140KB) | 89% smaller |
+| Fuel | 4032×3024 (905KB) | 1280×960 (139KB) | 85% smaller |
+
+| Reading | 4K Result | Resized Result |
+|---------|-----------|----------------|
+| Odometer | 47,457 ❌ | 157,467 ✅ |
+| Fuel | 25% ❌ | 85% ✅ |
 
 ## Benchmark System
 **Location:** `/home/velo/scripts/vllm/`
@@ -148,6 +183,18 @@ ls -la /home/velo/scripts/vllm/benchmarks/test-images/
 ```
 
 ## Used By
+- **Fleet Check-In:** Odometer/fuel gauge reading (`/api/fleet/check-in/process-vlm`)
+  - Service: `src/modules/fleet/services/fleetVlmService.ts` (has auto-resize)
+  - Hook: `src/modules/fleet/check-in/hooks/useCheckIn.ts`
 - **Fleet Portal:** License plate verification (`/api/fleet/portal/verify-plate`)
 - **Activate Module:** Photo categorization (`/api/activate/categorize-photos`)
 - **Staff Documents:** ID/License OCR (`/api/documents-ocr-preview`)
+
+## Fleet Check-In VLM Flow
+1. User takes photo → `processPhotoWithVlm()` called with temp IDs (preview mode)
+2. VLM extracts value with auto-resize → form auto-filled
+3. User submits → Record created with real ID
+4. Photo uploaded → VLM re-called with real IDs to persist results
+5. Results stored in `fleet_photo_vlm_results` and `fleet_odometer_history`
+
+**Note:** Preview mode (`photoId.startsWith('temp-')`) skips DB persistence for instant feedback.

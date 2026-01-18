@@ -522,24 +522,32 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
 
             // Re-process VLM with real record/photo IDs to persist results
             const photoConfig = requiredPhotos.find(p => p.type === type);
-            if (photoConfig?.vlmType && photoId) {
-              const base64 = photo.dataUrl.split(',')[1];
+            if (photoConfig?.vlmType && photoId && photo.dataUrl) {
+              const base64 = photo.dataUrl.includes(',')
+                ? photo.dataUrl.split(',')[1]
+                : photo.dataUrl;
 
-              // Fire and forget - don't block submission for VLM persistence
-              fetch('/api/fleet/check-in/process-vlm', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  photoId,
-                  recordId: record.id,
-                  vehicleId,
-                  analysisType: photoConfig.vlmType,
-                  base64Image: base64,
-                  expectedPlate: vehicleRegistration,
-                }),
-              }).catch(() => {
-                // Silently fail - VLM persistence is best-effort
-              });
+              if (base64) {
+                // Fire and forget - don't block submission for VLM persistence
+                fetch('/api/fleet/check-in/process-vlm', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    photoId,
+                    recordId: record.id,
+                    vehicleId,
+                    analysisType: photoConfig.vlmType,
+                    base64Image: base64,
+                    expectedPlate: vehicleRegistration,
+                  }),
+                })
+                  .then(r => r.ok ? console.log(`VLM persisted for ${type}`) : console.error(`VLM persist failed for ${type}: ${r.status}`))
+                  .catch(e => console.error(`VLM persist error for ${type}:`, e));
+              } else {
+                console.warn(`No base64 data for ${type} photo, skipping VLM persist`);
+              }
+            } else {
+              console.warn(`Skipping VLM persist for ${type}: vlmType=${photoConfig?.vlmType}, photoId=${photoId}, hasDataUrl=${!!photo.dataUrl}`);
             }
           }
         }
