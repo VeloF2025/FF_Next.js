@@ -464,14 +464,14 @@ function DailyCountsContent({
               </span>
             </span>
             <span className="text-yellow-600 dark:text-yellow-500">
-              Incomplete:{' '}
+              Not Reviewed:{' '}
               <span className="font-semibold">
-                {data.grand_total.incomplete}
+                {data.grand_total.notReviewed}
               </span>
             </span>
             <span className="text-green-600 dark:text-green-500">
-              Complete:{' '}
-              <span className="font-semibold">{data.grand_total.complete}</span>
+              Reviewed:{' '}
+              <span className="font-semibold">{data.grand_total.reviewed}</span>
             </span>
             {/* Anomaly counts */}
             {data.grand_total.anomalies && (data.grand_total.anomalies.wa_only > 0 || data.grand_total.anomalies.oes_only > 0) && (
@@ -559,11 +559,11 @@ function ProjectAccordion({
             <span className="font-semibold">{project.activated}</span>
           </span>
           <span className="text-yellow-600 dark:text-yellow-500">
-            Incomplete:{' '}
-            <span className="font-semibold">{project.incomplete}</span>
+            Not Reviewed:{' '}
+            <span className="font-semibold">{project.notReviewed}</span>
           </span>
           <span className="text-green-600 dark:text-green-500">
-            Complete: <span className="font-semibold">{project.complete}</span>
+            Reviewed: <span className="font-semibold">{project.reviewed}</span>
           </span>
           {/* Anomaly counts */}
           {project.anomalies && (project.anomalies.wa_only > 0 || project.anomalies.oes_only > 0) && (
@@ -649,10 +649,10 @@ function ZoneAccordion({
             Activated: {zone.activated}
           </span>
           <span className="text-yellow-600 dark:text-yellow-500">
-            Incomplete: {zone.incomplete}
+            Not Reviewed: {zone.notReviewed}
           </span>
           <span className="text-green-600 dark:text-green-500">
-            Complete: {zone.complete}
+            Reviewed: {zone.reviewed}
           </span>
           {/* Anomaly counts */}
           {zone.anomalies && (zone.anomalies.wa_only > 0 || zone.anomalies.oes_only > 0) && (
@@ -694,10 +694,10 @@ function ZoneAccordion({
                   {pon.activated}
                 </span>
                 <span className="text-yellow-600 dark:text-yellow-500">
-                  {pon.incomplete}
+                  {pon.notReviewed}
                 </span>
                 <span className="text-green-600 dark:text-green-500">
-                  {pon.complete}
+                  {pon.reviewed}
                 </span>
                 {/* Anomaly counts */}
                 {pon.anomalies && (pon.anomalies.wa_only > 0 || pon.anomalies.oes_only > 0) && (
@@ -1091,8 +1091,8 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
           color="purple"
         />
         <SummaryCard
-          title="Avg Completion"
-          value={`${data.summary.avg_completion_rate}%`}
+          title="Avg Review Rate"
+          value={`${data.summary.avg_review_rate}%`}
           color="green"
         />
         <SummaryCard
@@ -1142,10 +1142,10 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
                   Installed
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Complete
+                  Reviewed
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Completion %
+                  Review %
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Serial %
@@ -1175,19 +1175,19 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
                     {user.installed}
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 dark:text-green-500">
-                    {user.complete}
+                    {user.reviewed}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span
                       className={`font-medium ${
-                        user.completion_rate >= 80
+                        user.review_rate >= 80
                           ? 'text-green-600 dark:text-green-500'
-                          : user.completion_rate >= 50
+                          : user.review_rate >= 50
                             ? 'text-yellow-600 dark:text-yellow-500'
                             : 'text-red-600 dark:text-red-500'
                       }`}
                     >
-                      {user.completion_rate}%
+                      {user.review_rate}%
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm">

@@ -64,8 +64,8 @@ export function getPool(): Pool {
  *   Resubmissions are NOT counted again - only the first occurrence
  * - ACTIVATED: First OES appearance only (from oes_activations.activation_date)
  *   Uses OES date, INDEPENDENT of WA submission date
- * - COMPLETE: vlm_categorization_status = 'approved'
- * - INCOMPLETE: vlm_categorization_status != 'approved'
+ * - REVIEWED: feedback_sent = true (QA has reviewed and sent feedback)
+ * - NOT REVIEWED: feedback_sent = false or null
  *
  * ANOMALIES (for Reports tab):
  * - wa_only: Installed but not activated (may need maintenance ticket)
@@ -85,7 +85,7 @@ export async function getDailyCountsWithBreakdown(
       project,
     });
 
-    // Query 1: Get INSTALLED DRs with complete/incomplete status
+    // Query 1: Get INSTALLED DRs with reviewed/notReviewed status
     // Uses dr_photo_unified_reviews.submitted_date (first submission date, preserved on resubmission)
     const installedResult = await pool.query(
       `
@@ -95,9 +95,9 @@ export async function getDailyCountsWithBreakdown(
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
         CASE
-          WHEN upr.vlm_categorization_status = 'approved' THEN true
+          WHEN upr.feedback_sent = true THEN true
           ELSE false
-        END as is_complete
+        END as is_reviewed
       FROM dr_photo_unified_reviews upr
       LEFT JOIN drops d ON d.drop_number = upr.drop_number
       WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
@@ -141,7 +141,7 @@ export async function getDailyCountsWithBreakdown(
       const projectName = row.project || 'Unknown';
       const zoneNo = row.zone_no || 0;
       const ponNo = row.pon_no || 0;
-      const isComplete = row.is_complete === true;
+      const isReviewed = row.is_reviewed === true;
       const isActivated = activatedSet.has(row.drop_number);
 
       // Get or create project
@@ -152,8 +152,8 @@ export async function getDailyCountsWithBreakdown(
           total: 0,
           installed: 0,
           activated: 0,
-          incomplete: 0,
-          complete: 0,
+          notReviewed: 0,
+          reviewed: 0,
           zones: [],
           anomalies: emptyAnomalies(),
         });
@@ -169,10 +169,10 @@ export async function getDailyCountsWithBreakdown(
         // WA only anomaly: installed but not activated
         projectData.anomalies!.wa_only++;
       }
-      if (isComplete) {
-        projectData.complete++;
+      if (isReviewed) {
+        projectData.reviewed++;
       } else {
-        projectData.incomplete++;
+        projectData.notReviewed++;
       }
 
       // Find or create zone
@@ -185,8 +185,8 @@ export async function getDailyCountsWithBreakdown(
           total: 0,
           installed: 0,
           activated: 0,
-          incomplete: 0,
-          complete: 0,
+          notReviewed: 0,
+          reviewed: 0,
           anomalies: emptyAnomalies(),
         };
         projectData.zones.push(zone);
@@ -200,10 +200,10 @@ export async function getDailyCountsWithBreakdown(
       } else {
         zone.anomalies!.wa_only++;
       }
-      if (isComplete) {
-        zone.complete++;
+      if (isReviewed) {
+        zone.reviewed++;
       } else {
-        zone.incomplete++;
+        zone.notReviewed++;
       }
 
       // Find or create PON
@@ -215,8 +215,8 @@ export async function getDailyCountsWithBreakdown(
           total: 0,
           installed: 0,
           activated: 0,
-          incomplete: 0,
-          complete: 0,
+          notReviewed: 0,
+          reviewed: 0,
           anomalies: emptyAnomalies(),
         };
         zone.pons.push(pon);
@@ -230,10 +230,10 @@ export async function getDailyCountsWithBreakdown(
       } else {
         pon.anomalies!.wa_only++;
       }
-      if (isComplete) {
-        pon.complete++;
+      if (isReviewed) {
+        pon.reviewed++;
       } else {
-        pon.incomplete++;
+        pon.notReviewed++;
       }
     }
 
@@ -253,8 +253,8 @@ export async function getDailyCountsWithBreakdown(
           total: 0,
           installed: 0,
           activated: 0,
-          incomplete: 0,
-          complete: 0,
+          notReviewed: 0,
+          reviewed: 0,
           zones: [],
           anomalies: emptyAnomalies(),
         });
@@ -276,8 +276,8 @@ export async function getDailyCountsWithBreakdown(
           total: 0,
           installed: 0,
           activated: 0,
-          incomplete: 0,
-          complete: 0,
+          notReviewed: 0,
+          reviewed: 0,
           anomalies: emptyAnomalies(),
         };
         projectData.zones.push(zone);
@@ -296,8 +296,8 @@ export async function getDailyCountsWithBreakdown(
           total: 0,
           installed: 0,
           activated: 0,
-          incomplete: 0,
-          complete: 0,
+          notReviewed: 0,
+          reviewed: 0,
           anomalies: emptyAnomalies(),
         };
         zone.pons.push(pon);
@@ -323,14 +323,14 @@ export async function getDailyCountsWithBreakdown(
         total: acc.total + p.total,
         installed: acc.installed + p.installed,
         activated: acc.activated + p.activated,
-        incomplete: acc.incomplete + p.incomplete,
-        complete: acc.complete + p.complete,
+        notReviewed: acc.notReviewed + p.notReviewed,
+        reviewed: acc.reviewed + p.reviewed,
         anomalies: {
           wa_only: (acc.anomalies?.wa_only || 0) + (p.anomalies?.wa_only || 0),
           oes_only: (acc.anomalies?.oes_only || 0) + (p.anomalies?.oes_only || 0),
         },
       }),
-      { total: 0, installed: 0, activated: 0, incomplete: 0, complete: 0, anomalies: emptyAnomalies() }
+      { total: 0, installed: 0, activated: 0, notReviewed: 0, reviewed: 0, anomalies: emptyAnomalies() }
     );
 
     return {
@@ -568,8 +568,8 @@ export async function getSerialValidationReport(
  *
  * TERMINOLOGY:
  * - INSTALLED: DR submitted via WhatsApp (installation was done)
- * - COMPLETE: All steps/photos submitted AND verified by QA (vlm_categorization_status = 'approved')
- * - INCOMPLETE: Missing steps/photos OR not verified by QA
+ * - REVIEWED: feedback_sent = true (QA has reviewed and sent feedback)
+ * - NOT REVIEWED: feedback_sent = false or null
  * - ACTIVATED: DR confirmed as active on OES report
  *
  * Shows performance metrics for:
@@ -596,7 +596,7 @@ export async function getUserTeamAttributionReport(
         qpr.sender_phone,
         qpr.project,
         COUNT(*) as installed,
-        COUNT(*) FILTER (WHERE upr.vlm_categorization_status = 'approved') as complete,
+        COUNT(*) FILTER (WHERE upr.feedback_sent = true) as reviewed,
         COUNT(*) FILTER (WHERE oes.drop_number IS NOT NULL) as activated,
         COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as ont_scanned,
         COUNT(*) FILTER (WHERE upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned != '') as ups_scanned
@@ -615,7 +615,7 @@ export async function getUserTeamAttributionReport(
     // Map user performance with consistent terminology
     const users: UserPerformance[] = userResult.rows.map((row) => {
       const installed = parseInt(row.installed, 10) || 0;
-      const complete = parseInt(row.complete, 10) || 0;
+      const reviewed = parseInt(row.reviewed, 10) || 0;
       const activated = parseInt(row.activated, 10) || 0;
       const ontScanned = parseInt(row.ont_scanned, 10) || 0;
       const upsScanned = parseInt(row.ups_scanned, 10) || 0;
@@ -625,10 +625,10 @@ export async function getUserTeamAttributionReport(
         sender_phone: row.sender_phone,
         project: row.project || 'Unknown',
         installed,
-        complete,
-        incomplete: installed - complete,
+        reviewed,
+        notReviewed: installed - reviewed,
         activated,
-        completion_rate: installed > 0 ? Math.round((complete / installed) * 100) : 0,
+        review_rate: installed > 0 ? Math.round((reviewed / installed) * 100) : 0,
         activation_rate: installed > 0 ? Math.round((activated / installed) * 100) : 0,
         ont_scanned: ontScanned,
         ups_scanned: upsScanned,
@@ -675,10 +675,10 @@ export async function getUserTeamAttributionReport(
     // Calculate summary
     const totalUsers = users.length;
     const totalTeams = teams.length;
-    const avgCompletionRate =
+    const avgReviewRate =
       users.length > 0
         ? Math.round(
-            users.reduce((acc, u) => acc + u.completion_rate, 0) / users.length
+            users.reduce((acc, u) => acc + u.review_rate, 0) / users.length
           )
         : 0;
     const avgSerialCompliance =
@@ -696,7 +696,7 @@ export async function getUserTeamAttributionReport(
       summary: {
         total_users: totalUsers,
         total_teams: totalTeams,
-        avg_completion_rate: avgCompletionRate,
+        avg_review_rate: avgReviewRate,
         avg_serial_compliance: avgSerialCompliance,
       },
     };

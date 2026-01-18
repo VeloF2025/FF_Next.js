@@ -6,8 +6,8 @@
  *
  * TERMINOLOGY (consistent across all reports):
  * - INSTALLED: DR submitted via WhatsApp (installation was done)
- * - COMPLETE: All required steps/photos submitted AND verified by QA
- * - INCOMPLETE: Missing steps/photos OR not verified by QA
+ * - REVIEWED: QA feedback has been sent (feedback_sent = true)
+ * - NOT REVIEWED: QA feedback not yet sent
  * - ACTIVATED: DR confirmed as active on OES report
  *
  * Following PAI principles:
@@ -50,10 +50,10 @@ export interface PonBreakdown {
   installed: number;
   /** Confirmed active on OES report */
   activated: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
+  /** QA feedback not yet sent */
+  notReviewed: number;
+  /** QA feedback has been sent */
+  reviewed: number;
   /** Anomaly counts (for Reports tab) */
   anomalies?: AnomalyCounts;
 }
@@ -74,10 +74,10 @@ export interface ZoneBreakdown {
   installed: number;
   /** Confirmed active on OES report */
   activated: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
+  /** QA feedback not yet sent */
+  notReviewed: number;
+  /** QA feedback has been sent */
+  reviewed: number;
   /** Anomaly counts (for Reports tab) */
   anomalies?: AnomalyCounts;
 }
@@ -96,10 +96,10 @@ export interface ProjectDailyCount {
   installed: number;
   /** Confirmed active on OES report */
   activated: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
+  /** QA feedback not yet sent */
+  notReviewed: number;
+  /** QA feedback has been sent */
+  reviewed: number;
   /** Zone breakdowns (expanded when clicked) */
   zones: ZoneBreakdown[];
   /** Anomaly counts (for Reports tab) */
@@ -125,10 +125,10 @@ export interface DailyCountsResponse {
     installed: number;
     /** Confirmed active on OES report */
     activated: number;
-    /** Missing steps/photos OR not verified by QA */
-    incomplete: number;
-    /** All steps/photos submitted AND verified by QA */
-    complete: number;
+    /** QA feedback not yet sent */
+    notReviewed: number;
+    /** QA feedback has been sent */
+    reviewed: number;
     /** Anomaly counts (for Reports tab) */
     anomalies?: AnomalyCounts;
   };
@@ -297,14 +297,14 @@ export interface UserPerformance {
   // Counts (using consistent terminology)
   /** DRs submitted via WhatsApp (installation done) */
   installed: number;
-  /** All steps/photos submitted AND verified by QA */
-  complete: number;
-  /** Missing steps/photos OR not verified by QA */
-  incomplete: number;
+  /** QA feedback has been sent */
+  reviewed: number;
+  /** QA feedback not yet sent */
+  notReviewed: number;
   /** Confirmed active on OES report */
   activated: number;
-  /** Completion rate (0-100) */
-  completion_rate: number;
+  /** Review rate (0-100) */
+  review_rate: number;
   /** Activation rate (0-100) */
   activation_rate: number;
 
@@ -358,8 +358,8 @@ export interface UserTeamAttributionResponse {
     total_users: number;
     /** Total unique teams */
     total_teams: number;
-    /** Average completion rate */
-    avg_completion_rate: number;
+    /** Average review rate */
+    avg_review_rate: number;
     /** Average serial compliance */
     avg_serial_compliance: number;
   };

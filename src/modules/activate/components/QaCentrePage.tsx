@@ -335,12 +335,12 @@ function QaCentrePageContent() {
                   </label>
                   <select
                     value={filters.statusFilter}
-                    onChange={(e) => updateFilter('statusFilter', e.target.value as 'all' | 'complete' | 'incomplete')}
+                    onChange={(e) => updateFilter('statusFilter', e.target.value as 'all' | 'reviewed' | 'notReviewed')}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="all">All Statuses</option>
-                    <option value="incomplete">Incomplete</option>
-                    <option value="complete">Complete</option>
+                    <option value="notReviewed">Not Reviewed</option>
+                    <option value="reviewed">Reviewed</option>
                   </select>
                 </div>
 

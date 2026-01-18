@@ -42,7 +42,7 @@ export interface ActivateFilters {
   searchTerm: string;
   dateFrom: string;
   dateTo: string;
-  statusFilter: 'all' | 'complete' | 'incomplete';
+  statusFilter: 'all' | 'reviewed' | 'notReviewed';
   projectFilter: string;
 }
 
@@ -97,8 +97,8 @@ const defaultDashboardStats: DashboardStats = {
   totalDrops: 0,
   installed: 0,
   activated: 0,
-  incomplete: 0,
-  complete: 0,
+  notReviewed: 0,
+  reviewed: 0,
   totalFeedback: 0,
 };
 
@@ -187,8 +187,8 @@ export function ActivateDataProvider({
           totalDrops: response.summary.totalDrops,
           installed: response.summary.installed ?? 0,
           activated: response.summary.activated ?? 0,
-          incomplete: response.summary.incomplete,
-          complete: response.summary.complete,
+          notReviewed: response.summary.notReviewed,
+          reviewed: response.summary.reviewed,
           totalFeedback: response.summary.totalFeedback,
         });
         setProjectStats(response.projectStats);
@@ -233,8 +233,11 @@ export function ActivateDataProvider({
   });
 
   // Initial fetch when filters change
+  // Note: Empty dateFrom/dateTo means "All" - still needs to fetch
   useEffect(() => {
-    if (filters.dateFrom && filters.dateTo) {
+    // Only fetch if either both dates are set OR both are empty ("All" filter)
+    const hasValidDateRange = (filters.dateFrom && filters.dateTo) || (!filters.dateFrom && !filters.dateTo);
+    if (hasValidDateRange) {
       setCurrentPage(1);
       fetchData(true, 1);
     }

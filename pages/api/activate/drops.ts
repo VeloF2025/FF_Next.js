@@ -65,8 +65,8 @@ interface ProjectStats {
   total: number;
   installed: number;
   activated: number;
-  complete: number;
-  incomplete: number;
+  reviewed: number;
+  notReviewed: number;
 }
 
 interface Summary {
@@ -76,10 +76,10 @@ interface Summary {
   installed: number;
   /** DRs present in OES activation report */
   activated: number;
-  /** DRs not yet fully QA reviewed */
-  incomplete: number;
-  /** DRs marked complete by HITL/AI */
-  complete: number;
+  /** DRs not yet QA reviewed */
+  notReviewed: number;
+  /** DRs that have been QA reviewed */
+  reviewed: number;
   /** DRs with feedback sent */
   totalFeedback: number;
   // Legacy fields for backward compatibility
@@ -174,17 +174,11 @@ async function getPaginatedDrops(
     paramIndex++;
   }
 
-  // Status filter (complete/incomplete)
-  const isCompleteCondition = `(
-    u.step_01_house_photo AND u.step_02_cable_from_pole AND u.step_03_entry_outside AND
-    u.step_04_entry_inside AND u.step_05_wall AND u.step_06_ont_back AND
-    u.step_07_power_meter AND u.step_08_final_installation AND u.step_09_green_lights AND
-    u.step_10_signature
-  )`;
-  if (filters?.status === 'complete') {
-    conditions.push(isCompleteCondition);
-  } else if (filters?.status === 'incomplete') {
-    conditions.push(`NOT ${isCompleteCondition}`);
+  // Status filter (reviewed/notReviewed based on feedback_sent)
+  if (filters?.status === 'reviewed') {
+    conditions.push('u.feedback_sent = true');
+  } else if (filters?.status === 'notReviewed') {
+    conditions.push('(u.feedback_sent IS NULL OR u.feedback_sent = false)');
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -380,25 +374,26 @@ async function calculateSummary(filters?: {
 
   // Total = INSTALLED + OES-only (all DRs in system for this period)
   let total = installed + oesOnly;
-  let complete = parseInt(installedRow?.complete || '0', 10);
-  let incomplete = installed - complete;
+  // Reviewed = feedback_sent (QA has reviewed and sent feedback)
+  let reviewed = parseInt(installedRow?.feedback_sent || '0', 10);
+  let notReviewed = installed - reviewed;
   const feedbackSent = parseInt(installedRow?.feedback_sent || '0', 10);
 
   // Apply status filter to the results
-  if (filters?.status === 'complete') {
-    total = complete;
-    incomplete = 0;
-  } else if (filters?.status === 'incomplete') {
-    total = incomplete;
-    complete = 0;
+  if (filters?.status === 'reviewed') {
+    total = reviewed;
+    notReviewed = 0;
+  } else if (filters?.status === 'notReviewed') {
+    total = notReviewed;
+    reviewed = 0;
   }
 
   return {
     totalDrops: total,
     installed,
     activated,
-    incomplete: filters?.status === 'complete' ? 0 : (filters?.status === 'incomplete' ? total : incomplete),
-    complete,
+    notReviewed: filters?.status === 'reviewed' ? 0 : (filters?.status === 'notReviewed' ? total : notReviewed),
+    reviewed,
     totalFeedback: feedbackSent,
     // Legacy fields
     feedback_sent: feedbackSent,
@@ -452,13 +447,13 @@ async function getProjectStats(filters?: {
   // Conditions based on unified table's submitted_date (first submission)
   const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
 
-  // Query 1: INSTALLED from dr_photo_unified_reviews with complete count
-  // Complete = vlm_categorization_status = 'approved'
+  // Query 1: INSTALLED from dr_photo_unified_reviews with reviewed count
+  // Reviewed = feedback_sent = true (QA has reviewed and sent feedback)
   const installedQuery = `
     SELECT
       COALESCE(project, 'Unknown') as project,
       COUNT(*) as installed,
-      COUNT(*) FILTER (WHERE vlm_categorization_status = 'approved') as complete
+      COUNT(*) FILTER (WHERE feedback_sent = true) as reviewed
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}
     GROUP BY COALESCE(project, 'Unknown')
@@ -514,14 +509,14 @@ async function getProjectStats(filters?: {
   // Initialize from installed results
   for (const row of installedResult.rows) {
     const installed = parseInt(row.installed, 10);
-    const complete = parseInt(row.complete, 10);
+    const reviewed = parseInt(row.reviewed, 10);
     projectMap.set(row.project, {
       project: row.project,
       total: installed, // Will add OES-only below
       installed,
       activated: 0,
-      complete,
-      incomplete: installed - complete,
+      reviewed,
+      notReviewed: installed - reviewed,
     });
   }
 
@@ -536,8 +531,8 @@ async function getProjectStats(filters?: {
         total: 0, // Will add OES-only below
         installed: 0,
         activated: parseInt(row.activated, 10),
-        complete: 0,
-        incomplete: 0,
+        reviewed: 0,
+        notReviewed: 0,
       });
     }
   }
@@ -554,8 +549,8 @@ async function getProjectStats(filters?: {
         total: oesOnly,
         installed: 0,
         activated: oesOnly, // OES-only means they're all activated
-        complete: 0,
-        incomplete: 0,
+        reviewed: 0,
+        notReviewed: 0,
       });
     }
   }
@@ -564,15 +559,15 @@ async function getProjectStats(filters?: {
   const stats = Array.from(projectMap.values());
 
   // Apply status filter
-  if (filters?.status === 'complete') {
+  if (filters?.status === 'reviewed') {
     return stats
-      .filter((s) => s.complete > 0)
-      .map((s) => ({ ...s, total: s.complete, incomplete: 0 }))
+      .filter((s) => s.reviewed > 0)
+      .map((s) => ({ ...s, total: s.reviewed, notReviewed: 0 }))
       .sort((a, b) => b.total - a.total);
-  } else if (filters?.status === 'incomplete') {
+  } else if (filters?.status === 'notReviewed') {
     return stats
-      .filter((s) => s.incomplete > 0)
-      .map((s) => ({ ...s, total: s.incomplete, complete: 0 }))
+      .filter((s) => s.notReviewed > 0)
+      .map((s) => ({ ...s, total: s.notReviewed, reviewed: 0 }))
       .sort((a, b) => b.total - a.total);
   }
 

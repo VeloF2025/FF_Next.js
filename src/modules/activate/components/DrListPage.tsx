@@ -280,7 +280,7 @@ function DashboardPageContent() {
         {/* Dashboard Tab Content */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Dashboard Stats - Order: Total, Installed, Activated, Incomplete, Complete */}
+            {/* Dashboard Stats - Order: Total, Installed, Activated, Not Reviewed, Reviewed */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               {/* Total Drops */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
@@ -315,23 +315,23 @@ function DashboardPageContent() {
                 )}
               </div>
 
-              {/* Incomplete - Not yet QA reviewed */}
+              {/* Not Reviewed - Feedback not yet sent */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
-                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Incomplete</h3>
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Not Reviewed</h3>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500 mt-1">{dashboardStats.incomplete}</p>
+                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500 mt-1">{dashboardStats.notReviewed}</p>
                 )}
               </div>
 
-              {/* Complete - QA reviewed complete */}
+              {/* Reviewed - QA feedback sent */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
-                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Complete</h3>
+                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Reviewed</h3>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{dashboardStats.complete}</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{dashboardStats.reviewed}</p>
                 )}
               </div>
             </div>
@@ -424,12 +424,12 @@ function DashboardPageContent() {
                       </label>
                       <select
                         value={filters.statusFilter}
-                        onChange={(e) => setFilters(prev => ({ ...prev, statusFilter: e.target.value as 'all' | 'complete' | 'incomplete' }))}
+                        onChange={(e) => setFilters(prev => ({ ...prev, statusFilter: e.target.value as 'all' | 'reviewed' | 'notReviewed' }))}
                         className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
                       >
                         <option value="all">All Statuses</option>
-                        <option value="complete">Complete</option>
-                        <option value="incomplete">Incomplete</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="notReviewed">Not Reviewed</option>
                       </select>
                     </div>
 
@@ -502,8 +502,8 @@ function DashboardPageContent() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Installed</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Activated</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wider">Incomplete</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wider">Complete</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wider">Not Reviewed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wider">Reviewed</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -535,8 +535,8 @@ function DashboardPageContent() {
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{stat.total}</td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">{stat.installed ?? 0}</td>
                             <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 dark:text-purple-400">{stat.activated ?? 0}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.incomplete}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.complete}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.notReviewed}</td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.reviewed}</td>
                           </tr>
                         ))}
                         {/* Summary Row */}
@@ -564,13 +564,13 @@ function DashboardPageContent() {
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
-                            ).reduce((sum, s) => sum + s.incomplete, 0)}
+                            ).reduce((sum, s) => sum + s.notReviewed, 0)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-500">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
-                            ).reduce((sum, s) => sum + s.complete, 0)}
+                            ).reduce((sum, s) => sum + s.reviewed, 0)}
                           </td>
                         </tr>
                       </>
