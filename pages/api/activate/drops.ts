@@ -38,6 +38,11 @@ interface UnifiedDrop {
   feedback_sent: boolean;
   created_at: string;
   updated_at: string;
+  // OneMap synced data (from foto_ai_reviews)
+  onemap_ont_serial: string | null;
+  onemap_ups_serial: string | null;
+  sender_phone: string | null;
+  submitted_date: string | null;
   // Step completion status (10 steps after migration 054)
   step_01_house_photo: boolean;
   step_02_cable_from_pole: boolean;
@@ -124,29 +129,74 @@ function countCompletedSteps(drop: any): number {
 
 /**
  * Get paginated drops from dr_photo_unified_reviews
+ * LEFT JOINs with foto_ai_reviews to get OneMap synced data (serials)
  */
 async function getPaginatedDrops(
   page: number,
   pageSize: number,
-  searchTerm?: string
+  searchTerm?: string,
+  filters?: {
+    dateFrom?: string;
+    dateTo?: string;
+    project?: string;
+    status?: string;
+  }
 ): Promise<{ drops: UnifiedDrop[]; pagination: any }> {
   const offset = (page - 1) * pageSize;
 
-  let whereClause = '';
+  const conditions: string[] = [];
   const params: any[] = [];
+  let paramIndex = 1;
 
+  // Search filter
   if (searchTerm) {
-    whereClause = 'WHERE drop_number ILIKE $1 OR project ILIKE $1';
+    conditions.push(`(u.drop_number ILIKE $${paramIndex} OR u.project ILIKE $${paramIndex})`);
     params.push(`%${searchTerm}%`);
+    paramIndex++;
   }
 
-  // Build queries
-  const countQuery = `SELECT COUNT(*) FROM dr_photo_unified_reviews ${whereClause}`;
+  // Date filters
+  if (filters?.dateFrom) {
+    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) >= $${paramIndex}::DATE`);
+    params.push(filters.dateFrom);
+    paramIndex++;
+  }
+  if (filters?.dateTo) {
+    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) <= $${paramIndex}::DATE`);
+    params.push(filters.dateTo);
+    paramIndex++;
+  }
+
+  // Project filter
+  if (filters?.project && filters.project !== 'all') {
+    conditions.push(`u.project = $${paramIndex}`);
+    params.push(filters.project);
+    paramIndex++;
+  }
+
+  // Status filter (complete/incomplete)
+  const isCompleteCondition = `(
+    u.step_01_house_photo AND u.step_02_cable_from_pole AND u.step_03_entry_outside AND
+    u.step_04_entry_inside AND u.step_05_wall AND u.step_06_ont_back AND
+    u.step_07_power_meter AND u.step_08_final_installation AND u.step_09_green_lights AND
+    u.step_10_signature
+  )`;
+  if (filters?.status === 'complete') {
+    conditions.push(isCompleteCondition);
+  } else if (filters?.status === 'incomplete') {
+    conditions.push(`NOT ${isCompleteCondition}`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // Build queries - serials are in dr_photo_unified_reviews (synced from 1Map)
+  const countQuery = `SELECT COUNT(*) FROM dr_photo_unified_reviews u ${whereClause}`;
   const dataQuery = `
-    SELECT * FROM dr_photo_unified_reviews
+    SELECT u.*
+    FROM dr_photo_unified_reviews u
     ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    ORDER BY u.created_at DESC
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
   `;
   const dataParams = [...params, pageSize, offset];
 
@@ -222,12 +272,12 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
 /**
  * Calculate summary statistics with optional filters
  *
- * Terminology:
- * - totalDrops: Total unique drops (counted once at first install)
- * - installed: Unique valid DRs from WhatsApp (qa_photo_reviews)
- * - activated: DRs present in OES activation report (oes_activations)
- * - incomplete: DRs not yet fully QA reviewed
- * - complete: DRs marked complete by HITL/AI
+ * CORRECTED LOGIC (Jan 2026) - Aligned with reportingService:
+ * - totalDrops: INSTALLED + OES-only (all DRs in system for selected period)
+ * - installed: Unique DRs from WhatsApp (first submission in date range)
+ * - activated: DRs in OES report (activation_date in date range, independent)
+ * - incomplete: DRs where vlm_categorization_status != 'approved'
+ * - complete: DRs where vlm_categorization_status = 'approved'
  */
 async function calculateSummary(filters?: {
   dateFrom?: string;
@@ -259,31 +309,20 @@ async function calculateSummary(filters?: {
     return { conditions, params, whereClause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' };
   };
 
-  // Conditions for dr_photo_unified_reviews
+  // Conditions for dr_photo_unified_reviews (INSTALLED)
   const unifiedCond = buildConditions(
     'COALESCE(submitted_date, created_at::DATE)',
     'project'
   );
-  // Conditions with upr. prefix for EXISTS subqueries (avoids ambiguous column reference)
-  const unifiedCondWithAlias = buildConditions(
-    'COALESCE(upr.submitted_date, upr.created_at::DATE)',
-    'upr.project'
-  );
-  // Conditions for OES activations - filter by activation_date from OES report
-  const oesCond = buildConditions('oes.activation_date', 'upr.project');
+  // Conditions for OES activations (ACTIVATED - independent date context)
+  const oesCond = buildConditions('activation_date', 'upr.project');
 
-  const isCompleteCondition = `
-    step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
-    step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
-    step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
-    step_10_signature
-  `;
-
-  // Query 1: Complete/Incomplete from dr_photo_unified_reviews
-  const unifiedQuery = `
+  // Query 1: INSTALLED - DRs from WhatsApp (dr_photo_unified_reviews)
+  // Also gets complete/incomplete counts based on vlm_categorization_status
+  const installedQuery = `
     SELECT
-      COUNT(*) as total_drops,
-      COUNT(*) FILTER (WHERE ${isCompleteCondition}) as complete,
+      COUNT(*) as installed,
+      COUNT(*) FILTER (WHERE vlm_categorization_status = 'approved') as complete,
       COUNT(*) FILTER (WHERE feedback_sent = true) as feedback_sent,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'pending' OR vlm_categorization_status IS NULL) as vlm_pending,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'processing') as vlm_processing,
@@ -293,40 +332,57 @@ async function calculateSummary(filters?: {
     ${unifiedCond.whereClause}
   `;
 
-  // Query 2: Installed count - DRs whose FIRST submission (submitted_date) is in date range
-  // Uses unified table to avoid counting resubmissions from qa_photo_reviews
-  // Only counts DRs that exist in qa_photo_reviews (confirmed from WhatsApp)
-  const installedQuery = `
-    SELECT COUNT(DISTINCT drop_number) as installed
-    FROM dr_photo_unified_reviews
-    WHERE EXISTS (SELECT 1 FROM qa_photo_reviews qpr WHERE qpr.drop_number = dr_photo_unified_reviews.drop_number)
-    ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
-  `;
-
-  // Query 3: Activated count - DRs in OES filtered by OES activation_date
-  // Uses activation_date from OES report (when ONT was actually activated)
+  // Query 2: ACTIVATED - DRs in OES filtered by OES activation_date (independent)
   const activatedQuery = `
     SELECT COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
-    INNER JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
-    ${oesCond.conditions.length > 0 ? 'WHERE ' + oesCond.conditions.join(' AND ') : ''}
+    LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    WHERE oes.activation_date >= $1::DATE
+      AND oes.activation_date <= $2::DATE
+      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR upr.project IS NULL)' : ''}
+  `;
+  const activatedParams = filters?.project && filters.project !== 'all'
+    ? [filters.dateFrom || '1900-01-01', filters.dateTo || '2100-01-01', filters.project]
+    : [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
+
+  // Query 3: OES-only count - activated but NOT in dr_photo_unified_reviews for this period
+  const oesOnlyQuery = `
+    SELECT COUNT(DISTINCT oes.drop_number) as oes_only
+    FROM oes_activations oes
+    WHERE oes.activation_date >= $1::DATE
+      AND oes.activation_date <= $2::DATE
+      AND NOT EXISTS (
+        SELECT 1 FROM dr_photo_unified_reviews upr
+        WHERE upr.drop_number = oes.drop_number
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+          ${filters?.project && filters.project !== 'all' ? 'AND upr.project = $3' : ''}
+      )
+      ${filters?.project && filters.project !== 'all' ? `
+        AND EXISTS (
+          SELECT 1 FROM dr_photo_unified_reviews upr2
+          WHERE upr2.drop_number = oes.drop_number AND upr2.project = $3
+        )
+      ` : ''}
   `;
 
   // Run all queries in parallel
-  const [unifiedResult, installedResult, activatedResult] = await Promise.all([
-    pool.query(unifiedQuery, unifiedCond.params),
+  const [installedResult, activatedResult, oesOnlyResult] = await Promise.all([
     pool.query(installedQuery, unifiedCond.params),
-    pool.query(activatedQuery, oesCond.params),
+    pool.query(activatedQuery, activatedParams),
+    pool.query(oesOnlyQuery, activatedParams),
   ]);
 
-  const unifiedRow = unifiedResult.rows[0];
-  const installed = parseInt(installedResult.rows[0]?.installed || '0', 10);
+  const installedRow = installedResult.rows[0];
+  const installed = parseInt(installedRow?.installed || '0', 10);
   const activated = parseInt(activatedResult.rows[0]?.activated || '0', 10);
+  const oesOnly = parseInt(oesOnlyResult.rows[0]?.oes_only || '0', 10);
 
-  let total = parseInt(unifiedRow.total_drops, 10);
-  let complete = parseInt(unifiedRow.complete, 10);
-  let incomplete = total - complete;
-  const feedbackSent = parseInt(unifiedRow.feedback_sent, 10);
+  // Total = INSTALLED + OES-only (all DRs in system for this period)
+  let total = installed + oesOnly;
+  let complete = parseInt(installedRow?.complete || '0', 10);
+  let incomplete = installed - complete;
+  const feedbackSent = parseInt(installedRow?.feedback_sent || '0', 10);
 
   // Apply status filter to the results
   if (filters?.status === 'complete') {
@@ -346,22 +402,22 @@ async function calculateSummary(filters?: {
     totalFeedback: feedbackSent,
     // Legacy fields
     feedback_sent: feedbackSent,
-    vlm_pending: parseInt(unifiedRow.vlm_pending, 10),
-    vlm_processing: parseInt(unifiedRow.vlm_processing, 10),
-    vlm_categorized: parseInt(unifiedRow.vlm_categorized, 10),
-    vlm_failed: parseInt(unifiedRow.vlm_failed, 10),
+    vlm_pending: parseInt(installedRow?.vlm_pending || '0', 10),
+    vlm_processing: parseInt(installedRow?.vlm_processing || '0', 10),
+    vlm_categorized: parseInt(installedRow?.vlm_categorized || '0', 10),
+    vlm_failed: parseInt(installedRow?.vlm_failed || '0', 10),
   };
 }
 
 /**
  * Get project statistics with optional filtering
  *
- * Returns per-project stats including:
- * - total: Total unique drops
- * - installed: Unique DRs from WhatsApp
- * - activated: DRs in OES report
- * - complete: QA reviewed complete
- * - incomplete: Not yet QA complete
+ * CORRECTED LOGIC (Jan 2026) - Aligned with reportingService:
+ * - total: INSTALLED + OES-only (all DRs for this project in period)
+ * - installed: Unique DRs from WhatsApp (first submission in date range)
+ * - activated: DRs in OES report (activation_date in range, independent)
+ * - complete: vlm_categorization_status = 'approved'
+ * - incomplete: installed - complete
  */
 async function getProjectStats(filters?: {
   dateFrom?: string;
@@ -393,92 +449,80 @@ async function getProjectStats(filters?: {
     return { conditions, params, whereClause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' };
   };
 
-  const isCompleteCondition = `
-    step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
-    step_04_entry_inside AND step_05_wall AND step_06_ont_back AND
-    step_07_power_meter AND step_08_final_installation AND step_09_green_lights AND
-    step_10_signature
-  `;
-
   // Conditions based on unified table's submitted_date (first submission)
   const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
-  // Conditions with upr. prefix for JOIN queries (avoids ambiguous column reference)
-  const unifiedCondWithAlias = buildConditions('COALESCE(upr.submitted_date, upr.created_at::DATE)', 'upr.project');
-  // Conditions for OES activations - filter by activation_date from OES report
-  const oesCond = buildConditions('oes.activation_date', 'upr.project');
 
-  // Query 1: Complete/Incomplete from dr_photo_unified_reviews grouped by project
-  const unifiedQuery = `
+  // Query 1: INSTALLED from dr_photo_unified_reviews with complete count
+  // Complete = vlm_categorization_status = 'approved'
+  const installedQuery = `
     SELECT
       COALESCE(project, 'Unknown') as project,
-      COUNT(*) as total,
-      COUNT(*) FILTER (WHERE ${isCompleteCondition}) as complete
+      COUNT(*) as installed,
+      COUNT(*) FILTER (WHERE vlm_categorization_status = 'approved') as complete
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
-  // Query 2: Installed from unified - DRs with first submission in date range that exist in qa_photo_reviews
-  const installedQuery = `
-    SELECT
-      COALESCE(project, 'Unknown') as project,
-      COUNT(DISTINCT drop_number) as installed
-    FROM dr_photo_unified_reviews
-    WHERE EXISTS (SELECT 1 FROM qa_photo_reviews qpr WHERE qpr.drop_number = dr_photo_unified_reviews.drop_number)
-    ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
-    GROUP BY COALESCE(project, 'Unknown')
-  `;
+  // Query 2: ACTIVATED - DRs in OES filtered by OES activation_date (independent)
+  const activatedParams = filters?.project && filters.project !== 'all'
+    ? [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01', filters.project]
+    : [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
 
-  // Query 3: Activated - DRs in OES filtered by OES activation_date
   const activatedQuery = `
     SELECT
       COALESCE(upr.project, 'Unknown') as project,
       COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
-    INNER JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
-    ${oesCond.conditions.length > 0 ? 'WHERE ' + oesCond.conditions.join(' AND ') : ''}
+    LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    WHERE oes.activation_date >= $1::DATE
+      AND oes.activation_date <= $2::DATE
+      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR upr.project IS NULL)' : ''}
+    GROUP BY COALESCE(upr.project, 'Unknown')
+  `;
+
+  // Query 3: OES-only by project - activated but NOT installed in this period
+  const oesOnlyQuery = `
+    SELECT
+      COALESCE(upr.project, 'Unknown') as project,
+      COUNT(DISTINCT oes.drop_number) as oes_only
+    FROM oes_activations oes
+    LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    WHERE oes.activation_date >= $1::DATE
+      AND oes.activation_date <= $2::DATE
+      AND NOT EXISTS (
+        SELECT 1 FROM dr_photo_unified_reviews upr2
+        WHERE upr2.drop_number = oes.drop_number
+          AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) <= $2::DATE
+          ${filters?.project && filters.project !== 'all' ? 'AND upr2.project = $3' : ''}
+      )
+      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR upr.project IS NULL)' : ''}
     GROUP BY COALESCE(upr.project, 'Unknown')
   `;
 
   // Run all queries in parallel
-  const [unifiedResult, installedResult, activatedResult] = await Promise.all([
-    pool.query(unifiedQuery, unifiedCond.params),
+  const [installedResult, activatedResult, oesOnlyResult] = await Promise.all([
     pool.query(installedQuery, unifiedCond.params),
-    pool.query(activatedQuery, oesCond.params),
+    pool.query(activatedQuery, activatedParams),
+    pool.query(oesOnlyQuery, activatedParams),
   ]);
 
   // Merge results by project
   const projectMap = new Map<string, ProjectStats>();
 
-  // Initialize from unified results (total, complete, incomplete)
-  for (const row of unifiedResult.rows) {
-    const total = parseInt(row.total, 10);
+  // Initialize from installed results
+  for (const row of installedResult.rows) {
+    const installed = parseInt(row.installed, 10);
     const complete = parseInt(row.complete, 10);
     projectMap.set(row.project, {
       project: row.project,
-      total,
-      installed: 0,
+      total: installed, // Will add OES-only below
+      installed,
       activated: 0,
       complete,
-      incomplete: total - complete,
+      incomplete: installed - complete,
     });
-  }
-
-  // Add installed counts
-  for (const row of installedResult.rows) {
-    const existing = projectMap.get(row.project);
-    if (existing) {
-      existing.installed = parseInt(row.installed, 10);
-    } else {
-      projectMap.set(row.project, {
-        project: row.project,
-        total: 0,
-        installed: parseInt(row.installed, 10),
-        activated: 0,
-        complete: 0,
-        incomplete: 0,
-      });
-    }
   }
 
   // Add activated counts
@@ -489,9 +533,27 @@ async function getProjectStats(filters?: {
     } else {
       projectMap.set(row.project, {
         project: row.project,
-        total: 0,
+        total: 0, // Will add OES-only below
         installed: 0,
         activated: parseInt(row.activated, 10),
+        complete: 0,
+        incomplete: 0,
+      });
+    }
+  }
+
+  // Add OES-only to total
+  for (const row of oesOnlyResult.rows) {
+    const oesOnly = parseInt(row.oes_only, 10);
+    const existing = projectMap.get(row.project);
+    if (existing) {
+      existing.total += oesOnly;
+    } else {
+      projectMap.set(row.project, {
+        project: row.project,
+        total: oesOnly,
+        installed: 0,
+        activated: oesOnly, // OES-only means they're all activated
         complete: 0,
         incomplete: 0,
       });
@@ -571,7 +633,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Run all queries in parallel for faster response
     const [result, summary, projectStats] = await Promise.all([
-      getPaginatedDrops(currentPage, pageSize, searchTerm),
+      getPaginatedDrops(currentPage, pageSize, searchTerm, filters),
       skipSummary === 'true' ? Promise.resolve(null) : calculateSummary(filters),
       getProjectStats(filters),
     ]);
