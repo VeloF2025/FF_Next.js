@@ -18,6 +18,21 @@
  */
 
 // ============================================================================
+// ANOMALY COUNTS (for data quality tracking)
+// ============================================================================
+
+/**
+ * Anomaly counts for data quality tracking
+ * Used in Reports tab for identifying discrepancies
+ */
+export interface AnomalyCounts {
+  /** Installed (WA submission) but NOT activated on OES - may need maintenance ticket */
+  wa_only: number;
+  /** Activated on OES but NOT installed via WA - forgot to add to group? */
+  oes_only: number;
+}
+
+// ============================================================================
 // DAILY DR COUNTS WITH ZONE/PON BREAKDOWN
 // ============================================================================
 
@@ -39,6 +54,8 @@ export interface PonBreakdown {
   incomplete: number;
   /** All steps/photos submitted AND verified by QA */
   complete: number;
+  /** Anomaly counts (for Reports tab) */
+  anomalies?: AnomalyCounts;
 }
 
 /**
@@ -61,6 +78,8 @@ export interface ZoneBreakdown {
   incomplete: number;
   /** All steps/photos submitted AND verified by QA */
   complete: number;
+  /** Anomaly counts (for Reports tab) */
+  anomalies?: AnomalyCounts;
 }
 
 /**
@@ -83,6 +102,8 @@ export interface ProjectDailyCount {
   complete: number;
   /** Zone breakdowns (expanded when clicked) */
   zones: ZoneBreakdown[];
+  /** Anomaly counts (for Reports tab) */
+  anomalies?: AnomalyCounts;
 }
 
 /**
@@ -108,6 +129,8 @@ export interface DailyCountsResponse {
     incomplete: number;
     /** All steps/photos submitted AND verified by QA */
     complete: number;
+    /** Anomaly counts (for Reports tab) */
+    anomalies?: AnomalyCounts;
   };
 }
 

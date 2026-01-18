@@ -36,6 +36,7 @@ import type {
   UserTeamAttributionResponse,
   ProjectDailyCount,
   ZoneBreakdown,
+  AnomalyCounts,
 } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
 
@@ -472,6 +473,23 @@ function DailyCountsContent({
               Complete:{' '}
               <span className="font-semibold">{data.grand_total.complete}</span>
             </span>
+            {/* Anomaly counts */}
+            {data.grand_total.anomalies && (data.grand_total.anomalies.wa_only > 0 || data.grand_total.anomalies.oes_only > 0) && (
+              <>
+                {data.grand_total.anomalies.wa_only > 0 && (
+                  <span className="text-orange-600 dark:text-orange-400" title="Installed but not activated - may need maintenance ticket">
+                    WA Only:{' '}
+                    <span className="font-semibold">{data.grand_total.anomalies.wa_only}</span>
+                  </span>
+                )}
+                {data.grand_total.anomalies.oes_only > 0 && (
+                  <span className="text-red-600 dark:text-red-400" title="Activated but not installed - forgot to add to WA group?">
+                    OES Only:{' '}
+                    <span className="font-semibold">{data.grand_total.anomalies.oes_only}</span>
+                  </span>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -547,6 +565,21 @@ function ProjectAccordion({
           <span className="text-green-600 dark:text-green-500">
             Complete: <span className="font-semibold">{project.complete}</span>
           </span>
+          {/* Anomaly counts */}
+          {project.anomalies && (project.anomalies.wa_only > 0 || project.anomalies.oes_only > 0) && (
+            <>
+              {project.anomalies.wa_only > 0 && (
+                <span className="text-orange-600 dark:text-orange-400" title="Installed but not activated">
+                  WA Only: <span className="font-semibold">{project.anomalies.wa_only}</span>
+                </span>
+              )}
+              {project.anomalies.oes_only > 0 && (
+                <span className="text-red-600 dark:text-red-400" title="Activated but not installed">
+                  OES Only: <span className="font-semibold">{project.anomalies.oes_only}</span>
+                </span>
+              )}
+            </>
+          )}
         </div>
       </button>
 
@@ -621,6 +654,21 @@ function ZoneAccordion({
           <span className="text-green-600 dark:text-green-500">
             Complete: {zone.complete}
           </span>
+          {/* Anomaly counts */}
+          {zone.anomalies && (zone.anomalies.wa_only > 0 || zone.anomalies.oes_only > 0) && (
+            <>
+              {zone.anomalies.wa_only > 0 && (
+                <span className="text-orange-600 dark:text-orange-400">
+                  WA: {zone.anomalies.wa_only}
+                </span>
+              )}
+              {zone.anomalies.oes_only > 0 && (
+                <span className="text-red-600 dark:text-red-400">
+                  OES: {zone.anomalies.oes_only}
+                </span>
+              )}
+            </>
+          )}
         </div>
       </button>
 
@@ -651,6 +699,21 @@ function ZoneAccordion({
                 <span className="text-green-600 dark:text-green-500">
                   {pon.complete}
                 </span>
+                {/* Anomaly counts */}
+                {pon.anomalies && (pon.anomalies.wa_only > 0 || pon.anomalies.oes_only > 0) && (
+                  <>
+                    {pon.anomalies.wa_only > 0 && (
+                      <span className="text-orange-600 dark:text-orange-400">
+                        WA:{pon.anomalies.wa_only}
+                      </span>
+                    )}
+                    {pon.anomalies.oes_only > 0 && (
+                      <span className="text-red-600 dark:text-red-400">
+                        OES:{pon.anomalies.oes_only}
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}

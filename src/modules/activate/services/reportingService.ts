@@ -23,6 +23,7 @@ import type {
   ProjectDailyCount,
   ZoneBreakdown,
   PonBreakdown,
+  AnomalyCounts,
   DiscrepancyReportResponse,
   DiscrepancyRecord,
   SerialValidationReportResponse,
@@ -58,13 +59,18 @@ export function getPool(): Pool {
 /**
  * Get daily DR counts with zone/PON breakdown
  *
- * TERMINOLOGY:
- * - INSTALLED: DR submitted via WhatsApp (installation was done)
- * - COMPLETE: All steps/photos submitted AND verified by QA (vlm_categorization_status = 'approved')
- * - INCOMPLETE: Missing steps/photos OR not verified by QA
- * - ACTIVATED: DR confirmed as active on OES report
+ * CORRECTED LOGIC (Jan 2026):
+ * - INSTALLED: First WA submission only (from dr_photo_unified_reviews.submitted_date)
+ *   Resubmissions are NOT counted again - only the first occurrence
+ * - ACTIVATED: First OES appearance only (from oes_activations.activation_date)
+ *   Uses OES date, INDEPENDENT of WA submission date
+ * - COMPLETE: vlm_categorization_status = 'approved'
+ * - INCOMPLETE: vlm_categorization_status != 'approved'
  *
- * Joins qa_photo_reviews with drops and oes_activations for zone/pon and activation data
+ * ANOMALIES (for Reports tab):
+ * - wa_only: Installed but not activated (may need maintenance ticket)
+ * - oes_only: Activated but not installed (forgot to add to WA group?)
+ *
  * Groups hierarchically: Project -> Zone -> PON
  */
 export async function getDailyCountsWithBreakdown(
@@ -79,47 +85,64 @@ export async function getDailyCountsWithBreakdown(
       project,
     });
 
-    // Query to get all DRs with their zone/pon data, QA status, and activation status
-    const result = await pool.query(
+    // Query 1: Get INSTALLED DRs with complete/incomplete status
+    // Uses dr_photo_unified_reviews.submitted_date (first submission date, preserved on resubmission)
+    const installedResult = await pool.query(
       `
       SELECT
-        qpr.drop_number,
-        qpr.project,
+        upr.drop_number,
+        upr.project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
-        -- Complete = verified by QA (vlm_categorization_status = 'approved')
         CASE
           WHEN upr.vlm_categorization_status = 'approved' THEN true
           ELSE false
-        END as is_complete,
-        -- Activated = exists in OES activations
-        CASE
-          WHEN oes.drop_number IS NOT NULL THEN true
-          ELSE false
-        END as is_activated
-      FROM qa_photo_reviews qpr
-      LEFT JOIN drops d ON d.drop_number = qpr.drop_number
-      LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = qpr.drop_number
-      LEFT JOIN oes_activations oes ON oes.drop_number = qpr.drop_number
-      WHERE (
-        COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE >= $1::DATE
-        AND COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE <= $2::DATE
-      )
-      AND ($3::TEXT IS NULL OR qpr.project = $3)
-      ORDER BY qpr.project, d.zone_no, d.pon_no
+        END as is_complete
+      FROM dr_photo_unified_reviews upr
+      LEFT JOIN drops d ON d.drop_number = upr.drop_number
+      WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+        AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3)
       `,
       [dateFrom, dateTo, project || null]
     );
 
+    // Query 2: Get ACTIVATED DRs from OES (independent date context)
+    // Uses oes_activations.activation_date (when ONT was activated on OES)
+    const activatedResult = await pool.query(
+      `
+      SELECT DISTINCT
+        oes.drop_number,
+        COALESCE(upr.project, 'Unknown') as project,
+        COALESCE(d.zone_no, 0) as zone_no,
+        COALESCE(d.pon_no, 0) as pon_no
+      FROM oes_activations oes
+      LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+      LEFT JOIN drops d ON d.drop_number = oes.drop_number
+      WHERE oes.activation_date >= $1::DATE
+        AND oes.activation_date <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    // Build sets for quick lookup
+    const installedSet = new Set(installedResult.rows.map((r: { drop_number: string }) => r.drop_number));
+    const activatedSet = new Set(activatedResult.rows.map((r: { drop_number: string }) => r.drop_number));
+
+    // Helper to create empty anomaly counts
+    const emptyAnomalies = (): AnomalyCounts => ({ wa_only: 0, oes_only: 0 });
+
     // Build hierarchical structure: Project -> Zone -> PON
     const projectMap = new Map<string, ProjectDailyCount>();
 
-    for (const row of result.rows) {
+    // Process INSTALLED rows (from dr_photo_unified_reviews)
+    for (const row of installedResult.rows) {
       const projectName = row.project || 'Unknown';
       const zoneNo = row.zone_no || 0;
       const ponNo = row.pon_no || 0;
       const isComplete = row.is_complete === true;
-      const isActivated = row.is_activated === true;
+      const isActivated = activatedSet.has(row.drop_number);
 
       // Get or create project
       if (!projectMap.has(projectName)) {
@@ -132,6 +155,7 @@ export async function getDailyCountsWithBreakdown(
           incomplete: 0,
           complete: 0,
           zones: [],
+          anomalies: emptyAnomalies(),
         });
       }
       const projectData = projectMap.get(projectName)!;
@@ -141,6 +165,9 @@ export async function getDailyCountsWithBreakdown(
       projectData.installed++;
       if (isActivated) {
         projectData.activated++;
+      } else {
+        // WA only anomaly: installed but not activated
+        projectData.anomalies!.wa_only++;
       }
       if (isComplete) {
         projectData.complete++;
@@ -160,6 +187,7 @@ export async function getDailyCountsWithBreakdown(
           activated: 0,
           incomplete: 0,
           complete: 0,
+          anomalies: emptyAnomalies(),
         };
         projectData.zones.push(zone);
       }
@@ -169,6 +197,8 @@ export async function getDailyCountsWithBreakdown(
       zone.installed++;
       if (isActivated) {
         zone.activated++;
+      } else {
+        zone.anomalies!.wa_only++;
       }
       if (isComplete) {
         zone.complete++;
@@ -187,6 +217,7 @@ export async function getDailyCountsWithBreakdown(
           activated: 0,
           incomplete: 0,
           complete: 0,
+          anomalies: emptyAnomalies(),
         };
         zone.pons.push(pon);
       }
@@ -196,12 +227,85 @@ export async function getDailyCountsWithBreakdown(
       pon.installed++;
       if (isActivated) {
         pon.activated++;
+      } else {
+        pon.anomalies!.wa_only++;
       }
       if (isComplete) {
         pon.complete++;
       } else {
         pon.incomplete++;
       }
+    }
+
+    // Process OES-only rows (activated but not installed via WA)
+    for (const row of activatedResult.rows) {
+      if (installedSet.has(row.drop_number)) continue; // Already counted above
+
+      const projectName = row.project || 'Unknown';
+      const zoneNo = row.zone_no || 0;
+      const ponNo = row.pon_no || 0;
+
+      // Get or create project
+      if (!projectMap.has(projectName)) {
+        projectMap.set(projectName, {
+          project: projectName,
+          date: dateFrom === dateTo ? dateFrom : `${dateFrom} to ${dateTo}`,
+          total: 0,
+          installed: 0,
+          activated: 0,
+          incomplete: 0,
+          complete: 0,
+          zones: [],
+          anomalies: emptyAnomalies(),
+        });
+      }
+      const projectData = projectMap.get(projectName)!;
+
+      // OES-only: activated but never installed via WA
+      projectData.total++;
+      projectData.activated++;
+      projectData.anomalies!.oes_only++;
+
+      // Find or create zone
+      let zone = projectData.zones.find((z) => z.zone_no === zoneNo);
+      if (!zone) {
+        zone = {
+          zone_no: zoneNo,
+          zone_name: zoneNo === 0 ? 'Unknown Zone' : `Zone ${zoneNo}`,
+          pons: [],
+          total: 0,
+          installed: 0,
+          activated: 0,
+          incomplete: 0,
+          complete: 0,
+          anomalies: emptyAnomalies(),
+        };
+        projectData.zones.push(zone);
+      }
+
+      zone.total++;
+      zone.activated++;
+      zone.anomalies!.oes_only++;
+
+      // Find or create PON
+      let pon = zone.pons.find((p) => p.pon_no === ponNo);
+      if (!pon) {
+        pon = {
+          pon_no: ponNo,
+          pon_name: ponNo === 0 ? 'Unknown PON' : `PON ${zoneNo}.${ponNo}`,
+          total: 0,
+          installed: 0,
+          activated: 0,
+          incomplete: 0,
+          complete: 0,
+          anomalies: emptyAnomalies(),
+        };
+        zone.pons.push(pon);
+      }
+
+      pon.total++;
+      pon.activated++;
+      pon.anomalies!.oes_only++;
     }
 
     // Sort zones and PONs
@@ -221,8 +325,12 @@ export async function getDailyCountsWithBreakdown(
         activated: acc.activated + p.activated,
         incomplete: acc.incomplete + p.incomplete,
         complete: acc.complete + p.complete,
+        anomalies: {
+          wa_only: (acc.anomalies?.wa_only || 0) + (p.anomalies?.wa_only || 0),
+          oes_only: (acc.anomalies?.oes_only || 0) + (p.anomalies?.oes_only || 0),
+        },
       }),
-      { total: 0, installed: 0, activated: 0, incomplete: 0, complete: 0 }
+      { total: 0, installed: 0, activated: 0, incomplete: 0, complete: 0, anomalies: emptyAnomalies() }
     );
 
     return {
