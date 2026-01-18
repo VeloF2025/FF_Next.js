@@ -78,7 +78,7 @@ export default function NewRFQPage() {
         const response = await fetch('/api/suppliers?status=active');
         if (response.ok) {
           const data = await response.json();
-          setSuppliers(data.suppliers || data || []);
+          setSuppliers(data.data || data.suppliers || []);
         }
       } catch (error) {
         log.error('Failed to load suppliers:', { data: error }, 'NewRFQPage');
