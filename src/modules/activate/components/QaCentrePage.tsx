@@ -123,7 +123,7 @@ function QaCentrePageContent() {
   };
 
   // Export to CSV using API endpoint for full data with all fields
-  const handleExportCSV = useCallback(async () => {
+  const handleExportExcel = useCallback(async () => {
     setIsExporting(true);
     try {
       const params = new URLSearchParams();
@@ -144,7 +144,7 @@ function QaCentrePageContent() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `qa-centre-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.csv`;
+      a.download = `qa-centre-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(downloadUrl);
@@ -222,13 +222,13 @@ function QaCentrePageContent() {
               <span className="text-sm text-gray-700 dark:text-gray-300">REFRESH</span>
             </button>
             <button
-              onClick={handleExportCSV}
+              onClick={handleExportExcel}
               disabled={isExporting}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Export filtered data to CSV"
+              title="Export filtered data to Excel"
             >
               <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
-              <span className="text-sm">{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+              <span className="text-sm">{isExporting ? 'Exporting...' : 'Export Excel'}</span>
             </button>
           </div>
         </div>

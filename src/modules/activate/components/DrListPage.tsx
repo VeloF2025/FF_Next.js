@@ -143,7 +143,7 @@ function DashboardPageContent() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `activate-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.csv`;
+      a.download = `activate-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(downloadUrl);
@@ -379,10 +379,10 @@ function DashboardPageContent() {
                     onClick={handleExport}
                     disabled={isExporting}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Export filtered data to CSV"
+                    title="Export filtered data to Excel"
                   >
                     <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
-                    {isExporting ? 'Exporting...' : 'Export CSV'}
+                    {isExporting ? 'Exporting...' : 'Export Excel'}
                   </button>
                 </div>
               </div>

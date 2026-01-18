@@ -1,8 +1,8 @@
 /**
- * Activate Module - CSV Export API
+ * Activate Module - Excel Export API
  * GET /api/activate/export
  *
- * Exports filtered DR data to CSV format
+ * Exports filtered DR data to Excel format (.xlsx)
  * Respects same filters as Dashboard/QA Centre: dateFrom, dateTo, project, status
  *
  * Includes:
@@ -16,6 +16,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
+import * as XLSX from 'xlsx';
 import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
@@ -61,65 +62,6 @@ interface ExportRow {
 }
 
 /**
- * Escape CSV field - handles commas, quotes, newlines
- */
-function escapeCSV(value: any): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value);
-  // If contains comma, quote, or newline, wrap in quotes and escape existing quotes
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-/**
- * Convert rows to CSV string
- */
-function toCSV(rows: ExportRow[]): string {
-  if (rows.length === 0) return '';
-
-  // Define column headers and their display names
-  const columns: { key: keyof ExportRow; header: string }[] = [
-    { key: 'drop_number', header: 'DR Number' },
-    { key: 'project', header: 'Project' },
-    { key: 'submitted_date', header: 'Submitted Date' },
-    { key: 'photo_count', header: 'Photo Count' },
-    { key: 'steps_completed', header: 'Steps Completed' },
-    { key: 'is_complete', header: 'Is Complete' },
-    { key: 'step_01_house_photo', header: 'Step 1: House Photo' },
-    { key: 'step_02_cable_from_pole', header: 'Step 2: Cable from Pole' },
-    { key: 'step_03_entry_outside', header: 'Step 3: Entry Outside' },
-    { key: 'step_04_entry_inside', header: 'Step 4: Entry Inside' },
-    { key: 'step_05_wall', header: 'Step 5: Wall' },
-    { key: 'step_06_ont_back', header: 'Step 6: ONT Back' },
-    { key: 'step_07_power_meter', header: 'Step 7: Power Meter' },
-    { key: 'step_08_final_installation', header: 'Step 8: Final Installation' },
-    { key: 'step_09_green_lights', header: 'Step 9: Green Lights' },
-    { key: 'step_10_signature', header: 'Step 10: Signature' },
-    { key: 'vlm_status', header: 'VLM Status' },
-    { key: 'feedback_sent', header: 'Feedback Sent' },
-    { key: 'onemap_ont_serial', header: 'ONT Serial' },
-    { key: 'onemap_ups_serial', header: 'UPS Serial' },
-    { key: 'sender_phone', header: 'Sender Phone' },
-    { key: 'sender_name', header: 'Sender Name' },
-    { key: 'assigned_agent', header: 'Assigned Agent' },
-    { key: 'activation_date', header: 'Activation Date' },
-    { key: 'activated', header: 'Activated' },
-  ];
-
-  // Create header row
-  const headerRow = columns.map((c) => c.header).join(',');
-
-  // Create data rows
-  const dataRows = rows.map((row) =>
-    columns.map((c) => escapeCSV(row[c.key])).join(',')
-  );
-
-  return [headerRow, ...dataRows].join('\n');
-}
-
-/**
  * Count completed steps
  */
 function countCompletedSteps(row: any): number {
@@ -153,6 +95,108 @@ function isComplete(row: any): boolean {
     row.step_09_green_lights &&
     row.step_10_signature
   );
+}
+
+/**
+ * Convert rows to Excel workbook
+ */
+function toExcel(rows: ExportRow[]): Buffer {
+  // Define column headers
+  const headers = [
+    'DR Number',
+    'Project',
+    'Submitted Date',
+    'Photo Count',
+    'Steps Completed',
+    'Is Complete',
+    'Step 1: House Photo',
+    'Step 2: Cable from Pole',
+    'Step 3: Entry Outside',
+    'Step 4: Entry Inside',
+    'Step 5: Wall',
+    'Step 6: ONT Back',
+    'Step 7: Power Meter',
+    'Step 8: Final Installation',
+    'Step 9: Green Lights',
+    'Step 10: Signature',
+    'VLM Status',
+    'Feedback Sent',
+    'ONT Serial',
+    'UPS Serial',
+    'Sender Phone',
+    'Sender Name',
+    'Assigned Agent',
+    'Activation Date',
+    'Activated',
+  ];
+
+  // Convert rows to array of arrays
+  const data = rows.map((row) => [
+    row.drop_number,
+    row.project,
+    row.submitted_date,
+    row.photo_count,
+    row.steps_completed,
+    row.is_complete ? 'Yes' : 'No',
+    row.step_01_house_photo ? 'Yes' : 'No',
+    row.step_02_cable_from_pole ? 'Yes' : 'No',
+    row.step_03_entry_outside ? 'Yes' : 'No',
+    row.step_04_entry_inside ? 'Yes' : 'No',
+    row.step_05_wall ? 'Yes' : 'No',
+    row.step_06_ont_back ? 'Yes' : 'No',
+    row.step_07_power_meter ? 'Yes' : 'No',
+    row.step_08_final_installation ? 'Yes' : 'No',
+    row.step_09_green_lights ? 'Yes' : 'No',
+    row.step_10_signature ? 'Yes' : 'No',
+    row.vlm_status || '',
+    row.feedback_sent ? 'Yes' : 'No',
+    row.onemap_ont_serial || '',
+    row.onemap_ups_serial || '',
+    row.sender_phone || '',
+    row.sender_name || '',
+    row.assigned_agent || '',
+    row.activation_date || '',
+    row.activated ? 'Yes' : 'No',
+  ]);
+
+  // Create worksheet
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+  // Set column widths
+  ws['!cols'] = [
+    { wch: 12 }, // DR Number
+    { wch: 10 }, // Project
+    { wch: 12 }, // Submitted Date
+    { wch: 8 }, // Photo Count
+    { wch: 10 }, // Steps Completed
+    { wch: 10 }, // Is Complete
+    { wch: 8 }, // Steps 1-10
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 12 }, // VLM Status
+    { wch: 10 }, // Feedback Sent
+    { wch: 15 }, // ONT Serial
+    { wch: 15 }, // UPS Serial
+    { wch: 15 }, // Sender Phone
+    { wch: 15 }, // Sender Name
+    { wch: 15 }, // Assigned Agent
+    { wch: 12 }, // Activation Date
+    { wch: 10 }, // Activated
+  ];
+
+  // Create workbook
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Activate Export');
+
+  // Write to buffer
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -235,7 +279,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       LEFT JOIN (
         SELECT DISTINCT ON (drop_number) *
         FROM qa_photo_reviews
-        ORDER BY drop_number, submitted_at DESC
+        ORDER BY drop_number, created_at DESC
       ) qpr ON qpr.drop_number = upr.drop_number
       LEFT JOIN oes_activations oes ON oes.drop_number = upr.drop_number
       ${whereClause}
@@ -258,26 +302,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status,
     });
 
-    // Return as CSV file download
-    if (format !== 'json') {
-      const csv = toCSV(rows);
-      const filename = `activate-export-${dateFrom || 'all'}-to-${dateTo || 'all'}.csv`;
-
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      return res.status(200).send(csv);
+    // Return as JSON if format=json requested
+    if (format === 'json') {
+      return res.status(200).json({
+        success: true,
+        data: rows,
+        meta: {
+          count: rows.length,
+          filters: { dateFrom, dateTo, project, status },
+          exportedAt: new Date().toISOString(),
+        },
+      });
     }
 
-    // Return as JSON if format=json requested
-    return res.status(200).json({
-      success: true,
-      data: rows,
-      meta: {
-        count: rows.length,
-        filters: { dateFrom, dateTo, project, status },
-        exportedAt: new Date().toISOString(),
-      },
-    });
+    // Return as Excel file download (default)
+    const excel = toExcel(rows);
+    const filename = `activate-export-${dateFrom || 'all'}-to-${dateTo || 'all'}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(excel);
   } catch (error: any) {
     log.error('ActivateExportAPI', 'Error exporting data', error);
     return res.status(500).json({
