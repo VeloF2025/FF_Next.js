@@ -120,7 +120,8 @@ async function handleDelete(id: string, req: NextApiRequest, res: NextApiRespons
           dependencies: {
             purchaseOrders: deps.purchaseOrders,
             rfqs: deps.rfqs,
-            boqItems: deps.boqItems
+            boqItems: deps.boqItems,
+            grns: deps.grns
           },
           suggestion: 'Use soft delete (deactivate) instead, or remove the related records first.'
         });

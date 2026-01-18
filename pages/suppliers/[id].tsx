@@ -262,6 +262,7 @@ export default function SupplierDetailPage() {
           if (deps.purchaseOrders > 0) parts.push(`${deps.purchaseOrders} PO${deps.purchaseOrders > 1 ? 's' : ''}`);
           if (deps.rfqs > 0) parts.push(`${deps.rfqs} RFQ${deps.rfqs > 1 ? 's' : ''}`);
           if (deps.boqItems > 0) parts.push(`${deps.boqItems} BOQ item${deps.boqItems > 1 ? 's' : ''}`);
+          if (deps.grns > 0) parts.push(`${deps.grns} GRN${deps.grns > 1 ? 's' : ''}`);
 
           toast.error(
             `Cannot delete: supplier has ${parts.join(', ')}. Use "Deactivate" instead.`,

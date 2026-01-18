@@ -308,30 +308,52 @@ export class NeonSupplierService {
     purchaseOrders: number;
     rfqs: number;
     boqItems: number;
+    grns: number;
     message?: string;
   }> {
     try {
       const supplierId = parseInt(id);
 
-      // Check purchase orders
+      // Check purchase orders (supplier_id is INTEGER)
       const poResult = await sql`
-        SELECT COUNT(*) as count FROM purchase_orders WHERE supplier_id = ${supplierId}
+        SELECT COUNT(*)::int as count FROM purchase_orders WHERE supplier_id = ${supplierId}
       `;
-      const purchaseOrders = parseInt(poResult[0]?.count || '0');
+      const purchaseOrders = poResult[0]?.count || 0;
 
-      // Check RFQs (supplier_id might be JSON array or direct reference)
-      const rfqResult = await sql`
-        SELECT COUNT(*) as count FROM rfqs WHERE supplier_id = ${supplierId}
-      `;
-      const rfqs = parseInt(rfqResult[0]?.count || '0');
+      // Check RFQs via rfq_suppliers junction table (supplier_id is INTEGER in rfq_suppliers)
+      let rfqs = 0;
+      try {
+        const rfqResult = await sql`
+          SELECT COUNT(DISTINCT rfq_id)::int as count FROM rfq_suppliers WHERE supplier_id = ${supplierId}
+        `;
+        rfqs = rfqResult[0]?.count || 0;
+      } catch {
+        // Table might not exist or have different schema, ignore
+      }
 
-      // Check BOQ items with supplier reference
-      const boqResult = await sql`
-        SELECT COUNT(*) as count FROM boq_items WHERE supplier_id = ${supplierId}
-      `;
-      const boqItems = parseInt(boqResult[0]?.count || '0');
+      // Check BOQ items (supplier_id can be UUID or null, so check carefully)
+      let boqItems = 0;
+      try {
+        const boqResult = await sql`
+          SELECT COUNT(*)::int as count FROM boq_items WHERE supplier_id::text = ${id}
+        `;
+        boqItems = boqResult[0]?.count || 0;
+      } catch {
+        // Table might not have supplier_id column, ignore
+      }
 
-      const hasDependencies = purchaseOrders > 0 || rfqs > 0 || boqItems > 0;
+      // Check Goods Receipt Notes (supplier_id is INTEGER)
+      let grns = 0;
+      try {
+        const grnResult = await sql`
+          SELECT COUNT(*)::int as count FROM goods_receipt_notes WHERE supplier_id = ${supplierId}
+        `;
+        grns = grnResult[0]?.count || 0;
+      } catch {
+        // Table might not exist, ignore
+      }
+
+      const hasDependencies = purchaseOrders > 0 || rfqs > 0 || boqItems > 0 || grns > 0;
 
       let message: string | undefined;
       if (hasDependencies) {
@@ -339,10 +361,11 @@ export class NeonSupplierService {
         if (purchaseOrders > 0) parts.push(`${purchaseOrders} purchase order${purchaseOrders > 1 ? 's' : ''}`);
         if (rfqs > 0) parts.push(`${rfqs} RFQ${rfqs > 1 ? 's' : ''}`);
         if (boqItems > 0) parts.push(`${boqItems} BOQ item${boqItems > 1 ? 's' : ''}`);
+        if (grns > 0) parts.push(`${grns} goods receipt note${grns > 1 ? 's' : ''}`);
         message = `Cannot delete supplier. This supplier has ${parts.join(', ')} referencing it. Please deactivate the supplier instead, or remove the related records first.`;
       }
 
-      return { hasDependencies, purchaseOrders, rfqs, boqItems, message };
+      return { hasDependencies, purchaseOrders, rfqs, boqItems, grns, message };
     } catch (error) {
       log.error(`Error checking supplier dependencies ${id}:`, { data: error }, 'neonSupplier');
       // Return safe default - assume dependencies exist to prevent accidental deletion
@@ -351,6 +374,7 @@ export class NeonSupplierService {
         purchaseOrders: 0,
         rfqs: 0,
         boqItems: 0,
+        grns: 0,
         message: 'Unable to verify dependencies. Please use soft delete (deactivate) instead.'
       };
     }
