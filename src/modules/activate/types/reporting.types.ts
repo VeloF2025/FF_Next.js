@@ -408,6 +408,353 @@ export type ReportType =
   | 'serial-validation'
   | 'user-attribution';
 
+/**
+ * Report category for dashboard navigation
+ */
+export type ReportCategory =
+  | 'anomalies'
+  | 'trends'
+  | 'team'
+  | 'funnel';
+
+// ============================================================================
+// TREND ANALYSIS TYPES
+// ============================================================================
+
+/**
+ * Time grouping options for trend reports
+ */
+export type TrendGroupBy = 'day' | 'week' | 'month';
+
+/**
+ * Single data point in trend series
+ */
+export interface TrendDataPoint {
+  /** Date/period label (YYYY-MM-DD or Week XX) */
+  label: string;
+  /** Full date for sorting */
+  date: string;
+  /** DRs submitted via WhatsApp */
+  installed: number;
+  /** Confirmed active on OES */
+  activated: number;
+  /** QA feedback sent */
+  reviewed: number;
+  /** QA feedback not sent */
+  notReviewed: number;
+}
+
+/**
+ * Trend analysis API response
+ */
+export interface TrendAnalysisResponse {
+  /** Date range queried */
+  date_range: {
+    from: string;
+    to: string;
+  };
+  /** Grouping used */
+  group_by: TrendGroupBy;
+  /** Project filter (if any) */
+  project: string | null;
+  /** Data points for chart */
+  data: TrendDataPoint[];
+  /** Velocity metrics */
+  velocity: {
+    /** Average installs per period */
+    avg_installed: number;
+    /** Average activations per period */
+    avg_activated: number;
+    /** Trend direction for installs */
+    installed_trend: 'up' | 'down' | 'stable';
+    /** Trend direction for activations */
+    activated_trend: 'up' | 'down' | 'stable';
+    /** Week-over-week change % for installs */
+    installed_wow_change: number;
+    /** Week-over-week change % for activations */
+    activated_wow_change: number;
+  };
+}
+
+/**
+ * Project progress tracker data
+ */
+export interface ProjectProgress {
+  /** Project name */
+  project: string;
+  /** Total scope (from drops table if available) */
+  total_scope: number | null;
+  /** Current installed count */
+  installed: number;
+  /** Current activated count */
+  activated: number;
+  /** Completion % based on scope */
+  completion_percent: number | null;
+  /** Estimated completion date (linear projection) */
+  estimated_completion: string | null;
+  /** Days remaining (estimated) */
+  days_remaining: number | null;
+}
+
+// ============================================================================
+// RESUBMISSION ANALYSIS TYPES
+// ============================================================================
+
+/**
+ * Resubmission metrics per grouping
+ */
+export interface ResubmissionMetrics {
+  /** Group name (project or team) */
+  group_name: string;
+  /** Total DRs with submissions */
+  total_drs: number;
+  /** DRs with 2+ submissions */
+  resubmitted_drs: number;
+  /** Resubmission rate (0-100) */
+  resubmission_rate: number;
+  /** Average submissions per DR */
+  avg_submissions: number;
+  /** Max submissions on any DR */
+  max_submissions: number;
+}
+
+/**
+ * Individual DR with high resubmissions
+ */
+export interface TopResubmittedDR {
+  /** DR number */
+  drop_number: string;
+  /** Project name */
+  project: string | null;
+  /** Submission count */
+  submission_count: number;
+  /** First submitted */
+  first_submitted_at: string;
+  /** Last resubmitted */
+  last_resubmitted_at: string;
+  /** Submitter name */
+  submitted_by: string | null;
+}
+
+/**
+ * Resubmission analysis API response
+ */
+export interface ResubmissionAnalysisResponse {
+  /** Date range queried */
+  date_range: {
+    from: string;
+    to: string;
+  };
+  /** Overall summary */
+  summary: {
+    /** Total DRs checked */
+    total_drs: number;
+    /** DRs with resubmissions */
+    resubmitted_drs: number;
+    /** Overall resubmission rate */
+    resubmission_rate: number;
+    /** Average submissions per DR */
+    avg_submissions: number;
+  };
+  /** Breakdown by project */
+  by_project: ResubmissionMetrics[];
+  /** Breakdown by user/team */
+  by_user: ResubmissionMetrics[];
+  /** Top resubmitted DRs */
+  top_resubmitted: TopResubmittedDR[];
+}
+
+// ============================================================================
+// QA WORKFLOW FUNNEL TYPES
+// ============================================================================
+
+/**
+ * Funnel stage metrics
+ */
+export interface FunnelStageMetrics {
+  /** Stage name */
+  stage: string;
+  /** Count at this stage */
+  count: number;
+  /** Percentage of total */
+  percentage: number;
+  /** Drop-off from previous stage */
+  drop_off_percent: number;
+}
+
+/**
+ * Photo step completion metrics
+ */
+export interface PhotoStepMetrics {
+  /** Step number (1-10) */
+  step: number;
+  /** Step label */
+  label: string;
+  /** Completion count */
+  completed: number;
+  /** Total checked */
+  total: number;
+  /** Completion rate (0-100) */
+  completion_rate: number;
+  /** VLM pass rate if evaluated */
+  vlm_pass_rate: number | null;
+}
+
+/**
+ * Processing time metrics (in minutes)
+ */
+export interface ProcessingTimeMetrics {
+  /** Stage name */
+  stage: string;
+  /** 50th percentile */
+  p50: number;
+  /** 90th percentile */
+  p90: number;
+  /** 99th percentile */
+  p99: number;
+  /** Average */
+  avg: number;
+  /** Target time (minutes) */
+  target: number;
+  /** Meeting target rate (0-100) */
+  meeting_target_rate: number;
+}
+
+/**
+ * QA Workflow Funnel API response
+ */
+export interface QAFunnelResponse {
+  /** Date range queried */
+  date_range: {
+    from: string;
+    to: string;
+  };
+  /** Project filter (if any) */
+  project: string | null;
+  /** Funnel stages */
+  funnel: FunnelStageMetrics[];
+  /** Photo step analysis */
+  photo_steps: PhotoStepMetrics[];
+  /** Processing time metrics */
+  processing_times: ProcessingTimeMetrics[];
+  /** Summary metrics */
+  summary: {
+    /** Total submitted */
+    total_submitted: number;
+    /** End-to-end conversion rate */
+    conversion_rate: number;
+    /** Average end-to-end time (minutes) */
+    avg_cycle_time: number;
+    /** Photo completion rate */
+    photo_completion_rate: number;
+  };
+}
+
+// ============================================================================
+// ENHANCED TEAM PERFORMANCE TYPES
+// ============================================================================
+
+/**
+ * Enhanced technician metrics for leaderboard
+ */
+export interface TechnicianLeaderboardEntry {
+  /** Rank position */
+  rank: number;
+  /** User name */
+  user_name: string | null;
+  /** Phone number */
+  sender_phone: string | null;
+  /** Project(s) */
+  projects: string[];
+  /** Total submissions */
+  total_submissions: number;
+  /** First-pass success count */
+  first_pass_success: number;
+  /** First-pass success rate (0-100) */
+  first_pass_rate: number;
+  /** Resubmission count */
+  resubmissions: number;
+  /** Resubmission rate (0-100) */
+  resubmission_rate: number;
+  /** ONT serial scanned count */
+  ont_scanned: number;
+  /** UPS serial scanned count */
+  ups_scanned: number;
+  /** Serial compliance rate (0-100) */
+  serial_compliance: number;
+  /** Average VLM quality score (if available) */
+  avg_quality_score: number | null;
+  /** 7-day trend data (for sparkline) */
+  trend_7d: number[];
+}
+
+/**
+ * Team comparison metrics
+ */
+export interface TeamComparisonEntry {
+  /** Team name (from OES) */
+  team: string;
+  /** Project(s) */
+  projects: string[];
+  /** Total activations */
+  total_activations: number;
+  /** Matched to WA submissions */
+  matched_to_wa: number;
+  /** WA submission match rate (0-100) */
+  wa_match_rate: number;
+  /** Average activation time (hours from submission to activation) */
+  avg_activation_time: number | null;
+  /** Average ONT signal quality (dBm) */
+  avg_ont_signal: number | null;
+  /** Average OLT signal quality (dBm) */
+  avg_olt_signal: number | null;
+}
+
+/**
+ * Compliance metrics summary
+ */
+export interface ComplianceMetrics {
+  /** WA submission compliance (activated with WA submission %) */
+  wa_submission_compliance: number;
+  /** Serial scan compliance (ONT scanned %) */
+  serial_scan_compliance: number;
+  /** Photo completion (all 10 steps %) */
+  photo_completion_compliance: number;
+  /** Target values for gauges */
+  targets: {
+    wa_submission: number;
+    serial_scan: number;
+    photo_completion: number;
+  };
+}
+
+/**
+ * Enhanced Team Performance API response
+ */
+export interface TeamPerformanceResponse {
+  /** Date range queried */
+  date_range: {
+    from: string;
+    to: string;
+  };
+  /** Project filter (if any) */
+  project: string | null;
+  /** Technician leaderboard */
+  leaderboard: TechnicianLeaderboardEntry[];
+  /** Team comparison */
+  teams: TeamComparisonEntry[];
+  /** Compliance metrics */
+  compliance: ComplianceMetrics;
+  /** Summary */
+  summary: {
+    total_technicians: number;
+    total_teams: number;
+    avg_first_pass_rate: number;
+    avg_serial_compliance: number;
+    top_performer: string | null;
+  };
+}
+
 // ============================================================================
 // UI STATE TYPES
 // ============================================================================

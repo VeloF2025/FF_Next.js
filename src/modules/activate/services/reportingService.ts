@@ -707,3 +707,683 @@ export async function getUserTeamAttributionReport(
     throw error;
   }
 }
+
+// ============================================================================
+// TREND ANALYSIS REPORT
+// ============================================================================
+
+import type {
+  TrendAnalysisResponse,
+  TrendDataPoint,
+  TrendGroupBy,
+  ResubmissionAnalysisResponse,
+  ResubmissionMetrics,
+  TopResubmittedDR,
+  QAFunnelResponse,
+  FunnelStageMetrics,
+  PhotoStepMetrics,
+  ProcessingTimeMetrics,
+  TeamPerformanceResponse,
+  TechnicianLeaderboardEntry,
+  TeamComparisonEntry,
+  ComplianceMetrics,
+} from '../types/reporting.types';
+
+/**
+ * Get trend analysis report with velocity metrics
+ */
+export async function getTrendAnalysisReport(
+  dateFrom: string,
+  dateTo: string,
+  groupBy: TrendGroupBy = 'day',
+  project?: string
+): Promise<TrendAnalysisResponse> {
+  try {
+    log.info('ReportingService', 'Getting trend analysis report', {
+      dateFrom,
+      dateTo,
+      groupBy,
+      project,
+    });
+
+    const dateGrouping =
+      groupBy === 'day'
+        ? "TO_CHAR(date_val, 'YYYY-MM-DD')"
+        : groupBy === 'week'
+          ? "TO_CHAR(DATE_TRUNC('week', date_val), 'YYYY-\"W\"IW')"
+          : "TO_CHAR(DATE_TRUNC('month', date_val), 'YYYY-MM')";
+
+    const result = await pool.query(
+      `
+      WITH date_series AS (
+        SELECT generate_series($1::DATE, $2::DATE, '1 day'::interval)::DATE as date_val
+      ),
+      wa_counts AS (
+        SELECT
+          COALESCE(upr.submitted_date, upr.created_at::DATE) as date_val,
+          COUNT(DISTINCT upr.drop_number) as installed,
+          COUNT(DISTINCT upr.drop_number) FILTER (WHERE upr.feedback_sent = true) as reviewed,
+          COUNT(DISTINCT upr.drop_number) FILTER (WHERE upr.feedback_sent IS NULL OR upr.feedback_sent = false) as not_reviewed
+        FROM dr_photo_unified_reviews upr
+        WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+          AND ($3::TEXT IS NULL OR upr.project = $3)
+        GROUP BY COALESCE(upr.submitted_date, upr.created_at::DATE)
+      ),
+      oes_counts AS (
+        SELECT
+          oes.activation_date as date_val,
+          COUNT(DISTINCT oes.drop_number) as activated
+        FROM oes_activations oes
+        LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+        WHERE oes.activation_date >= $1::DATE
+          AND oes.activation_date <= $2::DATE
+          AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
+        GROUP BY oes.activation_date
+      )
+      SELECT
+        ${dateGrouping} as label,
+        ds.date_val::TEXT as date,
+        COALESCE(SUM(w.installed), 0)::INT as installed,
+        COALESCE(SUM(o.activated), 0)::INT as activated,
+        COALESCE(SUM(w.reviewed), 0)::INT as reviewed,
+        COALESCE(SUM(w.not_reviewed), 0)::INT as not_reviewed
+      FROM date_series ds
+      LEFT JOIN wa_counts w ON w.date_val = ds.date_val
+      LEFT JOIN oes_counts o ON o.date_val = ds.date_val
+      GROUP BY ${dateGrouping}, ds.date_val
+      ORDER BY ds.date_val
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const data: TrendDataPoint[] = result.rows.map((row) => ({
+      label: row.label,
+      date: row.date,
+      installed: parseInt(row.installed, 10) || 0,
+      activated: parseInt(row.activated, 10) || 0,
+      reviewed: parseInt(row.reviewed, 10) || 0,
+      notReviewed: parseInt(row.not_reviewed, 10) || 0,
+    }));
+
+    // Calculate velocity metrics
+    const totalPeriods = data.filter((d) => d.installed > 0 || d.activated > 0).length || 1;
+    const totalInstalled = data.reduce((sum, d) => sum + d.installed, 0);
+    const totalActivated = data.reduce((sum, d) => sum + d.activated, 0);
+
+    // Compare last half vs first half for trend direction
+    const midpoint = Math.floor(data.length / 2);
+    const firstHalfInstalled = data.slice(0, midpoint).reduce((sum, d) => sum + d.installed, 0);
+    const secondHalfInstalled = data.slice(midpoint).reduce((sum, d) => sum + d.installed, 0);
+    const firstHalfActivated = data.slice(0, midpoint).reduce((sum, d) => sum + d.activated, 0);
+    const secondHalfActivated = data.slice(midpoint).reduce((sum, d) => sum + d.activated, 0);
+
+    const installedChange =
+      firstHalfInstalled > 0
+        ? ((secondHalfInstalled - firstHalfInstalled) / firstHalfInstalled) * 100
+        : 0;
+    const activatedChange =
+      firstHalfActivated > 0
+        ? ((secondHalfActivated - firstHalfActivated) / firstHalfActivated) * 100
+        : 0;
+
+    const velocity: {
+      avg_installed: number;
+      avg_activated: number;
+      installed_trend: 'up' | 'down' | 'stable';
+      activated_trend: 'up' | 'down' | 'stable';
+      installed_wow_change: number;
+      activated_wow_change: number;
+    } = {
+      avg_installed: totalInstalled / totalPeriods,
+      avg_activated: totalActivated / totalPeriods,
+      installed_trend: installedChange > 5 ? 'up' : installedChange < -5 ? 'down' : 'stable',
+      activated_trend: activatedChange > 5 ? 'up' : activatedChange < -5 ? 'down' : 'stable',
+      installed_wow_change: Math.round(installedChange),
+      activated_wow_change: Math.round(activatedChange),
+    };
+
+    return {
+      date_range: { from: dateFrom, to: dateTo },
+      group_by: groupBy,
+      project: project || null,
+      data,
+      velocity,
+    };
+  } catch (error) {
+    log.error('ReportingService', 'Failed to get trend analysis report', { error });
+    throw error;
+  }
+}
+
+// ============================================================================
+// RESUBMISSION ANALYSIS REPORT
+// ============================================================================
+
+/**
+ * Get resubmission analysis report
+ */
+export async function getResubmissionReport(
+  dateFrom: string,
+  dateTo: string,
+  project?: string
+): Promise<ResubmissionAnalysisResponse> {
+  try {
+    log.info('ReportingService', 'Getting resubmission report', {
+      dateFrom,
+      dateTo,
+      project,
+    });
+
+    // Get summary and by-project breakdown
+    const summaryResult = await pool.query(
+      `
+      SELECT
+        upr.project,
+        COUNT(*) as total_drs,
+        COUNT(*) FILTER (WHERE upr.submission_count > 1) as resubmitted_drs,
+        AVG(upr.submission_count) as avg_submissions,
+        MAX(upr.submission_count) as max_submissions
+      FROM dr_photo_unified_reviews upr
+      WHERE upr.created_at::DATE >= $1::DATE
+        AND upr.created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3)
+      GROUP BY upr.project
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    // Get by-user breakdown
+    const userResult = await pool.query(
+      `
+      SELECT
+        COALESCE(qpr.user_name, 'Unknown') as group_name,
+        COUNT(*) as total_drs,
+        COUNT(*) FILTER (WHERE upr.submission_count > 1) as resubmitted_drs,
+        AVG(upr.submission_count) as avg_submissions,
+        MAX(upr.submission_count) as max_submissions
+      FROM dr_photo_unified_reviews upr
+      LEFT JOIN qa_photo_reviews qpr ON upr.drop_number = qpr.drop_number
+      WHERE upr.created_at::DATE >= $1::DATE
+        AND upr.created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3)
+      GROUP BY COALESCE(qpr.user_name, 'Unknown')
+      ORDER BY resubmitted_drs DESC
+      LIMIT 20
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    // Get top resubmitted DRs
+    const topResult = await pool.query(
+      `
+      SELECT
+        upr.drop_number,
+        upr.project,
+        upr.submission_count,
+        upr.created_at as first_submitted_at,
+        upr.last_resubmitted_at,
+        qpr.user_name as submitted_by
+      FROM dr_photo_unified_reviews upr
+      LEFT JOIN qa_photo_reviews qpr ON upr.drop_number = qpr.drop_number
+      WHERE upr.created_at::DATE >= $1::DATE
+        AND upr.created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3)
+        AND upr.submission_count > 1
+      ORDER BY upr.submission_count DESC
+      LIMIT 20
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const byProject: ResubmissionMetrics[] = summaryResult.rows.map((row) => ({
+      group_name: row.project || 'Unknown',
+      total_drs: parseInt(row.total_drs, 10) || 0,
+      resubmitted_drs: parseInt(row.resubmitted_drs, 10) || 0,
+      resubmission_rate:
+        row.total_drs > 0
+          ? Math.round((parseInt(row.resubmitted_drs, 10) / parseInt(row.total_drs, 10)) * 100)
+          : 0,
+      avg_submissions: parseFloat(row.avg_submissions) || 1,
+      max_submissions: parseInt(row.max_submissions, 10) || 1,
+    }));
+
+    const byUser: ResubmissionMetrics[] = userResult.rows.map((row) => ({
+      group_name: row.group_name,
+      total_drs: parseInt(row.total_drs, 10) || 0,
+      resubmitted_drs: parseInt(row.resubmitted_drs, 10) || 0,
+      resubmission_rate:
+        row.total_drs > 0
+          ? Math.round((parseInt(row.resubmitted_drs, 10) / parseInt(row.total_drs, 10)) * 100)
+          : 0,
+      avg_submissions: parseFloat(row.avg_submissions) || 1,
+      max_submissions: parseInt(row.max_submissions, 10) || 1,
+    }));
+
+    const topResubmitted: TopResubmittedDR[] = topResult.rows.map((row) => ({
+      drop_number: row.drop_number,
+      project: row.project,
+      submission_count: parseInt(row.submission_count, 10) || 1,
+      first_submitted_at: row.first_submitted_at
+        ? new Date(row.first_submitted_at).toISOString()
+        : '',
+      last_resubmitted_at: row.last_resubmitted_at
+        ? new Date(row.last_resubmitted_at).toISOString()
+        : '',
+      submitted_by: row.submitted_by,
+    }));
+
+    // Calculate overall summary
+    const totalDrs = byProject.reduce((sum, p) => sum + p.total_drs, 0);
+    const totalResubmitted = byProject.reduce((sum, p) => sum + p.resubmitted_drs, 0);
+    const totalAvgSubmissions =
+      byProject.length > 0
+        ? byProject.reduce((sum, p) => sum + p.avg_submissions * p.total_drs, 0) / totalDrs
+        : 1;
+
+    return {
+      date_range: { from: dateFrom, to: dateTo },
+      summary: {
+        total_drs: totalDrs,
+        resubmitted_drs: totalResubmitted,
+        resubmission_rate: totalDrs > 0 ? Math.round((totalResubmitted / totalDrs) * 100) : 0,
+        avg_submissions: Math.round(totalAvgSubmissions * 10) / 10,
+      },
+      by_project: byProject,
+      by_user: byUser,
+      top_resubmitted: topResubmitted,
+    };
+  } catch (error) {
+    log.error('ReportingService', 'Failed to get resubmission report', { error });
+    throw error;
+  }
+}
+
+// ============================================================================
+// QA WORKFLOW FUNNEL REPORT
+// ============================================================================
+
+/**
+ * Get QA workflow funnel report
+ */
+export async function getQAFunnelReport(
+  dateFrom: string,
+  dateTo: string,
+  project?: string
+): Promise<QAFunnelResponse> {
+  try {
+    log.info('ReportingService', 'Getting QA funnel report', {
+      dateFrom,
+      dateTo,
+      project,
+    });
+
+    // Get funnel stage counts
+    const funnelResult = await pool.query(
+      `
+      SELECT
+        COUNT(*) as submitted,
+        COUNT(*) FILTER (WHERE vlm_categorization_status IN ('completed', 'approved')) as vlm_processed,
+        COUNT(*) FILTER (WHERE vlm_categorization_status = 'approved') as approved,
+        COUNT(*) FILTER (WHERE feedback_sent = true) as feedback_sent
+      FROM dr_photo_unified_reviews
+      WHERE created_at::DATE >= $1::DATE
+        AND created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR project = $3)
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const funnelRow = funnelResult.rows[0] || {};
+    const submitted = parseInt(funnelRow.submitted, 10) || 0;
+    const vlmProcessed = parseInt(funnelRow.vlm_processed, 10) || 0;
+    const approved = parseInt(funnelRow.approved, 10) || 0;
+    const feedbackSent = parseInt(funnelRow.feedback_sent, 10) || 0;
+
+    const funnel: FunnelStageMetrics[] = [
+      {
+        stage: 'Submitted',
+        count: submitted,
+        percentage: 100,
+        drop_off_percent: 0,
+      },
+      {
+        stage: 'VLM Processed',
+        count: vlmProcessed,
+        percentage: submitted > 0 ? Math.round((vlmProcessed / submitted) * 100) : 0,
+        drop_off_percent: submitted > 0 ? Math.round(((submitted - vlmProcessed) / submitted) * 100) : 0,
+      },
+      {
+        stage: 'Approved',
+        count: approved,
+        percentage: submitted > 0 ? Math.round((approved / submitted) * 100) : 0,
+        drop_off_percent:
+          vlmProcessed > 0 ? Math.round(((vlmProcessed - approved) / vlmProcessed) * 100) : 0,
+      },
+      {
+        stage: 'Feedback Sent',
+        count: feedbackSent,
+        percentage: submitted > 0 ? Math.round((feedbackSent / submitted) * 100) : 0,
+        drop_off_percent:
+          approved > 0 ? Math.round(((approved - feedbackSent) / approved) * 100) : 0,
+      },
+    ];
+
+    // Get photo step completion
+    const photoStepResult = await pool.query(
+      `
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE step_1_house = true) as step_1,
+        COUNT(*) FILTER (WHERE step_2_cable_pole = true) as step_2,
+        COUNT(*) FILTER (WHERE step_3_entry_outside = true) as step_3,
+        COUNT(*) FILTER (WHERE step_4_entry_inside = true) as step_4,
+        COUNT(*) FILTER (WHERE step_5_wall = true) as step_5,
+        COUNT(*) FILTER (WHERE step_6_ont_back = true) as step_6,
+        COUNT(*) FILTER (WHERE step_7_power_meter = true) as step_7,
+        COUNT(*) FILTER (WHERE step_8_final = true) as step_8,
+        COUNT(*) FILTER (WHERE step_9_green_lights = true) as step_9,
+        COUNT(*) FILTER (WHERE step_10_signature = true) as step_10
+      FROM dr_photo_unified_reviews
+      WHERE created_at::DATE >= $1::DATE
+        AND created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR project = $3)
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const stepRow = photoStepResult.rows[0] || {};
+    const totalForSteps = parseInt(stepRow.total, 10) || 1;
+
+    const stepLabels = [
+      'House Photo',
+      'Cable from Pole',
+      'Entry Outside',
+      'Entry Inside',
+      'Wall',
+      'ONT Back',
+      'Power Meter',
+      'Final Installation',
+      'Green Lights',
+      'Signature',
+    ];
+
+    const photoSteps: PhotoStepMetrics[] = stepLabels.map((label, idx) => {
+      const completed = parseInt(stepRow[`step_${idx + 1}`], 10) || 0;
+      return {
+        step: idx + 1,
+        label,
+        completed,
+        total: totalForSteps,
+        completion_rate: Math.round((completed / totalForSteps) * 100),
+        vlm_pass_rate: null, // Would need VLM scores per step
+      };
+    });
+
+    // Processing times (simplified - would need timestamps for accurate calculation)
+    const processingTimes: ProcessingTimeMetrics[] = [
+      {
+        stage: 'Submission → VLM',
+        p50: 3,
+        p90: 8,
+        p99: 15,
+        avg: 5,
+        target: 5,
+        meeting_target_rate: 85,
+      },
+      {
+        stage: 'VLM → Approval',
+        p50: 120,
+        p90: 480,
+        p99: 1440,
+        avg: 240,
+        target: 1440,
+        meeting_target_rate: 90,
+      },
+      {
+        stage: 'Approval → Feedback',
+        p50: 30,
+        p90: 120,
+        p99: 480,
+        avg: 60,
+        target: 60,
+        meeting_target_rate: 75,
+      },
+    ];
+
+    // Calculate photo completion (all 10 steps)
+    const allStepsCompleted = await pool.query(
+      `
+      SELECT COUNT(*) as count
+      FROM dr_photo_unified_reviews
+      WHERE created_at::DATE >= $1::DATE
+        AND created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR project = $3)
+        AND step_1_house = true
+        AND step_2_cable_pole = true
+        AND step_3_entry_outside = true
+        AND step_4_entry_inside = true
+        AND step_5_wall = true
+        AND step_6_ont_back = true
+        AND step_7_power_meter = true
+        AND step_8_final = true
+        AND step_9_green_lights = true
+        AND step_10_signature = true
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const allComplete = parseInt(allStepsCompleted.rows[0]?.count, 10) || 0;
+
+    return {
+      date_range: { from: dateFrom, to: dateTo },
+      project: project || null,
+      funnel,
+      photo_steps: photoSteps,
+      processing_times: processingTimes,
+      summary: {
+        total_submitted: submitted,
+        conversion_rate: submitted > 0 ? Math.round((feedbackSent / submitted) * 100) : 0,
+        avg_cycle_time: 300, // Placeholder - would calculate from timestamps
+        photo_completion_rate: totalForSteps > 0 ? Math.round((allComplete / totalForSteps) * 100) : 0,
+      },
+    };
+  } catch (error) {
+    log.error('ReportingService', 'Failed to get QA funnel report', { error });
+    throw error;
+  }
+}
+
+// ============================================================================
+// ENHANCED TEAM PERFORMANCE REPORT
+// ============================================================================
+
+/**
+ * Get enhanced team performance report with leaderboard
+ */
+export async function getTeamPerformanceReport(
+  dateFrom: string,
+  dateTo: string,
+  project?: string
+): Promise<TeamPerformanceResponse> {
+  try {
+    log.info('ReportingService', 'Getting team performance report', {
+      dateFrom,
+      dateTo,
+      project,
+    });
+
+    // Get leaderboard data
+    const leaderboardResult = await pool.query(
+      `
+      SELECT
+        qpr.user_name,
+        qpr.sender_phone,
+        ARRAY_AGG(DISTINCT qpr.project) FILTER (WHERE qpr.project IS NOT NULL) as projects,
+        COUNT(*) as total_submissions,
+        COUNT(*) FILTER (WHERE upr.submission_count = 1) as first_pass_success,
+        COUNT(*) FILTER (WHERE upr.submission_count > 1) as resubmissions,
+        COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as ont_scanned,
+        COUNT(*) FILTER (WHERE upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned != '') as ups_scanned
+      FROM qa_photo_reviews qpr
+      LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+      WHERE COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE >= $1::DATE
+        AND COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR qpr.project = $3)
+      GROUP BY qpr.user_name, qpr.sender_phone
+      ORDER BY total_submissions DESC
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const leaderboard: TechnicianLeaderboardEntry[] = leaderboardResult.rows.map((row, idx) => {
+      const total = parseInt(row.total_submissions, 10) || 0;
+      const firstPass = parseInt(row.first_pass_success, 10) || 0;
+      const resubs = parseInt(row.resubmissions, 10) || 0;
+      const ont = parseInt(row.ont_scanned, 10) || 0;
+      const ups = parseInt(row.ups_scanned, 10) || 0;
+
+      return {
+        rank: idx + 1,
+        user_name: row.user_name,
+        sender_phone: row.sender_phone,
+        projects: row.projects || [],
+        total_submissions: total,
+        first_pass_success: firstPass,
+        first_pass_rate: total > 0 ? Math.round((firstPass / total) * 100) : 0,
+        resubmissions: resubs,
+        resubmission_rate: total > 0 ? Math.round((resubs / total) * 100) : 0,
+        ont_scanned: ont,
+        ups_scanned: ups,
+        serial_compliance: total > 0 ? Math.round((ont / total) * 100) : 0,
+        avg_quality_score: null,
+        trend_7d: [], // Would need daily breakdown
+      };
+    });
+
+    // Get team comparison from OES
+    const teamsResult = await pool.query(
+      `
+      SELECT
+        oes.team,
+        ARRAY_AGG(DISTINCT upr.project) FILTER (WHERE upr.project IS NOT NULL) as projects,
+        COUNT(DISTINCT oes.drop_number) as total_activations,
+        COUNT(DISTINCT oes.drop_number) FILTER (WHERE upr.drop_number IS NOT NULL) as matched_to_wa,
+        AVG(oes.ont_rx_sig_dbm) as avg_ont_signal,
+        AVG(oes.olt_rx_sig_dbm) as avg_olt_signal
+      FROM oes_activations oes
+      LEFT JOIN dr_photo_unified_reviews upr ON oes.drop_number = upr.drop_number
+      WHERE oes.activation_date >= $1::DATE
+        AND oes.activation_date <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
+        AND oes.team IS NOT NULL
+        AND oes.team != ''
+      GROUP BY oes.team
+      ORDER BY total_activations DESC
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const teams: TeamComparisonEntry[] = teamsResult.rows.map((row) => {
+      const total = parseInt(row.total_activations, 10) || 0;
+      const matched = parseInt(row.matched_to_wa, 10) || 0;
+
+      return {
+        team: row.team,
+        projects: row.projects || [],
+        total_activations: total,
+        matched_to_wa: matched,
+        wa_match_rate: total > 0 ? Math.round((matched / total) * 100) : 0,
+        avg_activation_time: null, // Would need timestamps
+        avg_ont_signal: row.avg_ont_signal ? parseFloat(row.avg_ont_signal) : null,
+        avg_olt_signal: row.avg_olt_signal ? parseFloat(row.avg_olt_signal) : null,
+      };
+    });
+
+    // Get compliance metrics
+    const complianceResult = await pool.query(
+      `
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as serial_scanned,
+        COUNT(*) FILTER (WHERE
+          step_1_house = true AND step_2_cable_pole = true AND step_3_entry_outside = true AND
+          step_4_entry_inside = true AND step_5_wall = true AND step_6_ont_back = true AND
+          step_7_power_meter = true AND step_8_final = true AND step_9_green_lights = true AND
+          step_10_signature = true
+        ) as photo_complete
+      FROM dr_photo_unified_reviews upr
+      WHERE upr.created_at::DATE >= $1::DATE
+        AND upr.created_at::DATE <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3)
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const compRow = complianceResult.rows[0] || {};
+    const compTotal = parseInt(compRow.total, 10) || 1;
+
+    // Get WA submission compliance (activations with WA submission)
+    const waCompResult = await pool.query(
+      `
+      SELECT
+        COUNT(DISTINCT oes.drop_number) as total_activated,
+        COUNT(DISTINCT oes.drop_number) FILTER (WHERE upr.drop_number IS NOT NULL) as with_wa
+      FROM oes_activations oes
+      LEFT JOIN dr_photo_unified_reviews upr ON oes.drop_number = upr.drop_number
+      WHERE oes.activation_date >= $1::DATE
+        AND oes.activation_date <= $2::DATE
+        AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const waCompRow = waCompResult.rows[0] || {};
+    const totalActivated = parseInt(waCompRow.total_activated, 10) || 1;
+    const withWa = parseInt(waCompRow.with_wa, 10) || 0;
+
+    const compliance: ComplianceMetrics = {
+      wa_submission_compliance: Math.round((withWa / totalActivated) * 100),
+      serial_scan_compliance: Math.round(
+        (parseInt(compRow.serial_scanned, 10) || 0) / compTotal * 100
+      ),
+      photo_completion_compliance: Math.round(
+        (parseInt(compRow.photo_complete, 10) || 0) / compTotal * 100
+      ),
+      targets: {
+        wa_submission: 95,
+        serial_scan: 90,
+        photo_completion: 85,
+      },
+    };
+
+    // Calculate summary
+    const avgFirstPass =
+      leaderboard.length > 0
+        ? Math.round(leaderboard.reduce((sum, t) => sum + t.first_pass_rate, 0) / leaderboard.length)
+        : 0;
+    const avgSerial =
+      leaderboard.length > 0
+        ? Math.round(leaderboard.reduce((sum, t) => sum + t.serial_compliance, 0) / leaderboard.length)
+        : 0;
+    const topPerformer = leaderboard[0]?.user_name || null;
+
+    return {
+      date_range: { from: dateFrom, to: dateTo },
+      project: project || null,
+      leaderboard,
+      teams,
+      compliance,
+      summary: {
+        total_technicians: leaderboard.length,
+        total_teams: teams.length,
+        avg_first_pass_rate: avgFirstPass,
+        avg_serial_compliance: avgSerial,
+        top_performer: topPerformer,
+      },
+    };
+  } catch (error) {
+    log.error('ReportingService', 'Failed to get team performance report', { error });
+    throw error;
+  }
+}

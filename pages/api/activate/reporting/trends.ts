@@ -1,0 +1,73 @@
+/**
+ * API Route: /api/activate/reporting/trends
+ *
+ * Purpose: Get trend analysis report with velocity metrics
+ * Method: GET
+ *
+ * Query Parameters:
+ * - dateFrom (required): Start date (YYYY-MM-DD)
+ * - dateTo (required): End date (YYYY-MM-DD)
+ * - groupBy (optional): 'day' | 'week' | 'month' (default: 'day')
+ * - project (optional): Filter by project name
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getTrendAnalysisReport } from '@/modules/activate/services/reportingService';
+import type { TrendGroupBy } from '@/modules/activate/types/reporting.types';
+import { log } from '@/lib/logger';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { dateFrom, dateTo, groupBy, project } = req.query;
+
+    // Validate required parameters
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({
+        error: 'Missing required parameters: dateFrom and dateTo',
+      });
+    }
+
+    const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
+    const dateToStr = Array.isArray(dateTo) ? dateTo[0] : dateTo;
+    const groupByStr = (
+      groupBy
+        ? Array.isArray(groupBy)
+          ? groupBy[0]
+          : groupBy
+        : 'day'
+    ) as TrendGroupBy;
+    const projectStr = project
+      ? Array.isArray(project)
+        ? project[0]
+        : project
+      : undefined;
+
+    log.info('TrendsAPI', 'Fetching trend analysis report', {
+      dateFrom: dateFromStr,
+      dateTo: dateToStr,
+      groupBy: groupByStr,
+      project: projectStr,
+    });
+
+    const data = await getTrendAnalysisReport(
+      dateFromStr as string,
+      dateToStr as string,
+      groupByStr,
+      projectStr
+    );
+
+    return res.status(200).json(data);
+  } catch (error) {
+    log.error('TrendsAPI', 'Failed to fetch trend analysis report', { error });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+}

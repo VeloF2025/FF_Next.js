@@ -16,7 +16,7 @@ import type { ZoneBreakdown, PonBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
-import { ReportsTab } from './reporting/ReportsTab';
+import { ReportsDashboard } from './reporting/ReportsDashboard';
 import {
   ActivateDataProvider,
   useActivateData,
@@ -738,7 +738,7 @@ function DashboardPageContent() {
 
         {/* Reports Tab Content */}
         {activeTab === 'reports' && (
-          <ReportsTab />
+          <ReportsDashboard />
         )}
 
         {/* OES Import Tab Content */}
