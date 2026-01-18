@@ -1,12 +1,14 @@
 /**
  * UnifiedReviewCard Component
  *
- * Main component for unified DR photo review with 5 tabs:
- * 1. QA Wizard - 5-phase guided workflow (Prerequisites → Photo Review → Data Validation → Final Decision → Feedback)
- * 2. Photos - Photo gallery with step grouping
- * 3. Feedback - Generate and send WhatsApp feedback
- * 4. Activity - Review history, comments, and activity timeline
- * 5. Manual QA - Legacy 10-step checklist (for reference)
+ * Main component for unified DR photo review with 7 tabs:
+ * 1. Summary - DR overview with timeline, team, and status (landing tab)
+ * 2. QA Wizard - 5-phase guided workflow (Prerequisites → Photo Review → Data Validation → Final Decision → Feedback)
+ * 3. Photos - Photo gallery with step grouping
+ * 4. AI Categorization - VLM photo categorization results
+ * 5. Activity - Review history, comments, and activity timeline
+ * 6. Feedback - Generate and send WhatsApp feedback
+ * 7. Manual QA - Legacy 10-step checklist (for reference)
  *
  * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
  * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
@@ -17,6 +19,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { useUnifiedReview } from '../hooks/useUnifiedReview';
 import { STEP_LABELS } from '../types/unified.types';
 import type { UnifiedReview } from '../types/unified.types';
@@ -24,15 +27,18 @@ import { PhotoGalleryUnified } from './PhotoGalleryUnified';
 import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
 import { QaWizardContainer } from './wizard/QaWizardContainer';
+import { DrSummaryPage } from './DrSummaryPage';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
+  onBackToList?: () => void;
 }
 
-type TabKey = 'wizard' | 'photos' | 'feedback' | 'activity' | 'qa' | 'categorization';
+type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'qa' | 'categorization';
 
-export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('wizard');
+export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCardProps) {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabKey>('summary');
   const {
     review,
     isLoading,
@@ -79,13 +85,28 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
   }
 
   const tabs = [
+    { key: 'summary' as const, label: 'Summary', icon: '📋' },
     { key: 'wizard' as const, label: 'QA Wizard', icon: '🧙' },
     { key: 'photos' as const, label: `Photos (${review.photo_count})`, icon: '📸' },
     { key: 'categorization' as const, label: 'AI Categorization', icon: '🏷️' },
     { key: 'activity' as const, label: 'Activity', icon: '📜' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
-    { key: 'qa' as const, label: 'Manual QA', icon: '📋' },
+    { key: 'qa' as const, label: 'Manual QA', icon: '✅' },
   ];
+
+  const handleBackToList = () => {
+    if (onBackToList) {
+      onBackToList();
+    } else {
+      router.push('/activate');
+    }
+  };
+
+  const handleQAWizardComplete = () => {
+    // Refresh data and switch to summary tab to show updated state
+    refresh();
+    setActiveTab('summary');
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-900/50">
@@ -138,13 +159,21 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
 
       {/* Tab Content */}
       <div className="p-6">
+        {activeTab === 'summary' && (
+          <DrSummaryPage
+            dropNumber={dropNumber}
+            onStartQA={() => setActiveTab('wizard')}
+            onViewPhotos={() => setActiveTab('photos')}
+            onBackToList={handleBackToList}
+          />
+        )}
         {activeTab === 'wizard' && (
           <QaWizardContainer
             dropNumber={dropNumber}
             onPhaseChange={(phase) => {
               // Could log phase changes or update parent state
             }}
-            onComplete={refresh}
+            onComplete={handleQAWizardComplete}
           />
         )}
         {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
