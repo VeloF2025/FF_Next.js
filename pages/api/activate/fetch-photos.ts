@@ -16,6 +16,7 @@ import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { UnifiedReview } from '@/modules/activate/types/unified.types';
+import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -263,7 +264,7 @@ async function fetchFromOneMap(
     // If skipCategorization is true, return step=null so VLM can categorize
     const photos: Photo[] = localPhotos.map((photo: any) => ({
       filename: photo.filename,
-      step: skipCategorization ? null : mapPhotoTypeToStep(photo.type),
+      step: skipCategorization ? null : (photoTypeToStep(photo.type) ?? 0),
       url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
       size: photo.size,
       modified: photo.modified,
@@ -310,7 +311,7 @@ async function fetchFromBossApi(
     // If skipCategorization is true, return step=null so VLM can categorize
     const photos: Photo[] = data.photos.map((photo: any) => ({
       filename: photo.filename,
-      step: skipCategorization ? null : mapPhotoTypeToStep(photo.type),
+      step: skipCategorization ? null : (photoTypeToStep(photo.type) ?? 0),
       url: photo.url,
       size: photo.size,
       modified: photo.modified,
@@ -335,39 +336,6 @@ async function fetchFromLocalCache(dropNumber: string): Promise<PhotoFetchResult
   // TODO: Implement local cache fetching (Phase 4 enhancement)
   // This would read from /srv/data/boss/dr_photos/ or similar
   throw new Error('Local cache not yet implemented');
-}
-
-/**
- * Map photo type to unified step number (10 steps)
- *
- * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
- * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
- */
-function mapPhotoTypeToStep(photoType: string): number {
-  const mapping: Record<string, number> = {
-    // Step 1: House Photo / Property
-    'ph_prop': 1, 'ph_sign1': 1, 'ph_drop': 1, 'ph_outs': 1,
-    // Step 2: Cable from Pole
-    'ph_pole': 2, 'ph_cbl_r': 2,
-    // Step 3: Entry Outside
-    'ph_entry_out': 3, 'ph_hm_ln': 3,
-    // Step 4: Entry Inside
-    'ph_entry_in': 4, 'ph_hm_en': 4,
-    // Step 5: Wall for Installation
-    'ph_wall': 5,
-    // Step 6: ONT Back After Install
-    'ph_ont': 6, 'ph_ont_back': 6,
-    // Step 7: Power Meter Reading
-    'ph_powm': 7, 'ph_powm1': 7, 'ph_powm2': 7,
-    // Step 8: Final Installation (was step 10)
-    'ph_after': 8, 'ph_final': 8,
-    // Step 9: Green Lights on ONT (was step 11)
-    'ph_lights': 9, 'ph_led': 9,
-    // Step 10: Signature (was step 12)
-    'ph_sign2': 10, 'ph_signature': 10,
-  };
-
-  return mapping[photoType] || 0;
 }
 
 /**
