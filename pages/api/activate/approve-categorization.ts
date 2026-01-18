@@ -22,6 +22,8 @@ import {
   VlmCategorizationResult,
   Photo,
 } from '@/modules/activate/types/unified.types';
+import { recordCorrection, RecordCorrectionInput } from '@/modules/qa-learning';
+import { STEP_LABELS } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -182,6 +184,49 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       overriddenCount,
       totalPhotos: photosToStore.length,
     });
+
+    // HITL Learning: Record human overrides as corrections for few-shot learning
+    // Only record when human disagreed with VLM (override_step differs from vlm_predicted_step)
+    const correctionsToRecord: RecordCorrectionInput[] = [];
+
+    for (const catResult of updatedResults) {
+      // Check if this was an override (human_override_step is set and differs from VLM prediction)
+      if (
+        catResult.human_override_step !== null &&
+        catResult.human_override_step !== catResult.vlm_predicted_step
+      ) {
+        correctionsToRecord.push({
+          workflowType: 'dr_photo',
+          photoFilename: catResult.photo_filename,
+          photoDescription: catResult.vlm_identified_as || undefined,
+          vlmPredictedStep: catResult.vlm_predicted_step,
+          vlmPredictedCategory: catResult.vlm_predicted_category,
+          vlmConfidence: catResult.vlm_confidence,
+          vlmReasoning: catResult.vlm_reasoning || undefined,
+          correctStep: catResult.human_override_step,
+          correctCategory: STEP_LABELS[catResult.human_override_step] || `Step ${catResult.human_override_step}`,
+          correctionReason: catResult.human_override_reason || undefined,
+          correctedBy: approvedBy,
+        });
+      }
+    }
+
+    // Record corrections asynchronously (don't block response)
+    if (correctionsToRecord.length > 0) {
+      Promise.all(
+        correctionsToRecord.map((correction) =>
+          recordCorrection(correction).catch((err) => {
+            log.warn('ApproveCategorization', 'Failed to record correction for few-shot learning', {
+              photoFilename: correction.photoFilename,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          })
+        )
+      ).then((results) => {
+        const successCount = results.filter((r) => r !== undefined).length;
+        log.info('ApproveCategorization', `Recorded ${successCount}/${correctionsToRecord.length} corrections for HITL learning`);
+      });
+    }
 
     const response: ApproveCategorizeResponse = {
       dropNumber,

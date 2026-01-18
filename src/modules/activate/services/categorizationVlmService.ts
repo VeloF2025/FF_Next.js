@@ -16,6 +16,12 @@ import {
   VlmBatchCategorizationResponse,
   STEP_LABELS,
 } from '../types/unified.types';
+import {
+  FewShotExample,
+  getRelevantExamples,
+  buildFewShotPromptSection,
+  hasCorrections,
+} from '@/modules/qa-learning';
 
 // ============================================================================
 // CONFIGURATION
@@ -49,9 +55,17 @@ export class CategorizationError extends Error {
 
 /**
  * Build the categorization prompt for a batch of photos
+ *
+ * @param photoCount - Number of photos in batch
+ * @param drNumber - DR number for context
+ * @param fewShotExamples - Optional few-shot examples from human corrections
  */
-function buildCategorizationPrompt(photoCount: number, drNumber: string): string {
-  return `You are an expert fiber optic installation photo categorizer for ${drNumber}.
+function buildCategorizationPrompt(
+  photoCount: number,
+  drNumber: string,
+  fewShotExamples?: FewShotExample[]
+): string {
+  let prompt = `You are an expert fiber optic installation photo categorizer for ${drNumber}.
 
 Your task is to analyze ${photoCount} photos and categorize each one into one of these 10 installation steps:
 
@@ -71,7 +85,14 @@ KEY DIFFERENTIATORS for commonly confused categories:
 - Step 3 vs Step 4: OUTSIDE (exterior wall, weather elements) vs INSIDE (interior wall, indoor lighting)
 - Step 6 vs Step 8: ONT BACK only (cables) vs FULL SETUP wide shot (ONT + UPS + cables)
 - Step 1 vs Step 8: House ONLY (no equipment) vs House with visible installation
-- Step 9 vs Step 6: FRONT of ONT (lights) vs BACK of ONT (cables)
+- Step 9 vs Step 6: FRONT of ONT (lights) vs BACK of ONT (cables)`;
+
+  // Inject few-shot examples from human corrections (HITL learning)
+  if (fewShotExamples && fewShotExamples.length > 0) {
+    prompt += buildFewShotPromptSection(fewShotExamples);
+  }
+
+  prompt += `
 
 For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
 {
@@ -89,6 +110,8 @@ For EACH photo (numbered 1-${photoCount}), respond in this JSON format:
 
 CRITICAL: Do NOT trust any pre-existing labels or filenames. Categorize based ONLY on visual content.
 If a photo doesn't clearly match any category, set confidence below 0.5 and explain why.`;
+
+  return prompt;
 }
 
 // ============================================================================
@@ -160,13 +183,19 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
 
 /**
  * Call VLM API to categorize a batch of photos
+ *
+ * @param drNumber - DR number for context
+ * @param photos - Array of photos to categorize
+ * @param base64Images - Base64 encoded images
+ * @param fewShotExamples - Optional few-shot examples for prompt enhancement
  */
 async function callVlmForCategorization(
   drNumber: string,
   photos: Array<{ filename: string; url: string; original_type: string | null }>,
-  base64Images: string[]
+  base64Images: string[],
+  fewShotExamples?: FewShotExample[]
 ): Promise<VlmBatchCategorizationResponse> {
-  const prompt = buildCategorizationPrompt(photos.length, drNumber);
+  const prompt = buildCategorizationPrompt(photos.length, drNumber, fewShotExamples);
 
   const requestBody = {
     model: VLM_MODEL,
@@ -294,6 +323,37 @@ export async function categorizePhotos(
 
   log.info('CategorizationVlm', `Starting categorization for ${drNumber}: ${photos.length} photos`);
 
+  // HITL Learning: Fetch few-shot examples from human corrections
+  let fewShotExamples: FewShotExample[] = [];
+  try {
+    // Quick check to avoid unnecessary queries
+    const hasCorrectionData = await hasCorrections('dr_photo');
+    if (hasCorrectionData) {
+      const selectionResult = await getRelevantExamples({
+        workflowType: 'dr_photo',
+        maxExamples: 5,
+        includeConfusionPairs: true,
+      });
+      fewShotExamples = selectionResult.examples;
+
+      if (fewShotExamples.length > 0) {
+        log.info('CategorizationVlm', {
+          action: 'fewShotLoaded',
+          drNumber,
+          exampleCount: fewShotExamples.length,
+          criteria: selectionResult.selectionCriteria,
+        });
+      }
+    }
+  } catch (error) {
+    // Don't fail categorization if few-shot loading fails
+    log.warn('CategorizationVlm', {
+      action: 'fewShotLoadFailed',
+      drNumber,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Process in batches
   for (let i = 0; i < photos.length; i += batchSize) {
     const batch = photos.slice(i, i + batchSize);
@@ -335,9 +395,14 @@ export async function categorizePhotos(
       continue;
     }
 
-    // Call VLM
+    // Call VLM with few-shot examples
     try {
-      const vlmResponse = await callVlmForCategorization(drNumber, validPhotos, base64Images);
+      const vlmResponse = await callVlmForCategorization(
+        drNumber,
+        validPhotos,
+        base64Images,
+        fewShotExamples
+      );
 
       // Map VLM response to results
       for (const cat of vlmResponse.categorizations) {
