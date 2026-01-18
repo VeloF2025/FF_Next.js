@@ -446,12 +446,19 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
     modified: photo.modified,
   }));
 
+  // Check data completeness
+  const hasPhotos = photos.length > 0;
+  const hasOntSerial = !!review.ont_serial_scanned;
+  const hasUpsSerial = !!review.ups_serial_scanned;
+  const isDataIncomplete = !hasPhotos || (!hasOntSerial && !hasUpsSerial);
+
   const handleFetchPhotos = async () => {
     setIsFetching(true);
     setFetchError(null);
 
     try {
-      const response = await fetch('/api/activate/fetch-photos', {
+      // Use ensure-data endpoint for comprehensive refresh
+      const response = await fetch('/api/activate/ensure-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber: review.drop_number, force: true }),
@@ -459,13 +466,13 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error?.message || 'Failed to fetch photos');
+        throw new Error(data.error?.message || 'Failed to fetch data');
       }
 
-      // Refresh the review to get updated photos_metadata
+      // Refresh the review to get updated data
       onRefresh?.();
     } catch (error) {
-      setFetchError(error instanceof Error ? error.message : 'Failed to fetch photos');
+      setFetchError(error instanceof Error ? error.message : 'Failed to fetch data');
     } finally {
       setIsFetching(false);
     }
@@ -473,27 +480,61 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Serial Numbers from OneMap */}
-      {(review.ont_serial_scanned || review.ups_serial_scanned) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-              ONT Barcode
-            </label>
-            <p className="text-lg font-mono font-semibold text-gray-900 dark:text-white">
-              {review.ont_serial_scanned || <span className="text-gray-400 dark:text-gray-500">—</span>}
-            </p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-              UPS Serial
-            </label>
-            <p className="text-lg font-mono font-semibold text-gray-900 dark:text-white">
-              {review.ups_serial_scanned || <span className="text-gray-400 dark:text-gray-500">—</span>}
-            </p>
+      {/* Data Incomplete Warning Banner */}
+      {isDataIncomplete && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <h4 className="font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                Data Incomplete
+              </h4>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
+                {!hasPhotos && 'No photos loaded. '}
+                {!hasOntSerial && !hasUpsSerial && 'No serial numbers synced. '}
+                Data may still be syncing from OneMap.
+              </p>
+              <button
+                onClick={handleFetchPhotos}
+                disabled={isFetching}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+              >
+                {isFetching ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Refreshing from OneMap...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔄</span>
+                    <span>Refresh Data from OneMap</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Serial Numbers from OneMap */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+            ONT Barcode
+          </label>
+          <p className={`text-lg font-mono font-semibold ${hasOntSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+            {review.ont_serial_scanned || '— not synced'}
+          </p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+            UPS Serial
+          </label>
+          <p className={`text-lg font-mono font-semibold ${hasUpsSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+            {review.ups_serial_scanned || '— not synced'}
+          </p>
+        </div>
+      </div>
 
       {/* Fetch Photos Header */}
       <div className="flex items-center justify-between">
@@ -502,23 +543,25 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
             ? `${photos.length} photos loaded from ${review.photo_source || 'unknown source'}`
             : 'No photos loaded yet'}
         </div>
-        <button
-          onClick={handleFetchPhotos}
-          disabled={isFetching}
-          className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-        >
-          {isFetching ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              <span>Fetching...</span>
-            </>
-          ) : (
-            <>
-              <span>🔄</span>
-              <span>Fetch from OneMap</span>
-            </>
-          )}
-        </button>
+        {!isDataIncomplete && (
+          <button
+            onClick={handleFetchPhotos}
+            disabled={isFetching}
+            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            {isFetching ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Refreshing...</span>
+              </>
+            ) : (
+              <>
+                <span>🔄</span>
+                <span>Refresh from OneMap</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Error Message */}

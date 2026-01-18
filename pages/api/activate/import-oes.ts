@@ -286,7 +286,60 @@ export default async function handler(
         [matched, unmatched, batchId]
       );
 
-      log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, errors: errors.length });
+      // Step 6: Create unified records for OES-only DRs (not submitted via WhatsApp)
+      // These will appear in QA centre for review, photos will be fetched when opened
+      const existingUnifiedResult = await pool.query(
+        `SELECT drop_number FROM dr_photo_unified_reviews WHERE drop_number = ANY($1)`,
+        [dropNumbers]
+      );
+      const existingUnifiedSet = new Set(existingUnifiedResult.rows.map(r => r.drop_number));
+
+      // Find DRs that are in OES but NOT in unified table
+      const oesOnlyDRs = oesRows.filter(row => !existingUnifiedSet.has(row.drop_number));
+
+      if (oesOnlyDRs.length > 0) {
+        log.info('OESImport', `Creating ${oesOnlyDRs.length} unified records for OES-only DRs`);
+
+        // Batch insert OES-only DRs into unified table
+        // Photos will be fetched via ensure-data when user opens for QA review
+        const OES_BATCH_SIZE = 100;
+        let oesOnlyCreated = 0;
+
+        for (let i = 0; i < oesOnlyDRs.length; i += OES_BATCH_SIZE) {
+          const chunk = oesOnlyDRs.slice(i, i + OES_BATCH_SIZE);
+
+          const values: any[] = [];
+          const placeholders: string[] = [];
+
+          chunk.forEach((row, idx) => {
+            // Try to find project from drops table
+            const dropId = dropsMap.get(row.drop_number) || null;
+            const offset = idx * 3;
+            placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3})`);
+            values.push(
+              row.drop_number,
+              row.activation_date, // Use OES activation date as submitted_date
+              'OES Import' // Mark source as OES import
+            );
+          });
+
+          try {
+            await pool.query(
+              `INSERT INTO dr_photo_unified_reviews (drop_number, submitted_date, photo_source)
+               VALUES ${placeholders.join(', ')}
+               ON CONFLICT (drop_number) DO NOTHING`,
+              values
+            );
+            oesOnlyCreated += chunk.length;
+          } catch (oesErr) {
+            log.error('OESImport', `Error creating OES-only unified records at batch ${i}`, oesErr);
+          }
+        }
+
+        log.info('OESImport', `Created ${oesOnlyCreated} OES-only unified records`);
+      }
+
+      log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, errors: errors.length });
 
       return res.status(200).json({
         success: true,
@@ -295,6 +348,7 @@ export default async function handler(
         updated,
         matched,
         unmatched,
+        oesOnlyCreated: oesOnlyDRs.length,
         errors,
         batchId,
       });

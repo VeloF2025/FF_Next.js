@@ -97,6 +97,7 @@ export function QaWizardContainer({
 }: QaWizardContainerProps) {
   const [state, setState] = useState<QaWizardState>(initialState);
   const [loading, setLoading] = useState(false);
+  const [dataStatus, setDataStatus] = useState<string | null>(null); // Loading message for data fetch
   const [error, setError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
 
@@ -108,9 +109,33 @@ export function QaWizardContainer({
   const loadWizardState = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setDataStatus('Ensuring data is up to date...');
 
     try {
-      // Check prerequisites first
+      // STEP 0: Ensure data is complete before checking prerequisites
+      // This fetches from OneMap if photos/serials are missing
+      const ensureResponse = await fetch('/api/activate/ensure-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dropNumber }),
+      });
+
+      if (ensureResponse.ok) {
+        const ensureData = await ensureResponse.json();
+        const ensureResult = ensureData.data;
+
+        if (ensureResult.refreshed) {
+          setDataStatus(`Refreshed: ${ensureResult.photoCount} photos loaded`);
+          log.info('QaWizard', `Data refreshed for ${dropNumber}`, ensureResult);
+        } else if (ensureResult.status === 'partial') {
+          setDataStatus('Partial data available - some items may be missing');
+          log.warn('QaWizard', `Partial data for ${dropNumber}`, ensureResult);
+        }
+      }
+
+      setDataStatus('Checking prerequisites...');
+
+      // STEP 1: Check prerequisites
       const prereqResponse = await fetch(
         `/api/activate/validate-prerequisites?dropNumber=${encodeURIComponent(dropNumber)}`
       );
@@ -212,6 +237,7 @@ export function QaWizardContainer({
       log.error('QaWizard', `Failed to load state for ${dropNumber}: ${message}`);
     } finally {
       setLoading(false);
+      setDataStatus(null);
     }
   }, [dropNumber]);
 
@@ -364,7 +390,9 @@ export function QaWizardContainer({
     return (
       <div className="p-6 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-        <p className="text-gray-600 dark:text-gray-400">Loading QA Wizard...</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          {dataStatus || 'Loading QA Wizard...'}
+        </p>
       </div>
     );
   }
