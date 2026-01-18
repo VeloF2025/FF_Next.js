@@ -268,6 +268,43 @@ const odometerAnomaly = useMemo((): ReadingAnomaly | null => {
 - **Cause:** Image too large, token truncation
 - **Fix:** Resize to 1280×960 before VLM processing
 
+## Fuel Gauge Reading (Jan 2026)
+**Location:** `src/modules/fleet/services/fleetVlmService.ts`
+
+### Improved Prompt Design
+The fuel gauge prompt uses **categorical levels** for better accuracy:
+- `empty` = 0%
+- `1/4` = 25%
+- `1/2` = 50%
+- `3/4` = 75%
+- `full` = 100%
+
+### Key Prompt Elements
+1. **Gauge identification:** Look for E/F markings + fuel pump icon
+2. **Direction clarity:** E (Empty) on LEFT, F (Full) on RIGHT
+3. **Needle focus:** Read where needle TIP points
+4. **Categorical response:** Pick closest level from 5 options
+
+### Response Format
+```json
+{
+  "level_category": "1/4",
+  "level": 25,
+  "confidence": 0.85,
+  "description": "needle between E and first mark"
+}
+```
+
+### Benchmark Performance
+| Test | Expected | Typical Result | Time |
+|------|----------|----------------|------|
+| image_fuel | 1/4 | 1/4 ✅ | ~90ms |
+
+### Troubleshooting Fuel Misreads
+1. **Image too large:** Resize to max 800×600 (benchmark uses this)
+2. **Wrong gauge selected:** VLM may confuse with speedometer/temp gauge
+3. **Inverted reading:** If reading E as F or vice versa, prompt needs clearer E-F orientation
+
 ## Related Files
 - `pages/fleet/portal.tsx` - Driver portal page
 - `pages/api/fleet/portal/verify-plate.ts` - Plate verification API

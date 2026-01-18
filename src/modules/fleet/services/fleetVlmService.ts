@@ -142,21 +142,33 @@ If no plate visible or unreadable:
   "visible": false
 }`;
 
-const FUEL_GAUGE_PROMPT = `Look at this vehicle dashboard photo. Find the FUEL GAUGE.
+const FUEL_GAUGE_PROMPT = `TASK: Read the FUEL GAUGE in this vehicle dashboard photo.
 
-HOW TO IDENTIFY THE FUEL GAUGE:
-- Has "E" (Empty) on one side and "F" (Full) on the other
-- Usually has a fuel pump icon nearby
-- NOT the speedometer (has large numbers 0-220)
-- NOT the temperature gauge (has C/H markings)
+HOW TO FIND THE FUEL GAUGE:
+1. Look for a gauge with "E" (Empty) and "F" (Full) markings
+2. Usually has a fuel pump icon (⛽) next to it
+3. It is a SMALL gauge, NOT the large speedometer
+4. NOT the temperature gauge (has C/H or blue/red markings)
 
-TASK: Where is the fuel gauge needle pointing? Estimate the tank percentage (0-100%).
+HOW TO READ THE FUEL LEVEL:
+- E (Empty) = 0% fuel
+- F (Full) = 100% fuel
+- Most gauges: E is on LEFT, F is on RIGHT
+- The NEEDLE points to current fuel level
+- Look at where the needle tip is pointing between E and F
+
+ANSWER OPTIONS - pick the closest:
+- "empty" = 0% (needle at E)
+- "1/4" = 25% (needle 1/4 way from E to F)
+- "1/2" = 50% (needle halfway between E and F)
+- "3/4" = 75% (needle 3/4 way from E to F)
+- "full" = 100% (needle at F)
 
 Reply with JSON only:
-{"level": <0-100>, "confidence": <0.0-1.0>, "description": "<brief description of needle position>"}
+{"level_category": "<empty|1/4|1/2|3/4|full>", "level": <0-100>, "confidence": <0.0-1.0>, "description": "<where is the needle pointing, e.g. 'needle between E and first mark'>"}
 
 If fuel gauge not visible:
-{"level": null, "confidence": 0, "description": "Fuel gauge not found"}`;
+{"level_category": null, "level": null, "confidence": 0, "description": "Fuel gauge not found"}`;
 
 const FUEL_RECEIPT_PROMPT = `You are analyzing a fuel station receipt or invoice photo.
 
@@ -450,6 +462,22 @@ export async function verifyLicensePlate(
 }
 
 /**
+ * Map categorical fuel level to percentage
+ */
+function categoryToPercent(category: string | null): number | null {
+  if (!category) return null;
+  const normalized = category.toLowerCase().trim();
+  const mapping: Record<string, number> = {
+    'empty': 0,
+    '1/4': 25,
+    '1/2': 50,
+    '3/4': 75,
+    'full': 100,
+  };
+  return mapping[normalized] ?? null;
+}
+
+/**
  * Extract fuel gauge level from dashboard photo
  * @param base64Image - Base64-encoded image of fuel gauge
  * @returns Fuel level result (0-100 percentage)
@@ -462,13 +490,23 @@ export async function extractFuelLevel(
 
     const content = await callVlmApi(base64Image, FUEL_GAUGE_PROMPT, 'fuel_gauge');
     const result = parseVlmJson<{
+      level_category?: string | null;
       level: number | null;
       confidence: number;
       description: string;
     }>(content);
 
-    // Ensure level is within 0-100 range
+    // Prefer categorical level if available (more reliable)
     let level = result.level;
+    if (result.level_category) {
+      const categoryLevel = categoryToPercent(result.level_category);
+      if (categoryLevel !== null) {
+        log.info('FleetVlmService', `Using categorical level: ${result.level_category} -> ${categoryLevel}%`);
+        level = categoryLevel;
+      }
+    }
+
+    // Ensure level is within 0-100 range
     if (level !== null) {
       level = Math.max(0, Math.min(100, level));
     }
