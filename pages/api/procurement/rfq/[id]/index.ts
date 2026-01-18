@@ -42,22 +42,26 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     const rfq = rfqResult[0];
 
-    // Get RFQ items
+    // Get RFQ items with stock item info
     const items = await sql`
-      SELECT * FROM rfq_items
-      WHERE rfq_id::text = ${id}
-      ORDER BY line_number
+      SELECT ri.*, si.description as stock_item_description, si.item_code as stock_item_code
+      FROM rfq_items ri
+      LEFT JOIN stock_items si ON ri.stock_item_id = si.id
+      WHERE ri.rfq_id::text = ${id}
+      ORDER BY ri.line_number
     `;
 
-    // Get suppliers info if invited
-    let suppliers: any[] = [];
-    if (rfq.invited_suppliers && Array.isArray(rfq.invited_suppliers) && rfq.invited_suppliers.length > 0) {
-      suppliers = await sql`
-        SELECT id, company_name, email, phone, status
-        FROM suppliers
-        WHERE id = ANY(${rfq.invited_suppliers})
-      `;
-    }
+    // Get suppliers from junction table with status tracking
+    const suppliers = await sql`
+      SELECT
+        s.id, s.company_name, s.name, s.email, s.phone, s.status as supplier_status,
+        rs.id as rfq_supplier_id, rs.status, rs.invited_at, rs.viewed_at,
+        rs.responded_at, rs.invitation_sent, rs.notes
+      FROM rfq_suppliers rs
+      JOIN suppliers s ON rs.supplier_id = s.id
+      WHERE rs.rfq_id::text = ${id}
+      ORDER BY rs.invited_at
+    `;
 
     // Get quotes for this RFQ
     const quotes = await sql`
@@ -88,13 +92,24 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         unit: item.uom,
         specifications: item.specifications,
         estimatedUnitPrice: item.estimated_unit_price ? Number(item.estimated_unit_price) : 0,
+        stockItemId: item.stock_item_id,
+        stockItemDescription: item.stock_item_description,
+        stockItemCode: item.stock_item_code,
+        boqItemId: item.boq_item_id,
       })),
       suppliers: suppliers.map((s: any) => ({
         id: s.id,
-        companyName: s.company_name,
+        rfqSupplierId: s.rfq_supplier_id,
+        companyName: s.company_name || s.name,
         email: s.email,
         phone: s.phone,
-        status: s.status,
+        supplierStatus: s.supplier_status,
+        invitationStatus: s.status,
+        invitedAt: s.invited_at,
+        viewedAt: s.viewed_at,
+        respondedAt: s.responded_at,
+        invitationSent: s.invitation_sent,
+        notes: s.notes,
       })),
       quotes: quotes.map((q: any) => ({
         id: q.id,
@@ -121,7 +136,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
 async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
-    const { title, description, status, dueDate, items } = req.body;
+    const { title, description, status, dueDate, items, suppliers, supplierIds } = req.body;
 
     // Update RFQ
     const updated = await sql`
@@ -145,18 +160,57 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) 
       // Delete existing items
       await sql`DELETE FROM rfq_items WHERE rfq_id::text = ${id}`;
 
-      // Insert new items
+      // Insert new items with stock_item_id and boq_item_id support
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         await sql`
           INSERT INTO rfq_items (
             rfq_id, line_number, description, quantity, uom,
-            specifications, estimated_unit_price
+            specifications, estimated_unit_price, stock_item_id, boq_item_id
           ) VALUES (
-            ${id}, ${i + 1}, ${item.description}, ${item.quantity}, ${item.unit},
-            ${item.specifications || null}, ${item.estimatedUnitPrice || 0}
+            ${id}, ${i + 1}, ${item.description}, ${item.quantity}, ${item.unit || item.uom || 'EA'},
+            ${item.specifications || null}, ${item.estimatedUnitPrice || item.estimated_unit_price || 0},
+            ${item.stockItemId || item.stock_item_id || null},
+            ${item.boqItemId || item.boq_item_id || null}
           )
         `;
+      }
+    }
+
+    // Update suppliers if provided (via junction table)
+    const supplierList = suppliers || supplierIds;
+    if (supplierList && Array.isArray(supplierList)) {
+      // Get existing suppliers to preserve their status/tracking data
+      const existingSuppliers = await sql`
+        SELECT supplier_id, status, viewed_at, responded_at
+        FROM rfq_suppliers WHERE rfq_id::text = ${id}
+      `;
+      const existingMap = new Map(existingSuppliers.map((s: any) => [s.supplier_id, s]));
+
+      // Delete suppliers not in the new list
+      await sql`DELETE FROM rfq_suppliers WHERE rfq_id::text = ${id}`;
+
+      // Insert/re-insert suppliers
+      for (const supplierId of supplierList) {
+        if (supplierId) {
+          const sid = typeof supplierId === 'object' ? supplierId.id : parseInt(supplierId);
+          const existing = existingMap.get(sid);
+          try {
+            await sql`
+              INSERT INTO rfq_suppliers (
+                rfq_id, supplier_id, status, viewed_at, responded_at
+              ) VALUES (
+                ${id}, ${sid},
+                ${existing?.status || 'invited'},
+                ${existing?.viewed_at || null},
+                ${existing?.responded_at || null}
+              )
+              ON CONFLICT (rfq_id, supplier_id) DO NOTHING
+            `;
+          } catch (e) {
+            // Skip invalid supplier IDs
+          }
+        }
       }
     }
 
@@ -170,8 +224,9 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) 
 
 async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
-    // Delete RFQ items first
+    // Delete related records first (CASCADE also handles this, but explicit is clearer)
     await sql`DELETE FROM rfq_items WHERE rfq_id::text = ${id}`;
+    await sql`DELETE FROM rfq_suppliers WHERE rfq_id::text = ${id}`;
 
     // Delete RFQ
     const deleted = await sql`

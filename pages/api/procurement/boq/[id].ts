@@ -66,6 +66,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         unitPrice: Number(item.unit_price) || 0,
         totalPrice: Number(item.total_price) || 0,
         category: item.category || 'Materials',
+        stockItemId: item.stock_item_id || null,
       })),
     };
 

@@ -23,8 +23,10 @@ import {
   Building2,
   Mail,
   Phone,
+  ShoppingCart,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { ConvertToPOModal } from '@/components/procurement/rfq/ConvertToPOModal';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 
@@ -92,6 +94,7 @@ export default function RFQDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'items' | 'suppliers' | 'quotes'>('items');
+  const [showConvertToPOModal, setShowConvertToPOModal] = useState(false);
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -203,6 +206,16 @@ export default function RFQDetailPage() {
     } catch (err) {
       toast.error('Failed to close RFQ');
     }
+  };
+
+  const handlePOCreated = (poId: string, poNumber: string) => {
+    toast.success(`Purchase Order ${poNumber} created!`);
+    // Update RFQ status to awarded
+    if (rfq) {
+      setRfq({ ...rfq, status: 'awarded' });
+    }
+    // Navigate to the new PO
+    router.push(`/procurement/purchase-orders/${poId}`);
   };
 
   if (isLoading) {
@@ -508,6 +521,12 @@ export default function RFQDetailPage() {
                       Close & Evaluate
                     </Button>
                   )}
+                  {(rfq.status === 'evaluating' || rfq.status === 'awarded') && (
+                    <Button className="w-full" onClick={() => setShowConvertToPOModal(true)}>
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Create Purchase Order
+                    </Button>
+                  )}
                   <Button variant="outline" className="w-full" onClick={() => router.push(`/procurement/rfq/${rfq.id}/edit`)}>
                     <Edit2 className="h-4 w-4 mr-2" />
                     Edit RFQ
@@ -517,6 +536,32 @@ export default function RFQDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Convert to PO Modal */}
+        <ConvertToPOModal
+          isOpen={showConvertToPOModal}
+          onClose={() => setShowConvertToPOModal(false)}
+          rfqId={rfq.id}
+          rfqNumber={rfq.rfqNumber}
+          rfqTitle={rfq.title}
+          projectId={rfq.projectId}
+          suppliers={rfq.suppliers.map((s) => ({
+            id: s.id,
+            companyName: s.companyName,
+            email: s.email,
+            phone: s.phone,
+            status: s.status,
+          }))}
+          items={rfq.items.map((item) => ({
+            id: item.id,
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            estimatedUnitPrice: item.estimatedUnitPrice,
+          }))}
+          totalValue={rfq.totalValue}
+          onSuccess={handlePOCreated}
+        />
       </div>
     </AppLayout>
   );

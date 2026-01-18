@@ -6,8 +6,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
-import { ArrowLeft, Plus, Trash2, Loader2, Users, Calendar, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Users, Calendar, FileText, Package } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { StockItemSelector } from '@/components/procurement/StockItemSelector';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 
@@ -29,6 +30,8 @@ interface RFQItem {
   unit: string;
   specifications: string;
   estimatedUnitPrice: number;
+  boqItemId?: string;
+  stockItemId?: string;
 }
 
 export default function NewRFQPage() {
@@ -42,6 +45,9 @@ export default function NewRFQPage() {
   const [responseDeadline, setResponseDeadline] = useState<string>('');
   const [items, setItems] = useState<RFQItem[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [sourceBoqId, setSourceBoqId] = useState<string | null>(null);
+  const [stockSelectorOpen, setStockSelectorOpen] = useState(false);
+  const [stockSelectorItemIndex, setStockSelectorItemIndex] = useState<number | null>(null);
 
   // Data state
   const [projects, setProjects] = useState<Project[]>([]);
@@ -113,22 +119,53 @@ export default function NewRFQPage() {
   const importItemsFromBOQ = async (id: string) => {
     try {
       setImportingFromBOQ(true);
-      const response = await fetch(`/api/procurement/boq?projectId=${selectedProjectId || 'all'}`);
+      // Fetch the specific BOQ by ID
+      const response = await fetch(`/api/procurement/boq/${id}`);
       if (response.ok) {
         const data = await response.json();
-        const boqItems = data.items || [];
+        const boq = data.data || data;
+        const boqItems = boq.items || [];
 
         if (boqItems.length > 0) {
+          setSourceBoqId(id);
           setItems(boqItems.map((item: any) => ({
-            description: item.description || '',
+            description: item.description || item.item_description || '',
             quantity: item.quantity || 1,
-            unit: item.unit || 'unit',
-            specifications: '',
-            estimatedUnitPrice: item.unitPrice || 0
+            unit: item.unit || item.uom || 'unit',
+            specifications: item.specifications || '',
+            estimatedUnitPrice: item.unit_price || item.unitPrice || 0,
+            boqItemId: item.id,
+            stockItemId: item.stock_item_id || null
           })));
+          // Auto-set title if not set
+          if (!title && boq.title) {
+            setTitle(`RFQ from BOQ: ${boq.title}`);
+          }
           toast.success(`Imported ${boqItems.length} items from BOQ`);
         } else {
           toast('No items found in selected BOQ');
+        }
+      } else {
+        // Fallback to project BOQ list if specific BOQ not found
+        const listResponse = await fetch(`/api/procurement/boq?projectId=${selectedProjectId || 'all'}`);
+        if (listResponse.ok) {
+          const data = await listResponse.json();
+          const boqs = data.data || data.boqs || [];
+          if (boqs.length > 0 && boqs[0].items) {
+            const firstBoq = boqs[0];
+            setSourceBoqId(firstBoq.id);
+            setItems(firstBoq.items.map((item: any) => ({
+              description: item.description || '',
+              quantity: item.quantity || 1,
+              unit: item.unit || 'unit',
+              specifications: '',
+              estimatedUnitPrice: item.unitPrice || 0,
+              boqItemId: item.id
+            })));
+            toast.success(`Imported ${firstBoq.items.length} items from BOQ`);
+          } else {
+            toast('No BOQ items found for this project');
+          }
         }
       }
     } catch (error) {
@@ -157,6 +194,32 @@ export default function NewRFQPage() {
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
+  };
+
+  const openStockSelector = (index: number) => {
+    setStockSelectorItemIndex(index);
+    setStockSelectorOpen(true);
+  };
+
+  const handleStockItemSelect = (stockItem: {
+    stockItemId: string;
+    description: string;
+    unit: string;
+    estimatedUnitPrice: number;
+  }) => {
+    if (stockSelectorItemIndex !== null) {
+      const newItems = [...items];
+      newItems[stockSelectorItemIndex] = {
+        ...newItems[stockSelectorItemIndex],
+        description: stockItem.description,
+        unit: stockItem.unit,
+        estimatedUnitPrice: stockItem.estimatedUnitPrice,
+        stockItemId: stockItem.stockItemId,
+      };
+      setItems(newItems);
+    }
+    setStockSelectorOpen(false);
+    setStockSelectorItemIndex(null);
   };
 
   const toggleSupplier = (supplierId: string) => {
@@ -197,9 +260,16 @@ export default function NewRFQPage() {
           status,
           responseDeadline: new Date(responseDeadline).toISOString(),
           supplierIds: selectedSuppliers,
+          sourceBoqId: sourceBoqId, // Link to source BOQ for tracking
           items: items.map((item, index) => ({
-            ...item,
-            lineNumber: index + 1
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            specifications: item.specifications,
+            estimatedUnitPrice: item.estimatedUnitPrice,
+            lineNumber: index + 1,
+            boqItemId: item.boqItemId || null,
+            stockItemId: item.stockItemId || null
           })),
           totalValue: items.reduce((sum, item) => sum + (item.quantity * item.estimatedUnitPrice), 0)
         })
@@ -363,13 +433,34 @@ export default function NewRFQPage() {
                     {items.map((item, index) => (
                       <div key={index} className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border-light)]">
                         <div className="flex justify-between items-start mb-3">
-                          <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Item #{index + 1}</span>
-                          <button
-                            onClick={() => removeItem(index)}
-                            className="p-1 text-red-400 hover:bg-red-500/10 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Item #{index + 1}</span>
+                            {item.stockItemId && (
+                              <span className="px-1.5 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded">
+                                Linked to Stock
+                              </span>
+                            )}
+                            {item.boqItemId && (
+                              <span className="px-1.5 py-0.5 text-xs bg-green-500/20 text-green-400 rounded">
+                                From BOQ
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openStockSelector(index)}
+                              className="p-1 text-blue-400 hover:bg-blue-500/10 rounded"
+                              title="Browse Stock Catalog"
+                            >
+                              <Package className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => removeItem(index)}
+                              className="p-1 text-red-400 hover:bg-red-500/10 rounded"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div className="md:col-span-2">
@@ -536,6 +627,16 @@ export default function NewRFQPage() {
           </div>
         </div>
       </div>
+
+      {/* Stock Item Selector Modal */}
+      <StockItemSelector
+        isOpen={stockSelectorOpen}
+        onClose={() => {
+          setStockSelectorOpen(false);
+          setStockSelectorItemIndex(null);
+        }}
+        onSelect={handleStockItemSelect}
+      />
     </AppLayout>
   );
 }

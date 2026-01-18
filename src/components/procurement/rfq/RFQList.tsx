@@ -151,7 +151,7 @@ export default function RFQList({
               <div
                 key={rfq.id}
                 className={`p-6 hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors ${
-                  selectedRFQId === rfq.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                  selectedRFQId === rfq.id ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
                 }`}
                 onClick={() => handleRFQClick(rfq)}
               >

@@ -16,17 +16,18 @@ export default withErrorHandler(async (
   if (req.method === 'GET') {
     try {
       // Query real data from database
-      let rfqData;
-      let itemsData;
-      
+      let rfqData: any[];
+      let itemsData: any[] = [];
+      let suppliersData: any[] = [];
+
       if (projectId && projectId !== 'all') {
         // Get RFQs for specific project
         rfqData = await sql`
-          SELECT * FROM rfqs 
+          SELECT * FROM rfqs
           WHERE project_id = ${projectId}
           ORDER BY created_at DESC
         `;
-        
+
         // Get RFQ items
         if (rfqData.length > 0) {
           const rfqIds = rfqData.map(r => r.id);
@@ -35,20 +36,28 @@ export default withErrorHandler(async (
             WHERE rfq_id = ANY(${rfqIds})
             ORDER BY line_number
           `;
+
+          // Get suppliers from junction table
+          suppliersData = await sql`
+            SELECT rs.*, s.company_name, s.name, s.email
+            FROM rfq_suppliers rs
+            JOIN suppliers s ON rs.supplier_id = s.id
+            WHERE rs.rfq_id = ANY(${rfqIds})
+          `;
         } else {
           itemsData = [];
         }
       } else {
         // Get all RFQs with quotes count
         rfqData = await sql`
-          SELECT 
+          SELECT
             r.*,
             (SELECT COUNT(*) FROM quotes WHERE quotes.rfq_id = r.id)::int as quotes_received
           FROM rfqs r
           ORDER BY r.created_at DESC
           LIMIT 100
         `;
-        
+
         // Get items for recent RFQs
         if (rfqData.length > 0) {
           const rfqIds = rfqData.slice(0, 20).map(r => r.id);
@@ -58,10 +67,32 @@ export default withErrorHandler(async (
             ORDER BY line_number
             LIMIT 200
           `;
+
+          // Get suppliers from junction table
+          suppliersData = await sql`
+            SELECT rs.*, s.company_name, s.name, s.email
+            FROM rfq_suppliers rs
+            JOIN suppliers s ON rs.supplier_id = s.id
+            WHERE rs.rfq_id = ANY(${rfqIds})
+          `;
         } else {
           itemsData = [];
         }
       }
+
+      // Group suppliers by RFQ
+      const suppliersByRfq = suppliersData.reduce((acc, sup) => {
+        if (!acc[sup.rfq_id]) acc[sup.rfq_id] = [];
+        acc[sup.rfq_id].push({
+          id: sup.supplier_id,
+          name: sup.company_name || sup.name,
+          email: sup.email,
+          status: sup.status,
+          invitedAt: sup.invited_at,
+          respondedAt: sup.responded_at
+        });
+        return acc;
+      }, {} as Record<string, any[]>);
       
       // Group items by RFQ
       const itemsByRfq = itemsData.reduce((acc, item) => {
@@ -71,7 +102,7 @@ export default withErrorHandler(async (
       }, {} as Record<string, typeof itemsData>);
       
       // Transform data to match expected format
-      const transformedRFQs: RFQ[] = rfqData.map(rfq => ({
+      const transformedRFQs = rfqData.map((rfq: any) => ({
         id: rfq.id,
         rfqNumber: rfq.rfq_number,
         projectId: rfq.project_id,
@@ -80,16 +111,16 @@ export default withErrorHandler(async (
         status: rfq.status as 'draft' | 'open' | 'evaluating' | 'awarded' | 'cancelled',
         createdDate: rfq.created_at || new Date().toISOString(),
         dueDate: rfq.response_deadline || new Date().toISOString(),
-        items: (itemsByRfq[rfq.id] || []).map(item => ({
+        items: (itemsByRfq[rfq.id] || []).map((item: any) => ({
           id: item.id,
           description: item.description,
           quantity: Number(item.quantity),
           unit: item.uom,
-          specifications: typeof item.specifications === 'string' 
-            ? item.specifications 
+          specifications: typeof item.specifications === 'string'
+            ? item.specifications
             : JSON.stringify(item.specifications || '')
         })),
-        suppliers: rfq.invited_suppliers || [],
+        suppliers: suppliersByRfq[rfq.id] || [],
         quotesReceived: rfq.quotes_received || 0,
         totalValue: rfq.total_budget_estimate ? Number(rfq.total_budget_estimate) : 0,
         createdBy: rfq.created_by || 'System',
@@ -171,11 +202,11 @@ export default withErrorHandler(async (
       const rfqNumber = newRFQ.rfqNumber || `RFQ-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
       const responseDeadline = newRFQ.responseDeadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       
-      // Insert new RFQ into database
+      // Insert new RFQ into database (no longer storing invited_suppliers JSON)
       const insertedRFQs = await sql`
         INSERT INTO rfqs (
-          rfq_number, project_id, title, description, status, 
-          response_deadline, invited_suppliers, total_budget_estimate, created_by
+          rfq_number, project_id, title, description, status,
+          response_deadline, total_budget_estimate, created_by
         )
         VALUES (
           ${rfqNumber},
@@ -184,26 +215,90 @@ export default withErrorHandler(async (
           ${newRFQ.description || ''},
           ${newRFQ.status || 'draft'},
           ${responseDeadline},
-          ${JSON.stringify(newRFQ.suppliers || newRFQ.supplierIds || [])},
           ${newRFQ.totalValue || 0},
           ${newRFQ.createdBy || 'System'}
         )
         RETURNING *
       `;
-      
-      // Log RFQ creation
-      if (insertedRFQs[0]) {
-        logCreate('rfq', insertedRFQs[0].id, {
-          rfq_number: insertedRFQs[0].rfq_number,
-          project_id: insertedRFQs[0].project_id,
-          title: insertedRFQs[0].title,
-          total_budget: insertedRFQs[0].total_budget_estimate
-        });
+
+      const rfqId = insertedRFQs[0].id;
+
+      // Insert suppliers into junction table
+      const supplierIds = newRFQ.suppliers || newRFQ.supplierIds || [];
+      const insertedSuppliers: any[] = [];
+      for (const supplierId of supplierIds) {
+        if (supplierId) {
+          try {
+            const result = await sql`
+              INSERT INTO rfq_suppliers (rfq_id, supplier_id, status)
+              VALUES (${rfqId}, ${parseInt(supplierId)}, 'invited')
+              ON CONFLICT (rfq_id, supplier_id) DO NOTHING
+              RETURNING *
+            `;
+            if (result[0]) {
+              insertedSuppliers.push(result[0]);
+            }
+          } catch (e) {
+            // Skip invalid supplier IDs
+          }
+        }
       }
-      
+
+      // Insert items if provided
+      const items = newRFQ.items || [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        await sql`
+          INSERT INTO rfq_items (
+            rfq_id, line_number, description, quantity, uom,
+            specifications, estimated_unit_price, stock_item_id, boq_item_id
+          ) VALUES (
+            ${rfqId}, ${i + 1}, ${item.description}, ${item.quantity}, ${item.unit || item.uom || 'EA'},
+            ${item.specifications || null}, ${item.estimatedUnitPrice || item.estimated_unit_price || 0},
+            ${item.stockItemId || item.stock_item_id || null},
+            ${item.boqItemId || item.boq_item_id || null}
+          )
+        `;
+      }
+
+      // Create boq_rfq_links record if items were imported from BOQ
+      const sourceBoqId = newRFQ.sourceBoqId;
+      const boqLinkedItemsCount = items.filter((i: any) => i.boqItemId).length;
+      if (sourceBoqId && boqLinkedItemsCount > 0) {
+        try {
+          await sql`
+            INSERT INTO boq_rfq_links (boq_id, rfq_id, link_type, linked_items_count, created_by)
+            VALUES (${sourceBoqId}, ${rfqId}, 'import', ${boqLinkedItemsCount}, ${newRFQ.createdBy || 'System'})
+            ON CONFLICT DO NOTHING
+          `;
+        } catch (e) {
+          // Non-critical - don't fail if link creation fails
+        }
+      }
+
+      // Log RFQ creation
+      logCreate('rfq', rfqId, {
+        rfq_number: insertedRFQs[0].rfq_number,
+        project_id: insertedRFQs[0].project_id,
+        title: insertedRFQs[0].title,
+        total_budget: insertedRFQs[0].total_budget_estimate,
+        suppliers_count: insertedSuppliers.length,
+        items_count: items.length,
+        source_boq_id: sourceBoqId || null
+      });
+
+      // Get supplier details for response
+      let supplierDetails: any[] = [];
+      if (insertedSuppliers.length > 0) {
+        const sIds = insertedSuppliers.map(s => s.supplier_id);
+        supplierDetails = await sql`
+          SELECT id, company_name, name, email FROM suppliers WHERE id = ANY(${sIds})
+        `;
+      }
+
       // Transform the response to match RFQ type
       const createdRFQ: RFQ = {
-        id: insertedRFQs[0].id,
+        id: rfqId,
         rfqNumber: insertedRFQs[0].rfq_number,
         projectId: insertedRFQs[0].project_id,
         title: insertedRFQs[0].title,
@@ -211,8 +306,18 @@ export default withErrorHandler(async (
         status: insertedRFQs[0].status as 'draft' | 'open' | 'evaluating' | 'awarded' | 'cancelled',
         createdDate: insertedRFQs[0].created_at || new Date().toISOString(),
         dueDate: insertedRFQs[0].response_deadline || new Date().toISOString(),
-        items: [],
-        suppliers: insertedRFQs[0].invited_suppliers || [],
+        items: items.map((item: any, idx: number) => ({
+          id: `temp-${idx}`,
+          description: item.description,
+          quantity: Number(item.quantity),
+          unit: item.unit || item.uom || 'EA',
+          specifications: item.specifications || ''
+        })),
+        suppliers: supplierDetails.map((s: any) => ({
+          id: s.id,
+          name: s.company_name || s.name,
+          email: s.email
+        })),
         quotesReceived: 0,
         totalValue: Number(insertedRFQs[0].total_budget_estimate || 0),
         createdBy: insertedRFQs[0].created_by || 'System',
