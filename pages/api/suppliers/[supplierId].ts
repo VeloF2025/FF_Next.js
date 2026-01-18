@@ -95,7 +95,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
 async function handleDelete(id: string, req: NextApiRequest, res: NextApiResponse) {
   try {
     const { soft, reason, userId } = req.body;
-    
+
     // Check if supplier exists
     const existing = await NeonSupplierService.getById(id);
     if (!existing) {
@@ -110,10 +110,26 @@ async function handleDelete(id: string, req: NextApiRequest, res: NextApiRespons
       const actualUserId = userId || 'system';
       await NeonSupplierService.softDelete(id, reason || 'Deactivated via API', actualUserId);
     } else {
-      // Hard delete
+      // Check for dependencies before hard delete
+      const deps = await NeonSupplierService.checkDependencies(id);
+
+      if (deps.hasDependencies) {
+        return res.status(409).json({
+          error: 'Cannot delete supplier with dependencies',
+          message: deps.message,
+          dependencies: {
+            purchaseOrders: deps.purchaseOrders,
+            rfqs: deps.rfqs,
+            boqItems: deps.boqItems
+          },
+          suggestion: 'Use soft delete (deactivate) instead, or remove the related records first.'
+        });
+      }
+
+      // Hard delete - no dependencies
       await NeonSupplierService.delete(id);
     }
-    
+
     return res.status(200).json({
       success: true,
       message: soft ? 'Supplier deactivated successfully' : 'Supplier deleted successfully'

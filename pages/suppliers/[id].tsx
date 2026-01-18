@@ -253,14 +253,32 @@ export default function SupplierDetailPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete supplier');
+        const errorData = await response.json().catch(() => ({}));
+
+        // Handle 409 Conflict - supplier has dependencies
+        if (response.status === 409) {
+          const deps = errorData.dependencies || {};
+          const parts: string[] = [];
+          if (deps.purchaseOrders > 0) parts.push(`${deps.purchaseOrders} PO${deps.purchaseOrders > 1 ? 's' : ''}`);
+          if (deps.rfqs > 0) parts.push(`${deps.rfqs} RFQ${deps.rfqs > 1 ? 's' : ''}`);
+          if (deps.boqItems > 0) parts.push(`${deps.boqItems} BOQ item${deps.boqItems > 1 ? 's' : ''}`);
+
+          toast.error(
+            `Cannot delete: supplier has ${parts.join(', ')}. Use "Deactivate" instead.`,
+            { duration: 6000 }
+          );
+          setShowDeleteDialog(false);
+          return;
+        }
+
+        throw new Error(errorData.message || 'Failed to delete supplier');
       }
 
       toast.success(soft ? 'Supplier deactivated' : 'Supplier deleted');
       router.push('/suppliers');
     } catch (error) {
       log.error('Failed to delete supplier:', { data: error }, 'SupplierDetailPage');
-      toast.error('Failed to delete supplier');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete supplier');
     }
     setShowDeleteDialog(false);
   };

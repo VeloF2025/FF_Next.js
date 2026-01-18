@@ -198,3 +198,80 @@ ls -la /home/velo/scripts/vllm/benchmarks/test-images/
 5. Results stored in `fleet_photo_vlm_results` and `fleet_odometer_history`
 
 **Note:** Preview mode (`photoId.startsWith('temp-')`) skips DB persistence for instant feedback.
+
+## Fleet Portal VLM Flow (Jan 2026)
+**Page:** `/fleet/portal` - Mobile-first driver portal
+**API:** `/api/fleet/portal/verify-plate`
+
+### Verification Flow
+1. Driver scans license plate photo
+2. Image resized to 1024×768 (VLM token limit)
+3. VLM extracts plate text with confidence score
+4. Database lookup (exact match, then partial 6-char match)
+5. Returns vehicle details + driver info + last readings + last check-in
+
+### Portal Features After Verification
+- **Vehicle Card:** Registration, make/model/year, color
+- **Last Readings Card:** ODO (from history or check-in fallback), fuel level
+- **Registered Driver Card:** Name, ID number, phone
+- **Last Check-In Card:** Type, status, date, completed by
+- **Check-In History Link:** `/fleet/vehicles/[id]/check-in-history`
+- **Action Buttons:** Fuel Fill-up, Daily Check-In, Weekly Check-In
+
+### ODO Reading Fallback (Jan 2026)
+If `fleet_odometer_history` is empty, falls back to `fleet_check_records`:
+```sql
+SELECT odometer_reading, check_date
+FROM fleet_check_records
+WHERE vehicle_id = $1 AND odometer_reading IS NOT NULL
+ORDER BY check_date DESC, created_at DESC
+LIMIT 1
+```
+
+## Odometer Anomaly Detection
+**Location:** `src/modules/fleet/check-in/hooks/useCheckIn.ts`
+
+### Detection Rules
+| Condition | Severity | Action |
+|-----------|----------|--------|
+| ODO decreased (e.g., 167k → 157k) | HIGH | Block submit until confirmed |
+| ODO jump > 10,000 km | HIGH | Block submit until confirmed |
+| ODO jump > 5,000 km | MEDIUM | Warning shown |
+
+### How It Works
+```typescript
+const odometerAnomaly = useMemo((): ReadingAnomaly | null => {
+  const difference = currentValue - lastOdometer.value;
+
+  if (difference < 0) {
+    return { severity: 'high', warning: `Decreased by ${Math.abs(difference)} km` };
+  }
+  if (difference > 10000) {
+    return { severity: 'high', warning: `Increased by ${difference} km - suspicious` };
+  }
+  if (difference > 5000) {
+    return { severity: 'medium', warning: `Large increase of ${difference} km` };
+  }
+  return null;
+}, [formState.odometerReading, lastOdometer]);
+```
+
+### User Override Flow
+1. Anomaly detected → Warning shown, submit blocked
+2. User clicks "Confirm Override" → `confirmOdometerOverride()` called
+3. `odometerOverrideConfirmed = true` → Submit allowed
+4. Override logged with check-in record for audit
+
+### Known VLM Misreading Pattern
+**Problem:** VLM drops leading digits on 4K images
+- Actual: 167,443 → VLM reads: 47,457 or 157,457
+- **Cause:** Image too large, token truncation
+- **Fix:** Resize to 1280×960 before VLM processing
+
+## Related Files
+- `pages/fleet/portal.tsx` - Driver portal page
+- `pages/api/fleet/portal/verify-plate.ts` - Plate verification API
+- `pages/fleet/vehicles/[id]/check-in-history.tsx` - Vehicle check-in history
+- `pages/api/fleet/vehicles/[id]/check-records.ts` - Vehicle check records API
+- `src/modules/fleet/services/fleetVlmService.ts` - VLM service with resize
+- `src/modules/fleet/check-in/hooks/useCheckIn.ts` - Check-in with anomaly detection

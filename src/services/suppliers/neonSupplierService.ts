@@ -300,10 +300,75 @@ export class NeonSupplierService {
   }
 
   /**
-   * Delete supplier
+   * Check for supplier dependencies before deletion
+   * Returns object with counts of related records
+   */
+  static async checkDependencies(id: string): Promise<{
+    hasDependencies: boolean;
+    purchaseOrders: number;
+    rfqs: number;
+    boqItems: number;
+    message?: string;
+  }> {
+    try {
+      const supplierId = parseInt(id);
+
+      // Check purchase orders
+      const poResult = await sql`
+        SELECT COUNT(*) as count FROM purchase_orders WHERE supplier_id = ${supplierId}
+      `;
+      const purchaseOrders = parseInt(poResult[0]?.count || '0');
+
+      // Check RFQs (supplier_id might be JSON array or direct reference)
+      const rfqResult = await sql`
+        SELECT COUNT(*) as count FROM rfqs WHERE supplier_id = ${supplierId}
+      `;
+      const rfqs = parseInt(rfqResult[0]?.count || '0');
+
+      // Check BOQ items with supplier reference
+      const boqResult = await sql`
+        SELECT COUNT(*) as count FROM boq_items WHERE supplier_id = ${supplierId}
+      `;
+      const boqItems = parseInt(boqResult[0]?.count || '0');
+
+      const hasDependencies = purchaseOrders > 0 || rfqs > 0 || boqItems > 0;
+
+      let message: string | undefined;
+      if (hasDependencies) {
+        const parts: string[] = [];
+        if (purchaseOrders > 0) parts.push(`${purchaseOrders} purchase order${purchaseOrders > 1 ? 's' : ''}`);
+        if (rfqs > 0) parts.push(`${rfqs} RFQ${rfqs > 1 ? 's' : ''}`);
+        if (boqItems > 0) parts.push(`${boqItems} BOQ item${boqItems > 1 ? 's' : ''}`);
+        message = `Cannot delete supplier. This supplier has ${parts.join(', ')} referencing it. Please deactivate the supplier instead, or remove the related records first.`;
+      }
+
+      return { hasDependencies, purchaseOrders, rfqs, boqItems, message };
+    } catch (error) {
+      log.error(`Error checking supplier dependencies ${id}:`, { data: error }, 'neonSupplier');
+      // Return safe default - assume dependencies exist to prevent accidental deletion
+      return {
+        hasDependencies: true,
+        purchaseOrders: 0,
+        rfqs: 0,
+        boqItems: 0,
+        message: 'Unable to verify dependencies. Please use soft delete (deactivate) instead.'
+      };
+    }
+  }
+
+  /**
+   * Delete supplier (hard delete)
+   * Checks for dependencies first and throws descriptive error if found
    */
   static async delete(id: string): Promise<void> {
     try {
+      // Check for dependencies first
+      const deps = await this.checkDependencies(id);
+
+      if (deps.hasDependencies) {
+        throw new Error(deps.message || 'Cannot delete supplier with existing dependencies');
+      }
+
       await sql`DELETE FROM suppliers WHERE id = ${parseInt(id)}`;
     } catch (error) {
       log.error(`Error deleting supplier ${id}:`, { data: error }, 'neonSupplier');
