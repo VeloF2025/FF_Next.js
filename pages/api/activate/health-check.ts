@@ -30,7 +30,7 @@ const pool = new Pool({
 // Service endpoints
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const WA_SENDER_URL = process.env.WA_SENDER_URL || 'http://100.96.203.105:8081';
+const WA_SENDER_URL = process.env.WA_SENDER_URL || 'http://100.96.203.105:8090';
 
 interface ServiceStatus {
   status: 'healthy' | 'degraded' | 'down' | 'unknown';
