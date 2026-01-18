@@ -12,10 +12,13 @@ import {
   verifyLicensePlate,
   extractFuelLevel,
   checkFleetVlmHealth,
+  validateOdometerReading,
+  OdometerValidationResult,
 } from '@/modules/fleet/services/fleetVlmService';
 import {
   recordOdometerReading,
   recordFuelLevel,
+  getLatestOdometerReading,
 } from '@/modules/fleet/services/checkInService';
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
 
@@ -40,6 +43,8 @@ interface ProcessVlmResponse {
     plateMatches?: boolean;
     description?: string;
     error?: string;
+    // Validation fields for odometer
+    validation?: OdometerValidationResult;
   };
   processingTimeMs: number;
 }
@@ -86,23 +91,50 @@ export default async function handler(
     switch (analysisType) {
       case 'odometer': {
         const odometerResult = await extractOdometerReading(base64Image);
+
+        // Get previous reading for validation
+        let previousReading: number | null = null;
+        if (!isPreviewMode) {
+          const prevHistory = await getLatestOdometerReading(vehicleId);
+          previousReading = prevHistory?.reading ?? null;
+        }
+
+        // Validate the reading against previous value
+        const validation = validateOdometerReading(
+          odometerResult.reading,
+          odometerResult.confidence,
+          previousReading
+        );
+
         result = {
           extractedValue: odometerResult.rawText,
           extractedNumeric: odometerResult.reading,
           confidence: odometerResult.confidence,
           error: odometerResult.error,
+          validation,
         };
 
-        // Only record odometer reading if not in preview mode and extraction succeeded
+        // Log validation warnings
+        if (validation.warning) {
+          log.warn('FleetVlmApi', `ODO Validation: ${validation.warning} (action: ${validation.suggestedAction})`);
+        }
+
+        // Only record odometer reading if not in preview mode, extraction succeeded,
+        // and validation doesn't suggest rejection
         if (!isPreviewMode && odometerResult.reading !== null) {
-          await recordOdometerReading({
-            vehicleId,
-            checkRecordId: recordId,
-            reading: odometerResult.reading,
-            source: 'vlm',
-            vlmConfidence: odometerResult.confidence,
-          });
-          log.info('FleetVlmApi', `Recorded odometer reading: ${odometerResult.reading} km`);
+          if (validation.suggestedAction === 'reject') {
+            log.warn('FleetVlmApi', `ODO rejected by validation: ${validation.warning}`);
+            result.error = validation.warning || 'Reading failed validation';
+          } else {
+            await recordOdometerReading({
+              vehicleId,
+              checkRecordId: recordId,
+              reading: odometerResult.reading,
+              source: 'vlm',
+              vlmConfidence: odometerResult.confidence,
+            });
+            log.info('FleetVlmApi', `Recorded odometer reading: ${odometerResult.reading} km (validation: ${validation.suggestedAction})`);
+          }
         }
         break;
       }

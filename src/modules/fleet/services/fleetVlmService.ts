@@ -90,46 +90,21 @@ If no plate visible or unreadable:
   "visible": false
 }`;
 
-const FUEL_GAUGE_PROMPT = `You are analyzing a vehicle dashboard photo to read the FUEL GAUGE level.
+const FUEL_GAUGE_PROMPT = `Look at this vehicle dashboard photo. Find the FUEL GAUGE.
 
-TASK: Find the FUEL GAUGE (identified by ⛽ fuel pump icon) and estimate the fuel level.
+HOW TO IDENTIFY THE FUEL GAUGE:
+- Has "E" (Empty) on one side and "F" (Full) on the other
+- Usually has a fuel pump icon nearby
+- NOT the speedometer (has large numbers 0-220)
+- NOT the temperature gauge (has C/H markings)
 
-CRITICAL - HOW TO IDENTIFY THE FUEL GAUGE:
-1. Look for the FUEL PUMP ICON (⛽) - a small icon that looks like a gas pump
-2. The fuel gauge is ALWAYS marked with "E" (Empty) and "F" (Full) at opposite ends
-3. DO NOT confuse with:
-   - Speedometer (shows km/h or mph, has large numbers like 0-220)
-   - Temperature gauge (has C/H or cold/hot markings, often has thermometer icon)
-   - Tachometer (shows RPM x1000)
+TASK: Where is the fuel gauge needle pointing? Estimate the tank percentage (0-100%).
 
-READING THE FUEL GAUGE:
-1. Locate the fuel pump icon (⛽) near the gauge
-2. Find the needle position between E (Empty) and F (Full)
-3. E is typically on the LEFT, F on the RIGHT
-4. Estimate percentage based on needle position:
-   - At or near E = 0-10%
-   - Between E and 1/4 mark = 10-25%
-   - At 1/4 mark = 25%
-   - Between 1/4 and 1/2 = 25-50%
-   - At 1/2 mark (middle) = 50%
-   - Between 1/2 and 3/4 = 50-75%
-   - At 3/4 mark = 75%
-   - Between 3/4 and F = 75-90%
-   - At or near F = 90-100%
+Reply with JSON only:
+{"level": <0-100>, "confidence": <0.0-1.0>, "description": "<brief description of needle position>"}
 
-RESPONSE FORMAT (JSON only, no other text):
-{
-  "level": 25,
-  "confidence": 0.85,
-  "description": "Quarter tank - needle between E and half"
-}
-
-If fuel gauge not visible or cannot find fuel pump icon:
-{
-  "level": null,
-  "confidence": 0,
-  "description": "Fuel gauge not found - no fuel pump icon visible"
-}`;
+If fuel gauge not visible:
+{"level": null, "confidence": 0, "description": "Fuel gauge not found"}`;
 
 const FUEL_RECEIPT_PROMPT = `You are analyzing a fuel station receipt or invoice photo.
 
@@ -644,6 +619,194 @@ export function getFuelLevelDescription(level: number): string {
   if (level <= 55) return 'Half';
   if (level <= 80) return 'Three-quarters';
   return 'Full';
+}
+
+// ============================================================================
+// VLM Sanity Checks / Validation
+// ============================================================================
+
+export interface OdometerValidationResult {
+  isValid: boolean;
+  validatedReading: number | null;
+  originalReading: number | null;
+  warning: string | null;
+  warningLevel: 'none' | 'low' | 'medium' | 'high';
+  suggestedAction: 'accept' | 'verify' | 'reject';
+}
+
+/**
+ * Validate odometer reading against previous value and VLM confidence
+ * Returns validation result with warnings if the reading seems suspicious
+ */
+export function validateOdometerReading(
+  extractedReading: number | null,
+  confidence: number,
+  previousReading: number | null,
+  options?: {
+    maxDailyKm?: number;      // Max expected km per day (default 500)
+    maxSingleTripKm?: number; // Max km for a single check-in difference (default 1000)
+    minConfidence?: number;   // Min VLM confidence to auto-accept (default 0.85)
+  }
+): OdometerValidationResult {
+  const {
+    maxDailyKm = 500,
+    maxSingleTripKm = 1000,
+    minConfidence = 0.85,
+  } = options || {};
+
+  // No reading extracted
+  if (extractedReading === null) {
+    return {
+      isValid: false,
+      validatedReading: null,
+      originalReading: null,
+      warning: 'Could not extract odometer reading from image',
+      warningLevel: 'high',
+      suggestedAction: 'reject',
+    };
+  }
+
+  // Basic range check (reasonable odometer values: 0 - 2,000,000 km)
+  if (extractedReading < 0 || extractedReading > 2000000) {
+    return {
+      isValid: false,
+      validatedReading: null,
+      originalReading: extractedReading,
+      warning: `Reading ${extractedReading} km is outside reasonable range (0-2,000,000)`,
+      warningLevel: 'high',
+      suggestedAction: 'reject',
+    };
+  }
+
+  // Low confidence warning
+  if (confidence < minConfidence) {
+    return {
+      isValid: true,
+      validatedReading: extractedReading,
+      originalReading: extractedReading,
+      warning: `Low VLM confidence (${Math.round(confidence * 100)}%) - verify manually`,
+      warningLevel: 'medium',
+      suggestedAction: 'verify',
+    };
+  }
+
+  // No previous reading to compare - accept with low confidence warning
+  if (previousReading === null) {
+    return {
+      isValid: true,
+      validatedReading: extractedReading,
+      originalReading: extractedReading,
+      warning: null,
+      warningLevel: 'none',
+      suggestedAction: 'accept',
+    };
+  }
+
+  // Calculate difference
+  const kmDifference = extractedReading - previousReading;
+
+  // Odometer went backwards (impossible without tampering)
+  if (kmDifference < -10) { // Allow tiny margin for digit extraction errors
+    return {
+      isValid: false,
+      validatedReading: null,
+      originalReading: extractedReading,
+      warning: `Odometer appears to have gone backwards: ${extractedReading} km < previous ${previousReading} km`,
+      warningLevel: 'high',
+      suggestedAction: 'reject',
+    };
+  }
+
+  // Huge jump that's likely a VLM misread (more than 10x expected daily km)
+  if (kmDifference > maxDailyKm * 10) {
+    // Check if digits might have been transposed/misread
+    const extractedStr = extractedReading.toString();
+    const previousStr = previousReading.toString();
+
+    // If same length and similar pattern, likely a digit misread
+    if (extractedStr.length === previousStr.length) {
+      let diffDigits = 0;
+      for (let i = 0; i < extractedStr.length; i++) {
+        if (extractedStr[i] !== previousStr[i]) diffDigits++;
+      }
+
+      if (diffDigits <= 2) {
+        return {
+          isValid: false,
+          validatedReading: null,
+          originalReading: extractedReading,
+          warning: `Suspicious reading: ${extractedReading} km differs from previous ${previousReading} km by ${kmDifference} km - possible VLM digit misread`,
+          warningLevel: 'high',
+          suggestedAction: 'reject',
+        };
+      }
+    }
+
+    return {
+      isValid: true,
+      validatedReading: extractedReading,
+      originalReading: extractedReading,
+      warning: `Large km increase: ${kmDifference} km since last reading - verify if correct`,
+      warningLevel: 'high',
+      suggestedAction: 'verify',
+    };
+  }
+
+  // Moderate jump (more than max single trip)
+  if (kmDifference > maxSingleTripKm) {
+    return {
+      isValid: true,
+      validatedReading: extractedReading,
+      originalReading: extractedReading,
+      warning: `Above normal km: ${kmDifference} km since last reading`,
+      warningLevel: 'medium',
+      suggestedAction: 'verify',
+    };
+  }
+
+  // All good
+  return {
+    isValid: true,
+    validatedReading: extractedReading,
+    originalReading: extractedReading,
+    warning: null,
+    warningLevel: 'none',
+    suggestedAction: 'accept',
+  };
+}
+
+/**
+ * Enhanced odometer extraction with validation
+ * Gets previous reading from database and validates the extracted value
+ */
+export async function extractAndValidateOdometerReading(
+  base64Image: string,
+  vehicleId: string,
+  getPreviousReading: () => Promise<number | null>
+): Promise<OdometerExtractionResult & { validation: OdometerValidationResult }> {
+  // Extract reading using VLM
+  const extractionResult = await extractOdometerReading(base64Image);
+
+  // Get previous reading for comparison
+  const previousReading = await getPreviousReading();
+
+  // Validate the reading
+  const validation = validateOdometerReading(
+    extractionResult.reading,
+    extractionResult.confidence,
+    previousReading
+  );
+
+  log.info('FleetVlmService', `ODO validation: extracted=${extractionResult.reading}, previous=${previousReading}, action=${validation.suggestedAction}`);
+
+  if (validation.warning) {
+    log.warn('FleetVlmService', `ODO warning: ${validation.warning}`);
+  }
+
+  return {
+    ...extractionResult,
+    validation,
+  };
 }
 
 /**

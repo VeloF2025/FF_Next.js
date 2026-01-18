@@ -78,8 +78,8 @@ export default function BOQCard({
 
   return (
     <div
-      className={`bg-white rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer ${
-        isSelected ? 'border-blue-500 shadow-md' : 'border-gray-200'
+      className={`bg-[var(--ff-card-bg)] rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer ${
+        isSelected ? 'border-blue-500 shadow-md' : 'border-[var(--ff-border-light)]'
       }`}
       onClick={onClick}
     >
@@ -88,7 +88,7 @@ export default function BOQCard({
           <div className="flex items-center space-x-3">
             <FileText className="h-5 w-5 text-blue-500 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-medium text-gray-900 truncate">
+              <h3 className="text-lg font-medium text-[var(--ff-text-primary)] truncate">
                 {boq.title || boq.fileName}
               </h3>
               <div className="flex items-center space-x-2 mt-1">
@@ -97,12 +97,12 @@ export default function BOQCard({
                 }`}>
                   {boq.status.charAt(0).toUpperCase() + boq.status.slice(1)}
                 </span>
-                <span className="text-sm text-gray-500">v{boq.version}</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">v{boq.version}</span>
               </div>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center space-x-4 text-sm text-gray-500">
+          <div className="mt-3 flex items-center space-x-4 text-sm text-[var(--ff-text-secondary)]">
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
               {new Date(boq.createdAt).toLocaleDateString()}
@@ -118,7 +118,7 @@ export default function BOQCard({
           </div>
 
           {boq.description && (
-            <p className="mt-2 text-sm text-gray-600 line-clamp-2">
+            <p className="mt-2 text-sm text-[var(--ff-text-secondary)] line-clamp-2">
               {boq.description}
             </p>
           )}
@@ -135,7 +135,7 @@ export default function BOQCard({
               </div>
               
               {boq.itemCount > 0 && (
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-[var(--ff-text-secondary)]">
                   {Math.round((boq.mappedItems / boq.itemCount) * 100)}% mapped
                 </div>
               )}
@@ -143,7 +143,7 @@ export default function BOQCard({
 
             {/* Progress Bar */}
             {boq.itemCount > 0 && (
-              <div className="w-24 bg-gray-200 rounded-full h-2">
+              <div className="w-24 bg-[var(--ff-bg-hover)] rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full"
                   style={{ width: `${Math.round((boq.mappedItems / boq.itemCount) * 100)}%` }}
@@ -160,20 +160,20 @@ export default function BOQCard({
               e.stopPropagation();
               setActionMenuOpen(!actionMenuOpen);
             }}
-            className="p-1 text-gray-500 hover:text-gray-700"
+            className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
           >
             <MoreVertical className="h-5 w-5" />
           </button>
 
           {actionMenuOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border z-10">
+            <div className="absolute right-0 mt-1 w-48 bg-[var(--ff-card-bg)] rounded-md shadow-lg border border-[var(--ff-border-light)] z-10">
               <div className="py-1">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onView();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center"
                 >
                   <Eye className="h-4 w-4 mr-3" />
                   View Details
@@ -183,7 +183,7 @@ export default function BOQCard({
                     e.stopPropagation();
                     onEdit();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center"
                 >
                   <Edit3 className="h-4 w-4 mr-3" />
                   Edit BOQ
@@ -193,18 +193,18 @@ export default function BOQCard({
                     e.stopPropagation();
                     onDownload();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center"
                 >
                   <Download className="h-4 w-4 mr-3" />
                   Download
                 </button>
-                <div className="border-t border-gray-100" />
+                <div className="border-t border-[var(--ff-border-light)]" />
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onArchive();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] flex items-center"
                 >
                   <Archive className="h-4 w-4 mr-3" />
                   Archive
@@ -214,7 +214,7 @@ export default function BOQCard({
                     e.stopPropagation();
                     onDelete();
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 flex items-center"
                 >
                   <Trash2 className="h-4 w-4 mr-3" />
                   Delete

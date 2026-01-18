@@ -39,8 +39,8 @@ export default function BOQList({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading BOQs...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <span className="ml-2 text-[var(--ff-text-secondary)]">Loading BOQs...</span>
       </div>
     );
   }
@@ -88,10 +88,10 @@ export default function BOQList({
         </div>
       ) : (
         /* Empty State */
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <FileText className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No BOQs Found</h3>
-          <p className="mt-2 text-sm text-gray-500">
+        <div className="text-center py-12 bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+          <FileText className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)]" />
+          <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">No BOQs Found</h3>
+          <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">
             {boqs.length === 0
               ? "No BOQs have been created for this project yet."
               : "No BOQs match your current filters."}
@@ -109,7 +109,7 @@ export default function BOQList({
               {onUploadBOQ && (
                 <button
                   onClick={onUploadBOQ}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                  className="px-4 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-md text-sm font-medium hover:bg-[var(--ff-bg-hover)]"
                 >
                   Upload BOQ
                 </button>
