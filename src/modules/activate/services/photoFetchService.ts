@@ -311,3 +311,41 @@ export function getStatusMessage(status: PhotoFetchStatus): string {
       return status.message;
   }
 }
+
+/**
+ * Fetch a photo URL and return as base64 encoded string
+ *
+ * @param photoUrl - URL to fetch (can be absolute or relative API path)
+ * @returns Base64 encoded image data
+ */
+export async function fetchPhotoAsBase64(photoUrl: string): Promise<string> {
+  try {
+    // Handle relative URLs by prepending the base URL
+    let fullUrl = photoUrl;
+    if (photoUrl.startsWith('/api/')) {
+      // For server-side calls, use the internal API URL
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+      fullUrl = `${baseUrl}${photoUrl}`;
+    }
+
+    log.debug('PhotoFetchService', `Fetching photo as base64: ${fullUrl.substring(0, 80)}...`);
+
+    const response = await fetch(fullUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch photo: ${response.status} ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+
+    log.debug('PhotoFetchService', `Fetched photo: ${Math.round(buffer.length / 1024)}KB`);
+
+    return base64;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error('PhotoFetchService', `Failed to fetch photo as base64: ${message}`);
+    throw error;
+  }
+}

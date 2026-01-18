@@ -1,13 +1,12 @@
 /**
  * UnifiedReviewCard Component
  *
- * Main component for unified DR photo review with 6 tabs:
- * 1. Manual QA - 10-step checklist with incorrect marking
- * 2. AI Categorization - VLM photo categorization with human approval
- * 3. AI Evaluation - Trigger evaluation, show results, comparison
- * 4. Photos - Photo gallery with step grouping
- * 5. Feedback - Generate and send WhatsApp feedback
- * 6. Activity - Review history, comments, and activity timeline
+ * Main component for unified DR photo review with 5 tabs:
+ * 1. QA Wizard - 5-phase guided workflow (Prerequisites → Photo Review → Data Validation → Final Decision → Feedback)
+ * 2. Photos - Photo gallery with step grouping
+ * 3. Feedback - Generate and send WhatsApp feedback
+ * 4. Activity - Review history, comments, and activity timeline
+ * 5. Manual QA - Legacy 10-step checklist (for reference)
  *
  * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
  * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
@@ -25,15 +24,16 @@ import { ComparisonTable } from './ComparisonTable';
 import { PhotoGalleryUnified } from './PhotoGalleryUnified';
 import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
+import { QaWizardContainer } from './wizard/QaWizardContainer';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
 }
 
-type TabKey = 'qa' | 'categorization' | 'ai' | 'photos' | 'feedback' | 'activity';
+type TabKey = 'wizard' | 'photos' | 'feedback' | 'activity' | 'qa' | 'categorization' | 'ai';
 
 export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('qa');
+  const [activeTab, setActiveTab] = useState<TabKey>('wizard');
   const {
     review,
     isLoading,
@@ -81,12 +81,13 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
   }
 
   const tabs = [
-    { key: 'qa' as const, label: 'Manual QA', icon: '📋' },
-    { key: 'categorization' as const, label: 'AI Categorization', icon: '🏷️' },
-    { key: 'ai' as const, label: 'AI Evaluation', icon: '🤖' },
+    { key: 'wizard' as const, label: 'QA Wizard', icon: '🧙' },
     { key: 'photos' as const, label: `Photos (${review.photo_count})`, icon: '📸' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
     { key: 'activity' as const, label: 'Activity', icon: '📜' },
+    { key: 'qa' as const, label: 'Manual QA', icon: '📋' },
+    { key: 'categorization' as const, label: 'AI Categorization', icon: '🏷️' },
+    { key: 'ai' as const, label: 'AI Evaluation', icon: '🤖' },
   ];
 
   return (
@@ -140,6 +141,18 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
 
       {/* Tab Content */}
       <div className="p-6">
+        {activeTab === 'wizard' && (
+          <QaWizardContainer
+            dropNumber={dropNumber}
+            onPhaseChange={(phase) => {
+              // Could log phase changes or update parent state
+            }}
+            onComplete={refresh}
+          />
+        )}
+        {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
+        {activeTab === 'feedback' && <FeedbackTab review={review} generateFeedback={generateFeedback} sendFeedback={sendFeedback} />}
+        {activeTab === 'activity' && <ActivityTab dropNumber={dropNumber} feedbackSentAt={review.feedback_sent_at} />}
         {activeTab === 'qa' && <ManualQATab review={review} updateStep={updateStep} markIncorrect={markIncorrect} />}
         {activeTab === 'categorization' && (
           <AICategorizationTab
@@ -149,9 +162,6 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
           />
         )}
         {activeTab === 'ai' && <AIEvaluationTab review={review} triggerAiEvaluation={triggerAiEvaluation} />}
-        {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
-        {activeTab === 'feedback' && <FeedbackTab review={review} generateFeedback={generateFeedback} sendFeedback={sendFeedback} />}
-        {activeTab === 'activity' && <ActivityTab dropNumber={dropNumber} feedbackSentAt={review.feedback_sent_at} />}
       </div>
     </div>
   );

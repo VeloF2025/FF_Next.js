@@ -375,3 +375,123 @@ export interface UnifiedReviewWithCategorization extends UnifiedReview {
   vlm_approved_by: string | null;
   vlm_approved_at: Date | null;
 }
+
+// ============================================================================
+// QA WIZARD TYPES
+// ============================================================================
+
+/**
+ * QA Wizard phases
+ */
+export type QaWizardPhase =
+  | 'prerequisites'
+  | 'photo_review'
+  | 'data_validation'
+  | 'final_decision'
+  | 'feedback'
+  | 'completed';
+
+/**
+ * QA final decision
+ */
+export type QaDecision = 'PASS' | 'FAIL' | 'REWORK_NEEDED';
+
+/**
+ * Fail reason codes
+ */
+export type FailReasonCode =
+  | 'MISSING_PHOTOS'
+  | 'MISSING_SERIAL'
+  | 'SERIAL_MISMATCH'
+  | 'DR_NUMBER_MISMATCH'
+  | 'POWER_OUT_OF_RANGE'
+  | 'DISCARDED_CRITICAL';
+
+/**
+ * Power meter validation status
+ */
+export type PowerMeterStatus = 'pass' | 'fail_high' | 'fail_low' | 'manual' | 'pending';
+
+/**
+ * Serial validation status (3-way check)
+ */
+export type SerialValidationStatus = 'match' | 'mismatch' | 'partial' | 'manual' | 'pending';
+
+/**
+ * QA Wizard state
+ */
+export interface QaWizardState {
+  phase: QaWizardPhase;
+  prerequisites: {
+    passed: boolean;
+    checked: boolean;
+    failures: FailReasonCode[];
+    photosAvailable: boolean;
+    photoCount: number;
+    ontSerialPresent: boolean;
+    ontSerial: string | null;
+    upsSerialPresent: boolean;
+    upsSerial: string | null;
+  };
+  photoReview: {
+    completed: boolean;
+    stepsCovered: number[];
+    stepsMissing: number[];
+    totalPhotos: number;
+    categorizedPhotos: number;
+  };
+  dataValidation: {
+    completed: boolean;
+    powerMeter: {
+      status: PowerMeterStatus;
+      value: number | null;
+      inRange: boolean;
+    };
+    serialValidation: {
+      status: SerialValidationStatus;
+      onemapSerial: string | null;
+      step6Serial: string | null;
+      step9Serial: string | null;
+      step9DrNumber: string | null;
+      ontMatch: boolean;
+      drMatch: boolean;
+    };
+  };
+  finalDecision: {
+    decision: QaDecision | null;
+    reasons: FailReasonCode[];
+    notes: string | null;
+    decidedAt: string | null;
+    decidedBy: string | null;
+  };
+  feedback: {
+    sent: boolean;
+    sentAt: string | null;
+    message: string | null;
+  };
+}
+
+/**
+ * Extended UnifiedReview with QA Wizard fields
+ */
+export interface UnifiedReviewWithQaWizard extends UnifiedReviewWithCategorization {
+  qa_phase: QaWizardPhase;
+  qa_decision: QaDecision | null;
+  qa_decision_reasons: FailReasonCode[];
+  qa_decision_at: Date | null;
+  qa_decision_by: string | null;
+  qa_decision_notes: string | null;
+  vlm_power_meter_dbm: number | null;
+  vlm_power_meter_status: PowerMeterStatus | null;
+  vlm_ont_serial_step6: string | null;
+  vlm_ont_serial_step9: string | null;
+  vlm_dr_number_step9: string | null;
+  serial_validation_status: SerialValidationStatus | null;
+  prerequisites_passed: boolean | null;
+  photo_review_completed: boolean;
+  data_validation_completed: boolean;
+  onemap_ont_serial: string | null;
+  onemap_ups_serial: string | null;
+  step_coverage: Record<number, string[]>;
+  missing_steps: number[];
+}

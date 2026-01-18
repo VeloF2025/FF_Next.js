@@ -23,6 +23,12 @@ export interface DrListItem {
   reviewDate: string;
   completedPhotos: number;
   outstandingPhotos: number;
+  /** Actual photo count from OneMap sync */
+  photoCount: number;
+  /** ONT serial from OneMap sync */
+  ontSerial: string | null;
+  /** UPS serial from OneMap sync */
+  upsSerial: string | null;
   status: 'complete' | 'incomplete';
   feedbackSent: string | null;
   createdAt: string;
@@ -37,10 +43,10 @@ export interface DashboardStats {
   installed: number;
   /** DRs present in OES activation report (1-day lag) */
   activated: number;
-  /** DRs not yet fully QA reviewed */
-  incomplete: number;
-  /** DRs marked complete by HITL or AI */
-  complete: number;
+  /** DRs not yet QA reviewed */
+  notReviewed: number;
+  /** DRs that have been QA reviewed */
+  reviewed: number;
   /** DRs with feedback sent (legacy) */
   totalFeedback: number;
 }
@@ -54,9 +60,9 @@ export interface ProjectStat {
   /** DRs in OES activation report */
   activated: number;
   /** Not yet QA reviewed */
-  incomplete: number;
-  /** Marked complete by HITL/AI */
-  complete: number;
+  notReviewed: number;
+  /** QA reviewed */
+  reviewed: number;
 }
 
 export interface DailyStat {
@@ -65,8 +71,8 @@ export interface DailyStat {
   total: number;
   installed: number;
   activated: number;
-  incomplete: number;
-  complete: number;
+  notReviewed: number;
+  reviewed: number;
 }
 
 export interface PaginationInfo {
@@ -149,6 +155,9 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
     reviewDate: drop.updated_at,
     completedPhotos: drop.steps_completed || 0,
     outstandingPhotos: (drop.steps_total || 10) - (drop.steps_completed || 0),
+    photoCount: drop.photo_count || 0,
+    ontSerial: drop.ont_serial_scanned || null,
+    upsSerial: drop.ups_serial_scanned || null,
     status: drop.is_complete ? 'complete' : 'incomplete',
     feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
     createdAt: drop.created_at,
@@ -168,8 +177,8 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
     },
     summary: data.summary || {
       totalDrops: transformedDrops.length,
-      incomplete: transformedDrops.filter((d) => d.status === 'incomplete').length,
-      complete: transformedDrops.filter((d) => d.status === 'complete').length,
+      notReviewed: transformedDrops.filter((d) => !d.feedbackSent).length,
+      reviewed: transformedDrops.filter((d) => d.feedbackSent).length,
       totalFeedback: transformedDrops.filter((d) => d.feedbackSent).length,
     },
     projectStats: data.projectStats || [],
