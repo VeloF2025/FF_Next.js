@@ -109,10 +109,9 @@ interface CheckInRow {
   id: string;
   check_type: string;
   status: string;
-  completed_at: string | null;
+  check_date: string;
   created_at: string;
-  staff_first_name: string | null;
-  staff_last_name: string | null;
+  driver_name: string | null;
 }
 
 export const config = {
@@ -346,17 +345,15 @@ export default async function handler(
 
     const checkInRows = await sql`
       SELECT
-        fcr.id,
-        fcr.check_type,
-        fcr.status,
-        fcr.completed_at,
-        fcr.created_at,
-        s.first_name as staff_first_name,
-        s.last_name as staff_last_name
-      FROM fleet_check_records fcr
-      LEFT JOIN staff s ON fcr.staff_id = s.id
-      WHERE fcr.vehicle_id = ${vehicle.id}
-      ORDER BY fcr.created_at DESC
+        id,
+        check_type,
+        status,
+        check_date,
+        created_at,
+        driver_name
+      FROM fleet_check_records
+      WHERE vehicle_id = ${vehicle.id}
+      ORDER BY created_at DESC
       LIMIT 1
     ` as CheckInRow[];
 
@@ -366,10 +363,8 @@ export default async function handler(
         id: row.id,
         checkType: row.check_type,
         status: row.status,
-        completedAt: row.completed_at || row.created_at,
-        completedBy: row.staff_first_name
-          ? `${row.staff_first_name} ${row.staff_last_name || ''}`.trim()
-          : null,
+        completedAt: row.check_date || row.created_at,
+        completedBy: row.driver_name,
       };
     }
 
