@@ -46,7 +46,7 @@ export default function BOQPage({ projectId, projectName, initialData = [] }: BO
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Bill of Quantities</h1>
           {projectName && (
