@@ -59,7 +59,7 @@ export default function NewRFQPage() {
         const response = await fetch('/api/projects');
         if (response.ok) {
           const data = await response.json();
-          setProjects(data.projects || data || []);
+          setProjects(data.data || data.projects || []);
         }
       } catch (error) {
         log.error('Failed to load projects:', { data: error }, 'NewRFQPage');
