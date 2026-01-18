@@ -300,7 +300,7 @@ export default async function handler(
     let lastOdometer: { reading: number; recordedAt: string; source: string } | null = null;
     let lastFuel: { level: number; recordedAt: string; source: string } | null = null;
 
-    // Fetch last odometer reading
+    // Fetch last odometer reading from history table
     const odometerRows = await sql`
       SELECT reading, recorded_at, source
       FROM fleet_odometer_history
@@ -315,6 +315,24 @@ export default async function handler(
         recordedAt: odometerRows[0].recorded_at,
         source: odometerRows[0].source,
       };
+    } else {
+      // Fallback: Get last ODO from check-in records if history is empty
+      const checkInOdoRows = await sql`
+        SELECT odometer_reading, check_date
+        FROM fleet_check_records
+        WHERE vehicle_id = ${vehicle.id}
+          AND odometer_reading IS NOT NULL
+        ORDER BY check_date DESC, created_at DESC
+        LIMIT 1
+      ` as { odometer_reading: number; check_date: string }[];
+
+      if (checkInOdoRows.length > 0) {
+        lastOdometer = {
+          reading: checkInOdoRows[0].odometer_reading,
+          recordedAt: checkInOdoRows[0].check_date,
+          source: 'check-in',
+        };
+      }
     }
 
     // Fetch last fuel level from VLM results
