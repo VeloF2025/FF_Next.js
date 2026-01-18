@@ -460,6 +460,11 @@ export interface QaWizardState {
   finalDecision: {
     decision: QaDecision | null;
     reasons: FailReasonCode[];
+    /** Internal notes for QA team (NOT sent to technicians) */
+    internalNotes: string | null;
+    /** Technician feedback (sent via WhatsApp) */
+    technicianFeedback: string | null;
+    /** Combined notes for backward compatibility (deprecated) */
     notes: string | null;
     decidedAt: string | null;
     decidedBy: string | null;

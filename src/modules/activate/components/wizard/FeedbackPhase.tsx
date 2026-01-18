@@ -66,15 +66,16 @@ export function FeedbackPhase({
       lines.push('');
     }
 
-    // Photo coverage summary
-    const coveredSteps = 10 - (wizardState.photoReview.stepsMissing?.length || 0);
+    // Photo coverage summary with SPECIFIC missing steps
+    const missingSteps = wizardState.photoReview.stepsMissing || [];
+    const coveredSteps = 10 - missingSteps.length;
     lines.push(`*Photo Coverage:* ${coveredSteps}/10 steps`);
 
-    if (wizardState.photoReview.stepsMissing?.length > 0) {
-      const missingLabels = wizardState.photoReview.stepsMissing
+    if (missingSteps.length > 0) {
+      const missingLabels = missingSteps
         .map((s: number) => STEP_LABELS[s] || `Step ${s}`)
         .join(', ');
-      lines.push(`Missing: ${missingLabels}`);
+      lines.push(`*Missing Photos:* ${missingLabels}`);
     }
     lines.push('');
 
@@ -91,7 +92,7 @@ export function FeedbackPhase({
     // ONT Serial validation
     const sv = wizardState.dataValidation.serialValidation;
     if (sv.ontMatch) {
-      lines.push(`- ONT Serial: Verified`);
+      lines.push(`- ONT Serial: Verified ✓`);
     } else if (sv.onemapSerial || sv.step6Serial || sv.step9Serial) {
       lines.push(`- ONT Serial: MISMATCH`);
       if (sv.onemapSerial) lines.push(`  1Map: ${sv.onemapSerial}`);
@@ -101,26 +102,51 @@ export function FeedbackPhase({
 
     // DR Number validation
     if (sv.drMatch) {
-      lines.push(`- DR Number: Verified`);
+      lines.push(`- DR Number: Verified ✓`);
     } else if (sv.step9DrNumber) {
       lines.push(`- DR Number: MISMATCH (${sv.step9DrNumber})`);
     }
 
     lines.push('');
 
-    // Issues found
-    if (wizardState.finalDecision.reasons.length > 0) {
+    // Issues summary - use specific descriptions, not generic codes
+    const issues: string[] = [];
+
+    // Add specific missing photo details
+    if (missingSteps.length > 0) {
+      const missingLabels = missingSteps
+        .map((s: number) => STEP_LABELS[s] || `Step ${s}`)
+        .join(', ');
+      issues.push(`Missing photos: ${missingLabels}`);
+    }
+
+    // Add serial mismatch if applicable
+    if (!sv.ontMatch && (sv.onemapSerial || sv.step6Serial || sv.step9Serial)) {
+      issues.push('ONT serial mismatch between photos and 1Map');
+    }
+
+    // Add power meter issue if applicable
+    if (pm.value !== null && !pm.inRange) {
+      issues.push(`Power meter reading out of range (${pm.value} dBm)`);
+    }
+
+    // Add DR number mismatch if applicable
+    if (!sv.drMatch && sv.step9DrNumber) {
+      issues.push(`DR number mismatch on label`);
+    }
+
+    if (issues.length > 0) {
       lines.push('*Issues Found:*');
-      wizardState.finalDecision.reasons.forEach((reason: string) => {
-        lines.push(`- ${getFailReasonDescription(reason as any)}`);
+      issues.forEach((issue) => {
+        lines.push(`- ${issue}`);
       });
       lines.push('');
     }
 
-    // Notes from QA reviewer
-    if (wizardState.finalDecision.notes) {
-      lines.push('*QA Notes:*');
-      lines.push(wizardState.finalDecision.notes);
+    // Technician feedback from QA reviewer (NOT internal notes!)
+    if (wizardState.finalDecision.technicianFeedback) {
+      lines.push('*QA Feedback:*');
+      lines.push(wizardState.finalDecision.technicianFeedback);
       lines.push('');
     }
 

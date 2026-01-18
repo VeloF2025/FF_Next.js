@@ -77,6 +77,8 @@ const initialState: QaWizardState = {
   finalDecision: {
     decision: null,
     reasons: [],
+    internalNotes: null,
+    technicianFeedback: null,
     notes: null,
     decidedAt: null,
     decidedBy: null,
@@ -144,7 +146,37 @@ export function QaWizardContainer({
         if (photosResponse.ok) {
           const photosData = await photosResponse.json();
           if (photosData.data?.photos) {
-            setPhotos(photosData.data.photos);
+            const fetchedPhotos = photosData.data.photos as Photo[];
+            setPhotos(fetchedPhotos);
+
+            // Calculate step coverage from photos
+            const stepCounts = new Map<number, number>();
+            fetchedPhotos.forEach((photo: Photo) => {
+              if (photo.step && photo.step >= 1 && photo.step <= 10) {
+                stepCounts.set(photo.step, (stepCounts.get(photo.step) || 0) + 1);
+              }
+            });
+
+            const stepsCovered: number[] = [];
+            const stepsMissing: number[] = [];
+            for (let i = 1; i <= 10; i++) {
+              if (stepCounts.has(i) && (stepCounts.get(i) || 0) > 0) {
+                stepsCovered.push(i);
+              } else {
+                stepsMissing.push(i);
+              }
+            }
+
+            setState((prev) => ({
+              ...prev,
+              photoReview: {
+                ...prev.photoReview,
+                totalPhotos: fetchedPhotos.length,
+                categorizedPhotos: fetchedPhotos.filter((p: Photo) => p.step !== null).length,
+                stepsCovered,
+                stepsMissing,
+              },
+            }));
           }
         }
       } catch {
@@ -210,7 +242,11 @@ export function QaWizardContainer({
     }
   };
 
-  const handlePhotoReviewComplete = (categorizedPhotos: Photo[]) => {
+  const handlePhotoReviewComplete = (
+    categorizedPhotos: Photo[],
+    stepsCovered: number[],
+    stepsMissing: number[]
+  ) => {
     // Update photos state with categorized results
     setPhotos(categorizedPhotos);
     setState((prev) => ({
@@ -220,6 +256,8 @@ export function QaWizardContainer({
         completed: true,
         totalPhotos: categorizedPhotos.length,
         categorizedPhotos: categorizedPhotos.length,
+        stepsCovered,
+        stepsMissing,
       },
     }));
     goToNextPhase();
@@ -233,13 +271,20 @@ export function QaWizardContainer({
     goToNextPhase();
   };
 
-  const handleFinalDecision = (decision: QaDecision, reasons: string[], notes: string | null) => {
+  const handleFinalDecision = (
+    decision: QaDecision,
+    reasons: string[],
+    internalNotes: string | null,
+    technicianFeedback: string | null
+  ) => {
     setState((prev) => ({
       ...prev,
       finalDecision: {
         decision,
         reasons: reasons as QaWizardState['finalDecision']['reasons'],
-        notes,
+        internalNotes,
+        technicianFeedback,
+        notes: internalNotes, // backward compat
         decidedAt: new Date().toISOString(),
         decidedBy: null,
       },

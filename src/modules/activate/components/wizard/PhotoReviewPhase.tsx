@@ -23,7 +23,7 @@ import { STEP_LABELS } from '../../utils/stepMapper';
 interface PhotoReviewPhaseProps {
   dropNumber: string;
   photoCount: number;
-  onComplete: (categorizedPhotos: Photo[]) => void;
+  onComplete: (categorizedPhotos: Photo[], stepsCovered: number[], stepsMissing: number[]) => void;
   onBack: () => void;
 }
 
@@ -214,7 +214,26 @@ export function PhotoReviewPhase({
       original_type: null,
     }));
 
-    onComplete(categorizedPhotos);
+    // Calculate step coverage
+    const stepCounts = new Map<number, number>();
+    state.results.forEach((result) => {
+      const step = result.human_override_step ?? result.vlm_predicted_step;
+      if (step >= 1 && step <= 10) {
+        stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
+      }
+    });
+
+    const stepsCovered: number[] = [];
+    const stepsMissing: number[] = [];
+    for (let i = 1; i <= 10; i++) {
+      if (stepCounts.has(i) && (stepCounts.get(i) || 0) > 0) {
+        stepsCovered.push(i);
+      } else {
+        stepsMissing.push(i);
+      }
+    }
+
+    onComplete(categorizedPhotos, stepsCovered, stepsMissing);
   };
 
   const setPhotoApproval = (filename: string, approved: boolean, overrideStep?: number) => {

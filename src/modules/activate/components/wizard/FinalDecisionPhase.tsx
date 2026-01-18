@@ -27,7 +27,12 @@ interface FinalDecisionPhaseProps {
   dropNumber: string;
   wizardState: QaWizardState;
   photos?: Photo[];
-  onComplete: (decision: QaDecision, reasons: string[], notes: string | null) => void;
+  onComplete: (
+    decision: QaDecision,
+    reasons: string[],
+    internalNotes: string | null,
+    technicianFeedback: string | null
+  ) => void;
   onBack: () => void;
 }
 
@@ -112,8 +117,8 @@ export function FinalDecisionPhase({
 
     setLoading(true);
 
-    // Build comprehensive notes
-    const noteParts: string[] = [];
+    // Build internal notes (for QA team only - NOT sent to technicians)
+    const internalParts: string[] = [];
 
     if (issueClassification.issueType) {
       const typeLabels: Record<string, string> = {
@@ -122,26 +127,23 @@ export function FinalDecisionPhase({
         real_issue: 'Real Issue Found',
         no_issue: 'No Issue (False Positive)',
       };
-      noteParts.push(`[${typeLabels[issueClassification.issueType]}]`);
+      internalParts.push(`[${typeLabels[issueClassification.issueType]}]`);
     }
 
     if (issueClassification.correctValue) {
-      noteParts.push(`Correct value: ${issueClassification.correctValue}`);
+      internalParts.push(`Correct value: ${issueClassification.correctValue}`);
     }
 
     if (issueClassification.createTicket && issueClassification.ticketType) {
-      noteParts.push(`Ticket: ${issueClassification.ticketType.toUpperCase()}`);
+      internalParts.push(`Ticket: ${issueClassification.ticketType.toUpperCase()}`);
     }
 
     if (internalNotes) {
-      noteParts.push(`Internal: ${internalNotes}`);
+      internalParts.push(internalNotes);
     }
 
-    if (technicianFeedback) {
-      noteParts.push(`Tech Feedback: ${technicianFeedback}`);
-    }
-
-    const finalNotes = noteParts.join(' | ') || null;
+    const finalInternalNotes = internalParts.join(' | ') || null;
+    const finalTechnicianFeedback = technicianFeedback || null;
 
     try {
       const response = await fetch('/api/activate/final-decision', {
@@ -150,11 +152,11 @@ export function FinalDecisionPhase({
         body: JSON.stringify({
           dropNumber,
           decision,
-          notes: finalNotes,
+          notes: finalInternalNotes, // backward compat
           overrideReason: overrideReason || null,
           issueClassification,
-          internalNotes: internalNotes || null,
-          technicianFeedback: technicianFeedback || null,
+          internalNotes: finalInternalNotes,
+          technicianFeedback: finalTechnicianFeedback,
         }),
       });
 
@@ -168,7 +170,7 @@ export function FinalDecisionPhase({
           await createTicket();
         }
 
-        onComplete(decision, data.data.reasons || [], finalNotes);
+        onComplete(decision, data.data.reasons || [], finalInternalNotes, finalTechnicianFeedback);
       } else {
         throw new Error(data.error || 'Failed to save decision');
       }

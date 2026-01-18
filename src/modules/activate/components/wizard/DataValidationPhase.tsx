@@ -63,6 +63,13 @@ export function DataValidationPhase({
   const [powerMeterOverride, setPowerMeterOverride] = useState<string>('');
   const [useManualPower, setUseManualPower] = useState(false);
 
+  // Auto-start extraction on mount
+  useEffect(() => {
+    if (!extractionDone && !loading) {
+      runExtraction();
+    }
+  }, []);
+
   const runExtraction = async () => {
     setLoading(true);
     setError(null);
