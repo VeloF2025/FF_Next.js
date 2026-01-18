@@ -327,22 +327,28 @@ async function calculateSummary(filters?: {
   `;
 
   // Query 2: ACTIVATED - DRs in OES filtered by OES activation_date (independent)
+  // Falls back to drops table for project when no WA submission exists
   const activatedQuery = `
     SELECT COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
     LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    LEFT JOIN drops d ON d.drop_number = oes.drop_number
+    LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
-      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR upr.project IS NULL)' : ''}
+      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3)' : ''}
   `;
   const activatedParams = filters?.project && filters.project !== 'all'
     ? [filters.dateFrom || '1900-01-01', filters.dateTo || '2100-01-01', filters.project]
     : [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
 
   // Query 3: OES-only count - activated but NOT in dr_photo_unified_reviews for this period
+  // Falls back to drops table for project when no WA submission exists
   const oesOnlyQuery = `
     SELECT COUNT(DISTINCT oes.drop_number) as oes_only
     FROM oes_activations oes
+    LEFT JOIN drops d ON d.drop_number = oes.drop_number
+    LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
       AND NOT EXISTS (
@@ -352,12 +358,7 @@ async function calculateSummary(filters?: {
           AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
           ${filters?.project && filters.project !== 'all' ? 'AND upr.project = $3' : ''}
       )
-      ${filters?.project && filters.project !== 'all' ? `
-        AND EXISTS (
-          SELECT 1 FROM dr_photo_unified_reviews upr2
-          WHERE upr2.drop_number = oes.drop_number AND upr2.project = $3
-        )
-      ` : ''}
+      ${filters?.project && filters.project !== 'all' ? 'AND p.project_name = $3' : ''}
   `;
 
   // Run all queries in parallel
@@ -460,29 +461,35 @@ async function getProjectStats(filters?: {
   `;
 
   // Query 2: ACTIVATED - DRs in OES filtered by OES activation_date (independent)
+  // Falls back to drops table for project when no WA submission exists
   const activatedParams = filters?.project && filters.project !== 'all'
     ? [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01', filters.project]
     : [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
 
   const activatedQuery = `
     SELECT
-      COALESCE(upr.project, 'Unknown') as project,
+      COALESCE(upr.project, p.project_name, 'Unknown') as project,
       COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
     LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    LEFT JOIN drops d ON d.drop_number = oes.drop_number
+    LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
-      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR upr.project IS NULL)' : ''}
-    GROUP BY COALESCE(upr.project, 'Unknown')
+      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3 OR (upr.project IS NULL AND p.project_name IS NULL))' : ''}
+    GROUP BY COALESCE(upr.project, p.project_name, 'Unknown')
   `;
 
   // Query 3: OES-only by project - activated but NOT installed in this period
+  // Falls back to drops table for project when no WA submission exists
   const oesOnlyQuery = `
     SELECT
-      COALESCE(upr.project, 'Unknown') as project,
+      COALESCE(upr.project, p.project_name, 'Unknown') as project,
       COUNT(DISTINCT oes.drop_number) as oes_only
     FROM oes_activations oes
     LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    LEFT JOIN drops d ON d.drop_number = oes.drop_number
+    LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
       AND NOT EXISTS (
@@ -492,8 +499,8 @@ async function getProjectStats(filters?: {
           AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) <= $2::DATE
           ${filters?.project && filters.project !== 'all' ? 'AND upr2.project = $3' : ''}
       )
-      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR upr.project IS NULL)' : ''}
-    GROUP BY COALESCE(upr.project, 'Unknown')
+      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3 OR (upr.project IS NULL AND p.project_name IS NULL))' : ''}
+    GROUP BY COALESCE(upr.project, p.project_name, 'Unknown')
   `;
 
   // Run all queries in parallel
