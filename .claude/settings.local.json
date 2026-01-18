@@ -216,7 +216,8 @@
       "mcp__claude-in-chrome__shortcuts_list",
       "mcp__claude-in-chrome__shortcuts_execute",
       "Bash(netstat:*)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(git check-ignore:*)"
     ],
     "deny": [],
     "ask": [],

@@ -30,8 +30,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     let paramIndex = 1;
 
     if (status && status !== 'all') {
-      whereConditions.push(`po.status = $${paramIndex}`);
-      params.push(status as string);
+      // Handle both single status and array of statuses (e.g., ?status=approved&status=sent)
+      const statusArray = Array.isArray(status) ? status : [status];
+      whereConditions.push(`po.status = ANY($${paramIndex})`);
+      params.push(statusArray);
       paramIndex++;
     }
 

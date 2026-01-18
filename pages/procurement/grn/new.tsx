@@ -52,8 +52,9 @@ interface PurchaseOrder {
 }
 
 interface Supplier {
-  id: number;
-  companyName: string;
+  id: number | string;
+  name?: string;
+  companyName?: string;
 }
 
 interface Location {
@@ -393,7 +394,7 @@ export default function NewGRNPage() {
                     <option value="">Select supplier</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.companyName}
+                        {s.companyName || s.name || `Supplier ${s.id}`}
                       </option>
                     ))}
                   </select>
