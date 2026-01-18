@@ -41,6 +41,11 @@ interface ProcessNewDrRequest {
   submittedDate?: string; // Date when DR was submitted (YYYY-MM-DD), defaults to today
   skipCategorization?: boolean; // Optional: only fetch photos, don't categorize
   senderPhone?: string; // Phone number of sender (from WA Monitor)
+  // WhatsApp message context for reply threading
+  waMessageId?: string; // Original WhatsApp message ID (stanza ID)
+  waSenderJid?: string; // Sender JID (may be LID format)
+  waOriginalText?: string; // Original message text
+  waGroupJid?: string; // WhatsApp group JID
 }
 
 interface PreviousSubmission {
@@ -198,7 +203,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
   const startTime = Date.now();
 
   try {
-    const { dropNumber, project, submittedDate, skipCategorization, senderPhone } = req.body as ProcessNewDrRequest;
+    const {
+      dropNumber,
+      project,
+      submittedDate,
+      skipCategorization,
+      senderPhone,
+      waMessageId,
+      waSenderJid,
+      waOriginalText,
+      waGroupJid,
+    } = req.body as ProcessNewDrRequest;
 
     // Parse submitted date or default to today
     const submittedDateValue = submittedDate ? new Date(submittedDate) : new Date();
@@ -284,6 +299,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       // Update record with new submission info and preserved history
       // Note: submitted_date is preserved from original submission, not overwritten
+      // WhatsApp context is updated for resubmission to enable reply threading on new feedback
       await pool.query(
         `UPDATE dr_photo_unified_reviews
          SET
@@ -292,9 +308,23 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            last_resubmitted_at = NOW(),
            resubmitted_by = 'manual_entry',
            project = COALESCE($3, project),
+           wa_message_id = COALESCE($5, wa_message_id),
+           wa_sender_jid = COALESCE($6, wa_sender_jid),
+           wa_original_text = COALESCE($7, wa_original_text),
+           wa_group_jid = COALESCE($8, wa_group_jid),
+           wa_received_at = CASE WHEN $5 IS NOT NULL THEN NOW() ELSE wa_received_at END,
            updated_at = NOW()
          WHERE drop_number = $4`,
-        [submissionCount, JSON.stringify(updatedHistory), project, dropNumber]
+        [
+          submissionCount,
+          JSON.stringify(updatedHistory),
+          project,
+          dropNumber,
+          waMessageId || null,
+          waSenderJid || null,
+          waOriginalText || null,
+          waGroupJid || null,
+        ]
       );
 
       log.info('ProcessNewDr', `Resubmission detected for ${dropNumber}`, {
@@ -318,14 +348,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
-           drop_number, project, submission_count, submitted_date, sender_phone, created_at, updated_at,
-           submission_history
-         ) VALUES ($1, $2, 1, $3, $4, $5, $5, $6)`,
+           drop_number, project, submission_count, submitted_date, sender_phone,
+           wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
+           created_at, updated_at, submission_history
+         ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10)`,
         [
           dropNumber,
           project || existingQA.project,
           qaSubmittedDateStr, // Use WhatsApp message date instead of user-provided date
           existingQA.sender_phone || senderPhone || null, // Copy sender phone from WA Monitor
+          waMessageId || null, // WhatsApp message context for reply threading
+          waSenderJid || null,
+          waOriginalText || null,
+          waGroupJid || null,
           originalCreatedAt, // Preserve original timestamp from qa_photo_reviews
           JSON.stringify([{
             submission_number: 0,
@@ -347,13 +382,27 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       isResubmission = true;
       submissionCount = 1;
     } else {
-      // Brand new DR - create fresh record
+      // Brand new DR - create fresh record with WhatsApp message context for reply threading
       await pool.query(
-        `INSERT INTO dr_photo_unified_reviews (drop_number, project, submission_count, submitted_date, created_at, updated_at)
-         VALUES ($1, $2, 1, $3, NOW(), NOW())`,
-        [dropNumber, project || null, submittedDateStr]
+        `INSERT INTO dr_photo_unified_reviews (
+           drop_number, project, submission_count, submitted_date,
+           wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
+           created_at, updated_at
+         )
+         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, NOW(), NOW(), NOW())`,
+        [
+          dropNumber,
+          project || null,
+          submittedDateStr,
+          waMessageId || null,
+          waSenderJid || null,
+          waOriginalText || null,
+          waGroupJid || null,
+        ]
       );
-      log.info('ProcessNewDr', `Created new record for ${dropNumber}`);
+      log.info('ProcessNewDr', `Created new record for ${dropNumber}`, {
+        hasWaContext: !!(waMessageId && waSenderJid),
+      });
     }
 
     // Fetch photos from OneMap with robust retry logic

@@ -52,6 +52,11 @@ interface UnifiedReview {
   photo_count: number;
   ont_serial_scanned: string | null;
   ups_serial_scanned: string | null;
+  // WhatsApp threading fields
+  wa_message_id: string | null;
+  wa_sender_jid: string | null;
+  wa_original_text: string | null;
+  wa_group_jid: string | null;
 }
 
 // STEP_LABELS imported from stepMapper.ts
@@ -103,8 +108,16 @@ async function handlePost(
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${review.project}`);
     }
 
-    // 5. Send to WhatsApp via Bridge API
-    const sent = await sendToWhatsApp(groupId, feedbackMessage);
+    // 5. Send to WhatsApp via Bridge API (with threading if available)
+    const replyParams: WhatsAppReplyParams | undefined = review.wa_message_id
+      ? {
+          replyToId: review.wa_message_id,
+          replyToSender: review.wa_sender_jid,
+          quotedContent: review.wa_original_text || `${dropNumber}`,
+        }
+      : undefined;
+
+    const sent = await sendToWhatsApp(groupId, feedbackMessage, replyParams);
 
     if (!sent) {
       throw new Error('Failed to send message via WhatsApp Bridge');
@@ -145,7 +158,11 @@ async function getUnifiedReview(dropNumber: string): Promise<UnifiedReview | nul
       photos_metadata,
       photo_count,
       ont_serial_scanned,
-      ups_serial_scanned
+      ups_serial_scanned,
+      wa_message_id,
+      wa_sender_jid,
+      wa_original_text,
+      wa_group_jid
     FROM dr_photo_unified_reviews
     WHERE drop_number = $1;
     `,
@@ -284,23 +301,50 @@ function getWhatsAppGroupId(project: string): string | null {
   return groupMappings[project] || null;
 }
 
+interface WhatsAppReplyParams {
+  replyToId?: string | null;
+  replyToSender?: string | null;
+  quotedContent?: string | null;
+}
+
 /**
  * Send message to WhatsApp via Bridge API
+ * Supports threaded replies when replyParams are provided
  */
-async function sendToWhatsApp(groupId: string, message: string): Promise<boolean> {
+async function sendToWhatsApp(
+  groupId: string,
+  message: string,
+  replyParams?: WhatsAppReplyParams
+): Promise<boolean> {
   try {
     // WhatsApp Bridge API endpoint (running on Velocity Server port 8083)
     const bridgeUrl = process.env.WHATSAPP_BRIDGE_URL || 'http://192.168.1.150:8083';
+
+    // Build request body with optional reply threading
+    const requestBody: Record<string, string> = {
+      recipient: groupId,
+      message: message,
+    };
+
+    // Add reply threading params if available (for threaded replies)
+    if (replyParams?.replyToId && replyParams?.replyToSender) {
+      requestBody.replyToId = replyParams.replyToId;
+      requestBody.replyToSender = replyParams.replyToSender;
+      if (replyParams.quotedContent) {
+        requestBody.quotedContent = replyParams.quotedContent;
+      }
+      log.info('Sending threaded reply', {
+        replyToId: replyParams.replyToId,
+        replyToSender: replyParams.replyToSender,
+      });
+    }
 
     const response = await fetch(`${bridgeUrl}/api/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        recipient: groupId,
-        message: message,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -313,7 +357,10 @@ async function sendToWhatsApp(groupId: string, message: string): Promise<boolean
     }
 
     const data = await response.json();
-    log.info('Message sent via WhatsApp Bridge', { messageId: data.messageId });
+    log.info('Message sent via WhatsApp Bridge', {
+      messageId: data.messageId,
+      wasThreadedReply: !!(replyParams?.replyToId),
+    });
 
     return true;
   } catch (error) {
