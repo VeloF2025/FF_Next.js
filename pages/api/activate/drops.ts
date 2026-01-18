@@ -269,6 +269,8 @@ async function calculateSummary(filters?: {
     'COALESCE(upr.submitted_date, upr.created_at::DATE)',
     'upr.project'
   );
+  // Conditions for OES activations - filter by activation_date from OES report
+  const oesCond = buildConditions('oes.activation_date', 'upr.project');
 
   const isCompleteCondition = `
     step_01_house_photo AND step_02_cable_from_pole AND step_03_entry_outside AND
@@ -301,23 +303,20 @@ async function calculateSummary(filters?: {
     ${unifiedCond.conditions.length > 0 ? 'AND ' + unifiedCond.conditions.join(' AND ') : ''}
   `;
 
-  // Query 3: Activated count - DRs in OES whose unified submitted_date is in date range
-  // Only counts if the DR exists in unified (valid DR with first submission in range)
+  // Query 3: Activated count - DRs in OES filtered by OES activation_date
+  // Uses activation_date from OES report (when ONT was actually activated)
   const activatedQuery = `
     SELECT COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
-    WHERE EXISTS (
-      SELECT 1 FROM dr_photo_unified_reviews upr
-      WHERE upr.drop_number = oes.drop_number
-      ${unifiedCondWithAlias.conditions.length > 0 ? 'AND ' + unifiedCondWithAlias.conditions.join(' AND ') : ''}
-    )
+    INNER JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
+    ${oesCond.conditions.length > 0 ? 'WHERE ' + oesCond.conditions.join(' AND ') : ''}
   `;
 
   // Run all queries in parallel
   const [unifiedResult, installedResult, activatedResult] = await Promise.all([
     pool.query(unifiedQuery, unifiedCond.params),
     pool.query(installedQuery, unifiedCond.params),
-    pool.query(activatedQuery, unifiedCondWithAlias.params),
+    pool.query(activatedQuery, oesCond.params),
   ]);
 
   const unifiedRow = unifiedResult.rows[0];
@@ -405,6 +404,8 @@ async function getProjectStats(filters?: {
   const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
   // Conditions with upr. prefix for JOIN queries (avoids ambiguous column reference)
   const unifiedCondWithAlias = buildConditions('COALESCE(upr.submitted_date, upr.created_at::DATE)', 'upr.project');
+  // Conditions for OES activations - filter by activation_date from OES report
+  const oesCond = buildConditions('oes.activation_date', 'upr.project');
 
   // Query 1: Complete/Incomplete from dr_photo_unified_reviews grouped by project
   const unifiedQuery = `
@@ -428,14 +429,14 @@ async function getProjectStats(filters?: {
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
-  // Query 3: Activated - DRs in OES whose unified submitted_date is in date range
+  // Query 3: Activated - DRs in OES filtered by OES activation_date
   const activatedQuery = `
     SELECT
       COALESCE(upr.project, 'Unknown') as project,
       COUNT(DISTINCT oes.drop_number) as activated
     FROM oes_activations oes
     INNER JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
-    ${unifiedCondWithAlias.conditions.length > 0 ? 'WHERE ' + unifiedCondWithAlias.conditions.join(' AND ') : ''}
+    ${oesCond.conditions.length > 0 ? 'WHERE ' + oesCond.conditions.join(' AND ') : ''}
     GROUP BY COALESCE(upr.project, 'Unknown')
   `;
 
@@ -443,7 +444,7 @@ async function getProjectStats(filters?: {
   const [unifiedResult, installedResult, activatedResult] = await Promise.all([
     pool.query(unifiedQuery, unifiedCond.params),
     pool.query(installedQuery, unifiedCond.params),
-    pool.query(activatedQuery, unifiedCondWithAlias.params),
+    pool.query(activatedQuery, oesCond.params),
   ]);
 
   // Merge results by project
