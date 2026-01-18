@@ -95,15 +95,52 @@ If a photo doesn't clearly match any category, set confidence below 0.5 and expl
 // IMAGE HANDLING
 // ============================================================================
 
+// Internal OneMap server for direct photo fetching (bypasses proxy for server-side)
+const ONEMAP_INTERNAL_URL = process.env.ONEMAP_INTERNAL_URL || 'http://192.168.1.150:8003';
+
+/**
+ * Convert proxy URL to internal OneMap URL for server-side fetching
+ *
+ * Proxy URL format: /api/activate/photo/{drNumber}/{filename}
+ * Internal URL format: http://192.168.1.150:8003/api/photo/{drNumber}/{filename}
+ */
+function resolveImageUrl(imageUrl: string): string {
+  // If already an absolute URL, use it directly
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+
+  // Convert relative proxy URL to internal OneMap URL
+  // /api/activate/photo/DR123/file.jpg → http://192.168.1.150:8003/api/photo/DR123/file.jpg
+  const proxyPattern = /^\/api\/activate\/photo\/(.+)$/;
+  const match = imageUrl.match(proxyPattern);
+
+  if (match) {
+    const internalUrl = `${ONEMAP_INTERNAL_URL}/api/photo/${match[1]}`;
+    log.debug('CategorizationVlm', `Resolved proxy URL to internal: ${imageUrl} → ${internalUrl}`);
+    return internalUrl;
+  }
+
+  // Fallback: prepend internal URL base (shouldn't happen with current architecture)
+  log.warn('CategorizationVlm', `Unrecognized URL format, using as-is: ${imageUrl}`);
+  return imageUrl;
+}
+
 /**
  * Fetch an image and convert to base64
+ *
+ * Handles both:
+ * - Relative proxy URLs: /api/activate/photo/{dr}/{file} → converts to internal OneMap
+ * - Absolute URLs: Used directly
  */
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
+  const resolvedUrl = resolveImageUrl(imageUrl);
+
   try {
-    const response = await fetch(imageUrl);
+    const response = await fetch(resolvedUrl);
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
+      throw new Error(`Failed to fetch image: ${response.status} from ${resolvedUrl}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -112,7 +149,7 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
 
     return base64;
   } catch (error) {
-    log.error('CategorizationVlm', `Failed to fetch/encode image ${imageUrl}: ${error}`);
+    log.error('CategorizationVlm', `Failed to fetch/encode image ${resolvedUrl}: ${error}`);
     throw error;
   }
 }

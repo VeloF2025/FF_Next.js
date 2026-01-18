@@ -270,18 +270,22 @@ Extract serial with: `/\(S\)([^(]+)/`
 
 ## 10-Step Photo Checklist
 
-| Step | ID | Description |
-|------|----|-------------|
-| 1 | `cable_placement` | Cable correctly placed |
-| 2 | `splicing_complete` | Splicing work completed |
-| 3 | `enclosure_sealed` | Enclosure properly sealed |
-| 4 | `labels_visible` | Labels clearly visible |
-| 5 | `fiber_protection` | Fiber protection in place |
-| 6 | `nbn_compliance` | NBN compliance met |
-| 7 | `documentation` | Documentation complete |
-| 8 | `site_cleanup` | Site cleaned up |
-| 9 | `safety_measures` | Safety measures followed |
-| 10 | `quality_check` | Final quality check passed |
+**CANONICAL REFERENCE**: See `/photo-categorization` skill for full mapping details.
+
+| Step | Label | 1Map Types | Description |
+|------|-------|------------|-------------|
+| 1 | House Photo | `ph_prop` | Photo of Property |
+| 2 | Cable from Pole | `ph_pole`, `ph_outs` | Outside cable span: Pole to Pigtail screw |
+| 3 | Entry Outside | `ph_entry_out`, `ph_hm_ln` | Home Entry Point: Outside |
+| 4 | Entry Inside | `ph_entry_in`, `ph_hm_en` | Home entry point - Inside |
+| 5 | Wall | `ph_wall` | Photo Showing Location on the Wall |
+| 6 | ONT Back | `ph_ont`, `ph_ont_back`, `ph_drop`, `ph_cbl_r`, `ph_bl` | Fiber cable: entry to ONT |
+| 7 | Power Meter | `ph_powm`, `ph_powm1`, `ph_powm2` | Powermeter reading |
+| 8 | Final Installation | `ph_after`, `ph_final` | Overall work area after complete install |
+| 9 | Green Lights | `ph_lights`, `ph_led` | Photo of Active Broadband Light |
+| 10 | Signature | `ph_sign1`, `ph_sign2`, `ph_signature` | Signature of owner/tenant |
+
+**Note**: Steps 11 & 12 (ONT Barcode, UPS Serial) are NOT photo steps - they are scanned barcodes stored in `ont_serial_scanned` and `ups_serial_scanned` fields.
 
 ## API Endpoints
 
@@ -554,6 +558,8 @@ FROM dr_photo_unified_reviews;
 
 ## Related Skills
 
+- `/photo-categorization` - **CANONICAL** photo type → step mappings (must reference this for any mapping changes)
+- `/ai-qa-validation` - VLM quality validation criteria (FiberTime standards)
 - `/deploy` - Deploy to staging
 - `/oes` - OES import operations
 - `/wa-monitor` - WhatsApp monitor issues
