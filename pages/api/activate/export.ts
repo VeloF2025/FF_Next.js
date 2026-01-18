@@ -49,9 +49,6 @@ interface ExportRow {
   // VLM status
   vlm_status: string;
   feedback_sent: boolean;
-  // OneMap serials
-  onemap_ont_serial: string | null;
-  onemap_ups_serial: string | null;
   // Agent info from WhatsApp
   sender_phone: string | null;
   sender_name: string | null;
@@ -121,8 +118,6 @@ function toExcel(rows: ExportRow[]): Buffer {
     'Step 10: Signature',
     'VLM Status',
     'Feedback Sent',
-    'ONT Serial',
-    'UPS Serial',
     'Sender Phone',
     'Sender Name',
     'Assigned Agent',
@@ -150,8 +145,6 @@ function toExcel(rows: ExportRow[]): Buffer {
     row.step_10_signature ? 'Yes' : 'No',
     row.vlm_status || '',
     row.feedback_sent ? 'Yes' : 'No',
-    row.onemap_ont_serial || '',
-    row.onemap_ups_serial || '',
     row.sender_phone || '',
     row.sender_name || '',
     row.assigned_agent || '',
@@ -182,8 +175,6 @@ function toExcel(rows: ExportRow[]): Buffer {
     { wch: 8 },
     { wch: 12 }, // VLM Status
     { wch: 10 }, // Feedback Sent
-    { wch: 15 }, // ONT Serial
-    { wch: 15 }, // UPS Serial
     { wch: 15 }, // Sender Phone
     { wch: 15 }, // Sender Name
     { wch: 15 }, // Assigned Agent
@@ -264,18 +255,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         upr.step_10_signature,
         upr.vlm_categorization_status as vlm_status,
         upr.feedback_sent,
-        -- OneMap serials from foto_ai_reviews
-        fai.onemap_ont_serial,
-        fai.onemap_ups_serial,
-        -- Sender info from foto_ai_reviews or qa_photo_reviews
-        COALESCE(fai.sender_phone, qpr.sender_phone) as sender_phone,
+        -- Sender info from unified reviews or qa_photo_reviews
+        COALESCE(upr.sender_phone, qpr.sender_phone) as sender_phone,
         qpr.user_name as sender_name,
         qpr.assigned_agent,
         -- OES activation data
         oes.activation_date::TEXT as activation_date,
         CASE WHEN oes.drop_number IS NOT NULL THEN true ELSE false END as activated
       FROM dr_photo_unified_reviews upr
-      LEFT JOIN foto_ai_reviews fai ON fai.dr_number = upr.drop_number
       LEFT JOIN (
         SELECT DISTINCT ON (drop_number) *
         FROM qa_photo_reviews
