@@ -88,7 +88,7 @@ export default function BOQList({
         </div>
       ) : (
         /* Empty State */
-        <div className="text-center py-12 bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+        <div className="text-center py-12 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
           <FileText className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)]" />
           <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">No BOQs Found</h3>
           <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">

@@ -78,7 +78,7 @@ export default function BOQCard({
 
   return (
     <div
-      className={`bg-[var(--ff-card-bg)] rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer ${
+      className={`bg-[var(--ff-bg-secondary)] rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer ${
         isSelected ? 'border-blue-500 shadow-md' : 'border-[var(--ff-border-light)]'
       }`}
       onClick={onClick}
@@ -166,7 +166,7 @@ export default function BOQCard({
           </button>
 
           {actionMenuOpen && (
-            <div className="absolute right-0 mt-1 w-48 bg-[var(--ff-card-bg)] rounded-md shadow-lg border border-[var(--ff-border-light)] z-10">
+            <div className="absolute right-0 mt-1 w-48 bg-[var(--ff-bg-secondary)] rounded-md shadow-lg border border-[var(--ff-border-light)] z-10">
               <div className="py-1">
                 <button
                   onClick={(e) => {

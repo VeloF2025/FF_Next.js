@@ -161,15 +161,15 @@ export default function NewBOQPage() {
           </div>
 
           {/* Project Selection */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Project Selection</h2>
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 mb-6">
+            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Project Selection</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Project <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Project <span className="text-red-400">*</span>
                 </label>
                 {isLoadingProjects ? (
-                  <div className="flex items-center text-gray-500">
+                  <div className="flex items-center text-[var(--ff-text-secondary)]">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Loading projects...
                   </div>
@@ -177,7 +177,7 @@ export default function NewBOQPage() {
                   <select
                     value={selectedProjectId}
                     onChange={(e) => setSelectedProjectId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Select a project...</option>
                     {projects.map((project) => (
@@ -189,20 +189,20 @@ export default function NewBOQPage() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  BOQ Title <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  BOQ Title <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., Phase 1 Materials"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 placeholder:text-[var(--ff-text-tertiary)]"
                 />
               </div>
             </div>
             <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                 Description
               </label>
               <textarea
@@ -210,19 +210,19 @@ export default function NewBOQPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
                 placeholder="Optional description..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 placeholder:text-[var(--ff-text-tertiary)]"
               />
             </div>
           </div>
 
           {/* Tab Selection */}
-          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
+          <div className="flex space-x-1 bg-[var(--ff-bg-tertiary)] p-1 rounded-lg mb-6 w-fit">
             <button
               onClick={() => setActiveTab('upload')}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center ${
                 activeTab === 'upload'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] shadow-sm'
+                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
               }`}
             >
               <Upload className="h-4 w-4 mr-2" />
@@ -232,8 +232,8 @@ export default function NewBOQPage() {
               onClick={() => setActiveTab('manual')}
               className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center ${
                 activeTab === 'manual'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] shadow-sm'
+                  : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
               }`}
             >
               <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -243,11 +243,11 @@ export default function NewBOQPage() {
 
           {/* Upload Tab */}
           {activeTab === 'upload' && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Upload BOQ File</h2>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Upload BOQ File</h2>
               {!selectedProjectId ? (
-                <div className="text-center py-8 text-gray-500">
-                  <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <div className="text-center py-8 text-[var(--ff-text-secondary)]">
+                  <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
                   <p>Please select a project first to enable file upload</p>
                 </div>
               ) : (
@@ -264,9 +264,9 @@ export default function NewBOQPage() {
 
           {/* Manual Entry Tab */}
           {activeTab === 'manual' && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Line Items</h2>
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Line Items</h2>
                 <Button onClick={addItem} size="sm">
                   <Plus className="h-4 w-4 mr-1" />
                   Add Item
@@ -274,12 +274,12 @@ export default function NewBOQPage() {
               </div>
 
               {items.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <div className="text-center py-8 text-[var(--ff-text-secondary)]">
+                  <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
                   <p>No items added yet</p>
                   <button
                     onClick={addItem}
-                    className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                    className="mt-4 text-blue-400 hover:text-blue-300 font-medium"
                   >
                     Add your first item
                   </button>
@@ -287,7 +287,7 @@ export default function NewBOQPage() {
               ) : (
                 <div className="space-y-4">
                   {/* Table Header */}
-                  <div className="grid grid-cols-12 gap-2 text-sm font-medium text-gray-500 px-2">
+                  <div className="grid grid-cols-12 gap-2 text-sm font-medium text-[var(--ff-text-secondary)] px-2">
                     <div className="col-span-4">Description</div>
                     <div className="col-span-2">Category</div>
                     <div className="col-span-1">Unit</div>
@@ -305,14 +305,14 @@ export default function NewBOQPage() {
                           value={item.description}
                           onChange={(e) => updateItem(index, 'description', e.target.value)}
                           placeholder="Item description"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                         />
                       </div>
                       <div className="col-span-2">
                         <select
                           value={item.category}
                           onChange={(e) => updateItem(index, 'category', e.target.value)}
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                         >
                           <option value="Materials">Materials</option>
                           <option value="Equipment">Equipment</option>
@@ -326,7 +326,7 @@ export default function NewBOQPage() {
                           value={item.unit}
                           onChange={(e) => updateItem(index, 'unit', e.target.value)}
                           placeholder="m"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                         />
                       </div>
                       <div className="col-span-2">
@@ -335,7 +335,7 @@ export default function NewBOQPage() {
                           value={item.quantity}
                           onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                           min="0"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                         />
                       </div>
                       <div className="col-span-2">
@@ -345,13 +345,13 @@ export default function NewBOQPage() {
                           onChange={(e) => updateItem(index, 'unitPrice', Number(e.target.value))}
                           min="0"
                           step="0.01"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                          className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                         />
                       </div>
                       <div className="col-span-1">
                         <button
                           onClick={() => removeItem(index)}
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                          className="p-1.5 text-red-400 hover:bg-red-500/10 rounded"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -360,10 +360,10 @@ export default function NewBOQPage() {
                   ))}
 
                   {/* Total */}
-                  <div className="flex justify-end pt-4 border-t border-gray-200">
+                  <div className="flex justify-end pt-4 border-t border-[var(--ff-border-light)]">
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">Total Value</p>
-                      <p className="text-xl font-bold text-gray-900">
+                      <p className="text-sm text-[var(--ff-text-secondary)]">Total Value</p>
+                      <p className="text-xl font-bold text-[var(--ff-text-primary)]">
                         R {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </p>
                     </div>
@@ -373,7 +373,7 @@ export default function NewBOQPage() {
 
               {/* Submit Button */}
               {items.length > 0 && (
-                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[var(--ff-border-light)]">
                   <Button
                     variant="outline"
                     onClick={() => router.push('/procurement/boq')}
