@@ -244,11 +244,12 @@ async function checkWhatsAppSender(): Promise<ServiceStatus> {
 
     if (response.ok) {
       const data = await response.json();
-      const connected = data.connected === true;
+      // Support both formats: {connected: true} (old) and {status: "healthy"} (wa-feedback)
+      const isHealthy = data.connected === true || data.status === 'healthy';
       return {
-        status: connected ? 'healthy' : 'degraded',
+        status: isHealthy ? 'healthy' : 'degraded',
         latencyMs: Date.now() - start,
-        message: connected ? 'WhatsApp Sender connected' : 'Sender not connected to WhatsApp',
+        message: isHealthy ? 'WA Feedback service healthy' : 'WA Feedback service unhealthy',
         lastCheck: new Date().toISOString(),
       };
     } else {
