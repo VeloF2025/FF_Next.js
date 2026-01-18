@@ -28,7 +28,7 @@ export function SuppliersPage() {
       return (
         (supplier.name || supplier.companyName || '').toLowerCase().includes(search) ||
         (supplier.registrationNumber || supplier.registrationNo || '').toLowerCase().includes(search) ||
-        supplier.email.toLowerCase().includes(search)
+        (supplier.email || '').toLowerCase().includes(search)
       );
     }
     return true;

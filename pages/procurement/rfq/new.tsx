@@ -248,18 +248,18 @@ export default function NewRFQPage() {
             {/* Main Form - Left Column */}
             <div className="lg:col-span-2 space-y-6">
               {/* Basic Information */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <FileText className="h-5 w-5 mr-2 text-gray-500" />
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4 flex items-center">
+                  <FileText className="h-5 w-5 mr-2 text-[var(--ff-text-secondary)]" />
                   Basic Information
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Project <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Project <span className="text-red-400">*</span>
                     </label>
                     {isLoadingProjects ? (
-                      <div className="flex items-center text-gray-500">
+                      <div className="flex items-center text-[var(--ff-text-secondary)]">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         Loading projects...
                       </div>
@@ -267,7 +267,7 @@ export default function NewRFQPage() {
                       <select
                         value={selectedProjectId}
                         onChange={(e) => setSelectedProjectId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="">Select a project...</option>
                         {projects.map((project) => (
@@ -279,35 +279,35 @@ export default function NewRFQPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Response Deadline <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Response Deadline <span className="text-red-400">*</span>
                     </label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
                       <input
                         type="date"
                         value={responseDeadline}
                         onChange={(e) => setResponseDeadline(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
                 </div>
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    RFQ Title <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    RFQ Title <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g., Fiber Cable Supply - Phase 1"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 placeholder:text-[var(--ff-text-tertiary)]"
                   />
                 </div>
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                     Description
                   </label>
                   <textarea
@@ -315,15 +315,15 @@ export default function NewRFQPage() {
                     onChange={(e) => setDescription(e.target.value)}
                     rows={3}
                     placeholder="Provide details about the quotation requirements..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md focus:ring-blue-500 focus:border-blue-500 placeholder:text-[var(--ff-text-tertiary)]"
                   />
                 </div>
               </div>
 
               {/* Line Items */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Line Items</h2>
+                  <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Line Items</h2>
                   <div className="flex gap-2">
                     {selectedProjectId && (
                       <Button
@@ -348,12 +348,12 @@ export default function NewRFQPage() {
                 </div>
 
                 {items.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <div className="text-center py-8 text-[var(--ff-text-secondary)] border border-dashed border-[var(--ff-border-light)] rounded-lg">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
                     <p>No items added yet</p>
                     <button
                       onClick={addItem}
-                      className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                      className="mt-4 text-blue-400 hover:text-blue-300 font-medium"
                     >
                       Add your first item
                     </button>
@@ -361,68 +361,68 @@ export default function NewRFQPage() {
                 ) : (
                   <div className="space-y-4">
                     {items.map((item, index) => (
-                      <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div key={index} className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border-light)]">
                         <div className="flex justify-between items-start mb-3">
-                          <span className="text-sm font-medium text-gray-500">Item #{index + 1}</span>
+                          <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Item #{index + 1}</span>
                           <button
                             onClick={() => removeItem(index)}
-                            className="p-1 text-red-500 hover:bg-red-50 rounded"
+                            className="p-1 text-red-400 hover:bg-red-500/10 rounded"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <div className="md:col-span-2">
-                            <label className="block text-xs text-gray-500 mb-1">Description</label>
+                            <label className="block text-xs text-[var(--ff-text-secondary)] mb-1">Description</label>
                             <input
                               type="text"
                               value={item.description}
                               onChange={(e) => updateItem(index, 'description', e.target.value)}
                               placeholder="Item description"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">Quantity</label>
+                            <label className="block text-xs text-[var(--ff-text-secondary)] mb-1">Quantity</label>
                             <input
                               type="number"
                               value={item.quantity}
                               onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                               min="1"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">Unit</label>
+                            <label className="block text-xs text-[var(--ff-text-secondary)] mb-1">Unit</label>
                             <input
                               type="text"
                               value={item.unit}
                               onChange={(e) => updateItem(index, 'unit', e.target.value)}
                               placeholder="m, unit, kg"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                             />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">Specifications</label>
+                            <label className="block text-xs text-[var(--ff-text-secondary)] mb-1">Specifications</label>
                             <input
                               type="text"
                               value={item.specifications}
                               onChange={(e) => updateItem(index, 'specifications', e.target.value)}
                               placeholder="Technical specs (optional)"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs text-gray-500 mb-1">Est. Unit Price (R)</label>
+                            <label className="block text-xs text-[var(--ff-text-secondary)] mb-1">Est. Unit Price (R)</label>
                             <input
                               type="number"
                               value={item.estimatedUnitPrice}
                               onChange={(e) => updateItem(index, 'estimatedUnitPrice', Number(e.target.value))}
                               min="0"
                               step="0.01"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                             />
                           </div>
                         </div>
@@ -430,10 +430,10 @@ export default function NewRFQPage() {
                     ))}
 
                     {/* Total */}
-                    <div className="flex justify-end pt-4 border-t border-gray-200">
+                    <div className="flex justify-end pt-4 border-t border-[var(--ff-border-light)]">
                       <div className="text-right">
-                        <p className="text-sm text-gray-500">Estimated Total</p>
-                        <p className="text-xl font-bold text-gray-900">
+                        <p className="text-sm text-[var(--ff-text-secondary)]">Estimated Total</p>
+                        <p className="text-xl font-bold text-[var(--ff-text-primary)]">
                           R {calculateTotal().toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </p>
                       </div>
@@ -445,27 +445,27 @@ export default function NewRFQPage() {
 
             {/* Supplier Selection - Right Column */}
             <div className="space-y-6">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Users className="h-5 w-5 mr-2 text-gray-500" />
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4 flex items-center">
+                  <Users className="h-5 w-5 mr-2 text-[var(--ff-text-secondary)]" />
                   Invite Suppliers
                 </h2>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
                   Select suppliers to receive this RFQ ({selectedSuppliers.length} selected)
                 </p>
 
                 {isLoadingSuppliers ? (
-                  <div className="flex items-center justify-center py-8 text-gray-500">
+                  <div className="flex items-center justify-center py-8 text-[var(--ff-text-secondary)]">
                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
                     Loading suppliers...
                   </div>
                 ) : suppliers.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <div className="text-center py-8 text-[var(--ff-text-secondary)]">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
                     <p>No active suppliers found</p>
                     <a
                       href="/suppliers"
-                      className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
+                      className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
                     >
                       Add suppliers
                     </a>
@@ -477,21 +477,21 @@ export default function NewRFQPage() {
                         key={supplier.id}
                         className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
                           selectedSuppliers.includes(supplier.id)
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:bg-gray-50'
+                            ? 'border-blue-500 bg-blue-500/10'
+                            : 'border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedSuppliers.includes(supplier.id)}
                           onChange={() => toggleSupplier(supplier.id)}
-                          className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          className="h-4 w-4 text-blue-600 rounded border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] focus:ring-blue-500"
                         />
                         <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-[var(--ff-text-primary)]">
                             {supplier.company_name}
                           </p>
-                          <p className="text-xs text-gray-500">{supplier.email}</p>
+                          <p className="text-xs text-[var(--ff-text-secondary)]">{supplier.email}</p>
                         </div>
                       </label>
                     ))}
@@ -500,8 +500,8 @@ export default function NewRFQPage() {
               </div>
 
               {/* Actions */}
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Actions</h2>
                 <div className="space-y-3">
                   <Button
                     className="w-full"
@@ -517,21 +517,19 @@ export default function NewRFQPage() {
                       'Issue RFQ'
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
+                  <button
+                    className="w-full px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-transparent border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-tertiary)] disabled:opacity-50"
                     onClick={() => handleSubmit('draft')}
                     disabled={isSubmitting}
                   >
                     Save as Draft
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
+                  </button>
+                  <button
+                    className="w-full px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-transparent border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-tertiary)]"
                     onClick={() => router.push('/procurement/rfq')}
                   >
                     Cancel
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>

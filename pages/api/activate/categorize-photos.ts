@@ -20,11 +20,14 @@ import {
   PhotoInput,
 } from '@/modules/activate/services/categorizationVlmService';
 import {
+  fetchPhotosWithRetry,
+  checkPhotosExist,
+} from '@/modules/activate/services/photoFetchService';
+import {
   CategorizePhotosRequest,
   CategorizePhotosResponse,
   VlmCategorizationResult,
 } from '@/modules/activate/types/unified.types';
-import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -35,55 +38,6 @@ const pool = new Pool({
     'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
 });
 
-// OneMap API host
-const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
-
-/**
- * Fetch raw photos from OneMap (without step mapping)
- */
-async function fetchRawPhotos(
-  dropNumber: string
-): Promise<{ photos: PhotoInput[]; ont_barcode: string | null; ups_serial: string | null }> {
-  // Try to get the record from OneMap
-  let response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
-
-  // If 404, trigger download first
-  if (response.status === 404 || response.status === 422) {
-    log.info('CategorizePhotos', `Record not found for ${dropNumber}, triggering download`);
-
-    const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
-      method: 'POST',
-    });
-
-    if (downloadResponse.ok) {
-      // Retry fetching record
-      response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`);
-    } else {
-      throw new Error(`Download failed: ${downloadResponse.status}`);
-    }
-  }
-
-  if (!response.ok) {
-    throw new Error(`OneMap API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const localPhotos = data.local_photos || [];
-
-  // Map to PhotoInput format (raw, for categorization)
-  const photos: PhotoInput[] = localPhotos.map((photo: any) => ({
-    filename: photo.filename,
-    url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
-    original_type: photo.type || null,
-    original_step: photo.type ? photoTypeToStep(photo.type) : null,
-  }));
-
-  return {
-    photos,
-    ont_barcode: data.ont_barcode || null,
-    ups_serial: data.ups_serial || null,
-  };
-}
 
 /**
  * POST /api/activate/categorize-photos
@@ -137,9 +91,28 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       [dropNumber]
     );
 
-    // Fetch raw photos from OneMap
-    log.info('CategorizePhotos', `Fetching raw photos for ${dropNumber}`);
-    const { photos, ont_barcode, ups_serial } = await fetchRawPhotos(dropNumber);
+    // Fetch photos from OneMap with robust retry logic
+    log.info('CategorizePhotos', `Fetching photos for ${dropNumber} with retry`);
+    const fetchResult = await fetchPhotosWithRetry(dropNumber, {
+      maxRetries: 5,
+      initialDelayMs: 2000,
+      onStatusUpdate: (status) => {
+        log.debug('CategorizePhotos', `Photo fetch status: ${status.message}`, {
+          dropNumber,
+          attempt: status.attempt,
+          status: status.status,
+        });
+      },
+    });
+
+    const { photos, ont_barcode, ups_serial, fetchAttempts, downloadTriggered, totalWaitTimeMs } = fetchResult;
+
+    log.info('CategorizePhotos', `Photo fetch complete for ${dropNumber}`, {
+      photoCount: photos.length,
+      fetchAttempts,
+      downloadTriggered,
+      totalWaitTimeMs,
+    });
 
     if (photos.length === 0) {
       await pool.query(

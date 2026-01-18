@@ -102,48 +102,129 @@ export default withErrorHandler(async (
     }
   } else if (req.method === 'POST') {
     try {
-      const newItem = req.body;
-      
-      // Insert new BOQ item into database
-      const insertedItems = await sql`
+      const body = req.body;
+      const effectiveProjectId = body.projectId || projectId;
+
+      if (!effectiveProjectId) {
+        return res.status(400).json({ error: 'Project ID is required' });
+      }
+
+      // If items array is provided, create a full BOQ with items
+      if (body.items && Array.isArray(body.items)) {
+        // Generate version string
+        const version = `V${Date.now()}`;
+
+        // Calculate totals
+        const totalValue = body.items.reduce((sum: number, item: BOQItem) => {
+          return sum + (Number(item.totalPrice) || (Number(item.quantity) * Number(item.unitPrice)) || 0);
+        }, 0);
+
+        // First create the parent BOQ record
+        const [boq] = await sql`
+          INSERT INTO boqs (
+            project_id, version, title, description, status,
+            uploaded_by, item_count, total_estimated_value
+          )
+          VALUES (
+            ${effectiveProjectId},
+            ${version},
+            ${body.title || 'Untitled BOQ'},
+            ${body.description || null},
+            'draft',
+            ${'system'},
+            ${body.items.length},
+            ${totalValue}
+          )
+          RETURNING *
+        `;
+
+        // Log BOQ creation
+        logCreate('boq', boq.id, {
+          project_id: boq.project_id,
+          title: boq.title,
+          item_count: body.items.length,
+          total_value: totalValue
+        });
+
+        // Now insert all items with the boq_id
+        const insertedItems = [];
+        for (let i = 0; i < body.items.length; i++) {
+          const item = body.items[i];
+          const itemTotal = Number(item.totalPrice) || (Number(item.quantity) * Number(item.unitPrice)) || 0;
+
+          const [insertedItem] = await sql`
+            INSERT INTO boq_items (
+              boq_id, item_code, description, unit, quantity,
+              unit_price, total_price, category, sort_order
+            )
+            VALUES (
+              ${boq.id},
+              ${item.itemCode || `ITEM-${i + 1}`},
+              ${item.description},
+              ${item.unit || item.uom || 'unit'},
+              ${item.quantity},
+              ${item.unitPrice || 0},
+              ${itemTotal},
+              ${item.category || 'Materials'},
+              ${i + 1}
+            )
+            RETURNING *
+          `;
+          insertedItems.push(insertedItem);
+        }
+
+        return res.status(201).json({
+          message: 'BOQ created successfully',
+          boqId: boq.id,
+          boq: boq,
+          items: insertedItems,
+          itemsCreated: insertedItems.length
+        });
+      }
+
+      // Single item creation (legacy support) - requires existing boqId
+      const newItem = body;
+      if (!newItem.boqId) {
+        return res.status(400).json({
+          error: 'boqId is required for single item creation. Use items array to create a new BOQ with items.'
+        });
+      }
+
+      const [insertedItem] = await sql`
         INSERT INTO boq_items (
-          boq_id, project_id, item_code, description, uom, quantity, 
-          unit_price, total_price, category, catalog_item_name, procurement_status
+          boq_id, item_code, description, unit, quantity,
+          unit_price, total_price, category, sort_order
         )
         VALUES (
-          ${newItem.boqId || null}, 
-          ${newItem.projectId || projectId},
-          ${newItem.itemCode || ''}, 
-          ${newItem.description}, 
-          ${newItem.unit || newItem.uom}, 
-          ${newItem.quantity}, 
-          ${newItem.unitPrice || 0}, 
-          ${newItem.totalPrice || 0}, 
-          ${newItem.category || 'Materials'}, 
-          ${newItem.supplier || ''}, 
-          ${newItem.status || 'pending'}
+          ${newItem.boqId},
+          ${newItem.itemCode || ''},
+          ${newItem.description},
+          ${newItem.unit || newItem.uom || 'unit'},
+          ${newItem.quantity || 0},
+          ${newItem.unitPrice || 0},
+          ${newItem.totalPrice || 0},
+          ${newItem.category || 'Materials'},
+          ${newItem.sequenceNumber || 1}
         )
         RETURNING *
       `;
-      
+
       // Log BOQ item creation
-      if (insertedItems[0]) {
-        logCreate('boq_item', insertedItems[0].id, {
-          project_id: insertedItems[0].project_id,
-          item_code: insertedItems[0].item_code,
-          description: insertedItems[0].description,
-          quantity: insertedItems[0].quantity,
-          total_price: insertedItems[0].total_price
-        });
-      }
-      
-      res.status(201).json({ 
+      logCreate('boq_item', insertedItem.id, {
+        boq_id: insertedItem.boq_id,
+        item_code: insertedItem.item_code,
+        description: insertedItem.description,
+        quantity: insertedItem.quantity,
+        total_price: insertedItem.total_price
+      });
+
+      res.status(201).json({
         message: 'BOQ item created successfully',
-        item: insertedItems[0]
+        item: insertedItem
       });
     } catch (error) {
-      console.error('Error creating BOQ item:', error);
-      res.status(500).json({ error: 'Failed to create BOQ item' });
+      console.error('Error creating BOQ:', error);
+      res.status(500).json({ error: 'Failed to create BOQ' });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });

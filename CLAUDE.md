@@ -12,7 +12,8 @@
 src/
 ├── modules/           # Modular features (Lego blocks)
 │   ├── wa-monitor/    # WhatsApp monitor (fully isolated)
-│   ├── dr-photo-unified/ # AI photo review with VLM
+│   ├── activate/      # DR Photo review with VLM + HITL learning
+│   ├── qa-learning/   # HITL few-shot learning (shared)
 │   └── rag/           # Contractor health monitoring
 ├── components/        # Shared UI (AppLayout is standard)
 ├── services/          # API services
@@ -243,7 +244,7 @@ Unified system for DR (Drop Receipt) photo review with AI-powered categorization
 - **Review Page:** `/activate/[dropNumber]`
 - **API Prefix:** `/api/activate/*`
 - **Table:** `foto_ai_reviews`
-- **VLM:** Qwen3 via VLLM on 100.96.203.105:8000
+- **VLM:** Qwen3 via VLLM on 100.96.203.105:8100
 
 ### Key Features
 1. **AI Categorization:** Qwen3 VLM analyzes photos against 10-step checklist
@@ -340,25 +341,28 @@ echo 'velo2026' | sudo -S systemctl restart whatsapp-sender
 - Velo Test: `120363421664266245@g.us`
 - Mamelodi: `120363408849234743@g.us`
 
-### 10-Step Photo Checklist
-1. `cable_placement` - Cable correctly placed
-2. `splicing_complete` - Splicing work completed
-3. `enclosure_sealed` - Enclosure properly sealed
-4. `labels_visible` - Labels clearly visible
-5. `fiber_protection` - Fiber protection in place
-6. `nbn_compliance` - NBN compliance met
-7. `documentation` - Documentation complete
-8. `site_cleanup` - Site cleaned up
-9. `safety_measures` - Safety measures followed
-10. `quality_check` - Final quality check passed
+### 10-Step Photo Checklist (DR Photo)
+| Step | Label | Description |
+|------|-------|-------------|
+| 1 | House Photo | Property exterior for location verification |
+| 2 | Cable from Pole | Aerial fiber drop from utility pole to house |
+| 3 | Entry Outside | EXTERIOR view of where cable enters building |
+| 4 | Entry Inside | INTERIOR view of cable routing toward ONT |
+| 5 | Wall | Wall surface with mounting bracket before ONT install |
+| 6 | ONT Back | Back panel showing fiber and power cable connections |
+| 7 | Power Meter | Optical power meter display showing dBm reading |
+| 8 | Final Installation | Wide shot of complete setup (ONT + UPS + cables) |
+| 9 | Green Lights | Front panel of ONT with illuminated indicator lights |
+| 10 | Signature | Customer signature on completion form |
 
 ### Troubleshooting
 
 **VLM not responding:**
 ```bash
 ssh velo@100.96.203.105  # Password: velo2026
-docker ps | grep vllm
-docker logs vllm-qwen3
+echo 'velo2026' | sudo -S systemctl status vllm-qwen.service
+echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
+# Restart: /home/velo/scripts/vllm/startup.sh
 ```
 
 **Photos not categorizing:**
@@ -373,6 +377,132 @@ docker logs vllm-qwen3
 **Full Documentation:**
 - `/home/hein/Downloads/DR_PHOTO_UNIFIED_WA_INTEGRATION.md`
 - `src/modules/activate/README.md`
+
+## QA Learning Module (HITL Few-Shot)
+
+**Status:** ✅ ACTIVE - VLM learns from human corrections via few-shot prompting
+
+- **Module:** `src/modules/qa-learning/` - See README for details
+- **Tables:** `qa_correction_examples`, `qa_workflow_steps`
+- **Supports:** `dr_photo`, `civil_works`, `optical_works` (isolated learning)
+
+## VLM Infrastructure (Qwen3-VL-8B)
+
+**Status:** ✅ PRODUCTION - Running on Velocity Server
+
+### Quick Reference
+- **URL:** `http://100.96.203.105:8100`
+- **Model:** Qwen/Qwen3-VL-8B-Instruct
+- **Service:** `vllm-qwen.service`
+- **Config:** `/etc/systemd/system/vllm-qwen.service`
+
+### VLM Configuration
+```bash
+# Current stable settings (Jan 2026)
+--model Qwen/Qwen3-VL-8B-Instruct
+--max-model-len 16384      # Max tokens (increased from 12288)
+--gpu-memory-utilization 0.90
+--dtype bfloat16
+--max-num-seqs 4           # 4 parallel sequences
+--enforce-eager            # REQUIRED: prevents FLASHINFER backend crashes
+```
+
+**Note:** RTX 5090 is in compute-only mode (Exclusive_Process). Display uses AMD integrated GPU.
+
+### Image Size Limits
+**CRITICAL:** Large images exceed VLM token limits (16384 max)
+- Resize images before sending to VLM
+- Max recommended: 1024x768 for plates, 1280x960 for documents
+- Use `sharp` library for resizing:
+```typescript
+import sharp from 'sharp';
+const resized = await sharp(buffer)
+  .resize(1024, 768, { fit: 'inside', withoutEnlargement: true })
+  .jpeg({ quality: 85 })
+  .toBuffer();
+```
+
+### VLM Benchmark System
+**Location:** `/home/velo/scripts/vllm/`
+
+**Test Images:**
+```
+/home/velo/scripts/vllm/benchmarks/test-images/
+├── plate.jpg           # Expected: KR 27 FN GP
+├── odometer.jpg        # Expected: 167443
+├── fuel.jpg            # Expected: 1/4
+├── sa_id.jpg           # Expected: 7802035087081
+└── drivers_license.jpg # Expected: 7802035087081
+```
+
+**7 Benchmark Tests:**
+| Test | Type | Expected | Typical Time |
+|------|------|----------|--------------|
+| text_math | Text | "4" | ~35ms |
+| text_plate_format | Text | "Gauteng" | ~55ms |
+| image_plate | Image | KR27FNGP | ~90ms |
+| image_odometer | Image | 167443 | ~90ms |
+| image_fuel | Image | 1/4 | ~57ms |
+| image_sa_id | Image | 7802035087081 | ~170ms |
+| image_license_id | Image | 7802035087081 | ~190ms |
+
+**Cron Schedule:**
+```bash
+0 3 * * *           # 3:00 AM - Nightly restart
+*/5 * * * *         # Every 5 min - Health check
+0 6,12,18,23 * * *  # 6am, 12pm, 6pm, 11pm - Benchmarks (4x daily)
+```
+
+**Results:**
+```bash
+# Latest results
+cat /home/velo/scripts/vllm/benchmarks/latest_results.json
+
+# Historical results
+ls /home/velo/scripts/vllm/benchmarks/results_*.json
+```
+
+**Manual Commands:**
+```bash
+ssh velo@100.96.203.105
+
+# Run benchmark manually
+/home/velo/scripts/vllm/benchmark.sh
+
+# Check service status
+echo 'velo2026' | sudo -S systemctl status vllm-qwen.service
+
+# View logs
+tail -f /var/log/vllm-benchmark.log
+tail -f /var/log/vllm-maintenance.log
+
+# Restart VLM
+/home/velo/scripts/vllm/startup.sh
+```
+
+### VLM Troubleshooting
+
+**Service not starting:**
+```bash
+# Check GPU memory
+nvidia-smi
+
+# Check logs
+echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
+
+# Clean restart
+/home/velo/scripts/vllm/startup.sh
+```
+
+**Token limit errors (400 response):**
+- Image too large - resize before sending
+- Error: "decoder prompt is longer than maximum model length"
+- Solution: Resize to max 1024x768
+
+**Benchmark failures:**
+- Check `/var/log/vllm-benchmark.log`
+- Verify test images exist in `/home/velo/scripts/vllm/benchmarks/test-images/`
+- Run manually: `/home/velo/scripts/vllm/benchmark.sh`
 
 ## Arcjet Security
 
@@ -505,6 +635,29 @@ After changes, update `docs/page-logs/{page-name}.md` with:
 4. Document changes in page logs
 5. Use antihall validator for code verification
 6. Prefer editing existing files over creating new ones
+
+## 🚨 CRITICAL: Browser Automation
+
+**ALWAYS use `claude-in-chrome` (mcp__claude-in-chrome__*) for browser automation.**
+
+❌ **DO NOT USE:** `boss-ghost-mcp` or `chrome-devtools` MCP tools
+✅ **USE:** `mcp__claude-in-chrome__*` tools
+
+**Why:** Claude-in-chrome requires the Chrome extension and `claude --chrome` flag, providing better stability and user control.
+
+**Workflow:**
+1. User runs: `claude --chrome`
+2. Use `mcp__claude-in-chrome__tabs_context_mcp` first to get tab context
+3. Create new tab with `mcp__claude-in-chrome__tabs_create_mcp`
+4. Use `mcp__claude-in-chrome__navigate`, `read_page`, `computer`, etc.
+
+**Key tools:**
+- `tabs_context_mcp` - Get/create tab context (REQUIRED FIRST)
+- `navigate` - Go to URL
+- `read_page` - Get accessibility tree
+- `computer` - Click, type, screenshot
+- `find` - Find elements by natural language
+- `form_input` - Fill form fields
 
 ## GitHub Workflow
 

@@ -201,6 +201,17 @@ export class ApiResponseHelper {
   }
 
   /**
+   * Send bad request error response (400)
+   */
+  static badRequest(
+    res: NextApiResponse,
+    message: string,
+    details?: any
+  ): void {
+    this.error(res, ErrorCode.BAD_REQUEST, message, details);
+  }
+
+  /**
    * Send validation error response
    */
   static validationError(
@@ -334,6 +345,7 @@ export const apiResponse = {
   noContent: ApiResponseHelper.noContent.bind(ApiResponseHelper),
   paginated: ApiResponseHelper.paginated.bind(ApiResponseHelper),
   error: ApiResponseHelper.error.bind(ApiResponseHelper),
+  badRequest: ApiResponseHelper.badRequest.bind(ApiResponseHelper),
   validationError: ApiResponseHelper.validationError.bind(ApiResponseHelper),
   notFound: ApiResponseHelper.notFound.bind(ApiResponseHelper),
   unauthorized: ApiResponseHelper.unauthorized.bind(ApiResponseHelper),

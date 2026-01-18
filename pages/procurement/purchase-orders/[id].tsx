@@ -161,7 +161,8 @@ export default function PurchaseOrderDetailPage() {
       const data = await response.json();
 
       if (data.success) {
-        fetchPurchaseOrder(); // Refresh data
+        // Await the refresh to prevent race conditions
+        await fetchPurchaseOrder();
       } else {
         setError(data.error?.message || `Failed to ${action}`);
       }

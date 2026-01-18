@@ -196,7 +196,25 @@
       "Bash(src/modules/sow/imports-datagrid/components/StatsCards.tsx )",
       "Bash(src/modules/workflow/components/editor/WorkflowEditor.tsx )",
       "Bash(src/modules/projects/tracker/UnifiedTrackerGrid.tsx )",
-      "Bash(src/modules/sow/ImportsDataGridPage.tsx.backup)"
+      "Bash(src/modules/sow/ImportsDataGridPage.tsx.backup)",
+      "Bash(scp:*)",
+      "mcp__claude-in-chrome__javascript_tool",
+      "mcp__claude-in-chrome__read_page",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude-in-chrome__form_input",
+      "mcp__claude-in-chrome__computer",
+      "mcp__claude-in-chrome__navigate",
+      "mcp__claude-in-chrome__resize_window",
+      "mcp__claude-in-chrome__gif_creator",
+      "mcp__claude-in-chrome__upload_image",
+      "mcp__claude-in-chrome__get_page_text",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__claude-in-chrome__tabs_create_mcp",
+      "mcp__claude-in-chrome__update_plan",
+      "mcp__claude-in-chrome__read_console_messages",
+      "mcp__claude-in-chrome__read_network_requests",
+      "mcp__claude-in-chrome__shortcuts_list",
+      "mcp__claude-in-chrome__shortcuts_execute"
     ],
     "deny": [],
     "ask": [],
@@ -224,6 +242,28 @@
             "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then npx ts-node .claude/hooks/pre-commit.ts; fi",
             "timeout": 120,
             "statusMessage": "Running pre-commit validation..."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__boss-ghost-mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TOOL_NAME=\"$TOOL_NAME\" bash .claude/hooks/browser-mcp-reminder.sh",
+            "timeout": 5,
+            "statusMessage": "Checking browser MCP preference..."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__chrome-devtools__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TOOL_NAME=\"$TOOL_NAME\" bash .claude/hooks/browser-mcp-reminder.sh",
+            "timeout": 5,
+            "statusMessage": "Checking browser MCP preference..."
           }
         ]
       }

@@ -243,24 +243,24 @@ export default function StockPage() {
 
   const getStatusBadge = (status: string, quantity: number, minQuantity: number) => {
     if (quantity <= 0) {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Out of Stock</span>;
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-400">Out of Stock</span>;
     }
     if (minQuantity > 0 && quantity <= minQuantity) {
-      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Low Stock</span>;
+      return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">Low Stock</span>;
     }
-    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">In Stock</span>;
+    return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">In Stock</span>;
   };
 
   const getMovementIcon = (type: string) => {
     switch (type) {
       case 'receipt':
-        return <ArrowDown className="h-4 w-4 text-green-600" />;
+        return <ArrowDown className="h-4 w-4 text-green-400" />;
       case 'issue':
-        return <ArrowUp className="h-4 w-4 text-red-600" />;
+        return <ArrowUp className="h-4 w-4 text-red-400" />;
       case 'transfer':
-        return <ArrowLeftRight className="h-4 w-4 text-blue-600" />;
+        return <ArrowLeftRight className="h-4 w-4 text-blue-400" />;
       default:
-        return <RefreshCw className="h-4 w-4 text-gray-600" />;
+        return <RefreshCw className="h-4 w-4 text-[var(--ff-text-tertiary)]" />;
     }
   };
 
@@ -268,8 +268,8 @@ export default function StockPage() {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-gray-500">Loading stock data...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+          <span className="ml-2 text-[var(--ff-text-secondary)]">Loading stock data...</span>
         </div>
       </AppLayout>
     );
@@ -301,12 +301,12 @@ export default function StockPage() {
 
           {/* Critical Alerts */}
           {(metrics.lowStockItems > 0 || metrics.outOfStockItems > 0) && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="font-medium text-red-900">Stock Level Alerts</h3>
-                  <p className="text-sm text-red-700 mt-1">
+                  <h3 className="font-medium text-red-400">Stock Level Alerts</h3>
+                  <p className="text-sm text-red-300 mt-1">
                     {metrics.outOfStockItems > 0 &&
                       `${metrics.outOfStockItems} item${metrics.outOfStockItems !== 1 ? 's' : ''} out of stock. `
                     }
@@ -329,54 +329,54 @@ export default function StockPage() {
 
           {/* Metrics Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
               <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Package className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <Package className="h-5 w-5 text-blue-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-gray-500">Total Items</p>
-                  <p className="text-xl font-bold text-gray-900">{metrics.totalItems.toLocaleString()}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Total Items</p>
+                  <p className="text-xl font-bold text-[var(--ff-text-primary)]">{metrics.totalItems.toLocaleString()}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
               <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-green-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-gray-500">Total Value</p>
-                  <p className="text-xl font-bold text-green-600">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Total Value</p>
+                  <p className="text-xl font-bold text-green-400">
                     R {(metrics.totalValue / 1000).toFixed(0)}k
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
               <div className="flex items-center">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                <div className="p-2 bg-red-500/20 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-red-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-gray-500">Critical Stock</p>
-                  <p className="text-xl font-bold text-red-600">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Critical Stock</p>
+                  <p className="text-xl font-bold text-red-400">
                     {metrics.lowStockItems + metrics.outOfStockItems}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
               <div className="flex items-center">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Truck className="h-5 w-5 text-orange-600" />
+                <div className="p-2 bg-orange-500/20 rounded-lg">
+                  <Truck className="h-5 w-5 text-orange-400" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-gray-500">Recent Movements</p>
-                  <p className="text-xl font-bold text-orange-600">{movements.length}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Recent Movements</p>
+                  <p className="text-xl font-bold text-orange-400">{movements.length}</p>
                 </div>
               </div>
             </div>
@@ -403,7 +403,7 @@ export default function StockPage() {
           </div>
 
           {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
+          <div className="border-b border-[var(--ff-border-light)] mb-6">
             <nav className="flex space-x-8">
               {[
                 { id: 'positions', label: 'Stock Positions', count: stockItems.length },
@@ -415,14 +415,14 @@ export default function StockPage() {
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
                   className={`flex items-center gap-2 py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
                   }`}
                 >
                   {tab.label}
                   {tab.count > 0 && (
                     <span className={`px-2 py-0.5 rounded-full text-xs ${
-                      activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                      activeTab === tab.id ? 'bg-blue-500/20 text-blue-400' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
                     }`}>
                       {tab.count}
                     </span>
@@ -433,29 +433,29 @@ export default function StockPage() {
           </div>
 
           {/* Tab Content */}
-          <div className="bg-white rounded-lg border border-gray-200">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
             {activeTab === 'positions' && (
               <div>
                 {/* Filters */}
-                <div className="p-4 border-b border-gray-200 flex flex-wrap gap-4">
+                <div className="p-4 border-b border-[var(--ff-border-light)] flex flex-wrap gap-4">
                   <div className="flex-1 min-w-64">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
                       <input
                         type="text"
                         placeholder="Search items..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-gray-400" />
+                    <Filter className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md"
+                      className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
                     >
                       <option value="all">All Categories</option>
                       {categories.map((cat) => (
@@ -469,42 +469,42 @@ export default function StockPage() {
                 {filteredItems.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-[var(--ff-bg-tertiary)]">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Item</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Category</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Location</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Quantity</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Value</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-[var(--ff-border-light)]">
                         {filteredItems.map((item) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
+                          <tr key={item.id} className="hover:bg-[var(--ff-bg-hover)]">
                             <td className="px-4 py-4">
                               <div>
-                                <p className="font-medium text-gray-900">{item.name}</p>
-                                <p className="text-sm text-gray-500">{item.itemCode}</p>
+                                <p className="font-medium text-[var(--ff-text-primary)]">{item.name}</p>
+                                <p className="text-sm text-[var(--ff-text-secondary)]">{item.itemCode}</p>
                               </div>
                             </td>
-                            <td className="px-4 py-4 text-sm text-gray-600">{item.category}</td>
+                            <td className="px-4 py-4 text-sm text-[var(--ff-text-secondary)]">{item.category}</td>
                             <td className="px-4 py-4">
-                              <div className="flex items-center gap-1 text-sm text-gray-600">
+                              <div className="flex items-center gap-1 text-sm text-[var(--ff-text-secondary)]">
                                 <MapPin className="h-3 w-3" />
                                 {item.warehouse}
                                 {item.location && ` / ${item.location}`}
                               </div>
                             </td>
                             <td className="px-4 py-4 text-right">
-                              <p className="font-medium text-gray-900">{item.quantity} {item.unit}</p>
+                              <p className="font-medium text-[var(--ff-text-primary)]">{item.quantity} {item.unit}</p>
                               {item.minQuantity > 0 && (
-                                <p className="text-xs text-gray-500">Min: {item.minQuantity}</p>
+                                <p className="text-xs text-[var(--ff-text-tertiary)]">Min: {item.minQuantity}</p>
                               )}
                             </td>
                             <td className="px-4 py-4 text-right">
-                              <p className="font-medium text-gray-900">R {item.totalValue.toLocaleString()}</p>
-                              <p className="text-xs text-gray-500">@ R {item.unitCost.toFixed(2)}</p>
+                              <p className="font-medium text-[var(--ff-text-primary)]">R {item.totalValue.toLocaleString()}</p>
+                              <p className="text-xs text-[var(--ff-text-tertiary)]">@ R {item.unitCost.toFixed(2)}</p>
                             </td>
                             <td className="px-4 py-4">
                               {getStatusBadge(item.status, item.quantity, item.minQuantity)}
@@ -516,9 +516,9 @@ export default function StockPage() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Stock Items</h3>
-                    <p className="text-gray-500">
+                    <Package className="h-12 w-12 mx-auto text-[var(--ff-text-tertiary)] mb-4" />
+                    <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No Stock Items</h3>
+                    <p className="text-[var(--ff-text-secondary)]">
                       {searchTerm || categoryFilter !== 'all'
                         ? 'No items match your search criteria'
                         : 'Start by receiving stock into inventory'}
@@ -531,34 +531,34 @@ export default function StockPage() {
             {activeTab === 'movements' && (
               <div>
                 {movements.length > 0 ? (
-                  <div className="divide-y divide-gray-200">
+                  <div className="divide-y divide-[var(--ff-border-light)]">
                     {movements.map((movement) => (
-                      <div key={movement.id} className="p-4 hover:bg-gray-50">
+                      <div key={movement.id} className="p-4 hover:bg-[var(--ff-bg-hover)]">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             {getMovementIcon(movement.movement_type)}
                             <div>
-                              <p className="font-medium text-gray-900">
+                              <p className="font-medium text-[var(--ff-text-primary)]">
                                 {movement.item_name || 'Unknown Item'}
                               </p>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-[var(--ff-text-secondary)]">
                                 {movement.movement_type.charAt(0).toUpperCase() + movement.movement_type.slice(1)}
                                 {movement.reference_number && ` - ${movement.reference_number}`}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium text-gray-900">
+                            <p className="font-medium text-[var(--ff-text-primary)]">
                               {movement.movement_type === 'issue' ? '-' : '+'}{movement.quantity}
                             </p>
-                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               {new Date(movement.movement_date).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
                         {movement.notes && (
-                          <p className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                          <p className="mt-2 text-sm text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] p-2 rounded">
                             {movement.notes}
                           </p>
                         )}
@@ -567,9 +567,9 @@ export default function StockPage() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Truck className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Movements</h3>
-                    <p className="text-gray-500">Stock movements will appear here</p>
+                    <Truck className="h-12 w-12 mx-auto text-[var(--ff-text-tertiary)] mb-4" />
+                    <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No Movements</h3>
+                    <p className="text-[var(--ff-text-secondary)]">Stock movements will appear here</p>
                   </div>
                 )}
               </div>
@@ -578,16 +578,16 @@ export default function StockPage() {
             {activeTab === 'alerts' && (
               <div>
                 {alertItems.length > 0 ? (
-                  <div className="divide-y divide-gray-200">
+                  <div className="divide-y divide-[var(--ff-border-light)]">
                     {alertItems.map((item) => (
-                      <div key={item.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
+                      <div key={item.id} className="p-4 flex items-center justify-between hover:bg-[var(--ff-bg-hover)]">
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${item.quantity <= 0 ? 'bg-red-100' : 'bg-yellow-100'}`}>
-                            <AlertTriangle className={`h-5 w-5 ${item.quantity <= 0 ? 'text-red-600' : 'text-yellow-600'}`} />
+                          <div className={`p-2 rounded-lg ${item.quantity <= 0 ? 'bg-red-500/20' : 'bg-yellow-500/20'}`}>
+                            <AlertTriangle className={`h-5 w-5 ${item.quantity <= 0 ? 'text-red-400' : 'text-yellow-400'}`} />
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">{item.name}</p>
-                            <p className="text-sm text-gray-500">
+                            <p className="font-medium text-[var(--ff-text-primary)]">{item.name}</p>
+                            <p className="text-sm text-[var(--ff-text-secondary)]">
                               {item.quantity <= 0 ? 'Out of stock' : `Only ${item.quantity} ${item.unit} remaining (min: ${item.minQuantity})`}
                             </p>
                           </div>
@@ -607,8 +607,8 @@ export default function StockPage() {
                 ) : (
                   <div className="text-center py-12">
                     <Package className="h-12 w-12 mx-auto text-green-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">All Stock Healthy</h3>
-                    <p className="text-gray-500">No items require attention</p>
+                    <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">All Stock Healthy</h3>
+                    <p className="text-[var(--ff-text-secondary)]">No items require attention</p>
                   </div>
                 )}
               </div>
@@ -618,26 +618,26 @@ export default function StockPage() {
           {/* Movement Modal */}
           {showMovementModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 max-w-md w-full mx-4 border border-[var(--ff-border-light)]">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                     {movementType === 'receipt' && 'Receive Stock'}
                     {movementType === 'issue' && 'Issue Stock'}
                     {movementType === 'transfer' && 'Transfer Stock'}
                     {movementType === 'adjustment' && 'Adjust Stock'}
                   </h3>
-                  <button onClick={() => setShowMovementModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <button onClick={() => setShowMovementModal(false)} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
                     <X className="h-5 w-5" />
                   </button>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Item</label>
                     <select
                       value={movementForm.itemId}
                       onChange={(e) => setMovementForm({ ...movementForm, itemId: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
                     >
                       <option value="">Select an item...</option>
                       {stockItems.map((item) => (
@@ -649,19 +649,19 @@ export default function StockPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Quantity</label>
                     <input
                       type="number"
                       min="1"
                       value={movementForm.quantity}
                       onChange={(e) => setMovementForm({ ...movementForm, quantity: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
                     />
                   </div>
 
                   {(movementType === 'receipt' || movementType === 'transfer') && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         {movementType === 'transfer' ? 'To Location' : 'Location'}
                       </label>
                       <input
@@ -669,31 +669,31 @@ export default function StockPage() {
                         value={movementForm.toLocation}
                         onChange={(e) => setMovementForm({ ...movementForm, toLocation: e.target.value })}
                         placeholder="e.g., Main Warehouse / Bin A1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                       />
                     </div>
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Reference Number</label>
                     <input
                       type="text"
                       value={movementForm.referenceNumber}
                       onChange={(e) => setMovementForm({ ...movementForm, referenceNumber: e.target.value })}
                       placeholder="e.g., GRN-001 or PO-123"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       {movementType === 'adjustment' ? 'Reason for Adjustment' : 'Notes'}
                     </label>
                     <textarea
                       value={movementForm.reason}
                       onChange={(e) => setMovementForm({ ...movementForm, reason: e.target.value })}
                       rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
                     />
                   </div>
                 </div>

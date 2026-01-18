@@ -36,13 +36,15 @@ export default function RFQPage({ projectId, projectName, initialData = [] }: RF
   const loadRFQData = async () => {
     setIsLoading(true);
     try {
-      const url = projectId 
+      const url = projectId
         ? `/api/procurement/rfq?projectId=${projectId}`
         : '/api/procurement/rfq';
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to load RFQ data');
-      const data = await response.json();
-      setRfqs(data.rfqs || []);
+      const result = await response.json();
+      // API wraps response in { success, data: { rfqs, total } }
+      const rfqData = result.data?.rfqs || result.rfqs || [];
+      setRfqs(rfqData);
     } catch (error) {
       console.error('Error loading RFQ data:', error);
     } finally {
