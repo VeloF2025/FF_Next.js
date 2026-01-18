@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, Package, Loader2, X } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import toast from 'react-hot-toast';
@@ -161,8 +162,9 @@ export function StockItemSelector({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  // Use portal to render outside of AppLayout's overflow-hidden container
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50"
@@ -366,4 +368,11 @@ export function StockItemSelector({
       </div>
     </div>
   );
+
+  // Render to document body via portal to escape AppLayout's overflow-hidden
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
