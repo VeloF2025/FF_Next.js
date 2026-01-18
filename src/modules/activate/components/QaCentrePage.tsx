@@ -58,6 +58,7 @@ function QaCentrePageContent() {
   // Local UI state
   const [searchInput, setSearchInput] = useState('');
   const [showFilters, setShowFilters] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Debounced search
   useEffect(() => {
@@ -121,44 +122,40 @@ function QaCentrePageContent() {
     clearFilters();
   };
 
-  // Export to CSV
-  const handleExportCSV = () => {
-    const csvRows = [];
+  // Export to CSV using API endpoint for full data with all fields
+  const handleExportCSV = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters.projectFilter !== 'all') params.set('project', filters.projectFilter);
+      if (filters.statusFilter !== 'all') params.set('status', filters.statusFilter);
 
-    csvRows.push([
-      'DR Number',
-      'Project',
-      'Agent',
-      'Status',
-      'Completed Photos',
-      'Outstanding Photos',
-      'Feedback Sent',
-      'Created',
-    ].join(','));
+      const url = `/api/activate/export?${params.toString()}`;
+      const response = await fetch(url);
 
-    filteredDrops.forEach(drop => {
-      csvRows.push([
-        drop.dropNumber,
-        drop.project || '',
-        drop.senderPhone || '',
-        drop.status,
-        drop.completedPhotos,
-        drop.outstandingPhotos,
-        drop.feedbackSent ? 'Yes' : 'No',
-        new Date(drop.createdAt).toLocaleString(),
-      ].join(','));
-    });
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
 
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `qa-centre-export-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  };
+      // Get the CSV content and trigger download
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `qa-centre-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filters]);
 
   // Format phone number for display
   const formatAgent = (phone: string | null) => {
@@ -226,10 +223,12 @@ function QaCentrePageContent() {
             </button>
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+              disabled={isExporting}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Export filtered data to CSV"
             >
-              <Download className="h-4 w-4" />
-              <span className="text-sm">EXPORT CSV</span>
+              <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
+              <span className="text-sm">{isExporting ? 'Exporting...' : 'Export CSV'}</span>
             </button>
           </div>
         </div>
@@ -463,7 +462,19 @@ function QaCentrePageContent() {
                         })}</span></span>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        <span>Photos: {drop.completedPhotos}/{drop.completedPhotos + drop.outstandingPhotos}</span>
+                        <span>Photos: <span className="font-medium text-gray-900 dark:text-white">{drop.photoCount || 0}</span></span>
+                        {drop.ontSerial && (
+                          <>
+                            <span>•</span>
+                            <span>ONT: <span className="font-mono text-xs font-medium text-blue-600 dark:text-blue-400">{drop.ontSerial}</span></span>
+                          </>
+                        )}
+                        {drop.upsSerial && (
+                          <>
+                            <span>•</span>
+                            <span>UPS: <span className="font-mono text-xs font-medium text-purple-600 dark:text-purple-400">{drop.upsSerial}</span></span>
+                          </>
+                        )}
                       </div>
                     </div>
 

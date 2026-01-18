@@ -11,7 +11,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X } from 'lucide-react';
+import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
@@ -59,6 +59,7 @@ function DashboardPageContent() {
   // Local UI state
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [showFilters, setShowFilters] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Get unique projects from projectStats for filter dropdown
   const uniqueProjects = projectStats.map(s => s.project).filter(Boolean);
@@ -118,6 +119,41 @@ function DashboardPageContent() {
       projectFilter: 'all',
     });
   }, [setFilters]);
+
+  // Export filtered data to CSV
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters.projectFilter !== 'all') params.set('project', filters.projectFilter);
+      if (filters.statusFilter !== 'all') params.set('status', filters.statusFilter);
+
+      const url = `/api/activate/export?${params.toString()}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      // Get the CSV content and trigger download
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `activate-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filters]);
 
   // Skeleton component
   const Skeleton = ({ className }: { className?: string }) => (
@@ -318,23 +354,36 @@ function DashboardPageContent() {
                   </div>
                 </div>
 
-                {/* Filter Toggle Button */}
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                    showFilters || hasActiveFilters
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <Filter className="h-4 w-4" />
-                  Filters
-                  {hasActiveFilters && (
-                    <span className="ml-1 px-1.5 py-0.5 text-xs bg-white text-blue-600 rounded-full">
-                      Active
-                    </span>
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  {/* Filter Toggle Button */}
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                      showFilters || hasActiveFilters
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <Filter className="h-4 w-4" />
+                    Filters
+                    {hasActiveFilters && (
+                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-white text-blue-600 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Export Button */}
+                  <button
+                    onClick={handleExport}
+                    disabled={isExporting}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Export filtered data to CSV"
+                  >
+                    <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
+                    {isExporting ? 'Exporting...' : 'Export CSV'}
+                  </button>
+                </div>
               </div>
 
               {/* Expanded Filters */}
