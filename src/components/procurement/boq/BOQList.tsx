@@ -15,7 +15,8 @@ export default function BOQList({
   onCreateBOQ,
   onUploadBOQ,
   selectedBOQId,
-  className
+  className,
+  projectId
 }: BOQListProps) {
   const {
     boqs,
@@ -34,7 +35,7 @@ export default function BOQList({
     handleDownloadBOQ,
     handleArchiveBOQ,
     handleDeleteBOQ
-  } = useBOQList(onSelectBOQ);
+  } = useBOQList(onSelectBOQ, projectId);
 
   if (isLoading) {
     return (

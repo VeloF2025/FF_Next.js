@@ -5,12 +5,21 @@ const API_BASE = '/api/procurement';
 // Helper function to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
   const data = await response.json();
-  
-  if (!data.success) {
-    throw new Error(data.error || 'API request failed');
+
+  // Handle both formats:
+  // 1. Standard apiResponse format: {success: true, data: ...}
+  // 2. Raw response format: {items: [...], boqs: [...], ...}
+  if (data.success === false) {
+    throw new Error(data.error?.message || data.error || 'API request failed');
   }
-  
-  return data.data || data;
+
+  // If wrapped response, return data property
+  if (data.success === true && data.data !== undefined) {
+    return data.data;
+  }
+
+  // Otherwise return raw data
+  return data;
 }
 
 export interface StockPosition {
@@ -531,78 +540,82 @@ export const boqApi = {
     limit?: number;
     status?: string;
   }): Promise<PaginatedResponse<BOQ>> {
-    const queryParams = new URLSearchParams({
-      resource: 'boq',
-      projectId,
-      ...params
-    } as any);
-    
-    const response = await fetch(`${API_BASE}?${queryParams}`, {
+    const queryParams = new URLSearchParams();
+    if (projectId) queryParams.set('projectId', projectId);
+    if (params?.page) queryParams.set('page', String(params.page));
+    if (params?.limit) queryParams.set('limit', String(params.limit));
+    if (params?.status) queryParams.set('status', params.status);
+
+    const url = queryParams.toString()
+      ? `${API_BASE}/boq?${queryParams}`
+      : `${API_BASE}/boq`;
+
+    const response = await fetch(url, {
       method: 'GET'
     });
-    
+
     return handleResponse<PaginatedResponse<BOQ>>(response);
   },
 
   // Get single BOQ
   async getBOQ(projectId: string, boqId: string): Promise<BOQ> {
-    const response = await fetch(`${API_BASE}?resource=boq&projectId=${projectId}&id=${boqId}`, {
+    const response = await fetch(`${API_BASE}/boq/${boqId}?projectId=${projectId}`, {
       method: 'GET'
     });
-    
+
     return handleResponse<BOQ>(response);
   },
 
   // Create BOQ
   async createBOQ(projectId: string, data: Partial<BOQ>): Promise<BOQ> {
-    const response = await fetch(`${API_BASE}?resource=boq&projectId=${projectId}`, {
+    const response = await fetch(`${API_BASE}/boq?projectId=${projectId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data)
     });
-    
+
     return handleResponse<BOQ>(response);
   },
 
   // Update BOQ
   async updateBOQ(projectId: string, boqId: string, data: Partial<BOQ>): Promise<BOQ> {
-    const response = await fetch(`${API_BASE}?resource=boq&projectId=${projectId}&id=${boqId}`, {
+    const response = await fetch(`${API_BASE}/boq/${boqId}?projectId=${projectId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data)
     });
-    
+
     return handleResponse<BOQ>(response);
   },
 
   // Delete BOQ
   async deleteBOQ(projectId: string, boqId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}?resource=boq&projectId=${projectId}&id=${boqId}`, {
+    const response = await fetch(`${API_BASE}/boq/${boqId}?projectId=${projectId}`, {
       method: 'DELETE'
     });
-    
+
     await handleResponse<void>(response);
   },
 
   // Get BOQ items
   async getItems(projectId: string, boqId: string): Promise<any[]> {
-    const response = await fetch(`${API_BASE}?resource=boq&action=items&projectId=${projectId}&boqId=${boqId}`, {
+    const response = await fetch(`${API_BASE}/boq/${boqId}/items?projectId=${projectId}`, {
       method: 'GET'
     });
-    
+
     return handleResponse<any[]>(response);
   },
 
   // Get BOQ exceptions
   async getExceptions(projectId: string, boqId: string): Promise<any[]> {
-    const response = await fetch(`${API_BASE}?resource=boq&action=exceptions&projectId=${projectId}&boqId=${boqId}`, {
+    const response = await fetch(`${API_BASE}/boq/${boqId}/exceptions?projectId=${projectId}`, {
       method: 'GET'
     });
-    
+
     return handleResponse<any[]>(response);
   },
 
@@ -612,27 +625,27 @@ export const boqApi = {
     data: any[];
     mappings?: Record<string, string>;
   }): Promise<BOQ> {
-    const response = await fetch(`${API_BASE}?resource=boq&action=import&projectId=${projectId}`, {
+    const response = await fetch(`${API_BASE}/boq/import?projectId=${projectId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data)
     });
-    
+
     return handleResponse<BOQ>(response);
   },
 
   // Perform BOQ mapping
   async performMapping(projectId: string, boqId: string, mappings: Record<string, any>): Promise<void> {
-    const response = await fetch(`${API_BASE}?resource=boq&action=map&projectId=${projectId}&id=${boqId}`, {
+    const response = await fetch(`${API_BASE}/boq/${boqId}/map?projectId=${projectId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ mappings })
     });
-    
+
     await handleResponse<void>(response);
   },
 
@@ -642,14 +655,14 @@ export const boqApi = {
     mappingId?: string;
     newItemData?: any;
   }): Promise<void> {
-    const response = await fetch(`${API_BASE}?resource=boq&action=resolve-exception&projectId=${projectId}&id=${exceptionId}`, {
+    const response = await fetch(`${API_BASE}/boq/exception/${exceptionId}/resolve?projectId=${projectId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(resolution)
     });
-    
+
     await handleResponse<void>(response);
   }
 };

@@ -15,7 +15,8 @@ export class BOQClient {
     projectId: string
   ): Promise<BOQ[]> {
     const response = await procurementApi.boq.getBOQs(projectId);
-    return response.data;
+    // API returns {boqs: [...], items: [...], stats: {...}}
+    return (response as any).boqs || (response as any).data || [];
   }
 
   static async getBOQ(

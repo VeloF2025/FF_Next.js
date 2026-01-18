@@ -89,6 +89,20 @@ interface StaffRow {
   id: string;
   first_name: string;
   last_name: string;
+  id_number: string | null;
+  phone: string | null;
+}
+
+interface OdometerRow {
+  reading: number;
+  recorded_at: string;
+  source: string;
+}
+
+interface FuelRow {
+  fuel_level: number;
+  recorded_at: string;
+  source: string;
 }
 
 export const config = {
@@ -249,19 +263,66 @@ export default async function handler(
 
     const vehicle = vehicleRows[0];
 
-    // Step 4: Get assigned driver name if exists
-    let assignedStaffName: string | null = null;
+    // Step 4: Get assigned driver details if exists
+    let assignedDriver: {
+      name: string;
+      idNumber: string | null;
+      phone: string | null;
+    } | null = null;
+
     if (vehicle.assigned_driver_id) {
       const staffRows = await sql`
-        SELECT id, first_name, last_name
+        SELECT id, first_name, last_name, id_number, phone
         FROM staff
         WHERE id = ${vehicle.assigned_driver_id}
         LIMIT 1
       ` as StaffRow[];
 
       if (staffRows.length > 0) {
-        assignedStaffName = `${staffRows[0].first_name} ${staffRows[0].last_name}`.trim();
+        assignedDriver = {
+          name: `${staffRows[0].first_name} ${staffRows[0].last_name}`.trim(),
+          idNumber: staffRows[0].id_number,
+          phone: staffRows[0].phone,
+        };
       }
+    }
+
+    // Step 5: Get last confirmed odometer and fuel readings
+    let lastOdometer: { reading: number; recordedAt: string; source: string } | null = null;
+    let lastFuel: { level: number; recordedAt: string; source: string } | null = null;
+
+    // Fetch last odometer reading
+    const odometerRows = await sql`
+      SELECT reading, recorded_at, source
+      FROM fleet_odometer_history
+      WHERE vehicle_id = ${vehicle.id}
+      ORDER BY recorded_at DESC
+      LIMIT 1
+    ` as OdometerRow[];
+
+    if (odometerRows.length > 0) {
+      lastOdometer = {
+        reading: odometerRows[0].reading,
+        recordedAt: odometerRows[0].recorded_at,
+        source: odometerRows[0].source,
+      };
+    }
+
+    // Fetch last fuel level from VLM results
+    const fuelRows = await sql`
+      SELECT fuel_level, recorded_at, source
+      FROM fleet_fuel_history
+      WHERE vehicle_id = ${vehicle.id}
+      ORDER BY recorded_at DESC
+      LIMIT 1
+    ` as FuelRow[];
+
+    if (fuelRows.length > 0) {
+      lastFuel = {
+        level: fuelRows[0].fuel_level,
+        recordedAt: fuelRows[0].recorded_at,
+        source: fuelRows[0].source,
+      };
     }
 
     log.info('Vehicle verified via plate', {
@@ -269,6 +330,8 @@ export default async function handler(
       vehicleId: vehicle.id,
       registration: vehicle.registration,
       confidence,
+      hasDriver: !!assignedDriver,
+      hasLastOdometer: !!lastOdometer,
     });
 
     return apiResponse.success(res, {
@@ -283,7 +346,10 @@ export default async function handler(
         year: vehicle.year,
         vehicleType: vehicle.vehicle_type,
         color: vehicle.color,
-        assignedStaffName,
+        assignedStaffName: assignedDriver?.name || null,
+        assignedDriver,
+        lastOdometer,
+        lastFuel,
       },
     });
   } catch (error) {

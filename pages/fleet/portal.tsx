@@ -29,10 +29,28 @@ import {
   X,
   Save,
   Receipt,
+  User,
+  Phone,
+  CreditCard,
+  Gauge,
+  Info,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Types
+interface AssignedDriver {
+  name: string;
+  idNumber: string | null;
+  phone: string | null;
+}
+
+interface LastReading {
+  reading?: number;
+  level?: number;
+  recordedAt: string;
+  source: string;
+}
+
 interface Vehicle {
   id: string;
   registration: string;
@@ -42,6 +60,9 @@ interface Vehicle {
   vehicleType: string;
   color: string | null;
   assignedStaffName: string | null;
+  assignedDriver: AssignedDriver | null;
+  lastOdometer: LastReading | null;
+  lastFuel: LastReading | null;
 }
 
 interface PlateVerificationResult {
@@ -484,6 +505,80 @@ export default function VehiclePortalPage() {
                         Color: {verifiedVehicle.color}
                       </p>
                     )}
+                  </div>
+                </div>
+
+                {/* Last Readings */}
+                {(verifiedVehicle.lastOdometer || verifiedVehicle.lastFuel) && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      <Gauge className="w-4 h-4" />
+                      <span className="font-medium">Last Recorded Readings</span>
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      {verifiedVehicle.lastOdometer && (
+                        <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 rounded-lg">
+                          <span className="text-gray-500 dark:text-gray-400">Odometer: </span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {verifiedVehicle.lastOdometer.reading?.toLocaleString()} km
+                          </span>
+                          <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">
+                            ({new Date(verifiedVehicle.lastOdometer.recordedAt).toLocaleDateString()})
+                          </span>
+                        </div>
+                      )}
+                      {verifiedVehicle.lastFuel && (
+                        <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 rounded-lg">
+                          <span className="text-gray-500 dark:text-gray-400">Fuel: </span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {verifiedVehicle.lastFuel.level}%
+                          </span>
+                          <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">
+                            ({new Date(verifiedVehicle.lastFuel.recordedAt).toLocaleDateString()})
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Registered Driver Card */}
+              {verifiedVehicle.assignedDriver && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-3">
+                    <User className="w-5 h-5" />
+                    <span className="font-medium">Registered Driver</span>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {verifiedVehicle.assignedDriver.name}
+                    </p>
+                    {verifiedVehicle.assignedDriver.idNumber && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <CreditCard className="w-4 h-4" />
+                        <span>ID: {verifiedVehicle.assignedDriver.idNumber}</span>
+                      </div>
+                    )}
+                    {verifiedVehicle.assignedDriver.phone && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Phone className="w-4 h-4" />
+                        <span>{verifiedVehicle.assignedDriver.phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Fleet Manager Contact Notice */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      If any of the above details are incorrect, please contact the{' '}
+                      <span className="font-semibold">Fleet Manager</span> to update them.
+                    </p>
                   </div>
                 </div>
               </div>

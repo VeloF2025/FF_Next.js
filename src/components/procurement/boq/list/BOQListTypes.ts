@@ -10,6 +10,7 @@ export interface BOQListProps {
   onUploadBOQ?: () => void;
   selectedBOQId?: string;
   className?: string;
+  projectId?: string;
 }
 
 export interface FilterState {

@@ -4,8 +4,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { BOQ } from '@/types/procurement/boq.types';
-import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
-import { procurementApiService } from '@/services/procurement/boqApiExtensions';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 import {
@@ -15,8 +13,7 @@ import {
   INITIAL_FILTERS
 } from './BOQListTypes';
 
-export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void) => {
-  const { context } = useProcurementContext();
+export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string) => {
   const [boqs, setBOQs] = useState<BOQ[]>([]);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [sortField, setSortField] = useState<SortField>('createdAt');
@@ -25,28 +22,49 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void) => {
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null);
 
-  // Load BOQs
+  // Load BOQs directly from API
   useEffect(() => {
     loadBOQs();
-  }, [context]);
+  }, [projectId]);
 
   const loadBOQs = useCallback(async () => {
-    if (!context) {
-      setIsLoading(false);
-      return;
-    }
-
     try {
       setIsLoading(true);
-      const data = await procurementApiService.getBOQsByProject(context as any, context.projectId);
-      setBOQs(data as any);
+      // Fetch directly from API - works with or without projectId
+      const url = projectId
+        ? `/api/procurement/boq?projectId=${projectId}`
+        : '/api/procurement/boq';
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to fetch BOQs');
+      }
+      const data = await response.json();
+      // API returns { boqs: [...], items: [...], stats: {...} }
+      const boqData = data.boqs || [];
+      // Transform to BOQ type
+      const transformed: BOQ[] = boqData.map((b: any) => ({
+        id: b.id,
+        projectId: b.project_id,
+        title: b.title || 'Untitled BOQ',
+        description: b.description || '',
+        version: b.version || 'V1',
+        status: b.status || 'draft',
+        fileName: b.file_name || b.title || 'Unknown',
+        itemCount: b.item_count || b.items_count || 0,
+        totalEstimatedValue: Number(b.total_estimated_value) || 0,
+        mappingStatus: b.mapping_status || 'pending',
+        uploadedBy: b.uploaded_by || 'System',
+        createdAt: b.created_at || new Date().toISOString(),
+        updatedAt: b.updated_at || new Date().toISOString(),
+      }));
+      setBOQs(transformed);
     } catch (error) {
       log.error('Failed to load BOQs:', { data: error }, 'useBOQList');
       toast.error('Failed to load BOQs');
     } finally {
       setIsLoading(false);
     }
-  }, [context]);
+  }, [projectId]);
 
   // Get unique filter values
   const filterOptions = useMemo(() => {
@@ -149,12 +167,14 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void) => {
   const handleViewBOQ = (boq: BOQ) => {
     onSelectBOQ?.(boq);
     setActionMenuOpen(null);
+    // Navigate to BOQ detail page
+    window.location.href = `/procurement/boq/${boq.id}`;
   };
 
-  const handleEditBOQ = (_boq: BOQ) => {
+  const handleEditBOQ = (boq: BOQ) => {
     // Navigate to edit page
-    // TODO: Implement navigation to BOQ edit page
     setActionMenuOpen(null);
+    window.location.href = `/procurement/boq/${boq.id}/edit`;
   };
 
   const handleDownloadBOQ = async (boq: BOQ) => {
@@ -196,7 +216,13 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void) => {
     }
 
     try {
-      await procurementApiService.deleteBOQ(context as any, boq.id);
+      // Call API directly to delete BOQ
+      const response = await fetch(`/api/procurement/boq/${boq.id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete BOQ');
+      }
       setBOQs(prev => prev.filter(b => b.id !== boq.id));
       toast.success('BOQ deleted successfully');
     } catch (error) {
