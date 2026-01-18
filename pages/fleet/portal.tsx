@@ -576,8 +576,8 @@ export default function VehiclePortalPage() {
                   <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      If any of the above details are incorrect, please contact the{' '}
-                      <span className="font-semibold">Fleet Manager</span> to update them.
+                      If any of the above details are incorrect or in case of emergency, please contact the{' '}
+                      <span className="font-semibold">Fleet Manager</span>.
                     </p>
                   </div>
                 </div>
