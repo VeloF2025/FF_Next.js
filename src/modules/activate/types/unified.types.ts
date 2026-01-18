@@ -159,6 +159,7 @@ export interface UnifiedReview {
  * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
  */
 export const STEP_LABELS: Record<number, string> = {
+  0: 'Discard - Rubbish',
   1: 'House Photo',
   2: 'Cable from Pole',
   3: 'Cable Entry Outside',

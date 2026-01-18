@@ -154,11 +154,12 @@ export default withErrorHandler(async (
 
           const [insertedItem] = await sql`
             INSERT INTO boq_items (
-              boq_id, item_code, description, unit, quantity,
-              unit_price, total_price, category, sort_order
+              boq_id, project_id, item_code, description, uom, quantity,
+              unit_price, total_price, category, line_number
             )
             VALUES (
               ${boq.id},
+              ${effectiveProjectId},
               ${item.itemCode || `ITEM-${i + 1}`},
               ${item.description},
               ${item.unit || item.uom || 'unit'},
@@ -192,11 +193,12 @@ export default withErrorHandler(async (
 
       const [insertedItem] = await sql`
         INSERT INTO boq_items (
-          boq_id, item_code, description, unit, quantity,
-          unit_price, total_price, category, sort_order
+          boq_id, project_id, item_code, description, uom, quantity,
+          unit_price, total_price, category, line_number
         )
         VALUES (
           ${newItem.boqId},
+          ${effectiveProjectId},
           ${newItem.itemCode || ''},
           ${newItem.description},
           ${newItem.unit || newItem.uom || 'unit'},

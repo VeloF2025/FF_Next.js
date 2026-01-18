@@ -48,6 +48,46 @@ function findExpertiseFile(startDir: string): string | null {
   return null;
 }
 
+/**
+ * Detect modules without corresponding skills
+ */
+function detectSkillGaps(baseDir: string): string[] {
+  const gaps: string[] = [];
+  const modulesDir = path.join(baseDir, 'src', 'modules');
+  const skillsDir = path.join(baseDir, '.claude', 'skills', 'modules');
+
+  if (!fs.existsSync(modulesDir) || !fs.existsSync(skillsDir)) {
+    return gaps;
+  }
+
+  // Get all module directories
+  const modules = fs.readdirSync(modulesDir, { withFileTypes: true })
+    .filter(d => d.isDirectory())
+    .map(d => d.name);
+
+  // Get existing skill files (without .md extension)
+  const skills = fs.readdirSync(skillsDir)
+    .filter(f => f.endsWith('.md'))
+    .map(f => f.replace('.md', '').toLowerCase());
+
+  // Find modules without skills
+  for (const mod of modules) {
+    const normalizedMod = mod.toLowerCase().replace(/-/g, '');
+    const hasSkill = skills.some(s => {
+      const normalizedSkill = s.replace(/-/g, '');
+      return normalizedSkill === normalizedMod ||
+             normalizedSkill.includes(normalizedMod) ||
+             normalizedMod.includes(normalizedSkill);
+    });
+
+    if (!hasSkill) {
+      gaps.push(mod);
+    }
+  }
+
+  return gaps;
+}
+
 function validateLocations(
   baseDir: string,
   locations: Record<string, string>
@@ -160,12 +200,29 @@ async function main() {
   // Format output
   const formatted = formatExpertise(expertise, validation);
 
+  // Detect skill gaps
+  const skillGaps = detectSkillGaps(workDir);
+
   // Output to stderr (visible in session)
   console.error('');
   console.error('='.repeat(50));
   console.error('EXPERTISE LOADED - Read First, Validate, Then Act');
   console.error('='.repeat(50));
   console.error(formatted);
+
+  // Output skill gap detection
+  if (skillGaps.length > 0) {
+    console.error('');
+    console.error('### SKILL GAPS DETECTED');
+    console.error('These modules need skills (use /Createskill):');
+    for (const gap of skillGaps.slice(0, 5)) {
+      console.error(`  - src/modules/${gap}/`);
+    }
+    if (skillGaps.length > 5) {
+      console.error(`  ... and ${skillGaps.length - 5} more`);
+    }
+  }
+
   console.error('='.repeat(50));
   console.error('');
 }

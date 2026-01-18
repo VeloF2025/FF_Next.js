@@ -404,6 +404,25 @@ export function AICategorizationTab({
             );
           })}
         </div>
+
+        {/* Show discarded photos if any */}
+        {(() => {
+          const discardedPhotos = state.results.filter((r) => {
+            const finalStep = r.human_override_step ?? r.vlm_predicted_step;
+            return finalStep === 0;
+          });
+          if (discardedPhotos.length === 0) return null;
+          return (
+            <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                <span className="text-lg">🗑️</span>
+                <span className="font-medium">
+                  {discardedPhotos.length} photo{discardedPhotos.length > 1 ? 's' : ''} discarded as rubbish
+                </span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -547,6 +566,9 @@ export function AICategorizationTab({
                         className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       >
                         <option value="">Select step...</option>
+                        <option value="0" className="text-red-600">
+                          ❌ {STEP_LABELS[0]}
+                        </option>
                         {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
                           <option key={step} value={step}>
                             {step}: {STEP_LABELS[step]}
