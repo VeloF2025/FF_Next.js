@@ -46,26 +46,24 @@ export default function BOQPage({ projectId, projectName, initialData = [] }: BO
 
   return (
     <AppLayout>
-      <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Bill of Quantities</h1>
-            {projectName && (
-              <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
-            )}
-          </div>
-
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="text-[var(--ff-text-secondary)]">Loading BOQs...</div>
-            </div>
-          ) : (
-            <BOQList
-              onCreateBOQ={handleCreateBOQ}
-              className="mt-6"
-            />
+      <div className="space-y-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Bill of Quantities</h1>
+          {projectName && (
+            <p className="mt-2 text-[var(--ff-text-secondary)]">Project: {projectName}</p>
           )}
         </div>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="text-[var(--ff-text-secondary)]">Loading BOQs...</div>
+          </div>
+        ) : (
+          <BOQList
+            onCreateBOQ={handleCreateBOQ}
+            className="mt-6"
+          />
+        )}
       </div>
     </AppLayout>
   );
