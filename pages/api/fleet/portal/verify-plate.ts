@@ -105,6 +105,16 @@ interface FuelRow {
   source: string;
 }
 
+interface CheckInRow {
+  id: string;
+  check_type: string;
+  status: string;
+  completed_at: string | null;
+  created_at: string;
+  staff_first_name: string | null;
+  staff_last_name: string | null;
+}
+
 export const config = {
   api: {
     bodyParser: {
@@ -325,6 +335,44 @@ export default async function handler(
       };
     }
 
+    // Step 6: Get last check-in record
+    let lastCheckIn: {
+      id: string;
+      checkType: string;
+      status: string;
+      completedAt: string | null;
+      completedBy: string | null;
+    } | null = null;
+
+    const checkInRows = await sql`
+      SELECT
+        fcr.id,
+        fcr.check_type,
+        fcr.status,
+        fcr.completed_at,
+        fcr.created_at,
+        s.first_name as staff_first_name,
+        s.last_name as staff_last_name
+      FROM fleet_check_records fcr
+      LEFT JOIN staff s ON fcr.staff_id = s.id
+      WHERE fcr.vehicle_id = ${vehicle.id}
+      ORDER BY fcr.created_at DESC
+      LIMIT 1
+    ` as CheckInRow[];
+
+    if (checkInRows.length > 0) {
+      const row = checkInRows[0];
+      lastCheckIn = {
+        id: row.id,
+        checkType: row.check_type,
+        status: row.status,
+        completedAt: row.completed_at || row.created_at,
+        completedBy: row.staff_first_name
+          ? `${row.staff_first_name} ${row.staff_last_name || ''}`.trim()
+          : null,
+      };
+    }
+
     log.info('Vehicle verified via plate', {
       extractedPlate,
       vehicleId: vehicle.id,
@@ -350,6 +398,7 @@ export default async function handler(
         assignedDriver,
         lastOdometer,
         lastFuel,
+        lastCheckIn,
       },
     });
   } catch (error) {

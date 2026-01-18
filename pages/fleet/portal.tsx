@@ -34,6 +34,9 @@ import {
   CreditCard,
   Gauge,
   Info,
+  History,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -51,6 +54,14 @@ interface LastReading {
   source: string;
 }
 
+interface LastCheckIn {
+  id: string;
+  checkType: string;
+  status: string;
+  completedAt: string | null;
+  completedBy: string | null;
+}
+
 interface Vehicle {
   id: string;
   registration: string;
@@ -63,6 +74,7 @@ interface Vehicle {
   assignedDriver: AssignedDriver | null;
   lastOdometer: LastReading | null;
   lastFuel: LastReading | null;
+  lastCheckIn: LastCheckIn | null;
 }
 
 interface PlateVerificationResult {
@@ -570,6 +582,58 @@ export default function VehiclePortalPage() {
                 </div>
               )}
 
+              {/* Last Check-In Card */}
+              {verifiedVehicle.lastCheckIn && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-3">
+                    <Clock className="w-5 h-5" />
+                    <span className="font-medium">Last Check-In</span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Type:</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">
+                        {verifiedVehicle.lastCheckIn.checkType.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
+                      <span className={`text-sm font-medium capitalize ${
+                        verifiedVehicle.lastCheckIn.status === 'completed'
+                          ? 'text-green-600 dark:text-green-400'
+                          : verifiedVehicle.lastCheckIn.status === 'in_progress'
+                          ? 'text-yellow-600 dark:text-yellow-400'
+                          : 'text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {verifiedVehicle.lastCheckIn.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    {verifiedVehicle.lastCheckIn.completedAt && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Date:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {new Date(verifiedVehicle.lastCheckIn.completedAt).toLocaleDateString('en-ZA', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {verifiedVehicle.lastCheckIn.completedBy && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">By:</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {verifiedVehicle.lastCheckIn.completedBy}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Fleet Manager Contact Notice */}
               <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
                 <div className="flex items-start gap-3">
@@ -580,6 +644,27 @@ export default function VehiclePortalPage() {
                       <span className="font-semibold">Fleet Manager</span>.
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Check-In History Card */}
+              <div
+                onClick={() => router.push(`/fleet/vehicles/${verifiedVehicle.id}/check-in-history`)}
+                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-2 border-transparent hover:border-blue-400 dark:hover:border-blue-500"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                      <History className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-white">View Check-In History</span>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        See all past inspections for this vehicle
+                      </p>
+                    </div>
+                  </div>
+                  <ExternalLink className="w-5 h-5 text-gray-400" />
                 </div>
               </div>
 
