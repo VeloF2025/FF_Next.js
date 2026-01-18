@@ -11,7 +11,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3 } from 'lucide-react';
+import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
@@ -58,6 +58,10 @@ function DashboardPageContent() {
 
   // Local UI state
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Get unique projects from projectStats for filter dropdown
+  const uniqueProjects = projectStats.map(s => s.project).filter(Boolean);
 
   // Quick filter handler for project table
   const handleQuickFilter = useCallback((filter: 'today' | 'yesterday' | 'last7days' | 'all') => {
@@ -104,6 +108,16 @@ function DashboardPageContent() {
 
   const hasActiveFilters = filters.dateFrom || filters.dateTo ||
     filters.statusFilter !== 'all' || filters.projectFilter !== 'all';
+
+  // Clear all filters
+  const handleClearFilters = useCallback(() => {
+    setFilters({
+      dateFrom: getTodaySAST(),
+      dateTo: getTodaySAST(),
+      statusFilter: 'all',
+      projectFilter: 'all',
+    });
+  }, [setFilters]);
 
   // Skeleton component
   const Skeleton = ({ className }: { className?: string }) => (
@@ -283,6 +297,122 @@ function DashboardPageContent() {
                   <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{dashboardStats.complete}</p>
                 )}
               </div>
+            </div>
+
+            {/* Filter Panel */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4 mb-6">
+              <div className="flex items-center justify-between">
+                {/* Search placeholder for consistency with QA Centre */}
+                <div className="flex-1 max-w-md">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search drop number..."
+                      className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                      disabled
+                      title="Use QA Centre for search"
+                    />
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Filter Toggle Button */}
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    showFilters || hasActiveFilters
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {hasActiveFilters && (
+                    <span className="ml-1 px-1.5 py-0.5 text-xs bg-white text-blue-600 rounded-full">
+                      Active
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Expanded Filters */}
+              {showFilters && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* From Date */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        From Date
+                      </label>
+                      <input
+                        type="date"
+                        value={filters.dateFrom}
+                        onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* To Date */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        To Date
+                      </label>
+                      <input
+                        type="date"
+                        value={filters.dateTo}
+                        onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Status Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={filters.statusFilter}
+                        onChange={(e) => setFilters(prev => ({ ...prev, statusFilter: e.target.value as 'all' | 'complete' | 'incomplete' }))}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="complete">Complete</option>
+                        <option value="incomplete">Incomplete</option>
+                      </select>
+                    </div>
+
+                    {/* Project Filter */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Project
+                      </label>
+                      <select
+                        value={filters.projectFilter}
+                        onChange={(e) => setFilters(prev => ({ ...prev, projectFilter: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                      >
+                        <option value="all">All Projects</option>
+                        {uniqueProjects.map(project => (
+                          <option key={project} value={project}>{project}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={handleClearFilters}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                      Clear All Filters
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Daily Stats Per Project */}
