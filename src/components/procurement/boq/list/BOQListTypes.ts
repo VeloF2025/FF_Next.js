@@ -41,13 +41,13 @@ export const BOQ_STATUS_LABELS = {
 };
 
 export const BOQ_STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-800',
-  uploaded: 'bg-blue-100 text-blue-800',
-  mapping: 'bg-yellow-100 text-yellow-800',
-  mapped: 'bg-green-100 text-green-800',
-  approved: 'bg-green-100 text-green-800',
-  archived: 'bg-gray-100 text-gray-800',
-  mapping_review: 'bg-orange-100 text-orange-800'
+  draft: 'bg-gray-500/20 text-gray-400',
+  uploaded: 'bg-blue-500/20 text-blue-400',
+  mapping: 'bg-yellow-500/20 text-yellow-400',
+  mapped: 'bg-green-500/20 text-green-400',
+  approved: 'bg-green-500/20 text-green-400',
+  archived: 'bg-gray-500/20 text-gray-400',
+  mapping_review: 'bg-orange-500/20 text-orange-400'
 };
 
 export const MAPPING_STATUS_LABELS = {
@@ -58,9 +58,9 @@ export const MAPPING_STATUS_LABELS = {
 };
 
 export const MAPPING_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-800',
-  in_progress: 'bg-yellow-100 text-yellow-800',
-  mapped: 'bg-green-100 text-green-800',
-  exception: 'bg-red-100 text-red-800',
-  completed: 'bg-green-100 text-green-800'
+  pending: 'bg-gray-500/20 text-gray-400',
+  in_progress: 'bg-yellow-500/20 text-yellow-400',
+  mapped: 'bg-green-500/20 text-green-400',
+  exception: 'bg-red-500/20 text-red-400',
+  completed: 'bg-green-500/20 text-green-400'
 };
