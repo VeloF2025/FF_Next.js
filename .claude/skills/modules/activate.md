@@ -296,10 +296,18 @@ Extract serial with: `/\(S\)([^(]+)/`
 | `/api/activate/process-new-dr` | POST | Validate & process new DR |
 | `/api/activate/admin/retry-failed` | POST | Retry failed categorizations |
 | `/api/activate/import-oes` | POST | Import OES Excel data |
+| `/api/activate/export` | GET | Export filtered data to Excel (.xlsx) |
 | `/api/activate/reporting/daily-counts` | GET | Daily DR counts with zone/PON breakdown |
 | `/api/activate/reporting/discrepancy` | GET | WhatsApp vs OES comparison |
 | `/api/activate/reporting/serial-validation` | GET | ONT/UPS serial matching |
 | `/api/activate/reporting/user-attribution` | GET | User/team performance metrics |
+
+### Export API Parameters
+- `dateFrom` - Start date (YYYY-MM-DD)
+- `dateTo` - End date (YYYY-MM-DD)
+- `project` - Filter by project (or 'all')
+- `status` - Filter by completion status ('complete', 'incomplete', or 'all')
+- `format` - Output format ('json' for JSON, omit for Excel)
 
 ## Reports Tab (4 Report Types)
 
@@ -531,7 +539,8 @@ FROM dr_photo_unified_reviews;
 
 | File | Purpose |
 |------|---------|
-| `src/modules/activate/components/DrListPage.tsx` | Main page with tabs |
+| `src/modules/activate/components/DrListPage.tsx` | Main page with tabs + Export Excel button |
+| `src/modules/activate/components/QaCentrePage.tsx` | QA Centre page + Export Excel button |
 | `src/modules/activate/components/SystemHealthDashboard.tsx` | Health monitoring UI |
 | `src/modules/activate/components/OESImportTab.tsx` | OES import UI |
 | `src/modules/activate/components/ManualDREntry.tsx` | Manual DR addition |
@@ -542,6 +551,7 @@ FROM dr_photo_unified_reviews;
 | `pages/api/activate/dr-acknowledgment.ts` | Acknowledgment data API |
 | `pages/api/activate/process-new-dr.ts` | DR validation & processing |
 | `pages/api/activate/import-oes.ts` | OES import API |
+| `pages/api/activate/export.ts` | Excel export API (filtered data) |
 | `pages/api/activate/reporting/daily-counts.ts` | Daily counts report API |
 | `pages/api/activate/reporting/discrepancy.ts` | Discrepancy report API |
 | `pages/api/activate/reporting/serial-validation.ts` | Serial validation API |

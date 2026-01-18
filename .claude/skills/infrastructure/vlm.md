@@ -1,7 +1,10 @@
 # VLM Infrastructure Skill
 
 ## Overview
-Qwen3-VL-8B-Instruct running on Velocity Server for image analysis (plates, documents, photos).
+Qwen3-VL-8B-Instruct running on Velocity Server for image analysis.
+
+**Primary Use Case:** Fibre site photo categorization and QA (Activate module)
+**Secondary Use Cases:** Fleet check-in (odometer/fuel), license plates, document OCR
 
 ## Quick Reference
 - **URL:** `http://100.96.203.105:8100`
@@ -29,6 +32,63 @@ To set compute-only mode:
 ```bash
 sudo nvidia-smi -c 3  # Exclusive_Process
 ```
+
+### 32B Model Experiment (Jan 2026)
+**Result:** Does NOT fit in 32GB VRAM
+
+Attempted upgrade to `Qwen3-VL-32B-Instruct-FP8` for potentially better accuracy:
+- Model downloaded: ~34GB (FP8 quantized)
+- Model weights alone: 30.6GB
+- **Problem:** No room left for KV cache
+- **Error:** `torch.OutOfMemoryError: CUDA out of memory`
+- Even with `--max-model-len 4096` and `--max-num-seqs 1`: still OOM
+
+**Conclusion:** 8B model is the maximum for RTX 5090. Performance is excellent anyway (89-97% confidence on categorization).
+
+**Backup config:** `/etc/systemd/system/vllm-qwen.service.8b-backup`
+
+## Model Benchmark Comparison (Jan 2026)
+
+### Qwen3-VL-8B-Instruct Scores
+| Benchmark | Score | Notes |
+|-----------|-------|-------|
+| **DocVQA** | 96.1% | Excellent for document/photo understanding |
+| **OCRBench** | 896 | Top-tier OCR capability |
+| **MMBench v1.1** | 85.0% | Strong general vision understanding |
+| **MathVista** | 77.2% | Visual math reasoning |
+| **MMMU** | 69.6% | Multimodal reasoning |
+| **MMStar** | 70.9% | Multi-modal star benchmark |
+| **AI2D** | 85.7% | Diagram understanding |
+
+### Comparison with Alternatives (~8B class)
+| Benchmark | Qwen3-VL-8B | InternVL3.5-8B | MiniCPM-V 4.5 | Qwen2.5-VL-7B |
+|-----------|-------------|----------------|---------------|---------------|
+| **MMMU** | 69.6% | 60.3% | ~70% | 58.6% |
+| **MMBench** | **85.0%** | ~80% | ~82% | - |
+| **MMStar** | **70.9%** | 65.0% | 59.0% | - |
+| **DocVQA** | **96.1%** | - | - | 95.7% |
+| **MathVista** | **77.2%** | - | - | 68.2% |
+
+### Verdict
+**Qwen3-VL-8B is one of the best performing models in its class** for:
+- Document/photo understanding (96.1% DocVQA)
+- OCR tasks (896 OCRBench)
+- General vision (85% MMBench)
+
+### Alternative Models Considered
+| Model | Params | VRAM | vLLM | Verdict |
+|-------|--------|------|------|---------|
+| **MiniCPM-V 4.5** | 8B | ~20-28GB | ✅ v0.10.2+ | Similar performance, potentially faster |
+| **InternVL3.5-8B** | 8B | ~24GB | ✅ | Better on MMVet (76.6%) |
+| **Qwen2.5-VL-7B** | 7B | ~18GB | ✅ | Faster inference than Qwen3-VL |
+| **Kimi-VL-A3B** | 2.8B active | ~16GB | ⚠️ | MoE - most efficient |
+
+### When to Consider Switching
+- **MiniCPM-V 4.5**: If inference speed becomes critical
+- **Qwen2.5-VL-7B**: If Qwen3-VL inference is too slow
+- **InternVL3.5-8B**: If visual reasoning needs improvement
+
+**Current recommendation:** Stay with Qwen3-VL-8B - excellent benchmarks and 100% success rate on photo categorization.
 
 ## Token Limits
 | Parallel Seqs | Max Tokens | Use Case |
@@ -183,12 +243,62 @@ ls -la /home/velo/scripts/vllm/benchmarks/test-images/
 ```
 
 ## Used By
+- **Activate Module:** Photo categorization (`/api/activate/categorize-photos`) - PRIMARY
 - **Fleet Check-In:** Odometer/fuel gauge reading (`/api/fleet/check-in/process-vlm`)
   - Service: `src/modules/fleet/services/fleetVlmService.ts` (has auto-resize)
   - Hook: `src/modules/fleet/check-in/hooks/useCheckIn.ts`
 - **Fleet Portal:** License plate verification (`/api/fleet/portal/verify-plate`)
-- **Activate Module:** Photo categorization (`/api/activate/categorize-photos`)
 - **Staff Documents:** ID/License OCR (`/api/documents-ocr-preview`)
+
+## Photo Categorization Performance (Jan 2026)
+**Primary use case for the VLM - categorizing fibre installation photos.**
+
+### Performance Stats (Jan 18, 2026)
+| Metric | Value |
+|--------|-------|
+| Success Rate | **100%** |
+| Average Confidence | **89-97%** |
+| Photos Processed | 76 across 4 DRs |
+| Categories | 10 installation steps |
+
+### 10-Step Installation Categories
+| Step | Category | Description |
+|------|----------|-------------|
+| 1 | House Photo | Wide shot of property exterior |
+| 2 | Cable from Pole | Aerial cable run from pole to house |
+| 3 | Cable Entry Outside | Where cable enters building exterior |
+| 4 | Cable Entry Inside | Where cable comes through wall inside |
+| 5 | Wall for Installation | Wall area prepared for ONT mounting |
+| 6 | ONT Back After Install | Back of ONT showing connections |
+| 7 | Power Meter Reading | Optical power meter display |
+| 8 | Final Installation | Wide shot of complete setup |
+| 9 | Green Lights on ONT | Front panel showing illuminated LEDs |
+| 10 | Signature | Customer signature confirmation |
+
+### VLM Response Structure
+```json
+{
+  "vlm_predicted_step": 8,
+  "vlm_predicted_category": "Final Installation",
+  "vlm_confidence": 0.98,
+  "vlm_identified_as": "Wide shot showing complete fiber installation...",
+  "vlm_reasoning": "This matches Step 8: Wide shot of complete setup..."
+}
+```
+
+### Database Storage
+- **Table:** `dr_photo_unified_reviews`
+- **Column:** `vlm_categorization_results` (JSONB array)
+- **Status Column:** `vlm_categorization_status` (pending/categorized/approved)
+
+### Service Location
+- `src/modules/activate/services/categorizationVlmService.ts`
+- Batches photos (max 6 per VLM call)
+- Uses few-shot examples from human corrections (HITL learning)
+
+### Historical Note
+Jan 16 showed 238 errors (100% failure) due to URL parsing bug, not VLM capability.
+After fix on Jan 18: 100% success rate with 89-97% confidence.
 
 ## Fleet Check-In VLM Flow
 1. User takes photo → `processPhotoWithVlm()` called with temp IDs (preview mode)
@@ -306,6 +416,14 @@ The fuel gauge prompt uses **categorical levels** for better accuracy:
 3. **Inverted reading:** If reading E as F or vice versa, prompt needs clearer E-F orientation
 
 ## Related Files
+
+### Activate Module (Photo Categorization)
+- `src/modules/activate/services/categorizationVlmService.ts` - VLM categorization service
+- `pages/api/activate/categorize-photos.ts` - Categorization API endpoint
+- `pages/api/activate/approve-categorization.ts` - Human approval API
+- `pages/activate/[dropNumber].tsx` - DR review page
+
+### Fleet Module
 - `pages/fleet/portal.tsx` - Driver portal page
 - `pages/api/fleet/portal/verify-plate.ts` - Plate verification API
 - `pages/fleet/vehicles/[id]/check-in-history.tsx` - Vehicle check-in history

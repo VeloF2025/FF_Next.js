@@ -173,10 +173,16 @@ Navigate to `/activate` → Reports tab → Serial Validation → Check "Show mi
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/activate/drops` | GET | Main dashboard data with stats |
+| `/api/activate/export` | GET | Export filtered data to Excel (.xlsx) |
 | `/api/activate/reporting/daily-counts` | GET | Zone/PON breakdown |
 | `/api/activate/reporting/discrepancy` | GET | WA vs OES comparison |
 | `/api/activate/reporting/serial-validation` | GET | Serial matching |
 | `/api/activate/reporting/user-attribution` | GET | User/team performance |
+
+### Excel Export
+Export button available on Dashboard and QA Centre pages. Exports filtered data to `.xlsx` file.
+- Respects current date range, project, and status filters
+- Includes: DR number, project, submitted date, photo count, 10 steps, VLM status, sender info, activation status
 
 ## Files
 
