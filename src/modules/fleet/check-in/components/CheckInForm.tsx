@@ -49,6 +49,18 @@ export function CheckInForm({
     checkType,
     vlmResults,
     isProcessingVlm,
+    // Last confirmed readings
+    lastOdometer,
+    lastFuel,
+    isLoadingLastReadings,
+    // Anomaly detection
+    odometerAnomaly,
+    fuelAnomaly,
+    // Override confirmations
+    odometerOverrideConfirmed,
+    fuelOverrideConfirmed,
+    confirmOdometerOverride,
+    confirmFuelOverride,
     setCheckType,
     setOdometerReading,
     setFuelLevel,
@@ -200,6 +212,41 @@ export function CheckInForm({
         />
       </div>
 
+      {/* Last Confirmed Readings */}
+      {(lastOdometer || lastFuel) && !isLoadingLastReadings && (
+        <div className="px-4 mb-4">
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">
+              Previous Readings
+            </h4>
+            <div className="flex flex-wrap gap-4 text-sm">
+              {lastOdometer && (
+                <div>
+                  <span className="text-blue-600 dark:text-blue-400">Odometer: </span>
+                  <span className="font-semibold text-blue-900 dark:text-blue-200">
+                    {lastOdometer.value.toLocaleString()} km
+                  </span>
+                  <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">
+                    ({new Date(lastOdometer.recordedAt).toLocaleDateString()})
+                  </span>
+                </div>
+              )}
+              {lastFuel && (
+                <div>
+                  <span className="text-blue-600 dark:text-blue-400">Fuel: </span>
+                  <span className="font-semibold text-blue-900 dark:text-blue-200">
+                    {lastFuel.value}%
+                  </span>
+                  <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">
+                    ({new Date(lastFuel.recordedAt).toLocaleDateString()})
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* VLM Results Cards */}
       {(odometerVlm || fuelVlm) && (
         <div className="px-4 mb-6 space-y-3">
@@ -222,6 +269,93 @@ export function CheckInForm({
               unit="%"
               onOverride={(value) => overrideVlmValue('fuel_gauge', value)}
             />
+          )}
+        </div>
+      )}
+
+      {/* Anomaly Warnings with Confirm Buttons */}
+      {(odometerAnomaly || fuelAnomaly) && (
+        <div className="px-4 mb-6 space-y-3">
+          {odometerAnomaly && !odometerOverrideConfirmed && (
+            <div className={`p-4 rounded-lg border ${
+              odometerAnomaly.severity === 'high'
+                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                  odometerAnomaly.severity === 'high' ? 'text-red-500' : 'text-amber-500'
+                }`} />
+                <div className="flex-1">
+                  <p className={`font-medium ${
+                    odometerAnomaly.severity === 'high'
+                      ? 'text-red-700 dark:text-red-400'
+                      : 'text-amber-700 dark:text-amber-400'
+                  }`}>
+                    Odometer Anomaly Detected
+                  </p>
+                  <p className={`text-sm mt-1 ${
+                    odometerAnomaly.severity === 'high'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }`}>
+                    {odometerAnomaly.warning}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={confirmOdometerOverride}
+                    className={`mt-3 px-4 py-2 text-sm font-medium rounded-lg ${
+                      odometerAnomaly.severity === 'high'
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-800 dark:text-red-200 dark:hover:bg-red-700'
+                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-800 dark:text-amber-200 dark:hover:bg-amber-700'
+                    }`}
+                  >
+                    I confirm this reading is correct
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {fuelAnomaly && !fuelOverrideConfirmed && (
+            <div className={`p-4 rounded-lg border ${
+              fuelAnomaly.severity === 'high'
+                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                  fuelAnomaly.severity === 'high' ? 'text-red-500' : 'text-amber-500'
+                }`} />
+                <div className="flex-1">
+                  <p className={`font-medium ${
+                    fuelAnomaly.severity === 'high'
+                      ? 'text-red-700 dark:text-red-400'
+                      : 'text-amber-700 dark:text-amber-400'
+                  }`}>
+                    Fuel Level Anomaly Detected
+                  </p>
+                  <p className={`text-sm mt-1 ${
+                    fuelAnomaly.severity === 'high'
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }`}>
+                    {fuelAnomaly.warning}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={confirmFuelOverride}
+                    className={`mt-3 px-4 py-2 text-sm font-medium rounded-lg ${
+                      fuelAnomaly.severity === 'high'
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-800 dark:text-red-200 dark:hover:bg-red-700'
+                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-800 dark:text-amber-200 dark:hover:bg-amber-700'
+                    }`}
+                  >
+                    I confirm this reading is correct
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}

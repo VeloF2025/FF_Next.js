@@ -3,7 +3,7 @@
  * Manages check-in form state and submission with daily/weekly modes
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type {
   CheckTemplateWithItems,
   CreateCheckResponseInput,
@@ -54,6 +54,22 @@ interface VlmValidation {
   warning?: string;
 }
 
+interface LastReading {
+  value: number;
+  recordedAt: string;
+  source: 'vlm' | 'manual';
+}
+
+interface ReadingAnomaly {
+  type: 'odometer' | 'fuel';
+  currentValue: number;
+  lastValue: number;
+  difference: number;
+  percentChange: number;
+  warning: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
 interface VlmResult {
   photoType: CheckPhotoType;
   analysisType: VlmAnalysisType;
@@ -87,6 +103,19 @@ interface UseCheckInReturn {
   vlmResults: Map<CheckPhotoType, VlmResult>;
   isProcessingVlm: boolean;
 
+  // Last confirmed readings (for display)
+  lastOdometer: LastReading | null;
+  lastFuel: LastReading | null;
+  isLoadingLastReadings: boolean;
+
+  // Anomaly detection
+  odometerAnomaly: ReadingAnomaly | null;
+  fuelAnomaly: ReadingAnomaly | null;
+
+  // Manual override tracking
+  odometerOverrideConfirmed: boolean;
+  fuelOverrideConfirmed: boolean;
+
   // Form handlers
   setCheckType: (type: CheckType) => void;
   setOdometerReading: (value: string) => void;
@@ -95,6 +124,8 @@ interface UseCheckInReturn {
   setPhoto: (type: CheckPhotoType, dataUrl: string, file?: File) => void;
   removePhoto: (type: CheckPhotoType) => void;
   overrideVlmValue: (photoType: CheckPhotoType, value: string | number) => void;
+  confirmOdometerOverride: () => void;
+  confirmFuelOverride: () => void;
 
   // Actions
   loadTemplate: (checkType?: CheckType, templateId?: string) => Promise<void>;
@@ -134,6 +165,15 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   // VLM state
   const [vlmResults, setVlmResults] = useState<Map<CheckPhotoType, VlmResult>>(new Map());
   const [isProcessingVlm, setIsProcessingVlm] = useState(false);
+
+  // Last confirmed readings state
+  const [lastOdometer, setLastOdometer] = useState<LastReading | null>(null);
+  const [lastFuel, setLastFuel] = useState<LastReading | null>(null);
+  const [isLoadingLastReadings, setIsLoadingLastReadings] = useState(false);
+
+  // Manual override confirmation state
+  const [odometerOverrideConfirmed, setOdometerOverrideConfirmed] = useState(false);
+  const [fuelOverrideConfirmed, setFuelOverrideConfirmed] = useState(false);
 
   // Get required photos based on check type
   const requiredPhotos = checkType === 'daily' ? DAILY_PHOTOS : WEEKLY_PHOTOS;
@@ -192,10 +232,14 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   // Form handlers
   const setOdometerReading = useCallback((value: string) => {
     setFormState(prev => ({ ...prev, odometerReading: value }));
+    // Reset override confirmation when value changes
+    setOdometerOverrideConfirmed(false);
   }, []);
 
   const setFuelLevel = useCallback((value: string) => {
     setFormState(prev => ({ ...prev, fuelLevel: value }));
+    // Reset override confirmation when value changes
+    setFuelOverrideConfirmed(false);
   }, []);
 
   const setItemResponse = useCallback((itemId: string, isPassed: boolean, notes?: string) => {
@@ -582,6 +626,162 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     loadTemplate(initialCheckType);
   }, [initialCheckType]); // Only run on mount
 
+  // Fetch last confirmed readings on mount
+  useEffect(() => {
+    const fetchLastReadings = async () => {
+      if (!vehicleId) return;
+
+      setIsLoadingLastReadings(true);
+      try {
+        const response = await fetch(`/api/fleet/check-in/vehicle/${vehicleId}?lastReading=true`);
+        if (response.ok) {
+          const data = await response.json();
+          const readings = data.data || data;
+
+          if (readings.odometer) {
+            setLastOdometer({
+              value: readings.odometer.reading,
+              recordedAt: readings.odometer.recordedAt,
+              source: readings.odometer.source,
+            });
+          }
+
+          if (readings.fuel) {
+            setLastFuel({
+              value: readings.fuel.level,
+              recordedAt: readings.fuel.recordedAt,
+              source: readings.fuel.source,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch last readings:', err);
+      } finally {
+        setIsLoadingLastReadings(false);
+      }
+    };
+
+    fetchLastReadings();
+  }, [vehicleId]);
+
+  // Anomaly detection for odometer
+  const odometerAnomaly = useMemo((): ReadingAnomaly | null => {
+    const currentValue = parseInt(formState.odometerReading, 10);
+    if (!lastOdometer || !currentValue || isNaN(currentValue)) return null;
+
+    const difference = currentValue - lastOdometer.value;
+    const percentChange = (difference / lastOdometer.value) * 100;
+
+    // Anomaly detection rules for odometer:
+    // - Odometer should never go backwards (unless reset)
+    // - Large jumps (>5000 km) might indicate a reading error
+    // - Very large jumps (>10000 km) are very suspicious
+
+    if (difference < 0) {
+      // Odometer went backwards
+      return {
+        type: 'odometer',
+        currentValue,
+        lastValue: lastOdometer.value,
+        difference,
+        percentChange,
+        warning: `Odometer decreased by ${Math.abs(difference).toLocaleString()} km. Previous reading: ${lastOdometer.value.toLocaleString()} km.`,
+        severity: 'high',
+      };
+    }
+
+    if (difference > 10000) {
+      return {
+        type: 'odometer',
+        currentValue,
+        lastValue: lastOdometer.value,
+        difference,
+        percentChange,
+        warning: `Large increase of ${difference.toLocaleString()} km since last reading (${lastOdometer.value.toLocaleString()} km). Please verify this is correct.`,
+        severity: 'high',
+      };
+    }
+
+    if (difference > 5000) {
+      return {
+        type: 'odometer',
+        currentValue,
+        lastValue: lastOdometer.value,
+        difference,
+        percentChange,
+        warning: `Increase of ${difference.toLocaleString()} km since last reading (${lastOdometer.value.toLocaleString()} km). Please verify.`,
+        severity: 'medium',
+      };
+    }
+
+    return null;
+  }, [formState.odometerReading, lastOdometer]);
+
+  // Anomaly detection for fuel level
+  const fuelAnomaly = useMemo((): ReadingAnomaly | null => {
+    const currentValue = parseInt(formState.fuelLevel, 10);
+    if (!lastFuel || !currentValue || isNaN(currentValue)) return null;
+
+    const difference = currentValue - lastFuel.value;
+    const percentChange = Math.abs(difference);
+
+    // Anomaly detection rules for fuel:
+    // - Large increases (>50%) might indicate a fill-up (normal)
+    // - Large decreases (>50%) might indicate an error or heavy usage
+    // - Values outside 0-100 range are invalid
+
+    if (currentValue < 0 || currentValue > 100) {
+      return {
+        type: 'fuel',
+        currentValue,
+        lastValue: lastFuel.value,
+        difference,
+        percentChange,
+        warning: `Fuel level must be between 0% and 100%.`,
+        severity: 'high',
+      };
+    }
+
+    if (difference < -50) {
+      return {
+        type: 'fuel',
+        currentValue,
+        lastValue: lastFuel.value,
+        difference,
+        percentChange,
+        warning: `Large fuel drop from ${lastFuel.value}% to ${currentValue}% (${Math.abs(difference)}% decrease). Please verify.`,
+        severity: 'medium',
+      };
+    }
+
+    return null;
+  }, [formState.fuelLevel, lastFuel]);
+
+  // Add anomaly validation errors (computed after anomaly detection)
+  const anomalyValidationErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (odometerAnomaly && !odometerOverrideConfirmed && odometerAnomaly.severity === 'high') {
+      errors.push(`Odometer anomaly: ${odometerAnomaly.warning} Please confirm or correct.`);
+    }
+    if (fuelAnomaly && !fuelOverrideConfirmed && fuelAnomaly.severity === 'high') {
+      errors.push(`Fuel anomaly: ${fuelAnomaly.warning} Please confirm or correct.`);
+    }
+    return errors;
+  }, [odometerAnomaly, fuelAnomaly, odometerOverrideConfirmed, fuelOverrideConfirmed]);
+
+  // Final canSubmit check including anomaly errors
+  const finalCanSubmit = validationErrors.length === 0 && anomalyValidationErrors.length === 0;
+  const allValidationErrors = [...validationErrors, ...anomalyValidationErrors];
+
+  // Override confirmation handlers
+  const confirmOdometerOverride = useCallback(() => {
+    setOdometerOverrideConfirmed(true);
+  }, []);
+
+  const confirmFuelOverride = useCallback(() => {
+    setFuelOverrideConfirmed(true);
+  }, []);
+
   return {
     template,
     formState,
@@ -591,6 +791,20 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     checkType,
     vlmResults,
     isProcessingVlm,
+
+    // Last confirmed readings
+    lastOdometer,
+    lastFuel,
+    isLoadingLastReadings,
+
+    // Anomaly detection
+    odometerAnomaly,
+    fuelAnomaly,
+
+    // Manual override tracking
+    odometerOverrideConfirmed,
+    fuelOverrideConfirmed,
+
     setCheckType,
     setOdometerReading,
     setFuelLevel,
@@ -598,12 +812,14 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     setPhoto,
     removePhoto,
     overrideVlmValue,
+    confirmOdometerOverride,
+    confirmFuelOverride,
     loadTemplate,
     processPhotoWithVlm,
     submit,
     reset,
-    canSubmit,
-    validationErrors,
+    canSubmit: finalCanSubmit,
+    validationErrors: allValidationErrors,
     hasCriticalFailures,
     hasMinorFailures,
     requiredPhotos,
