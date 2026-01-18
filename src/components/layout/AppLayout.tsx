@@ -248,7 +248,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pageMeta = getPageMeta();
 
   return (
-    <div className="flex h-screen bg-[var(--ff-background-secondary)] overflow-hidden">
+    <div className="flex h-screen bg-[var(--ff-background-primary)] overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
