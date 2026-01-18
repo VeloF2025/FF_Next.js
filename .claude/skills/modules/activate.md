@@ -9,8 +9,9 @@ Handle all Activate module operations:
 2. System health monitoring (5 services)
 3. WhatsApp acknowledgments and feedback
 4. OES import integration
-5. **Reporting** - Daily counts, discrepancy, serial validation, user attribution
-6. Troubleshooting and diagnostics
+5. **Dashboard** - Expandable Project → Zone → PON breakdown
+6. **Reports** - Discrepancy, serial validation, user/team attribution
+7. Troubleshooting and diagnostics
 
 ## Quick Reference
 
@@ -22,16 +23,16 @@ Handle all Activate module operations:
 | **API Prefix** | `/api/activate/*` |
 | **Database Tables** | `qa_photo_reviews`, `dr_photo_unified_reviews`, `oes_activations` |
 | **VLM Server** | `http://100.96.203.105:8100` (Qwen3) |
-| **WA Sender** | `http://100.96.203.105:8081` |
+| **WA Feedback** | `http://100.96.203.105:8090` (wa-feedback service, created Jan 16 2026) |
 | **Go Bridge** | `/home/louis/whatsapp-bridge-go/` |
 
 ### Tab-Based UI
 | Tab | Purpose |
 |-----|---------|
-| **Dashboard** | DR list with filters, stats, project breakdown |
-| **Manual Entry** | Add DRs manually |
+| **Dashboard** | DR list with filters, stats, expandable Project → Zone → PON breakdown |
+| **Reports** | Discrepancy, serial validation, user/team attribution reports |
 | **OES Import** | Import OES Excel activation reports |
-| **Reports** | Daily counts, discrepancy, serial validation, user attribution |
+| **Manual Entry** | Add DRs manually |
 
 ## Slash Commands
 
@@ -99,10 +100,10 @@ Go Bridge:
   Log: /home/louis/whatsapp-bridge-go/bridge.log
   Last activity: [timestamp]
 
-WhatsApp Sender:
-  Service: whatsapp-sender
-  Health: http://100.96.203.105:8081/health
-  Connected: ✅ Yes
+WhatsApp Feedback:
+  Service: wa-feedback
+  Health: http://100.96.203.105:8090/health
+  Status: ✅ healthy
 ```
 
 ## When to Activate
@@ -209,10 +210,11 @@ Inferred from recent DR activity:
 - Degraded: No DRs for 4-12 hours
 - Down: No DRs for 12+ hours
 
-### 5. WhatsApp Sender
+### 5. WhatsApp Feedback (wa-feedback service)
 ```bash
-curl http://100.96.203.105:8081/health
-# Returns: {"connected": true}
+curl http://100.96.203.105:8090/health
+# Returns: {"status": "healthy"} or {"connected": true}
+# Health check accepts both response formats
 ```
 
 ## DR Acknowledgment System
@@ -309,7 +311,18 @@ Extract serial with: `/\(S\)([^(]+)/`
 - `status` - Filter by completion status ('complete', 'incomplete', or 'all')
 - `format` - Output format ('json' for JSON, omit for Excel)
 
-## Reports Tab (4 Report Types)
+## Dashboard - Expandable Breakdown
+
+The Dashboard's "Numbers per Project" table supports drill-down:
+
+1. **Click Project Row** → Expands to show Zone breakdown
+2. **Click Zone Row** → Expands to show PON breakdown
+
+Each level shows: Total, Installed, Activated, Not Reviewed, Reviewed
+
+Data fetched on-demand from `/api/activate/reporting/daily-counts?project=X`
+
+## Reports Tab (3 Report Types)
 
 ### 🚨 CRITICAL: Reporting Terminology
 
@@ -317,20 +330,14 @@ Extract serial with: `/\(S\)([^(]+)/`
 
 | Term | Definition | Database Logic | Color |
 |------|------------|----------------|-------|
-| **INSTALLED** | DR submitted via WhatsApp (installation was done) | Record exists in `qa_photo_reviews` | Blue (`text-blue-600`) |
-| **COMPLETE** | All required steps/photos verified by QA | `vlm_categorization_status = 'approved'` | Green (`text-green-600`) |
-| **INCOMPLETE** | Missing steps/photos OR not verified by QA | NOT complete (inverse) | Yellow (`text-yellow-600`) |
+| **INSTALLED** | DR submitted via WhatsApp (installation was done) | Record exists in `dr_photo_unified_reviews` | Blue (`text-blue-600`) |
 | **ACTIVATED** | DR confirmed as active on OES report | Record exists in `oes_activations` | Purple (`text-purple-600`) |
+| **NOT REVIEWED** | Not yet QA reviewed | `vlm_categorization_status != 'approved'` | Yellow (`text-yellow-600`) |
+| **REVIEWED** | QA review completed | `vlm_categorization_status = 'approved'` | Green (`text-green-600`) |
 
 ### Report Types
 
-#### 1. Daily Counts Report
-- **Purpose**: Zone/PON breakdown per project
-- **UI**: Expandable accordion (Project → Zone → PON)
-- **Metrics**: Installed/Complete/Incomplete/Activated per level
-- **API**: `GET /api/activate/reporting/daily-counts?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD`
-
-#### 2. Discrepancy Report
+#### 1. Discrepancy Report
 - **Purpose**: Compare WhatsApp submissions vs OES activations
 - **Categories**:
   - **Matched**: Present in both WhatsApp and OES
@@ -338,13 +345,13 @@ Extract serial with: `/\(S\)([^(]+)/`
   - **OES Only**: In OES but not from WhatsApp (manual install?)
 - **API**: `GET /api/activate/reporting/discrepancy?waDate=YYYY-MM-DD`
 
-#### 3. Serial Validation Report
+#### 2. Serial Validation Report
 - **Purpose**: ONT/UPS serial matching between WhatsApp and OES
 - **Status Values**: Match, Mismatch, Missing WA, Missing OES, Both Missing
 - **Critical**: Mismatches indicate wrong ONT installed
 - **API**: `GET /api/activate/reporting/serial-validation?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD`
 
-#### 4. User/Team Attribution Report
+#### 3. User/Team Attribution Report
 - **Purpose**: Performance metrics per installer/team
 - **Per-user**: Installed, Complete, Completion %, Serial %, Activation %
 - **Per-team**: Total activations, WA match rate
@@ -354,7 +361,8 @@ Extract serial with: `/\(S\)([^(]+)/`
 
 | File | Purpose |
 |------|---------|
-| `src/modules/activate/components/reporting/ReportsTab.tsx` | Main reports container with sub-navigation |
+| `src/modules/activate/components/DrListPage.tsx` | Dashboard with expandable Project → Zone → PON |
+| `src/modules/activate/components/reporting/ReportsTab.tsx` | Reports tab (3 report types) |
 | `src/modules/activate/services/reportingService.ts` | Database queries for all reports |
 | `src/modules/activate/types/reporting.types.ts` | TypeScript interfaces |
 | `pages/api/activate/reporting/*.ts` | API endpoints |
@@ -409,11 +417,11 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemc
 # Check VLM server
 curl -s http://100.96.203.105:8100/v1/models | jq .
 
-# Check WA Sender
-curl -s http://100.96.203.105:8081/health | jq .
+# Check WA Feedback
+curl -s http://100.96.203.105:8090/health | jq .
 
-# Restart WA Sender
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart whatsapp-sender"
+# Restart WA Feedback
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart wa-feedback"
 ```
 
 ## Database Queries
@@ -454,7 +462,7 @@ WHERE drop_number = 'DR1234567';
 
 **Common Fixes**:
 - VLM down: Check docker on Velocity server
-- WA Sender: Restart whatsapp-sender service
+- WA Feedback: Restart wa-feedback service (port 8090)
 - 1M: Check 192.168.1.150 connectivity
 
 ---
@@ -539,12 +547,12 @@ FROM dr_photo_unified_reviews;
 
 | File | Purpose |
 |------|---------|
-| `src/modules/activate/components/DrListPage.tsx` | Main page with tabs + Export Excel button |
+| `src/modules/activate/components/DrListPage.tsx` | Main page with tabs, expandable Zone/PON breakdown, Export Excel |
 | `src/modules/activate/components/QaCentrePage.tsx` | QA Centre page + Export Excel button |
 | `src/modules/activate/components/SystemHealthDashboard.tsx` | Health monitoring UI |
 | `src/modules/activate/components/OESImportTab.tsx` | OES import UI |
 | `src/modules/activate/components/ManualDREntry.tsx` | Manual DR addition |
-| `src/modules/activate/components/reporting/ReportsTab.tsx` | Reports tab with 4 report types |
+| `src/modules/activate/components/reporting/ReportsTab.tsx` | Reports tab (Discrepancy, Serial Validation, User/Team) |
 | `src/modules/activate/services/reportingService.ts` | Reporting database queries |
 | `src/modules/activate/types/reporting.types.ts` | Reporting TypeScript interfaces |
 | `pages/api/activate/health-check.ts` | Health check API |
@@ -573,6 +581,7 @@ FROM dr_photo_unified_reviews;
 - `/deploy` - Deploy to staging
 - `/oes` - OES import operations
 - `/wa-monitor` - WhatsApp monitor issues
+- `/whatsapp` - **Full WhatsApp infrastructure** (Go bridge, services, message flow, phone numbers)
 
 ## Auto-Activation Rules
 
