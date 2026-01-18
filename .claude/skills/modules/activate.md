@@ -322,6 +322,19 @@ Each level shows: Total, Installed, Activated, Not Reviewed, Reviewed
 
 Data fetched on-demand from `/api/activate/reporting/daily-counts?project=X`
 
+### Project Attribution Logic (Jan 2026)
+
+For OES-only activations (no WhatsApp submission), project is determined via fallback:
+
+```sql
+COALESCE(upr.project, p.project_name, 'Unknown') as project
+-- 1. First try: dr_photo_unified_reviews.project (WhatsApp submission)
+-- 2. Fallback: drops → projects table (SOW data)
+-- 3. Last resort: 'Unknown'
+```
+
+**Why this matters:** Installers sometimes activate DRs on OES without submitting photos via WhatsApp. These OES-only activations are now correctly attributed to their projects using the SOW `drops` table instead of showing as "Unknown".
+
 ## Reports Tab (3 Report Types)
 
 ### 🚨 CRITICAL: Reporting Terminology
