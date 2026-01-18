@@ -9,9 +9,10 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download } from 'lucide-react';
+import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown } from 'lucide-react';
+import type { ZoneBreakdown, PonBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
@@ -60,6 +61,12 @@ function DashboardPageContent() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Expandable project rows state
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+  const [projectZoneData, setProjectZoneData] = useState<Record<string, ZoneBreakdown[]>>({});
+  const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
   // Get unique projects from projectStats for filter dropdown
   const uniqueProjects = projectStats.map(s => s.project).filter(Boolean);
@@ -120,6 +127,59 @@ function DashboardPageContent() {
       projectFilter: 'all',
     });
   }, [setFilters]);
+
+  // Toggle project expansion and fetch zone data if needed
+  const toggleProject = useCallback(async (project: string) => {
+    const newExpanded = new Set(expandedProjects);
+
+    if (newExpanded.has(project)) {
+      // Collapse
+      newExpanded.delete(project);
+      setExpandedProjects(newExpanded);
+    } else {
+      // Expand and fetch zone data if not already loaded
+      newExpanded.add(project);
+      setExpandedProjects(newExpanded);
+
+      if (!projectZoneData[project]) {
+        // Fetch zone breakdown for this project
+        setLoadingProjects(prev => new Set(prev).add(project));
+        try {
+          const params = new URLSearchParams();
+          params.set('dateFrom', filters.dateFrom || getTodaySAST());
+          params.set('dateTo', filters.dateTo || getTodaySAST());
+          params.set('project', project);
+
+          const response = await fetch(`/api/activate/reporting/daily-counts?${params.toString()}`);
+          if (response.ok) {
+            const data = await response.json();
+            // Get zones from the first (only) project in response
+            const zones = data.projects?.[0]?.zones || [];
+            setProjectZoneData(prev => ({ ...prev, [project]: zones }));
+          }
+        } catch (err) {
+          console.error('Failed to fetch zone data:', err);
+        } finally {
+          setLoadingProjects(prev => {
+            const next = new Set(prev);
+            next.delete(project);
+            return next;
+          });
+        }
+      }
+    }
+  }, [expandedProjects, projectZoneData, filters.dateFrom, filters.dateTo]);
+
+  // Toggle zone expansion
+  const toggleZone = useCallback((zoneKey: string) => {
+    const newExpanded = new Set(expandedZones);
+    if (newExpanded.has(zoneKey)) {
+      newExpanded.delete(zoneKey);
+    } else {
+      newExpanded.add(zoneKey);
+    }
+    setExpandedZones(newExpanded);
+  }, [expandedZones]);
 
   // Export filtered data to CSV
   const handleExport = useCallback(async () => {
@@ -529,19 +589,97 @@ function DashboardPageContent() {
                         {(filters.projectFilter !== 'all'
                           ? projectStats.filter(s => s.project === filters.projectFilter)
                           : projectStats
-                        ).map((stat) => (
-                          <tr key={stat.project} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
-                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{stat.project}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{stat.total}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">{stat.installed ?? 0}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 dark:text-purple-400">{stat.activated ?? 0}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.notReviewed}</td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.reviewed}</td>
-                          </tr>
-                        ))}
+                        ).map((stat) => {
+                          const isExpanded = expandedProjects.has(stat.project);
+                          const isLoadingZones = loadingProjects.has(stat.project);
+                          const zones = projectZoneData[stat.project] || [];
+
+                          return (
+                            <React.Fragment key={stat.project}>
+                              {/* Project Row */}
+                              <tr
+                                className="hover:bg-gray-50 dark:hover:bg-gray-900/30 cursor-pointer"
+                                onClick={() => toggleProject(stat.project)}
+                              >
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                  <div className="flex items-center gap-2">
+                                    {isLoadingZones ? (
+                                      <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+                                    ) : isExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                                    )}
+                                    {stat.project}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{stat.total}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">{stat.installed ?? 0}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 dark:text-purple-400">{stat.activated ?? 0}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.notReviewed}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.reviewed}</td>
+                              </tr>
+
+                              {/* Zone Rows (when expanded) */}
+                              {isExpanded && zones.map((zone) => {
+                                const zoneKey = `${stat.project}_${zone.zone_no}`;
+                                const isZoneExpanded = expandedZones.has(zoneKey);
+
+                                return (
+                                  <React.Fragment key={zoneKey}>
+                                    {/* Zone Row */}
+                                    <tr
+                                      className="bg-gray-50 dark:bg-gray-900/20 hover:bg-gray-100 dark:hover:bg-gray-900/40 cursor-pointer"
+                                      onClick={(e) => { e.stopPropagation(); toggleZone(zoneKey); }}
+                                    >
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                                        <div className="flex items-center gap-2 pl-6">
+                                          {zone.pons && zone.pons.length > 0 ? (
+                                            isZoneExpanded ? (
+                                              <ChevronDown className="h-3 w-3 text-gray-400" />
+                                            ) : (
+                                              <ChevronRight className="h-3 w-3 text-gray-400" />
+                                            )
+                                          ) : (
+                                            <span className="w-3" />
+                                          )}
+                                          {zone.zone_name}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{zone.total}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-500 dark:text-blue-400">{zone.installed}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-500 dark:text-purple-400">{zone.activated}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-yellow-500 dark:text-yellow-400">{zone.notReviewed}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-green-500 dark:text-green-400">{zone.reviewed}</td>
+                                    </tr>
+
+                                    {/* PON Rows (when zone expanded) */}
+                                    {isZoneExpanded && zone.pons?.map((pon) => (
+                                      <tr
+                                        key={`${zoneKey}_${pon.pon_no}`}
+                                        className="bg-gray-100 dark:bg-gray-900/40"
+                                      >
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                          <div className="pl-14">{pon.pon_name}</div>
+                                        </td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{pon.total}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-400 dark:text-blue-300">{pon.installed}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-400 dark:text-purple-300">{pon.activated}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-400 dark:text-yellow-300">{pon.notReviewed}</td>
+                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-green-400 dark:text-green-300">{pon.reviewed}</td>
+                                      </tr>
+                                    ))}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
                         {/* Summary Row */}
                         <tr className="bg-gray-100 dark:bg-gray-900/80 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">Total</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                            <div className="pl-6">Total</div>
+                          </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)

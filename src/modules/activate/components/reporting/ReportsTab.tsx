@@ -15,28 +15,20 @@
 
 'use client';
 
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  BarChart3,
   AlertTriangle,
   Hash,
   Users,
   Calendar,
   RefreshCw,
-  Download,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react';
 import type {
   ReportType,
   ReportFilters,
-  DailyCountsResponse,
   DiscrepancyReportResponse,
   SerialValidationReportResponse,
   UserTeamAttributionResponse,
-  ProjectDailyCount,
-  ZoneBreakdown,
-  AnomalyCounts,
 } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
 
@@ -44,8 +36,8 @@ export function ReportsTab() {
   // Get shared filters from context
   const { filters: sharedFilters, lastRefreshAt } = useActivateData();
 
-  // Active report type
-  const [activeReport, setActiveReport] = useState<ReportType>('daily-counts');
+  // Active report type (Daily Counts moved to Dashboard)
+  const [activeReport, setActiveReport] = useState<ReportType>('discrepancy');
 
   // Local filters - synced with shared context
   const [filters, setFilters] = useState<ReportFilters>({
@@ -67,21 +59,13 @@ export function ReportsTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Report data states
-  const [dailyCountsData, setDailyCountsData] =
-    useState<DailyCountsResponse | null>(null);
+  // Report data states (Daily Counts moved to Dashboard)
   const [discrepancyData, setDiscrepancyData] =
     useState<DiscrepancyReportResponse | null>(null);
   const [serialData, setSerialData] =
     useState<SerialValidationReportResponse | null>(null);
   const [userTeamData, setUserTeamData] =
     useState<UserTeamAttributionResponse | null>(null);
-
-  // Expanded state for accordions
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
-    new Set()
-  );
-  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
 
   // Track last refresh to trigger re-fetch on background refresh
   const [lastContextRefresh, setLastContextRefresh] = useState<Date | null>(null);
@@ -114,9 +98,6 @@ export function ReportsTab() {
 
       let endpoint = '';
       switch (activeReport) {
-        case 'daily-counts':
-          endpoint = `/api/activate/reporting/daily-counts?${params.toString()}`;
-          break;
         case 'discrepancy':
           endpoint = `/api/activate/reporting/discrepancy?waDate=${filters.dateFrom}`;
           if (filters.project) endpoint += `&project=${filters.project}`;
@@ -137,9 +118,6 @@ export function ReportsTab() {
       const data = await response.json();
 
       switch (activeReport) {
-        case 'daily-counts':
-          setDailyCountsData(data);
-          break;
         case 'discrepancy':
           setDiscrepancyData(data);
           break;
@@ -182,28 +160,6 @@ export function ReportsTab() {
     }
   };
 
-  // Toggle project expansion
-  const toggleProject = (project: string) => {
-    const newExpanded = new Set(expandedProjects);
-    if (newExpanded.has(project)) {
-      newExpanded.delete(project);
-    } else {
-      newExpanded.add(project);
-    }
-    setExpandedProjects(newExpanded);
-  };
-
-  // Toggle zone expansion
-  const toggleZone = (projectZoneKey: string) => {
-    const newExpanded = new Set(expandedZones);
-    if (newExpanded.has(projectZoneKey)) {
-      newExpanded.delete(projectZoneKey);
-    } else {
-      newExpanded.add(projectZoneKey);
-    }
-    setExpandedZones(newExpanded);
-  };
-
   // Get active quick filter
   const getActiveQuickFilter = (): 'today' | 'yesterday' | 'last7days' | null => {
     const todayStr = getTodaySAST();
@@ -231,20 +187,9 @@ export function ReportsTab() {
 
   return (
     <div className="space-y-6">
-      {/* Report Type Navigation */}
+      {/* Report Type Navigation (Daily Counts moved to Dashboard) */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveReport('daily-counts')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-              activeReport === 'daily-counts'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Daily Counts
-          </button>
           <button
             onClick={() => setActiveReport('discrepancy')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
@@ -342,7 +287,7 @@ export function ReportsTab() {
 
           {/* Refresh Button */}
           <button
-            onClick={fetchReportData}
+            onClick={() => fetchReportData()}
             disabled={isLoading}
             className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
           >
@@ -363,18 +308,6 @@ export function ReportsTab() {
 
       {/* Report Content */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
-        {/* Daily Counts Report */}
-        {activeReport === 'daily-counts' && (
-          <DailyCountsContent
-            data={dailyCountsData}
-            isLoading={isLoading}
-            expandedProjects={expandedProjects}
-            expandedZones={expandedZones}
-            onToggleProject={toggleProject}
-            onToggleZone={toggleZone}
-          />
-        )}
-
         {/* Discrepancy Report */}
         {activeReport === 'discrepancy' && (
           <DiscrepancyContent data={discrepancyData} isLoading={isLoading} />
@@ -390,335 +323,6 @@ export function ReportsTab() {
           <UserTeamContent data={userTeamData} isLoading={isLoading} />
         )}
       </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// DAILY COUNTS CONTENT
-// ============================================================================
-
-interface DailyCountsContentProps {
-  data: DailyCountsResponse | null;
-  isLoading: boolean;
-  expandedProjects: Set<string>;
-  expandedZones: Set<string>;
-  onToggleProject: (project: string) => void;
-  onToggleZone: (key: string) => void;
-}
-
-function DailyCountsContent({
-  data,
-  isLoading,
-  expandedProjects,
-  expandedZones,
-  onToggleProject,
-  onToggleZone,
-}: DailyCountsContentProps) {
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-16 animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (!data || data.projects.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-        No data available for the selected date range.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      {/* Grand Total */}
-      <div className="bg-gray-100 dark:bg-gray-900/50 rounded-lg p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-gray-900 dark:text-white">
-            Grand Total
-          </span>
-          <div className="flex gap-4 text-sm">
-            <span className="text-gray-600 dark:text-gray-400">
-              Total:{' '}
-              <span className="font-semibold">
-                {data.grand_total.total}
-              </span>
-            </span>
-            <span className="text-blue-600 dark:text-blue-400">
-              Installed:{' '}
-              <span className="font-semibold">
-                {data.grand_total.installed}
-              </span>
-            </span>
-            <span className="text-purple-600 dark:text-purple-400">
-              Activated:{' '}
-              <span className="font-semibold">
-                {data.grand_total.activated}
-              </span>
-            </span>
-            <span className="text-yellow-600 dark:text-yellow-500">
-              Not Reviewed:{' '}
-              <span className="font-semibold">
-                {data.grand_total.notReviewed}
-              </span>
-            </span>
-            <span className="text-green-600 dark:text-green-500">
-              Reviewed:{' '}
-              <span className="font-semibold">{data.grand_total.reviewed}</span>
-            </span>
-            {/* Anomaly counts */}
-            {data.grand_total.anomalies && (data.grand_total.anomalies.wa_only > 0 || data.grand_total.anomalies.oes_only > 0) && (
-              <>
-                {data.grand_total.anomalies.wa_only > 0 && (
-                  <span className="text-orange-600 dark:text-orange-400" title="Installed but not activated - may need maintenance ticket">
-                    WA Only:{' '}
-                    <span className="font-semibold">{data.grand_total.anomalies.wa_only}</span>
-                  </span>
-                )}
-                {data.grand_total.anomalies.oes_only > 0 && (
-                  <span className="text-red-600 dark:text-red-400" title="Activated but not installed - forgot to add to WA group?">
-                    OES Only:{' '}
-                    <span className="font-semibold">{data.grand_total.anomalies.oes_only}</span>
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Project Accordions */}
-      {data.projects.map((project) => (
-        <ProjectAccordion
-          key={project.project}
-          project={project}
-          isExpanded={expandedProjects.has(project.project)}
-          expandedZones={expandedZones}
-          onToggle={() => onToggleProject(project.project)}
-          onToggleZone={onToggleZone}
-        />
-      ))}
-    </div>
-  );
-}
-
-interface ProjectAccordionProps {
-  project: ProjectDailyCount;
-  isExpanded: boolean;
-  expandedZones: Set<string>;
-  onToggle: () => void;
-  onToggleZone: (key: string) => void;
-}
-
-function ProjectAccordion({
-  project,
-  isExpanded,
-  expandedZones,
-  onToggle,
-  onToggleZone,
-}: ProjectAccordionProps) {
-  return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      {/* Project Header */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/30 hover:bg-gray-100 dark:hover:bg-gray-900/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="h-5 w-5 text-gray-500" />
-          ) : (
-            <ChevronRight className="h-5 w-5 text-gray-500" />
-          )}
-          <span className="font-semibold text-gray-900 dark:text-white">
-            {project.project}
-          </span>
-        </div>
-        <div className="flex gap-4 text-sm">
-          <span className="text-gray-600 dark:text-gray-400">
-            Total:{' '}
-            <span className="font-semibold">
-              {project.total}
-            </span>
-          </span>
-          <span className="text-blue-600 dark:text-blue-400">
-            Installed:{' '}
-            <span className="font-semibold">
-              {project.installed}
-            </span>
-          </span>
-          <span className="text-purple-600 dark:text-purple-400">
-            Activated:{' '}
-            <span className="font-semibold">{project.activated}</span>
-          </span>
-          <span className="text-yellow-600 dark:text-yellow-500">
-            Not Reviewed:{' '}
-            <span className="font-semibold">{project.notReviewed}</span>
-          </span>
-          <span className="text-green-600 dark:text-green-500">
-            Reviewed: <span className="font-semibold">{project.reviewed}</span>
-          </span>
-          {/* Anomaly counts */}
-          {project.anomalies && (project.anomalies.wa_only > 0 || project.anomalies.oes_only > 0) && (
-            <>
-              {project.anomalies.wa_only > 0 && (
-                <span className="text-orange-600 dark:text-orange-400" title="Installed but not activated">
-                  WA Only: <span className="font-semibold">{project.anomalies.wa_only}</span>
-                </span>
-              )}
-              {project.anomalies.oes_only > 0 && (
-                <span className="text-red-600 dark:text-red-400" title="Activated but not installed">
-                  OES Only: <span className="font-semibold">{project.anomalies.oes_only}</span>
-                </span>
-              )}
-            </>
-          )}
-        </div>
-      </button>
-
-      {/* Zone Breakdown */}
-      {isExpanded && (
-        <div className="pl-6 pr-4 pb-4 pt-2 space-y-2">
-          {project.zones.map((zone) => (
-            <ZoneAccordion
-              key={`${project.project}_${zone.zone_no}`}
-              projectName={project.project}
-              zone={zone}
-              isExpanded={expandedZones.has(
-                `${project.project}_${zone.zone_no}`
-              )}
-              onToggle={() =>
-                onToggleZone(`${project.project}_${zone.zone_no}`)
-              }
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface ZoneAccordionProps {
-  projectName: string;
-  zone: ZoneBreakdown;
-  isExpanded: boolean;
-  onToggle: () => void;
-}
-
-function ZoneAccordion({
-  projectName,
-  zone,
-  isExpanded,
-  onToggle,
-}: ZoneAccordionProps) {
-  return (
-    <div className="border border-gray-100 dark:border-gray-700 rounded-lg overflow-hidden">
-      {/* Zone Header */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-400" />
-          )}
-          <span className="font-medium text-gray-700 dark:text-gray-300">
-            {zone.zone_name}
-          </span>
-        </div>
-        <div className="flex gap-4 text-sm">
-          <span className="text-gray-500 dark:text-gray-400">
-            Total:{' '}
-            <span className="font-medium">
-              {zone.total}
-            </span>
-          </span>
-          <span className="text-blue-600 dark:text-blue-400">
-            Installed: {zone.installed}
-          </span>
-          <span className="text-purple-600 dark:text-purple-400">
-            Activated: {zone.activated}
-          </span>
-          <span className="text-yellow-600 dark:text-yellow-500">
-            Not Reviewed: {zone.notReviewed}
-          </span>
-          <span className="text-green-600 dark:text-green-500">
-            Reviewed: {zone.reviewed}
-          </span>
-          {/* Anomaly counts */}
-          {zone.anomalies && (zone.anomalies.wa_only > 0 || zone.anomalies.oes_only > 0) && (
-            <>
-              {zone.anomalies.wa_only > 0 && (
-                <span className="text-orange-600 dark:text-orange-400">
-                  WA: {zone.anomalies.wa_only}
-                </span>
-              )}
-              {zone.anomalies.oes_only > 0 && (
-                <span className="text-red-600 dark:text-red-400">
-                  OES: {zone.anomalies.oes_only}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-      </button>
-
-      {/* PON List */}
-      {isExpanded && (
-        <div className="pl-8 pr-4 pb-3 pt-1 space-y-1">
-          {zone.pons.map((pon) => (
-            <div
-              key={`${projectName}_${zone.zone_no}_${pon.pon_no}`}
-              className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-900/30 rounded"
-            >
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {pon.pon_name}
-              </span>
-              <div className="flex gap-4 text-sm">
-                <span className="text-gray-500 dark:text-gray-400">
-                  {pon.total}
-                </span>
-                <span className="text-blue-600 dark:text-blue-400">
-                  {pon.installed}
-                </span>
-                <span className="text-purple-600 dark:text-purple-400">
-                  {pon.activated}
-                </span>
-                <span className="text-yellow-600 dark:text-yellow-500">
-                  {pon.notReviewed}
-                </span>
-                <span className="text-green-600 dark:text-green-500">
-                  {pon.reviewed}
-                </span>
-                {/* Anomaly counts */}
-                {pon.anomalies && (pon.anomalies.wa_only > 0 || pon.anomalies.oes_only > 0) && (
-                  <>
-                    {pon.anomalies.wa_only > 0 && (
-                      <span className="text-orange-600 dark:text-orange-400">
-                        WA:{pon.anomalies.wa_only}
-                      </span>
-                    )}
-                    {pon.anomalies.oes_only > 0 && (
-                      <span className="text-red-600 dark:text-red-400">
-                        OES:{pon.anomalies.oes_only}
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
