@@ -223,7 +223,17 @@
       "Bash(do curl -s http://localhost:3005/api/health)",
       "Bash(break)",
       "Bash(done curl -s http://localhost:3005/api/procurement/rfq/f856df44-5b66-4f0c-8388-9b9189a9a922)",
-      "Bash(TOOL_INPUT='{\"file_path\":\"/home/hein/Workspace/FF_Next.js/src/modules/fleet/services/fleetVlmService.ts\",\"old_string\":\"test\",\"new_string\":\"CRITICAL: Image resizing fix\\\\\\\\nLine 2\\\\\\\\nLine 3\\\\\\\\nLine 4\\\\\\\\nLine 5\\\\\\\\nLine 6\\\\\\\\nLine 7\\\\\\\\nLine 8\\\\\\\\nLine 9\\\\\\\\nLine 10\\\\\\\\nLine 11\\\\\\\\nLine 12\"}' TOOL_NAME=\"Edit\" node:*)"
+      "Bash(TOOL_INPUT='{\"file_path\":\"/home/hein/Workspace/FF_Next.js/src/modules/fleet/services/fleetVlmService.ts\",\"old_string\":\"test\",\"new_string\":\"CRITICAL: Image resizing fix\\\\\\\\nLine 2\\\\\\\\nLine 3\\\\\\\\nLine 4\\\\\\\\nLine 5\\\\\\\\nLine 6\\\\\\\\nLine 7\\\\\\\\nLine 8\\\\\\\\nLine 9\\\\\\\\nLine 10\\\\\\\\nLine 11\\\\\\\\nLine 12\"}' TOOL_NAME=\"Edit\" node:*)",
+      "Bash(pages/procurement/boq/index.tsx )",
+      "Bash(pages/procurement/boq/[id].tsx )",
+      "Bash(pages/api/procurement/boq/[id].ts )",
+      "Bash(pages/procurement/rfq/[id].tsx )",
+      "Bash(pages/api/procurement/rfq/[id].ts )",
+      "Bash(src/components/procurement/boq/BOQList.tsx )",
+      "Bash(src/components/procurement/boq/list/BOQListTypes.ts )",
+      "Bash(src/services/api/procurementApi.ts )",
+      "Bash(src/services/procurement/client/modules/BOQClient.ts)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": [],

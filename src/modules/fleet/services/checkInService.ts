@@ -441,6 +441,7 @@ export async function getCheckRecords(options?: {
   offset?: number;
   status?: CheckRecordStatus;
   driverId?: string;
+  vehicleId?: string;
   dateFrom?: string;
   dateTo?: string;
 }): Promise<{ records: CheckRecordWithDetails[]; total: number }> {
@@ -451,6 +452,7 @@ export async function getCheckRecords(options?: {
   const conditions: string[] = ['1=1'];
   if (options?.status) conditions.push(`r.status = '${options.status}'`);
   if (options?.driverId) conditions.push(`r.driver_id = '${options.driverId}'`);
+  if (options?.vehicleId) conditions.push(`r.vehicle_id = '${options.vehicleId}'`);
   if (options?.dateFrom) conditions.push(`r.check_date >= '${options.dateFrom}'`);
   if (options?.dateTo) conditions.push(`r.check_date <= '${options.dateTo}'`);
 

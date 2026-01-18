@@ -207,13 +207,38 @@ export class NeonSupplierService {
       const params: any[] = [];
       let paramCount = 0;
 
+      // Support both camelCase and snake_case field names
       const fieldMapping: Record<string, string> = {
         name: 'name',
         companyName: 'company_name',
+        company_name: 'company_name',
+        tradingName: 'trading_name',
+        trading_name: 'trading_name',
         email: 'email',
         phone: 'phone',
+        website: 'website',
         status: 'status',
         businessType: 'business_type',
+        business_type: 'business_type',
+        registrationNumber: 'registration_number',
+        registration_number: 'registration_number',
+        taxNumber: 'tax_number',
+        tax_number: 'tax_number',
+        physicalAddress: 'physical_address',
+        physical_address: 'physical_address',
+        city: 'city',
+        province: 'province',
+        postalCode: 'postal_code',
+        postal_code: 'postal_code',
+        country: 'country',
+        contactName: 'contact_name',
+        contact_name: 'contact_name',
+        contactEmail: 'contact_email',
+        contact_email: 'contact_email',
+        contactPhone: 'contact_phone',
+        contact_phone: 'contact_phone',
+        contactTitle: 'contact_title',
+        contact_title: 'contact_title',
         notes: 'notes'
       };
 
@@ -253,19 +278,21 @@ export class NeonSupplierService {
       updateFields.push(`updated_by = $${paramCount}`);
       params.push(userId);
 
-      paramCount++;
+      // updated_at uses NOW() - no parameter needed
       updateFields.push(`updated_at = NOW()`);
 
       paramCount++;
       params.push(parseInt(id));
 
       const query = `
-        UPDATE suppliers 
+        UPDATE suppliers
         SET ${updateFields.join(', ')}
         WHERE id = $${paramCount}
       `;
 
-      await sql(query, params);
+      log.info(`Supplier update query:`, { query, params, updateFields }, 'neonSupplier');
+      const result = await sql.query(query, params);
+      log.info(`Supplier update result:`, { result }, 'neonSupplier');
     } catch (error) {
       log.error(`Error updating supplier ${id}:`, { data: error }, 'neonSupplier');
       throw new Error(`Failed to update supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);

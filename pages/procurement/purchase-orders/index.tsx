@@ -115,10 +115,11 @@ export default function PurchaseOrdersPage() {
     });
   };
 
-  // Stats
+  // Stats - show the 5 most relevant PO workflow statuses
   const stats = [
     { status: 'draft' as POStatus, label: 'Draft' },
     { status: 'pending_approval' as POStatus, label: 'Pending' },
+    { status: 'approved' as POStatus, label: 'Approved' },
     { status: 'sent' as POStatus, label: 'Sent' },
     { status: 'completed' as POStatus, label: 'Completed' },
   ];
@@ -192,7 +193,7 @@ export default function PurchaseOrdersPage() {
           </div>
 
           {/* Stats */}
-          <div className="mb-6 grid grid-cols-4 gap-4">
+          <div className="mb-6 grid grid-cols-5 gap-4">
             {stats.map(({ status, label }) => {
               const config = statusConfig[status];
               const count = purchaseOrders.filter((po) => po.status === status).length;

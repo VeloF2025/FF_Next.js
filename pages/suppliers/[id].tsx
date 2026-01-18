@@ -32,12 +32,54 @@ import { log } from '@/lib/logger';
 
 interface Supplier {
   id: string;
-  company_name: string;
-  trading_name?: string;
+  name: string;
+  companyName?: string;
+  tradingName?: string;
   email: string;
   phone: string;
   website?: string;
   status: string;
+  businessType?: string;
+  registrationNumber?: string;
+  taxNumber?: string;
+  // Address fields from mapSupplier
+  addresses?: {
+    physical?: {
+      street1?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
+  };
+  // Contact from mapSupplier
+  contact?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  primaryContact?: {
+    name?: string;
+    title?: string;
+    email?: string;
+    phone?: string;
+  };
+  rating?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Form data uses snake_case to match backend fieldMapping
+interface SupplierFormData {
+  id?: string;
+  name?: string;
+  company_name?: string;
+  trading_name?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  status?: string;
   business_type?: string;
   registration_number?: string;
   tax_number?: string;
@@ -47,13 +89,7 @@ interface Supplier {
   postal_code?: string;
   country?: string;
   contact_name?: string;
-  contact_email?: string;
-  contact_phone?: string;
-  contact_title?: string;
-  rating?: number;
   notes?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
 interface PurchaseOrder {
@@ -82,9 +118,33 @@ export default function SupplierDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'profile' | 'performance' | 'documents' | 'orders' | 'rfqs'>('profile');
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<Supplier>>({});
+  const [editForm, setEditForm] = useState<SupplierFormData>({});
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Transform API response (camelCase) to form fields (snake_case for editing)
+  const transformForForm = (data: Supplier): SupplierFormData => {
+    return {
+      id: data.id,
+      name: data.name,
+      company_name: data.name || data.companyName,  // Use name as main identifier
+      trading_name: data.tradingName,
+      email: data.email,
+      phone: data.phone,
+      website: data.website,
+      status: data.status,
+      business_type: data.businessType,
+      registration_number: data.registrationNumber,
+      tax_number: data.taxNumber,
+      physical_address: data.addresses?.physical?.street1,
+      city: data.addresses?.physical?.city,
+      province: data.addresses?.physical?.state,
+      postal_code: data.addresses?.physical?.postalCode,
+      country: data.addresses?.physical?.country || 'South Africa',
+      contact_name: data.primaryContact?.name || data.contact?.name,
+      notes: data.notes
+    };
+  };
 
   // Load supplier data
   useEffect(() => {
@@ -108,8 +168,9 @@ export default function SupplierDetailPage() {
         throw new Error('Failed to fetch supplier');
       }
       const supplierData = await supplierRes.json();
-      setSupplier(supplierData.data || supplierData);
-      setEditForm(supplierData.data || supplierData);
+      const data = supplierData.data || supplierData;
+      setSupplier(data);
+      setEditForm(transformForForm(data));
 
       // Fetch purchase orders (if endpoint exists)
       try {
@@ -146,17 +207,31 @@ export default function SupplierDetailPage() {
 
     setIsSaving(true);
     try {
+      // Filter out null/undefined values to avoid overwriting with nulls
+      const cleanedData: Record<string, any> = {};
+      Object.entries(editForm).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          cleanedData[key] = value;
+        }
+      });
+
+      // Also update the 'name' field if company_name changed
+      if (cleanedData.company_name) {
+        cleanedData.name = cleanedData.company_name;
+      }
+
       const response = await fetch(`/api/suppliers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: editForm })
+        body: JSON.stringify({ data: cleanedData })
       });
 
       if (!response.ok) {
         throw new Error('Failed to update supplier');
       }
 
-      setSupplier(editForm as Supplier);
+      // Reload supplier data to get fresh values from DB
+      await loadSupplierData(id);
       setIsEditing(false);
       toast.success('Supplier updated successfully');
     } catch (error) {
@@ -265,13 +340,13 @@ export default function SupplierDetailPage() {
                 <div>
                   <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                      {supplier.company_name}
+                      {supplier.name || supplier.companyName}
                     </h1>
                     {getStatusBadge(supplier.status)}
                   </div>
-                  {supplier.trading_name && (
+                  {supplier.tradingName && (
                     <p className="text-sm text-[var(--ff-text-secondary)]">
-                      Trading as: {supplier.trading_name}
+                      Trading as: {supplier.tradingName}
                     </p>
                   )}
                   <div className="flex items-center gap-2 mt-1">
@@ -281,14 +356,20 @@ export default function SupplierDetailPage() {
                         <span className="text-sm font-medium">{supplier.rating.toFixed(1)}</span>
                       </div>
                     )}
-                    {supplier.business_type && (
-                      <span className="text-sm text-gray-500">{supplier.business_type}</span>
+                    {supplier.businessType && (
+                      <span className="text-sm text-gray-500">{supplier.businessType}</span>
                     )}
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => router.push(`/procurement/rfq/new?supplierId=${id}`)}
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  Send RFQ
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setIsEditing(!isEditing)}
@@ -338,77 +419,197 @@ export default function SupplierDetailPage() {
                 {isEditing ? (
                   // Edit Form
                   <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-                        <input
-                          type="text"
-                          value={editForm.company_name || ''}
-                          onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Trading Name</label>
-                        <input
-                          type="text"
-                          value={editForm.trading_name || ''}
-                          onChange={(e) => setEditForm({ ...editForm, trading_name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input
-                          type="email"
-                          value={editForm.email || ''}
-                          onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                        <input
-                          type="tel"
-                          value={editForm.phone || ''}
-                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                        <input
-                          type="url"
-                          value={editForm.website || ''}
-                          onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select
-                          value={editForm.status || 'pending'}
-                          onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                        >
-                          <option value="active">Active</option>
-                          <option value="pending">Pending</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="suspended">Suspended</option>
-                        </select>
+                    {/* Basic Info */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Basic Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                          <input
+                            type="text"
+                            value={editForm.company_name || ''}
+                            onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Trading Name</label>
+                          <input
+                            type="text"
+                            value={editForm.trading_name || ''}
+                            onChange={(e) => setEditForm({ ...editForm, trading_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Business Type</label>
+                          <select
+                            value={editForm.business_type || ''}
+                            onChange={(e) => setEditForm({ ...editForm, business_type: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="">Select type...</option>
+                            <option value="Manufacturer">Manufacturer</option>
+                            <option value="Distributor">Distributor</option>
+                            <option value="Wholesaler">Wholesaler</option>
+                            <option value="Retailer">Retailer</option>
+                            <option value="Service Provider">Service Provider</option>
+                            <option value="Contractor">Contractor</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                          <select
+                            value={editForm.status || 'pending'}
+                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="active">Active</option>
+                            <option value="approved">Approved</option>
+                            <option value="pending">Pending</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="suspended">Suspended</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Contact Info */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Contact Information</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                          <input
+                            type="email"
+                            value={editForm.email || ''}
+                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                          <input
+                            type="tel"
+                            value={editForm.phone || ''}
+                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                          <input
+                            type="url"
+                            value={editForm.website || ''}
+                            onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="https://"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                          <input
+                            type="text"
+                            value={editForm.contact_name || ''}
+                            onChange={(e) => setEditForm({ ...editForm, contact_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Address</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                          <input
+                            type="text"
+                            value={editForm.physical_address || ''}
+                            onChange={(e) => setEditForm({ ...editForm, physical_address: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                          <input
+                            type="text"
+                            value={editForm.city || ''}
+                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                          <input
+                            type="text"
+                            value={editForm.province || ''}
+                            onChange={(e) => setEditForm({ ...editForm, province: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                          <input
+                            type="text"
+                            value={editForm.postal_code || ''}
+                            onChange={(e) => setEditForm({ ...editForm, postal_code: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                          <input
+                            type="text"
+                            value={editForm.country || 'South Africa'}
+                            onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Business Registration */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Business Registration</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Registration Number</label>
+                          <input
+                            type="text"
+                            value={editForm.registration_number || ''}
+                            onChange={(e) => setEditForm({ ...editForm, registration_number: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">VAT/Tax Number</label>
+                          <input
+                            type="text"
+                            value={editForm.tax_number || ''}
+                            onChange={(e) => setEditForm({ ...editForm, tax_number: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Notes */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                       <textarea
                         value={editForm.notes || ''}
                         onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
                         rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Additional notes about this supplier..."
                       />
                     </div>
-                    <div className="flex justify-end gap-3">
-                      <Button variant="outline" onClick={() => setIsEditing(false)}>
+
+                    {/* Actions */}
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <Button variant="outline" onClick={() => { setIsEditing(false); if (supplier) setEditForm(transformForForm(supplier)); }}>
                         Cancel
                       </Button>
                       <Button onClick={handleSave} disabled={isSaving}>
@@ -443,13 +644,13 @@ export default function SupplierDetailPage() {
                             </a>
                           </div>
                         )}
-                        {supplier.physical_address && (
+                        {supplier.addresses?.physical?.street1 && (
                           <div className="flex items-start gap-3 text-gray-600">
                             <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
                             <div>
-                              <p>{supplier.physical_address}</p>
-                              <p>{[supplier.city, supplier.province, supplier.postal_code].filter(Boolean).join(', ')}</p>
-                              {supplier.country && <p>{supplier.country}</p>}
+                              <p>{supplier.addresses.physical.street1}</p>
+                              <p>{[supplier.addresses.physical.city, supplier.addresses.physical.state, supplier.addresses.physical.postalCode].filter(Boolean).join(', ')}</p>
+                              {supplier.addresses.physical.country && <p>{supplier.addresses.physical.country}</p>}
                             </div>
                           </div>
                         )}
@@ -458,29 +659,29 @@ export default function SupplierDetailPage() {
                     <div className="space-y-4">
                       <h3 className="font-semibold text-gray-900">Business Details</h3>
                       <div className="space-y-2">
-                        {supplier.registration_number && (
+                        {supplier.registrationNumber && (
                           <div className="flex justify-between py-2 border-b border-gray-100">
                             <span className="text-gray-500">Registration No.</span>
-                            <span className="font-medium">{supplier.registration_number}</span>
+                            <span className="font-medium">{supplier.registrationNumber}</span>
                           </div>
                         )}
-                        {supplier.tax_number && (
+                        {supplier.taxNumber && (
                           <div className="flex justify-between py-2 border-b border-gray-100">
                             <span className="text-gray-500">Tax Number</span>
-                            <span className="font-medium">{supplier.tax_number}</span>
+                            <span className="font-medium">{supplier.taxNumber}</span>
                           </div>
                         )}
-                        {supplier.business_type && (
+                        {supplier.businessType && (
                           <div className="flex justify-between py-2 border-b border-gray-100">
                             <span className="text-gray-500">Business Type</span>
-                            <span className="font-medium">{supplier.business_type}</span>
+                            <span className="font-medium">{supplier.businessType}</span>
                           </div>
                         )}
-                        {supplier.created_at && (
+                        {supplier.createdAt && (
                           <div className="flex justify-between py-2 border-b border-gray-100">
                             <span className="text-gray-500">Added</span>
                             <span className="font-medium">
-                              {new Date(supplier.created_at).toLocaleDateString()}
+                              {new Date(supplier.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                         )}
