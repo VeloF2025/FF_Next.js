@@ -137,6 +137,7 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
  * Step Labels for Human-Readable Display (short)
  */
 export const STEP_LABELS: Record<number, string> = {
+  0: 'Discard - Rubbish',
   1: 'House Photo',
   2: 'Cable from Pole',
   3: 'Entry Outside',
@@ -153,6 +154,7 @@ export const STEP_LABELS: Record<number, string> = {
  * Step Descriptions for Friendly Feedback Messages
  */
 export const STEP_DESCRIPTIONS: Record<number, string> = {
+  0: 'Discarded as rubbish - not a valid installation photo',
   1: 'Photo of the house/property',
   2: 'Cable running from the pole',
   3: 'Cable entry point outside',
