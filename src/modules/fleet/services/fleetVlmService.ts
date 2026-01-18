@@ -9,6 +9,7 @@
  */
 
 import { log } from '@/lib/logger';
+import sharp from 'sharp';
 import {
   OdometerExtractionResult,
   LicensePlateExtractionResult,
@@ -23,6 +24,57 @@ const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
 const VLM_MODEL = process.env.FLEET_VLM_MODEL || 'Qwen/Qwen3-VL-8B-Instruct';
 const VLM_TIMEOUT_MS = 60000; // 1 minute for single image
+
+// Image size limits for VLM processing
+// Large images (4K+) cause token limit errors and incorrect readings
+const VLM_MAX_WIDTH = 1280;
+const VLM_MAX_HEIGHT = 960;
+const VLM_JPEG_QUALITY = 85;
+
+/**
+ * Resize image to fit within VLM limits
+ * CRITICAL: 4K images (4032x3024) cause VLM to misread odometer/fuel readings
+ * Resizing to ~1280x960 fixes accuracy issues
+ */
+async function resizeImageForVlm(base64Image: string): Promise<string> {
+  try {
+    const inputBuffer = Buffer.from(base64Image, 'base64');
+
+    // Get image metadata to check if resizing is needed
+    const metadata = await sharp(inputBuffer).metadata();
+    const width = metadata.width || 0;
+    const height = metadata.height || 0;
+
+    // Skip resizing if image is already small enough
+    if (width <= VLM_MAX_WIDTH && height <= VLM_MAX_HEIGHT) {
+      log.info('FleetVlmService', `Image ${width}x${height} already within limits, skipping resize`);
+      return base64Image;
+    }
+
+    log.info('FleetVlmService', `Resizing image from ${width}x${height} to max ${VLM_MAX_WIDTH}x${VLM_MAX_HEIGHT}`);
+
+    const resizedBuffer = await sharp(inputBuffer)
+      .resize(VLM_MAX_WIDTH, VLM_MAX_HEIGHT, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: VLM_JPEG_QUALITY })
+      .toBuffer();
+
+    const resizedBase64 = resizedBuffer.toString('base64');
+
+    // Log size reduction
+    const originalSize = Math.round(inputBuffer.length / 1024);
+    const resizedSize = Math.round(resizedBuffer.length / 1024);
+    log.info('FleetVlmService', `Image resized: ${originalSize}KB -> ${resizedSize}KB (${Math.round(resizedSize/originalSize*100)}%)`);
+
+    return resizedBase64;
+  } catch (error) {
+    log.error('FleetVlmService', `Image resize failed: ${error}`);
+    // Return original if resize fails - better than no result
+    return base64Image;
+  }
+}
 
 /**
  * VLM API Error
@@ -209,12 +261,17 @@ If the licence disk is not clearly visible or unreadable:
 
 /**
  * Call VLM API with a single image and prompt
+ * IMPORTANT: Images are automatically resized to prevent token limit errors
  */
 async function callVlmApi(
   base64Image: string,
   prompt: string,
   analysisType: VlmAnalysisType
 ): Promise<string> {
+  // CRITICAL: Resize large images to prevent VLM misreads
+  // 4K images (4032x3024) cause VLM to drop digits or misread values
+  const resizedImage = await resizeImageForVlm(base64Image);
+
   const requestBody = {
     model: VLM_MODEL,
     messages: [
@@ -225,7 +282,7 @@ async function callVlmApi(
           {
             type: 'image_url',
             image_url: {
-              url: `data:image/jpeg;base64,${base64Image}`,
+              url: `data:image/jpeg;base64,${resizedImage}`,
             },
           },
         ],

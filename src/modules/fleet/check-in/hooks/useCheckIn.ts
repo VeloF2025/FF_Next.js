@@ -49,6 +49,11 @@ interface CheckInFormState {
   photos: Map<CheckPhotoType, PhotoData>;
 }
 
+interface VlmValidation {
+  suggestedAction: 'accept' | 'review' | 'reject';
+  warning?: string;
+}
+
 interface VlmResult {
   photoType: CheckPhotoType;
   analysisType: VlmAnalysisType;
@@ -58,6 +63,7 @@ interface VlmResult {
   plateMatches?: boolean;
   isProcessing: boolean;
   error?: string;
+  validation?: VlmValidation;
 }
 
 interface UseCheckInOptions {
@@ -307,7 +313,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       if (vlmData.success && vlmData.result) {
         const result = vlmData.result;
 
-        // Update VLM result
+        // Update VLM result with validation info
         setVlmResults(prev => {
           const newResults = new Map(prev);
           newResults.set(type, {
@@ -319,6 +325,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
             plateMatches: result.plateMatches,
             isProcessing: false,
             error: result.error,
+            validation: result.validation,
           });
           return newResults;
         });
@@ -391,6 +398,18 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   // Check odometer reading (required for both daily and weekly)
   if (!formState.odometerReading) {
     validationErrors.push('Odometer reading required');
+  }
+
+  // Check VLM validation results - block submission if readings are rejected
+  for (const [photoType, vlmResult] of vlmResults.entries()) {
+    if (vlmResult.validation?.suggestedAction === 'reject') {
+      const label = requiredPhotos.find(p => p.type === photoType)?.label || photoType;
+      validationErrors.push(`${label}: ${vlmResult.validation.warning || 'Reading rejected by validation'}`);
+    }
+    // Also warn about plate mismatches
+    if (vlmResult.analysisType === 'license_plate' && vlmResult.plateMatches === false) {
+      validationErrors.push('License plate does not match vehicle registration');
+    }
   }
 
   // Check failures
@@ -482,18 +501,47 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
 
       const record = (data.data || data) as CheckRecord;
 
-      // Upload photos
+      // Upload photos and re-process VLM with real record ID
       for (const [type, photo] of formState.photos.entries()) {
         if (photo.file) {
+          // Upload photo first
           const formData = new FormData();
           formData.append('recordId', record.id);
           formData.append('photoType', type);
           formData.append('file', photo.file);
 
-          await fetch('/api/fleet/check-in/photos', {
+          const uploadResponse = await fetch('/api/fleet/check-in/photos', {
             method: 'POST',
             body: formData,
           });
+
+          // Get the photo ID from the upload response
+          if (uploadResponse.ok) {
+            const uploadData = await uploadResponse.json();
+            const photoId = uploadData.data?.id || uploadData.id;
+
+            // Re-process VLM with real record/photo IDs to persist results
+            const photoConfig = requiredPhotos.find(p => p.type === type);
+            if (photoConfig?.vlmType && photoId) {
+              const base64 = photo.dataUrl.split(',')[1];
+
+              // Fire and forget - don't block submission for VLM persistence
+              fetch('/api/fleet/check-in/process-vlm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  photoId,
+                  recordId: record.id,
+                  vehicleId,
+                  analysisType: photoConfig.vlmType,
+                  base64Image: base64,
+                  expectedPlate: vehicleRegistration,
+                }),
+              }).catch(() => {
+                // Silently fail - VLM persistence is best-effort
+              });
+            }
+          }
         }
       }
 
@@ -504,7 +552,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures]);
+  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, requiredPhotos, vehicleId, vehicleRegistration]);
 
   // Reset form
   const reset = useCallback(() => {
