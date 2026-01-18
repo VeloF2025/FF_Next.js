@@ -113,6 +113,7 @@ function DashboardPageContent() {
   // Clear all filters
   const handleClearFilters = useCallback(() => {
     setFilters({
+      searchTerm: '',
       dateFrom: getTodaySAST(),
       dateTo: getTodaySAST(),
       statusFilter: 'all',
