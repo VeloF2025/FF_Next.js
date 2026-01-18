@@ -20,7 +20,6 @@ import { useState } from 'react';
 import { useUnifiedReview } from '../hooks/useUnifiedReview';
 import { STEP_LABELS } from '../types/unified.types';
 import type { UnifiedReview } from '../types/unified.types';
-import { ComparisonTable } from './ComparisonTable';
 import { PhotoGalleryUnified } from './PhotoGalleryUnified';
 import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
@@ -30,7 +29,7 @@ interface UnifiedReviewCardProps {
   dropNumber: string;
 }
 
-type TabKey = 'wizard' | 'photos' | 'feedback' | 'activity' | 'qa' | 'categorization' | 'ai';
+type TabKey = 'wizard' | 'photos' | 'feedback' | 'activity' | 'qa' | 'categorization';
 
 export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('wizard');
@@ -40,7 +39,6 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
     error,
     updateStep,
     markIncorrect,
-    triggerAiEvaluation,
     generateFeedback,
     sendFeedback,
     refresh,
@@ -83,11 +81,10 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
   const tabs = [
     { key: 'wizard' as const, label: 'QA Wizard', icon: '🧙' },
     { key: 'photos' as const, label: `Photos (${review.photo_count})`, icon: '📸' },
-    { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
-    { key: 'activity' as const, label: 'Activity', icon: '📜' },
-    { key: 'qa' as const, label: 'Manual QA', icon: '📋' },
     { key: 'categorization' as const, label: 'AI Categorization', icon: '🏷️' },
-    { key: 'ai' as const, label: 'AI Evaluation', icon: '🤖' },
+    { key: 'activity' as const, label: 'Activity', icon: '📜' },
+    { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
+    { key: 'qa' as const, label: 'Manual QA', icon: '📋' },
   ];
 
   return (
@@ -161,7 +158,6 @@ export function UnifiedReviewCard({ dropNumber }: UnifiedReviewCardProps) {
             onCategorizationApproved={refresh}
           />
         )}
-        {activeTab === 'ai' && <AIEvaluationTab review={review} triggerAiEvaluation={triggerAiEvaluation} />}
       </div>
     </div>
   );
@@ -321,111 +317,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
 }
 
 /**
- * Tab 2: AI Evaluation
- * Trigger evaluation, show results, comparison
- */
-interface AIEvaluationTabProps {
-  review: UnifiedReview;
-  triggerAiEvaluation: () => Promise<void>;
-}
-
-function AIEvaluationTab({ review, triggerAiEvaluation }: AIEvaluationTabProps) {
-  const [isEvaluating, setIsEvaluating] = useState(false);
-
-  const handleTriggerEvaluation = async () => {
-    setIsEvaluating(true);
-    try {
-      await triggerAiEvaluation();
-    } catch (error) {
-      console.error('Failed to trigger AI evaluation:', error);
-    } finally {
-      setIsEvaluating(false);
-    }
-  };
-
-  if (!review.ai_overall_status) {
-    return (
-      <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
-          <span className="text-3xl">🤖</span>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">AI Evaluation Not Run</h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          Trigger AI evaluation to get automated quality assessment
-        </p>
-        <button
-          onClick={handleTriggerEvaluation}
-          disabled={isEvaluating}
-          className="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isEvaluating ? 'Evaluating...' : 'Evaluate with AI'}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* AI Results Summary */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">AI Evaluation Results</h3>
-          <span
-            className={`px-4 py-2 rounded-lg text-sm font-bold ${
-              review.ai_overall_status === 'PASS'
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
-            }`}
-          >
-            {review.ai_overall_status}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Average Score</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {review.ai_average_score != null
-                ? typeof review.ai_average_score === 'number'
-                  ? review.ai_average_score.toFixed(1)
-                  : parseFloat(String(review.ai_average_score)).toFixed(1)
-                : '0.0'}/10
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Evaluated At</p>
-            <p className="text-sm text-gray-900 dark:text-gray-200">
-              {review.ai_evaluated_at
-                ? new Date(review.ai_evaluated_at).toLocaleString()
-                : 'N/A'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Comparison Table */}
-      <ComparisonTable
-        manualSteps={getManualSteps(review)}
-        aiSteps={review.ai_step_results || []}
-      />
-
-      {/* AI Markdown Report */}
-      {review.ai_markdown_report && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
-          <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-4">AI Detailed Report</h4>
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-              {review.ai_markdown_report}
-            </pre>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Tab 3: Photos
+ * Tab 2: Photos
  * Photo gallery with step grouping and fetch capability
  */
 interface PhotosTabProps {
@@ -699,19 +591,3 @@ function getStepValues(review: UnifiedReview): Record<number, boolean> {
   return values;
 }
 
-/**
- * Helper: Get manual steps for comparison table
- */
-function getManualSteps(review: UnifiedReview): Array<{ step: number; passed: boolean; label: string }> {
-  const steps: Array<{ step: number; passed: boolean; label: string }> = [];
-
-  for (let i = 1; i <= 10; i++) {
-    steps.push({
-      step: i,
-      passed: getStepValue(review, i),
-      label: STEP_LABELS[i],
-    });
-  }
-
-  return steps;
-}
