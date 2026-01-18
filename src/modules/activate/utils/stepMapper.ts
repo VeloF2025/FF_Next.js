@@ -128,7 +128,6 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   'ph_led': 9,
 
   // Step 10: Signature
-  'ph_sign1': 10,
   'ph_sign2': 10,
   'ph_signature': 10,
 };
@@ -181,7 +180,7 @@ export const STEP_TO_PHOTO_TYPES: Record<number, string[]> = {
   7: ['ph_powm', 'ph_powm1', 'ph_powm2'],
   8: ['ph_after', 'ph_final'],
   9: ['ph_lights', 'ph_led'],
-  10: ['ph_sign1', 'ph_sign2', 'ph_signature'],
+  10: ['ph_sign2', 'ph_signature'],
 };
 
 /**
