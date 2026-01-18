@@ -49,6 +49,9 @@ interface ExportRow {
   // VLM status
   vlm_status: string;
   feedback_sent: boolean;
+  // Serials (scanned from photos)
+  ont_serial_scanned: string | null;
+  ups_serial_scanned: string | null;
   // Agent info from WhatsApp
   sender_phone: string | null;
   sender_name: string | null;
@@ -118,6 +121,8 @@ function toExcel(rows: ExportRow[]): Buffer {
     'Step 10: Signature',
     'VLM Status',
     'Feedback Sent',
+    'ONT Serial',
+    'UPS Serial',
     'Sender Phone',
     'Sender Name',
     'Assigned Agent',
@@ -145,6 +150,8 @@ function toExcel(rows: ExportRow[]): Buffer {
     row.step_10_signature ? 'Yes' : 'No',
     row.vlm_status || '',
     row.feedback_sent ? 'Yes' : 'No',
+    row.ont_serial_scanned || '',
+    row.ups_serial_scanned || '',
     row.sender_phone || '',
     row.sender_name || '',
     row.assigned_agent || '',
@@ -175,6 +182,8 @@ function toExcel(rows: ExportRow[]): Buffer {
     { wch: 8 },
     { wch: 12 }, // VLM Status
     { wch: 10 }, // Feedback Sent
+    { wch: 18 }, // ONT Serial
+    { wch: 18 }, // UPS Serial
     { wch: 15 }, // Sender Phone
     { wch: 15 }, // Sender Name
     { wch: 15 }, // Assigned Agent
@@ -255,6 +264,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         upr.step_10_signature,
         upr.vlm_categorization_status as vlm_status,
         upr.feedback_sent,
+        -- Serials (scanned from photos)
+        upr.ont_serial_scanned,
+        upr.ups_serial_scanned,
         -- Sender info from unified reviews or qa_photo_reviews
         COALESCE(upr.sender_phone, qpr.sender_phone) as sender_phone,
         qpr.user_name as sender_name,
