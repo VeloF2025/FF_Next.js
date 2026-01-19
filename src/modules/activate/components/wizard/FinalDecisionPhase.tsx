@@ -175,7 +175,19 @@ export function FinalDecisionPhase({
       if (data.success) {
         log.info('FinalDecision', `Decision ${decision} submitted for ${dropNumber}`);
 
-        // Create ticket if requested
+        // Auto-create ticket for swapped serials (CRITICAL issue)
+        const swapCheck = detectSwappedSerials(
+          wizardState.prerequisites.ontSerial,
+          wizardState.prerequisites.upsSerial
+        );
+        if (swapCheck.swapped) {
+          const ticketUid = await createSwapTicket(swapCheck.details);
+          if (ticketUid) {
+            log.info('FinalDecision', `Auto-created swap ticket ${ticketUid} for ${dropNumber}`);
+          }
+        }
+
+        // Create additional ticket if requested by user
         if (issueClassification.createTicket && issueClassification.ticketType) {
           await createTicket();
         }
@@ -194,21 +206,60 @@ export function FinalDecisionPhase({
 
   const createTicket = async () => {
     try {
-      await fetch('/api/ticketing/tickets', {
+      const response = await fetch('/api/ticketing/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          source: 'manual' as const,
           title: `QA Issue: ${dropNumber}`,
           description: issueClassification.ticketDescription || `Issue found during QA review of ${dropNumber}`,
-          type: issueClassification.ticketType,
-          priority: issueClassification.ticketType === 'maintenance' ? 'high' : 'medium',
-          relatedDr: dropNumber,
+          ticket_type: issueClassification.ticketType || 'maintenance',
+          priority: issueClassification.ticketType === 'maintenance' ? 'high' : 'normal',
+          dr_number: dropNumber,
         }),
       });
-      log.info('FinalDecision', `Ticket created for ${dropNumber}`);
+      if (response.ok) {
+        log.info('FinalDecision', `Ticket created for ${dropNumber}`);
+      } else {
+        const data = await response.json();
+        log.warn('FinalDecision', `Failed to create ticket: ${data.error?.message || 'Unknown error'}`);
+      }
     } catch (err) {
       log.error('FinalDecision', 'Failed to create ticket', err);
     }
+  };
+
+  /**
+   * Create a ticket for swapped serials - CRITICAL issue
+   * Auto-created when serials appear to be in wrong fields
+   */
+  const createSwapTicket = async (swapDetails: string) => {
+    try {
+      const response = await fetch('/api/ticketing/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'ont_swap' as const,
+          title: `🔴 SWAPPED SERIALS: ${dropNumber}`,
+          description: `${swapDetails}\n\nONT field: ${wizardState.prerequisites.ontSerial || 'N/A'}\nUPS field: ${wizardState.prerequisites.upsSerial || 'N/A'}\n\nTechnician needs to correct serial assignments in 1Map.`,
+          ticket_type: 'ont_swap' as const,
+          priority: 'high' as const,
+          dr_number: dropNumber,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        log.info('FinalDecision', `Swap ticket ${data.data?.ticket_uid} created for ${dropNumber}`);
+        return data.data?.ticket_uid;
+      } else {
+        const data = await response.json();
+        log.warn('FinalDecision', `Failed to create swap ticket: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      log.error('FinalDecision', 'Failed to create swap ticket', err);
+    }
+    return null;
   };
 
   const isOverriding = Boolean(autoFailResult && decision !== autoFailResult.recommendation);
@@ -296,9 +347,14 @@ export function FinalDecisionPhase({
               {/* Swapped serials - critical error */}
               {swapCheck.swapped && (
                 <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/40 rounded-lg border border-red-300 dark:border-red-700">
-                  <div className="flex items-center gap-2 text-red-800 dark:text-red-200 font-semibold">
-                    <span className="text-lg">🔴</span>
-                    SERIALS SWAPPED
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-red-800 dark:text-red-200 font-semibold">
+                      <span className="text-lg">🔴</span>
+                      SERIALS SWAPPED
+                    </div>
+                    <span className="text-xs px-2 py-1 bg-red-200 dark:bg-red-800 rounded text-red-700 dark:text-red-200">
+                      🎫 Auto-ticket on submit
+                    </span>
                   </div>
                   <p className="text-sm text-red-700 dark:text-red-300 mt-1">{swapCheck.details}</p>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -311,6 +367,9 @@ export function FinalDecisionPhase({
                       <code className="ml-1 font-mono">{wizardState.prerequisites.upsSerial || 'N/A'}</code>
                     </div>
                   </div>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2 italic">
+                    A ticket will be automatically created to track resolution of this issue.
+                  </p>
                 </div>
               )}
 
