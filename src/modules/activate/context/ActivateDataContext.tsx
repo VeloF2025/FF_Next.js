@@ -40,6 +40,7 @@ import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 export type StatusFilter = 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed';
 export type QaStatusFilter = 'all' | 'pending' | 'passed' | 'failed' | 'rework';
+export type SerialStatusFilter = 'all' | 'valid' | 'swapped' | 'missing' | 'invalid';
 
 export interface ActivateFilters {
   searchTerm: string;
@@ -47,6 +48,7 @@ export interface ActivateFilters {
   dateTo: string;
   statusFilter: StatusFilter;
   qaStatusFilter: QaStatusFilter;
+  serialStatusFilter: SerialStatusFilter;
   projectFilter: string;
 }
 
@@ -95,6 +97,7 @@ const defaultFilters: ActivateFilters = {
   dateTo: getTodaySAST(),
   statusFilter: 'all',
   qaStatusFilter: 'all',
+  serialStatusFilter: 'all',
   projectFilter: 'all',
 };
 
@@ -175,6 +178,7 @@ export function ActivateDataProvider({
       project: filters.projectFilter !== 'all' ? filters.projectFilter : undefined,
       status: filters.statusFilter !== 'all' ? filters.statusFilter : undefined,
       qaStatus: filters.qaStatusFilter !== 'all' ? filters.qaStatusFilter : undefined,
+      serialStatus: filters.serialStatusFilter !== 'all' ? filters.serialStatusFilter : undefined,
       search: filters.searchTerm.trim() || undefined,
       page: page ?? currentPage,
     }),
@@ -255,7 +259,7 @@ export function ActivateDataProvider({
       fetchData(true, 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.qaStatusFilter, filters.searchTerm]);
+  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.qaStatusFilter, filters.serialStatusFilter, filters.searchTerm]);
 
   // Fetch when page changes
   useEffect(() => {
@@ -278,6 +282,7 @@ export function ActivateDataProvider({
       ...defaultFilters,
       dateFrom: '',
       dateTo: '',
+      serialStatusFilter: 'all',
     });
     setCurrentPage(1);
   }, []);

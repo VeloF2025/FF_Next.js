@@ -150,6 +150,7 @@ async function getPaginatedDrops(
     project?: string;
     status?: string;
     qaStatus?: string;
+    serialStatus?: string;
   }
 ): Promise<{ drops: UnifiedDrop[]; pagination: any }> {
   const offset = (page - 1) * pageSize;
@@ -211,6 +212,36 @@ async function getPaginatedDrops(
     conditions.push("u.qa_decision = 'FAIL'");
   } else if (filters?.qaStatus === 'rework') {
     conditions.push("u.qa_decision = 'REWORK_NEEDED'");
+  }
+
+  // Serial Status filter - filter by ONT/UPS serial validation
+  // valid = both serials present and correct format
+  // swapped = ONT looks like UPS or vice versa
+  // missing = ONT or UPS serial is NULL
+  // invalid = serial present but wrong format
+  if (filters?.serialStatus === 'valid') {
+    // Both serials present and match expected patterns (ONT: ALCL/ALCB, UPS: GU18W)
+    conditions.push(`(
+      u.ont_serial_scanned IS NOT NULL
+      AND u.ups_serial_scanned IS NOT NULL
+      AND (u.ont_serial_scanned LIKE 'ALCL%' OR u.ont_serial_scanned LIKE 'ALCB%')
+      AND u.ups_serial_scanned LIKE 'GU18W%'
+    )`);
+  } else if (filters?.serialStatus === 'swapped') {
+    // ONT looks like UPS (GU18W) OR UPS looks like ONT (ALCL/ALCB)
+    conditions.push(`(
+      (u.ont_serial_scanned LIKE 'GU18W%')
+      OR (u.ups_serial_scanned LIKE 'ALCL%' OR u.ups_serial_scanned LIKE 'ALCB%')
+    )`);
+  } else if (filters?.serialStatus === 'missing') {
+    // Either serial is NULL
+    conditions.push('(u.ont_serial_scanned IS NULL OR u.ups_serial_scanned IS NULL)');
+  } else if (filters?.serialStatus === 'invalid') {
+    // Serial present but doesn't match expected pattern (and not swapped)
+    conditions.push(`(
+      (u.ont_serial_scanned IS NOT NULL AND u.ont_serial_scanned NOT LIKE 'ALCL%' AND u.ont_serial_scanned NOT LIKE 'ALCB%' AND u.ont_serial_scanned NOT LIKE 'GU18W%')
+      OR (u.ups_serial_scanned IS NOT NULL AND u.ups_serial_scanned NOT LIKE 'GU18W%' AND u.ups_serial_scanned NOT LIKE 'ALCL%' AND u.ups_serial_scanned NOT LIKE 'ALCB%')
+    )`);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -684,7 +715,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus } = req.query;
+    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus, serialStatus } = req.query;
 
     // Get single drop by ID
     if (id && typeof id === 'string') {
@@ -726,6 +757,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       project: project && typeof project === 'string' ? project : undefined,
       status: status && typeof status === 'string' ? status : undefined,
       qaStatus: qaStatus && typeof qaStatus === 'string' ? qaStatus : undefined,
+      serialStatus: serialStatus && typeof serialStatus === 'string' ? serialStatus : undefined,
     };
 
     const searchTerm = search && typeof search === 'string' ? search : undefined;

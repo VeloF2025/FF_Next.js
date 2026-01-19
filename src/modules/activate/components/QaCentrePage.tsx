@@ -16,6 +16,7 @@ import {
   getTodaySAST,
   getYesterdaySAST,
   type QaStatusFilter,
+  type SerialStatusFilter,
 } from '../context';
 import type {
   QaWizardPhase,
@@ -441,7 +442,7 @@ function QaCentrePageContent() {
   );
 
   const hasActiveFilters = filters.searchTerm || filters.dateFrom || filters.dateTo ||
-    filters.statusFilter !== 'all' || filters.qaStatusFilter !== 'all' || filters.projectFilter !== 'all';
+    filters.statusFilter !== 'all' || filters.qaStatusFilter !== 'all' || filters.serialStatusFilter !== 'all' || filters.projectFilter !== 'all';
 
   if (error) {
     return (
@@ -573,7 +574,7 @@ function QaCentrePageContent() {
 
             {/* Filter Options */}
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 {/* From Date */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -634,6 +635,24 @@ function QaCentrePageContent() {
                   </select>
                 </div>
 
+                {/* Serial Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Serial Status
+                  </label>
+                  <select
+                    value={filters.serialStatusFilter}
+                    onChange={(e) => updateFilter('serialStatusFilter', e.target.value as SerialStatusFilter)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All</option>
+                    <option value="valid">✓ Confirmed</option>
+                    <option value="swapped">⚠ Swapped</option>
+                    <option value="missing">✗ Missing</option>
+                    <option value="invalid">⚠ Invalid</option>
+                  </select>
+                </div>
+
                 {/* Project Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -655,7 +674,7 @@ function QaCentrePageContent() {
 
                 {/* Clear Filters Button */}
                 {hasActiveFilters && (
-                  <div className="md:col-span-5 flex justify-end">
+                  <div className="md:col-span-6 flex justify-end">
                     <button
                       onClick={handleClearFilters}
                       className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"

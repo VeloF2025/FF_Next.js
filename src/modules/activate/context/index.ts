@@ -11,4 +11,7 @@ export type {
   DashboardStats,
   ProjectStat,
   DailyStat,
+  StatusFilter,
+  QaStatusFilter,
+  SerialStatusFilter,
 } from './ActivateDataContext';
