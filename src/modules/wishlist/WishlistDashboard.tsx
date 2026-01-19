@@ -11,7 +11,7 @@ import { WishlistAnalytics } from './components/WishlistAnalytics';
 import { AddWishlistItemModal } from './components/AddWishlistItemModal';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { AppLayout } from '@/components/layout';
+// AppLayout removed - handled by page wrapper
 
 type TabType = 'board' | 'analytics' | 'settings';
 
@@ -54,35 +54,30 @@ export function WishlistDashboard() {
 
   if (loading && !board.columns.length) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-screen">
-          <LoadingSpinner />
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center h-screen">
+        <LoadingSpinner />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <p className="text-red-500 mb-4">{error}</p>
-            <button
-              onClick={refetch}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">{error}</p>
+          <button
+            onClick={refetch}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
         </div>
-      </AppLayout>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <StandardModuleHeader
           title="Feature Wishlist"
@@ -197,7 +192,6 @@ export function WishlistDashboard() {
           onSubmit={createItem}
         />
       </div>
-    </AppLayout>
   );
 }
 

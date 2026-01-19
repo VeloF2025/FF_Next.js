@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
-import { apiResponse } from '@/lib/apiResponse';
 import type { WishlistBoard, CreateWishlistItemInput } from '@/modules/wishlist/types/wishlist';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -10,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
-      return apiResponse.unauthorized();
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = auth.userId;
 
@@ -41,10 +40,13 @@ export async function GET(req: NextRequest) {
       columns: columnsWithItems
     };
 
-    return apiResponse.success(board);
+    return NextResponse.json({ success: true, data: board });
   } catch (error) {
     console.error('Wishlist GET error:', error);
-    return apiResponse.internalError(error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error?.message },
+      { status: 500 }
+    );
   }
 }
 
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
-      return apiResponse.unauthorized();
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = auth.userId;
 
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
     const { title, description, priority = 'medium', effortEstimate, businessValue } = body;
 
     if (!title) {
-      return apiResponse.badRequest('Title is required');
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
     // Get user details from auth
@@ -79,10 +81,13 @@ export async function POST(req: NextRequest) {
       RETURNING *
     `;
 
-    return apiResponse.success(newItem, 201);
+    return NextResponse.json({ success: true, data: newItem }, { status: 201 });
   } catch (error) {
     console.error('Wishlist POST error:', error);
-    return apiResponse.internalError(error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error?.message },
+      { status: 500 }
+    );
   }
 }
 
