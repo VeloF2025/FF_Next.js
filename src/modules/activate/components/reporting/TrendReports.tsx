@@ -211,9 +211,9 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.activated}
               onChange={() => toggleSeries('activated')}
-              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              className="w-4 h-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
             />
-            <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">Activated</span>
+            <span className="text-sm text-cyan-600 dark:text-cyan-400 font-medium">Activated</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -229,9 +229,9 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.notReviewed}
               onChange={() => toggleSeries('notReviewed')}
-              className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
             />
-            <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">Not Reviewed</span>
+            <span className="text-sm text-red-600 dark:text-red-400 font-medium">Not Reviewed</span>
           </label>
         </div>
       </div>
@@ -371,9 +371,9 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
           }) || []}
           series={[
             ...(seriesVisibility.installed ? [{ dataKey: 'Installed', name: 'Installed', color: '#3B82F6' }] : []),
-            ...(seriesVisibility.activated ? [{ dataKey: 'Activated', name: 'Activated', color: '#8B5CF6' }] : []),
+            ...(seriesVisibility.activated ? [{ dataKey: 'Activated', name: 'Activated', color: '#06B6D4' }] : []),
             ...(seriesVisibility.reviewed ? [{ dataKey: 'Reviewed', name: 'Reviewed', color: '#10B981' }] : []),
-            ...(seriesVisibility.notReviewed ? [{ dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#F59E0B' }] : []),
+            ...(seriesVisibility.notReviewed ? [{ dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#EF4444' }] : []),
           ]}
           type="line"
           xAxisKey="date"
