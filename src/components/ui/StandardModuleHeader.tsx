@@ -1,4 +1,6 @@
-import { useRouter } from 'next/router';
+'use client';
+
+import { useRouter } from 'next/navigation';
 import { Plus, Upload, Download } from 'lucide-react';
 
 interface StandardModuleHeaderProps {
