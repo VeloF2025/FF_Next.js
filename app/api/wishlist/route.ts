@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withArcjetProtection, aj } from '@/lib/arcjet';
 import type { WishlistBoard, CreateWishlistItemInput } from '@/modules/wishlist/types/wishlist';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function GET(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
@@ -49,7 +48,7 @@ async function GET(req: NextRequest) {
   }
 }
 
-async function POST(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
@@ -87,4 +86,4 @@ async function POST(req: NextRequest) {
   }
 }
 
-export default withArcjetProtection({ GET, POST }, aj);
+// Note: Arcjet protection can be added later with middleware
