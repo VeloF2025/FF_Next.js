@@ -2,7 +2,7 @@
  * Communications section configuration
  */
 
-import { MessageSquare, Users, CheckCircle } from 'lucide-react';
+import { MessageSquare, Users, CheckCircle, ListTodo } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const communicationsSection: NavSection = {
@@ -29,6 +29,13 @@ export const communicationsSection: NavSection = {
       icon: CheckCircle,
       label: 'Action Items',
       shortLabel: 'Actions',
+      permissions: [],
+    },
+    {
+      to: '/communications/wishlist',
+      icon: ListTodo,
+      label: 'Wishlist',
+      shortLabel: 'Wishlist',
       permissions: [],
     },
   ]
