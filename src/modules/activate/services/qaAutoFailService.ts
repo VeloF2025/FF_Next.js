@@ -332,11 +332,20 @@ export function checkStepCoverage(
 
 /**
  * Validate 3-way serial cross-reference
+ *
+ * IMPORTANT: Step 6 (ONT back) is the definitive serial source because:
+ * - The serial sticker is clearly visible on the back panel
+ * - Step 9 (front/green lights) may have different labels or be harder to read
+ *
+ * Validation logic:
+ * - If Step 6 matches OneMap → PASS (ignore Step 9 mismatch)
+ * - If Step 6 doesn't match but Step 9 does → PARTIAL (flag for review)
+ * - If neither matches OneMap → MISMATCH
  */
 export function validateSerialCrossReference(data: DrValidationData): SerialValidationResult {
-  const onemapSerial = data.ontSerial?.trim() || null;
-  const step6Serial = data.vlmOntSerialStep6?.trim() || null;
-  const step9Serial = data.vlmOntSerialStep9?.trim() || null;
+  const onemapSerial = data.ontSerial?.trim().toUpperCase() || null;
+  const step6Serial = data.vlmOntSerialStep6?.trim().toUpperCase() || null;
+  const step9Serial = data.vlmOntSerialStep9?.trim().toUpperCase() || null;
   const step9DrNumber = data.vlmDrNumberStep9?.trim() || null;
 
   // Check if any VLM extractions are pending
@@ -354,10 +363,10 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
     };
   }
 
-  // Check ONT serial match (3-way)
-  const serialsToCompare = [onemapSerial, step6Serial, step9Serial].filter(Boolean);
-  const uniqueSerials = [...new Set(serialsToCompare.map((s) => s?.toUpperCase()))];
-  const ontMatch = uniqueSerials.length <= 1 && serialsToCompare.length > 0;
+  // Step 6 is the definitive serial source (ONT back panel sticker)
+  const step6MatchesOnemap = onemapSerial && step6Serial && step6Serial === onemapSerial;
+  const step9MatchesOnemap = onemapSerial && step9Serial && step9Serial === onemapSerial;
+  const step6MatchesStep9 = step6Serial && step9Serial && step6Serial === step9Serial;
 
   // Check DR number match
   const drMatch =
@@ -365,25 +374,55 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
     step9DrNumber.toUpperCase().includes(data.drNumber.toUpperCase()) ||
     data.drNumber.toUpperCase().includes(step9DrNumber.toUpperCase());
 
-  // Determine status
+  // Determine ONT match status - Step 6 is authoritative
+  let ontMatch = false;
   let status: SerialValidationResult['status'];
   let details: string;
 
-  if (ontMatch && drMatch) {
-    status = 'match';
-    details = 'All serial and DR number checks passed';
-  } else if (!ontMatch && !drMatch) {
-    status = 'mismatch';
-    details = `ONT serials don't match (${uniqueSerials.join(' vs ')}) AND DR number mismatch`;
-  } else if (!ontMatch) {
-    status = 'mismatch';
-    details = `ONT serials don't match: OneMap=${onemapSerial}, Step6=${step6Serial}, Step9=${step9Serial}`;
-  } else if (!drMatch) {
-    status = 'mismatch';
-    details = `DR number mismatch: Expected ${data.drNumber}, Got ${step9DrNumber}`;
-  } else {
+  if (step6MatchesOnemap) {
+    // Step 6 matches OneMap - this is the gold standard
+    ontMatch = true;
+    if (step6MatchesStep9) {
+      // Perfect: all three match
+      status = drMatch ? 'match' : 'mismatch';
+      details = drMatch
+        ? 'All serial and DR number checks passed'
+        : `DR number mismatch: Expected ${data.drNumber}, Got ${step9DrNumber}`;
+    } else if (step9Serial) {
+      // Step 6 matches but Step 9 differs - log warning but pass serial check
+      // This could be VLM misread on Step 9 or different front label
+      status = drMatch ? 'match' : 'mismatch';
+      details = drMatch
+        ? `Serial verified via Step 6 (${step6Serial}). Note: Step 9 shows different value (${step9Serial})`
+        : `DR number mismatch. Serial verified via Step 6.`;
+      log.warn('QaAutoFail', `Step 9 serial differs from Step 6 for ${data.drNumber}`, {
+        step6Serial,
+        step9Serial,
+        onemapSerial,
+        note: 'Step 6 matches OneMap, treating as valid',
+      });
+    } else {
+      // Step 6 matches but no Step 9 - still valid
+      status = drMatch ? 'match' : 'mismatch';
+      details = drMatch
+        ? `Serial verified via Step 6 (${step6Serial})`
+        : `DR number mismatch. Serial verified via Step 6.`;
+    }
+  } else if (step9MatchesOnemap) {
+    // Step 6 doesn't match but Step 9 does - flag for manual review
+    ontMatch = false;
     status = 'partial';
-    details = 'Partial match - some checks pending';
+    details = `Step 6 serial (${step6Serial || 'N/A'}) doesn't match OneMap (${onemapSerial}), but Step 9 does. Needs review.`;
+  } else if (!onemapSerial && (step6Serial || step9Serial)) {
+    // No OneMap serial to compare - can't validate
+    ontMatch = false;
+    status = 'pending';
+    details = 'No OneMap serial available for comparison';
+  } else {
+    // Neither Step 6 nor Step 9 matches OneMap - definite mismatch
+    ontMatch = false;
+    status = 'mismatch';
+    details = `ONT serials don't match OneMap: OneMap=${onemapSerial}, Step6=${step6Serial || 'N/A'}, Step9=${step9Serial || 'N/A'}`;
   }
 
   return {
