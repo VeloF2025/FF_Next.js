@@ -30,7 +30,8 @@ const pool = new Pool({
 // Service endpoints
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-const WA_SENDER_URL = process.env.WA_SENDER_URL || 'http://100.96.203.105:8090';
+// WA Sender (port 8081) - sends QA feedback from FibreFlow Sender number (082 418 9511)
+const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://100.96.203.105:8081';
 
 interface ServiceStatus {
   status: 'healthy' | 'degraded' | 'down' | 'unknown';
@@ -244,12 +245,13 @@ async function checkWhatsAppSender(): Promise<ServiceStatus> {
 
     if (response.ok) {
       const data = await response.json();
-      // Support both formats: {connected: true} (old) and {status: "healthy"} (wa-feedback)
+      // Support both formats: {connected: true, phone: "..."} (sender) and {status: "healthy"} (wa-feedback proxy)
       const isHealthy = data.connected === true || data.status === 'healthy';
+      const phone = data.phone ? ` (${data.phone})` : '';
       return {
         status: isHealthy ? 'healthy' : 'degraded',
         latencyMs: Date.now() - start,
-        message: isHealthy ? 'WA Feedback service healthy' : 'WA Feedback service unhealthy',
+        message: isHealthy ? `WA Sender connected${phone}` : 'WA Sender not connected',
         lastCheck: new Date().toISOString(),
       };
     } else {
