@@ -50,7 +50,7 @@ async function cacheQContactActivities(
 
       // Check if already cached
       const existing = await sql`
-        SELECT id FROM ticket_activities
+        SELECT id FROM maintenance_activities
         WHERE ticket_id = ${ticketId} AND external_id = ${externalId}
       `;
 
@@ -61,7 +61,7 @@ async function cacheQContactActivities(
 
       // Insert new activity
       await sql`
-        INSERT INTO ticket_activities (
+        INSERT INTO maintenance_activities (
           id,
           ticket_id,
           external_id,
@@ -122,7 +122,7 @@ export async function GET(
     // Get the ticket to find QContact case ID (stored as external_id for qcontact source)
     const tickets = await sql`
       SELECT id, source, external_id, dr_number
-      FROM tickets
+      FROM maintenance_tickets
       WHERE id = ${ticketId}
     `;
 
@@ -197,7 +197,7 @@ export async function GET(
               source,
               external_timestamp,
               created_at
-            FROM ticket_activities
+            FROM maintenance_activities
             WHERE ticket_id = ${ticketId}
               AND (source IS NULL OR source != 'qcontact')
             ORDER BY COALESCE(external_timestamp, created_at) DESC
@@ -214,7 +214,7 @@ export async function GET(
               source,
               external_timestamp,
               created_at
-            FROM ticket_activities
+            FROM maintenance_activities
             WHERE ticket_id = ${ticketId}
             ORDER BY COALESCE(external_timestamp, created_at) DESC
           `;
@@ -330,7 +330,7 @@ export async function POST(
 
     // Verify ticket exists
     const tickets = await sql`
-      SELECT id FROM tickets WHERE id = ${ticketId}
+      SELECT id FROM maintenance_tickets WHERE id = ${ticketId}
     `;
 
     if (tickets.length === 0) {
@@ -342,7 +342,7 @@ export async function POST(
     const now = new Date().toISOString();
 
     await sql`
-      INSERT INTO ticket_activities (
+      INSERT INTO maintenance_activities (
         id, ticket_id, type, description, created_by, created_at, is_private, is_pinned
       ) VALUES (
         ${activityId},

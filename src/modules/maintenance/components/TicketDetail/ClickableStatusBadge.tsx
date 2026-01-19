@@ -40,7 +40,7 @@ interface ClickableStatusBadgeProps {
 }
 
 /**
- * Database status type from ticket_statuses table
+ * Database status type from maintenance_statuses table
  */
 interface StatusOption {
   id: string;

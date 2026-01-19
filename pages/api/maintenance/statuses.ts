@@ -40,14 +40,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (parent_id) {
           statuses = (await sql`
             SELECT id, code, name, description, parent_id, color, icon, display_order, is_active, is_terminal, qcontact_status
-            FROM ticket_statuses
+            FROM maintenance_statuses
             WHERE parent_id = ${parent_id as string}
             ORDER BY display_order, name
           `) as TicketStatus[];
         } else {
           statuses = (await sql`
             SELECT id, code, name, description, parent_id, color, icon, display_order, is_active, is_terminal, qcontact_status
-            FROM ticket_statuses
+            FROM maintenance_statuses
             ORDER BY display_order, name
           `) as TicketStatus[];
         }
@@ -55,14 +55,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (parent_id) {
           statuses = (await sql`
             SELECT id, code, name, description, parent_id, color, icon, display_order, is_active, is_terminal, qcontact_status
-            FROM ticket_statuses
+            FROM maintenance_statuses
             WHERE is_active = true AND parent_id = ${parent_id as string}
             ORDER BY display_order, name
           `) as TicketStatus[];
         } else {
           statuses = (await sql`
             SELECT id, code, name, description, parent_id, color, icon, display_order, is_active, is_terminal, qcontact_status
-            FROM ticket_statuses
+            FROM maintenance_statuses
             WHERE is_active = true
             ORDER BY display_order, name
           `) as TicketStatus[];
@@ -95,7 +95,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const result = await sql`
-        INSERT INTO ticket_statuses (code, name, description, parent_id, color, icon, display_order, is_terminal, qcontact_status)
+        INSERT INTO maintenance_statuses (code, name, description, parent_id, color, icon, display_order, is_terminal, qcontact_status)
         VALUES (
           ${code},
           ${name},
