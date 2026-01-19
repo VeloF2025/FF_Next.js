@@ -22,13 +22,60 @@ export function useWishlist() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Calculate stats from columns
+  const calculateStats = (columns: any[]) => {
+    let total = 0;
+    let totalVotes = 0;
+    let inProgress = 0;
+    let completed = 0;
+    const byPriority = { low: 0, medium: 0, high: 0 };
+    const byStatus: Record<string, number> = {};
+
+    columns.forEach(column => {
+      const itemCount = column.items?.length || 0;
+      byStatus[column.name] = itemCount;
+      total += itemCount;
+
+      column.items?.forEach((item: any) => {
+        totalVotes += item.votes || 0;
+
+        if (item.priority) {
+          byPriority[item.priority as keyof typeof byPriority] =
+            (byPriority[item.priority as keyof typeof byPriority] || 0) + 1;
+        }
+
+        if (column.name === 'In Progress') {
+          inProgress++;
+        } else if (column.name === 'Completed') {
+          completed++;
+        }
+      });
+    });
+
+    return {
+      total,
+      totalVotes,
+      inProgress,
+      completed,
+      byPriority,
+      byStatus,
+    };
+  };
+
   // Fetch board data
   const fetchBoard = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await wishlistService.getBoard();
-      setBoard(data);
+
+      // Calculate stats from columns data
+      const stats = calculateStats(data.columns || []);
+
+      setBoard({
+        ...data,
+        stats,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load wishlist';
       setError(message);

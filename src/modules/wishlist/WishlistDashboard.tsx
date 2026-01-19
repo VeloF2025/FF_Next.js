@@ -170,7 +170,7 @@ export function WishlistDashboard() {
             </DragDropContext>
           )}
 
-          {activeTab === 'analytics' && (
+          {activeTab === 'analytics' && board.stats && (
             <WishlistAnalytics stats={board.stats} />
           )}
 
