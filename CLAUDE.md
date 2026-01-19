@@ -3,7 +3,7 @@
 ## Project Overview
 **FibreFlow Next.js** - A fiber network project management application
 - **Framework**: Next.js 14+ with App Router
-- **Auth**: Clerk (fully integrated)
+- **Auth**: PostgreSQL-based authentication (role-based)
 - **Database**: Neon PostgreSQL (direct SQL)
 - **Storage**: Firebase Storage (files/images)
 
@@ -660,7 +660,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c
 
 - **Server**: Now hosted on Velocity Server (migrated from old VPS)
 - **Migration Complete**: Next.js in production, React/Vite archived
-- **Authentication**: Clerk only (Firebase Auth removed)
+- **Authentication**: PostgreSQL-based authentication (mock auth for development)
 - **Database**: Direct SQL with Neon serverless client (no ORM)
 - **Archive**: `../FF_React_Archive/` has old files for reference
 - **Full Server Docs**: `~/VF/server/LOUIS_VELOCITY_SERVER_ACCESS.md`
