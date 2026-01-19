@@ -136,7 +136,7 @@ export default function BOQCard({
               
               {boq.itemCount > 0 && (
                 <div className="text-sm text-[var(--ff-text-secondary)]">
-                  {Math.round((boq.mappedItems / boq.itemCount) * 100)}% mapped
+                  {Math.round(((boq.mappedItems || 0) / boq.itemCount) * 100)}% mapped
                 </div>
               )}
             </div>
@@ -146,7 +146,7 @@ export default function BOQCard({
               <div className="w-24 bg-[var(--ff-bg-hover)] rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full"
-                  style={{ width: `${Math.round((boq.mappedItems / boq.itemCount) * 100)}%` }}
+                  style={{ width: `${Math.round(((boq.mappedItems || 0) / boq.itemCount) * 100)}%` }}
                 />
               </div>
             )}
