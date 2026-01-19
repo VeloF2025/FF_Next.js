@@ -56,6 +56,9 @@ export function PhotoReviewPhase({
   // Lightbox state
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
+  // Edit mode - allows editing approved categorizations without re-running VLM
+  const [isEditing, setIsEditing] = useState(false);
+
   // Load categorization state on mount
   useEffect(() => {
     loadCategorizationState();
@@ -337,7 +340,7 @@ export function PhotoReviewPhase({
     );
   }
 
-  // Approved state - can proceed
+  // Approved state - can proceed (or edit individual assignments)
   if (state.status === 'approved') {
     // Count photos per step - use approvals map for current session overrides
     const stepCounts = new Map<number, number>();
@@ -355,6 +358,151 @@ export function PhotoReviewPhase({
       }
     }
 
+    // If in edit mode, show the editing UI
+    if (isEditing) {
+      return (
+        <div className="space-y-4">
+          {/* Photo lightbox */}
+          {lightboxPhoto && (
+            <div
+              className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+              onClick={() => setLightboxPhoto(null)}
+            >
+              <div className="relative max-w-4xl max-h-[90vh]">
+                <img
+                  src={lightboxPhoto}
+                  alt="Full size"
+                  className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                />
+                <button
+                  onClick={() => setLightboxPhoto(null)}
+                  className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full hover:bg-black/70"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Edit mode header */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-blue-800 dark:text-blue-200">
+                  ✏️ Edit Step Assignments
+                </h4>
+                <p className="text-blue-600 dark:text-blue-400 text-sm">
+                  Change individual photo step assignments below. Click Save when done.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              <p className="text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Photo grid for editing */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
+            {[...state.results]
+              .sort((a, b) => {
+                const stepA = approvals.get(a.photo_filename)?.overrideStep ?? a.human_override_step ?? a.vlm_predicted_step;
+                const stepB = approvals.get(b.photo_filename)?.overrideStep ?? b.human_override_step ?? b.vlm_predicted_step;
+                return stepA - stepB;
+              })
+              .map((result) => {
+              const approval = approvals.get(result.photo_filename);
+              const currentStep = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
+              const photoUrl = `/api/activate/photo/${dropNumber}/${result.photo_filename}`;
+
+              return (
+                <div
+                  key={result.photo_filename}
+                  className="border rounded-lg p-3 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                >
+                  <div className="flex gap-3">
+                    {/* Thumbnail */}
+                    <button
+                      type="button"
+                      onClick={() => setLightboxPhoto(photoUrl)}
+                      className="flex-shrink-0 relative group"
+                    >
+                      <img
+                        src={photoUrl}
+                        alt={result.photo_filename}
+                        className="w-20 h-20 object-cover rounded border border-gray-200 dark:border-gray-600"
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                        <span className="text-white text-xs">View</span>
+                      </span>
+                    </button>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900 dark:text-white text-sm">
+                          Step {currentStep}: {STEP_LABELS[currentStep] || 'Unknown'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
+                        {result.vlm_identified_as}
+                      </p>
+
+                      {/* Step selector */}
+                      <select
+                        value={currentStep}
+                        onChange={(e) => {
+                          const newStep = parseInt(e.target.value);
+                          setPhotoApproval(result.photo_filename, true, newStep);
+                        }}
+                        className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 w-full"
+                      >
+                        <option value="0">❌ Discard (Step 0)</option>
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
+                          <option key={step} value={step}>
+                            Step {step}: {STEP_LABELS[step]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setIsEditing(false)}
+              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            >
+              ← Cancel
+            </button>
+            <button
+              onClick={async () => {
+                await submitApprovals();
+                setIsEditing(false);
+              }}
+              disabled={isProcessing}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isProcessing ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Normal approved view (not editing)
     return (
       <div className="space-y-6">
         {/* Success banner */}
@@ -371,20 +519,28 @@ export function PhotoReviewPhase({
                 </p>
               </div>
             </div>
-            <button
-              onClick={runCategorization}
-              disabled={isProcessing}
-              className="px-3 py-1 text-sm border border-green-600 text-green-600 rounded hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50"
-            >
-              {isProcessing ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600" />
-                  Re-categorizing...
-                </span>
-              ) : (
-                'Re-categorize'
-              )}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30"
+              >
+                ✏️ Edit
+              </button>
+              <button
+                onClick={runCategorization}
+                disabled={isProcessing}
+                className="px-3 py-1 text-sm border border-green-600 text-green-600 rounded hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50"
+              >
+                {isProcessing ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600" />
+                    Re-categorizing...
+                  </span>
+                ) : (
+                  'Re-categorize'
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
