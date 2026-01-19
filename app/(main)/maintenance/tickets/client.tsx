@@ -102,7 +102,7 @@ export default function TicketsListPageClient() {
 
           {/* Create Ticket Button */}
           <Link
-            href="/ticketing/tickets/new"
+            href="/maintenance/tickets/new"
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Create Ticket

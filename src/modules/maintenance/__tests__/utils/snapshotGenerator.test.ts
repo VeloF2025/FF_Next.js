@@ -40,7 +40,7 @@ describe('Snapshot Generator (TDD)', () => {
     description: 'Customer reports no connectivity',
     status: 'pending_handover',
     priority: 'high',
-    ticket_type: 'maintenance',
+    ticket_type: 'fault_repair',
     dr_number: 'DR-12345',
     project_id: 'project-uuid-001',
     zone_id: 'zone-uuid-001',
@@ -171,7 +171,7 @@ describe('Snapshot Generator (TDD)', () => {
       expect(result.snapshot_data.description).toBe('Customer reports no connectivity');
       expect(result.snapshot_data.status).toBe('pending_handover');
       expect(result.snapshot_data.priority).toBe('high');
-      expect(result.snapshot_data.ticket_type).toBe('maintenance');
+      expect(result.snapshot_data.ticket_type).toBe('fault_repair');
     });
 
     it('should include all location data in snapshot', async () => {

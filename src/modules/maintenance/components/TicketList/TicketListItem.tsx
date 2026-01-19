@@ -153,7 +153,7 @@ export function TicketListItem({ ticket, compact = false, onClick }: TicketListI
   // Default: render as link
   return (
     <Link
-      href={`/ticketing/tickets/${ticket.id}`}
+      href={`/maintenance/tickets/${ticket.id}`}
       className={cn(
         'block bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors',
         compact ? 'p-3' : 'p-4'

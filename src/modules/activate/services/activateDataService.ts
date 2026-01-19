@@ -11,10 +11,41 @@ import type {
   SerialValidationReportResponse,
   UserTeamAttributionResponse,
 } from '../types/reporting.types';
+import {
+  looksLikeOntSerial,
+  looksLikeGizzuSerial,
+  detectSwappedSerials,
+  maskSerial,
+} from './qaAutoFailService';
 
 // ============================================================================
 // TYPES
 // ============================================================================
+
+/** QA Workflow phases in order */
+export type QaWizardPhase =
+  | 'prerequisites'
+  | 'photo_review'
+  | 'data_validation'
+  | 'final_decision'
+  | 'feedback'
+  | 'completed';
+
+/** Final QA decision */
+export type QaDecision = 'PASS' | 'FAIL' | 'REWORK_NEEDED';
+
+/** Serial validation status for display */
+export type SerialValidationStatus = 'valid' | 'swapped' | 'missing' | 'invalid';
+
+/** Workflow phase order for progress calculation */
+export const QA_PHASE_ORDER: QaWizardPhase[] = [
+  'prerequisites',
+  'photo_review',
+  'data_validation',
+  'final_decision',
+  'feedback',
+  'completed',
+];
 
 export interface DrListItem {
   id: string;
@@ -34,6 +65,26 @@ export interface DrListItem {
   createdAt: string;
   submittedDate: string | null;
   senderPhone: string | null;
+
+  // Rich Status Model (new fields)
+  /** Whether DR exists in oes_activations table */
+  isActivated: boolean;
+  /** Current workflow phase */
+  qaPhase: QaWizardPhase | null;
+  /** Final QA decision */
+  qaDecision: QaDecision | null;
+
+  // Serial Validation (new fields)
+  /** ONT serial validation status */
+  ontSerialStatus: SerialValidationStatus;
+  /** UPS serial validation status */
+  upsSerialStatus: SerialValidationStatus;
+  /** Whether serials appear to be swapped */
+  serialsSwapped: boolean;
+  /** Masked ONT serial for display */
+  ontSerialMasked: string;
+  /** Masked UPS serial for display */
+  upsSerialMasked: string;
 }
 
 export interface DashboardStats {
@@ -103,6 +154,46 @@ export interface DropsFilters {
 }
 
 // ============================================================================
+// SERIAL VALIDATION HELPER
+// ============================================================================
+
+/**
+ * Calculate serial validation status for a given serial
+ * @param serial - The serial to validate
+ * @param expectedType - Whether this is expected to be 'ont' or 'ups'
+ * @param otherSerial - The other serial (for swap detection)
+ */
+export function calculateSerialStatus(
+  serial: string | null,
+  expectedType: 'ont' | 'ups',
+  otherSerial: string | null
+): SerialValidationStatus {
+  if (!serial) return 'missing';
+
+  // Check for swapped serials
+  const swapInfo = detectSwappedSerials(
+    expectedType === 'ont' ? serial : otherSerial,
+    expectedType === 'ups' ? serial : otherSerial
+  );
+  if (swapInfo.swapped) return 'swapped';
+
+  // Check if serial matches expected format
+  if (expectedType === 'ont') {
+    return looksLikeOntSerial(serial) ? 'valid' : 'invalid';
+  }
+  return looksLikeGizzuSerial(serial) ? 'valid' : 'invalid';
+}
+
+/**
+ * Get the phase index for progress calculation (0-5)
+ */
+export function getPhaseIndex(phase: QaWizardPhase | null): number {
+  if (!phase) return 0;
+  const index = QA_PHASE_ORDER.indexOf(phase);
+  return index >= 0 ? index : 0;
+}
+
+// ============================================================================
 // DATE HELPERS
 // ============================================================================
 
@@ -152,22 +243,40 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
   }
 
   // Transform API response
-  const transformedDrops: DrListItem[] = data.data.map((drop: any) => ({
-    id: drop.id,
-    dropNumber: drop.drop_number,
-    project: drop.project,
-    reviewDate: drop.updated_at,
-    completedPhotos: drop.steps_completed || 0,
-    outstandingPhotos: (drop.steps_total || 10) - (drop.steps_completed || 0),
-    photoCount: drop.photo_count || 0,
-    ontSerial: drop.ont_serial_scanned || null,
-    upsSerial: drop.ups_serial_scanned || null,
-    status: drop.is_complete ? 'complete' : 'incomplete',
-    feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
-    createdAt: drop.created_at,
-    submittedDate: drop.submitted_date || null,
-    senderPhone: drop.sender_phone || null,
-  }));
+  const transformedDrops: DrListItem[] = data.data.map((drop: any) => {
+    const ontSerial = drop.ont_serial_scanned || null;
+    const upsSerial = drop.ups_serial_scanned || null;
+    const swapInfo = detectSwappedSerials(ontSerial, upsSerial);
+
+    return {
+      id: drop.id,
+      dropNumber: drop.drop_number,
+      project: drop.project,
+      reviewDate: drop.updated_at,
+      completedPhotos: drop.steps_completed || 0,
+      outstandingPhotos: (drop.steps_total || 10) - (drop.steps_completed || 0),
+      photoCount: drop.photo_count || 0,
+      ontSerial,
+      upsSerial,
+      status: drop.is_complete ? 'complete' : 'incomplete',
+      feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
+      createdAt: drop.created_at,
+      submittedDate: drop.submitted_date || null,
+      senderPhone: drop.sender_phone || null,
+
+      // Rich Status Model
+      isActivated: drop.is_activated || false,
+      qaPhase: drop.qa_phase || null,
+      qaDecision: drop.qa_decision || null,
+
+      // Serial Validation
+      ontSerialStatus: calculateSerialStatus(ontSerial, 'ont', upsSerial),
+      upsSerialStatus: calculateSerialStatus(upsSerial, 'ups', ontSerial),
+      serialsSwapped: swapInfo.swapped,
+      ontSerialMasked: maskSerial(ontSerial),
+      upsSerialMasked: maskSerial(upsSerial),
+    };
+  });
 
   return {
     success: true,

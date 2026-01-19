@@ -4,7 +4,7 @@
  * Tests FIRST - Implementation SECOND
  *
  * Testing cron-triggered sync endpoint:
- * - POST /api/ticketing/cron/sync-qcontact
+ * - POST /api/maintenance/cron/sync-qcontact
  * - Authorization verification
  * - Job execution tracking
  * - Error handling
@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { POST, GET } from '@/app/api/ticketing/cron/sync-qcontact/route';
+import { POST, GET } from '@/app/api/maintenance/cron/sync-qcontact/route';
 import { NextRequest } from 'next/server';
 
 // Mock dependencies
@@ -32,7 +32,7 @@ vi.mock('@/lib/logger', () => ({
 
 import { runSyncJob } from '@/modules/maintenance/jobs/qcontactSync';
 
-describe('POST /api/ticketing/cron/sync-qcontact', () => {
+describe('POST /api/maintenance/cron/sync-qcontact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Clear environment variables
@@ -78,7 +78,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
 
     vi.mocked(runSyncJob).mockResolvedValue(mockJobResult);
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
     });
 
@@ -98,7 +98,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
     // 🟢 WORKING: Test authorization verification
     process.env.CRON_SECRET = 'test-secret-123';
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer test-secret-123',
@@ -154,7 +154,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
     // 🟢 WORKING: Test unauthorized access
     process.env.CRON_SECRET = 'correct-secret';
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer wrong-secret',
@@ -174,7 +174,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
     // 🟢 WORKING: Test missing authorization
     process.env.CRON_SECRET = 'test-secret';
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
     });
 
@@ -190,7 +190,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
     // 🟢 WORKING: Test error handling
     vi.mocked(runSyncJob).mockRejectedValue(new Error('Database connection failed'));
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
     });
 
@@ -242,7 +242,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
 
     vi.mocked(runSyncJob).mockResolvedValue(mockJobResult);
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
     });
 
@@ -270,7 +270,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
 
     vi.mocked(runSyncJob).mockResolvedValue(mockJobResult);
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
     });
 
@@ -323,7 +323,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
 
     vi.mocked(runSyncJob).mockResolvedValue(mockJobResult);
 
-    const request = new NextRequest('http://localhost:3000/api/ticketing/cron/sync-qcontact', {
+    const request = new NextRequest('http://localhost:3000/api/maintenance/cron/sync-qcontact', {
       method: 'POST',
     });
 
@@ -337,7 +337,7 @@ describe('POST /api/ticketing/cron/sync-qcontact', () => {
   });
 });
 
-describe('GET /api/ticketing/cron/sync-qcontact', () => {
+describe('GET /api/maintenance/cron/sync-qcontact', () => {
   it('should reject GET requests', async () => {
     // 🟢 WORKING: Test method not allowed
     const response = await GET();

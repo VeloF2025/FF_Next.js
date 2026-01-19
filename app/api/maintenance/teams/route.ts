@@ -1,8 +1,8 @@
 /**
  * Teams API Route - List and Create
  *
- * GET  /api/ticketing/teams - List all teams
- * POST /api/ticketing/teams - Create new team
+ * GET  /api/maintenance/teams - List all teams
+ * POST /api/maintenance/teams - Create new team
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,10 +14,10 @@ import {
 } from '@/modules/maintenance/services/teamService';
 import type { CreateTeamPayload, TeamFilters } from '@/modules/maintenance/types/team';
 
-const logger = createLogger('ticketing:api:teams');
+const logger = createLogger('maintenance:api:teams');
 
 /**
- * GET /api/ticketing/teams
+ * GET /api/maintenance/teams
  *
  * Query params:
  * - team_type: Filter by team type
@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/ticketing/teams
+ * POST /api/maintenance/teams
  */
 export async function POST(req: NextRequest) {
   try {

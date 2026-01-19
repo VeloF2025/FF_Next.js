@@ -69,7 +69,7 @@ describe('QContact Inbound Sync Service', () => {
         customer_email: 'john@example.com',
         address: '123 Main Street, Cape Town',
         assigned_to: null,
-        category: 'maintenance',
+        category: 'fault_repair',
         subcategory: 'fiber_fault',
         custom_fields: null,
       };
@@ -162,7 +162,7 @@ describe('QContact Inbound Sync Service', () => {
         custom_fields: null,
       });
 
-      expect(mapQContactTicketToFibreFlow(createTicket('maintenance')).ticket_type).toBe(TicketType.FAULT_REPAIR);
+      expect(mapQContactTicketToFibreFlow(createTicket('fault_repair')).ticket_type).toBe(TicketType.FAULT_REPAIR);
       expect(mapQContactTicketToFibreFlow(createTicket('installation')).ticket_type).toBe(TicketType.NEW_INSTALLATION);
       expect(mapQContactTicketToFibreFlow(createTicket('modification')).ticket_type).toBe(TicketType.MODIFICATION);
       expect(mapQContactTicketToFibreFlow(createTicket('ont_swap')).ticket_type).toBe(TicketType.ONT_SWAP);
@@ -187,7 +187,7 @@ describe('QContact Inbound Sync Service', () => {
         customer_email: 'john@example.com',
         address: '123 Main Street',
         assigned_to: null,
-        category: 'maintenance',
+        category: 'fault_repair',
         subcategory: 'fiber_fault',
         custom_fields: {
           dr_number: 'DR-2024-001',
@@ -385,7 +385,7 @@ describe('QContact Inbound Sync Service', () => {
           customer_email: null,
           address: null,
           assigned_to: null,
-          category: 'maintenance',
+          category: 'fault_repair',
           subcategory: null,
           custom_fields: null,
         },

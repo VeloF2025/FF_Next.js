@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for sending WhatsApp notifications
  *
- * POST /api/ticketing/notifications/whatsapp - Send WhatsApp notification
+ * POST /api/maintenance/notifications/whatsapp - Send WhatsApp notification
  *
  * Features:
  * - Template-based messaging with variable substitution
@@ -12,7 +12,7 @@
  * - Proper error handling with standard API responses
  * - Follows Zero Tolerance protocol (no console.log, proper error handling)
  *
- * @module api/ticketing/notifications/whatsapp
+ * @module api/maintenance/notifications/whatsapp
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,7 +22,7 @@ import type { SendNotificationRequest } from '@/modules/maintenance/types/whatsa
 import { RecipientType } from '@/modules/maintenance/types/whatsapp';
 
 // 🟢 WORKING: Logger instance for WhatsApp notification API
-const logger = createLogger('ticketing:api:notifications:whatsapp');
+const logger = createLogger('maintenance:api:notifications:whatsapp');
 
 // Valid enum values for validation
 const VALID_RECIPIENT_TYPES: RecipientType[] = [
@@ -32,7 +32,7 @@ const VALID_RECIPIENT_TYPES: RecipientType[] = [
   RecipientType.TEAM,
 ];
 
-// ==================== POST /api/ticketing/notifications/whatsapp ====================
+// ==================== POST /api/maintenance/notifications/whatsapp ====================
 
 /**
  * 🟢 WORKING: Send WhatsApp notification via WAHA API

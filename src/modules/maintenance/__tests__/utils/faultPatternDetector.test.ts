@@ -571,17 +571,17 @@ mockQuery.mockResolvedValueOnce([]); // No existing escalation
         const scopeValue = params[0];
         if (scopeValue === poleNumber) {
           // Check if this is the escalation check query
-          if (queryText.includes('repeat_fault_escalations')) {
+          if (queryText.includes('maintenance_escalations')) {
             return [];
           }
           return mockPoleTickets;
         } else if (scopeValue === ponNumber) {
-          if (queryText.includes('repeat_fault_escalations')) {
+          if (queryText.includes('maintenance_escalations')) {
             return [];
           }
           return mockPonTickets;
         } else if (scopeValue === zoneId) {
-          if (queryText.includes('repeat_fault_escalations')) {
+          if (queryText.includes('maintenance_escalations')) {
             return [];
           }
           return mockZoneTickets;

@@ -4,17 +4,17 @@
  * Tests FIRST - Implementation SECOND
  *
  * Testing dashboard API endpoints:
- * - GET /api/ticketing/dashboard/summary - Dashboard summary statistics
- * - GET /api/ticketing/dashboard/sla - SLA compliance metrics
- * - GET /api/ticketing/dashboard/workload - Workload by assignee
+ * - GET /api/maintenance/dashboard/summary - Dashboard summary statistics
+ * - GET /api/maintenance/dashboard/sla - SLA compliance metrics
+ * - GET /api/maintenance/dashboard/workload - Workload by assignee
  *
  * 🟢 WORKING: Comprehensive test suite for dashboard API endpoints
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { GET as getSummary } from '@/app/api/ticketing/dashboard/summary/route';
-import { GET as getSLA } from '@/app/api/ticketing/dashboard/sla/route';
-import { GET as getWorkload } from '@/app/api/ticketing/dashboard/workload/route';
+import { GET as getSummary } from '@/app/api/maintenance/dashboard/summary/route';
+import { GET as getSLA } from '@/app/api/maintenance/dashboard/sla/route';
+import { GET as getWorkload } from '@/app/api/maintenance/dashboard/workload/route';
 import { NextRequest } from 'next/server';
 
 // Mock the dashboard service
@@ -45,9 +45,9 @@ describe('Dashboard API Endpoints - TDD', () => {
     vi.clearAllMocks();
   });
 
-  // ==================== GET /api/ticketing/dashboard/summary ====================
+  // ==================== GET /api/maintenance/dashboard/summary ====================
 
-  describe('GET /api/ticketing/dashboard/summary', () => {
+  describe('GET /api/maintenance/dashboard/summary', () => {
     it('should return complete dashboard summary statistics', async () => {
       // 🟢 WORKING: Test summary endpoint returns all key metrics
       // Arrange
@@ -72,7 +72,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getDashboardSummary).mockResolvedValue(mockSummary);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/summary');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/summary');
 
       // Act
       const response = await getSummary(req);
@@ -104,7 +104,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       vi.mocked(getDashboardSummary).mockResolvedValue(mockSummary);
 
       const req = new NextRequest(
-        'http://localhost:3000/api/ticketing/dashboard/summary?project_id=proj-123'
+        'http://localhost:3000/api/maintenance/dashboard/summary?project_id=proj-123'
       );
 
       // Act
@@ -131,7 +131,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       const startDate = '2024-01-01T00:00:00Z';
       const endDate = '2024-01-31T23:59:59Z';
       const req = new NextRequest(
-        `http://localhost:3000/api/ticketing/dashboard/summary?start_date=${startDate}&end_date=${endDate}`
+        `http://localhost:3000/api/maintenance/dashboard/summary?start_date=${startDate}&end_date=${endDate}`
       );
 
       // Act
@@ -148,7 +148,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       // Arrange: Service throws error
       vi.mocked(getDashboardSummary).mockRejectedValue(new Error('Database connection failed'));
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/summary');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/summary');
 
       // Act
       const response = await getSummary(req);
@@ -174,7 +174,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getDashboardSummary).mockResolvedValue(mockSummary);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/summary');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/summary');
 
       // Act
       const response = await getSummary(req);
@@ -188,9 +188,9 @@ describe('Dashboard API Endpoints - TDD', () => {
     });
   });
 
-  // ==================== GET /api/ticketing/dashboard/sla ====================
+  // ==================== GET /api/maintenance/dashboard/sla ====================
 
-  describe('GET /api/ticketing/dashboard/sla', () => {
+  describe('GET /api/maintenance/dashboard/sla', () => {
     it('should return SLA compliance statistics', async () => {
       // 🟢 WORKING: Test SLA endpoint returns compliance metrics
       // Arrange
@@ -204,7 +204,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getSLACompliance).mockResolvedValue(mockSLA);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/sla');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/sla');
 
       // Act
       const response = await getSLA(req);
@@ -235,7 +235,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getSLACompliance).mockResolvedValue(mockSLA);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/sla');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/sla');
 
       // Act
       const response = await getSLA(req);
@@ -262,7 +262,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       const startDate = '2024-01-01T00:00:00Z';
       const endDate = '2024-01-31T23:59:59Z';
       const req = new NextRequest(
-        `http://localhost:3000/api/ticketing/dashboard/sla?start_date=${startDate}&end_date=${endDate}`
+        `http://localhost:3000/api/maintenance/dashboard/sla?start_date=${startDate}&end_date=${endDate}`
       );
 
       // Act
@@ -279,7 +279,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       // Arrange: Service throws error
       vi.mocked(getSLACompliance).mockRejectedValue(new Error('Query timeout'));
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/sla');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/sla');
 
       // Act
       const response = await getSLA(req);
@@ -304,7 +304,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getSLACompliance).mockResolvedValue(mockSLA);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/sla');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/sla');
 
       // Act
       const response = await getSLA(req);
@@ -316,9 +316,9 @@ describe('Dashboard API Endpoints - TDD', () => {
     });
   });
 
-  // ==================== GET /api/ticketing/dashboard/workload ====================
+  // ==================== GET /api/maintenance/dashboard/workload ====================
 
-  describe('GET /api/ticketing/dashboard/workload', () => {
+  describe('GET /api/maintenance/dashboard/workload', () => {
     it('should return workload distribution by assignee', async () => {
       // 🟢 WORKING: Test workload endpoint returns assignee data
       // Arrange
@@ -345,7 +345,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getWorkloadByAssignee).mockResolvedValue(mockWorkload);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/workload');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/workload');
 
       // Act
       const response = await getWorkload(req);
@@ -378,7 +378,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       vi.mocked(getWorkloadByAssignee).mockResolvedValue(mockWorkload);
 
       const req = new NextRequest(
-        'http://localhost:3000/api/ticketing/dashboard/workload?active_only=true'
+        'http://localhost:3000/api/maintenance/dashboard/workload?active_only=true'
       );
 
       // Act
@@ -396,7 +396,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getWorkloadByAssignee).mockResolvedValue(mockWorkload);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/workload');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/workload');
 
       // Act
       const response = await getWorkload(req);
@@ -413,7 +413,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       // Arrange: Service throws error
       vi.mocked(getWorkloadByAssignee).mockRejectedValue(new Error('Connection lost'));
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/workload');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/workload');
 
       // Act
       const response = await getWorkload(req);
@@ -436,7 +436,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getWorkloadByAssignee).mockResolvedValue(mockWorkload);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/workload');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/workload');
 
       // Act
       const response = await getWorkload(req);
@@ -460,7 +460,7 @@ describe('Dashboard API Endpoints - TDD', () => {
 
       vi.mocked(getWorkloadByAssignee).mockResolvedValue(mockWorkload);
 
-      const req = new NextRequest('http://localhost:3000/api/ticketing/dashboard/workload');
+      const req = new NextRequest('http://localhost:3000/api/maintenance/dashboard/workload');
 
       // Act
       const response = await getWorkload(req);
@@ -487,7 +487,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       });
 
       const req = new NextRequest(
-        'http://localhost:3000/api/ticketing/dashboard/summary?project_id=proj-456&start_date=2024-01-01T00:00:00Z&end_date=2024-01-31T23:59:59Z'
+        'http://localhost:3000/api/maintenance/dashboard/summary?project_id=proj-456&start_date=2024-01-01T00:00:00Z&end_date=2024-01-31T23:59:59Z'
       );
 
       // Act
@@ -512,7 +512,7 @@ describe('Dashboard API Endpoints - TDD', () => {
       });
 
       const req = new NextRequest(
-        'http://localhost:3000/api/ticketing/dashboard/summary?start_date=invalid&end_date=invalid'
+        'http://localhost:3000/api/maintenance/dashboard/summary?start_date=invalid&end_date=invalid'
       );
 
       // Act

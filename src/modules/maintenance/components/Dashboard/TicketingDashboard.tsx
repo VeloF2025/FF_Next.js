@@ -1,7 +1,7 @@
 /**
  * TicketingDashboard Component - Main Dashboard View
  *
- * 🟢 WORKING: Production-ready ticketing dashboard component
+ * 🟢 WORKING: Production-ready maintenance dashboard component
  *
  * Features:
  * - Summary statistics display
@@ -44,7 +44,7 @@ interface TicketingDashboardProps {
 }
 
 /**
- * 🟢 WORKING: Main ticketing dashboard component
+ * 🟢 WORKING: Main maintenance dashboard component
  */
 export function TicketingDashboard({
   refreshInterval = 30000,
@@ -66,7 +66,7 @@ export function TicketingDashboard({
       setError(null);
 
       // Fetch summary data
-      const summaryResponse = await fetch('/api/ticketing/dashboard/summary');
+      const summaryResponse = await fetch('/api/maintenance/dashboard/summary');
       if (!summaryResponse.ok) {
         const errorData = await summaryResponse.json();
         throw new Error(errorData.error?.message || 'Failed to fetch dashboard data');
@@ -78,7 +78,7 @@ export function TicketingDashboard({
       setSummaryData(summaryResult.data);
 
       // Fetch workload data
-      const workloadResponse = await fetch('/api/ticketing/dashboard/workload?active_only=true');
+      const workloadResponse = await fetch('/api/maintenance/dashboard/workload?active_only=true');
       if (!workloadResponse.ok) {
         throw new Error('Failed to fetch workload data');
       }
@@ -88,7 +88,7 @@ export function TicketingDashboard({
       }
 
       // Fetch recent tickets (using tickets API with filters)
-      const recentResponse = await fetch('/api/ticketing/tickets?limit=10&sort=created_at:desc');
+      const recentResponse = await fetch('/api/maintenance/tickets?limit=10&sort=created_at:desc');
       if (!recentResponse.ok) {
         throw new Error('Failed to fetch recent tickets');
       }

@@ -38,7 +38,7 @@ async function fetchTeams(filters?: TeamFilters): Promise<Team[]> {
     if (filters.search) params.append('search', filters.search);
   }
 
-  const url = `/api/ticketing/teams?${params.toString()}`;
+  const url = `/api/maintenance/teams?${params.toString()}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -51,7 +51,7 @@ async function fetchTeams(filters?: TeamFilters): Promise<Team[]> {
 }
 
 async function fetchTeamsDropdown(): Promise<TeamDropdownOption[]> {
-  const response = await fetch('/api/ticketing/teams?dropdown=true');
+  const response = await fetch('/api/maintenance/teams?dropdown=true');
 
   if (!response.ok) {
     const error = await response.json();
@@ -63,7 +63,7 @@ async function fetchTeamsDropdown(): Promise<TeamDropdownOption[]> {
 }
 
 async function fetchTeam(id: string): Promise<Team> {
-  const response = await fetch(`/api/ticketing/teams/${id}?include_members=true`);
+  const response = await fetch(`/api/maintenance/teams/${id}?include_members=true`);
 
   if (!response.ok) {
     const error = await response.json();
@@ -75,7 +75,7 @@ async function fetchTeam(id: string): Promise<Team> {
 }
 
 async function createTeamRequest(payload: CreateTeamPayload): Promise<Team> {
-  const response = await fetch('/api/ticketing/teams', {
+  const response = await fetch('/api/maintenance/teams', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -97,7 +97,7 @@ async function updateTeamRequest({
   id: string;
   payload: UpdateTeamPayload;
 }): Promise<Team> {
-  const response = await fetch(`/api/ticketing/teams/${id}`, {
+  const response = await fetch(`/api/maintenance/teams/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -113,7 +113,7 @@ async function updateTeamRequest({
 }
 
 async function deleteTeamRequest(id: string): Promise<Team> {
-  const response = await fetch(`/api/ticketing/teams/${id}`, {
+  const response = await fetch(`/api/maintenance/teams/${id}`, {
     method: 'DELETE',
   });
 

@@ -1,6 +1,6 @@
 /**
  * Maintenance Module - Constants Index
- * 🟢 WORKING: Central export point for all ticketing constants
+ * 🟢 WORKING: Central export point for all maintenance constants
  *
  * Exports ticket statuses, types, priorities, fault causes,
  * verification steps, and QA readiness check definitions.

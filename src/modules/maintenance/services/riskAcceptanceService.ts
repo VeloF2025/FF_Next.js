@@ -31,7 +31,7 @@ import {
 } from '../types/riskAcceptance';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:risk-acceptance');
+const logger = createLogger('maintenance:risk-acceptance');
 
 /**
  * UUID validation regex

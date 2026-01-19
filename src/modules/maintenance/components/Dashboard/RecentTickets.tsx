@@ -108,7 +108,7 @@ export function RecentTickets({
         {displayTickets.map((ticket) => (
           <li key={ticket.id} role="listitem">
             <a
-              href={`/ticketing/tickets/${ticket.id}`}
+              href={`/maintenance/tickets/${ticket.id}`}
               className="block bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-4 hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
             <div className="flex items-start justify-between gap-3">
@@ -161,7 +161,7 @@ export function RecentTickets({
       {showViewAll && tickets.length > limit && (
         <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)] text-center">
           <a
-            href="/ticketing/tickets"
+            href="/maintenance/tickets"
             className="text-sm text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 font-medium transition-colors inline-flex items-center gap-1"
           >
             View all {tickets.length} tickets

@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for fault cause classification
  *
- * PUT /api/ticketing/tickets/[id]/fault-cause - Set fault cause and optional details
+ * PUT /api/maintenance/tickets/[id]/fault-cause - Set fault cause and optional details
  *
  * Features:
  * - Fault cause enum validation (7 valid causes)
@@ -21,7 +21,7 @@ import {
 } from '@/modules/maintenance/services/ticketService';
 import { FaultCause } from '@/modules/maintenance/types/ticket';
 
-const logger = createLogger('ticketing:api:fault-cause');
+const logger = createLogger('maintenance:api:fault-cause');
 
 /**
  * UUID validation regex
@@ -105,7 +105,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== PUT /api/ticketing/tickets/[id]/fault-cause ====================
+// ==================== PUT /api/maintenance/tickets/[id]/fault-cause ====================
 
 /**
  * PUT handler - Set fault cause for ticket

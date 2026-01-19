@@ -3,10 +3,10 @@
  * 🟢 WORKING: TDD tests for escalation management API endpoints
  *
  * Tests for:
- * - GET /api/ticketing/escalations - List escalations with filters
- * - GET /api/ticketing/escalations/{id} - Get escalation detail
- * - POST /api/ticketing/escalations/{id}/resolve - Resolve escalation
- * - GET /api/ticketing/repeat-faults/check - Check for repeat fault patterns
+ * - GET /api/maintenance/escalations - List escalations with filters
+ * - GET /api/maintenance/escalations/{id} - Get escalation detail
+ * - POST /api/maintenance/escalations/{id}/resolve - Resolve escalation
+ * - GET /api/maintenance/repeat-faults/check - Check for repeat fault patterns
  *
  * Following TDD methodology: Tests written FIRST, implementation SECOND
  */
@@ -60,7 +60,7 @@ describe('Escalation API Endpoints', () => {
     vi.clearAllMocks();
   });
 
-  describe('GET /api/ticketing/escalations', () => {
+  describe('GET /api/maintenance/escalations', () => {
     it('should list all escalations without filters', async () => {
       // Arrange
       const mockEscalations = [mockEscalation, mockEscalationResolved];
@@ -158,7 +158,7 @@ describe('Escalation API Endpoints', () => {
     });
   });
 
-  describe('GET /api/ticketing/escalations/{id}', () => {
+  describe('GET /api/maintenance/escalations/{id}', () => {
     it('should get escalation by valid ID', async () => {
       // Arrange
       const escalationId = mockEscalation.id;
@@ -214,7 +214,7 @@ describe('Escalation API Endpoints', () => {
     });
   });
 
-  describe('POST /api/ticketing/escalations/{id}/resolve', () => {
+  describe('POST /api/maintenance/escalations/{id}/resolve', () => {
     it('should resolve escalation with valid payload', async () => {
       // Arrange
       const escalationId = mockEscalation.id;
@@ -336,7 +336,7 @@ describe('Escalation API Endpoints', () => {
     });
   });
 
-  describe('GET /api/ticketing/repeat-faults/check', () => {
+  describe('GET /api/maintenance/repeat-faults/check', () => {
     it('should check pattern for pole with faults exceeding threshold', async () => {
       // Arrange
       const input = {

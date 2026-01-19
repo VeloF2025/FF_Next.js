@@ -159,7 +159,7 @@ export function ClickablePriorityBadge({
     setIsOpen(false);
 
     try {
-      const response = await fetch(`/api/ticketing/tickets/${ticketId}`, {
+      const response = await fetch(`/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority: newPriority }),

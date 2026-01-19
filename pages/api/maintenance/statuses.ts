@@ -1,5 +1,5 @@
 /**
- * API: /api/ticketing/statuses
+ * API: /api/maintenance/statuses
  *
  * GET - Fetch all active ticket statuses
  * POST - Create a new status (admin only)

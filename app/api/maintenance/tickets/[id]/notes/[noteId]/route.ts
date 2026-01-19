@@ -15,7 +15,7 @@ const logger = createLogger('ticket-note-api');
 const sql = neon(process.env.DATABASE_URL!);
 
 /**
- * GET /api/ticketing/tickets/[id]/notes/[noteId]
+ * GET /api/maintenance/tickets/[id]/notes/[noteId]
  * Get a single note
  */
 export async function GET(
@@ -75,7 +75,7 @@ export async function GET(
 }
 
 /**
- * PATCH /api/ticketing/tickets/[id]/notes/[noteId]
+ * PATCH /api/maintenance/tickets/[id]/notes/[noteId]
  * Update a note
  */
 export async function PATCH(
@@ -203,7 +203,7 @@ export async function PATCH(
 }
 
 /**
- * DELETE /api/ticketing/tickets/[id]/notes/[noteId]
+ * DELETE /api/maintenance/tickets/[id]/notes/[noteId]
  * Delete a note
  */
 export async function DELETE(

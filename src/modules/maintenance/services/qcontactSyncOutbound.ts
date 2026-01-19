@@ -11,7 +11,7 @@
  * - Error handling with graceful degradation
  * - Automatic field mapping between FibreFlow and QContact schemas
  *
- * @module ticketing/services/qcontactSyncOutbound
+ * @module maintenance/services/qcontactSyncOutbound
  */
 
 import { queryOne } from '../utils/db';

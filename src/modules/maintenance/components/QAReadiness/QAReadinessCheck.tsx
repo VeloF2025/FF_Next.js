@@ -34,7 +34,7 @@ interface QAReadinessCheckProps {
  * 🟢 WORKING: Fetch QA readiness status from API
  */
 async function fetchReadinessStatus(ticketId: string): Promise<QAReadinessStatus> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/qa-readiness`);
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/qa-readiness`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch QA readiness status');
@@ -48,7 +48,7 @@ async function fetchReadinessStatus(ticketId: string): Promise<QAReadinessStatus
  * 🟢 WORKING: Run QA readiness check via API
  */
 async function runReadinessCheckAPI(ticketId: string, checkedBy: string | null) {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/qa-readiness-check`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/qa-readiness-check`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

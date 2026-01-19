@@ -22,7 +22,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createLogger } from '@/lib/logger';
 import { NoteVisibility } from '../types/note';
 
-const logger = createLogger('ticketing:hooks:notes');
+const logger = createLogger('maintenance:hooks:notes');
 
 // ==================== Types ====================
 
@@ -86,7 +86,7 @@ async function fetchNotes(
   const params = new URLSearchParams();
   if (visibility) params.set('visibility', visibility);
 
-  const url = `/api/ticketing/tickets/${ticketId}/notes${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/api/maintenance/tickets/${ticketId}/notes${params.toString() ? '?' + params.toString() : ''}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -106,7 +106,7 @@ async function createNote(
   ticketId: string,
   payload: CreateNotePayload
 ): Promise<TicketNote> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/notes`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/notes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -130,7 +130,7 @@ async function updateNote(
   noteId: string,
   payload: UpdateNotePayload
 ): Promise<TicketNote> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/notes/${noteId}`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/notes/${noteId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -153,7 +153,7 @@ async function deleteNote(
   ticketId: string,
   noteId: string
 ): Promise<{ id: string; deleted: boolean }> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/notes/${noteId}`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/notes/${noteId}`, {
     method: 'DELETE',
   });
 

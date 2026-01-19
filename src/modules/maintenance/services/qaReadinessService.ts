@@ -21,7 +21,7 @@ import { validateQAReadiness } from '../utils/qaReadinessValidator';
 import type { QAReadinessCheck, QAReadinessStatus } from '../types/verification';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:qaReadinessService');
+const logger = createLogger('maintenance:qaReadinessService');
 
 /**
  * UUID validation regex

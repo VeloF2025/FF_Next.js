@@ -59,7 +59,7 @@ export default function RiskAcceptanceReviewPageClient() {
     setError(null);
 
     try {
-      let url = '/api/ticketing/risk-acceptances?';
+      let url = '/api/maintenance/risk-acceptances?';
 
       switch (filter) {
         case 'active':
@@ -102,7 +102,7 @@ export default function RiskAcceptanceReviewPageClient() {
   // Resolve a risk
   const handleResolve = async (riskId: string, notes: string) => {
     try {
-      const response = await fetch(`/api/ticketing/risk-acceptances/${riskId}/resolve`, {
+      const response = await fetch(`/api/maintenance/risk-acceptances/${riskId}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,7 +272,7 @@ export default function RiskAcceptanceReviewPageClient() {
                     {/* Ticket Info */}
                     <div className="flex items-center gap-2 mb-2">
                       <a
-                        href={`/ticketing/tickets/${risk.ticket_id}`}
+                        href={`/maintenance/tickets/${risk.ticket_id}`}
                         className="text-sm font-mono text-blue-400 hover:underline flex items-center gap-1"
                       >
                         {risk.ticket_uid || 'Unknown'}

@@ -2,8 +2,8 @@
  * FiberTime QContact Sync API Route
  * 🟢 WORKING: Syncs tickets from FiberTime QContact (Maintenance - Velocity)
  *
- * POST /api/ticketing/sync/fibertime - Trigger inbound sync from FiberTime
- * GET /api/ticketing/sync/fibertime - Check sync status and last run
+ * POST /api/maintenance/sync/fibertime - Trigger inbound sync from FiberTime
+ * GET /api/maintenance/sync/fibertime - Check sync status and last run
  *
  * FiberTime QContact:
  * - Base URL: https://fibertime.qcontact.com/api/v2/
@@ -22,9 +22,9 @@ import {
   MAINTENANCE_VELOCITY_ID,
 } from '@/modules/maintenance/services/fibertimeQContactClient';
 
-const logger = createLogger('ticketing:api:sync:fibertime');
+const logger = createLogger('maintenance:api:sync:fibertime');
 
-// ==================== GET /api/ticketing/sync/fibertime ====================
+// ==================== GET /api/maintenance/sync/fibertime ====================
 
 /**
  * 🟢 WORKING: Check FiberTime sync status and API health
@@ -73,7 +73,7 @@ export async function GET() {
   }
 }
 
-// ==================== POST /api/ticketing/sync/fibertime ====================
+// ==================== POST /api/maintenance/sync/fibertime ====================
 
 /**
  * 🟢 WORKING: Trigger FiberTime inbound sync

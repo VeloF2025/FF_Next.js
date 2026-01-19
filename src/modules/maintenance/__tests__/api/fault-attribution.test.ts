@@ -4,8 +4,8 @@
  * 🟢 WORKING: Tests written FIRST following TDD methodology
  *
  * Tests fault cause classification and trend analysis endpoints:
- * - PUT /api/ticketing/tickets/[id]/fault-cause - Set fault cause for ticket
- * - GET /api/ticketing/analytics/fault-trends - Get fault trends by cause/location
+ * - PUT /api/maintenance/tickets/[id]/fault-cause - Set fault cause for ticket
+ * - GET /api/maintenance/analytics/fault-trends - Get fault trends by cause/location
  *
  * Test Strategy:
  * - Mock service layer to isolate API route logic
@@ -27,7 +27,7 @@ function createMockTicket(overrides: Partial<Ticket> = {}): Ticket {
     external_id: null,
     title: 'Test Ticket',
     description: 'Test description',
-    ticket_type: 'maintenance',
+    ticket_type: 'fault_repair',
     priority: 'normal',
     status: 'open',
     dr_number: 'DR123',
@@ -95,9 +95,9 @@ describe('Fault Attribution API Endpoints', () => {
     vi.restoreAllMocks();
   });
 
-  // ==================== PUT /api/ticketing/tickets/[id]/fault-cause ====================
+  // ==================== PUT /api/maintenance/tickets/[id]/fault-cause ====================
 
-  describe('PUT /api/ticketing/tickets/[id]/fault-cause - Set fault cause', () => {
+  describe('PUT /api/maintenance/tickets/[id]/fault-cause - Set fault cause', () => {
     it('should set fault cause for a ticket', async () => {
       const { updateTicket, getTicketById } = await import('../../services/ticketService');
       const mockTicket = createMockTicket({
@@ -109,9 +109,9 @@ describe('Fault Attribution API Endpoints', () => {
       vi.mocked(getTicketById).mockResolvedValue(mockTicket);
       vi.mocked(updateTicket).mockResolvedValue(mockTicket);
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/fault-cause/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -140,9 +140,9 @@ describe('Fault Attribution API Endpoints', () => {
     });
 
     it('should validate fault cause enum values', async () => {
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/fault-cause/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -163,9 +163,9 @@ describe('Fault Attribution API Endpoints', () => {
     });
 
     it('should validate UUID format', async () => {
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/fault-cause/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets/invalid-uuid/fault-cause', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets/invalid-uuid/fault-cause', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,9 +189,9 @@ describe('Fault Attribution API Endpoints', () => {
       const { updateTicket } = await import('../../services/ticketService');
       vi.mocked(updateTicket).mockResolvedValue(null);
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/fault-cause/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -214,9 +214,9 @@ describe('Fault Attribution API Endpoints', () => {
       const { updateTicket } = await import('../../services/ticketService');
       vi.mocked(updateTicket).mockRejectedValue(new Error('Database connection failed'));
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/fault-cause/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -245,9 +245,9 @@ describe('Fault Attribution API Endpoints', () => {
       vi.mocked(getTicketById).mockResolvedValue(mockTicket);
       vi.mocked(updateTicket).mockResolvedValue(mockTicket);
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/fault-cause/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/fault-cause/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets/123e4567-e89b-12d3-a456-426614174000/fault-cause', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -267,9 +267,9 @@ describe('Fault Attribution API Endpoints', () => {
     });
   });
 
-  // ==================== GET /api/ticketing/analytics/fault-trends ====================
+  // ==================== GET /api/maintenance/analytics/fault-trends ====================
 
-  describe('GET /api/ticketing/analytics/fault-trends - Get fault trends', () => {
+  describe('GET /api/maintenance/analytics/fault-trends - Get fault trends', () => {
     it('should get trends by fault cause', async () => {
       const { query } = await import('../../utils/db');
       const mockTrends = {
@@ -294,9 +294,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=fault_cause');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -328,9 +328,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=pole_number');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=pole_number');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -360,9 +360,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=pon_number');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=pon_number');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -391,9 +391,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=zone_id');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=zone_id');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -417,9 +417,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=fault_cause&project_id=proj-123');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=fault_cause&project_id=proj-123');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -445,9 +445,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=fault_cause&start_date=2024-01-01&end_date=2024-12-31');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=fault_cause&start_date=2024-01-01&end_date=2024-12-31');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -460,9 +460,9 @@ describe('Fault Attribution API Endpoints', () => {
     });
 
     it('should validate group_by parameter', async () => {
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=invalid_field');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=invalid_field');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -476,9 +476,9 @@ describe('Fault Attribution API Endpoints', () => {
       const { query } = await import('../../utils/db');
       vi.mocked(query).mockResolvedValue({ rows: [] });
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=fault_cause');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -491,9 +491,9 @@ describe('Fault Attribution API Endpoints', () => {
       const { query } = await import('../../utils/db');
       vi.mocked(query).mockRejectedValue(new Error('Database connection failed'));
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=fault_cause');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -516,9 +516,9 @@ describe('Fault Attribution API Endpoints', () => {
 
       vi.mocked(query).mockResolvedValue(mockTrends);
 
-      const { GET } = await import('../../../../app/api/ticketing/analytics/fault-trends/route');
+      const { GET } = await import('../../../../app/api/maintenance/analytics/fault-trends/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/analytics/fault-trends?group_by=fault_cause');
+      const mockRequest = new Request('http://localhost/api/maintenance/analytics/fault-trends?group_by=fault_cause');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 

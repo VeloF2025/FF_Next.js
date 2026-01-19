@@ -56,11 +56,11 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     shortLabel: 'Proj',
     permissions: [],
   },
-  'ticketing': {
-    to: '/ticketing',
+  'maintenance': {
+    to: '/maintenance',
     icon: Ticket,
-    label: 'Ticketing',
-    shortLabel: 'Tickets',
+    label: 'Maintenance',
+    shortLabel: 'Maint',
     permissions: [],
   },
   'analytics': {

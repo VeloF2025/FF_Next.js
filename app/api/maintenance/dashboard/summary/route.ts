@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready dashboard summary endpoint
  *
- * GET /api/ticketing/dashboard/summary - Get complete dashboard summary
+ * GET /api/maintenance/dashboard/summary - Get complete dashboard summary
  *
  * Returns:
  * - Total tickets count
@@ -29,7 +29,7 @@ import { createLogger } from '@/lib/logger';
 import { getDashboardSummary } from '@/modules/maintenance/services/dashboardService';
 import type { DashboardFilters } from '@/modules/maintenance/services/dashboardService';
 
-const logger = createLogger('ticketing:api:dashboard:summary');
+const logger = createLogger('maintenance:api:dashboard:summary');
 
 /**
  * 🟢 WORKING: Get dashboard summary statistics

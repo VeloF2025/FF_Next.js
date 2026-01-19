@@ -3,8 +3,8 @@
  * 🟢 WORKING: Tests written FIRST following TDD methodology
  *
  * Tests the attachment API endpoints:
- * - POST /api/ticketing/tickets/[id]/attachments (upload)
- * - GET /api/ticketing/tickets/[id]/attachments (list)
+ * - POST /api/maintenance/tickets/[id]/attachments (upload)
+ * - GET /api/maintenance/tickets/[id]/attachments (list)
  *
  * These tests should initially FAIL (red phase)
  * Implementation comes AFTER tests pass (green phase)
@@ -77,7 +77,7 @@ const mockAttachmentList: AttachmentListResponse = {
   evidence_count: 0
 };
 
-describe('POST /api/ticketing/tickets/[id]/attachments', () => {
+describe('POST /api/maintenance/tickets/[id]/attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -86,7 +86,7 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
     // 🟢 WORKING: Test successful file upload
     vi.mocked(attachmentService.uploadAttachment).mockResolvedValue(mockUploadResult);
 
-    const { POST } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { POST } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     // Create form data
     const formData = new FormData();
@@ -95,7 +95,7 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
     formData.append('uploaded_by', mockUserId);
     formData.append('is_evidence', 'false');
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'POST',
       body: formData,
     });
@@ -128,7 +128,7 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
 
     vi.mocked(attachmentService.uploadAttachment).mockResolvedValue(evidenceResult);
 
-    const { POST } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { POST } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const formData = new FormData();
     const file = new File(['test content'], 'evidence.jpg', { type: 'image/jpeg' });
@@ -137,7 +137,7 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
     formData.append('is_evidence', 'true');
     formData.append('verification_step_id', '111e2222-e89b-12d3-a456-426614174001');
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'POST',
       body: formData,
     });
@@ -156,12 +156,12 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
   });
 
   it('should return 422 if no file provided', async () => {
-    const { POST } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { POST } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const formData = new FormData();
     formData.append('uploaded_by', mockUserId);
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'POST',
       body: formData,
     });
@@ -176,13 +176,13 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
   });
 
   it('should return 422 if uploaded_by is missing', async () => {
-    const { POST } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { POST } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const formData = new FormData();
     const file = new File(['test content'], 'photo.jpg', { type: 'image/jpeg' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'POST',
       body: formData,
     });
@@ -197,14 +197,14 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
   });
 
   it('should return 422 for invalid ticket ID format', async () => {
-    const { POST } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { POST } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const formData = new FormData();
     const file = new File(['test content'], 'photo.jpg', { type: 'image/jpeg' });
     formData.append('file', file);
     formData.append('uploaded_by', mockUserId);
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/invalid-uuid/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/invalid-uuid/attachments', {
       method: 'POST',
       body: formData,
     });
@@ -223,14 +223,14 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
       new Error('Storage quota exceeded')
     );
 
-    const { POST } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { POST } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const formData = new FormData();
     const file = new File(['test content'], 'photo.jpg', { type: 'image/jpeg' });
     formData.append('file', file);
     formData.append('uploaded_by', mockUserId);
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'POST',
       body: formData,
     });
@@ -244,7 +244,7 @@ describe('POST /api/ticketing/tickets/[id]/attachments', () => {
   });
 });
 
-describe('GET /api/ticketing/tickets/[id]/attachments', () => {
+describe('GET /api/maintenance/tickets/[id]/attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -253,9 +253,9 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
     // 🟢 WORKING: Test listing attachments
     vi.mocked(attachmentService.listAttachmentsForTicket).mockResolvedValue(mockAttachmentList);
 
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'GET',
     });
 
@@ -276,10 +276,10 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
   it('should filter attachments by file type', async () => {
     vi.mocked(attachmentService.listAttachmentsForTicket).mockResolvedValue(mockAttachmentList);
 
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const request = new NextRequest(
-      'http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments?file_type=photo',
+      'http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments?file_type=photo',
       { method: 'GET' }
     );
 
@@ -302,10 +302,10 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
 
     vi.mocked(attachmentService.listAttachmentsForTicket).mockResolvedValue(evidenceList);
 
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const request = new NextRequest(
-      'http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments?is_evidence=true',
+      'http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments?is_evidence=true',
       { method: 'GET' }
     );
 
@@ -323,11 +323,11 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
   it('should filter attachments by verification step', async () => {
     vi.mocked(attachmentService.listAttachmentsForTicket).mockResolvedValue(mockAttachmentList);
 
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
     const stepId = '111e2222-e89b-12d3-a456-426614174001';
     const request = new NextRequest(
-      'http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments?verification_step_id=' + stepId,
+      'http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments?verification_step_id=' + stepId,
       { method: 'GET' }
     );
 
@@ -353,9 +353,9 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
 
     vi.mocked(attachmentService.listAttachmentsForTicket).mockResolvedValue(emptyList);
 
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'GET',
     });
 
@@ -369,9 +369,9 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
   });
 
   it('should return 422 for invalid ticket ID format', async () => {
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/invalid-uuid/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/invalid-uuid/attachments', {
       method: 'GET',
     });
 
@@ -389,9 +389,9 @@ describe('GET /api/ticketing/tickets/[id]/attachments', () => {
       new Error('Database connection failed')
     );
 
-    const { GET } = await import('@/app/api/ticketing/tickets/[id]/attachments/route');
+    const { GET } = await import('@/app/api/maintenance/tickets/[id]/attachments/route');
 
-    const request = new NextRequest('http://localhost/api/ticketing/tickets/' + mockTicketId + '/attachments', {
+    const request = new NextRequest('http://localhost/api/maintenance/tickets/' + mockTicketId + '/attachments', {
       method: 'GET',
     });
 

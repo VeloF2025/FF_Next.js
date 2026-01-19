@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for creating handover snapshots
  *
- * POST /api/ticketing/tickets/[id]/handover - Create handover snapshot
+ * POST /api/maintenance/tickets/[id]/handover - Create handover snapshot
  *
  * Features:
  * - Validate handover gates before creation
@@ -27,7 +27,7 @@ import type {
   OwnerType,
 } from '@/modules/maintenance/types/handover';
 
-const logger = createLogger('ticketing:api:handover');
+const logger = createLogger('maintenance:api:handover');
 
 /**
  * UUID validation regex
@@ -129,7 +129,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== POST /api/ticketing/tickets/[id]/handover ====================
+// ==================== POST /api/maintenance/tickets/[id]/handover ====================
 
 /**
  * 🟢 WORKING: Create a new handover snapshot for a ticket

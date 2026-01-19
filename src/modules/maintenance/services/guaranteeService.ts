@@ -31,7 +31,7 @@ import {
 import { GuaranteeStatus, FaultCause } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:guarantee-service');
+const logger = createLogger('maintenance:guarantee-service');
 
 /**
  * UUID validation regex

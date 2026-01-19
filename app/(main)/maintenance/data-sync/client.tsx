@@ -69,7 +69,7 @@ function ImportHistory() {
   useEffect(() => {
     async function fetchHistory() {
       try {
-        const response = await fetch('/api/ticketing/import/weekly/history');
+        const response = await fetch('/api/maintenance/import/weekly/history');
         const data = await response.json();
         if (data.success) {
           setReports(data.data.reports || []);

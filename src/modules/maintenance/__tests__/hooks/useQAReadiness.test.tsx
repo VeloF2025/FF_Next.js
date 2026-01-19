@@ -198,7 +198,7 @@ describe('useQAReadinessStatus', () => {
     expect(result.current.data?.failed_reasons).toBeNull();
     expect(result.current.error).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/ticketing/tickets/${mockTicketId}/qa-readiness`,
+      `/api/maintenance/tickets/${mockTicketId}/qa-readiness`,
       expect.objectContaining({
         method: 'GET',
       })
@@ -428,7 +428,7 @@ describe('useRunQAReadinessCheck', () => {
     expect(result.current.data?.passed).toBe(true);
     expect(result.current.data?.failed_checks).toHaveLength(0);
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       expect.objectContaining({
         method: 'POST',
         headers: {
@@ -500,7 +500,7 @@ describe('useRunQAReadinessCheck', () => {
 
     expect(result.current.data?.checked_by).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({}),

@@ -2,7 +2,7 @@
  * Escalation Detail API Route
  * 🟢 WORKING: Production-ready API endpoint for individual escalation operations
  *
- * GET /api/ticketing/escalations/[id] - Get escalation detail
+ * GET /api/maintenance/escalations/[id] - Get escalation detail
  *
  * Features:
  * - UUID format validation
@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { getEscalationById } from '@/modules/maintenance/services/escalationService';
 
-const logger = createLogger('ticketing:api:escalations:id');
+const logger = createLogger('maintenance:api:escalations:id');
 
 /**
  * UUID validation regex
@@ -86,7 +86,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/escalations/[id] ====================
+// ==================== GET /api/maintenance/escalations/[id] ====================
 
 /**
  * 🟢 WORKING: Get escalation by ID

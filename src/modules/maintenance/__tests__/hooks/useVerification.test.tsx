@@ -175,7 +175,7 @@ describe('useVerificationSteps', () => {
     expect(result.current.data).toEqual(mockVerificationSteps);
     expect(result.current.error).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/ticketing/tickets/${mockTicketId}/verification`,
+      `/api/maintenance/tickets/${mockTicketId}/verification`,
       expect.objectContaining({
         method: 'GET',
       })
@@ -303,7 +303,7 @@ describe('useVerificationProgress', () => {
     expect(result.current.data).toEqual(mockVerificationProgress);
     expect(result.current.error).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/ticketing/tickets/${mockTicketId}/verification/complete`,
+      `/api/maintenance/tickets/${mockTicketId}/verification/complete`,
       expect.objectContaining({
         method: 'POST',
       })
@@ -457,7 +457,7 @@ describe('useUpdateVerificationStep', () => {
 
     expect(result.current.data).toEqual(updatedStep);
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/ticketing/tickets/${mockTicketId}/verification/2`,
+      `/api/maintenance/tickets/${mockTicketId}/verification/2`,
       expect.objectContaining({
         method: 'PUT',
         headers: {

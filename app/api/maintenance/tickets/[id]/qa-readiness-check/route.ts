@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for running QA readiness checks
  *
- * POST /api/ticketing/tickets/[id]/qa-readiness-check - Run QA readiness check
+ * POST /api/maintenance/tickets/[id]/qa-readiness-check - Run QA readiness check
  *
  * Features:
  * - Runs all QA readiness validations
@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { runReadinessCheck } from '@/modules/maintenance/services/qaReadinessService';
 
-const logger = createLogger('ticketing:api:qa-readiness-check');
+const logger = createLogger('maintenance:api:qa-readiness-check');
 
 /**
  * UUID validation regex
@@ -93,7 +93,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== POST /api/ticketing/tickets/[id]/qa-readiness-check ====================
+// ==================== POST /api/maintenance/tickets/[id]/qa-readiness-check ====================
 
 /**
  * 🟢 WORKING: Run QA readiness check on a ticket

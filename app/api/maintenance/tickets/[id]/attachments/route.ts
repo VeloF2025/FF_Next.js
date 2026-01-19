@@ -3,8 +3,8 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for attachment upload and listing
  *
- * POST /api/ticketing/tickets/[id]/attachments - Upload attachment
- * GET  /api/ticketing/tickets/[id]/attachments - List all attachments for a ticket
+ * POST /api/maintenance/tickets/[id]/attachments - Upload attachment
+ * GET  /api/maintenance/tickets/[id]/attachments - List all attachments for a ticket
  *
  * Features:
  * - File upload to Firebase Storage
@@ -26,12 +26,12 @@ import {
   FileUploadRequest
 } from '@/modules/maintenance/types/attachment';
 
-const logger = createLogger('ticketing:api:ticket-attachments');
+const logger = createLogger('maintenance:api:ticket-attachments');
 
 // UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// ==================== POST /api/ticketing/tickets/[id]/attachments ====================
+// ==================== POST /api/maintenance/tickets/[id]/attachments ====================
 
 /**
  * 🟢 WORKING: Upload attachment (photo or document) to ticket
@@ -147,7 +147,7 @@ export async function POST(
   }
 }
 
-// ==================== GET /api/ticketing/tickets/[id]/attachments ====================
+// ==================== GET /api/maintenance/tickets/[id]/attachments ====================
 
 /**
  * 🟢 WORKING: List attachments for a ticket with optional filters

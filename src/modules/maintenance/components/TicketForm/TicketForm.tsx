@@ -39,7 +39,7 @@ export function TicketForm({ onCancel }: TicketFormProps) {
     if (onCancel) {
       onCancel();
     } else {
-      router.push('/ticketing/tickets');
+      router.push('/maintenance/tickets');
     }
   };
 

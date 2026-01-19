@@ -12,7 +12,7 @@
  * - Database persistence for all notifications
  * - Session health monitoring
  *
- * @module ticketing/services/whatsappService
+ * @module maintenance/services/whatsappService
  */
 
 import { createLogger } from '@/lib/logger';

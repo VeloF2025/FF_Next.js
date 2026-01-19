@@ -1,6 +1,6 @@
 /**
  * Maintenance Module - Services Exports
- * 🟢 WORKING: Central export point for all ticketing services (server-side only)
+ * 🟢 WORKING: Central export point for all maintenance services (server-side only)
  */
 
 // Ticket CRUD Service (subtask 1.5)

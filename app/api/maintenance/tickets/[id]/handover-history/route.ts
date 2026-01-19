@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for retrieving handover history
  *
- * GET /api/ticketing/tickets/[id]/handover-history - Get handover history
+ * GET /api/maintenance/tickets/[id]/handover-history - Get handover history
  *
  * Features:
  * - Retrieve all handover snapshots for a ticket
@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { getHandoverHistory } from '@/modules/maintenance/services/handoverService';
 
-const logger = createLogger('ticketing:api:handover-history');
+const logger = createLogger('maintenance:api:handover-history');
 
 /**
  * UUID validation regex
@@ -92,7 +92,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/tickets/[id]/handover-history ====================
+// ==================== GET /api/maintenance/tickets/[id]/handover-history ====================
 
 /**
  * 🟢 WORKING: Get handover history for a ticket

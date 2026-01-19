@@ -4,7 +4,7 @@
  * 🟢 WORKING: Tests written FIRST following TDD methodology
  *
  * Tests the DR lookup endpoint:
- * - GET /api/ticketing/dr-lookup/[drNumber] - Lookup DR details from SOW module
+ * - GET /api/maintenance/dr-lookup/[drNumber] - Lookup DR details from SOW module
  *
  * Test Strategy:
  * - Mock drLookupService to isolate API route logic
@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { GET } from '@/app/api/ticketing/dr-lookup/[drNumber]/route';
+import { GET } from '@/app/api/maintenance/dr-lookup/[drNumber]/route';
 import type { DRLookupResult, DRLookupData } from '../../types/ticket';
 
 // Helper to create mock DR lookup data
@@ -70,7 +70,7 @@ describe('DR Lookup API Endpoint', () => {
     vi.restoreAllMocks();
   });
 
-  describe('GET /api/ticketing/dr-lookup/[drNumber]', () => {
+  describe('GET /api/maintenance/dr-lookup/[drNumber]', () => {
     it('should return DR details for valid DR number', async () => {
       // Arrange
       const mockDRData = createMockDRData();
@@ -79,7 +79,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR12345');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR12345');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR12345' } });
@@ -123,7 +123,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR99999');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR99999');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR99999' } });
@@ -145,7 +145,7 @@ describe('DR Lookup API Endpoint', () => {
         error: 'DR number not found',
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/INVALID123');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/INVALID123');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'INVALID123' } });
@@ -171,7 +171,7 @@ describe('DR Lookup API Endpoint', () => {
         error: 'DR number is required',
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/   ');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/   ');
 
       // Act
       const response = await GET(request, { params: { drNumber: '   ' } });
@@ -195,7 +195,7 @@ describe('DR Lookup API Endpoint', () => {
         error: 'DR number is required',
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/');
 
       // Act
       const response = await GET(request, { params: { drNumber: '' } });
@@ -215,7 +215,7 @@ describe('DR Lookup API Endpoint', () => {
         error: 'Failed to lookup DR number: Database connection error',
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR12345');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR12345');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR12345' } });
@@ -233,7 +233,7 @@ describe('DR Lookup API Endpoint', () => {
       // Arrange
       mockLookupDR.mockRejectedValue(new Error('Unexpected error'));
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR12345');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR12345');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR12345' } });
@@ -254,7 +254,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/  DR12345  ');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/  DR12345  ');
 
       // Act
       const response = await GET(request, { params: { drNumber: '  DR12345  ' } });
@@ -281,7 +281,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR12345');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR12345');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR12345' } });
@@ -308,7 +308,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR54321');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR54321');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR54321' } });
@@ -336,7 +336,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR11111');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR11111');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR11111' } });
@@ -363,7 +363,7 @@ describe('DR Lookup API Endpoint', () => {
         data: mockDRData,
       } as DRLookupResult);
 
-      const request = new Request('http://localhost:3000/api/ticketing/dr-lookup/DR22222');
+      const request = new Request('http://localhost:3000/api/maintenance/dr-lookup/DR22222');
 
       // Act
       const response = await GET(request, { params: { drNumber: 'DR22222' } });

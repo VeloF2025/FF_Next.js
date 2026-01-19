@@ -10,7 +10,7 @@
  * - Request tracing with unique IDs
  * - Rate limit handling with Retry-After support
  *
- * @module ticketing/services/qcontactClient
+ * @module maintenance/services/qcontactClient
  */
 
 import { createLogger } from '@/lib/logger';

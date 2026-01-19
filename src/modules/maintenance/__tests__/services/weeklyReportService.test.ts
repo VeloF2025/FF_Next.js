@@ -292,7 +292,7 @@ describe('Weekly Report Service - TDD', () => {
         {
           row_number: 1,
           title: 'Fiber cut at Pole 123',
-          ticket_type: 'maintenance',
+          ticket_type: 'fault_repair',
           dr_number: 'DR-2024-001',
           pole_number: 'POLE-123',
           priority: 'high'
@@ -338,18 +338,18 @@ describe('Weekly Report Service - TDD', () => {
         {
           row_number: 1,
           title: 'Valid ticket',
-          ticket_type: 'maintenance',
+          ticket_type: 'fault_repair',
           dr_number: 'DR-2024-001'
         },
         {
           row_number: 2,
           title: '', // Invalid - missing title
-          ticket_type: 'maintenance'
+          ticket_type: 'fault_repair'
         },
         {
           row_number: 3,
           title: 'Another valid ticket',
-          ticket_type: 'maintenance',
+          ticket_type: 'fault_repair',
           dr_number: 'DR-2024-003'
         }
       ];
@@ -387,12 +387,12 @@ describe('Weekly Report Service - TDD', () => {
           row_number: 1,
           ticket_uid: 'FT123456',
           title: 'Existing ticket',
-          ticket_type: 'maintenance'
+          ticket_type: 'fault_repair'
         },
         {
           row_number: 2,
           title: 'New ticket',
-          ticket_type: 'maintenance'
+          ticket_type: 'fault_repair'
         }
       ];
 
@@ -423,7 +423,7 @@ describe('Weekly Report Service - TDD', () => {
       const importRows: ImportRow[] = Array.from({ length: 10 }, (_, i) => ({
         row_number: i + 1,
         title: `Ticket ${i + 1}`,
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
         dr_number: `DR-2024-${String(i + 1).padStart(3, '0')}`
       }));
 
@@ -459,7 +459,7 @@ describe('Weekly Report Service - TDD', () => {
       const importRows: ImportRow[] = Array.from({ length: 100 }, (_, i) => ({
         row_number: i + 1,
         title: `Ticket ${i + 1}`,
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
         dr_number: `DR-2024-${String(i + 1).padStart(3, '0')}`
       }));
 
@@ -494,7 +494,7 @@ describe('Weekly Report Service - TDD', () => {
       const rows: ImportRow[] = Array.from({ length: 20 }, (_, i) => ({
         row_number: i + 1,
         title: `Ticket ${i + 1}`,
-        ticket_type: 'maintenance'
+        ticket_type: 'fault_repair'
       }));
 
       vi.mocked(createTicket).mockResolvedValue({

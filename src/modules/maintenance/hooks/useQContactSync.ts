@@ -31,7 +31,7 @@ import type {
   FullSyncResult,
 } from '../types/qcontact';
 
-const logger = createLogger('ticketing:hooks:qcontact-sync');
+const logger = createLogger('maintenance:hooks:qcontact-sync');
 
 // ==================== Query Keys ====================
 
@@ -53,7 +53,7 @@ export const qcontactSyncKeys = {
  * 🟢 WORKING: Fetch sync status overview from API
  */
 async function fetchSyncStatus(): Promise<SyncStatusOverview> {
-  const response = await fetch('/api/ticketing/sync/qcontact/status', {
+  const response = await fetch('/api/maintenance/sync/qcontact/status', {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ async function fetchSyncLog(filters?: SyncLogFilters): Promise<SyncLogListRespon
     if (filters.synced_before) queryParams.append('synced_before', filters.synced_before.toISOString());
   }
 
-  const url = `/api/ticketing/sync/qcontact/log${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const url = `/api/maintenance/sync/qcontact/log${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
   const response = await fetch(url, {
     method: 'GET',
@@ -116,7 +116,7 @@ async function fetchSyncLog(filters?: SyncLogFilters): Promise<SyncLogListRespon
  * 🟢 WORKING: Trigger manual sync via API
  */
 async function triggerManualSync(request?: FullSyncRequest): Promise<FullSyncResult> {
-  const response = await fetch('/api/ticketing/sync/qcontact', {
+  const response = await fetch('/api/maintenance/sync/qcontact', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

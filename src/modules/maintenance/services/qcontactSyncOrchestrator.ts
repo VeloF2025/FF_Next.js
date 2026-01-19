@@ -13,7 +13,7 @@
  * permissions to change status/close tickets in QContact. Only note-adding
  * would be possible, which will be handled separately if needed.
  *
- * @module ticketing/services/qcontactSyncOrchestrator
+ * @module maintenance/services/qcontactSyncOrchestrator
  */
 
 import { query, queryOne } from '../utils/db';

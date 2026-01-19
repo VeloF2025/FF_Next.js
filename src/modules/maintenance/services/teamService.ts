@@ -18,7 +18,7 @@ import type {
   AddTeamMemberPayload,
 } from '../types/team';
 
-const logger = createLogger('ticketing:teamService');
+const logger = createLogger('maintenance:teamService');
 
 /**
  * UUID validation regex

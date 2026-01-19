@@ -32,7 +32,7 @@ export default function EscalationsPageClient() {
     async function fetchEscalations() {
       try {
         setIsLoading(true);
-        const response = await fetch('/api/ticketing/escalations');
+        const response = await fetch('/api/maintenance/escalations');
         if (!response.ok) {
           throw new Error('Failed to fetch escalations');
         }

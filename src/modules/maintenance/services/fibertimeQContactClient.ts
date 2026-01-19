@@ -10,7 +10,7 @@
  * - Field mapping for FibreFlow integration
  * - Automatic retry with exponential backoff
  *
- * @module ticketing/services/fibertimeQContactClient
+ * @module maintenance/services/fibertimeQContactClient
  */
 
 import { createLogger } from '@/lib/logger';

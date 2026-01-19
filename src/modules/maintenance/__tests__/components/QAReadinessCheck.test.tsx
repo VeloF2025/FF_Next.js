@@ -242,7 +242,7 @@ describe('QAReadinessCheck Component', () => {
       // Assert
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith(
-          expect.stringContaining('/api/ticketing/tickets/ticket-456/qa-readiness-check'),
+          expect.stringContaining('/api/maintenance/tickets/ticket-456/qa-readiness-check'),
           expect.objectContaining({ method: 'POST' })
         );
       });

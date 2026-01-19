@@ -9,7 +9,7 @@ const VALID_ITEM_IDS = [
   'action-items',
   'tasks',
   'projects',
-  'ticketing',
+  'maintenance',
   'analytics',
   'fleet',
   'staff',

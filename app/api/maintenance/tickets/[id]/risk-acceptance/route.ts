@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for creating QA risk acceptances
  *
- * POST /api/ticketing/tickets/[id]/risk-acceptance - Create risk acceptance
+ * POST /api/maintenance/tickets/[id]/risk-acceptance - Create risk acceptance
  *
  * Features:
  * - Create risk acceptance with conditional approval
@@ -18,7 +18,7 @@ import { createLogger } from '@/lib/logger';
 import { createRiskAcceptance } from '@/modules/maintenance/services/riskAcceptanceService';
 import type { CreateRiskAcceptancePayload } from '@/modules/maintenance/types/riskAcceptance';
 
-const logger = createLogger('ticketing:api:risk-acceptance');
+const logger = createLogger('maintenance:api:risk-acceptance');
 
 /**
  * UUID validation regex
@@ -73,7 +73,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== POST /api/ticketing/tickets/[id]/risk-acceptance ====================
+// ==================== POST /api/maintenance/tickets/[id]/risk-acceptance ====================
 
 /**
  * 🟢 WORKING: Create a new risk acceptance for a ticket

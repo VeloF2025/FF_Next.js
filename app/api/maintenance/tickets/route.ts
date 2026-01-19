@@ -3,8 +3,8 @@
  *
  * 🟢 WORKING: Production-ready API endpoints for ticket listing and creation
  *
- * GET  /api/ticketing/tickets - List all tickets with optional filters
- * POST /api/ticketing/tickets - Create new ticket
+ * GET  /api/maintenance/tickets - List all tickets with optional filters
+ * POST /api/maintenance/tickets - Create new ticket
  *
  * Features:
  * - Multi-criteria filtering (status, type, priority, assigned_to, etc.)
@@ -20,45 +20,47 @@ import {
   listTickets,
   createTicket
 } from '@/modules/maintenance/services/ticketService';
-import type {
-  CreateTicketPayload,
-  TicketFilters,
+import {
   TicketSource,
   TicketType,
   TicketPriority,
 } from '@/modules/maintenance/types/ticket';
+import type {
+  CreateTicketPayload,
+  TicketFilters,
+} from '@/modules/maintenance/types/ticket';
 
-const logger = createLogger('ticketing:api:tickets');
+const logger = createLogger('maintenance:api:tickets');
 
 // Valid enum values for validation
 const VALID_SOURCES: TicketSource[] = [
-  'qcontact',
-  'weekly_report',
-  'construction',
-  'ad_hoc',
-  'incident',
-  'revenue',
-  'ont_swap',
-  'manual',
+  TicketSource.QCONTACT,
+  TicketSource.WEEKLY_REPORT,
+  TicketSource.CONSTRUCTION,
+  TicketSource.AD_HOC,
+  TicketSource.INCIDENT,
+  TicketSource.REVENUE,
+  TicketSource.ONT_SWAP,
+  TicketSource.MANUAL,
 ];
 
 const VALID_TYPES: TicketType[] = [
-  'maintenance',
-  'new_installation',
-  'modification',
-  'ont_swap',
-  'incident',
+  TicketType.FAULT_REPAIR,
+  TicketType.NEW_INSTALLATION,
+  TicketType.MODIFICATION,
+  TicketType.ONT_SWAP,
+  TicketType.INCIDENT,
 ];
 
 const VALID_PRIORITIES: TicketPriority[] = [
-  'low',
-  'normal',
-  'high',
-  'urgent',
-  'critical',
+  TicketPriority.LOW,
+  TicketPriority.NORMAL,
+  TicketPriority.HIGH,
+  TicketPriority.URGENT,
+  TicketPriority.CRITICAL,
 ];
 
-// ==================== GET /api/ticketing/tickets ====================
+// ==================== GET /api/maintenance/tickets ====================
 
 /**
  * 🟢 WORKING: List tickets with filters and pagination
@@ -148,7 +150,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ==================== POST /api/ticketing/tickets ====================
+// ==================== POST /api/maintenance/tickets ====================
 
 /**
  * 🟢 WORKING: Create new ticket with validation

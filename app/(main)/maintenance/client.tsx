@@ -3,7 +3,7 @@
 /**
  * Ticketing Dashboard Page Client Component
  *
- * Displays ticketing module dashboard with:
+ * Displays maintenance module dashboard with:
  * - Summary statistics (open, in progress, closed tickets)
  * - SLA compliance metrics
  * - Workload distribution by assignee

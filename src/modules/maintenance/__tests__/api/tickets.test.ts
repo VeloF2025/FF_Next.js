@@ -4,11 +4,11 @@
  * 🟢 WORKING: Tests written FIRST following TDD methodology
  *
  * Tests all ticket CRUD endpoints:
- * - GET /api/ticketing/tickets - List tickets with filters
- * - POST /api/ticketing/tickets - Create ticket
- * - GET /api/ticketing/tickets/[id] - Get ticket detail
- * - PUT /api/ticketing/tickets/[id] - Update ticket
- * - DELETE /api/ticketing/tickets/[id] - Soft delete ticket
+ * - GET /api/maintenance/tickets - List tickets with filters
+ * - POST /api/maintenance/tickets - Create ticket
+ * - GET /api/maintenance/tickets/[id] - Get ticket detail
+ * - PUT /api/maintenance/tickets/[id] - Update ticket
+ * - DELETE /api/maintenance/tickets/[id] - Soft delete ticket
  *
  * Test Strategy:
  * - Mock service layer to isolate API route logic
@@ -33,7 +33,7 @@ function createMockTicket(overrides: Partial<Ticket> = {}): Ticket {
     external_id: null,
     title: 'Test Ticket',
     description: 'Test description',
-    ticket_type: 'maintenance',
+    ticket_type: 'fault_repair',
     priority: 'normal',
     status: 'open',
     dr_number: null,
@@ -99,9 +99,9 @@ describe('Ticket CRUD API Endpoints', () => {
     vi.restoreAllMocks();
   });
 
-  // ==================== GET /api/ticketing/tickets ====================
+  // ==================== GET /api/maintenance/tickets ====================
 
-  describe('GET /api/ticketing/tickets - List tickets', () => {
+  describe('GET /api/maintenance/tickets - List tickets', () => {
     it('should list all tickets without filters', async () => {
       const { listTickets } = await import('../../services/ticketService');
       const mockTickets: Ticket[] = [
@@ -121,9 +121,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets');
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -153,9 +153,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets?status=open');
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets?status=open');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -180,14 +180,14 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets?ticket_type=maintenance');
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets?ticket_type=maintenance');
       const response = await GET(mockRequest as any);
 
       expect(response.status).toBe(200);
       expect(listTickets).toHaveBeenCalledWith({
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
       });
     });
 
@@ -205,9 +205,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets?page=2&pageSize=10');
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets?page=2&pageSize=10');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -234,9 +234,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(listTickets).mockResolvedValue(mockResponse);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets?status=open&priority=high&assigned_to=user123');
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets?status=open&priority=high&assigned_to=user123');
       const response = await GET(mockRequest as any);
 
       expect(response.status).toBe(200);
@@ -253,9 +253,9 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database connection failed')
       );
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets');
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets');
       const response = await GET(mockRequest as any);
       const data = await response.json();
 
@@ -266,16 +266,16 @@ describe('Ticket CRUD API Endpoints', () => {
     });
   });
 
-  // ==================== POST /api/ticketing/tickets ====================
+  // ==================== POST /api/maintenance/tickets ====================
 
-  describe('POST /api/ticketing/tickets - Create ticket', () => {
+  describe('POST /api/maintenance/tickets - Create ticket', () => {
     it('should create ticket with valid data', async () => {
       const { createTicket } = await import('../../services/ticketService');
       const createPayload: CreateTicketPayload = {
         source: 'manual',
         title: 'New Ticket',
         description: 'Test description',
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
         priority: 'normal',
       };
 
@@ -286,9 +286,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(createTicket).mockResolvedValue(mockTicket);
 
-      const { POST } = await import('../../../../app/api/ticketing/tickets/route');
+      const { POST } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload),
@@ -321,9 +321,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(createTicket).mockResolvedValue(mockTicket);
 
-      const { POST } = await import('../../../../app/api/ticketing/tickets/route');
+      const { POST } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload),
@@ -341,9 +341,9 @@ describe('Ticket CRUD API Endpoints', () => {
         description: 'No title or source',
       };
 
-      const { POST } = await import('../../../../app/api/ticketing/tickets/route');
+      const { POST } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invalidPayload),
@@ -364,12 +364,12 @@ describe('Ticket CRUD API Endpoints', () => {
       const invalidPayload = {
         source: 'invalid_source',
         title: 'Test',
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
       };
 
-      const { POST } = await import('../../../../app/api/ticketing/tickets/route');
+      const { POST } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(invalidPayload),
@@ -389,16 +389,16 @@ describe('Ticket CRUD API Endpoints', () => {
       const createPayload: CreateTicketPayload = {
         source: 'manual',
         title: 'Test',
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
       };
 
       vi.mocked(createTicket).mockRejectedValue(
         new Error('Database error')
       );
 
-      const { POST } = await import('../../../../app/api/ticketing/tickets/route');
+      const { POST } = await import('../../../../app/api/maintenance/tickets/route');
 
-      const mockRequest = new Request('http://localhost/api/ticketing/tickets', {
+      const mockRequest = new Request('http://localhost/api/maintenance/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createPayload),
@@ -413,9 +413,9 @@ describe('Ticket CRUD API Endpoints', () => {
     });
   });
 
-  // ==================== GET /api/ticketing/tickets/[id] ====================
+  // ==================== GET /api/maintenance/tickets/[id] ====================
 
-  describe('GET /api/ticketing/tickets/[id] - Get ticket detail', () => {
+  describe('GET /api/maintenance/tickets/[id] - Get ticket detail', () => {
     it('should get ticket by valid ID', async () => {
       const { getTicketById } = await import('../../services/ticketService');
       const ticketId = '123e4567-e89b-12d3-a456-426614174000';
@@ -423,9 +423,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(getTicketById).mockResolvedValue(mockTicket);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`);
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`);
       const response = await GET(mockRequest as any, { params: { id: ticketId } });
       const data = await response.json();
 
@@ -442,9 +442,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(getTicketById).mockResolvedValue(null);
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`);
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`);
       const response = await GET(mockRequest as any, { params: { id: ticketId } });
       const data = await response.json();
 
@@ -459,9 +459,9 @@ describe('Ticket CRUD API Endpoints', () => {
       const { getTicketById } = await import('../../services/ticketService');
       const invalidId = 'not-a-uuid';
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${invalidId}`);
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${invalidId}`);
       const response = await GET(mockRequest as any, { params: { id: invalidId } });
       const data = await response.json();
 
@@ -479,9 +479,9 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { GET } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { GET } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`);
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`);
       const response = await GET(mockRequest as any, { params: { id: ticketId } });
       const data = await response.json();
 
@@ -491,9 +491,9 @@ describe('Ticket CRUD API Endpoints', () => {
     });
   });
 
-  // ==================== PUT /api/ticketing/tickets/[id] ====================
+  // ==================== PUT /api/maintenance/tickets/[id] ====================
 
-  describe('PUT /api/ticketing/tickets/[id] - Update ticket', () => {
+  describe('PUT /api/maintenance/tickets/[id] - Update ticket', () => {
     it('should update ticket with partial data', async () => {
       const { updateTicket } = await import('../../services/ticketService');
       const ticketId = '123e4567-e89b-12d3-a456-426614174000';
@@ -510,9 +510,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(updateTicket).mockResolvedValue(updatedTicket);
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -542,9 +542,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(updateTicket).mockResolvedValue(updatedTicket);
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -563,9 +563,9 @@ describe('Ticket CRUD API Endpoints', () => {
         status: 'in_progress',
       };
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${invalidId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${invalidId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -583,9 +583,9 @@ describe('Ticket CRUD API Endpoints', () => {
       const { updateTicket } = await import('../../services/ticketService');
       const ticketId = '123e4567-e89b-12d3-a456-426614174000';
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -609,9 +609,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(updateTicket).mockResolvedValue(null);
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -635,9 +635,9 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { PUT } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { PUT } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload),
@@ -651,9 +651,9 @@ describe('Ticket CRUD API Endpoints', () => {
     });
   });
 
-  // ==================== DELETE /api/ticketing/tickets/[id] ====================
+  // ==================== DELETE /api/maintenance/tickets/[id] ====================
 
-  describe('DELETE /api/ticketing/tickets/[id] - Soft delete ticket', () => {
+  describe('DELETE /api/maintenance/tickets/[id] - Soft delete ticket', () => {
     it('should soft delete ticket by ID', async () => {
       const { deleteTicket } = await import('../../services/ticketService');
       const ticketId = '123e4567-e89b-12d3-a456-426614174000';
@@ -664,9 +664,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(deleteTicket).mockResolvedValue(deletedTicket);
 
-      const { DELETE } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { DELETE } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'DELETE',
       });
 
@@ -684,9 +684,9 @@ describe('Ticket CRUD API Endpoints', () => {
       const { deleteTicket } = await import('../../services/ticketService');
       const invalidId = 'not-a-uuid';
 
-      const { DELETE } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { DELETE } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${invalidId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${invalidId}`, {
         method: 'DELETE',
       });
 
@@ -704,9 +704,9 @@ describe('Ticket CRUD API Endpoints', () => {
 
       vi.mocked(deleteTicket).mockResolvedValue(null);
 
-      const { DELETE } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { DELETE } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'DELETE',
       });
 
@@ -725,9 +725,9 @@ describe('Ticket CRUD API Endpoints', () => {
         new Error('Database error')
       );
 
-      const { DELETE } = await import('../../../../app/api/ticketing/tickets/[id]/route');
+      const { DELETE } = await import('../../../../app/api/maintenance/tickets/[id]/route');
 
-      const mockRequest = new Request(`http://localhost/api/ticketing/tickets/${ticketId}`, {
+      const mockRequest = new Request(`http://localhost/api/maintenance/tickets/${ticketId}`, {
         method: 'DELETE',
       });
 

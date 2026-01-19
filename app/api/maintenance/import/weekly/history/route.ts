@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready endpoint for listing weekly import history
  *
- * GET /api/ticketing/import/weekly/history - List all imports with filters
+ * GET /api/maintenance/import/weekly/history - List all imports with filters
  *
  * Features:
  * - List all weekly imports
@@ -22,7 +22,7 @@ import {
 } from '@/modules/maintenance/services/weeklyReportService';
 import { WeeklyReportStatus, WeeklyReportFilters } from '@/modules/maintenance/types/weeklyReport';
 
-const logger = createLogger('ticketing:api:weekly-import-history');
+const logger = createLogger('maintenance:api:weekly-import-history');
 
 // Valid status values for validation
 const VALID_STATUSES: WeeklyReportStatus[] = [
@@ -32,7 +32,7 @@ const VALID_STATUSES: WeeklyReportStatus[] = [
   WeeklyReportStatus.FAILED,
 ];
 
-// ==================== GET /api/ticketing/import/weekly/history ====================
+// ==================== GET /api/maintenance/import/weekly/history ====================
 
 /**
  * 🟢 WORKING: List weekly import history with filters

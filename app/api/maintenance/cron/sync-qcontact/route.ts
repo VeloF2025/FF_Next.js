@@ -2,7 +2,7 @@
  * QContact Sync Cron Job API Route
  * 🟢 WORKING: Production-ready API endpoint for cron-triggered sync
  *
- * POST /api/ticketing/cron/sync-qcontact - Trigger automatic sync job
+ * POST /api/maintenance/cron/sync-qcontact - Trigger automatic sync job
  *
  * Features:
  * - Designed for Vercel Cron or external cron services
@@ -20,16 +20,16 @@
  * - Optionally verify CRON_SECRET environment variable
  * - Only allows POST requests
  *
- * @module api/ticketing/cron/sync-qcontact
+ * @module api/maintenance/cron/sync-qcontact
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { runSyncJob } from '@/modules/maintenance/jobs/qcontactSync';
 
-const logger = createLogger('ticketing:api:cron:sync-qcontact');
+const logger = createLogger('maintenance:api:cron:sync-qcontact');
 
-// ==================== POST /api/ticketing/cron/sync-qcontact ====================
+// ==================== POST /api/maintenance/cron/sync-qcontact ====================
 
 /**
  * 🟢 WORKING: Trigger QContact sync job via cron

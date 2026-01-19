@@ -1,9 +1,9 @@
 /**
  * Individual Team API Route
  *
- * GET    /api/ticketing/teams/[id] - Get team by ID
- * PUT    /api/ticketing/teams/[id] - Update team
- * DELETE /api/ticketing/teams/[id] - Delete team (soft delete)
+ * GET    /api/maintenance/teams/[id] - Get team by ID
+ * PUT    /api/maintenance/teams/[id] - Update team
+ * DELETE /api/maintenance/teams/[id] - Delete team (soft delete)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,7 +16,7 @@ import {
 } from '@/modules/maintenance/services/teamService';
 import type { UpdateTeamPayload } from '@/modules/maintenance/types/team';
 
-const logger = createLogger('ticketing:api:teams:id');
+const logger = createLogger('maintenance:api:teams:id');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,7 +25,7 @@ function isValidUUID(id: string): boolean {
 }
 
 /**
- * GET /api/ticketing/teams/[id]
+ * GET /api/maintenance/teams/[id]
  *
  * Query params:
  * - include_members: If 'true', includes team members
@@ -92,7 +92,7 @@ export async function GET(
 }
 
 /**
- * PUT /api/ticketing/teams/[id]
+ * PUT /api/maintenance/teams/[id]
  */
 export async function PUT(
   req: NextRequest,
@@ -161,7 +161,7 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/ticketing/teams/[id]
+ * DELETE /api/maintenance/teams/[id]
  */
 export async function DELETE(
   req: NextRequest,

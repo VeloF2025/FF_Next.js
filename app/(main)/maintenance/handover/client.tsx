@@ -76,7 +76,7 @@ export default function HandoverCenterPageClient() {
     setError(null);
 
     try {
-      let url = '/api/ticketing/handovers/pending?';
+      let url = '/api/maintenance/handovers/pending?';
 
       if (filter !== 'all') {
         url += `handover_type=${filter}`;

@@ -142,8 +142,8 @@ export async function uploadAttachment(
     // Sanitize filename
     const sanitizedFileName = sanitizeFileName(request.filename);
 
-    // Create storage path for ticketing attachments
-    const uploadPath = localFileStorage.getTicketAttachmentPath(request.ticket_id);
+    // Create storage path for maintenance attachments
+    const uploadPath = localFileStorage.getMaintenanceAttachmentPath(request.ticket_id);
 
     // Get file buffer from File object
     const file = request.file as File;

@@ -2,7 +2,7 @@
  * QContact Sync Status API Route
  * 🟢 WORKING: Production-ready API endpoint for retrieving sync status
  *
- * GET /api/ticketing/sync/qcontact/status - Get current sync status and statistics
+ * GET /api/maintenance/sync/qcontact/status - Get current sync status and statistics
  *
  * Features:
  * - Current sync progress (last 24 hours)
@@ -21,9 +21,9 @@ import { query, queryOne } from '@/modules/maintenance/utils/db';
 // Disable caching - status should always be fresh
 export const dynamic = 'force-dynamic';
 
-const logger = createLogger('ticketing:api:sync:status');
+const logger = createLogger('maintenance:api:sync:status');
 
-// ==================== GET /api/ticketing/sync/qcontact/status ====================
+// ==================== GET /api/maintenance/sync/qcontact/status ====================
 
 /**
  * 🟢 WORKING: Get sync status and statistics

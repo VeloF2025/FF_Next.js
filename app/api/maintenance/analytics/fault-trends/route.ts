@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for fault trend analysis
  *
- * GET /api/ticketing/analytics/fault-trends - Get fault trends by cause or location
+ * GET /api/maintenance/analytics/fault-trends - Get fault trends by cause or location
  *
  * Features:
  * - Group by: fault_cause, pole_number, pon_number, zone_id, dr_number
@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { query } from '@/modules/maintenance/utils/db';
 
-const logger = createLogger('ticketing:api:fault-trends');
+const logger = createLogger('maintenance:api:fault-trends');
 
 /**
  * Valid group_by parameters
@@ -78,7 +78,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/analytics/fault-trends ====================
+// ==================== GET /api/maintenance/analytics/fault-trends ====================
 
 /**
  * GET handler - Get fault trends by cause or location

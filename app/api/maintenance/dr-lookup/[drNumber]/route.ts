@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for DR number lookup
  *
- * GET /api/ticketing/dr-lookup/[drNumber] - Lookup DR details from SOW module
+ * GET /api/maintenance/dr-lookup/[drNumber] - Lookup DR details from SOW module
  *
  * Features:
  * - Queries SOW module for DR (Drop) information
@@ -17,9 +17,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { lookupDR } from '@/modules/maintenance/services/drLookupService';
 
-const logger = createLogger('ticketing:api:dr-lookup');
+const logger = createLogger('maintenance:api:dr-lookup');
 
-// ==================== GET /api/ticketing/dr-lookup/[drNumber] ====================
+// ==================== GET /api/maintenance/dr-lookup/[drNumber] ====================
 
 /**
  * 🟢 WORKING: Lookup DR number and return complete details

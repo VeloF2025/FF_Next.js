@@ -62,7 +62,7 @@ async function fetchActivities(
   if (options.source) params.set('source', options.source);
   if (options.type) params.set('type', options.type);
 
-  const url = `/api/ticketing/tickets/${ticketId}/activities${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `/api/maintenance/tickets/${ticketId}/activities${params.toString() ? '?' + params.toString() : ''}`;
   const response = await fetch(url);
 
   if (!response.ok) {

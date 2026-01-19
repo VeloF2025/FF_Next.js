@@ -17,7 +17,7 @@
  * - ticket.closed - Ticket successfully closed
  * - ticket.sla_warning - SLA deadline approaching
  *
- * @module ticketing/services/notificationTriggers
+ * @module maintenance/services/notificationTriggers
  */
 
 import { createLogger } from '@/lib/logger';

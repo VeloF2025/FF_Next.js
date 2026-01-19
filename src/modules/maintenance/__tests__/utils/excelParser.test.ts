@@ -77,7 +77,7 @@ describe('Excel Parser Utility', () => {
           'FT123456',
           'Fiber cut on Main St',
           'Customer reports no internet',
-          'maintenance',
+          'fault_repair',
           'high',
           'open',
           'DR-2024-001',
@@ -119,7 +119,7 @@ describe('Excel Parser Utility', () => {
       expect(result.rows[0]).toMatchObject({
         row_number: 2,
         title: 'Fiber cut on Main St',
-        ticket_type: 'maintenance'
+        ticket_type: 'fault_repair'
       });
       expect(result.rows[1]).toMatchObject({
         row_number: 3,
@@ -132,7 +132,7 @@ describe('Excel Parser Utility', () => {
       // 🟢 WORKING: Test custom column mapping
       const buffer = createTestExcelBuffer([
         ['ID', 'Job Title', 'Job Type', 'DR Ref'],
-        ['FT001', 'Fiber repair', 'maintenance', 'DR-001'],
+        ['FT001', 'Fiber repair', 'fault_repair', 'DR-001'],
         ['FT002', 'New install', 'new_installation', 'DR-002']
       ]);
 
@@ -152,7 +152,7 @@ describe('Excel Parser Utility', () => {
       expect(result.rows[0]).toMatchObject({
         ticket_uid: 'FT001',
         title: 'Fiber repair',
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
         dr_number: 'DR-001'
       });
     });
@@ -160,7 +160,7 @@ describe('Excel Parser Utility', () => {
     it('should handle Excel file with missing headers', async () => {
       // 🟢 WORKING: Test Excel without headers (should use default A, B, C...)
       const buffer = createTestExcelBuffer([
-        ['FT001', 'Test Ticket', 'maintenance'],
+        ['FT001', 'Test Ticket', 'fault_repair'],
         ['FT002', 'Another Ticket', 'new_installation']
       ]);
 
@@ -219,7 +219,7 @@ describe('Excel Parser Utility', () => {
           'FT001',
           'Valid Ticket',
           'Description',
-          'maintenance',
+          'fault_repair',
           'high',
           'open',
           'DR-001',
@@ -290,14 +290,14 @@ describe('Excel Parser Utility', () => {
       expect(result.success).toBe(true);
       expect(result.rows[0].ticket_uid).toBe('FT001');
       expect(result.rows[0].title).toBe('Title with spaces');
-      expect(result.rows[0].ticket_type).toBe('maintenance');
+      expect(result.rows[0].ticket_type).toBe('fault_repair');
     });
 
     it('should handle Excel file with multiple sheets (use first sheet)', async () => {
       // 🟢 WORKING: Test multi-sheet Excel (should use first sheet)
       const ws1 = XLSX.utils.aoa_to_sheet([
         ['Title', 'Type'],
-        ['Ticket 1', 'maintenance']
+        ['Ticket 1', 'fault_repair']
       ]);
       const ws2 = XLSX.utils.aoa_to_sheet([
         ['Title', 'Type'],
@@ -324,7 +324,7 @@ describe('Excel Parser Utility', () => {
       const row: ImportRow = {
         row_number: 2,
         title: 'Test Ticket',
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
         description: 'Test description'
       };
 
@@ -368,7 +368,7 @@ describe('Excel Parser Utility', () => {
       const row: ImportRow = {
         row_number: 2,
         title: '',
-        ticket_type: 'maintenance'
+        ticket_type: 'fault_repair'
       };
 
       const columnMapping: ExcelColumnMapping[] = [
@@ -398,7 +398,7 @@ describe('Excel Parser Utility', () => {
           ticket_field: 'ticket_type',
           required: true,
           validate: (value: any) => {
-            const validTypes = ['maintenance', 'new_installation', 'ont_swap', 'modification', 'incident'];
+            const validTypes = ['fault_repair', 'new_installation', 'ont_swap', 'modification', 'incident'];
             return validTypes.includes(value);
           }
         }
@@ -415,7 +415,7 @@ describe('Excel Parser Utility', () => {
       const row: ImportRow = {
         row_number: 2,
         title: 'Test Ticket',
-        ticket_type: 'maintenance'
+        ticket_type: 'fault_repair'
         // Optional fields not provided
       };
 
@@ -437,9 +437,9 @@ describe('Excel Parser Utility', () => {
     it('should detect duplicate ticket UIDs', () => {
       // 🟢 WORKING: Test duplicate detection by ticket_uid
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Ticket 1', ticket_type: 'maintenance', ticket_uid: 'FT001' },
-        { row_number: 3, title: 'Ticket 2', ticket_type: 'maintenance', ticket_uid: 'FT002' },
-        { row_number: 4, title: 'Ticket 3', ticket_type: 'maintenance', ticket_uid: 'FT001' } // Duplicate
+        { row_number: 2, title: 'Ticket 1', ticket_type: 'fault_repair', ticket_uid: 'FT001' },
+        { row_number: 3, title: 'Ticket 2', ticket_type: 'fault_repair', ticket_uid: 'FT002' },
+        { row_number: 4, title: 'Ticket 3', ticket_type: 'fault_repair', ticket_uid: 'FT001' } // Duplicate
       ];
 
       const duplicates = detectDuplicates(rows, 'ticket_uid');
@@ -454,9 +454,9 @@ describe('Excel Parser Utility', () => {
     it('should detect duplicate DR numbers', () => {
       // 🟢 WORKING: Test duplicate detection by DR number
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Ticket 1', ticket_type: 'maintenance', dr_number: 'DR-001' },
-        { row_number: 3, title: 'Ticket 2', ticket_type: 'maintenance', dr_number: 'DR-002' },
-        { row_number: 4, title: 'Ticket 3', ticket_type: 'maintenance', dr_number: 'DR-001' } // Duplicate
+        { row_number: 2, title: 'Ticket 1', ticket_type: 'fault_repair', dr_number: 'DR-001' },
+        { row_number: 3, title: 'Ticket 2', ticket_type: 'fault_repair', dr_number: 'DR-002' },
+        { row_number: 4, title: 'Ticket 3', ticket_type: 'fault_repair', dr_number: 'DR-001' } // Duplicate
       ];
 
       const duplicates = detectDuplicates(rows, 'dr_number');
@@ -468,9 +468,9 @@ describe('Excel Parser Utility', () => {
     it('should handle rows with missing field (no duplicates for undefined)', () => {
       // 🟢 WORKING: Test that undefined/null values are not flagged as duplicates
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Ticket 1', ticket_type: 'maintenance' }, // No ticket_uid
-        { row_number: 3, title: 'Ticket 2', ticket_type: 'maintenance' }, // No ticket_uid
-        { row_number: 4, title: 'Ticket 3', ticket_type: 'maintenance', ticket_uid: 'FT001' }
+        { row_number: 2, title: 'Ticket 1', ticket_type: 'fault_repair' }, // No ticket_uid
+        { row_number: 3, title: 'Ticket 2', ticket_type: 'fault_repair' }, // No ticket_uid
+        { row_number: 4, title: 'Ticket 3', ticket_type: 'fault_repair', ticket_uid: 'FT001' }
       ];
 
       const duplicates = detectDuplicates(rows, 'ticket_uid');
@@ -481,9 +481,9 @@ describe('Excel Parser Utility', () => {
     it('should return empty array when no duplicates exist', () => {
       // 🟢 WORKING: Test no duplicates
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Ticket 1', ticket_type: 'maintenance', ticket_uid: 'FT001' },
-        { row_number: 3, title: 'Ticket 2', ticket_type: 'maintenance', ticket_uid: 'FT002' },
-        { row_number: 4, title: 'Ticket 3', ticket_type: 'maintenance', ticket_uid: 'FT003' }
+        { row_number: 2, title: 'Ticket 1', ticket_type: 'fault_repair', ticket_uid: 'FT001' },
+        { row_number: 3, title: 'Ticket 2', ticket_type: 'fault_repair', ticket_uid: 'FT002' },
+        { row_number: 4, title: 'Ticket 3', ticket_type: 'fault_repair', ticket_uid: 'FT003' }
       ];
 
       const duplicates = detectDuplicates(rows, 'ticket_uid');
@@ -494,9 +494,9 @@ describe('Excel Parser Utility', () => {
     it('should detect multiple duplicates of same value', () => {
       // 🟢 WORKING: Test multiple duplicates of same value
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Ticket 1', ticket_type: 'maintenance', ticket_uid: 'FT001' },
-        { row_number: 3, title: 'Ticket 2', ticket_type: 'maintenance', ticket_uid: 'FT001' },
-        { row_number: 4, title: 'Ticket 3', ticket_type: 'maintenance', ticket_uid: 'FT001' }
+        { row_number: 2, title: 'Ticket 1', ticket_type: 'fault_repair', ticket_uid: 'FT001' },
+        { row_number: 3, title: 'Ticket 2', ticket_type: 'fault_repair', ticket_uid: 'FT001' },
+        { row_number: 4, title: 'Ticket 3', ticket_type: 'fault_repair', ticket_uid: 'FT001' }
       ];
 
       const duplicates = detectDuplicates(rows, 'ticket_uid');
@@ -509,8 +509,8 @@ describe('Excel Parser Utility', () => {
     it('should generate preview with valid rows and errors', () => {
       // 🟢 WORKING: Test preview generation
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Valid Ticket', ticket_type: 'maintenance' },
-        { row_number: 3, title: '', ticket_type: 'maintenance' }, // Invalid: missing title
+        { row_number: 2, title: 'Valid Ticket', ticket_type: 'fault_repair' },
+        { row_number: 3, title: '', ticket_type: 'fault_repair' }, // Invalid: missing title
         { row_number: 4, title: 'Another Valid', ticket_type: 'ont_swap' }
       ];
 
@@ -535,7 +535,7 @@ describe('Excel Parser Utility', () => {
       const rows: ImportRow[] = Array.from({ length: 20 }, (_, i) => ({
         row_number: i + 2,
         title: `Ticket ${i + 1}`,
-        ticket_type: 'maintenance'
+        ticket_type: 'fault_repair'
       }));
 
       const columnMapping: ExcelColumnMapping[] = [
@@ -552,7 +552,7 @@ describe('Excel Parser Utility', () => {
     it('should set can_proceed to false when all rows are invalid', () => {
       // 🟢 WORKING: Test cannot proceed when all invalid
       const rows: ImportRow[] = [
-        { row_number: 2, title: '', ticket_type: 'maintenance' },
+        { row_number: 2, title: '', ticket_type: 'fault_repair' },
         { row_number: 3, title: 'Title', ticket_type: '' }
       ];
 
@@ -570,7 +570,7 @@ describe('Excel Parser Utility', () => {
     it('should include column mapping in preview', () => {
       // 🟢 WORKING: Test column mapping in preview
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Test', ticket_type: 'maintenance' }
+        { row_number: 2, title: 'Test', ticket_type: 'fault_repair' }
       ];
 
       const columnMapping: ExcelColumnMapping[] = [
@@ -588,8 +588,8 @@ describe('Excel Parser Utility', () => {
     it('should detect duplicates in preview', () => {
       // 🟢 WORKING: Test duplicate detection in preview
       const rows: ImportRow[] = [
-        { row_number: 2, title: 'Ticket 1', ticket_type: 'maintenance', ticket_uid: 'FT001' },
-        { row_number: 3, title: 'Ticket 2', ticket_type: 'maintenance', ticket_uid: 'FT001' }
+        { row_number: 2, title: 'Ticket 1', ticket_type: 'fault_repair', ticket_uid: 'FT001' },
+        { row_number: 3, title: 'Ticket 2', ticket_type: 'fault_repair', ticket_uid: 'FT001' }
       ];
 
       const columnMapping: ExcelColumnMapping[] = [
@@ -655,7 +655,7 @@ describe('Excel Parser Utility', () => {
       const excelRow = {
         'Ticket ID': 'FT001',
         'Title': 'Test Ticket',
-        'Type': 'maintenance',
+        'Type': 'fault_repair',
         'DR Number': 'DR-001'
       };
 
@@ -671,7 +671,7 @@ describe('Excel Parser Utility', () => {
       expect(result.row_number).toBe(2);
       expect(result.ticket_uid).toBe('FT001');
       expect(result.title).toBe('Test Ticket');
-      expect(result.ticket_type).toBe('maintenance');
+      expect(result.ticket_type).toBe('fault_repair');
       expect(result.dr_number).toBe('DR-001');
     });
 
@@ -730,7 +730,7 @@ describe('Excel Parser Utility', () => {
         `FT${String(i + 1).padStart(6, '0')}`,
         `Ticket ${i + 1}`,
         `Description for ticket ${i + 1}`,
-        i % 2 === 0 ? 'maintenance' : 'new_installation',
+        i % 2 === 0 ? 'fault_repair' : 'new_installation',
         i % 3 === 0 ? 'high' : 'normal',
         'open',
         `DR-2024-${String(i + 1).padStart(3, '0')}`,
@@ -765,7 +765,7 @@ describe('Excel Parser Utility', () => {
         `FT${String(i + 1).padStart(6, '0')}`,
         `Ticket ${i + 1}`,
         `Description ${i + 1}`,
-        'maintenance',
+        'fault_repair',
         'normal',
         'open',
         `DR-${i + 1}`,

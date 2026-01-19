@@ -11,7 +11,7 @@
  * - Error handling with graceful degradation
  * - Pagination support for large result sets
  *
- * @module ticketing/services/qcontactSyncInbound
+ * @module maintenance/services/qcontactSyncInbound
  */
 
 import { queryOne } from '../utils/db';

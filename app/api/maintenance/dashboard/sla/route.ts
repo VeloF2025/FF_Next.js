@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready SLA compliance endpoint
  *
- * GET /api/ticketing/dashboard/sla - Get SLA compliance statistics
+ * GET /api/maintenance/dashboard/sla - Get SLA compliance statistics
  *
  * Returns:
  * - Total tickets
@@ -28,7 +28,7 @@ import { createLogger } from '@/lib/logger';
 import { getSLACompliance } from '@/modules/maintenance/services/dashboardService';
 import type { DashboardFilters } from '@/modules/maintenance/services/dashboardService';
 
-const logger = createLogger('ticketing:api:dashboard:sla');
+const logger = createLogger('maintenance:api:dashboard:sla');
 
 /**
  * 🟢 WORKING: Get SLA compliance statistics

@@ -3,9 +3,9 @@
  * 🟢 WORKING: TDD tests for weekly report import API endpoints
  *
  * Tests:
- * - POST /api/ticketing/import/weekly - Upload Excel and create import
- * - GET /api/ticketing/import/weekly/[id] - Get import status
- * - GET /api/ticketing/import/weekly/history - Get import history
+ * - POST /api/maintenance/import/weekly - Upload Excel and create import
+ * - GET /api/maintenance/import/weekly/[id] - Get import status
+ * - GET /api/maintenance/import/weekly/history - Get import history
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -26,7 +26,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 describe('Weekly Import API', () => {
-  describe('POST /api/ticketing/import/weekly', () => {
+  describe('POST /api/maintenance/import/weekly', () => {
     beforeEach(() => {
       vi.clearAllMocks();
     });
@@ -59,7 +59,7 @@ describe('Weekly Import API', () => {
           {
             row_number: 1,
             title: 'Test Ticket',
-            ticket_type: 'maintenance',
+            ticket_type: 'fault_repair',
           } as ImportRow,
         ],
         total_rows: 1,
@@ -184,7 +184,7 @@ describe('Weekly Import API', () => {
     });
   });
 
-  describe('GET /api/ticketing/import/weekly/[id]', () => {
+  describe('GET /api/maintenance/import/weekly/[id]', () => {
     beforeEach(() => {
       vi.clearAllMocks();
     });
@@ -304,7 +304,7 @@ describe('Weekly Import API', () => {
     });
   });
 
-  describe('GET /api/ticketing/import/weekly/history', () => {
+  describe('GET /api/maintenance/import/weekly/history', () => {
     beforeEach(() => {
       vi.clearAllMocks();
     });

@@ -16,6 +16,211 @@ import {
   getTodaySAST,
   getYesterdaySAST,
 } from '../context';
+import type {
+  DrListItem,
+  QaWizardPhase,
+  QaDecision,
+  SerialValidationStatus,
+} from '../services/activateDataService';
+import { QA_PHASE_ORDER, getPhaseIndex } from '../services/activateDataService';
+
+// ============================================================================
+// BADGE COLOR REFERENCE
+// ============================================================================
+
+const BADGE_COLORS = {
+  // Status badges
+  installed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
+  activated: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200',
+  pending: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+  inReview: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200',
+  pass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
+  fail: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
+  rework: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200',
+
+  // Serial validation borders
+  valid: 'border-green-500',
+  swapped: 'border-yellow-500',
+  missing: 'border-red-500',
+  invalid: 'border-orange-500',
+} as const;
+
+// ============================================================================
+// STATUS BADGE STACK COMPONENT
+// ============================================================================
+
+interface StatusBadgeProps {
+  isActivated: boolean;
+  qaPhase: QaWizardPhase | null;
+  qaDecision: QaDecision | null;
+  feedbackSent: string | null;
+}
+
+/**
+ * Shows the most relevant status badge based on priority:
+ * 1. QA Decision (PASS/FAIL/REWORK)
+ * 2. In Review (final_decision or feedback phase)
+ * 3. Activated (in OES but not QA'd)
+ * 4. Installed (default - submitted via WA)
+ */
+function StatusBadge({ isActivated, qaPhase, qaDecision, feedbackSent }: StatusBadgeProps) {
+  // Priority 1: QA Decision exists
+  if (qaDecision === 'PASS') {
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.pass}`}>
+        QA Passed ✓
+      </span>
+    );
+  }
+  if (qaDecision === 'FAIL') {
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.fail}`}>
+        QA Failed ✗
+      </span>
+    );
+  }
+  if (qaDecision === 'REWORK_NEEDED') {
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.rework}`}>
+        Rework Needed
+      </span>
+    );
+  }
+
+  // Priority 2: In Review (final_decision or feedback phase)
+  if (qaPhase === 'final_decision' || qaPhase === 'feedback') {
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.inReview}`}>
+        In Review
+      </span>
+    );
+  }
+
+  // Priority 3: Activated (in OES but not yet QA'd)
+  if (isActivated && !qaDecision) {
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.activated}`}>
+        Activated
+      </span>
+    );
+  }
+
+  // Priority 4: Pending QA (has a phase but not reviewed yet)
+  if (qaPhase && ['prerequisites', 'photo_review', 'data_validation'].includes(qaPhase)) {
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.pending}`}>
+        Pending QA
+      </span>
+    );
+  }
+
+  // Default: Installed (submitted via WA, not in OES yet)
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${BADGE_COLORS.installed}`}>
+      Installed
+    </span>
+  );
+}
+
+// ============================================================================
+// SERIAL VALIDATION BADGE COMPONENT
+// ============================================================================
+
+interface SerialValidationBadgeProps {
+  label: 'ONT' | 'UPS';
+  status: SerialValidationStatus;
+  maskedSerial: string;
+}
+
+/**
+ * Shows serial badge with validation status indicator
+ * | Status | Display | Color |
+ * |--------|---------|-------|
+ * | valid | `ONT ✓ (ALC***3CA)` | Green border |
+ * | swapped | `ONT ⚠️ (GU18***...)` | Yellow border |
+ * | missing | `ONT ❌` | Red border |
+ * | invalid | `ONT ⚠️ (XYZ...)` | Orange border |
+ */
+function SerialValidationBadge({ label, status, maskedSerial }: SerialValidationBadgeProps) {
+  const isOnt = label === 'ONT';
+  const baseColor = isOnt ? 'text-blue-600 dark:text-blue-400' : 'text-purple-600 dark:text-purple-400';
+
+  if (status === 'missing') {
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.missing} rounded text-xs font-medium ${baseColor}`}>
+        {label} ❌
+      </span>
+    );
+  }
+
+  if (status === 'swapped') {
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.swapped} rounded text-xs font-medium ${baseColor}`}>
+        {label} ⚠️ <span className="font-mono">{maskedSerial}</span>
+      </span>
+    );
+  }
+
+  if (status === 'invalid') {
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.invalid} rounded text-xs font-medium ${baseColor}`}>
+        {label} ⚠️ <span className="font-mono">{maskedSerial}</span>
+      </span>
+    );
+  }
+
+  // valid
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.valid} rounded text-xs font-medium ${baseColor}`}>
+      {label} ✓ <span className="font-mono">{maskedSerial}</span>
+    </span>
+  );
+}
+
+// ============================================================================
+// PROGRESS DOTS COMPONENT
+// ============================================================================
+
+interface ProgressDotsProps {
+  qaPhase: QaWizardPhase | null;
+  qaDecision: QaDecision | null;
+}
+
+/**
+ * Visual workflow phase indicator (● ● ● ○ ○ ○)
+ * 6 dots representing workflow phases:
+ * 1. prerequisites
+ * 2. photo_review
+ * 3. data_validation
+ * 4. final_decision
+ * 5. feedback
+ * 6. completed
+ */
+function ProgressDots({ qaPhase, qaDecision }: ProgressDotsProps) {
+  // If there's a final decision, show full progress
+  const completedPhases = qaDecision ? 6 : getPhaseIndex(qaPhase) + 1;
+
+  return (
+    <div className="flex items-center gap-1" title={`Phase: ${qaPhase || 'Not started'}`}>
+      {QA_PHASE_ORDER.map((phase, index) => (
+        <span
+          key={phase}
+          className={`w-2 h-2 rounded-full ${
+            index < completedPhases
+              ? qaDecision === 'PASS'
+                ? 'bg-green-500'
+                : qaDecision === 'FAIL'
+                ? 'bg-red-500'
+                : qaDecision === 'REWORK_NEEDED'
+                ? 'bg-orange-500'
+                : 'bg-blue-500'
+              : 'bg-gray-300 dark:bg-gray-600'
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
 
 // ============================================================================
 // WRAPPER COMPONENT (Provides Context)
@@ -439,57 +644,71 @@ function QaCentrePageContent() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
+                      {/* Row 1: DR Number + Status Badge */}
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                           {drop.dropNumber}
                         </h3>
+                        <StatusBadge
+                          isActivated={drop.isActivated}
+                          qaPhase={drop.qaPhase}
+                          qaDecision={drop.qaDecision}
+                          feedbackSent={drop.feedbackSent}
+                        />
                         {drop.feedbackSent && (
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                            ✓ Feedback Sent
+                            ✓ Sent
                           </span>
                         )}
                       </div>
+
+                      {/* Row 2: Project • Agent • Date */}
                       <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <span>Project: <span className="font-medium text-gray-900 dark:text-white">{drop.project || 'Unknown'}</span></span>
+                        <span className="font-medium text-gray-900 dark:text-white">{drop.project || 'Unknown'}</span>
                         <span>•</span>
-                        <span>Agent: <span className="font-medium text-gray-900 dark:text-white">{formatAgent(drop.senderPhone)}</span></span>
+                        <span>{formatAgent(drop.senderPhone)}</span>
                         <span>•</span>
-                        <span>Created: <span className="font-medium text-gray-900 dark:text-white">{new Date(drop.createdAt).toLocaleString('en-US', {
+                        <span>{new Date(drop.createdAt).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
-                          year: 'numeric',
                           hour: 'numeric',
                           minute: '2-digit',
                           hour12: true
-                        })}</span></span>
+                        })}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        <span>Photos: <span className="font-medium text-gray-900 dark:text-white">{drop.photoCount || 0}</span></span>
-                        {drop.ontSerial && (
-                          <>
-                            <span>•</span>
-                            <span>ONT: <span className="font-mono text-xs font-medium text-blue-600 dark:text-blue-400">{drop.ontSerial}</span></span>
-                          </>
-                        )}
-                        {drop.upsSerial && (
-                          <>
-                            <span>•</span>
-                            <span>UPS: <span className="font-mono text-xs font-medium text-purple-600 dark:text-purple-400">{drop.upsSerial}</span></span>
-                          </>
+
+                      {/* Row 3: Photos + Serial Badges with validation */}
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          📷 <span className="font-medium text-gray-900 dark:text-white">{drop.photoCount || 0}</span>
+                        </span>
+                        <SerialValidationBadge
+                          label="ONT"
+                          status={drop.ontSerialStatus}
+                          maskedSerial={drop.ontSerialMasked}
+                        />
+                        <SerialValidationBadge
+                          label="UPS"
+                          status={drop.upsSerialStatus}
+                          maskedSerial={drop.upsSerialMasked}
+                        />
+                        {drop.serialsSwapped && (
+                          <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                            ⚠️ Swapped
+                          </span>
                         )}
                       </div>
                     </div>
 
-                    <div>
-                      {drop.status === 'complete' ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                          Complete
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
-                          Incomplete
-                        </span>
-                      )}
+                    {/* Right side: Progress Dots */}
+                    <div className="flex flex-col items-end gap-2">
+                      <ProgressDots
+                        qaPhase={drop.qaPhase}
+                        qaDecision={drop.qaDecision}
+                      />
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {drop.completedPhotos}/10 steps
+                      </span>
                     </div>
                   </div>
                 </button>

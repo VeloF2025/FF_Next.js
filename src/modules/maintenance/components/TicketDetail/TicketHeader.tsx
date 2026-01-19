@@ -56,7 +56,7 @@ function getGoogleMapsUrl(lat: number, lng: number): string {
 /**
  * 🟢 WORKING: Ticket header component
  */
-export function TicketHeader({ ticket, backLink = '/ticketing/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
+export function TicketHeader({ ticket, backLink = '/maintenance/tickets', onStatusChange, onPriorityChange }: TicketHeaderProps) {
   // Get GPS coordinates from enrichment or ticket
   const gps = ticket.fibreflow_enrichment?.fibreflow_gps
     || ticket.fibreflow_enrichment?.onemap_gps

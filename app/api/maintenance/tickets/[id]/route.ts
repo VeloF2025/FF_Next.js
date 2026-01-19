@@ -3,9 +3,9 @@
  *
  * 🟢 WORKING: Production-ready API endpoints for individual ticket operations
  *
- * GET    /api/ticketing/tickets/[id] - Get ticket detail
- * PUT    /api/ticketing/tickets/[id] - Update ticket
- * DELETE /api/ticketing/tickets/[id] - Soft delete ticket
+ * GET    /api/maintenance/tickets/[id] - Get ticket detail
+ * PUT    /api/maintenance/tickets/[id] - Update ticket
+ * DELETE /api/maintenance/tickets/[id] - Soft delete ticket
  *
  * Features:
  * - UUID format validation
@@ -25,7 +25,7 @@ import {
 import { enrichTicketData } from '@/modules/maintenance/services/ticketEnrichmentService';
 import type { UpdateTicketPayload } from '@/modules/maintenance/types/ticket';
 
-const logger = createLogger('ticketing:api:tickets:id');
+const logger = createLogger('maintenance:api:tickets:id');
 
 /**
  * UUID validation regex
@@ -97,7 +97,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/tickets/[id] ====================
+// ==================== GET /api/maintenance/tickets/[id] ====================
 
 /**
  * 🟢 WORKING: Get ticket by ID with enrichment
@@ -150,7 +150,7 @@ export async function GET(
   }
 }
 
-// ==================== PUT /api/ticketing/tickets/[id] ====================
+// ==================== PUT /api/maintenance/tickets/[id] ====================
 
 /**
  * 🟢 WORKING: Update ticket by ID
@@ -199,7 +199,7 @@ export async function PUT(
   }
 }
 
-// ==================== DELETE /api/ticketing/tickets/[id] ====================
+// ==================== DELETE /api/maintenance/tickets/[id] ====================
 
 /**
  * 🟢 WORKING: Soft delete ticket by ID

@@ -1,8 +1,8 @@
-# FibreFlow Ticketing Module - Phase 1 Core
+# FibreFlow Maintenance Module - Phase 1 Core
 
 ## Overview
 
-The FibreFlow Ticketing Module is a comprehensive system for managing fiber network issues, faults, and maintenance requests. This module replaces 6 parallel Excel spreadsheets and integrates with QContact, WhatsApp, and internal systems.
+The FibreFlow Maintenance Module is a comprehensive system for managing fiber network issues, faults, and maintenance requests. This module replaces 6 parallel Excel spreadsheets and integrates with QContact, WhatsApp, and internal systems.
 
 **Module Version:** 1.0.0 (Phase 1 Core)
 **Status:** 🚧 In Development
@@ -46,7 +46,7 @@ The FibreFlow Ticketing Module is a comprehensive system for managing fiber netw
 ## Module Structure
 
 ```
-src/modules/ticketing/
+src/modules/maintenance/
 ├── types/              # TypeScript type definitions
 ├── services/           # Business logic and data access
 ├── components/         # React components
@@ -102,54 +102,54 @@ export default function TicketsPage() {
 ## API Endpoints
 
 ### Ticket CRUD
-- `GET /api/ticketing/tickets` - List tickets with filters
-- `POST /api/ticketing/tickets` - Create ticket
-- `GET /api/ticketing/tickets/{id}` - Get ticket detail
-- `PUT /api/ticketing/tickets/{id}` - Update ticket
-- `DELETE /api/ticketing/tickets/{id}` - Delete ticket
+- `GET /api/maintenance/tickets` - List tickets with filters
+- `POST /api/maintenance/tickets` - Create ticket
+- `GET /api/maintenance/tickets/{id}` - Get ticket detail
+- `PUT /api/maintenance/tickets/{id}` - Update ticket
+- `DELETE /api/maintenance/tickets/{id}` - Delete ticket
 
 ### DR Lookup
-- `GET /api/ticketing/dr-lookup/{drNumber}` - Lookup DR from SOW module
+- `GET /api/maintenance/dr-lookup/{drNumber}` - Lookup DR from SOW module
 
 ### Verification
-- `GET /api/ticketing/tickets/{id}/verification` - Get verification steps
-- `PUT /api/ticketing/tickets/{id}/verification/{step}` - Update step
+- `GET /api/maintenance/tickets/{id}/verification` - Get verification steps
+- `PUT /api/maintenance/tickets/{id}/verification/{step}` - Update step
 
 ### QA Readiness
-- `POST /api/ticketing/tickets/{id}/qa-readiness-check` - Run readiness check
-- `GET /api/ticketing/tickets/{id}/qa-readiness` - Get readiness status
+- `POST /api/maintenance/tickets/{id}/qa-readiness-check` - Run readiness check
+- `GET /api/maintenance/tickets/{id}/qa-readiness` - Get readiness status
 
 ### Handover
-- `POST /api/ticketing/tickets/{id}/handover` - Create handover snapshot
-- `GET /api/ticketing/tickets/{id}/handover-history` - Get handover history
+- `POST /api/maintenance/tickets/{id}/handover` - Create handover snapshot
+- `GET /api/maintenance/tickets/{id}/handover-history` - Get handover history
 
 ### Weekly Import
-- `POST /api/ticketing/import/weekly` - Upload weekly report Excel
-- `GET /api/ticketing/import/weekly/{id}` - Get import status
+- `POST /api/maintenance/import/weekly` - Upload weekly report Excel
+- `GET /api/maintenance/import/weekly/{id}` - Get import status
 
 ### Dashboard
-- `GET /api/ticketing/dashboard/summary` - Dashboard summary stats
-- `GET /api/ticketing/dashboard/sla` - SLA compliance stats
+- `GET /api/maintenance/dashboard/summary` - Dashboard summary stats
+- `GET /api/maintenance/dashboard/sla` - SLA compliance stats
 
 ---
 
 ## Database Schema
 
 ### Core Tables (8)
-1. **tickets** - Main ticket table with all core fields
-2. **verification_steps** - 12-step verification tracking
-3. **weekly_reports** - Import batch tracking
-4. **qcontact_sync_log** - Bidirectional sync audit
-5. **guarantee_periods** - Guarantee configuration by project
-6. **whatsapp_notifications** - Notification delivery tracking
-7. **ticket_attachments** - File metadata
-8. **ticket_notes** - Internal/client notes
+1. **maintenance_tickets** - Main ticket table with all core fields
+2. **maintenance_verification_steps** - 12-step verification tracking
+3. **maintenance_weekly_reports** - Import batch tracking
+4. **maintenance_qcontact_sync_log** - Bidirectional sync audit
+5. **maintenance_guarantee_periods** - Guarantee configuration by project
+6. **maintenance_whatsapp_notifications** - Notification delivery tracking
+7. **maintenance_attachments** - File metadata
+8. **maintenance_notes** - Internal/client notes
 
 ### Maintenance Enhancement Tables (4)
-9. **qa_readiness_checks** - Pre-QA validation log
-10. **qa_risk_acceptances** - Conditional approval tracking
-11. **handover_snapshots** - Immutable audit trail
-12. **repeat_fault_escalations** - Infrastructure-level escalation
+9. **maintenance_qa_checks** - Pre-QA validation log
+10. **maintenance_risk_acceptances** - Conditional approval tracking
+11. **maintenance_handover_snapshots** - Immutable audit trail
+12. **maintenance_escalations** - Infrastructure-level escalation
 
 See `migrations/` folder for full schema.
 
@@ -172,13 +172,13 @@ This module follows **TDD (Test-Driven Development)** methodology.
 npm run test
 
 # Run tests for ticketing module
-npm run test src/modules/ticketing
+npm run test src/modules/maintenance
 
 # Run with coverage
 npm run test:coverage
 
 # Run specific test file
-npm run test src/modules/ticketing/__tests__/services/ticketService.test.ts
+npm run test src/modules/maintenance/__tests__/services/ticketService.test.ts
 ```
 
 ---
@@ -196,7 +196,7 @@ npm run test src/modules/ticketing/__tests__/services/ticketService.test.ts
 
 ```bash
 # Step 1: Write test file
-touch src/modules/ticketing/__tests__/services/ticketService.test.ts
+touch src/modules/maintenance/__tests__/services/ticketService.test.ts
 
 # Step 2: Write failing tests
 # ... write tests that describe expected behavior
@@ -205,7 +205,7 @@ touch src/modules/ticketing/__tests__/services/ticketService.test.ts
 npm run test ticketService.test.ts
 
 # Step 4: Implement code to make tests pass
-touch src/modules/ticketing/services/ticketService.ts
+touch src/modules/maintenance/services/ticketService.ts
 
 # Step 5: Run tests again (they should pass)
 npm run test ticketService.test.ts

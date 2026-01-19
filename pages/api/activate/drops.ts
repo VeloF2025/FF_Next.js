@@ -58,6 +58,10 @@ interface UnifiedDrop {
   is_complete: boolean;
   steps_completed: number;
   steps_total: number;
+  // Rich Status Model fields
+  qa_phase: string | null;
+  qa_decision: string | null;
+  is_activated: boolean;
 }
 
 interface ProjectStats {
@@ -197,7 +201,13 @@ async function getPaginatedDrops(
   // Build queries - serials are in dr_photo_unified_reviews (synced from 1Map)
   const countQuery = `SELECT COUNT(*) FROM dr_photo_unified_reviews u ${whereClause}`;
   const dataQuery = `
-    SELECT u.*
+    SELECT u.*,
+      u.qa_phase,
+      u.qa_decision,
+      EXISTS (
+        SELECT 1 FROM oes_activations oes
+        WHERE oes.drop_number = u.drop_number
+      ) as is_activated
     FROM dr_photo_unified_reviews u
     ${whereClause}
     ORDER BY u.created_at DESC
@@ -239,7 +249,14 @@ async function getPaginatedDrops(
  */
 async function getDropById(id: string): Promise<UnifiedDrop | null> {
   const result = await pool.query(
-    'SELECT * FROM dr_photo_unified_reviews WHERE id = $1',
+    `SELECT u.*,
+      u.qa_phase,
+      u.qa_decision,
+      EXISTS (
+        SELECT 1 FROM oes_activations oes
+        WHERE oes.drop_number = u.drop_number
+      ) as is_activated
+    FROM dr_photo_unified_reviews u WHERE u.id = $1`,
     [id]
   );
 
@@ -259,7 +276,14 @@ async function getDropById(id: string): Promise<UnifiedDrop | null> {
  */
 async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | null> {
   const result = await pool.query(
-    'SELECT * FROM dr_photo_unified_reviews WHERE drop_number = $1',
+    `SELECT u.*,
+      u.qa_phase,
+      u.qa_decision,
+      EXISTS (
+        SELECT 1 FROM oes_activations oes
+        WHERE oes.drop_number = u.drop_number
+      ) as is_activated
+    FROM dr_photo_unified_reviews u WHERE u.drop_number = $1`,
     [dropNumber]
   );
 

@@ -59,7 +59,7 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
     if (filters.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));
   }
 
-  const url = `/api/ticketing/tickets?${params.toString()}`;
+  const url = `/api/maintenance/tickets?${params.toString()}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -88,7 +88,7 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
  * 🟢 WORKING: Create new ticket
  */
 async function createTicketRequest(payload: CreateTicketPayload): Promise<Ticket> {
-  const response = await fetch('/api/ticketing/tickets', {
+  const response = await fetch('/api/maintenance/tickets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

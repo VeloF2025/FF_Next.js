@@ -21,7 +21,7 @@ export const assignmentKeys = {
 // ==================== API Functions ====================
 
 async function fetchUsersForAssignment(): Promise<UserDropdownOption[]> {
-  const response = await fetch('/api/ticketing/users');
+  const response = await fetch('/api/maintenance/users');
 
   if (!response.ok) {
     const error = await response.json();
@@ -33,7 +33,7 @@ async function fetchUsersForAssignment(): Promise<UserDropdownOption[]> {
 }
 
 async function fetchTeamsForAssignment(): Promise<TeamDropdownOption[]> {
-  const response = await fetch('/api/ticketing/teams?dropdown=true');
+  const response = await fetch('/api/maintenance/teams?dropdown=true');
 
   if (!response.ok) {
     const error = await response.json();
@@ -51,7 +51,7 @@ interface AssignTicketPayload {
 }
 
 async function assignTicketRequest(payload: AssignTicketPayload): Promise<void> {
-  const response = await fetch(`/api/ticketing/tickets/${payload.ticketId}`, {
+  const response = await fetch(`/api/maintenance/tickets/${payload.ticketId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

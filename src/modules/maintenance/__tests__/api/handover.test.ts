@@ -3,8 +3,8 @@
  * ⚪ UNTESTED: Tests written FIRST following TDD methodology
  *
  * Tests the handover API endpoints:
- * - POST /api/ticketing/tickets/[id]/handover
- * - GET /api/ticketing/tickets/[id]/handover-history
+ * - POST /api/maintenance/tickets/[id]/handover
+ * - GET /api/maintenance/tickets/[id]/handover-history
  *
  * TDD methodology:
  * - Tests written FIRST (this file) ✓
@@ -53,7 +53,7 @@ const mockHandoverSnapshot: HandoverSnapshot = {
     description: 'Fix broken fiber connection',
     status: 'qa_review',
     priority: 'high',
-    ticket_type: 'maintenance',
+    ticket_type: 'fault_repair',
     dr_number: 'DR-12345',
     project_id: '555e6666-e89b-12d3-a456-426614174000',
     zone_id: '666e7777-e89b-12d3-a456-426614174000',
@@ -192,12 +192,12 @@ const mockHandoverHistory: TicketHandoverHistory = {
       id: '999e0000-e89b-12d3-a456-426614174000',
       handover_type: 'qa_to_ops' as HandoverType,
       from_owner_type: 'qa' as OwnerType,
-      to_owner_type: 'maintenance' as OwnerType,
+      to_owner_type: 'ops' as OwnerType,
       handover_at: new Date('2024-01-16T10:00:00Z'),
     },
   ],
   total_handovers: 2,
-  current_owner_type: 'maintenance' as OwnerType,
+  current_owner_type: 'ops' as OwnerType,
   current_owner_id: mockToOwnerId,
 };
 
@@ -210,9 +210,9 @@ async function loadRouteHandlers(routePath: string) {
   return module;
 }
 
-// ==================== POST /api/ticketing/tickets/[id]/handover ====================
+// ==================== POST /api/maintenance/tickets/[id]/handover ====================
 
-describe('POST /api/ticketing/tickets/[id]/handover', () => {
+describe('POST /api/maintenance/tickets/[id]/handover', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -227,7 +227,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     vi.mocked(handoverService.createHandoverSnapshot).mockResolvedValue(mockHandoverSnapshot);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -240,7 +240,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -291,7 +291,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     vi.mocked(handoverService.createHandoverSnapshot).mockResolvedValue(minimalSnapshot);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -300,7 +300,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -322,7 +322,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     vi.mocked(handoverService.validateHandoverGate).mockResolvedValue(mockGateValidationFail);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -331,7 +331,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -359,7 +359,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
   it('should return 422 when missing handover_type', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -368,7 +368,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -389,7 +389,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
   it('should return 422 when missing handover_by', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -398,7 +398,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -419,7 +419,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
   it('should return 422 for invalid ticket ID format', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -428,7 +428,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      'http://localhost:3000/api/ticketing/tickets/invalid-id/handover',
+      'http://localhost:3000/api/maintenance/tickets/invalid-id/handover',
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -449,7 +449,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
   it('should return 422 for invalid handover_by UUID format', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -458,7 +458,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -483,7 +483,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -492,7 +492,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -516,7 +516,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -525,7 +525,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -550,7 +550,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const requestBody = {
@@ -559,7 +559,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     };
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: JSON.stringify(requestBody),
@@ -579,11 +579,11 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
   it('should return 400 for invalid JSON in request body', async () => {
     // Arrange
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover`,
       {
         method: 'POST',
         body: 'invalid-json{',
@@ -602,9 +602,9 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
   });
 });
 
-// ==================== GET /api/ticketing/tickets/[id]/handover-history ====================
+// ==================== GET /api/maintenance/tickets/[id]/handover-history ====================
 
-describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
+describe('GET /api/maintenance/tickets/[id]/handover-history', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -618,11 +618,11 @@ describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
     vi.mocked(handoverService.getHandoverHistory).mockResolvedValue(mockHandoverHistory);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover-history/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover-history`
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover-history`
     );
 
     // Act
@@ -636,7 +636,7 @@ describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
     expect(data.data.ticket_uid).toBe('FT406824');
     expect(data.data.handovers).toHaveLength(2);
     expect(data.data.total_handovers).toBe(2);
-    expect(data.data.current_owner_type).toBe('maintenance');
+    expect(data.data.current_owner_type).toBe('ops');
     expect(data.data.current_owner_id).toBe(mockToOwnerId);
     expect(data.meta.timestamp).toBeDefined();
     expect(handoverService.getHandoverHistory).toHaveBeenCalledWith(mockTicketId);
@@ -656,11 +656,11 @@ describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
     vi.mocked(handoverService.getHandoverHistory).mockResolvedValue(emptyHistory);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover-history/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover-history`
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover-history`
     );
 
     // Act
@@ -678,11 +678,11 @@ describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
   it('should return 422 for invalid ticket ID format', async () => {
     // Arrange
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover-history/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
-      'http://localhost:3000/api/ticketing/tickets/invalid-id/handover-history'
+      'http://localhost:3000/api/maintenance/tickets/invalid-id/handover-history'
     );
 
     // Act
@@ -703,11 +703,11 @@ describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover-history/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover-history`
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover-history`
     );
 
     // Act
@@ -727,11 +727,11 @@ describe('GET /api/ticketing/tickets/[id]/handover-history', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/handover-history/route'
+      '../../../../app/api/maintenance/tickets/[id]/handover-history/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/handover-history`
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/handover-history`
     );
 
     // Act

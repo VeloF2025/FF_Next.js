@@ -1,4 +1,4 @@
-# Module: ticketing
+# Module: maintenance
 
 ## Overview
 | Property | Value |
@@ -45,7 +45,7 @@
 - WhatsApp notification delivery
 
 ## API Endpoints
-All under `/api/ticketing/*` namespace
+All under `/api/maintenance/*` namespace
 
 ## Services
 

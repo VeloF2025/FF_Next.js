@@ -41,7 +41,7 @@ interface NoteResponse {
 }
 
 /**
- * GET /api/ticketing/tickets/[id]/notes
+ * GET /api/maintenance/tickets/[id]/notes
  * List all notes for a ticket
  */
 export async function GET(
@@ -170,7 +170,7 @@ export async function GET(
 }
 
 /**
- * POST /api/ticketing/tickets/[id]/notes
+ * POST /api/maintenance/tickets/[id]/notes
  * Create a new note for a ticket
  */
 export async function POST(

@@ -354,7 +354,7 @@ export function createDefaultColumnMapping(headers: string[]): ExcelColumnMappin
   const mapping: ExcelColumnMapping[] = [];
 
   // Common field mappings (case-insensitive)
-  // Supports both standard ticketing format AND maintenance Excel format
+  // Supports both standard maintenance format AND maintenance Excel format
   const fieldMappings: Record<string, { field: string; required: boolean }> = {
     // Ticket UID mappings
     'ticket id': { field: 'ticket_uid', required: false },

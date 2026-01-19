@@ -35,7 +35,7 @@ import {
 } from '../types/handover';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:handover');
+const logger = createLogger('maintenance:handover');
 
 /**
  * UUID validation regex

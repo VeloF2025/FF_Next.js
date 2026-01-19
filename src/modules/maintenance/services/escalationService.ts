@@ -34,7 +34,7 @@ import { createTicket } from './ticketService';
 import { TicketSource, TicketType, TicketPriority } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:escalation-service');
+const logger = createLogger('maintenance:escalation-service');
 
 /**
  * UUID validation regex

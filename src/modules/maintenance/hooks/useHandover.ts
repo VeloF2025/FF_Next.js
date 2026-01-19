@@ -55,7 +55,7 @@ async function validateHandoverGateAPI(
   handoverType: HandoverType
 ): Promise<HandoverGateValidation> {
   const response = await fetch(
-    `/api/ticketing/tickets/${ticketId}/handover/validate?type=${handoverType}`,
+    `/api/maintenance/tickets/${ticketId}/handover/validate?type=${handoverType}`,
     {
       method: 'GET',
       headers: {
@@ -79,7 +79,7 @@ async function validateHandoverGateAPI(
 async function createHandoverSnapshotAPI(
   payload: CreateHandoverSnapshotPayload
 ): Promise<HandoverSnapshot> {
-  const response = await fetch(`/api/ticketing/tickets/${payload.ticket_id}/handover`, {
+  const response = await fetch(`/api/maintenance/tickets/${payload.ticket_id}/handover`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -100,7 +100,7 @@ async function createHandoverSnapshotAPI(
  * 🟢 WORKING: Get handover history from API
  */
 async function getHandoverHistoryAPI(ticketId: string): Promise<TicketHandoverHistory> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/handover-history`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/handover-history`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -120,7 +120,7 @@ async function getHandoverHistoryAPI(ticketId: string): Promise<TicketHandoverHi
  * 🟢 WORKING: Get handover by ID from API
  */
 async function getHandoverByIdAPI(handoverId: string): Promise<HandoverSnapshot> {
-  const response = await fetch(`/api/ticketing/handovers/${handoverId}`, {
+  const response = await fetch(`/api/maintenance/handovers/${handoverId}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -213,7 +213,7 @@ export function useHandoverGateValidation(
  *   {
  *     onSuccess: (snapshot) => {
  *       toast.success('Handover completed successfully');
- *       router.push(`/ticketing/handovers/${snapshot.id}`);
+ *       router.push(`/maintenance/handovers/${snapshot.id}`);
  *     },
  *     onError: (error) => {
  *       toast.error(error.message);

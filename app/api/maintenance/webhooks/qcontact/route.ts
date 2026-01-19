@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready webhook endpoint for real-time updates from QContact
  *
- * POST /api/ticketing/webhooks/qcontact - Receive QContact webhook events
+ * POST /api/maintenance/webhooks/qcontact - Receive QContact webhook events
  *
  * Features:
  * - HMAC SHA-256 signature verification for security
@@ -33,7 +33,7 @@ import { queryOne } from '@/modules/maintenance/utils/db';
 import type { QContactWebhookPayload, QContactTicket } from '@/modules/maintenance/types/qcontact';
 import { SyncDirection, SyncType, SyncStatus } from '@/modules/maintenance/types/qcontact';
 
-const logger = createLogger('ticketing:api:webhook:qcontact');
+const logger = createLogger('maintenance:api:webhook:qcontact');
 
 // Webhook secret for signature verification
 const WEBHOOK_SECRET = process.env.QCONTACT_WEBHOOK_SECRET || '';
@@ -141,7 +141,7 @@ async function logWebhookReceipt(
 }
 
 // ============================================================================
-// POST /api/ticketing/webhooks/qcontact
+// POST /api/maintenance/webhooks/qcontact
 // ============================================================================
 
 /**

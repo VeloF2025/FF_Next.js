@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready workload distribution endpoint
  *
- * GET /api/ticketing/dashboard/workload - Get workload by assignee
+ * GET /api/maintenance/dashboard/workload - Get workload by assignee
  *
  * Returns array of workload data:
  * - assigned_to: User ID or null
@@ -27,7 +27,7 @@ import { createLogger } from '@/lib/logger';
 import { getWorkloadByAssignee } from '@/modules/maintenance/services/dashboardService';
 import type { DashboardFilters } from '@/modules/maintenance/services/dashboardService';
 
-const logger = createLogger('ticketing:api:dashboard:workload');
+const logger = createLogger('maintenance:api:dashboard:workload');
 
 /**
  * 🟢 WORKING: Get workload distribution by assignee

@@ -2,7 +2,7 @@
  * QContact Sync Log API Route
  * 🟢 WORKING: Production-ready API endpoint for retrieving sync audit logs
  *
- * GET /api/ticketing/sync/qcontact/log - Get sync audit log with filters
+ * GET /api/maintenance/sync/qcontact/log - Get sync audit log with filters
  *
  * Features:
  * - Filterable log retrieval (direction, type, status, date range, ticket ID)
@@ -18,7 +18,7 @@ import { query } from '@/modules/maintenance/utils/db';
 import { SyncDirection, SyncType, SyncStatus } from '@/modules/maintenance/types/qcontact';
 import type { QContactSyncLog } from '@/modules/maintenance/types/qcontact';
 
-const logger = createLogger('ticketing:api:sync:log');
+const logger = createLogger('maintenance:api:sync:log');
 
 // Valid enum values for validation
 const VALID_DIRECTIONS = [SyncDirection.INBOUND, SyncDirection.OUTBOUND];
@@ -31,7 +31,7 @@ const VALID_TYPES = [
 ];
 const VALID_STATUSES = [SyncStatus.SUCCESS, SyncStatus.FAILED, SyncStatus.PARTIAL];
 
-// ==================== GET /api/ticketing/sync/qcontact/log ====================
+// ==================== GET /api/maintenance/sync/qcontact/log ====================
 
 /**
  * 🟢 WORKING: Get sync audit log with filters and pagination

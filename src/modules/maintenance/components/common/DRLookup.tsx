@@ -58,7 +58,7 @@ export function DRLookup({
     setDrData(null);
 
     try {
-      const response = await fetch(`/api/ticketing/dr-lookup/${encodeURIComponent(drNumber)}`);
+      const response = await fetch(`/api/maintenance/dr-lookup/${encodeURIComponent(drNumber)}`);
 
       if (!response.ok) {
         const errorData = await response.json();

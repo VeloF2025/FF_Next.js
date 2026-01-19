@@ -18,7 +18,7 @@
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:db');
+const logger = createLogger('maintenance:db');
 
 /**
  * Database connection instance (lazy initialization)

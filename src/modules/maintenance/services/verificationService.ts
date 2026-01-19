@@ -32,7 +32,7 @@ import {
 } from '../constants/verificationSteps';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:verification-service');
+const logger = createLogger('maintenance:verification-service');
 
 /**
  * UUID validation regex

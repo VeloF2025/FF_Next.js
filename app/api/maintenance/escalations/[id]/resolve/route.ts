@@ -2,7 +2,7 @@
  * Escalation Resolve API Route
  * 🟢 WORKING: Production-ready API endpoint for resolving escalations
  *
- * POST /api/ticketing/escalations/[id]/resolve - Resolve or mark escalation as no_action
+ * POST /api/maintenance/escalations/[id]/resolve - Resolve or mark escalation as no_action
  *
  * Features:
  * - UUID format validation
@@ -17,7 +17,7 @@ import { createLogger } from '@/lib/logger';
 import { resolveEscalation } from '@/modules/maintenance/services/escalationService';
 import type { ResolveEscalationPayload, EscalationStatus } from '@/modules/maintenance/types/escalation';
 
-const logger = createLogger('ticketing:api:escalations:resolve');
+const logger = createLogger('maintenance:api:escalations:resolve');
 
 /**
  * UUID validation regex
@@ -89,7 +89,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== POST /api/ticketing/escalations/[id]/resolve ====================
+// ==================== POST /api/maintenance/escalations/[id]/resolve ====================
 
 /**
  * 🟢 WORKING: Resolve escalation with validation

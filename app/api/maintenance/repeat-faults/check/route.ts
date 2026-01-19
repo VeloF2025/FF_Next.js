@@ -2,7 +2,7 @@
  * Repeat Fault Pattern Check API Route
  * 🟢 WORKING: Production-ready API endpoint for checking repeat fault patterns
  *
- * GET /api/ticketing/repeat-faults/check - Check for repeat fault patterns
+ * GET /api/maintenance/repeat-faults/check - Check for repeat fault patterns
  *
  * Query Parameters:
  * - scope_type (required): 'pole' | 'pon' | 'zone' | 'dr'
@@ -29,7 +29,7 @@ import {
 } from '@/modules/maintenance/utils/faultPatternDetector';
 import { EscalationScopeType } from '@/modules/maintenance/types/escalation';
 
-const logger = createLogger('ticketing:api:repeat-faults:check');
+const logger = createLogger('maintenance:api:repeat-faults:check');
 
 // Valid enum values for validation
 const VALID_SCOPE_TYPES: EscalationScopeType[] = [
@@ -78,7 +78,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/repeat-faults/check ====================
+// ==================== GET /api/maintenance/repeat-faults/check ====================
 
 /**
  * 🟢 WORKING: Check for repeat fault patterns with configurable thresholds

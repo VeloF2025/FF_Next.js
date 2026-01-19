@@ -30,7 +30,7 @@ const AVAILABLE_ITEMS: CustomizableItem[] = [
   { id: 'action-items', label: 'Action Items', icon: CheckCircle, description: 'Tasks and to-dos' },
   { id: 'tasks', label: 'Task Management', icon: CheckCircle, description: 'Project task tracking' },
   { id: 'projects', label: 'Projects', icon: LayoutDashboard, description: 'Project management' },
-  { id: 'ticketing', label: 'Ticketing', icon: Ticket, description: 'Support tickets' },
+  { id: 'maintenance', label: 'Maintenance', icon: Ticket, description: 'Maintenance work orders' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, description: 'Reports and dashboards' },
   { id: 'fleet', label: 'Fleet Dashboard', icon: Car, description: 'Vehicle management' },
   { id: 'staff', label: 'Staff', icon: UserCircle, description: 'Employee directory' },

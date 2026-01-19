@@ -28,7 +28,7 @@ import type {
   VerificationProgress,
 } from '../types/verification';
 
-const logger = createLogger('ticketing:hooks:verification');
+const logger = createLogger('maintenance:hooks:verification');
 
 // ==================== Query Keys ====================
 
@@ -49,7 +49,7 @@ export const verificationKeys = {
  * 🟢 WORKING: Fetch verification steps from API
  */
 async function fetchVerificationSteps(ticketId: string): Promise<VerificationStep[]> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/verification`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/verification`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ async function fetchVerificationSteps(ticketId: string): Promise<VerificationSte
  * 🟢 WORKING: Fetch verification progress from API
  */
 async function fetchVerificationProgress(ticketId: string): Promise<VerificationProgress> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/verification/complete`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/verification/complete`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -93,7 +93,7 @@ async function updateVerificationStepAPI(
   stepNumber: VerificationStepNumber,
   payload: UpdateVerificationStepPayload
 ): Promise<VerificationStep> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/verification/${stepNumber}`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/verification/${stepNumber}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',

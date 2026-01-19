@@ -22,7 +22,7 @@ export default function CreateTicketPageClient() {
     <div className="p-6">
       <div className="mb-6">
         <Link
-          href="/ticketing/tickets"
+          href="/maintenance/tickets"
           className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -35,7 +35,7 @@ export default function CreateTicketPageClient() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Create New Ticket</h1>
-            <p className="text-[var(--ff-text-secondary)]">Create a new ticketing record for fiber network issues</p>
+            <p className="text-[var(--ff-text-secondary)]">Create a new maintenance record for fiber network issues</p>
           </div>
         </div>
       </div>

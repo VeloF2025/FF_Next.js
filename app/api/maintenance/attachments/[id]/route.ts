@@ -3,8 +3,8 @@
  *
  * 🟢 WORKING: Production-ready API endpoints for individual attachment operations
  *
- * GET    /api/ticketing/attachments/[id] - Get attachment by ID
- * DELETE /api/ticketing/attachments/[id] - Delete attachment
+ * GET    /api/maintenance/attachments/[id] - Get attachment by ID
+ * DELETE /api/maintenance/attachments/[id] - Delete attachment
  *
  * Features:
  * - Retrieve attachment metadata
@@ -21,9 +21,9 @@ import {
   deleteAttachment,
 } from '@/modules/maintenance/services/attachmentService';
 
-const logger = createLogger('ticketing:api:attachment');
+const logger = createLogger('maintenance:api:attachment');
 
-// ==================== GET /api/ticketing/attachments/[id] ====================
+// ==================== GET /api/maintenance/attachments/[id] ====================
 
 /**
  * 🟢 WORKING: Get attachment by ID
@@ -98,7 +98,7 @@ export async function GET(
   }
 }
 
-// ==================== DELETE /api/ticketing/attachments/[id] ====================
+// ==================== DELETE /api/maintenance/attachments/[id] ====================
 
 /**
  * 🟢 WORKING: Delete attachment from Firebase Storage and database

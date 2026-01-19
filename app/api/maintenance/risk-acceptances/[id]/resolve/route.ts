@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for resolving risk acceptances
  *
- * PUT /api/ticketing/risk-acceptances/[id]/resolve - Resolve risk acceptance
+ * PUT /api/maintenance/risk-acceptances/[id]/resolve - Resolve risk acceptance
  *
  * Features:
  * - Mark risk acceptance as resolved
@@ -18,7 +18,7 @@ import { createLogger } from '@/lib/logger';
 import { resolveRiskAcceptance } from '@/modules/maintenance/services/riskAcceptanceService';
 import type { ResolveRiskAcceptancePayload } from '@/modules/maintenance/types/riskAcceptance';
 
-const logger = createLogger('ticketing:api:risk-acceptance-resolve');
+const logger = createLogger('maintenance:api:risk-acceptance-resolve');
 
 /**
  * UUID validation regex
@@ -93,7 +93,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== PUT /api/ticketing/risk-acceptances/[id]/resolve ====================
+// ==================== PUT /api/maintenance/risk-acceptances/[id]/resolve ====================
 
 /**
  * 🟢 WORKING: Resolve a risk acceptance

@@ -33,7 +33,7 @@ import {
 } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:service');
+const logger = createLogger('maintenance:service');
 
 /**
  * UUID validation regex

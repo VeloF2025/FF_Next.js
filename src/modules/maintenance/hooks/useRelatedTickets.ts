@@ -39,7 +39,7 @@ async function fetchRelatedTickets(
     pageSize: '10', // Limit to 10 related tickets
   });
 
-  const response = await fetch(`/api/ticketing/tickets?${params.toString()}`);
+  const response = await fetch(`/api/maintenance/tickets?${params.toString()}`);
 
   if (!response.ok) {
     throw new Error('Failed to fetch related tickets');

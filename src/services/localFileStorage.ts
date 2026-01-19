@@ -228,8 +228,8 @@ export class LocalFileStorageService {
     return `contractors/${contractorId}/documents`;
   }
 
-  static getTicketAttachmentPath(ticketId: string): string {
-    return `ticketing-attachments/${ticketId}`;
+  static getMaintenanceAttachmentPath(ticketId: string): string {
+    return `maintenance-attachments/${ticketId}`;
   }
 
   static getProfilePicturePath(userId: string): string {

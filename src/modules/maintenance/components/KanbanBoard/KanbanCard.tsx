@@ -41,7 +41,7 @@ export function KanbanCard({ ticket, isDragging, onDragStart, onDragEnd }: Kanba
       e.preventDefault();
       return;
     }
-    router.push(`/ticketing/tickets/${ticket.id}`);
+    router.push(`/maintenance/tickets/${ticket.id}`);
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {

@@ -1,7 +1,7 @@
 /**
  * Weekly Import Parse API - Preview Excel File
  *
- * POST /api/ticketing/import/weekly/parse - Parse Excel file and return preview
+ * POST /api/maintenance/import/weekly/parse - Parse Excel file and return preview
  *
  * Accepts JSON body with:
  * - filename: string - Original filename
@@ -29,7 +29,7 @@ const TICKET_COLUMNS = [
   'date', 'date captured', 'date_captured'
 ];
 
-const logger = createLogger('ticketing:api:weekly-import:parse');
+const logger = createLogger('maintenance:api:weekly-import:parse');
 
 // Configuration
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB

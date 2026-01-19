@@ -60,7 +60,7 @@ async function fetchDRLookup(drNumber: string): Promise<DRLookupData | null> {
     return null;
   }
 
-  const response = await fetch(`/api/ticketing/dr-lookup/${encodeURIComponent(trimmed)}`);
+  const response = await fetch(`/api/maintenance/dr-lookup/${encodeURIComponent(trimmed)}`);
   const result: DRLookupAPIResponse = await response.json();
 
   if (!response.ok) {

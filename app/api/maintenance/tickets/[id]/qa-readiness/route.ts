@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for viewing QA readiness status
  *
- * GET /api/ticketing/tickets/[id]/qa-readiness - Get current QA readiness status
+ * GET /api/maintenance/tickets/[id]/qa-readiness - Get current QA readiness status
  *
  * Features:
  * - Returns current readiness status (is_ready: true/false)
@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { getReadinessStatus } from '@/modules/maintenance/services/qaReadinessService';
 
-const logger = createLogger('ticketing:api:qa-readiness');
+const logger = createLogger('maintenance:api:qa-readiness');
 
 /**
  * UUID validation regex
@@ -73,7 +73,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/tickets/[id]/qa-readiness ====================
+// ==================== GET /api/maintenance/tickets/[id]/qa-readiness ====================
 
 /**
  * 🟢 WORKING: Get current QA readiness status for a ticket

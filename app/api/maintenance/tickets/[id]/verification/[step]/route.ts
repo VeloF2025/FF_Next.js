@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for updating a specific verification step
  *
- * PUT /api/ticketing/tickets/[id]/verification/[step] - Update a verification step
+ * PUT /api/maintenance/tickets/[id]/verification/[step] - Update a verification step
  *
  * Features:
  * - Updates a specific step (1-12) for a ticket
@@ -19,7 +19,7 @@ import { createLogger } from '@/lib/logger';
 import { updateVerificationStep } from '@/modules/maintenance/services/verificationService';
 import type { UpdateVerificationStepPayload, VerificationStepNumber } from '@/modules/maintenance/types/verification';
 
-const logger = createLogger('ticketing:api:verification:step');
+const logger = createLogger('maintenance:api:verification:step');
 
 /**
  * UUID validation regex
@@ -107,7 +107,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== PUT /api/ticketing/tickets/[id]/verification/[step] ====================
+// ==================== PUT /api/maintenance/tickets/[id]/verification/[step] ====================
 
 /**
  * 🟢 WORKING: Update a specific verification step

@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready endpoint for retrieving weekly import status
  *
- * GET /api/ticketing/import/weekly/[id] - Get import status and progress
+ * GET /api/maintenance/import/weekly/[id] - Get import status and progress
  *
  * Features:
  * - Retrieve import status by ID
@@ -21,12 +21,12 @@ import {
   getImportProgress,
 } from '@/modules/maintenance/services/weeklyReportService';
 
-const logger = createLogger('ticketing:api:weekly-import-status');
+const logger = createLogger('maintenance:api:weekly-import-status');
 
 // UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// ==================== GET /api/ticketing/import/weekly/[id] ====================
+// ==================== GET /api/maintenance/import/weekly/[id] ====================
 
 /**
  * 🟢 WORKING: Get weekly import status and progress

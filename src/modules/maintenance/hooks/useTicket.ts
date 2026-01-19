@@ -24,8 +24,8 @@ import { ticketsKeys } from './useTickets';
  */
 async function fetchTicketById(id: string, enrich = true): Promise<EnrichedTicket> {
   const url = enrich
-    ? `/api/ticketing/tickets/${id}?enrich=true`
-    : `/api/ticketing/tickets/${id}`;
+    ? `/api/maintenance/tickets/${id}?enrich=true`
+    : `/api/maintenance/tickets/${id}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -46,7 +46,7 @@ async function fetchTicketById(id: string, enrich = true): Promise<EnrichedTicke
  * 🟢 WORKING: Update ticket
  */
 async function updateTicketRequest(id: string, payload: UpdateTicketPayload): Promise<Ticket> {
-  const response = await fetch(`/api/ticketing/tickets/${id}`, {
+  const response = await fetch(`/api/maintenance/tickets/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -70,7 +70,7 @@ async function updateTicketRequest(id: string, payload: UpdateTicketPayload): Pr
  * 🟢 WORKING: Delete ticket (soft delete)
  */
 async function deleteTicketRequest(id: string): Promise<void> {
-  const response = await fetch(`/api/ticketing/tickets/${id}`, {
+  const response = await fetch(`/api/maintenance/tickets/${id}`, {
     method: 'DELETE',
   });
 

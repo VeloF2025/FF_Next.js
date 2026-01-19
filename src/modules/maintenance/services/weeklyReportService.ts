@@ -38,7 +38,7 @@ import {
 import { TicketSource, CreateTicketPayload } from '../types/ticket';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:weekly-report');
+const logger = createLogger('maintenance:weekly-report');
 
 /**
  * UUID validation regex

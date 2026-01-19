@@ -238,7 +238,7 @@ describe('EscalationService (TDD)', () => {
         ticket_uid: 'FT123456',
         title: 'Infrastructure Investigation: Pole POLE-123',
         description: expect.stringContaining('5 repeat faults detected'),
-        ticket_type: 'maintenance',
+        ticket_type: 'fault_repair',
         source: 'construction',
         priority: 'high',
         status: 'open',
@@ -266,7 +266,7 @@ describe('EscalationService (TDD)', () => {
       expect(ticketService.createTicket).toHaveBeenCalledWith(
         expect.objectContaining({
           title: expect.stringContaining('POLE-123'),
-          ticket_type: 'maintenance',
+          ticket_type: 'fault_repair',
           source: 'construction',
           priority: 'high',
         })

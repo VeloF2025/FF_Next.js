@@ -351,7 +351,7 @@ export function useTicketForm(): UseTicketFormResult {
     try {
       const ticket = await createTicketMutation.mutateAsync(payload);
       // Redirect to ticket detail on success
-      router.push(`/ticketing/tickets/${ticket.id}`);
+      router.push(`/maintenance/tickets/${ticket.id}`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create ticket';
       setSubmitError(errorMessage);

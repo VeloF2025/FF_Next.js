@@ -100,7 +100,7 @@ async function cacheQContactActivities(
 }
 
 /**
- * GET /api/ticketing/tickets/[id]/activities
+ * GET /api/maintenance/tickets/[id]/activities
  * Fetch all activities for a ticket from both QContact and local database
  */
 export async function GET(
@@ -304,7 +304,7 @@ export async function GET(
 }
 
 /**
- * POST /api/ticketing/tickets/[id]/activities
+ * POST /api/maintenance/tickets/[id]/activities
  * Create a new activity (note) for a ticket
  */
 export async function POST(

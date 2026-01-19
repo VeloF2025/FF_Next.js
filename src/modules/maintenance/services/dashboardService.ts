@@ -23,7 +23,7 @@ import { query, queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
 import { calculateSLACompliance } from '../utils/slaCalculator';
 
-const logger = createLogger('ticketing:dashboard');
+const logger = createLogger('maintenance:dashboard');
 
 /**
  * Dashboard summary response

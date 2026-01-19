@@ -1,6 +1,6 @@
 /**
  * Maintenance Module - Type Definitions Index
- * 🟢 WORKING: Central export file for all ticketing types
+ * 🟢 WORKING: Central export file for all maintenance types
  *
  * Re-exports all TypeScript type definitions for the maintenance module.
  * These types match the database schema defined in migration files.

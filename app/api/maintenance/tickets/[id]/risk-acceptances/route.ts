@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for listing ticket risk acceptances
  *
- * GET /api/ticketing/tickets/[id]/risk-acceptances - List risk acceptances for ticket
+ * GET /api/maintenance/tickets/[id]/risk-acceptances - List risk acceptances for ticket
  *
  * Features:
  * - List all risk acceptances for a ticket
@@ -18,7 +18,7 @@ import { createLogger } from '@/lib/logger';
 import { listRisksForTicket } from '@/modules/maintenance/services/riskAcceptanceService';
 import type { RiskAcceptanceStatus } from '@/modules/maintenance/types/riskAcceptance';
 
-const logger = createLogger('ticketing:api:risk-acceptances');
+const logger = createLogger('maintenance:api:risk-acceptances');
 
 /**
  * UUID validation regex
@@ -73,7 +73,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/tickets/[id]/risk-acceptances ====================
+// ==================== GET /api/maintenance/tickets/[id]/risk-acceptances ====================
 
 /**
  * 🟢 WORKING: Get all risk acceptances for a ticket

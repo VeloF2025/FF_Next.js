@@ -2,7 +2,7 @@
  * Escalation List API Route
  * 🟢 WORKING: Production-ready API endpoint for listing escalations
  *
- * GET /api/ticketing/escalations - List all escalations with optional filters
+ * GET /api/maintenance/escalations - List all escalations with optional filters
  *
  * Features:
  * - Multi-criteria filtering (scope_type, status, project_id, escalation_type)
@@ -21,7 +21,7 @@ import {
 } from '@/modules/maintenance/types/escalation';
 import type { EscalationFilters } from '@/modules/maintenance/types/escalation';
 
-const logger = createLogger('ticketing:api:escalations');
+const logger = createLogger('maintenance:api:escalations');
 
 // Valid enum values for validation
 const VALID_SCOPE_TYPES: EscalationScopeType[] = [
@@ -42,7 +42,7 @@ const VALID_ESCALATION_TYPES: EscalationType[] = [
   EscalationType.REPLACEMENT,
 ];
 
-// ==================== GET /api/ticketing/escalations ====================
+// ==================== GET /api/maintenance/escalations ====================
 
 /**
  * 🟢 WORKING: List escalations with filters

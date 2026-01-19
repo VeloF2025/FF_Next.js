@@ -8,7 +8,7 @@
  * - Calculate sync health metrics
  * - Track sync success rates
  *
- * @module ticketing/services/qcontactSyncLogService
+ * @module maintenance/services/qcontactSyncLogService
  */
 
 import { query } from '../utils/db';

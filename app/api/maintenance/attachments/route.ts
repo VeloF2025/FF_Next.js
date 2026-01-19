@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for file uploads
  *
- * POST /api/ticketing/attachments - Upload file to Firebase Storage
+ * POST /api/maintenance/attachments - Upload file to Firebase Storage
  *
  * Features:
  * - Multipart/form-data file upload support
@@ -19,9 +19,9 @@ import { createLogger } from '@/lib/logger';
 import { uploadAttachment } from '@/modules/maintenance/services/attachmentService';
 import type { FileUploadRequest } from '@/modules/maintenance/types/attachment';
 
-const logger = createLogger('ticketing:api:attachments');
+const logger = createLogger('maintenance:api:attachments');
 
-// ==================== POST /api/ticketing/attachments ====================
+// ==================== POST /api/maintenance/attachments ====================
 
 /**
  * 🟢 WORKING: Upload attachment to Firebase Storage

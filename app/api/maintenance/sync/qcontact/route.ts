@@ -2,7 +2,7 @@
  * QContact Sync Trigger API Route
  * 🟢 WORKING: Production-ready API endpoint for triggering QContact sync
  *
- * POST /api/ticketing/sync/qcontact - Trigger full bidirectional sync
+ * POST /api/maintenance/sync/qcontact - Trigger full bidirectional sync
  *
  * Features:
  * - Bidirectional sync (inbound + outbound)
@@ -26,9 +26,9 @@ import {
 import { SyncDirection } from '@/modules/maintenance/types/qcontact';
 import type { FullSyncRequest } from '@/modules/maintenance/types/qcontact';
 
-const logger = createLogger('ticketing:api:sync:qcontact');
+const logger = createLogger('maintenance:api:sync:qcontact');
 
-// ==================== POST /api/ticketing/sync/qcontact ====================
+// ==================== POST /api/maintenance/sync/qcontact ====================
 
 /**
  * 🟢 WORKING: Trigger QContact sync with configurable options

@@ -4,10 +4,10 @@
  * 🟢 WORKING: Comprehensive integration tests for WhatsApp notification endpoints
  *
  * Tests:
- * - POST /api/ticketing/notifications/whatsapp - Send notification
- * - GET /api/ticketing/notifications/status - Get delivery status
+ * - POST /api/maintenance/notifications/whatsapp - Send notification
+ * - GET /api/maintenance/notifications/status - Get delivery status
  *
- * @module ticketing/__tests__/api/whatsapp
+ * @module maintenance/__tests__/api/whatsapp
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -64,10 +64,10 @@ describe('WhatsApp API Endpoints', () => {
   });
 
   // ==========================================================================
-  // POST /api/ticketing/notifications/whatsapp - Send Notification
+  // POST /api/maintenance/notifications/whatsapp - Send Notification
   // ==========================================================================
 
-  describe('POST /api/ticketing/notifications/whatsapp', () => {
+  describe('POST /api/maintenance/notifications/whatsapp', () => {
     it('should send notification with ticket_id and template', async () => {
       // Arrange
       const mockNotification = createMockNotification();
@@ -251,10 +251,10 @@ describe('WhatsApp API Endpoints', () => {
   });
 
   // ==========================================================================
-  // GET /api/ticketing/notifications/status - Get Delivery Status
+  // GET /api/maintenance/notifications/status - Get Delivery Status
   // ==========================================================================
 
-  describe('GET /api/ticketing/notifications/status', () => {
+  describe('GET /api/maintenance/notifications/status', () => {
     it('should get notification status by ID', async () => {
       // Arrange
       const mockStatus = createMockDeliveryStatus();
@@ -411,10 +411,10 @@ describe('WhatsApp API Endpoints', () => {
   });
 
   // ==========================================================================
-  // GET /api/ticketing/notifications/status - List Notifications by Filters
+  // GET /api/maintenance/notifications/status - List Notifications by Filters
   // ==========================================================================
 
-  describe('GET /api/ticketing/notifications/status - List with Filters', () => {
+  describe('GET /api/maintenance/notifications/status - List with Filters', () => {
     it('should list notifications by ticket_id', async () => {
       // Arrange
       const mockNotifications = [

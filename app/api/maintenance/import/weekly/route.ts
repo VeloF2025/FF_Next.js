@@ -1,7 +1,7 @@
 /**
  * Weekly Import API - Upload Excel File
  *
- * POST /api/ticketing/import/weekly - Upload Excel file and create import
+ * POST /api/maintenance/import/weekly - Upload Excel file and create import
  *
  * Supports two request formats:
  * 1. JSON body: { filename, data (byte array), user_id }
@@ -33,7 +33,7 @@ import {
 } from '@/modules/maintenance/services/weeklyReportService';
 import type { CreateWeeklyReportPayload } from '@/modules/maintenance/types/weeklyReport';
 
-const logger = createLogger('ticketing:api:weekly-import');
+const logger = createLogger('maintenance:api:weekly-import');
 
 // Configuration
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -50,7 +50,7 @@ function getWeekNumber(date: Date): number {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
-// ==================== POST /api/ticketing/import/weekly ====================
+// ==================== POST /api/maintenance/import/weekly ====================
 
 export async function POST(req: NextRequest) {
   try {

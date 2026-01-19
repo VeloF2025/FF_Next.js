@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for retrieving verification steps
  *
- * GET /api/ticketing/tickets/[id]/verification - List all verification steps
+ * GET /api/maintenance/tickets/[id]/verification - List all verification steps
  *
  * Features:
  * - Returns all 12 verification steps for a ticket (ordered by step_number)
@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { getVerificationSteps, initializeVerificationSteps } from '@/modules/maintenance/services/verificationService';
 
-const logger = createLogger('ticketing:api:verification');
+const logger = createLogger('maintenance:api:verification');
 
 /**
  * UUID validation regex
@@ -91,7 +91,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== GET /api/ticketing/tickets/[id]/verification ====================
+// ==================== GET /api/maintenance/tickets/[id]/verification ====================
 
 /**
  * 🟢 WORKING: Get all verification steps for a ticket
@@ -149,7 +149,7 @@ export async function GET(
   }
 }
 
-// ==================== POST /api/ticketing/tickets/[id]/verification ====================
+// ==================== POST /api/maintenance/tickets/[id]/verification ====================
 
 /**
  * 🟢 WORKING: Initialize verification steps for a ticket

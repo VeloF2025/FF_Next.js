@@ -114,7 +114,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
       const buffer = await readFileAsArrayBuffer(selectedFile);
 
       // Send to API for parsing
-      const response = await fetch('/api/ticketing/import/weekly/parse', {
+      const response = await fetch('/api/maintenance/import/weekly/parse', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +164,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
       const buffer = await readFileAsArrayBuffer(selectedFile);
 
       // Create weekly report and start import
-      const response = await fetch('/api/ticketing/import/weekly', {
+      const response = await fetch('/api/maintenance/import/weekly', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,7 +217,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
     // Poll every 2 seconds
     progressIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`/api/ticketing/import/weekly/${id}/progress`);
+        const response = await fetch(`/api/maintenance/import/weekly/${id}/progress`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch progress');
@@ -250,7 +250,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
   // 🟢 WORKING: Fetch final import results
   const fetchImportResults = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/ticketing/import/weekly/${id}`);
+      const response = await fetch(`/api/maintenance/import/weekly/${id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch results');

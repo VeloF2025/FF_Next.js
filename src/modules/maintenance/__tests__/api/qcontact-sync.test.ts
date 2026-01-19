@@ -4,9 +4,9 @@
  * 🟢 WORKING: Tests written following TDD methodology
  *
  * Tests all QContact sync endpoints:
- * - POST /api/ticketing/sync/qcontact - Trigger sync
- * - GET /api/ticketing/sync/qcontact/status - Get sync status
- * - GET /api/ticketing/sync/qcontact/log - Get sync audit log
+ * - POST /api/maintenance/sync/qcontact - Trigger sync
+ * - GET /api/maintenance/sync/qcontact/status - Get sync status
+ * - GET /api/maintenance/sync/qcontact/log - Get sync audit log
  *
  * Test Strategy:
  * - Mock service layer to isolate API route logic
@@ -87,18 +87,18 @@ describe('QContact Sync API', () => {
   });
 
   // ============================================================================
-  // POST /api/ticketing/sync/qcontact
+  // POST /api/maintenance/sync/qcontact
   // ============================================================================
 
-  describe('POST /api/ticketing/sync/qcontact', () => {
+  describe('POST /api/maintenance/sync/qcontact', () => {
     it('should trigger full bidirectional sync successfully', async () => {
       const { runFullSync } = await import('../../services/qcontactSyncOrchestrator');
       const mockResult = createMockSyncResult();
 
       vi.mocked(runFullSync).mockResolvedValue(mockResult);
 
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -138,8 +138,8 @@ describe('QContact Sync API', () => {
 
       vi.mocked(runInboundOnlySync).mockResolvedValue(mockResult);
 
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -173,8 +173,8 @@ describe('QContact Sync API', () => {
 
       vi.mocked(runOutboundOnlySync).mockResolvedValue(mockResult);
 
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,8 +196,8 @@ describe('QContact Sync API', () => {
 
       vi.mocked(runFullSync).mockResolvedValue(mockResult);
 
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -220,8 +220,8 @@ describe('QContact Sync API', () => {
     });
 
     it('should reject invalid sync_direction', async () => {
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -239,8 +239,8 @@ describe('QContact Sync API', () => {
     });
 
     it('should reject invalid date range (start_date after end_date)', async () => {
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -263,8 +263,8 @@ describe('QContact Sync API', () => {
 
       vi.mocked(runFullSync).mockRejectedValue(new Error('Sync service error'));
 
-      const { POST } = await import('@/app/api/ticketing/sync/qcontact/route');
-      const request = new Request('http://localhost/api/ticketing/sync/qcontact', {
+      const { POST } = await import('@/app/api/maintenance/sync/qcontact/route');
+      const request = new Request('http://localhost/api/maintenance/sync/qcontact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -280,10 +280,10 @@ describe('QContact Sync API', () => {
   });
 
   // ============================================================================
-  // GET /api/ticketing/sync/qcontact/status
+  // GET /api/maintenance/sync/qcontact/status
   // ============================================================================
 
-  describe('GET /api/ticketing/sync/qcontact/status', () => {
+  describe('GET /api/maintenance/sync/qcontact/status', () => {
     it('should return sync status successfully', async () => {
       const { getSyncProgress } = await import(
         '../../services/qcontactSyncOrchestrator'
@@ -320,9 +320,9 @@ describe('QContact Sync API', () => {
         },
       ]);
 
-      const { GET } = await import('@/app/api/ticketing/sync/qcontact/status/route');
+      const { GET } = await import('@/app/api/maintenance/sync/qcontact/status/route');
       const request = new Request(
-        'http://localhost/api/ticketing/sync/qcontact/status',
+        'http://localhost/api/maintenance/sync/qcontact/status',
         {
           method: 'GET',
         }
@@ -360,9 +360,9 @@ describe('QContact Sync API', () => {
       vi.mocked(queryOne).mockResolvedValue(null);
       vi.mocked(query).mockResolvedValue([]);
 
-      const { GET } = await import('@/app/api/ticketing/sync/qcontact/status/route');
+      const { GET } = await import('@/app/api/maintenance/sync/qcontact/status/route');
       const request = new Request(
-        'http://localhost/api/ticketing/sync/qcontact/status',
+        'http://localhost/api/maintenance/sync/qcontact/status',
         {
           method: 'GET',
         }
@@ -389,9 +389,9 @@ describe('QContact Sync API', () => {
 
       vi.mocked(getSyncProgress).mockRejectedValue(new Error('Database error'));
 
-      const { GET } = await import('@/app/api/ticketing/sync/qcontact/status/route');
+      const { GET } = await import('@/app/api/maintenance/sync/qcontact/status/route');
       const request = new Request(
-        'http://localhost/api/ticketing/sync/qcontact/status',
+        'http://localhost/api/maintenance/sync/qcontact/status',
         {
           method: 'GET',
         }
@@ -407,10 +407,10 @@ describe('QContact Sync API', () => {
   });
 
   // ============================================================================
-  // GET /api/ticketing/sync/qcontact/log
+  // GET /api/maintenance/sync/qcontact/log
   // ============================================================================
 
-  describe('GET /api/ticketing/sync/qcontact/log', () => {
+  describe('GET /api/maintenance/sync/qcontact/log', () => {
     it('should return sync logs with pagination', async () => {
       const { query } = await import('../../utils/db');
 
@@ -443,9 +443,9 @@ describe('QContact Sync API', () => {
           },
         ]);
 
-      const { GET } = await import('@/app/api/ticketing/sync/qcontact/log/route');
+      const { GET } = await import('@/app/api/maintenance/sync/qcontact/log/route');
       const request = new Request(
-        'http://localhost/api/ticketing/sync/qcontact/log',
+        'http://localhost/api/maintenance/sync/qcontact/log',
         {
           method: 'GET',
         }
@@ -462,9 +462,9 @@ describe('QContact Sync API', () => {
     });
 
     it('should reject invalid sync_direction filter', async () => {
-      const { GET } = await import('@/app/api/ticketing/sync/qcontact/log/route');
+      const { GET } = await import('@/app/api/maintenance/sync/qcontact/log/route');
       const request = new Request(
-        'http://localhost/api/ticketing/sync/qcontact/log?sync_direction=invalid',
+        'http://localhost/api/maintenance/sync/qcontact/log?sync_direction=invalid',
         {
           method: 'GET',
         }
@@ -483,9 +483,9 @@ describe('QContact Sync API', () => {
 
       vi.mocked(query).mockRejectedValue(new Error('Database error'));
 
-      const { GET } = await import('@/app/api/ticketing/sync/qcontact/log/route');
+      const { GET } = await import('@/app/api/maintenance/sync/qcontact/log/route');
       const request = new Request(
-        'http://localhost/api/ticketing/sync/qcontact/log',
+        'http://localhost/api/maintenance/sync/qcontact/log',
         {
           method: 'GET',
         }

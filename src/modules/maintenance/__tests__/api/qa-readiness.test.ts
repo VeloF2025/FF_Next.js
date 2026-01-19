@@ -3,8 +3,8 @@
  * 🟢 WORKING: All 11 tests passing with 97-100% coverage
  *
  * Tests the QA readiness API endpoints:
- * - POST /api/ticketing/tickets/[id]/qa-readiness-check
- * - GET /api/ticketing/tickets/[id]/qa-readiness
+ * - POST /api/maintenance/tickets/[id]/qa-readiness-check
+ * - GET /api/maintenance/tickets/[id]/qa-readiness
  *
  * TDD methodology followed:
  * - Tests written FIRST (red phase) ✓
@@ -123,7 +123,7 @@ async function loadRouteHandlers(routePath: string) {
   return module;
 }
 
-describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
+describe('POST /api/maintenance/tickets/[id]/qa-readiness-check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -138,11 +138,11 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
 
     // Import the route handler
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness-check/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       {
         method: 'POST',
         body: JSON.stringify({ checked_by: mockCheckerId }),
@@ -174,11 +174,11 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
     vi.mocked(qaReadinessService.runReadinessCheck).mockResolvedValue(mockFailedCheck);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness-check/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       {
         method: 'POST',
         body: JSON.stringify({ checked_by: mockCheckerId }),
@@ -202,11 +202,11 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
     vi.mocked(qaReadinessService.runReadinessCheck).mockResolvedValue(mockPassedCheck);
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness-check/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       {
         method: 'POST',
         body: JSON.stringify({}), // No checked_by
@@ -228,11 +228,11 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
     const invalidId = 'not-a-uuid';
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness-check/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${invalidId}/qa-readiness-check`,
+      `http://localhost:3000/api/maintenance/tickets/${invalidId}/qa-readiness-check`,
       {
         method: 'POST',
         body: JSON.stringify({}),
@@ -258,11 +258,11 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness-check/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       {
         method: 'POST',
         body: JSON.stringify({}),
@@ -287,11 +287,11 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
     );
 
     const { POST } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness-check/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness-check/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness-check`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness-check`,
       {
         method: 'POST',
         body: JSON.stringify({}),
@@ -309,7 +309,7 @@ describe('POST /api/ticketing/tickets/[id]/qa-readiness-check', () => {
   });
 });
 
-describe('GET /api/ticketing/tickets/[id]/qa-readiness', () => {
+describe('GET /api/maintenance/tickets/[id]/qa-readiness', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -323,11 +323,11 @@ describe('GET /api/ticketing/tickets/[id]/qa-readiness', () => {
     vi.mocked(qaReadinessService.getReadinessStatus).mockResolvedValue(mockReadyStatus);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness`,
       { method: 'GET' }
     );
 
@@ -352,11 +352,11 @@ describe('GET /api/ticketing/tickets/[id]/qa-readiness', () => {
     vi.mocked(qaReadinessService.getReadinessStatus).mockResolvedValue(mockNotReadyStatus);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness`,
       { method: 'GET' }
     );
 
@@ -377,11 +377,11 @@ describe('GET /api/ticketing/tickets/[id]/qa-readiness', () => {
     vi.mocked(qaReadinessService.getReadinessStatus).mockResolvedValue(mockNoCheckStatus);
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness`,
       { method: 'GET' }
     );
 
@@ -402,11 +402,11 @@ describe('GET /api/ticketing/tickets/[id]/qa-readiness', () => {
     const invalidId = 'not-a-uuid';
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${invalidId}/qa-readiness`,
+      `http://localhost:3000/api/maintenance/tickets/${invalidId}/qa-readiness`,
       { method: 'GET' }
     );
 
@@ -429,11 +429,11 @@ describe('GET /api/ticketing/tickets/[id]/qa-readiness', () => {
     );
 
     const { GET } = await loadRouteHandlers(
-      '../../../../app/api/ticketing/tickets/[id]/qa-readiness/route'
+      '../../../../app/api/maintenance/tickets/[id]/qa-readiness/route'
     );
 
     const request = new NextRequest(
-      `http://localhost:3000/api/ticketing/tickets/${mockTicketId}/qa-readiness`,
+      `http://localhost:3000/api/maintenance/tickets/${mockTicketId}/qa-readiness`,
       { method: 'GET' }
     );
 

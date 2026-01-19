@@ -133,7 +133,7 @@ export function RelatedTickets({
           {relatedTickets.map((ticket) => (
             <Link
               key={ticket.id}
-              href={`/ticketing/tickets/${ticket.id}`}
+              href={`/maintenance/tickets/${ticket.id}`}
               className={cn(
                 'block p-3 rounded-lg transition-colors',
                 'bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)]',

@@ -100,7 +100,7 @@ export function ClickableStatusBadge({
     async function fetchStatuses() {
       setIsLoadingStatuses(true);
       try {
-        const response = await fetch('/api/ticketing/statuses');
+        const response = await fetch('/api/maintenance/statuses');
         if (response.ok) {
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) {
@@ -144,7 +144,7 @@ export function ClickableStatusBadge({
     setIsOpen(false);
 
     try {
-      const response = await fetch(`/api/ticketing/tickets/${ticketId}`, {
+      const response = await fetch(`/api/maintenance/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),

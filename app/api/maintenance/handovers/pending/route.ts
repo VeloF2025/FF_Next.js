@@ -1,7 +1,7 @@
 /**
  * Pending Handovers API
  *
- * GET /api/ticketing/handovers/pending - List tickets pending handover
+ * GET /api/maintenance/handovers/pending - List tickets pending handover
  *
  * Query Parameters:
  * - handover_type: Filter by type (BUILD_TO_QA, QA_TO_MAINTENANCE, MAINTENANCE_COMPLETE)
@@ -17,7 +17,7 @@ import { createLogger } from '@/lib/logger';
 import { getPendingHandovers } from '@/modules/maintenance/services/handoverService';
 import { HandoverType } from '@/modules/maintenance/types/handover';
 
-const logger = createLogger('ticketing:api:handovers:pending');
+const logger = createLogger('maintenance:api:handovers:pending');
 
 export async function GET(req: NextRequest) {
   try {

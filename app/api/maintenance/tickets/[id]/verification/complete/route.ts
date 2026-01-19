@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for checking verification completion status
  *
- * POST /api/ticketing/tickets/[id]/verification/complete - Get verification progress
+ * POST /api/maintenance/tickets/[id]/verification/complete - Get verification progress
  *
  * Features:
  * - Returns complete verification progress (completed/total, percentage)
@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import { calculateProgress } from '@/modules/maintenance/services/verificationService';
 
-const logger = createLogger('ticketing:api:verification:complete');
+const logger = createLogger('maintenance:api:verification:complete');
 
 /**
  * UUID validation regex
@@ -97,7 +97,7 @@ function databaseError(message: string) {
   );
 }
 
-// ==================== POST /api/ticketing/tickets/[id]/verification/complete ====================
+// ==================== POST /api/maintenance/tickets/[id]/verification/complete ====================
 
 /**
  * 🟢 WORKING: Get verification progress and completion status

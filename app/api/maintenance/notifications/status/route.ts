@@ -3,7 +3,7 @@
  *
  * 🟢 WORKING: Production-ready API endpoint for retrieving notification delivery status
  *
- * GET /api/ticketing/notifications/status - Get notification delivery status
+ * GET /api/maintenance/notifications/status - Get notification delivery status
  *
  * Query parameters:
  * - notification_id: Get status for a specific notification by ID
@@ -21,7 +21,7 @@
  * - Proper error handling with standard API responses
  * - Follows Zero Tolerance protocol (no console.log, proper error handling)
  *
- * @module api/ticketing/notifications/status
+ * @module api/maintenance/notifications/status
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,7 +31,7 @@ import type { NotificationFilters } from '@/modules/maintenance/types/whatsapp';
 import { NotificationStatus, RecipientType } from '@/modules/maintenance/types/whatsapp';
 
 // 🟢 WORKING: Logger instance for notification status API
-const logger = createLogger('ticketing:api:notifications:status');
+const logger = createLogger('maintenance:api:notifications:status');
 
 // Valid enum values for validation
 const VALID_STATUSES: NotificationStatus[] = [
@@ -49,13 +49,13 @@ const VALID_RECIPIENT_TYPES: RecipientType[] = [
   RecipientType.TEAM,
 ];
 
-// ==================== GET /api/ticketing/notifications/status ====================
+// ==================== GET /api/maintenance/notifications/status ====================
 
 /**
  * 🟢 WORKING: Get notification delivery status
  *
  * @example Get single notification status:
- * GET /api/ticketing/notifications/status?notification_id=notif-uuid
+ * GET /api/maintenance/notifications/status?notification_id=notif-uuid
  *
  * Response (200):
  * {
@@ -74,7 +74,7 @@ const VALID_RECIPIENT_TYPES: RecipientType[] = [
  * }
  *
  * @example List notifications by ticket:
- * GET /api/ticketing/notifications/status?ticket_id=ticket-uuid
+ * GET /api/maintenance/notifications/status?ticket_id=ticket-uuid
  *
  * Response (200):
  * {

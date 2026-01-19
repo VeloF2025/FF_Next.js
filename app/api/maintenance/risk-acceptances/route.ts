@@ -1,7 +1,7 @@
 /**
  * Risk Acceptances API - Global List
  *
- * GET /api/ticketing/risk-acceptances - List all risk acceptances with filters
+ * GET /api/maintenance/risk-acceptances - List all risk acceptances with filters
  *
  * Query Parameters:
  * - status: Filter by status (active, resolved, expired, escalated) - can be comma-separated
@@ -18,7 +18,7 @@ import { createLogger } from '@/lib/logger';
 import { listAllRiskAcceptances, getExpiringRisks } from '@/modules/maintenance/services/riskAcceptanceService';
 import { RiskAcceptanceStatus } from '@/modules/maintenance/types/riskAcceptance';
 
-const logger = createLogger('ticketing:api:risk-acceptances');
+const logger = createLogger('maintenance:api:risk-acceptances');
 
 export async function GET(req: NextRequest) {
   try {

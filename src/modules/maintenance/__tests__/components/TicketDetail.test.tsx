@@ -97,7 +97,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test ticket detail display
   it('should display ticket detail', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -154,7 +154,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test status badge display
   it('should display ticket status badge', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -179,7 +179,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test priority display
   it('should display ticket priority', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -204,7 +204,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test QA ready indicator
   it('should display QA ready indicator', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -230,7 +230,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test additional details display
   it('should display additional ticket details', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -259,7 +259,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test actions section
   it('should display actions section', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -284,7 +284,7 @@ describe('TicketDetail', () => {
   // 🟢 WORKING: Test back link
   it('should display back link when provided', async () => {
     (global.fetch as any).mockImplementation((url: string) => {
-      if (url.includes('/api/ticketing/tickets/test-id-123')) {
+      if (url.includes('/api/maintenance/tickets/test-id-123')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({

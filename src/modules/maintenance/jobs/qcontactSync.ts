@@ -15,7 +15,7 @@
  * - Logs all executions to sync_job_history table
  * - Provides job history and status queries
  *
- * @module ticketing/jobs/qcontactSync
+ * @module maintenance/jobs/qcontactSync
  */
 
 import { query, queryOne } from '../utils/db';

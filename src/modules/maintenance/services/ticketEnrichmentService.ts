@@ -8,13 +8,13 @@
  * - Look up customer info from onemap_drops
  * - Cross-reference with existing FibreFlow data
  *
- * @module ticketing/services/ticketEnrichmentService
+ * @module maintenance/services/ticketEnrichmentService
  */
 
 import { query, queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger('ticketing:enrichment');
+const logger = createLogger('maintenance:enrichment');
 
 // ============================================================================
 // Types

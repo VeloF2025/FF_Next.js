@@ -26,7 +26,7 @@ import type {
   QAReadinessCheck,
 } from '../types/verification';
 
-const logger = createLogger('ticketing:hooks:qa-readiness');
+const logger = createLogger('maintenance:hooks:qa-readiness');
 
 // ==================== Query Keys ====================
 
@@ -46,7 +46,7 @@ export const qaReadinessKeys = {
  * 🟢 WORKING: Fetch QA readiness status from API
  */
 async function fetchQAReadinessStatus(ticketId: string): Promise<QAReadinessStatus> {
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/qa-readiness`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/qa-readiness`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ async function runQAReadinessCheckAPI(
 ): Promise<QAReadinessCheck> {
   const body = checkedBy ? { checked_by: checkedBy } : {};
 
-  const response = await fetch(`/api/ticketing/tickets/${ticketId}/qa-readiness-check`, {
+  const response = await fetch(`/api/maintenance/tickets/${ticketId}/qa-readiness-check`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

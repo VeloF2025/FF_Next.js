@@ -4,7 +4,7 @@
  * 🟢 WORKING: Tests written FIRST following TDD methodology
  *
  * Tests webhook endpoint:
- * - POST /api/ticketing/webhooks/qcontact - Receive QContact webhooks
+ * - POST /api/maintenance/webhooks/qcontact - Receive QContact webhooks
  *
  * Test Strategy:
  * - Mock service layer to isolate webhook handler logic
@@ -47,7 +47,7 @@ function createMockQContactTicket(
     customer_email: 'john@example.com',
     address: '123 Test St',
     assigned_to: null,
-    category: 'maintenance',
+    category: 'fault_repair',
     subcategory: null,
     custom_fields: {
       dr_number: 'DR001',
@@ -104,10 +104,10 @@ describe('QContact Webhook API', () => {
   });
 
   // ============================================================================
-  // POST /api/ticketing/webhooks/qcontact - Webhook Receipt
+  // POST /api/maintenance/webhooks/qcontact - Webhook Receipt
   // ============================================================================
 
-  describe('POST /api/ticketing/webhooks/qcontact', () => {
+  describe('POST /api/maintenance/webhooks/qcontact', () => {
     it('should receive and process ticket.created webhook successfully', async () => {
       const { syncSingleInboundTicket } = await import(
         '../../services/qcontactSyncInbound'
@@ -126,7 +126,7 @@ describe('QContact Webhook API', () => {
         synced_at: new Date(),
       });
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const signature = createWebhookSignature(
@@ -134,7 +134,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ describe('QContact Webhook API', () => {
         synced_at: new Date(),
       });
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const signature = createWebhookSignature(
@@ -182,7 +182,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -220,7 +220,7 @@ describe('QContact Webhook API', () => {
         synced_at: new Date(),
       });
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const signature = createWebhookSignature(
@@ -228,7 +228,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -250,12 +250,12 @@ describe('QContact Webhook API', () => {
       const mockTicket = createMockQContactTicket();
       const webhookPayload = createMockWebhookPayload('ticket.created', mockTicket);
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const invalidSignature = 'invalid-signature';
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -276,11 +276,11 @@ describe('QContact Webhook API', () => {
       const mockTicket = createMockQContactTicket();
       const webhookPayload = createMockWebhookPayload('ticket.created', mockTicket);
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -298,7 +298,7 @@ describe('QContact Webhook API', () => {
     });
 
     it('should reject webhook with invalid JSON payload', async () => {
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const invalidPayload = 'not valid json{';
       const signature = createWebhookSignature(
@@ -306,7 +306,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -341,7 +341,7 @@ describe('QContact Webhook API', () => {
         synced_at: new Date(),
       });
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const signature = createWebhookSignature(
@@ -349,7 +349,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -388,7 +388,7 @@ describe('QContact Webhook API', () => {
 
       vi.mocked(queryOne).mockResolvedValue({ id: 'webhook-log-123' });
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const signature = createWebhookSignature(
@@ -396,7 +396,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -437,7 +437,7 @@ describe('QContact Webhook API', () => {
         synced_at: new Date(),
       });
 
-      const { POST } = await import('@/app/api/ticketing/webhooks/qcontact/route');
+      const { POST } = await import('@/app/api/maintenance/webhooks/qcontact/route');
 
       const payloadString = JSON.stringify(webhookPayload);
       const signature = createWebhookSignature(
@@ -445,7 +445,7 @@ describe('QContact Webhook API', () => {
         process.env.QCONTACT_WEBHOOK_SECRET!
       );
 
-      const request = new Request('http://localhost/api/ticketing/webhooks/qcontact', {
+      const request = new Request('http://localhost/api/maintenance/webhooks/qcontact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
