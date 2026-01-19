@@ -427,9 +427,9 @@ describe('HandoverWizard Component', () => {
       renderWithQueryClient(
         <HandoverWizard
           ticketId="ticket-123"
-          handoverType={HandoverType.QA_TO_MAINTENANCE}
+          handoverType={HandoverType.QA_TO_OPS}
           fromOwnerType={OwnerType.QA}
-          toOwnerType={OwnerType.MAINTENANCE}
+          toOwnerType={OwnerType.OPS}
         />
       );
 

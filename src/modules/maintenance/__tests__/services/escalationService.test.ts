@@ -93,7 +93,7 @@ describe('EscalationService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockEscalation);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO repeat_fault_escalations'),
+        expect.stringContaining('INSERT INTO maintenance_escalations'),
         expect.arrayContaining([
           'pole',
           'POLE-123',
@@ -385,7 +385,7 @@ describe('EscalationService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockEscalation);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM repeat_fault_escalations'),
+        expect.stringContaining('SELECT * FROM maintenance_escalations'),
         ['11111111-1111-1111-1111-111111111111']
       );
     });
@@ -572,7 +572,7 @@ describe('EscalationService (TDD)', () => {
       expect(result.resolved_by).toBe('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
       expect(result.resolved_at).toBeDefined();
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE repeat_fault_escalations'),
+        expect.stringContaining('UPDATE maintenance_escalations'),
         expect.arrayContaining(['resolved', 'Pole replaced, issue resolved', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', escalationId])
       );
     });
@@ -672,7 +672,7 @@ describe('EscalationService (TDD)', () => {
       // Assert
       expect(result.status).toBe('investigating');
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE repeat_fault_escalations'),
+        expect.stringContaining('UPDATE maintenance_escalations'),
         ['investigating', escalationId]
       );
     });

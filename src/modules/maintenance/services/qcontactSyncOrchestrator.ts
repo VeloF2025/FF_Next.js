@@ -108,7 +108,7 @@ async function logSyncSummary(
 ): Promise<void> {
   try {
     const sql = `
-      INSERT INTO qcontact_sync_log (
+      INSERT INTO maintenance_qcontact_sync_log (
         ticket_id,
         qcontact_ticket_id,
         sync_direction,
@@ -204,7 +204,7 @@ async function fetchTicketsForOutboundSync(
       external_id,
       status,
       assigned_to
-    FROM tickets
+    FROM maintenance_tickets
     WHERE ${conditions.join(' AND ')}
     ORDER BY updated_at DESC
     LIMIT 1000
@@ -478,7 +478,7 @@ export async function getSyncProgress(): Promise<SyncProgress> {
       COUNT(*) FILTER (WHERE status = 'success') as successful,
       COUNT(*) FILTER (WHERE status = 'failed') as failed,
       COUNT(*) FILTER (WHERE status = 'partial') as partial
-    FROM qcontact_sync_log
+    FROM maintenance_qcontact_sync_log
     WHERE synced_at >= (NOW() AT TIME ZONE 'UTC')::timestamp - INTERVAL '24 hours'
   `;
 

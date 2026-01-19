@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Jobs Exports
+ * Maintenance Module - Jobs Exports
  * 🟢 WORKING: Central export point for all ticketing background jobs (server-side only)
  */
 

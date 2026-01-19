@@ -19,14 +19,14 @@ import { createLogger } from '@/lib/logger';
 import {
   listTickets,
   createTicket
-} from '@/modules/ticketing/services/ticketService';
+} from '@/modules/maintenance/services/ticketService';
 import type {
   CreateTicketPayload,
   TicketFilters,
   TicketSource,
   TicketType,
   TicketPriority,
-} from '@/modules/ticketing/types/ticket';
+} from '@/modules/maintenance/types/ticket';
 
 const logger = createLogger('ticketing:api:tickets');
 

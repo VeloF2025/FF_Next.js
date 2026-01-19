@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - QContact Integration Types
+ * Maintenance Module - QContact Integration Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for QContact API integration, bidirectional

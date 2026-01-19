@@ -63,7 +63,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const payload: CreateTicketPayload = {
         source: TicketSource.AD_HOC,
         title: 'Fiber cut at Pole 123',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         description: 'Customer reports no internet connectivity',
         priority: TicketPriority.HIGH,
         dr_number: 'DR-2024-001',
@@ -120,7 +120,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       expect(queryOne).toHaveBeenCalled();
       const callArgs = (queryOne as any).mock.calls[0];
-      expect(callArgs[0]).toContain('INSERT INTO tickets');
+      expect(callArgs[0]).toContain('INSERT INTO maintenance_tickets');
       expect(callArgs[1]).toContain(payload.source);
       expect(callArgs[1]).toContain(payload.title);
       expect(callArgs[1]).toContain(payload.ticket_type);
@@ -133,7 +133,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const payload: CreateTicketPayload = {
         source: TicketSource.QCONTACT,
         title: 'Customer complaint',
-        ticket_type: TicketType.MAINTENANCE
+        ticket_type: TicketType.FAULT_REPAIR
       };
 
       const mockCreatedTicket = {
@@ -208,7 +208,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const invalidPayload: CreateTicketPayload = {
         source: TicketSource.AD_HOC,
         title: '',
-        ticket_type: TicketType.MAINTENANCE
+        ticket_type: TicketType.FAULT_REPAIR
       };
 
       await expect(createTicket(invalidPayload)).rejects.toThrow(
@@ -223,7 +223,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const invalidPayload = {
         source: 'invalid_source',
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE
+        ticket_type: TicketType.FAULT_REPAIR
       } as CreateTicketPayload;
 
       await expect(createTicket(invalidPayload)).rejects.toThrow(
@@ -238,7 +238,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const payload: CreateTicketPayload = {
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE
+        ticket_type: TicketType.FAULT_REPAIR
       };
 
       const mockCreatedTicket = {
@@ -302,7 +302,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.OPEN,
         created_at: new Date('2024-01-15T10:00:00Z'),
@@ -345,7 +345,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const result = await getTicketById(ticketId);
 
       expect(queryOne).toHaveBeenCalledWith(
-        'SELECT * FROM tickets WHERE id = $1',
+        'SELECT * FROM maintenance_tickets WHERE id = $1',
         [ticketId]
       );
       expect(result).toEqual(mockTicket);
@@ -362,7 +362,7 @@ describe('Ticket Service - CRUD Operations', () => {
       );
 
       expect(queryOne).toHaveBeenCalledWith(
-        'SELECT * FROM tickets WHERE id = $1',
+        'SELECT * FROM maintenance_tickets WHERE id = $1',
         [ticketId]
       );
     });
@@ -388,7 +388,7 @@ describe('Ticket Service - CRUD Operations', () => {
         external_id: 'QC-12345',
         title: 'Complete ticket',
         description: 'Full description',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.HIGH,
         status: TicketStatus.IN_PROGRESS,
         dr_number: 'DR-2024-001',
@@ -449,7 +449,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.IN_PROGRESS, // Updated
         assigned_to: 'user-uuid-123', // Updated
@@ -493,7 +493,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       expect(queryOne).toHaveBeenCalled();
       const callArgs = (queryOne as any).mock.calls[0];
-      expect(callArgs[0]).toContain('UPDATE tickets');
+      expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
       expect(callArgs[1]).toContain(TicketStatus.IN_PROGRESS);
       expect(callArgs[1]).toContain('user-uuid-123');
       expect(callArgs[1]).toContain(ticketId);
@@ -513,7 +513,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Updated title', // Updated
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.OPEN,
         updated_at: new Date(),
@@ -603,7 +603,7 @@ describe('Ticket Service - CRUD Operations', () => {
         source: TicketSource.AD_HOC,
         title: updatePayload.title!,
         description: updatePayload.description!,
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: updatePayload.priority!,
         status: updatePayload.status!,
         assigned_to: updatePayload.assigned_to!,
@@ -664,7 +664,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.CLOSED,
         created_at: new Date('2024-01-15T10:00:00Z'),
@@ -723,7 +723,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.CANCELLED, // Soft deleted
         created_at: new Date('2024-01-15T10:00:00Z'),
@@ -767,7 +767,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       expect(queryOne).toHaveBeenCalled();
       const callArgs = (queryOne as any).mock.calls[0];
-      expect(callArgs[0]).toContain('UPDATE tickets');
+      expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
       expect(callArgs[0]).toContain('SET status = $1');
       expect(callArgs[1]).toEqual([TicketStatus.CANCELLED, ticketId]);
       expect(result.status).toBe(TicketStatus.CANCELLED);
@@ -793,7 +793,7 @@ describe('Ticket Service - CRUD Operations', () => {
         ticket_uid: 'FT406824',
         source: TicketSource.AD_HOC,
         title: 'Test ticket',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.NORMAL,
         status: TicketStatus.CANCELLED,
         created_at: new Date(),
@@ -838,8 +838,8 @@ describe('Ticket Service - CRUD Operations', () => {
       // Verify it's an UPDATE, not DELETE
       expect(queryOne).toHaveBeenCalled();
       const callArgs = (queryOne as any).mock.calls[0];
-      expect(callArgs[0]).toContain('UPDATE tickets');
-      expect(callArgs[0]).not.toContain('DELETE FROM tickets');
+      expect(callArgs[0]).toContain('UPDATE maintenance_tickets');
+      expect(callArgs[0]).not.toContain('DELETE FROM maintenance_tickets');
     });
   });
 
@@ -852,7 +852,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Ticket 1',
-          ticket_type: TicketType.MAINTENANCE,
+          ticket_type: TicketType.FAULT_REPAIR,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date('2024-01-15T10:00:00Z'),
@@ -939,7 +939,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       expect(query).toHaveBeenCalled();
       const callArgs = (query as any).mock.calls[0];
-      expect(callArgs[0]).toContain('SELECT * FROM tickets');
+      expect(callArgs[0]).toContain('SELECT * FROM maintenance_tickets');
       expect(result.tickets).toEqual(mockTickets);
       expect(result.total).toBe(2);
       expect(result.page).toBe(1);
@@ -954,7 +954,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Open Ticket',
-          ticket_type: TicketType.MAINTENANCE,
+          ticket_type: TicketType.FAULT_REPAIR,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date(),
@@ -1013,7 +1013,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Maintenance Ticket',
-          ticket_type: TicketType.MAINTENANCE,
+          ticket_type: TicketType.FAULT_REPAIR,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date(),
@@ -1054,12 +1054,12 @@ describe('Ticket Service - CRUD Operations', () => {
 
       (query as any).mockResolvedValue(mockTickets);
 
-      const result = await listTickets({ ticket_type: TicketType.MAINTENANCE });
+      const result = await listTickets({ ticket_type: TicketType.FAULT_REPAIR });
 
       expect(query).toHaveBeenCalled();
       const callArgs = (query as any).mock.calls[0];
       expect(callArgs[0]).toContain('ticket_type = $1');
-      expect(callArgs[1]).toContain(TicketType.MAINTENANCE);
+      expect(callArgs[1]).toContain(TicketType.FAULT_REPAIR);
       expect(result.tickets).toEqual(mockTickets);
     });
 
@@ -1072,7 +1072,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Assigned Ticket',
-          ticket_type: TicketType.MAINTENANCE,
+          ticket_type: TicketType.FAULT_REPAIR,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.ASSIGNED,
           assigned_to: assigneeId,
@@ -1130,7 +1130,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406824',
           source: TicketSource.AD_HOC,
           title: 'Filtered Ticket',
-          ticket_type: TicketType.MAINTENANCE,
+          ticket_type: TicketType.FAULT_REPAIR,
           priority: TicketPriority.HIGH,
           status: TicketStatus.IN_PROGRESS,
           assigned_to: 'user-uuid-123',
@@ -1173,7 +1173,7 @@ describe('Ticket Service - CRUD Operations', () => {
 
       const result = await listTickets({
         status: TicketStatus.IN_PROGRESS,
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         assigned_to: 'user-uuid-123'
       });
 
@@ -1181,7 +1181,7 @@ describe('Ticket Service - CRUD Operations', () => {
       const callArgs = (query as any).mock.calls[0];
       expect(callArgs[0]).toContain('WHERE');
       expect(callArgs[1]).toContain(TicketStatus.IN_PROGRESS);
-      expect(callArgs[1]).toContain(TicketType.MAINTENANCE);
+      expect(callArgs[1]).toContain(TicketType.FAULT_REPAIR);
       expect(callArgs[1]).toContain('user-uuid-123');
       expect(result.tickets).toEqual(mockTickets);
     });
@@ -1194,7 +1194,7 @@ describe('Ticket Service - CRUD Operations', () => {
           ticket_uid: 'FT406826',
           source: TicketSource.AD_HOC,
           title: 'Ticket 3',
-          ticket_type: TicketType.MAINTENANCE,
+          ticket_type: TicketType.FAULT_REPAIR,
           priority: TicketPriority.NORMAL,
           status: TicketStatus.OPEN,
           created_at: new Date(),

@@ -16,11 +16,11 @@ import { createLogger } from '@/lib/logger';
 import {
   syncFiberTimeInboundTickets,
   type FiberTimeSyncOptions,
-} from '@/modules/ticketing/services/qcontactSyncInbound';
+} from '@/modules/maintenance/services/qcontactSyncInbound';
 import {
   getDefaultFiberTimeQContactClient,
   MAINTENANCE_VELOCITY_ID,
-} from '@/modules/ticketing/services/fibertimeQContactClient';
+} from '@/modules/maintenance/services/fibertimeQContactClient';
 
 const logger = createLogger('ticketing:api:sync:fibertime');
 

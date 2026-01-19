@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Verification & QA Readiness Types
+ * Maintenance Module - Verification & QA Readiness Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for 12-step verification workflow,

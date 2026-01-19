@@ -28,7 +28,7 @@ const FAULT_CAUSE_DESCRIPTIONS: Record<FaultCause, string> = {
 
 export function FaultSection({ formData, errors, setField, disabled }: FaultSectionProps) {
   // Only show for maintenance tickets
-  if (formData.ticket_type !== TicketType.MAINTENANCE) {
+  if (formData.ticket_type !== TicketType.FAULT_REPAIR) {
     return null;
   }
 

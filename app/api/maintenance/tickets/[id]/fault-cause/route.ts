@@ -18,8 +18,8 @@ import { createLogger } from '@/lib/logger';
 import {
   updateTicket,
   getTicketById,
-} from '@/modules/ticketing/services/ticketService';
-import { FaultCause } from '@/modules/ticketing/types/ticket';
+} from '@/modules/maintenance/services/ticketService';
+import { FaultCause } from '@/modules/maintenance/types/ticket';
 
 const logger = createLogger('ticketing:api:fault-cause');
 

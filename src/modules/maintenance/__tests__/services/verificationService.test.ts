@@ -698,7 +698,7 @@ describe('VerificationService - TDD', () => {
 
       // Assert
       expect(db.query).toHaveBeenCalledWith(
-        'DELETE FROM verification_steps WHERE ticket_id = $1',
+        'DELETE FROM maintenance_verification_steps WHERE ticket_id = $1',
         [mockTicketId]
       );
     });

@@ -28,7 +28,7 @@ interface SourceSectionProps {
 }
 
 const TICKET_TYPE_ICONS: Record<TicketType, React.ReactNode> = {
-  [TicketType.MAINTENANCE]: <Wrench className="w-4 h-4" />,
+  [TicketType.FAULT_REPAIR]: <Wrench className="w-4 h-4" />,
   [TicketType.NEW_INSTALLATION]: <PlusCircle className="w-4 h-4" />,
   [TicketType.MODIFICATION]: <RefreshCw className="w-4 h-4" />,
   [TicketType.ONT_SWAP]: <RefreshCw className="w-4 h-4" />,

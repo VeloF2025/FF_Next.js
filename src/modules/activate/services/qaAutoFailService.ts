@@ -267,6 +267,122 @@ export function looksLikeGizzuSerial(serial: string | null): boolean {
 }
 
 /**
+ * Mask a serial number for display (privacy + verification)
+ * Shows first 3-4 chars and last 4 chars with *** in between
+ * Examples:
+ *   ALCLB48CC3CA -> ALC***3CA
+ *   GU18W12V2508057584 -> GU18***7584
+ */
+export function maskSerial(serial: string | null): string {
+  if (!serial) return 'N/A';
+  const trimmed = serial.trim();
+  if (trimmed.length <= 6) return trimmed; // Too short to mask
+
+  // For ONT (ALC*), show first 3 + last 4
+  if (trimmed.toUpperCase().startsWith('ALC')) {
+    return `${trimmed.slice(0, 3)}***${trimmed.slice(-4)}`;
+  }
+
+  // For Gizzu (GU18W), show first 4 + last 4
+  if (trimmed.toUpperCase().startsWith('GU18')) {
+    return `${trimmed.slice(0, 4)}***${trimmed.slice(-4)}`;
+  }
+
+  // Generic: show first 3 + last 4
+  return `${trimmed.slice(0, 3)}***${trimmed.slice(-4)}`;
+}
+
+/**
+ * Serial status type for detailed feedback
+ */
+export type SerialStatus =
+  | 'present_valid'      // Serial is present and matches expected format
+  | 'present_swapped'    // Serial is present but appears to be in wrong field
+  | 'present_invalid'    // Serial is present but format doesn't match expected
+  | 'missing';           // Serial is not present
+
+/**
+ * Get detailed serial status for feedback
+ */
+export function getSerialStatus(
+  serial: string | null,
+  expectedType: 'ont' | 'ups'
+): { status: SerialStatus; message: string } {
+  if (!serial) {
+    return {
+      status: 'missing',
+      message: expectedType === 'ont'
+        ? '❌ Not scanned in 1Map - please scan ONT barcode'
+        : '❌ Not scanned in 1Map - please scan UPS barcode',
+    };
+  }
+
+  const isOntFormat = looksLikeOntSerial(serial);
+  const isGizzuFormat = looksLikeGizzuSerial(serial);
+  const masked = maskSerial(serial);
+
+  if (expectedType === 'ont') {
+    // Expecting ONT (ALCL/ALCB)
+    if (isOntFormat) {
+      return {
+        status: 'present_valid',
+        message: `Present in 1Map ✓ (${masked})`,
+      };
+    }
+    if (isGizzuFormat) {
+      return {
+        status: 'present_swapped',
+        message: `⚠️ Wrong field - has Gizzu serial (${masked}) instead of ONT`,
+      };
+    }
+    return {
+      status: 'present_invalid',
+      message: `⚠️ Invalid format (${masked}) - expected ALCL/ALCB serial`,
+    };
+  } else {
+    // Expecting UPS/Gizzu (GU18W)
+    if (isGizzuFormat) {
+      return {
+        status: 'present_valid',
+        message: `Present in 1Map ✓ (${masked})`,
+      };
+    }
+    if (isOntFormat) {
+      return {
+        status: 'present_swapped',
+        message: `⚠️ Wrong field - has ONT serial (${masked}) instead of UPS`,
+      };
+    }
+    return {
+      status: 'present_invalid',
+      message: `⚠️ Invalid format (${masked}) - expected GU18W serial`,
+    };
+  }
+}
+
+/**
+ * Format serial validation results for WhatsApp feedback
+ * Returns formatted lines for both ONT and UPS
+ */
+export function formatSerialFeedback(
+  ontSerial: string | null,
+  upsSerial: string | null
+): { ontLine: string; upsLine: string; hasIssues: boolean } {
+  const ontStatus = getSerialStatus(ontSerial, 'ont');
+  const upsStatus = getSerialStatus(upsSerial, 'ups');
+
+  const hasIssues =
+    ontStatus.status !== 'present_valid' ||
+    upsStatus.status !== 'present_valid';
+
+  return {
+    ontLine: `- ONT Serial: ${ontStatus.message}`,
+    upsLine: `- UPS Serial: ${upsStatus.message}`,
+    hasIssues,
+  };
+}
+
+/**
  * Detect if ONT and UPS serials appear to be swapped
  * Returns details about the swap if detected
  */

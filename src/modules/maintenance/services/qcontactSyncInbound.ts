@@ -225,7 +225,7 @@ async function createSyncLog(
   errorMessage: string | null
 ): Promise<string> {
   const sql = `
-    INSERT INTO qcontact_sync_log (
+    INSERT INTO maintenance_qcontact_sync_log (
       ticket_id,
       qcontact_ticket_id,
       sync_direction,
@@ -279,7 +279,7 @@ async function createSyncLog(
 async function checkDuplicate(qcontactTicketId: string): Promise<string | null> {
   const sql = `
     SELECT id
-    FROM tickets
+    FROM maintenance_tickets
     WHERE source = $1
       AND external_id = $2
     LIMIT 1
@@ -346,7 +346,7 @@ export async function syncSingleInboundTicket(
     // Create ticket in FibreFlow with all available fields
     // Note: Database uses 'type' not 'ticket_type', 'zone' not 'zone_id', 'pon' not 'pon_number'
     const sql = `
-      INSERT INTO tickets (
+      INSERT INTO maintenance_tickets (
         ticket_uid,
         source,
         external_id,

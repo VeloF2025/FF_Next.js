@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import * as XLSX from 'xlsx';
-import { parseExcelFile } from '@/modules/ticketing/utils/excelParser';
+import { parseExcelFile } from '@/modules/maintenance/utils/excelParser';
 
 // Known ticket data column names for auto-detection
 const TICKET_COLUMNS = [
@@ -30,8 +30,8 @@ const TICKET_COLUMNS = [
 import {
   createWeeklyReport,
   importTicketsFromReport,
-} from '@/modules/ticketing/services/weeklyReportService';
-import type { CreateWeeklyReportPayload } from '@/modules/ticketing/types/weeklyReport';
+} from '@/modules/maintenance/services/weeklyReportService';
+import type { CreateWeeklyReportPayload } from '@/modules/maintenance/types/weeklyReport';
 
 const logger = createLogger('ticketing:api:weekly-import');
 

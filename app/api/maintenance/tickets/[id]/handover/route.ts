@@ -20,12 +20,12 @@ import { createLogger } from '@/lib/logger';
 import {
   validateHandoverGate,
   createHandoverSnapshot,
-} from '@/modules/ticketing/services/handoverService';
+} from '@/modules/maintenance/services/handoverService';
 import type {
   CreateHandoverSnapshotPayload,
   HandoverType,
   OwnerType,
-} from '@/modules/ticketing/types/handover';
+} from '@/modules/maintenance/types/handover';
 
 const logger = createLogger('ticketing:api:handover');
 

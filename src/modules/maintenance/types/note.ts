@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Ticket Note Types
+ * Maintenance Module - Ticket Note Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for ticket notes - internal comments,

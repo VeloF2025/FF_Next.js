@@ -104,7 +104,7 @@ const createMockHistory = (): TicketHandoverHistory => ({
     {
       id: 'handover-2',
       ticket_id: 'ticket-123',
-      handover_type: HandoverType.QA_TO_MAINTENANCE,
+      handover_type: HandoverType.QA_TO_OPS,
       snapshot_data: {
         ticket_uid: 'FT406824',
         title: 'Fiber installation',
@@ -137,7 +137,7 @@ const createMockHistory = (): TicketHandoverHistory => ({
       guarantee_status: 'under_guarantee',
       from_owner_type: OwnerType.QA,
       from_owner_id: 'qa-user-123',
-      to_owner_type: OwnerType.MAINTENANCE,
+      to_owner_type: OwnerType.OPS,
       to_owner_id: 'maint-user-123',
       handover_at: new Date('2024-01-15T12:00:00Z'),
       handover_by: 'qa-user-123',
@@ -146,7 +146,7 @@ const createMockHistory = (): TicketHandoverHistory => ({
     },
   ],
   total_handovers: 2,
-  current_owner_type: OwnerType.MAINTENANCE,
+  current_owner_type: OwnerType.OPS,
   current_owner_id: 'maint-user-123',
 });
 

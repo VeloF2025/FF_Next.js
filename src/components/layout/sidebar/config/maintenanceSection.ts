@@ -1,9 +1,9 @@
 /**
- * Ticketing navigation section configuration
+ * Maintenance navigation section configuration
  */
 
 import {
-  Ticket,
+  Wrench,
   LayoutDashboard,
   Database,
   AlertTriangle,
@@ -13,55 +13,55 @@ import {
 } from 'lucide-react';
 import type { NavSection } from './types';
 
-export const ticketingSection: NavSection = {
-  section: 'TICKETING',
-  sectionId: 'ticketing',
+export const maintenanceSection: NavSection = {
+  section: 'MAINTENANCE',
+  sectionId: 'maintenance',
   isCollapsible: true,
   items: [
     {
-      to: '/ticketing',
+      to: '/maintenance',
       icon: LayoutDashboard,
-      label: 'Ticketing Dashboard',
+      label: 'Dashboard',
       shortLabel: 'Dash',
       permissions: [],
     },
     {
-      to: '/ticketing/tickets',
-      icon: Ticket,
-      label: 'Tickets',
-      shortLabel: 'Tickets',
+      to: '/maintenance/tickets',
+      icon: Wrench,
+      label: 'Work Orders',
+      shortLabel: 'Orders',
       permissions: [],
     },
     {
-      to: '/ticketing/teams',
+      to: '/maintenance/teams',
       icon: Users,
       label: 'Teams',
       shortLabel: 'Teams',
       permissions: [],
     },
     {
-      to: '/ticketing/data-sync',
+      to: '/maintenance/data-sync',
       icon: Database,
       label: 'Data Sync',
       shortLabel: 'Sync',
       permissions: [],
     },
     {
-      to: '/ticketing/escalations',
+      to: '/maintenance/escalations',
       icon: AlertTriangle,
       label: 'Escalations',
       shortLabel: 'Escal',
       permissions: [],
     },
     {
-      to: '/ticketing/handover',
+      to: '/maintenance/handover',
       icon: ArrowRightLeft,
       label: 'Handover Center',
       shortLabel: 'Handover',
       permissions: [],
     },
     {
-      to: '/ticketing/risks',
+      to: '/maintenance/risks',
       icon: ShieldAlert,
       label: 'Risk Acceptance',
       shortLabel: 'Risks',

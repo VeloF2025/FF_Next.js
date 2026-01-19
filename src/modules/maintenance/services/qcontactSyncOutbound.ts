@@ -69,8 +69,8 @@ function mapStatusToQContact(fibreflowStatus: TicketStatus): string {
       return 'qa_approved';
     case TicketStatus.PENDING_HANDOVER:
       return 'pending_handover';
-    case TicketStatus.HANDED_TO_MAINTENANCE:
-      return 'handed_to_maintenance';
+    case TicketStatus.HANDED_TO_OPS:
+      return 'handed_to_ops';
     case TicketStatus.CLOSED:
       return 'closed';
     case TicketStatus.CANCELLED:
@@ -98,7 +98,7 @@ async function createSyncLog(
   errorMessage: string | null
 ): Promise<string> {
   const sql = `
-    INSERT INTO qcontact_sync_log (
+    INSERT INTO maintenance_qcontact_sync_log (
       ticket_id,
       qcontact_ticket_id,
       sync_direction,
@@ -154,7 +154,7 @@ async function fetchTicketForSync(ticketId: string): Promise<{
 } | null> {
   const sql = `
     SELECT id, external_id, source, status
-    FROM tickets
+    FROM maintenance_tickets
     WHERE id = $1
   `;
 

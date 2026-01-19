@@ -28,10 +28,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { createLogger } from '@/lib/logger';
-import { syncSingleInboundTicket } from '@/modules/ticketing/services/qcontactSyncInbound';
-import { queryOne } from '@/modules/ticketing/utils/db';
-import type { QContactWebhookPayload, QContactTicket } from '@/modules/ticketing/types/qcontact';
-import { SyncDirection, SyncType, SyncStatus } from '@/modules/ticketing/types/qcontact';
+import { syncSingleInboundTicket } from '@/modules/maintenance/services/qcontactSyncInbound';
+import { queryOne } from '@/modules/maintenance/utils/db';
+import type { QContactWebhookPayload, QContactTicket } from '@/modules/maintenance/types/qcontact';
+import { SyncDirection, SyncType, SyncStatus } from '@/modules/maintenance/types/qcontact';
 
 const logger = createLogger('ticketing:api:webhook:qcontact');
 

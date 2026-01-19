@@ -16,7 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { runReadinessCheck } from '@/modules/ticketing/services/qaReadinessService';
+import { runReadinessCheck } from '@/modules/maintenance/services/qaReadinessService';
 
 const logger = createLogger('ticketing:api:qa-readiness-check');
 

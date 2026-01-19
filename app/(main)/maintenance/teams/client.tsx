@@ -29,8 +29,8 @@ import {
   Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/modules/ticketing/hooks/useTeams';
-import type { Team, TeamType, CreateTeamPayload, UpdateTeamPayload } from '@/modules/ticketing/types/team';
+import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/modules/maintenance/hooks/useTeams';
+import type { Team, TeamType, CreateTeamPayload, UpdateTeamPayload } from '@/modules/maintenance/types/team';
 
 type TeamTypeFilter = 'all' | 'internal' | 'contractor';
 

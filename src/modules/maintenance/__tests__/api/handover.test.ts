@@ -190,7 +190,7 @@ const mockHandoverHistory: TicketHandoverHistory = {
     {
       ...mockHandoverSnapshot,
       id: '999e0000-e89b-12d3-a456-426614174000',
-      handover_type: 'qa_to_maintenance' as HandoverType,
+      handover_type: 'qa_to_ops' as HandoverType,
       from_owner_type: 'qa' as OwnerType,
       to_owner_type: 'maintenance' as OwnerType,
       handover_at: new Date('2024-01-16T10:00:00Z'),
@@ -295,7 +295,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     );
 
     const requestBody = {
-      handover_type: 'qa_to_maintenance',
+      handover_type: 'qa_to_ops',
       handover_by: mockHandoverBy,
     };
 
@@ -326,7 +326,7 @@ describe('POST /api/ticketing/tickets/[id]/handover', () => {
     );
 
     const requestBody = {
-      handover_type: 'qa_to_maintenance',
+      handover_type: 'qa_to_ops',
       handover_by: mockHandoverBy,
     };
 

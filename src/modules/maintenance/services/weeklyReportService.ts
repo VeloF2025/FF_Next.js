@@ -113,7 +113,7 @@ export async function createWeeklyReport(
   try {
     // 🟢 WORKING: Insert weekly report record
     const report = await queryOne<WeeklyReport>(
-      `INSERT INTO weekly_reports (
+      `INSERT INTO maintenance_weekly_reports (
         report_uid,
         week_number,
         year,
@@ -170,7 +170,7 @@ export async function getWeeklyReportById(
   }
 
   const report = await queryOne<WeeklyReport>(
-    `SELECT * FROM weekly_reports WHERE id = $1`,
+    `SELECT * FROM maintenance_weekly_reports WHERE id = $1`,
     [reportId]
   );
 
@@ -243,7 +243,7 @@ export async function updateWeeklyReport(
   values.push(reportId);
 
   const report = await queryOne<WeeklyReport>(
-    `UPDATE weekly_reports
+    `UPDATE maintenance_weekly_reports
      SET ${updates.join(', ')}
      WHERE id = $${paramIndex}
      RETURNING *`,
@@ -438,7 +438,7 @@ export async function processImportBatch(
 
       // 🟢 WORKING: Check if ticket already exists by DR Number or external_id
       const existingTicket = await queryOne<{ id: string; ticket_uid: string; status: string }>(
-        `SELECT id, ticket_uid, status FROM tickets
+        `SELECT id, ticket_uid, status FROM maintenance_tickets
          WHERE dr_number = $1 OR external_id = $2
          LIMIT 1`,
         [drNumber || null, ftRef || null]
@@ -489,7 +489,7 @@ export async function processImportBatch(
         if (updateFields.length > 1) { // More than just updated_at
           updateValues.push(existingTicket.id);
           const updateSql = `
-            UPDATE tickets
+            UPDATE maintenance_tickets
             SET ${updateFields.join(', ')}
             WHERE id = $${paramIndex}
             RETURNING id
@@ -693,7 +693,7 @@ export async function listWeeklyReports(
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const reports = await query<WeeklyReport>(
-    `SELECT * FROM weekly_reports
+    `SELECT * FROM maintenance_weekly_reports
      ${whereClause}
      ORDER BY created_at DESC`,
     values
@@ -738,7 +738,7 @@ export async function getWeeklyReportStats(): Promise<WeeklyReportStats> {
       COALESCE(SUM(imported_count), 0) as total_tickets_imported,
       COALESCE(AVG(imported_count), 0) as avg_tickets_per_import,
       MAX(completed_at) as last_import_date
-    FROM weekly_reports`
+    FROM maintenance_weekly_reports`
   );
 
   if (!result) {

@@ -128,7 +128,7 @@ describe('Database Connection Utility', () => {
       // 🟢 WORKING: Test basic query execution
       mockResults = [{ id: 1, name: 'Test Ticket' }];
 
-      const result = await query('SELECT * FROM tickets WHERE id = $1', [1]);
+      const result = await query('SELECT * FROM maintenance_tickets WHERE id = $1', [1]);
 
       expect(mockSqlFn).toHaveBeenCalled();
       expect(result).toEqual([{ id: 1, name: 'Test Ticket' }]);
@@ -139,7 +139,7 @@ describe('Database Connection Utility', () => {
       mockResults = [{ id: 1, status: 'open' }];
 
       const result = await query(
-        'SELECT * FROM tickets WHERE status = $1 AND priority = $2',
+        'SELECT * FROM maintenance_tickets WHERE status = $1 AND priority = $2',
         ['open', 'high']
       );
 
@@ -152,7 +152,7 @@ describe('Database Connection Utility', () => {
       mockResults = [{ id: 1, ticket_uid: 'FT001' }];
 
       const result = await query(
-        'INSERT INTO tickets (ticket_uid, title) VALUES ($1, $2) RETURNING *',
+        'INSERT INTO maintenance_tickets (ticket_uid, title) VALUES ($1, $2) RETURNING *',
         ['FT001', 'Test Ticket']
       );
 
@@ -164,7 +164,7 @@ describe('Database Connection Utility', () => {
       mockResults = [{ id: 1, status: 'closed' }];
 
       const result = await query(
-        'UPDATE tickets SET status = $1 WHERE id = $2 RETURNING *',
+        'UPDATE maintenance_tickets SET status = $1 WHERE id = $2 RETURNING *',
         ['closed', 1]
       );
 
@@ -176,7 +176,7 @@ describe('Database Connection Utility', () => {
       mockResults = [{ id: 1 }];
 
       const result = await query(
-        'DELETE FROM tickets WHERE id = $1 RETURNING id',
+        'DELETE FROM maintenance_tickets WHERE id = $1 RETURNING id',
         [1]
       );
 
@@ -187,7 +187,7 @@ describe('Database Connection Utility', () => {
       // 🟢 WORKING: Test empty result handling
       mockResults = [];
 
-      const result = await query('SELECT * FROM tickets WHERE id = $1', [999]);
+      const result = await query('SELECT * FROM maintenance_tickets WHERE id = $1', [999]);
 
       expect(result).toEqual([]);
     });
@@ -198,7 +198,7 @@ describe('Database Connection Utility', () => {
       // 🟢 WORKING: Test queryOne with result
       mockResults = [{ id: 1, name: 'Test' }];
 
-      const result = await queryOne('SELECT * FROM tickets WHERE id = $1', [1]);
+      const result = await queryOne('SELECT * FROM maintenance_tickets WHERE id = $1', [1]);
 
       expect(result).toEqual({ id: 1, name: 'Test' });
     });
@@ -207,7 +207,7 @@ describe('Database Connection Utility', () => {
       // 🟢 WORKING: Test queryOne with no results
       mockResults = [];
 
-      const result = await queryOne('SELECT * FROM tickets WHERE id = $1', [999]);
+      const result = await queryOne('SELECT * FROM maintenance_tickets WHERE id = $1', [999]);
 
       expect(result).toBeNull();
     });
@@ -219,7 +219,7 @@ describe('Database Connection Utility', () => {
         { id: 2, name: 'Second' }
       ];
 
-      const result = await queryOne('SELECT * FROM tickets');
+      const result = await queryOne('SELECT * FROM maintenance_tickets');
 
       expect(result).toEqual({ id: 1, name: 'First' });
     });
@@ -229,8 +229,8 @@ describe('Database Connection Utility', () => {
     it('should execute multiple queries in a transaction', async () => {
       // 🟢 WORKING: Test transaction with multiple operations
       const operations = [
-        { query: 'INSERT INTO tickets (ticket_uid) VALUES ($1)', params: ['FT001'] },
-        { query: 'INSERT INTO ticket_notes (ticket_id, content) VALUES ($1, $2)', params: [1, 'Note'] }
+        { query: 'INSERT INTO maintenance_tickets (ticket_uid) VALUES ($1)', params: ['FT001'] },
+        { query: 'INSERT INTO maintenance_notes (ticket_id, content) VALUES ($1, $2)', params: [1, 'Note'] }
       ];
 
       mockSqlFn
@@ -259,7 +259,7 @@ describe('Database Connection Utility', () => {
 
       await expect(async () => {
         await transaction(async (txn) => {
-          await txn.query('INSERT INTO tickets (ticket_uid) VALUES ($1)', ['FT001']);
+          await txn.query('INSERT INTO maintenance_tickets (ticket_uid) VALUES ($1)', ['FT001']);
           await txn.query('INVALID SQL');
         });
       }).rejects.toThrow('Database error');
@@ -293,7 +293,7 @@ describe('Database Connection Utility', () => {
 
       const result = await transaction(async (txn) => {
         const ticket = await txn.query(
-          'INSERT INTO tickets (ticket_uid) VALUES ($1) RETURNING *',
+          'INSERT INTO maintenance_tickets (ticket_uid) VALUES ($1) RETURNING *',
           ['FT001']
         );
         return ticket[0];
@@ -340,7 +340,7 @@ describe('Database Connection Utility', () => {
 
       // Parameters should be passed correctly
       const result = await query(
-        'SELECT COUNT(*) as count FROM tickets WHERE status = $1',
+        'SELECT COUNT(*) as count FROM maintenance_tickets WHERE status = $1',
         ['open']
       );
 
@@ -357,7 +357,7 @@ describe('Database Connection Utility', () => {
       const maliciousInput = "'; DROP TABLE tickets; --";
 
       await query(
-        'SELECT * FROM tickets WHERE ticket_uid = $1',
+        'SELECT * FROM maintenance_tickets WHERE ticket_uid = $1',
         [maliciousInput]
       );
 
@@ -373,7 +373,7 @@ describe('Database Connection Utility', () => {
       const specialChars = "Test's \"Quote\" & <Script>";
 
       await query(
-        'INSERT INTO tickets (title) VALUES ($1) RETURNING id',
+        'INSERT INTO maintenance_tickets (title) VALUES ($1) RETURNING id',
         [specialChars]
       );
 
@@ -452,7 +452,7 @@ describe('Database Connection Utility', () => {
       mockResults = [{ id: 1, optional_field: null }];
 
       const result = await query(
-        'SELECT * FROM tickets WHERE id = $1',
+        'SELECT * FROM maintenance_tickets WHERE id = $1',
         [1]
       );
 
@@ -469,7 +469,7 @@ describe('Database Connection Utility', () => {
         metadata: { key: 'value' }
       }];
 
-      const result = await queryOne('SELECT * FROM tickets WHERE id = $1', [1]);
+      const result = await queryOne('SELECT * FROM maintenance_tickets WHERE id = $1', [1]);
 
       expect(result).toBeDefined();
       expect(result?.title).toBe('Test');

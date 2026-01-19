@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - WhatsApp Notification Types
+ * Maintenance Module - WhatsApp Notification Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for WhatsApp notifications via WAHA API,

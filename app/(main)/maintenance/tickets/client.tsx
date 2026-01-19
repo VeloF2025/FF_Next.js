@@ -16,11 +16,11 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { TicketList } from '@/modules/ticketing/components/TicketList/TicketList';
-import { KanbanBoard } from '@/modules/ticketing/components/KanbanBoard';
+import { TicketList } from '@/modules/maintenance/components/TicketList/TicketList';
+import { KanbanBoard } from '@/modules/maintenance/components/KanbanBoard';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import type { TicketFilters } from '@/modules/ticketing/types/ticket';
+import type { TicketFilters } from '@/modules/maintenance/types/ticket';
 
 type ViewMode = 'table' | 'kanban';
 

@@ -2,7 +2,7 @@ import type { NavSection } from './config/types';
 import {
   mainSection,
   projectSection,
-  ticketingSection,
+  maintenanceSection,
   peopleSection,
   clientsSection,
   procurementSection,
@@ -19,7 +19,7 @@ import {
 export const navItems: NavSection[] = [
   mainSection,
   projectSection,
-  ticketingSection,
+  maintenanceSection,
   peopleSection,
   clientsSection,
   procurementSection,

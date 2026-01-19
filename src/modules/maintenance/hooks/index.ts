@@ -1,5 +1,5 @@
-// 🟢 WORKING: React hooks for FibreFlow Ticketing Module
-// This file exports all custom React hooks for the ticketing module
+// 🟢 WORKING: React hooks for FibreFlow Maintenance Module
+// This file exports all custom React hooks for the maintenance module
 
 // ==================== Verification Hooks (Subtask 2.9) ====================
 

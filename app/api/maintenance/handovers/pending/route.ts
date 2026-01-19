@@ -14,8 +14,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getPendingHandovers } from '@/modules/ticketing/services/handoverService';
-import { HandoverType } from '@/modules/ticketing/types/handover';
+import { getPendingHandovers } from '@/modules/maintenance/services/handoverService';
+import { HandoverType } from '@/modules/maintenance/types/handover';
 
 const logger = createLogger('ticketing:api:handovers:pending');
 
@@ -71,8 +71,8 @@ export async function GET(req: NextRequest) {
       blocked: tickets.filter(t => !t.can_handover).length,
       by_type: {
         BUILD_TO_QA: tickets.filter(t => t.pending_handover_type === HandoverType.BUILD_TO_QA).length,
-        QA_TO_MAINTENANCE: tickets.filter(t => t.pending_handover_type === HandoverType.QA_TO_MAINTENANCE).length,
-        MAINTENANCE_COMPLETE: tickets.filter(t => t.pending_handover_type === HandoverType.MAINTENANCE_COMPLETE).length
+        QA_TO_MAINTENANCE: tickets.filter(t => t.pending_handover_type === HandoverType.QA_TO_OPS).length,
+        MAINTENANCE_COMPLETE: tickets.filter(t => t.pending_handover_type === HandoverType.OPS_COMPLETE).length
       }
     };
 

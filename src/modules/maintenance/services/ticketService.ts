@@ -114,7 +114,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
   try {
     // 🟢 WORKING: Insert ticket with all fields
     const sql = `
-      INSERT INTO tickets (
+      INSERT INTO maintenance_tickets (
         ticket_uid,
         source,
         external_id,
@@ -206,7 +206,7 @@ export async function getTicketById(id: string): Promise<Ticket> {
           )
           ELSE NULL
         END as assigned_user
-      FROM tickets t
+      FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
       WHERE t.id = $1
     `;
@@ -298,7 +298,7 @@ export async function updateTicket(
     values.push(id);
 
     const sql = `
-      UPDATE tickets
+      UPDATE maintenance_tickets
       SET ${updateFields.join(', ')}
       WHERE id = $${paramCounter}
       RETURNING *
@@ -338,7 +338,7 @@ export async function deleteTicket(id: string): Promise<Ticket> {
   try {
     // 🟢 WORKING: Soft delete by updating status to CANCELLED
     const sql = `
-      UPDATE tickets
+      UPDATE maintenance_tickets
       SET status = $1, updated_at = NOW()
       WHERE id = $2
       RETURNING *
@@ -484,7 +484,7 @@ export async function listTickets(
     // 🟢 WORKING: First get the total count (without pagination)
     const countSql = `
       SELECT COUNT(*) as count
-      FROM tickets t
+      FROM maintenance_tickets t
       ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached)\b/g, 't.$1') : ''}
     `;
     // Count query uses same filter values but without LIMIT/OFFSET
@@ -504,7 +504,7 @@ export async function listTickets(
           )
           ELSE NULL
         END as assigned_user
-      FROM tickets t
+      FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
       ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached)\b/g, 't.$1') : ''}
       ORDER BY t.created_at DESC

@@ -42,7 +42,7 @@ function createMockDRData(overrides: Partial<DRLookupData> = {}): DRLookupData {
 }
 
 // Mock the DR lookup service
-vi.mock('@/modules/ticketing/services/drLookupService', () => ({
+vi.mock('@/modules/maintenance/services/drLookupService', () => ({
   lookupDR: vi.fn(),
 }));
 
@@ -62,7 +62,7 @@ describe('DR Lookup API Endpoint', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Get the mocked function
-    const { lookupDR } = await import('@/modules/ticketing/services/drLookupService');
+    const { lookupDR } = await import('@/modules/maintenance/services/drLookupService');
     mockLookupDR = lookupDR;
   });
 

@@ -1,4 +1,4 @@
-// 🟢 WORKING: FibreFlow Ticketing Module - Client-Safe Exports
+// 🟢 WORKING: FibreFlow Maintenance Module - Client-Safe Exports
 // Following FibreFlow Universal Module Structure
 //
 // This file exports ONLY client-safe code (no server-side dependencies).

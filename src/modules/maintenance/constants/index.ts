@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Constants Index
+ * Maintenance Module - Constants Index
  * 🟢 WORKING: Central export point for all ticketing constants
  *
  * Exports ticket statuses, types, priorities, fault causes,

@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getVerificationSteps, initializeVerificationSteps } from '@/modules/ticketing/services/verificationService';
+import { getVerificationSteps, initializeVerificationSteps } from '@/modules/maintenance/services/verificationService';
 
 const logger = createLogger('ticketing:api:verification');
 

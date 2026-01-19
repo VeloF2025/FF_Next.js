@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Weekly Report Import Types
+ * Maintenance Module - Weekly Report Import Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for weekly report Excel imports, batch

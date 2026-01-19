@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
-import { pushNote } from '@/modules/ticketing/services/qcontactSyncOutbound';
+import { pushNote } from '@/modules/maintenance/services/qcontactSyncOutbound';
 
 // Note: auth() function is not imported - the try/catch block in POST handles this gracefully
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

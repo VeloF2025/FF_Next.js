@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Database Connection Utility
+ * Maintenance Module - Database Connection Utility
  *
  * Neon PostgreSQL serverless connection with:
  * - Connection pooling (lazy initialization)
@@ -9,7 +9,7 @@
  * - Error handling and logging
  * - Health checks
  *
- * 🟢 WORKING: Production-ready database utility for ticketing module
+ * 🟢 WORKING: Production-ready database utility for maintenance module
  *
  * NOTE: Uses neon() HTTP driver with a query helper that converts
  * parameterized queries to tagged template literals.
@@ -96,7 +96,7 @@ async function executeParameterizedQuery<T>(
  * @returns {Promise<T[]>} Query results
  *
  * @example
- * const tickets = await query('SELECT * FROM tickets WHERE status = $1', ['open']);
+ * const tickets = await query('SELECT * FROM maintenance_tickets WHERE status = $1', ['open']);
  */
 export async function query<T = any>(
   queryText: string,
@@ -143,7 +143,7 @@ export async function query<T = any>(
  * @returns {Promise<T | null>} First row or null if no results
  *
  * @example
- * const ticket = await queryOne('SELECT * FROM tickets WHERE id = $1', [ticketId]);
+ * const ticket = await queryOne('SELECT * FROM maintenance_tickets WHERE id = $1', [ticketId]);
  */
 export async function queryOne<T = any>(
   queryText: string,
@@ -180,11 +180,11 @@ interface TransactionContext {
  * @example
  * const result = await transaction(async (txn) => {
  *   const ticket = await txn.queryOne(
- *     'INSERT INTO tickets (ticket_uid) VALUES ($1) RETURNING *',
+ *     'INSERT INTO maintenance_tickets (ticket_uid) VALUES ($1) RETURNING *',
  *     ['FT001']
  *   );
  *   await txn.query(
- *     'INSERT INTO ticket_notes (ticket_id, content) VALUES ($1, $2)',
+ *     'INSERT INTO maintenance_notes (ticket_id, content) VALUES ($1, $2)',
  *     [ticket.id, 'Created ticket']
  *   );
  *   return ticket;

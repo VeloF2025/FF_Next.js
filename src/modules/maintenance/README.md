@@ -73,7 +73,7 @@ src/modules/ticketing/
 
 ```typescript
 // Import from main index.ts
-import { ticketService, drLookupService } from '@/modules/ticketing';
+import { ticketService, drLookupService } from '@/modules/maintenance';
 
 // Use services in API routes
 const ticket = await ticketService.create({
@@ -89,7 +89,7 @@ const ticket = await ticketService.create({
 'use client';
 
 // Import from client.ts for client components
-import { useTickets, TicketList } from '@/modules/ticketing/client';
+import { useTickets, TicketList } from '@/modules/maintenance/client';
 
 export default function TicketsPage() {
   const { tickets, loading } = useTickets();

@@ -14,8 +14,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { resolveEscalation } from '@/modules/ticketing/services/escalationService';
-import type { ResolveEscalationPayload, EscalationStatus } from '@/modules/ticketing/types/escalation';
+import { resolveEscalation } from '@/modules/maintenance/services/escalationService';
+import type { ResolveEscalationPayload, EscalationStatus } from '@/modules/maintenance/types/escalation';
 
 const logger = createLogger('ticketing:api:escalations:resolve');
 

@@ -13,7 +13,7 @@
  * 🟢 WORKING: Dashboard page integrates TicketingDashboard component
  */
 
-import { TicketingDashboard } from '@/modules/ticketing/components/Dashboard/TicketingDashboard';
+import { TicketingDashboard } from '@/modules/maintenance/components/Dashboard/TicketingDashboard';
 
 export default function TicketingPageClient() {
   return (

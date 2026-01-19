@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Attachment Types
+ * Maintenance Module - Attachment Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for ticket attachments, photo evidence,

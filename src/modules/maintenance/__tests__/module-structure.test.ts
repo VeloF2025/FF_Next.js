@@ -1,9 +1,9 @@
 // 🟢 WORKING: Module structure verification test
-// This test verifies that the ticketing module structure is set up correctly
+// This test verifies that the maintenance module structure is set up correctly
 
 import { describe, it, expect } from 'vitest';
 
-describe('Ticketing Module Structure', () => {
+describe('Maintenance Module Structure', () => {
   describe('Server Exports (index.ts)', () => {
     it('should export from index.ts without errors', async () => {
       // This test verifies the module can be imported

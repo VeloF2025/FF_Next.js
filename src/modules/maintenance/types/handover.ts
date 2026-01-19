@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Handover & Ownership Transfer Types
+ * Maintenance Module - Handover & Ownership Transfer Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for handover snapshots, ownership transfers,
@@ -13,8 +13,8 @@ import { GuaranteeStatus } from './ticket';
  */
 export enum HandoverType {
   BUILD_TO_QA = 'build_to_qa',
-  QA_TO_MAINTENANCE = 'qa_to_maintenance',
-  MAINTENANCE_COMPLETE = 'maintenance_complete',
+  QA_TO_OPS = 'qa_to_ops', // Renamed from QA_TO_MAINTENANCE
+  OPS_COMPLETE = 'ops_complete', // Renamed from MAINTENANCE_COMPLETE
 }
 
 /**
@@ -23,7 +23,7 @@ export enum HandoverType {
 export enum OwnerType {
   BUILD = 'build',
   QA = 'qa',
-  MAINTENANCE = 'maintenance',
+  OPS = 'ops', // Renamed from MAINTENANCE
 }
 
 /**

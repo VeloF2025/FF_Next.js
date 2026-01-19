@@ -1,5 +1,5 @@
 /**
- * Team Types for Ticketing Module
+ * Team Types for Maintenance Module
  *
  * Supports both internal (Velocity Fibre) teams and contractor teams.
  */

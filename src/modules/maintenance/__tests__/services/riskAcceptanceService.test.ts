@@ -96,7 +96,7 @@ describe('Risk Acceptance Service', () => {
 
       expect(result).toEqual(mockCreatedRisk);
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO qa_risk_acceptances'),
+        expect.stringContaining('INSERT INTO maintenance_risk_acceptances'),
         expect.arrayContaining([
           payload.ticket_id,
           payload.risk_type,
@@ -221,7 +221,7 @@ describe('Risk Acceptance Service', () => {
 
       expect(result).toEqual(mockRisk);
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM qa_risk_acceptances WHERE id = $1'),
+        expect.stringContaining('SELECT * FROM maintenance_risk_acceptances WHERE id = $1'),
         [riskId]
       );
     });
@@ -360,7 +360,7 @@ describe('Risk Acceptance Service', () => {
       expect(result.resolved_by).toBe(payload.resolved_by);
       expect(result.resolution_notes).toBe(payload.resolution_notes);
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE qa_risk_acceptances'),
+        expect.stringContaining('UPDATE maintenance_risk_acceptances'),
         expect.arrayContaining([
           RiskAcceptanceStatus.RESOLVED,
           payload.resolved_by,
@@ -518,7 +518,7 @@ describe('Risk Acceptance Service', () => {
       expect(result.escalatedRisks).toHaveLength(1);
       // Should update expired risks to escalated
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE qa_risk_acceptances'),
+        expect.stringContaining('UPDATE maintenance_risk_acceptances'),
         expect.anything()
       );
     });
@@ -545,7 +545,7 @@ describe('Risk Acceptance Service', () => {
 
       // Should call to mark active risks as expired if expiry_date < today
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE qa_risk_acceptances'),
+        expect.stringContaining('UPDATE maintenance_risk_acceptances'),
         expect.arrayContaining([RiskAcceptanceStatus.EXPIRED])
       );
     });

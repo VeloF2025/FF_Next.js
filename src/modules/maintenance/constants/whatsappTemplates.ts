@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - WhatsApp Notification Templates
+ * Maintenance Module - WhatsApp Notification Templates
  * 🟢 WORKING: Pre-defined message templates for WhatsApp notifications
  *
  * Professional, clear message templates for different notification types

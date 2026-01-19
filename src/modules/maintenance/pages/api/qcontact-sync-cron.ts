@@ -17,7 +17,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { runSyncJob } from '@/modules/ticketing/jobs/qcontactSync';
+import { runSyncJob } from '@/modules/maintenance/jobs/qcontactSync';
 import { createLogger } from '@/lib/logger';
 
 // 🟢 WORKING: Logger instance for cron endpoint

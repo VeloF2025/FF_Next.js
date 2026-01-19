@@ -13,13 +13,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { listEscalations } from '@/modules/ticketing/services/escalationService';
+import { listEscalations } from '@/modules/maintenance/services/escalationService';
 import {
   EscalationScopeType,
   EscalationStatus,
   EscalationType,
-} from '@/modules/ticketing/types/escalation';
-import type { EscalationFilters } from '@/modules/ticketing/types/escalation';
+} from '@/modules/maintenance/types/escalation';
+import type { EscalationFilters } from '@/modules/maintenance/types/escalation';
 
 const logger = createLogger('ticketing:api:escalations');
 

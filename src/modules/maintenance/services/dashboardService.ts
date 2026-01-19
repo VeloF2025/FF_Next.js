@@ -133,7 +133,7 @@ export async function getDashboardSummary(
 
     // Get total tickets
     const totalResult = await queryOne<{ total: number }>(
-      `SELECT COUNT(*) as total FROM tickets WHERE 1=1`,
+      `SELECT COUNT(*) as total FROM maintenance_tickets WHERE 1=1`,
       []
     );
 
@@ -217,7 +217,7 @@ export async function getTicketsByStatus(
       SELECT
         status,
         COUNT(*) as count
-      FROM tickets
+      FROM maintenance_tickets
       ${whereClause}
       GROUP BY status
       ORDER BY count DESC
@@ -273,7 +273,7 @@ export async function getSLACompliance(
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE sla_breached = false) as sla_met,
         COUNT(*) FILTER (WHERE sla_breached = true) as sla_breached
-      FROM tickets
+      FROM maintenance_tickets
       ${whereClause}
     `;
 
@@ -350,7 +350,7 @@ export async function getOverdueTickets(
           title,
           due_at as sla_due_at,
           EXTRACT(EPOCH FROM (NOW() - due_at)) / 3600 as hours_overdue
-        FROM tickets
+        FROM maintenance_tickets
         WHERE due_at IS NOT NULL
           AND due_at < NOW()
           AND status NOT IN ($1, $2)
@@ -374,7 +374,7 @@ export async function getOverdueTickets(
       // Note: Using due_at column which exists in the current schema
       const sql = `
         SELECT COUNT(*) as overdue_count
-        FROM tickets
+        FROM maintenance_tickets
         WHERE due_at IS NOT NULL
           AND due_at < NOW()
           AND status NOT IN ($1, $2)
@@ -434,7 +434,7 @@ export async function getWorkloadByAssignee(
             AND t.due_at < NOW()
             AND t.status NOT IN ('closed', 'cancelled')
         ) as overdue_count
-      FROM tickets t
+      FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
       ${whereClause}
       GROUP BY t.assigned_to, u.first_name, u.last_name
@@ -482,7 +482,7 @@ export async function getAverageResolutionTime(
       SELECT
         AVG(EXTRACT(EPOCH FROM (closed_at - created_at)) / 3600) as avg_hours,
         COUNT(*) as total_resolved
-      FROM tickets
+      FROM maintenance_tickets
       ${whereClause}
         AND closed_at IS NOT NULL
     `;
@@ -555,7 +555,7 @@ export async function getRecentTickets(
         priority,
         created_at,
         assigned_to
-      FROM tickets
+      FROM maintenance_tickets
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${paramIndex}

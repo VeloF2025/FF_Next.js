@@ -15,10 +15,10 @@
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { EscalationList } from '@/modules/ticketing/components/Escalation/EscalationList';
-import { EscalationAlert } from '@/modules/ticketing/components/Escalation/EscalationAlert';
-import { RepeatFaultMap } from '@/modules/ticketing/components/Escalation/RepeatFaultMap';
-import type { RepeatFaultEscalation, RepeatFaultAlert } from '@/modules/ticketing/types/escalation';
+import { EscalationList } from '@/modules/maintenance/components/Escalation/EscalationList';
+import { EscalationAlert } from '@/modules/maintenance/components/Escalation/EscalationAlert';
+import { RepeatFaultMap } from '@/modules/maintenance/components/Escalation/RepeatFaultMap';
+import type { RepeatFaultEscalation, RepeatFaultAlert } from '@/modules/maintenance/types/escalation';
 
 export default function EscalationsPageClient() {
   const [activeView, setActiveView] = useState<'list' | 'map'>('list');

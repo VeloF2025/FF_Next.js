@@ -101,7 +101,7 @@ describe('Weekly Report Service - TDD', () => {
 
       expect(result).toEqual(mockCreatedReport);
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO weekly_reports'),
+        expect.stringContaining('INSERT INTO maintenance_weekly_reports'),
         expect.arrayContaining([
           expect.stringMatching(/WR\d{4}-W\d{1,2}/), // report_uid pattern
           payload.week_number,
@@ -193,7 +193,7 @@ describe('Weekly Report Service - TDD', () => {
 
       expect(result).toEqual(mockReport);
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM weekly_reports'),
+        expect.stringContaining('SELECT * FROM maintenance_weekly_reports'),
         [reportId]
       );
     });
@@ -245,7 +245,7 @@ describe('Weekly Report Service - TDD', () => {
 
       expect(result).toEqual(mockUpdatedReport);
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE weekly_reports'),
+        expect.stringContaining('UPDATE maintenance_weekly_reports'),
         expect.arrayContaining([reportId])
       );
     });
@@ -448,7 +448,7 @@ describe('Weekly Report Service - TDD', () => {
       expect(result.imported_count).toBe(10);
       // Verify update was called multiple times (progress updates)
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE weekly_reports'),
+        expect.stringContaining('UPDATE maintenance_weekly_reports'),
         expect.any(Array)
       );
     });
@@ -567,7 +567,7 @@ describe('Weekly Report Service - TDD', () => {
       expect(result.reports).toHaveLength(2);
       expect(result.total).toBe(2);
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM weekly_reports'),
+        expect.stringContaining('SELECT * FROM maintenance_weekly_reports'),
         expect.any(Array)
       );
     });

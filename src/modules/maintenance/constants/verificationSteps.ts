@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - 12 Standard Verification Steps
+ * Maintenance Module - 12 Standard Verification Steps
  * 🟢 WORKING: Defines the 12-step verification checklist for ticket completion
  *
  * Standard verification workflow for fiber installations and maintenance.

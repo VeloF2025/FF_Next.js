@@ -94,7 +94,7 @@ describe('QAReadinessService', () => {
 
       vi.mocked(db.queryOne).mockResolvedValueOnce(mockCheckRecord);
 
-      // Mock UPDATE tickets
+      // Mock UPDATE maintenance_tickets
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       // Act
@@ -107,7 +107,7 @@ describe('QAReadinessService', () => {
 
       // Verify INSERT was called for qa_readiness_checks
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO qa_readiness_checks'),
+        expect.stringContaining('INSERT INTO maintenance_qa_checks'),
         expect.arrayContaining([
           mockTicketId,
           true, // passed
@@ -128,7 +128,7 @@ describe('QAReadinessService', () => {
 
       // Verify UPDATE was called for tickets.qa_ready
       const updateCall = vi.mocked(db.query).mock.calls[0];
-      expect(updateCall[0]).toContain('UPDATE tickets');
+      expect(updateCall[0]).toContain('UPDATE maintenance_tickets');
       expect(updateCall[0]).toContain('qa_ready = $1');
       expect(updateCall[0]).toContain('qa_readiness_check_at = NOW()');
       expect(updateCall[1]).toEqual([true, mockTicketId]);
@@ -198,7 +198,7 @@ describe('QAReadinessService', () => {
 
       // Verify UPDATE was called with qa_ready = false
       const updateCall = vi.mocked(db.query).mock.calls[0];
-      expect(updateCall[0]).toContain('UPDATE tickets');
+      expect(updateCall[0]).toContain('UPDATE maintenance_tickets');
       expect(updateCall[0]).toContain('qa_ready = $1');
       expect(updateCall[1]).toEqual([false, mockTicketId]);
     });
@@ -258,7 +258,7 @@ describe('QAReadinessService', () => {
 
       // Verify INSERT was called with null for checked_by
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO qa_readiness_checks'),
+        expect.stringContaining('INSERT INTO maintenance_qa_checks'),
         expect.arrayContaining([mockTicketId, true, null])
       );
     });
@@ -376,7 +376,7 @@ describe('QAReadinessService', () => {
 
       // Verify SELECT query
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM qa_readiness_checks'),
+        expect.stringContaining('SELECT * FROM maintenance_qa_checks'),
         [mockTicketId]
       );
     });
@@ -499,7 +499,7 @@ describe('QAReadinessService', () => {
 
       // Verify SELECT query
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM qa_readiness_checks'),
+        expect.stringContaining('SELECT * FROM maintenance_qa_checks'),
         [mockTicketId]
       );
       expect(db.query).toHaveBeenCalledWith(

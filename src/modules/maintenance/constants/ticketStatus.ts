@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Ticket Status Constants
+ * Maintenance Module - Ticket Status Constants
  * 🟢 WORKING: Ticket status workflow definitions with labels and descriptions
  *
  * Defines all possible ticket statuses, their display labels, colors,
@@ -80,8 +80,8 @@ export const TICKET_STATUS_DEFINITIONS: Record<TicketStatus, TicketStatusMetadat
     color: 'warning',
     order: 8,
   },
-  [TicketStatus.HANDED_TO_MAINTENANCE]: {
-    value: TicketStatus.HANDED_TO_MAINTENANCE,
+  [TicketStatus.HANDED_TO_OPS]: {
+    value: TicketStatus.HANDED_TO_OPS,
     label: 'Handed to Maintenance',
     description: 'Successfully handed over to maintenance team',
     color: 'secondary',
@@ -151,7 +151,7 @@ export const WAITING_STATUSES = [
  */
 export const COMPLETED_STATUSES = [
   TicketStatus.QA_APPROVED,
-  TicketStatus.HANDED_TO_MAINTENANCE,
+  TicketStatus.HANDED_TO_OPS,
   TicketStatus.CLOSED,
 ];
 
@@ -245,10 +245,10 @@ export const VALID_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
     TicketStatus.CLOSED,
   ],
   [TicketStatus.PENDING_HANDOVER]: [
-    TicketStatus.HANDED_TO_MAINTENANCE,
+    TicketStatus.HANDED_TO_OPS,
     TicketStatus.QA_APPROVED,
   ],
-  [TicketStatus.HANDED_TO_MAINTENANCE]: [
+  [TicketStatus.HANDED_TO_OPS]: [
     TicketStatus.CLOSED,
   ],
   [TicketStatus.CLOSED]: [],

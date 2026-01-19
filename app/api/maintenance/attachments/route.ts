@@ -16,8 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { uploadAttachment } from '@/modules/ticketing/services/attachmentService';
-import type { FileUploadRequest } from '@/modules/ticketing/types/attachment';
+import { uploadAttachment } from '@/modules/maintenance/services/attachmentService';
+import type { FileUploadRequest } from '@/modules/maintenance/types/attachment';
 
 const logger = createLogger('ticketing:api:attachments');
 

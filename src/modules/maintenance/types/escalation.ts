@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Repeat Fault Escalation Types
+ * Maintenance Module - Repeat Fault Escalation Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for repeat fault detection, escalation

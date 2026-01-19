@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Risk Acceptance Types
+ * Maintenance Module - Risk Acceptance Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for QA risk acceptances - conditional

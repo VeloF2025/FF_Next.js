@@ -93,7 +93,7 @@ export async function detectFaultPattern(
         created_at,
         fault_cause,
         status
-      FROM tickets
+      FROM maintenance_tickets
       WHERE ${whereColumn} = $1
         AND created_at >= NOW() - INTERVAL '1 day' * $2
     `;
@@ -187,7 +187,7 @@ async function checkExistingEscalation(
 ): Promise<string | null> {
   const queryText = `
     SELECT id
-    FROM repeat_fault_escalations
+    FROM maintenance_escalations
     WHERE scope_type = $1
       AND scope_value = $2
       AND status IN ('open', 'investigating')

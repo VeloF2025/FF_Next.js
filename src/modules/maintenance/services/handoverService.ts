@@ -76,7 +76,7 @@ export async function validateHandoverGate(
   try {
     // 🟢 WORKING: Fetch ticket data
     const ticketSql = `
-      SELECT * FROM tickets WHERE id = $1
+      SELECT * FROM maintenance_tickets WHERE id = $1
     `;
     const ticket = await queryOne<any>(ticketSql, [ticketId]);
 
@@ -86,21 +86,21 @@ export async function validateHandoverGate(
 
     // 🟢 WORKING: Fetch attachments (photos)
     const attachmentsSql = `
-      SELECT * FROM ticket_attachments
+      SELECT * FROM maintenance_attachments
       WHERE ticket_id = $1 AND file_type = 'photo'
     `;
     const attachments = await query<any>(attachmentsSql, [ticketId]);
 
     // 🟢 WORKING: Fetch verification steps
     const verificationSql = `
-      SELECT * FROM verification_steps
+      SELECT * FROM maintenance_verification_steps
       WHERE ticket_id = $1
       ORDER BY step_number
     `;
     const verificationSteps = await query<any>(verificationSql, [ticketId]);
 
     // Determine strictness based on handover type
-    const isStrict = handoverType === HandoverType.QA_TO_MAINTENANCE;
+    const isStrict = handoverType === HandoverType.QA_TO_OPS;
 
     const gatesPassed: HandoverGateCheck[] = [];
     const gatesFailed: HandoverGateCheck[] = [];
@@ -312,7 +312,7 @@ export async function createHandoverSnapshot(
     // 🟢 WORKING: Use transaction for atomic snapshot creation
     return await transaction(async (txn) => {
       // Fetch ticket data
-      const ticketSql = `SELECT * FROM tickets WHERE id = $1`;
+      const ticketSql = `SELECT * FROM maintenance_tickets WHERE id = $1`;
       const ticket = await txn.queryOne<any>(ticketSql, [payload.ticket_id]);
 
       if (!ticket) {
@@ -329,7 +329,7 @@ export async function createHandoverSnapshot(
           uploaded_at,
           uploaded_by,
           verification_step_id
-        FROM ticket_attachments
+        FROM maintenance_attachments
         WHERE ticket_id = $1
         ORDER BY uploaded_at ASC
       `;
@@ -347,7 +347,7 @@ export async function createHandoverSnapshot(
 
       // 🟢 WORKING: Fetch verification steps
       const verificationSql = `
-        SELECT * FROM verification_steps
+        SELECT * FROM maintenance_verification_steps
         WHERE ticket_id = $1
         ORDER BY step_number
       `;
@@ -367,7 +367,7 @@ export async function createHandoverSnapshot(
           accepted_at,
           resolved_at,
           resolved_by
-        FROM qa_risk_acceptances
+        FROM maintenance_risk_acceptances
         WHERE ticket_id = $1
         ORDER BY created_at ASC
       `;
@@ -417,7 +417,7 @@ export async function createHandoverSnapshot(
 
       // 🟢 WORKING: Insert handover snapshot
       const insertSql = `
-        INSERT INTO handover_snapshots (
+        INSERT INTO maintenance_handover_snapshots (
           ticket_id,
           handover_type,
           snapshot_data,
@@ -484,7 +484,7 @@ export async function getHandoverHistory(
 
   try {
     // Verify ticket exists
-    const ticketSql = `SELECT ticket_uid FROM tickets WHERE id = $1`;
+    const ticketSql = `SELECT ticket_uid FROM maintenance_tickets WHERE id = $1`;
     const ticket = await queryOne<{ ticket_uid: string }>(ticketSql, [ticketId]);
 
     if (!ticket) {
@@ -493,7 +493,7 @@ export async function getHandoverHistory(
 
     // 🟢 WORKING: Fetch all handover snapshots
     const sql = `
-      SELECT * FROM handover_snapshots
+      SELECT * FROM maintenance_handover_snapshots
       WHERE ticket_id = $1
       ORDER BY handover_at ASC
     `;
@@ -544,7 +544,7 @@ export async function getHandoverById(
   logger.debug('Fetching handover by ID', { handover_id: handoverId });
 
   try {
-    const sql = `SELECT * FROM handover_snapshots WHERE id = $1`;
+    const sql = `SELECT * FROM maintenance_handover_snapshots WHERE id = $1`;
     const snapshot = await queryOne<HandoverSnapshot>(sql, [handoverId]);
 
     return snapshot;
@@ -610,7 +610,7 @@ export async function getPendingHandovers(
     // Count total
     const countSql = `
       SELECT COUNT(*) as total
-      FROM tickets t
+      FROM maintenance_tickets t
       ${whereClause}
     `;
     const countResult = await queryOne<{ total: string }>(countSql, values);
@@ -631,11 +631,11 @@ export async function getPendingHandovers(
         NULL::numeric as ont_rx_level,
         t.contractor_id as assigned_contractor_id,
         p.project_name,
-        (SELECT COUNT(*) FROM ticket_attachments ta WHERE ta.ticket_id = t.id AND ta.file_type = 'photo') as photo_count,
-        (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id) as verification_total,
-        (SELECT COUNT(*) FROM verification_steps vs WHERE vs.ticket_id = t.id AND vs.is_complete = true) as verification_complete,
-        (SELECT hs.to_owner_type FROM handover_snapshots hs WHERE hs.ticket_id = t.id ORDER BY hs.handover_at DESC LIMIT 1) as current_owner
-      FROM tickets t
+        (SELECT COUNT(*) FROM maintenance_attachments ta WHERE ta.ticket_id = t.id AND ta.file_type = 'photo') as photo_count,
+        (SELECT COUNT(*) FROM maintenance_verification_steps vs WHERE vs.ticket_id = t.id) as verification_total,
+        (SELECT COUNT(*) FROM maintenance_verification_steps vs WHERE vs.ticket_id = t.id AND vs.is_complete = true) as verification_complete,
+        (SELECT hs.to_owner_type FROM maintenance_handover_snapshots hs WHERE hs.ticket_id = t.id ORDER BY hs.handover_at DESC LIMIT 1) as current_owner
+      FROM maintenance_tickets t
       LEFT JOIN projects p ON t.project_id::uuid = p.id
       ${whereClause}
       ORDER BY t.updated_at DESC
@@ -650,9 +650,9 @@ export async function getPendingHandovers(
       // Determine pending handover type based on current state
       let pendingType: HandoverType = HandoverType.BUILD_TO_QA;
       if (ticket.current_owner === OwnerType.QA || ticket.status === 'qa_ready') {
-        pendingType = HandoverType.QA_TO_MAINTENANCE;
-      } else if (ticket.current_owner === OwnerType.MAINTENANCE) {
-        pendingType = HandoverType.MAINTENANCE_COMPLETE;
+        pendingType = HandoverType.QA_TO_OPS;
+      } else if (ticket.current_owner === OwnerType.OPS) {
+        pendingType = HandoverType.OPS_COMPLETE;
       }
 
       // Apply handover_type filter
@@ -661,7 +661,7 @@ export async function getPendingHandovers(
       }
 
       // Calculate gate status
-      const isStrict = pendingType === HandoverType.QA_TO_MAINTENANCE;
+      const isStrict = pendingType === HandoverType.QA_TO_OPS;
       const blockers: string[] = [];
       let gatesPassed = 0;
       const totalGates = 5;

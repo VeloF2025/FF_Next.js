@@ -1,4 +1,4 @@
-// 🟢 WORKING: FibreFlow Ticketing Module - Main Server Exports
+// 🟢 WORKING: FibreFlow Maintenance Module - Main Server Exports
 // Following FibreFlow Universal Module Structure
 //
 // This is the MAIN export file for server-side code.

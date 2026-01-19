@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Fault Cause Categories
+ * Maintenance Module - Fault Cause Categories
  * 🟢 WORKING: 7 fault attribution categories for maintenance tickets
  *
  * Critical for preventing blanket contractor blame and enabling

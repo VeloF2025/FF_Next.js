@@ -97,7 +97,7 @@ export async function createRiskAcceptance(
   try {
     // 🟢 WORKING: Insert risk acceptance with all fields
     const sql = `
-      INSERT INTO qa_risk_acceptances (
+      INSERT INTO maintenance_risk_acceptances (
         ticket_id,
         risk_type,
         risk_description,
@@ -161,7 +161,7 @@ export async function getRiskAcceptanceById(riskId: string): Promise<QARiskAccep
   logger.debug('Fetching risk acceptance by ID', { risk_id: riskId });
 
   try {
-    const sql = 'SELECT * FROM qa_risk_acceptances WHERE id = $1';
+    const sql = 'SELECT * FROM maintenance_risk_acceptances WHERE id = $1';
     const result = await queryOne<QARiskAcceptance>(sql, [riskId]);
 
     if (!result) {
@@ -196,7 +196,7 @@ export async function listRisksForTicket(
 
   try {
     const sql = `
-      SELECT * FROM qa_risk_acceptances
+      SELECT * FROM maintenance_risk_acceptances
       WHERE ticket_id = $1 AND status = $2
       ORDER BY created_at DESC
     `;
@@ -250,7 +250,7 @@ export async function resolveRiskAcceptance(
 
   try {
     const sql = `
-      UPDATE qa_risk_acceptances
+      UPDATE maintenance_risk_acceptances
       SET
         status = $1,
         resolved_at = NOW(),
@@ -310,7 +310,7 @@ export async function getExpiringRisks(
 
   try {
     const sql = `
-      SELECT * FROM qa_risk_acceptances
+      SELECT * FROM maintenance_risk_acceptances
       WHERE status = $1
         AND risk_expiry_date IS NOT NULL
         AND risk_expiry_date <= $2
@@ -355,7 +355,7 @@ export async function escalateExpiredRisks(
   try {
     // 🟢 WORKING: Step 1 - Mark active risks as EXPIRED if past expiry date
     const markExpiredSql = `
-      UPDATE qa_risk_acceptances
+      UPDATE maintenance_risk_acceptances
       SET status = $1
       WHERE status = $2
         AND risk_expiry_date IS NOT NULL
@@ -371,7 +371,7 @@ export async function escalateExpiredRisks(
 
     // 🟢 WORKING: Step 2 - Get all EXPIRED risks
     const findExpiredSql = `
-      SELECT * FROM qa_risk_acceptances
+      SELECT * FROM maintenance_risk_acceptances
       WHERE status = $1
       ORDER BY risk_expiry_date ASC
     `;
@@ -388,7 +388,7 @@ export async function escalateExpiredRisks(
     // 🟢 WORKING: Step 3 - Escalate all EXPIRED risks to ESCALATED
     const riskIds = expiredRisks.map(r => r.id);
     const escalateSql = `
-      UPDATE qa_risk_acceptances
+      UPDATE maintenance_risk_acceptances
       SET status = $1
       WHERE id = ANY($2::uuid[])
     `;
@@ -423,7 +423,7 @@ export async function canCloseTicket(ticketId: string): Promise<boolean> {
 
   try {
     const sql = `
-      SELECT * FROM qa_risk_acceptances
+      SELECT * FROM maintenance_risk_acceptances
       WHERE ticket_id = $1 AND status = $2
     `;
 
@@ -515,8 +515,8 @@ export async function listAllRiskAcceptances(
     // Count total
     const countSql = `
       SELECT COUNT(*) as total
-      FROM qa_risk_acceptances r
-      LEFT JOIN tickets t ON r.ticket_id = t.id
+      FROM maintenance_risk_acceptances r
+      LEFT JOIN maintenance_tickets t ON r.ticket_id = t.id
       ${whereClause}
     `;
     const countResult = await queryOne<{ total: string }>(countSql, values);
@@ -530,8 +530,8 @@ export async function listAllRiskAcceptances(
         t.ticket_uid,
         t.title as ticket_title,
         p.project_name
-      FROM qa_risk_acceptances r
-      LEFT JOIN tickets t ON r.ticket_id = t.id
+      FROM maintenance_risk_acceptances r
+      LEFT JOIN maintenance_tickets t ON r.ticket_id = t.id
       LEFT JOIN projects p ON t.project_id::uuid = p.id
       ${whereClause}
       ORDER BY
@@ -577,7 +577,7 @@ export async function getTicketRiskSummary(ticketId: string): Promise<TicketRisk
   try {
     // 🟢 WORKING: Fetch all risks for the ticket
     const sql = `
-      SELECT * FROM qa_risk_acceptances
+      SELECT * FROM maintenance_risk_acceptances
       WHERE ticket_id = $1
       ORDER BY created_at DESC
     `;

@@ -25,7 +25,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { runSyncJob } from '@/modules/ticketing/jobs/qcontactSync';
+import { runSyncJob } from '@/modules/maintenance/jobs/qcontactSync';
 
 const logger = createLogger('ticketing:api:cron:sync-qcontact');
 

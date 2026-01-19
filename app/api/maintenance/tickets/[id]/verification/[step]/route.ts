@@ -16,8 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { updateVerificationStep } from '@/modules/ticketing/services/verificationService';
-import type { UpdateVerificationStepPayload, VerificationStepNumber } from '@/modules/ticketing/types/verification';
+import { updateVerificationStep } from '@/modules/maintenance/services/verificationService';
+import type { UpdateVerificationStepPayload, VerificationStepNumber } from '@/modules/maintenance/types/verification';
 
 const logger = createLogger('ticketing:api:verification:step');
 

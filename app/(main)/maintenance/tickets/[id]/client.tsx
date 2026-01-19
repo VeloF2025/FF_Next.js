@@ -17,7 +17,7 @@
  * 🟢 WORKING: Ticket detail page integrates TicketDetail component
  */
 
-import { TicketDetail } from '@/modules/ticketing/components/TicketDetail/TicketDetail';
+import { TicketDetail } from '@/modules/maintenance/components/TicketDetail/TicketDetail';
 import { useParams } from 'next/navigation';
 
 export default function TicketDetailPageClient() {

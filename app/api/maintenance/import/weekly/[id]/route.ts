@@ -19,7 +19,7 @@ import { createLogger } from '@/lib/logger';
 import {
   getWeeklyReportById,
   getImportProgress,
-} from '@/modules/ticketing/services/weeklyReportService';
+} from '@/modules/maintenance/services/weeklyReportService';
 
 const logger = createLogger('ticketing:api:weekly-import-status');
 

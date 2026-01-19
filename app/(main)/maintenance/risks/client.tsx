@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Clock, CheckCircle, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
-import { RiskAcceptanceStatus } from '@/modules/ticketing/types/riskAcceptance';
+import { RiskAcceptanceStatus } from '@/modules/maintenance/types/riskAcceptance';
 
 type RiskFilter = 'active' | 'expiring' | 'resolved';
 

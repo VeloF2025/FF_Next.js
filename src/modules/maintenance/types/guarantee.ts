@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Guarantee & Billing Types
+ * Maintenance Module - Guarantee & Billing Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for guarantee periods, classifications,

@@ -4,7 +4,7 @@ import { createLogger } from '@/lib/logger';
 import {
   FiberTimeQContactClient,
   QContactActivity,
-} from '@/modules/ticketing/services/fibertimeQContactClient';
+} from '@/modules/maintenance/services/fibertimeQContactClient';
 
 const logger = createLogger('ticket-activities-api');
 

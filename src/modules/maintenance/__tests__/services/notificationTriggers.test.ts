@@ -360,7 +360,7 @@ describe('NotificationTriggerService', () => {
         type: 'ticket.closed',
         ticket_id: closedTicket.id,
         ticket: closedTicket,
-        previous_status: TicketStatus.HANDED_TO_MAINTENANCE,
+        previous_status: TicketStatus.HANDED_TO_OPS,
         new_status: TicketStatus.CLOSED,
         timestamp: new Date(),
       };

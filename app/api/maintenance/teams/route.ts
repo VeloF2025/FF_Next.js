@@ -11,8 +11,8 @@ import {
   listTeams,
   createTeam,
   getTeamsForDropdown,
-} from '@/modules/ticketing/services/teamService';
-import type { CreateTeamPayload, TeamFilters } from '@/modules/ticketing/types/team';
+} from '@/modules/maintenance/services/teamService';
+import type { CreateTeamPayload, TeamFilters } from '@/modules/maintenance/types/team';
 
 const logger = createLogger('ticketing:api:teams');
 

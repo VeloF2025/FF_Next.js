@@ -21,9 +21,9 @@ import {
   getTicketById,
   updateTicket,
   deleteTicket
-} from '@/modules/ticketing/services/ticketService';
-import { enrichTicketData } from '@/modules/ticketing/services/ticketEnrichmentService';
-import type { UpdateTicketPayload } from '@/modules/ticketing/types/ticket';
+} from '@/modules/maintenance/services/ticketService';
+import { enrichTicketData } from '@/modules/maintenance/services/ticketEnrichmentService';
+import type { UpdateTicketPayload } from '@/modules/maintenance/types/ticket';
 
 const logger = createLogger('ticketing:api:tickets:id');
 

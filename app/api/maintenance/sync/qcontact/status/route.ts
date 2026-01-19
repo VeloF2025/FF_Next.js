@@ -15,8 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getSyncProgress } from '@/modules/ticketing/services/qcontactSyncOrchestrator';
-import { query, queryOne } from '@/modules/ticketing/utils/db';
+import { getSyncProgress } from '@/modules/maintenance/services/qcontactSyncOrchestrator';
+import { query, queryOne } from '@/modules/maintenance/utils/db';
 
 // Disable caching - status should always be fresh
 export const dynamic = 'force-dynamic';

@@ -15,7 +15,7 @@
 
 import { ArrowLeft, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { TicketForm } from '@/modules/ticketing/components/TicketForm';
+import { TicketForm } from '@/modules/maintenance/components/TicketForm';
 
 export default function CreateTicketPageClient() {
   return (

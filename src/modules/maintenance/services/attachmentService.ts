@@ -253,7 +253,7 @@ export async function createAttachment(
     });
 
     const sql = `
-      INSERT INTO ticket_attachments (
+      INSERT INTO maintenance_attachments (
         ticket_id,
         filename,
         file_type,
@@ -314,7 +314,7 @@ export async function getAttachmentById(
     }
 
     const sql = `
-      SELECT * FROM ticket_attachments
+      SELECT * FROM maintenance_attachments
       WHERE id = $1
     `;
 
@@ -397,7 +397,7 @@ export async function listAttachmentsForTicket(
     const whereClause = whereClauses.join(' AND ');
 
     const sql = `
-      SELECT * FROM ticket_attachments
+      SELECT * FROM maintenance_attachments
       WHERE ${whereClause}
       ORDER BY uploaded_at DESC
     `;
@@ -470,7 +470,7 @@ export async function deleteAttachment(attachmentId: string): Promise<void> {
 
     // Delete from database
     const sql = `
-      DELETE FROM ticket_attachments
+      DELETE FROM maintenance_attachments
       WHERE id = $1
     `;
 
@@ -500,7 +500,7 @@ export async function getPhotoEvidenceSummary(
 
     // Get all photo attachments for ticket
     const attachmentsSql = `
-      SELECT * FROM ticket_attachments
+      SELECT * FROM maintenance_attachments
       WHERE ticket_id = $1 AND file_type = $2
       ORDER BY uploaded_at DESC
     `;
@@ -517,7 +517,7 @@ export async function getPhotoEvidenceSummary(
         step_number,
         id as verification_step_id,
         photo_verified
-      FROM verification_steps
+      FROM maintenance_verification_steps
       WHERE ticket_id = $1 AND photo_required = true
       ORDER BY step_number
     `;
@@ -594,7 +594,7 @@ export async function getAttachmentStatistics(): Promise<AttachmentStatistics> {
         COUNT(*) FILTER (WHERE file_type = 'excel')::int as excel_count,
         COUNT(*) FILTER (WHERE is_evidence = true)::int as evidence_photos,
         COUNT(*) FILTER (WHERE uploaded_at >= DATE_TRUNC('month', CURRENT_DATE))::int as attachments_this_month
-      FROM ticket_attachments
+      FROM maintenance_attachments
     `;
 
     const result = await queryOne<{

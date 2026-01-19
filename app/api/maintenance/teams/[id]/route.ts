@@ -13,8 +13,8 @@ import {
   updateTeam,
   deleteTeam,
   getTeamMembers,
-} from '@/modules/ticketing/services/teamService';
-import type { UpdateTeamPayload } from '@/modules/ticketing/types/team';
+} from '@/modules/maintenance/services/teamService';
+import type { UpdateTeamPayload } from '@/modules/maintenance/types/team';
 
 const logger = createLogger('ticketing:api:teams:id');
 

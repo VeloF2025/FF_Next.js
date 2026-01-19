@@ -14,6 +14,9 @@ import {
   getTechnicianIssues,
   getTechnicianIssueDescription,
   detectSwappedSerials,
+  formatSerialFeedback,
+  maskSerial,
+  getSerialStatus,
   type TechnicianIssue,
 } from '../../services/qaAutoFailService';
 import { STEP_LABELS } from '../../utils/stepMapper';
@@ -116,11 +119,13 @@ export function FeedbackPhase({
       lines.push(`- Power Meter: ${pm.value} dBm ${pmStatus}`);
     }
 
-    // Serial status (simple pass/fail, no VLM comparison data)
-    const ontPresent = !!wizardState.prerequisites.ontSerial;
-    const upsPresent = !!wizardState.prerequisites.upsSerial;
-    lines.push(`- ONT Serial: ${ontPresent ? (swapCheck.swapped ? 'SWAPPED ✗' : 'Scanned ✓') : 'NOT SCANNED ✗'}`);
-    lines.push(`- UPS Serial: ${upsPresent ? (swapCheck.swapped ? 'SWAPPED ✗' : 'Scanned ✓') : 'NOT SCANNED ✗'}`);
+    // Serial status with detailed feedback (shows partial serial, format validation)
+    const serialFeedback = formatSerialFeedback(
+      wizardState.prerequisites.ontSerial,
+      wizardState.prerequisites.upsSerial
+    );
+    lines.push(serialFeedback.ontLine);
+    lines.push(serialFeedback.upsLine);
     lines.push('');
 
     // Actionable issues for technician (excluding swap which is shown above)
@@ -351,36 +356,52 @@ export function FeedbackPhase({
             </div>
           </div>
 
-          {/* Serial Status - simplified, no VLM comparison */}
+          {/* Serial Status - with detailed info */}
           <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
             <div className="text-2xl mb-1">
               {(() => {
-                const swapped = detectSwappedSerials(
-                  wizardState.prerequisites.ontSerial,
-                  wizardState.prerequisites.upsSerial
-                ).swapped;
-                const ontPresent = !!wizardState.prerequisites.ontSerial;
-                const upsPresent = !!wizardState.prerequisites.upsSerial;
-                if (swapped) return '🔴';
-                if (ontPresent && upsPresent) return '✅';
+                const ontStatus = getSerialStatus(wizardState.prerequisites.ontSerial, 'ont');
+                const upsStatus = getSerialStatus(wizardState.prerequisites.upsSerial, 'ups');
+                if (ontStatus.status === 'present_swapped' || upsStatus.status === 'present_swapped') return '🔴';
+                if (ontStatus.status === 'present_valid' && upsStatus.status === 'present_valid') return '✅';
+                if (ontStatus.status === 'present_invalid' || upsStatus.status === 'present_invalid') return '⚠️';
                 return '❌';
               })()}
             </div>
             <div className="text-sm font-medium">Serials</div>
             <div className="text-xs text-gray-500">
               {(() => {
-                const swapped = detectSwappedSerials(
-                  wizardState.prerequisites.ontSerial,
-                  wizardState.prerequisites.upsSerial
-                ).swapped;
-                if (swapped) return 'SWAPPED';
-                const ontPresent = !!wizardState.prerequisites.ontSerial;
-                const upsPresent = !!wizardState.prerequisites.upsSerial;
-                if (ontPresent && upsPresent) return 'Both scanned';
-                if (!ontPresent && !upsPresent) return 'None scanned';
-                return ontPresent ? 'UPS missing' : 'ONT missing';
+                const ontStatus = getSerialStatus(wizardState.prerequisites.ontSerial, 'ont');
+                const upsStatus = getSerialStatus(wizardState.prerequisites.upsSerial, 'ups');
+                if (ontStatus.status === 'present_swapped' || upsStatus.status === 'present_swapped') return 'SWAPPED';
+                if (ontStatus.status === 'present_valid' && upsStatus.status === 'present_valid') return 'Both valid';
+                if (ontStatus.status === 'missing' && upsStatus.status === 'missing') return 'None scanned';
+                if (ontStatus.status === 'missing') return 'ONT missing';
+                if (upsStatus.status === 'missing') return 'UPS missing';
+                return 'Format issues';
               })()}
             </div>
+          </div>
+        </div>
+
+        {/* Detailed Serial Status */}
+        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+          <div className="font-medium text-gray-700 dark:text-gray-300 mb-2 text-sm">Serial Details</div>
+          <div className="space-y-1 text-sm">
+            {(() => {
+              const ontStatus = getSerialStatus(wizardState.prerequisites.ontSerial, 'ont');
+              const upsStatus = getSerialStatus(wizardState.prerequisites.upsSerial, 'ups');
+              return (
+                <>
+                  <div className={`${ontStatus.status === 'present_valid' ? 'text-green-600 dark:text-green-400' : ontStatus.status === 'missing' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                    ONT: {ontStatus.message}
+                  </div>
+                  <div className={`${upsStatus.status === 'present_valid' ? 'text-green-600 dark:text-green-400' : upsStatus.status === 'missing' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                    UPS: {upsStatus.message}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
 

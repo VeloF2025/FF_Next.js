@@ -19,8 +19,8 @@ import { createLogger } from '@/lib/logger';
 import {
   listWeeklyReports,
   getWeeklyReportStats,
-} from '@/modules/ticketing/services/weeklyReportService';
-import { WeeklyReportStatus, WeeklyReportFilters } from '@/modules/ticketing/types/weeklyReport';
+} from '@/modules/maintenance/services/weeklyReportService';
+import { WeeklyReportStatus, WeeklyReportFilters } from '@/modules/maintenance/types/weeklyReport';
 
 const logger = createLogger('ticketing:api:weekly-import-history');
 

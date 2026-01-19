@@ -26,8 +26,8 @@ import { createLogger } from '@/lib/logger';
 import {
   detectFaultPattern,
   getDefaultThresholds,
-} from '@/modules/ticketing/utils/faultPatternDetector';
-import { EscalationScopeType } from '@/modules/ticketing/types/escalation';
+} from '@/modules/maintenance/utils/faultPatternDetector';
+import { EscalationScopeType } from '@/modules/maintenance/types/escalation';
 
 const logger = createLogger('ticketing:api:repeat-faults:check');
 

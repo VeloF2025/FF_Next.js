@@ -63,7 +63,7 @@ export async function getGuaranteePeriodByProject(
   }
 
   const result = await queryOne<GuaranteePeriod>(
-    `SELECT * FROM guarantee_periods WHERE project_id = $1`,
+    `SELECT * FROM maintenance_guarantee_periods WHERE project_id = $1`,
     [projectId]
   );
 
@@ -103,7 +103,7 @@ export async function createGuaranteePeriod(
   });
 
   const result = await queryOne<GuaranteePeriod>(
-    `INSERT INTO guarantee_periods (
+    `INSERT INTO maintenance_guarantee_periods (
       project_id,
       installation_guarantee_days,
       material_guarantee_days,
@@ -186,7 +186,7 @@ export async function updateGuaranteePeriod(
   values.push(projectId);
 
   const updateQuery = `
-    UPDATE guarantee_periods
+    UPDATE maintenance_guarantee_periods
     SET ${updates.join(', ')}
     WHERE project_id = $${paramIndex}
     RETURNING *
@@ -271,7 +271,7 @@ export async function classifyTicketGuarantee(
       ticket_type,
       fault_cause,
       created_at
-    FROM tickets
+    FROM maintenance_tickets
     WHERE id = $1`,
     [ticketId]
   );
@@ -316,7 +316,7 @@ export async function classifyTicketGuarantee(
 
   // 6. Update ticket with classification
   await query(
-    `UPDATE tickets
+    `UPDATE maintenance_tickets
     SET
       guarantee_status = $1,
       guarantee_expires_at = $2,

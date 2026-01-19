@@ -75,7 +75,7 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
         MAX(synced_at) as last_sync_at,
         (
           SELECT status
-          FROM qcontact_sync_log
+          FROM maintenance_qcontact_sync_log
           WHERE sync_type = 'full_sync'
           ORDER BY synced_at DESC
           LIMIT 1
@@ -84,15 +84,15 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
           SELECT EXTRACT(EPOCH FROM (
             MAX(synced_at) - MIN(synced_at)
           ))
-          FROM qcontact_sync_log
+          FROM maintenance_qcontact_sync_log
           WHERE sync_type = 'full_sync'
             AND DATE(synced_at) = (
               SELECT DATE(MAX(synced_at))
-              FROM qcontact_sync_log
+              FROM maintenance_qcontact_sync_log
               WHERE sync_type = 'full_sync'
             )
         ) as last_sync_duration_seconds
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       WHERE sync_type = 'full_sync'
       `,
       []
@@ -104,13 +104,13 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
     const pendingOutboundResult = await query<{ count: string }>(
       `
       SELECT COUNT(*) as count
-      FROM tickets
+      FROM maintenance_tickets
       WHERE external_id IS NOT NULL
         AND source = 'qcontact'
         AND updated_at > COALESCE(
           (
             SELECT MAX(synced_at)
-            FROM qcontact_sync_log
+            FROM maintenance_qcontact_sync_log
             WHERE sync_direction = 'outbound'
           ),
           '1970-01-01'::timestamp
@@ -129,7 +129,7 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
     const failedLast24hResult = await query<{ count: string }>(
       `
       SELECT COUNT(*) as count
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       WHERE status = 'failed'
         AND synced_at > NOW() - INTERVAL '24 hours'
       `,
@@ -147,7 +147,7 @@ export async function getSyncStatus(): Promise<SyncStatusOverview> {
       SELECT
         COUNT(*) FILTER (WHERE status = 'success') as success_count,
         COUNT(*) as total_count
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       WHERE synced_at > NOW() - INTERVAL '7 days'
       `,
       []
@@ -294,7 +294,7 @@ export async function listSyncLogs(
 
     // Get total count
     const countResult = await query<{ count: string }>(
-      `SELECT COUNT(*) as count FROM qcontact_sync_log ${whereClause}`,
+      `SELECT COUNT(*) as count FROM maintenance_qcontact_sync_log ${whereClause}`,
       params
     );
 
@@ -315,7 +315,7 @@ export async function listSyncLogs(
         status,
         error_message,
         synced_at
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       ${whereClause}
       ORDER BY synced_at DESC
       LIMIT $${paramIndex++}
@@ -335,7 +335,7 @@ export async function listSyncLogs(
       SELECT
         sync_direction,
         COUNT(*) as count
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       ${whereClause}
       GROUP BY sync_direction
       `,
@@ -360,7 +360,7 @@ export async function listSyncLogs(
       SELECT
         status,
         COUNT(*) as count
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       ${whereClause}
       GROUP BY status
       `,

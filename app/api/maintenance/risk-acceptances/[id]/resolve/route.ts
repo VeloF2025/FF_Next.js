@@ -15,8 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { resolveRiskAcceptance } from '@/modules/ticketing/services/riskAcceptanceService';
-import type { ResolveRiskAcceptancePayload } from '@/modules/ticketing/types/riskAcceptance';
+import { resolveRiskAcceptance } from '@/modules/maintenance/services/riskAcceptanceService';
+import type { ResolveRiskAcceptancePayload } from '@/modules/maintenance/types/riskAcceptance';
 
 const logger = createLogger('ticketing:api:risk-acceptance-resolve');
 

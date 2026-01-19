@@ -161,7 +161,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -185,7 +185,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -209,7 +209,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -230,7 +230,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -251,7 +251,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -273,7 +273,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -296,7 +296,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -319,7 +319,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -345,7 +345,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -367,7 +367,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -395,7 +395,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -416,7 +416,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -435,7 +435,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -456,7 +456,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -478,7 +478,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -506,10 +506,10 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
         from_owner_type: OwnerType.QA,
         from_owner_id: 'qa-user-uuid-001',
-        to_owner_type: OwnerType.MAINTENANCE,
+        to_owner_type: OwnerType.OPS,
         to_owner_id: 'maint-user-uuid-001',
       };
 
@@ -517,7 +517,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       expect(result.from_owner_type).toBe(OwnerType.QA);
       expect(result.from_owner_id).toBe('qa-user-uuid-001');
-      expect(result.to_owner_type).toBe(OwnerType.MAINTENANCE);
+      expect(result.to_owner_type).toBe(OwnerType.OPS);
       expect(result.to_owner_id).toBe('maint-user-uuid-001');
     });
 
@@ -556,7 +556,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -576,7 +576,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -606,7 +606,7 @@ describe('Snapshot Generator (TDD)', () => {
       expect(result.handover_type).toBe(HandoverType.BUILD_TO_QA);
     });
 
-    it('should set handover type correctly for QA_TO_MAINTENANCE', async () => {
+    it('should set handover type correctly for QA_TO_OPS', async () => {
       const mockTicket = createMockTicket();
 
       mockQueryOne.mockResolvedValueOnce(mockTicket);
@@ -617,15 +617,15 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
 
-      expect(result.handover_type).toBe(HandoverType.QA_TO_MAINTENANCE);
+      expect(result.handover_type).toBe(HandoverType.QA_TO_OPS);
     });
 
-    it('should set handover type correctly for MAINTENANCE_COMPLETE', async () => {
+    it('should set handover type correctly for OPS_COMPLETE', async () => {
       const mockTicket = createMockTicket();
 
       mockQueryOne.mockResolvedValueOnce(mockTicket);
@@ -636,12 +636,12 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.MAINTENANCE_COMPLETE,
+        handover_type: HandoverType.OPS_COMPLETE,
       };
 
       const result = await generateHandoverSnapshot(input);
 
-      expect(result.handover_type).toBe(HandoverType.MAINTENANCE_COMPLETE);
+      expect(result.handover_type).toBe(HandoverType.OPS_COMPLETE);
     });
   });
 
@@ -651,7 +651,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'non-existent-ticket',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       await expect(generateHandoverSnapshot(input)).rejects.toThrow(
@@ -664,7 +664,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       await expect(generateHandoverSnapshot(input)).rejects.toThrow('Database connection failed');
@@ -692,7 +692,7 @@ describe('Snapshot Generator (TDD)', () => {
 
       const input: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
       };
 
       const result = await generateHandoverSnapshot(input);
@@ -709,10 +709,10 @@ describe('Snapshot Generator (TDD)', () => {
     it('should enforce correct input types at compile time', () => {
       const validInput: GenerateSnapshotInput = {
         ticket_id: 'ticket-uuid-001',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
         from_owner_type: OwnerType.QA,
         from_owner_id: 'qa-user-001',
-        to_owner_type: OwnerType.MAINTENANCE,
+        to_owner_type: OwnerType.OPS,
         to_owner_id: 'maint-user-001',
       };
 

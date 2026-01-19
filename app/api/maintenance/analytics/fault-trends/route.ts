@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { query } from '@/modules/ticketing/utils/db';
+import { query } from '@/modules/maintenance/utils/db';
 
 const logger = createLogger('ticketing:api:fault-trends');
 

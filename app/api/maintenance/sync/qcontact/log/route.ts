@@ -14,9 +14,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { query } from '@/modules/ticketing/utils/db';
-import { SyncDirection, SyncType, SyncStatus } from '@/modules/ticketing/types/qcontact';
-import type { QContactSyncLog } from '@/modules/ticketing/types/qcontact';
+import { query } from '@/modules/maintenance/utils/db';
+import { SyncDirection, SyncType, SyncStatus } from '@/modules/maintenance/types/qcontact';
+import type { QContactSyncLog } from '@/modules/maintenance/types/qcontact';
 
 const logger = createLogger('ticketing:api:sync:log');
 

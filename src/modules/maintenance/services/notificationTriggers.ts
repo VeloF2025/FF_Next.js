@@ -439,7 +439,7 @@ export class NotificationTriggerService {
 
       const existingNotification = await queryOne(
         `SELECT id
-         FROM whatsapp_notifications
+         FROM maintenance_whatsapp_notifications
          WHERE ticket_id = $1
            AND message_template = $2
            AND created_at >= $3

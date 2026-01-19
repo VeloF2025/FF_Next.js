@@ -105,7 +105,7 @@ export interface UseTicketFormResult {
 
 const initialFormData: TicketFormData = {
   source: TicketSource.MANUAL,
-  ticket_type: TicketType.MAINTENANCE,
+  ticket_type: TicketType.FAULT_REPAIR,
   priority: TicketPriority.NORMAL,
   title: '',
   description: '',
@@ -187,7 +187,7 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
   }
 
   // Fault cause required for maintenance tickets
-  if (data.ticket_type === TicketType.MAINTENANCE && !data.fault_cause) {
+  if (data.ticket_type === TicketType.FAULT_REPAIR && !data.fault_cause) {
     errors.fault_cause = 'Fault cause is required for maintenance tickets';
   }
 
@@ -407,7 +407,7 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
-  [TicketType.MAINTENANCE]: 'Maintenance',
+  [TicketType.FAULT_REPAIR]: 'Maintenance',
   [TicketType.NEW_INSTALLATION]: 'New Installation',
   [TicketType.MODIFICATION]: 'Modification',
   [TicketType.ONT_SWAP]: 'ONT Swap',

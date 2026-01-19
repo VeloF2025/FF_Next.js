@@ -228,7 +228,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
 
       // Verify DB record was created
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO ticket_attachments'),
+        expect.stringContaining('INSERT INTO maintenance_attachments'),
         expect.arrayContaining([
           'ticket-uuid-123',
           'photo.jpg',
@@ -408,7 +408,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       const result = await createAttachment(payload);
 
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO ticket_attachments'),
+        expect.stringContaining('INSERT INTO maintenance_attachments'),
         expect.arrayContaining([
           'ticket-uuid-123',
           'photo.jpg',
@@ -507,7 +507,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       const result = await getAttachmentById(attachmentId);
 
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM ticket_attachments'),
+        expect.stringContaining('SELECT * FROM maintenance_attachments'),
         [attachmentId]
       );
 
@@ -573,7 +573,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       const result = await listAttachmentsForTicket(ticketId);
 
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM ticket_attachments'),
+        expect.stringContaining('SELECT * FROM maintenance_attachments'),
         [ticketId]
       );
 
@@ -699,7 +699,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
 
       // Verify DB deletion
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM ticket_attachments'),
+        expect.stringContaining('DELETE FROM maintenance_attachments'),
         [attachmentId]
       );
     });
@@ -738,7 +738,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       await deleteAttachment(attachmentId);
 
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM ticket_attachments'),
+        expect.stringContaining('DELETE FROM maintenance_attachments'),
         [attachmentId]
       );
     });

@@ -80,7 +80,7 @@ describe('QContact Inbound Sync Service', () => {
       expect(mapped.external_id).toBe('QC-12345');
       expect(mapped.title).toBe('Internet connectivity issue');
       expect(mapped.description).toBe('Customer reports no internet');
-      expect(mapped.ticket_type).toBe(TicketType.MAINTENANCE);
+      expect(mapped.ticket_type).toBe(TicketType.FAULT_REPAIR);
       expect(mapped.priority).toBe(TicketPriority.HIGH);
       expect(mapped.address).toBe('123 Main Street, Cape Town');
     });
@@ -162,12 +162,12 @@ describe('QContact Inbound Sync Service', () => {
         custom_fields: null,
       });
 
-      expect(mapQContactTicketToFibreFlow(createTicket('maintenance')).ticket_type).toBe(TicketType.MAINTENANCE);
+      expect(mapQContactTicketToFibreFlow(createTicket('maintenance')).ticket_type).toBe(TicketType.FAULT_REPAIR);
       expect(mapQContactTicketToFibreFlow(createTicket('installation')).ticket_type).toBe(TicketType.NEW_INSTALLATION);
       expect(mapQContactTicketToFibreFlow(createTicket('modification')).ticket_type).toBe(TicketType.MODIFICATION);
       expect(mapQContactTicketToFibreFlow(createTicket('ont_swap')).ticket_type).toBe(TicketType.ONT_SWAP);
       expect(mapQContactTicketToFibreFlow(createTicket('incident')).ticket_type).toBe(TicketType.INCIDENT);
-      expect(mapQContactTicketToFibreFlow(createTicket(null)).ticket_type).toBe(TicketType.MAINTENANCE);
+      expect(mapQContactTicketToFibreFlow(createTicket(null)).ticket_type).toBe(TicketType.FAULT_REPAIR);
     });
   });
 
@@ -205,7 +205,7 @@ describe('QContact Inbound Sync Service', () => {
         external_id: 'QC-12345',
         title: 'Fiber fault',
         description: 'Customer reports fiber cut',
-        ticket_type: TicketType.MAINTENANCE,
+        ticket_type: TicketType.FAULT_REPAIR,
         priority: TicketPriority.HIGH,
         status: TicketStatus.OPEN,
         dr_number: 'DR-2024-001',
@@ -351,7 +351,7 @@ describe('QContact Inbound Sync Service', () => {
 
       // Verify sync log was created with correct parameters
       const syncLogCall = vi.mocked(queryOne).mock.calls[2];
-      expect(syncLogCall[0]).toContain('INSERT INTO qcontact_sync_log');
+      expect(syncLogCall[0]).toContain('INSERT INTO maintenance_qcontact_sync_log');
       expect(syncLogCall[1]).toContain('QC-67890'); // qcontact_ticket_id
       expect(syncLogCall[1]).toContain(SyncDirection.INBOUND);
       expect(syncLogCall[1]).toContain(SyncType.CREATE);

@@ -186,7 +186,7 @@ async function fetchTicketData(ticket_id: string): Promise<any> {
       qa_readiness_check_at,
       fault_cause,
       fault_cause_details
-    FROM tickets
+    FROM maintenance_tickets
     WHERE id = $1
   `;
 
@@ -208,7 +208,7 @@ async function fetchEvidenceLinks(ticket_id: string): Promise<EvidenceLink[]> {
       filename,
       uploaded_at,
       uploaded_by
-    FROM ticket_attachments
+    FROM maintenance_attachments
     WHERE ticket_id = $1
     ORDER BY uploaded_at ASC
   `;
@@ -236,7 +236,7 @@ async function fetchVerificationProgress(
     SELECT
       COUNT(*) as total,
       SUM(CASE WHEN is_complete THEN 1 ELSE 0 END) as completed
-    FROM verification_steps
+    FROM maintenance_verification_steps
     WHERE ticket_id = $1
   `;
 
@@ -268,7 +268,7 @@ async function fetchDecisions(ticket_id: string): Promise<HandoverDecision[]> {
       accepted_by,
       accepted_at,
       status
-    FROM qa_risk_acceptances
+    FROM maintenance_risk_acceptances
     WHERE ticket_id = $1
     ORDER BY accepted_at ASC
   `;

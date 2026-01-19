@@ -70,7 +70,7 @@ export async function runReadinessCheck(
     }>(
       `SELECT id, ticket_uid, dr_number, pole_number, pon_number, zone_id,
               ont_serial, ont_rx_level
-       FROM tickets
+       FROM maintenance_tickets
        WHERE id = $1`,
       [ticketId]
     );
@@ -82,7 +82,7 @@ export async function runReadinessCheck(
     // 🟢 WORKING: Get photo count for this ticket
     const photoResult = await queryOne<{ count: number }>(
       `SELECT COUNT(*) as count
-       FROM ticket_attachments
+       FROM maintenance_attachments
        WHERE ticket_id = $1 AND file_type = 'photo' AND is_evidence = true`,
       [ticketId]
     );
@@ -112,7 +112,7 @@ export async function runReadinessCheck(
 
     // 🟢 WORKING: Insert check record into qa_readiness_checks
     const checkRecord = await queryOne<QAReadinessCheck>(
-      `INSERT INTO qa_readiness_checks (
+      `INSERT INTO maintenance_qa_checks (
         ticket_id,
         passed,
         checked_by,
@@ -153,7 +153,7 @@ export async function runReadinessCheck(
 
     // 🟢 WORKING: Update ticket.qa_ready flag and timestamp
     await query(
-      `UPDATE tickets
+      `UPDATE maintenance_tickets
        SET qa_ready = $1,
            qa_readiness_check_at = NOW(),
            updated_at = NOW()
@@ -196,7 +196,7 @@ export async function getReadinessStatus(ticketId: string): Promise<QAReadinessS
   try {
     // 🟢 WORKING: Get latest readiness check
     const latestCheck = await queryOne<QAReadinessCheck>(
-      `SELECT * FROM qa_readiness_checks
+      `SELECT * FROM maintenance_qa_checks
        WHERE ticket_id = $1
        ORDER BY checked_at DESC
        LIMIT 1`,
@@ -257,7 +257,7 @@ export async function getReadinessHistory(ticketId: string): Promise<QAReadiness
   try {
     // 🟢 WORKING: Get all checks for ticket
     const checks = await query<QAReadinessCheck>(
-      `SELECT * FROM qa_readiness_checks
+      `SELECT * FROM maintenance_qa_checks
        WHERE ticket_id = $1
        ORDER BY checked_at DESC`,
       [ticketId]

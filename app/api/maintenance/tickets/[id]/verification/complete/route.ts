@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { calculateProgress } from '@/modules/ticketing/services/verificationService';
+import { calculateProgress } from '@/modules/maintenance/services/verificationService';
 
 const logger = createLogger('ticketing:api:verification:complete');
 

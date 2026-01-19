@@ -22,9 +22,9 @@ import {
   runFullSync,
   runInboundOnlySync,
   runOutboundOnlySync,
-} from '@/modules/ticketing/services/qcontactSyncOrchestrator';
-import { SyncDirection } from '@/modules/ticketing/types/qcontact';
-import type { FullSyncRequest } from '@/modules/ticketing/types/qcontact';
+} from '@/modules/maintenance/services/qcontactSyncOrchestrator';
+import { SyncDirection } from '@/modules/maintenance/types/qcontact';
+import type { FullSyncRequest } from '@/modules/maintenance/types/qcontact';
 
 const logger = createLogger('ticketing:api:sync:qcontact');
 

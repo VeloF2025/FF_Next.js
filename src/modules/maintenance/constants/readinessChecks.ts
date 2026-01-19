@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - QA Readiness Check Constants
+ * Maintenance Module - QA Readiness Check Constants
  * 🟢 WORKING: Pre-QA validation requirements and check definitions
  *
  * Defines the validation checks that must pass before QA can start.

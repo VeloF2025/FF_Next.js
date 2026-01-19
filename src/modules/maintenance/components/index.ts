@@ -1,5 +1,5 @@
-// 🟢 WORKING: Component exports for FibreFlow Ticketing Module
-// This file will export all React components for the ticketing module
+// 🟢 WORKING: Component exports for FibreFlow Maintenance Module
+// This file will export all React components for the maintenance module
 
 // Verification Components (✅ Completed - subtask 2.11)
 export { VerificationChecklist, VerificationStep, PhotoUpload } from './Verification';

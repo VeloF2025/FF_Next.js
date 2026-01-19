@@ -12,13 +12,13 @@ import React, { useState, useEffect } from 'react';
 import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 
 // QContact Sync components
-import { SyncDashboard } from '@/modules/ticketing/components/QContact/SyncDashboard';
-import { SyncTrigger } from '@/modules/ticketing/components/QContact/SyncTrigger';
-import { SyncAuditLog } from '@/modules/ticketing/components/QContact/SyncAuditLog';
-import { useTriggerManualSync } from '@/modules/ticketing/hooks/useQContactSync';
+import { SyncDashboard } from '@/modules/maintenance/components/QContact/SyncDashboard';
+import { SyncTrigger } from '@/modules/maintenance/components/QContact/SyncTrigger';
+import { SyncAuditLog } from '@/modules/maintenance/components/QContact/SyncAuditLog';
+import { useTriggerManualSync } from '@/modules/maintenance/hooks/useQContactSync';
 
 // Weekly Import component
-import { WeeklyImportWizard } from '@/modules/ticketing/components/WeeklyImport/WeeklyImportWizard';
+import { WeeklyImportWizard } from '@/modules/maintenance/components/WeeklyImport/WeeklyImportWizard';
 
 // Import History types
 interface ImportError {

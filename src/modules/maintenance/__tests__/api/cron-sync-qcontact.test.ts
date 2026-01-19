@@ -17,7 +17,7 @@ import { POST, GET } from '@/app/api/ticketing/cron/sync-qcontact/route';
 import { NextRequest } from 'next/server';
 
 // Mock dependencies
-vi.mock('@/modules/ticketing/jobs/qcontactSync', () => ({
+vi.mock('@/modules/maintenance/jobs/qcontactSync', () => ({
   runSyncJob: vi.fn(),
 }));
 
@@ -30,7 +30,7 @@ vi.mock('@/lib/logger', () => ({
   })),
 }));
 
-import { runSyncJob } from '@/modules/ticketing/jobs/qcontactSync';
+import { runSyncJob } from '@/modules/maintenance/jobs/qcontactSync';
 
 describe('POST /api/ticketing/cron/sync-qcontact', () => {
   beforeEach(() => {

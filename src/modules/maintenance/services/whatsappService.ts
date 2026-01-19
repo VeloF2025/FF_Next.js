@@ -372,14 +372,14 @@ export class WhatsAppService {
     // Update notification in database
     if (status === NotificationStatus.FAILED) {
       await query(
-        `UPDATE whatsapp_notifications
+        `UPDATE maintenance_whatsapp_notifications
          SET status = $1, error_message = $2
          WHERE waha_message_id = $3`,
         [status, payload.error || 'Message delivery failed', payload.message_id]
       );
     } else {
       await query(
-        `UPDATE whatsapp_notifications
+        `UPDATE maintenance_whatsapp_notifications
          SET status = $1, ${updateField} = $2
          WHERE waha_message_id = $3`,
         [status, updateValue, payload.message_id]
@@ -400,7 +400,7 @@ export class WhatsAppService {
     notificationId: string
   ): Promise<NotificationDeliveryStatus | null> {
     const notification = await queryOne<WhatsAppNotification>(
-      'SELECT * FROM whatsapp_notifications WHERE id = $1',
+      'SELECT * FROM maintenance_whatsapp_notifications WHERE id = $1',
       [notificationId]
     );
 
@@ -432,7 +432,7 @@ export class WhatsAppService {
    */
   async retryNotification(notificationId: string): Promise<boolean> {
     const notification = await queryOne<WhatsAppNotification>(
-      'SELECT * FROM whatsapp_notifications WHERE id = $1',
+      'SELECT * FROM maintenance_whatsapp_notifications WHERE id = $1',
       [notificationId]
     );
 
@@ -458,7 +458,7 @@ export class WhatsAppService {
 
       // Update notification
       await query(
-        `UPDATE whatsapp_notifications
+        `UPDATE maintenance_whatsapp_notifications
          SET status = $1, waha_message_id = $2, sent_at = NOW(), error_message = NULL
          WHERE id = $3`,
         [NotificationStatus.SENT, wahaResponse.id, notificationId]
@@ -636,7 +636,7 @@ export class WhatsAppService {
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const queryText = `SELECT * FROM whatsapp_notifications ${whereClause} ORDER BY created_at DESC`;
+    const queryText = `SELECT * FROM maintenance_whatsapp_notifications ${whereClause} ORDER BY created_at DESC`;
     const notifications = await query<WhatsAppNotification>(queryText, params);
 
     // Calculate statistics
@@ -921,7 +921,7 @@ export class WhatsAppService {
     data: Omit<WhatsAppNotification, 'id' | 'created_at'>
   ): Promise<WhatsAppNotification> {
     const result = await query<WhatsAppNotification>(
-      `INSERT INTO whatsapp_notifications (
+      `INSERT INTO maintenance_whatsapp_notifications (
         ticket_id, recipient_type, recipient_phone, recipient_name,
         message_template, message_content, status, waha_message_id,
         sent_at, delivered_at, read_at, error_message

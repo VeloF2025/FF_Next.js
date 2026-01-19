@@ -26,9 +26,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getDefaultWhatsAppService } from '@/modules/ticketing/services/whatsappService';
-import type { NotificationFilters } from '@/modules/ticketing/types/whatsapp';
-import { NotificationStatus, RecipientType } from '@/modules/ticketing/types/whatsapp';
+import { getDefaultWhatsAppService } from '@/modules/maintenance/services/whatsappService';
+import type { NotificationFilters } from '@/modules/maintenance/types/whatsapp';
+import { NotificationStatus, RecipientType } from '@/modules/maintenance/types/whatsapp';
 
 // 🟢 WORKING: Logger instance for notification status API
 const logger = createLogger('ticketing:api:notifications:status');

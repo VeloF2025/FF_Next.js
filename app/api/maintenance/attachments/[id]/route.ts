@@ -19,7 +19,7 @@ import { createLogger } from '@/lib/logger';
 import {
   getAttachmentById,
   deleteAttachment,
-} from '@/modules/ticketing/services/attachmentService';
+} from '@/modules/maintenance/services/attachmentService';
 
 const logger = createLogger('ticketing:api:attachment');
 

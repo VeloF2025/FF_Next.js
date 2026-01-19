@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Services Exports
+ * Maintenance Module - Services Exports
  * 🟢 WORKING: Central export point for all ticketing services (server-side only)
  */
 

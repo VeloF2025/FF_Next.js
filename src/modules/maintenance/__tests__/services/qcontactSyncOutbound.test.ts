@@ -754,7 +754,7 @@ describe('QContact Outbound Sync Service', () => {
 
       // Mock: Create sync log with specific structure
       const logSql = `
-    INSERT INTO qcontact_sync_log (
+    INSERT INTO maintenance_qcontact_sync_log (
       ticket_id,
       qcontact_ticket_id,
       sync_direction,
@@ -774,7 +774,7 @@ describe('QContact Outbound Sync Service', () => {
 
       // Verify sync log was attempted to be created
       expect(queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO qcontact_sync_log'),
+        expect.stringContaining('INSERT INTO maintenance_qcontact_sync_log'),
         expect.arrayContaining([
           ticketId,
           qcontactTicketId,
@@ -813,7 +813,7 @@ describe('QContact Outbound Sync Service', () => {
 
       // Verify error was logged (3rd call to queryOne)
       const logCall = vi.mocked(queryOne).mock.calls[2];
-      expect(logCall[0]).toContain('INSERT INTO qcontact_sync_log');
+      expect(logCall[0]).toContain('INSERT INTO maintenance_qcontact_sync_log');
       expect(logCall[1]).toEqual([
         ticketId,
         qcontactTicketId,

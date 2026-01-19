@@ -1,5 +1,5 @@
 /**
- * Ticketing Module - Ticket Types, Priorities, and Sources
+ * Maintenance Module - Ticket Types, Priorities, and Sources
  * 🟢 WORKING: Ticket classification constants with labels and descriptions
  *
  * Defines all ticket types, priority levels, and source channels
@@ -24,8 +24,8 @@ export interface TicketTypeMetadata {
  * 🟢 WORKING: All ticket types with metadata for UI display
  */
 export const TICKET_TYPE_DEFINITIONS: Record<TicketType, TicketTypeMetadata> = {
-  [TicketType.MAINTENANCE]: {
-    value: TicketType.MAINTENANCE,
+  [TicketType.FAULT_REPAIR]: {
+    value: TicketType.FAULT_REPAIR,
     label: 'Maintenance',
     description: 'Repair or fix existing fiber network issue or fault',
     icon: 'Build',

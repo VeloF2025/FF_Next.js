@@ -125,7 +125,7 @@ describe('Handover Service', () => {
       vi.mocked(query).mockResolvedValueOnce(mockAttachments);
       vi.mocked(query).mockResolvedValueOnce(mockVerificationSteps);
 
-      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_MAINTENANCE);
+      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_OPS);
 
       expect(result.can_handover).toBe(false);
       expect(result.blocking_issues.length).toBeGreaterThan(0);
@@ -156,7 +156,7 @@ describe('Handover Service', () => {
       vi.mocked(query).mockResolvedValueOnce(mockAttachments);
       vi.mocked(query).mockResolvedValueOnce(mockVerificationSteps);
 
-      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_MAINTENANCE);
+      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_OPS);
 
       expect(result.can_handover).toBe(false);
       expect(result.gates_failed.some(g => g.gate_name === HandoverGateName.PHOTOS_ARCHIVED)).toBe(true);
@@ -186,7 +186,7 @@ describe('Handover Service', () => {
       vi.mocked(query).mockResolvedValueOnce(mockAttachments);
       vi.mocked(query).mockResolvedValueOnce(mockVerificationSteps);
 
-      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_MAINTENANCE);
+      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_OPS);
 
       expect(result.can_handover).toBe(false);
       expect(result.gates_failed.some(g => g.gate_name === HandoverGateName.ONT_PON_VERIFIED)).toBe(true);
@@ -216,7 +216,7 @@ describe('Handover Service', () => {
       vi.mocked(query).mockResolvedValueOnce(mockAttachments);
       vi.mocked(query).mockResolvedValueOnce(mockVerificationSteps);
 
-      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_MAINTENANCE);
+      const result = await validateHandoverGate(ticketId, HandoverType.QA_TO_OPS);
 
       expect(result.can_handover).toBe(false);
       expect(result.gates_failed.some(g => g.gate_name === HandoverGateName.CONTRACTOR_ASSIGNED)).toBe(true);
@@ -366,10 +366,10 @@ describe('Handover Service', () => {
       // 🟢 WORKING: Test creating QA to maintenance handover
       const payload: CreateHandoverSnapshotPayload = {
         ticket_id: '123e4567-e89b-12d3-a456-426614174000',
-        handover_type: HandoverType.QA_TO_MAINTENANCE,
+        handover_type: HandoverType.QA_TO_OPS,
         from_owner_type: OwnerType.QA,
         from_owner_id: 'qa-team-uuid',
-        to_owner_type: OwnerType.MAINTENANCE,
+        to_owner_type: OwnerType.OPS,
         to_owner_id: 'maintenance-team-uuid',
         handover_by: 'user-uuid-qa-manager'
       };
@@ -462,9 +462,9 @@ describe('Handover Service', () => {
 
       const result = await createHandoverSnapshot(payload);
 
-      expect(result.handover_type).toBe(HandoverType.QA_TO_MAINTENANCE);
+      expect(result.handover_type).toBe(HandoverType.QA_TO_OPS);
       expect(result.from_owner_type).toBe(OwnerType.QA);
-      expect(result.to_owner_type).toBe(OwnerType.MAINTENANCE);
+      expect(result.to_owner_type).toBe(OwnerType.OPS);
     });
 
     it('should throw error if ticket not found', async () => {
@@ -524,14 +524,14 @@ describe('Handover Service', () => {
         {
           id: 'snapshot-uuid-002',
           ticket_id: ticketId,
-          handover_type: HandoverType.QA_TO_MAINTENANCE,
+          handover_type: HandoverType.QA_TO_OPS,
           snapshot_data: {} as any,
           evidence_links: [],
           decisions: [],
           guarantee_status: null,
           from_owner_type: OwnerType.QA,
           from_owner_id: 'qa-uuid',
-          to_owner_type: OwnerType.MAINTENANCE,
+          to_owner_type: OwnerType.OPS,
           to_owner_id: 'maintenance-uuid',
           handover_at: new Date('2024-01-20T14:00:00Z'),
           handover_by: 'user-uuid-002',
@@ -549,7 +549,7 @@ describe('Handover Service', () => {
       expect(result.ticket_uid).toBe(ticketUid);
       expect(result.handovers).toHaveLength(2);
       expect(result.total_handovers).toBe(2);
-      expect(result.current_owner_type).toBe(OwnerType.MAINTENANCE);
+      expect(result.current_owner_type).toBe(OwnerType.OPS);
       expect(result.current_owner_id).toBe('maintenance-uuid');
     });
 
@@ -652,7 +652,7 @@ describe('Handover Service', () => {
       vi.mocked(query).mockResolvedValueOnce(mockAttachments);
       vi.mocked(query).mockResolvedValueOnce(mockVerificationSteps);
 
-      const result = await canHandover(ticketId, HandoverType.QA_TO_MAINTENANCE);
+      const result = await canHandover(ticketId, HandoverType.QA_TO_OPS);
 
       expect(result).toBe(true);
     });
@@ -675,7 +675,7 @@ describe('Handover Service', () => {
       vi.mocked(query).mockResolvedValueOnce(mockAttachments);
       vi.mocked(query).mockResolvedValueOnce(mockVerificationSteps);
 
-      const result = await canHandover(ticketId, HandoverType.QA_TO_MAINTENANCE);
+      const result = await canHandover(ticketId, HandoverType.QA_TO_OPS);
 
       expect(result).toBe(false);
     });

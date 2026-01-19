@@ -19,12 +19,12 @@ import { createLogger } from '@/lib/logger';
 import {
   uploadAttachment,
   listAttachmentsForTicket
-} from '@/modules/ticketing/services/attachmentService';
+} from '@/modules/maintenance/services/attachmentService';
 import {
   FileType,
   AttachmentFilters,
   FileUploadRequest
-} from '@/modules/ticketing/types/attachment';
+} from '@/modules/maintenance/types/attachment';
 
 const logger = createLogger('ticketing:api:ticket-attachments');
 

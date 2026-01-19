@@ -157,7 +157,7 @@ async function getHandoverByIdAPI(handoverId: string): Promise<HandoverSnapshot>
  * ```tsx
  * const { data: validation, isLoading } = useHandoverGateValidation(
  *   ticketId,
- *   HandoverType.QA_TO_MAINTENANCE
+ *   HandoverType.QA_TO_OPS
  * );
  *
  * if (validation?.can_handover) {
@@ -203,10 +203,10 @@ export function useHandoverGateValidation(
  * createHandover.mutate(
  *   {
  *     ticket_id: ticketId,
- *     handover_type: HandoverType.QA_TO_MAINTENANCE,
+ *     handover_type: HandoverType.QA_TO_OPS,
  *     from_owner_type: OwnerType.QA,
  *     from_owner_id: qaUserId,
- *     to_owner_type: OwnerType.MAINTENANCE,
+ *     to_owner_type: OwnerType.OPS,
  *     to_owner_id: maintUserId,
  *     handover_by: currentUser.id,
  *   },
@@ -330,7 +330,7 @@ export function useHandover(handoverId: string, enabled = true) {
  *   createHandover,
  *   isValidating,
  *   isCreating,
- * } = useHandoverWizard(ticketId, HandoverType.QA_TO_MAINTENANCE);
+ * } = useHandoverWizard(ticketId, HandoverType.QA_TO_OPS);
  *
  * if (isValidating) return <Spinner />;
  *

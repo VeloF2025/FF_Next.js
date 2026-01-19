@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getHandoverHistory } from '@/modules/ticketing/services/handoverService';
+import { getHandoverHistory } from '@/modules/maintenance/services/handoverService';
 
 const logger = createLogger('ticketing:api:handover-history');
 

@@ -13,8 +13,8 @@
  * - Handover history and audit trail
  */
 
-import { HandoverWizard } from '@/modules/ticketing/components/Handover/HandoverWizard';
-import { HandoverHistory } from '@/modules/ticketing/components/Handover/HandoverHistory';
+import { HandoverWizard } from '@/modules/maintenance/components/Handover/HandoverWizard';
+import { HandoverHistory } from '@/modules/maintenance/components/Handover/HandoverHistory';
 import { useState, useEffect, useCallback } from 'react';
 import {
   ArrowRight,
@@ -27,7 +27,7 @@ import {
   ClipboardCheck,
   XCircle,
 } from 'lucide-react';
-import { HandoverType, OwnerType } from '@/modules/ticketing/types/handover';
+import { HandoverType, OwnerType } from '@/modules/maintenance/types/handover';
 
 type ViewMode = 'pending' | 'history';
 type HandoverFilter = 'all' | HandoverType;
@@ -126,14 +126,14 @@ export default function HandoverCenterPageClient() {
           color: 'text-blue-400',
           bgColor: 'bg-blue-500/20',
         };
-      case HandoverType.QA_TO_MAINTENANCE:
+      case HandoverType.QA_TO_OPS:
         return {
           label: 'QA → Maintenance',
           icon: Wrench,
           color: 'text-purple-400',
           bgColor: 'bg-purple-500/20',
         };
-      case HandoverType.MAINTENANCE_COMPLETE:
+      case HandoverType.OPS_COMPLETE:
         return {
           label: 'Maintenance Complete',
           icon: Shield,
@@ -157,7 +157,7 @@ export default function HandoverCenterPageClient() {
         return 'Build Team';
       case OwnerType.QA:
         return 'QA Team';
-      case OwnerType.MAINTENANCE:
+      case OwnerType.OPS:
         return 'Maintenance Team';
       default:
         return 'Unassigned';
@@ -336,9 +336,9 @@ export default function HandoverCenterPageClient() {
               Build → QA
             </button>
             <button
-              onClick={() => setFilter(HandoverType.QA_TO_MAINTENANCE)}
+              onClick={() => setFilter(HandoverType.QA_TO_OPS)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                filter === HandoverType.QA_TO_MAINTENANCE
+                filter === HandoverType.QA_TO_OPS
                   ? 'bg-blue-600 text-white'
                   : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
               }`}
@@ -346,9 +346,9 @@ export default function HandoverCenterPageClient() {
               QA → Maintenance
             </button>
             <button
-              onClick={() => setFilter(HandoverType.MAINTENANCE_COMPLETE)}
+              onClick={() => setFilter(HandoverType.OPS_COMPLETE)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                filter === HandoverType.MAINTENANCE_COMPLETE
+                filter === HandoverType.OPS_COMPLETE
                   ? 'bg-green-600 text-white'
                   : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
               }`}

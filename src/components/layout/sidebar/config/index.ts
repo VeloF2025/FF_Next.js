@@ -4,7 +4,7 @@
 
 export { mainSection } from './mainSection';
 export { projectSection } from './projectSection';
-export { ticketingSection } from './ticketingSection';
+export { maintenanceSection } from './maintenanceSection';
 export { peopleSection } from './peopleSection';
 export { clientsSection } from './clientsSection';
 export { procurementSection } from './procurementSection';

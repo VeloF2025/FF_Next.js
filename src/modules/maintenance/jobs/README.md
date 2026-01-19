@@ -147,7 +147,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ### Programmatic Usage
 
 ```typescript
-import { runSyncJob, getSyncJobHistory, getLastSyncJobRun } from '@/modules/ticketing/jobs/qcontactSync';
+import { runSyncJob, getSyncJobHistory, getLastSyncJobRun } from '@/modules/maintenance/jobs/qcontactSync';
 
 // Run a sync job
 const result = await runSyncJob();

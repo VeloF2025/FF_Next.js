@@ -64,7 +64,7 @@ describe('GuaranteeService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockGuaranteePeriod);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM guarantee_periods'),
+        expect.stringContaining('SELECT * FROM maintenance_guarantee_periods'),
         [mockProjectId]
       );
     });
@@ -120,7 +120,7 @@ describe('GuaranteeService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockCreatedPeriod);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO guarantee_periods'),
+        expect.stringContaining('INSERT INTO maintenance_guarantee_periods'),
         expect.arrayContaining([
           mockProjectId,
           90, // Default installation days
@@ -160,7 +160,7 @@ describe('GuaranteeService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockCreatedPeriod);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO guarantee_periods'),
+        expect.stringContaining('INSERT INTO maintenance_guarantee_periods'),
         [mockProjectId, 60, 180, false, false]
       );
     });
@@ -221,7 +221,7 @@ describe('GuaranteeService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockUpdatedPeriod);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE guarantee_periods'),
+        expect.stringContaining('UPDATE maintenance_guarantee_periods'),
         expect.arrayContaining([120, mockProjectId])
       );
     });
@@ -254,7 +254,7 @@ describe('GuaranteeService (TDD)', () => {
       // Assert
       expect(result).toEqual(mockUpdatedPeriod);
       expect(db.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE guarantee_periods'),
+        expect.stringContaining('UPDATE maintenance_guarantee_periods'),
         expect.arrayContaining([60, 180, false, false, mockProjectId])
       );
     });
@@ -350,7 +350,7 @@ describe('GuaranteeService (TDD)', () => {
 
       // Verify UPDATE was called for tickets
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE tickets'),
+        expect.stringContaining('UPDATE maintenance_tickets'),
         expect.arrayContaining([
           GuaranteeStatus.UNDER_GUARANTEE,
           expiryDate,

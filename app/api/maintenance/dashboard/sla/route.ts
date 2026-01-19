@@ -25,8 +25,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getSLACompliance } from '@/modules/ticketing/services/dashboardService';
-import type { DashboardFilters } from '@/modules/ticketing/services/dashboardService';
+import { getSLACompliance } from '@/modules/maintenance/services/dashboardService';
+import type { DashboardFilters } from '@/modules/maintenance/services/dashboardService';
 
 const logger = createLogger('ticketing:api:dashboard:sla');
 

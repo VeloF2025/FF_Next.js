@@ -224,7 +224,7 @@ describe('WhatsAppService', () => {
 
       // Verify database insert
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO whatsapp_notifications'),
+        expect.stringContaining('INSERT INTO maintenance_whatsapp_notifications'),
         expect.any(Array)
       );
     });
@@ -295,7 +295,7 @@ describe('WhatsAppService', () => {
 
       // Verify error was stored in database
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO whatsapp_notifications'),
+        expect.stringContaining('INSERT INTO maintenance_whatsapp_notifications'),
         expect.any(Array)
       );
     });
@@ -373,7 +373,7 @@ describe('WhatsAppService', () => {
       await service.handleWebhook(webhookPayload);
 
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE whatsapp_notifications'),
+        expect.stringContaining('UPDATE maintenance_whatsapp_notifications'),
         expect.arrayContaining([expect.anything(), expect.anything(), expect.any(String)])
       );
     });
@@ -391,7 +391,7 @@ describe('WhatsAppService', () => {
       await service.handleWebhook(webhookPayload);
 
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE whatsapp_notifications'),
+        expect.stringContaining('UPDATE maintenance_whatsapp_notifications'),
         expect.arrayContaining([expect.anything(), expect.anything(), expect.any(String)])
       );
     });
@@ -410,7 +410,7 @@ describe('WhatsAppService', () => {
       await service.handleWebhook(webhookPayload);
 
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE whatsapp_notifications'),
+        expect.stringContaining('UPDATE maintenance_whatsapp_notifications'),
         expect.any(Array)
       );
     });
@@ -454,7 +454,7 @@ describe('WhatsAppService', () => {
       expect(result).toBe(true);
       expect(mockFetch).toHaveBeenCalled();
       expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE whatsapp_notifications'),
+        expect.stringContaining('UPDATE maintenance_whatsapp_notifications'),
         expect.any(Array)
       );
     });

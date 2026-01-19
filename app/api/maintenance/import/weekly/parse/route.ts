@@ -18,7 +18,7 @@ import {
   parseExcelFile,
   generatePreview,
   createDefaultColumnMapping,
-} from '@/modules/ticketing/utils/excelParser';
+} from '@/modules/maintenance/utils/excelParser';
 
 // Known ticket data column names (case-insensitive)
 const TICKET_COLUMNS = [

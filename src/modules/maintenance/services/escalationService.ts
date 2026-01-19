@@ -81,7 +81,7 @@ export async function createEscalation(
 
     // 🟢 WORKING: Insert escalation record
     const queryText = `
-      INSERT INTO repeat_fault_escalations (
+      INSERT INTO maintenance_escalations (
         scope_type,
         scope_value,
         project_id,
@@ -161,7 +161,7 @@ export async function createInfrastructureTicket(
       source: TicketSource.CONSTRUCTION,
       title,
       description,
-      ticket_type: TicketType.MAINTENANCE,
+      ticket_type: TicketType.FAULT_REPAIR,
       priority: TicketPriority.HIGH,
       project_id: escalation.project_id || undefined,
       created_by: createdBy,
@@ -176,7 +176,7 @@ export async function createInfrastructureTicket(
 
     // Link ticket to escalation
     const updateQuery = `
-      UPDATE repeat_fault_escalations
+      UPDATE maintenance_escalations
       SET escalation_ticket_id = $1
       WHERE id = $2
       RETURNING *
@@ -276,7 +276,7 @@ export async function getEscalationById(escalationId: string): Promise<RepeatFau
 
   try {
     const queryText = `
-      SELECT * FROM repeat_fault_escalations
+      SELECT * FROM maintenance_escalations
       WHERE id = $1
     `;
 
@@ -345,7 +345,7 @@ export async function listEscalations(
 
     // Build query
     let queryText = `
-      SELECT * FROM repeat_fault_escalations
+      SELECT * FROM maintenance_escalations
     `;
 
     if (whereClauses.length > 0) {
@@ -404,7 +404,7 @@ export async function resolveEscalation(
     });
 
     const queryText = `
-      UPDATE repeat_fault_escalations
+      UPDATE maintenance_escalations
       SET
         status = $1,
         resolution_notes = $2,
@@ -458,7 +458,7 @@ export async function updateEscalationStatus(
     });
 
     const queryText = `
-      UPDATE repeat_fault_escalations
+      UPDATE maintenance_escalations
       SET status = $1
       WHERE id = $2
       RETURNING *
@@ -491,7 +491,7 @@ export async function checkForDuplicateEscalation(
 ): Promise<RepeatFaultEscalation | null> {
   try {
     const queryText = `
-      SELECT * FROM repeat_fault_escalations
+      SELECT * FROM maintenance_escalations
       WHERE scope_type = $1
         AND scope_value = $2
         AND status IN ('open', 'investigating')
@@ -551,7 +551,7 @@ export async function linkContributingTickets(
 
     // Update escalation
     const queryText = `
-      UPDATE repeat_fault_escalations
+      UPDATE maintenance_escalations
       SET
         contributing_tickets = $1,
         fault_count = $2

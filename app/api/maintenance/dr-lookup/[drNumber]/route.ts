@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { lookupDR } from '@/modules/ticketing/services/drLookupService';
+import { lookupDR } from '@/modules/maintenance/services/drLookupService';
 
 const logger = createLogger('ticketing:api:dr-lookup');
 

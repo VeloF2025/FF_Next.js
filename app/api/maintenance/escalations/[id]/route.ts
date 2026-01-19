@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getEscalationById } from '@/modules/ticketing/services/escalationService';
+import { getEscalationById } from '@/modules/maintenance/services/escalationService';
 
 const logger = createLogger('ticketing:api:escalations:id');
 

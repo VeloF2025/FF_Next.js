@@ -1,8 +1,8 @@
 /**
- * Ticketing Module - Core Ticket Types
+ * Maintenance Module - Core Ticket Types
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
- * Defines TypeScript types for tickets, status tracking, priorities,
+ * Defines TypeScript types for maintenance tickets, status tracking, priorities,
  * fault attribution, and all ticket-related enums.
  */
 
@@ -52,7 +52,7 @@ export enum TicketSource {
  * Ticket Type - Classification of ticket
  */
 export enum TicketType {
-  MAINTENANCE = 'maintenance',
+  FAULT_REPAIR = 'fault_repair', // Renamed from MAINTENANCE
   NEW_INSTALLATION = 'new_installation',
   MODIFICATION = 'modification',
   ONT_SWAP = 'ont_swap',
@@ -82,7 +82,7 @@ export enum TicketStatus {
   QA_REJECTED = 'qa_rejected',
   QA_APPROVED = 'qa_approved',
   PENDING_HANDOVER = 'pending_handover',
-  HANDED_TO_MAINTENANCE = 'handed_to_maintenance',
+  HANDED_TO_OPS = 'handed_to_ops', // Renamed from HANDED_TO_MAINTENANCE
   CLOSED = 'closed',
   CANCELLED = 'cancelled',
 }

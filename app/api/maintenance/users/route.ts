@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
-import { getUsersForDropdown } from '@/modules/ticketing/services/teamService';
+import { getUsersForDropdown } from '@/modules/maintenance/services/teamService';
 
 const logger = createLogger('ticketing:api:users');
 

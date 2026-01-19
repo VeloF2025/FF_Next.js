@@ -1,5 +1,5 @@
-// 🟢 WORKING: Utility functions for FibreFlow Ticketing Module
-// This file exports all utility functions for the ticketing module
+// 🟢 WORKING: Utility functions for FibreFlow Maintenance Module
+// This file exports all utility functions for the maintenance module
 
 // Database connection utility (subtask 1.4) ✅
 export { db, getConnection, query, queryOne, transaction, healthCheck, closeConnection } from './db';

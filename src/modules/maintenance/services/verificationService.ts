@@ -64,7 +64,7 @@ export async function initializeVerificationSteps(ticketId: string): Promise<Ver
 
   // 🟢 WORKING: Check if ticket exists
   const ticketExists = await queryOne<{ id: string }>(
-    'SELECT id FROM tickets WHERE id = $1',
+    'SELECT id FROM maintenance_tickets WHERE id = $1',
     [ticketId]
   );
 
@@ -74,7 +74,7 @@ export async function initializeVerificationSteps(ticketId: string): Promise<Ver
 
   // 🟢 WORKING: Check if steps already initialized
   const existingSteps = await query<VerificationStep>(
-    'SELECT id FROM verification_steps WHERE ticket_id = $1 LIMIT 1',
+    'SELECT id FROM maintenance_verification_steps WHERE ticket_id = $1 LIMIT 1',
     [ticketId]
   );
 
@@ -90,7 +90,7 @@ export async function initializeVerificationSteps(ticketId: string): Promise<Ver
       const template = VERIFICATION_STEP_TEMPLATES[stepNumber as VerificationStepNumber];
 
       const insertQuery = `
-        INSERT INTO verification_steps (
+        INSERT INTO maintenance_verification_steps (
           ticket_id,
           step_number,
           step_name,
@@ -171,7 +171,7 @@ export async function getVerificationSteps(ticketId: string): Promise<Verificati
       photo_verified,
       notes,
       created_at
-    FROM verification_steps
+    FROM maintenance_verification_steps
     WHERE ticket_id = $1
     ORDER BY step_number ASC`,
     [ticketId]
@@ -216,7 +216,7 @@ export async function getVerificationStep(
       photo_verified,
       notes,
       created_at
-    FROM verification_steps
+    FROM maintenance_verification_steps
     WHERE ticket_id = $1 AND step_number = $2`,
     [ticketId, stepNumber]
   );
@@ -301,7 +301,7 @@ export async function updateVerificationStep(
   values.push(stepNumber);
 
   const updateQuery = `
-    UPDATE verification_steps
+    UPDATE maintenance_verification_steps
     SET ${updates.join(', ')}
     WHERE ticket_id = $${paramIndex++} AND step_number = $${paramIndex++}
     RETURNING
@@ -405,7 +405,7 @@ export async function isAllStepsComplete(ticketId: string): Promise<boolean> {
     `SELECT
       COUNT(*) FILTER (WHERE is_complete = true) as completed,
       COUNT(*) as total
-    FROM verification_steps
+    FROM maintenance_verification_steps
     WHERE ticket_id = $1`,
     [ticketId]
   );
@@ -441,7 +441,7 @@ export async function deleteVerificationSteps(ticketId: string): Promise<void> {
   }
 
   await query(
-    'DELETE FROM verification_steps WHERE ticket_id = $1',
+    'DELETE FROM maintenance_verification_steps WHERE ticket_id = $1',
     [ticketId]
   );
 
