@@ -361,10 +361,11 @@ export function QaWizardContainer({
           return (
             <React.Fragment key={phase}>
               {/* Step with circle and label */}
-              <div className="flex flex-col items-center min-w-[60px]">
+              <div className="flex flex-col items-center min-w-[40px] sm:min-w-[60px]">
                 <button
                   onClick={() => isClickable && goToPhase(phase)}
                   disabled={!isClickable}
+                  title={PHASE_LABELS[phase]}
                   className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 dark:ring-offset-gray-800'
@@ -375,9 +376,9 @@ export function QaWizardContainer({
                 >
                   {isComplete ? '✓' : index + 1}
                 </button>
-                {/* Label under circle */}
+                {/* Label under circle - hidden on mobile */}
                 <span
-                  className={`mt-1 text-xs leading-tight text-center transition-colors ${
+                  className={`mt-1 text-xs leading-tight text-center transition-colors hidden sm:block ${
                     isActive
                       ? 'font-semibold text-blue-600 dark:text-blue-400'
                       : isComplete
@@ -394,7 +395,7 @@ export function QaWizardContainer({
                   className={`flex-1 h-0.5 mt-3.5 mx-1 ${
                     index < currentIndex
                       ? 'bg-green-500'
-                      : 'bg-gray-200 dark:bg-gray-700'
+                      : 'bg-gray-300 dark:bg-gray-500'
                   }`}
                 />
               )}
@@ -464,6 +465,7 @@ export function QaWizardContainer({
             photoCount={state.prerequisites.photoCount}
             onComplete={handlePhotoReviewComplete}
             onBack={goToPreviousPhase}
+            onSkipToDecision={() => goToPhase('final_decision')}
           />
         );
 

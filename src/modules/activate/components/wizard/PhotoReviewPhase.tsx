@@ -25,6 +25,7 @@ interface PhotoReviewPhaseProps {
   photoCount: number;
   onComplete: (categorizedPhotos: Photo[], stepsCovered: number[], stepsMissing: number[]) => void;
   onBack: () => void;
+  onSkipToDecision?: () => void;
 }
 
 interface CategorizationState {
@@ -39,6 +40,7 @@ export function PhotoReviewPhase({
   photoCount,
   onComplete,
   onBack,
+  onSkipToDecision,
 }: PhotoReviewPhaseProps) {
   const [state, setState] = useState<CategorizationState>({
     status: 'pending',
@@ -553,12 +555,21 @@ export function PhotoReviewPhase({
             return (
               <div
                 key={step}
-                className={`p-3 rounded-lg text-center border ${
+                className={`p-3 rounded-lg text-center border relative ${
                   isMissing
                     ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20'
                     : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50'
                 }`}
               >
+                {/* Warning icon for missing steps */}
+                {isMissing && (
+                  <span
+                    className="absolute -top-1.5 -right-1.5 text-amber-500 text-sm"
+                    title={`No photos for Step ${step}`}
+                  >
+                    ⚠️
+                  </span>
+                )}
                 <div className={`text-xl font-bold ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                   {count}
                 </div>
@@ -593,12 +604,23 @@ export function PhotoReviewPhase({
           >
             ← Back
           </button>
-          <button
-            onClick={handleProceed}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Continue to Data Validation →
-          </button>
+          <div className="flex gap-2">
+            {onSkipToDecision && (
+              <button
+                onClick={onSkipToDecision}
+                className="px-4 py-2 border border-orange-500 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                title="Skip data validation and go directly to final decision"
+              >
+                Skip to Decision ⏭️
+              </button>
+            )}
+            <button
+              onClick={handleProceed}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Continue to Data Validation →
+            </button>
+          </div>
         </div>
       </div>
     );
