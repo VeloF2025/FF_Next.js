@@ -76,6 +76,20 @@ export function OverviewEditSection({ formData, handleInputChange }: OverviewEdi
               className={inputClasses}
             />
           </div>
+
+          <div>
+            <label className={labelClasses}>WhatsApp ID</label>
+            <input
+              type="text"
+              value={formData.whatsappId || ''}
+              onChange={(e) => handleInputChange('whatsappId', e.target.value)}
+              className={inputClasses}
+              placeholder="e.g., 27831234567@s.whatsapp.net"
+            />
+            <p className="mt-1 text-xs text-[var(--ff-text-secondary)]">
+              Used for QA feedback and direct messaging
+            </p>
+          </div>
         </div>
       </div>
 

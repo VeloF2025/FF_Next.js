@@ -14,6 +14,7 @@ interface DbStaff {
   email?: string;
   phone?: string;
   alternate_phone?: string;
+  whatsapp_id?: string;
   address?: string;
   city?: string;
   state?: string;
@@ -133,6 +134,7 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     email: dbStaff.email || '',
     phone: dbStaff.phone || '',
     alternativePhone: dbStaff.alternate_phone,
+    whatsappId: dbStaff.whatsapp_id,
     address: dbStaff.address || '',
     city: dbStaff.city || '',
     province: dbStaff.state || '',
@@ -245,6 +247,7 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
     email: staff.email,
     phone: staff.phone,
     alternate_phone: staff.alternativePhone,
+    whatsapp_id: staff.whatsappId,
     address: staff.address,
     city: staff.city,
     state: staff.province,

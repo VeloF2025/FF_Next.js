@@ -14,6 +14,7 @@ export interface StaffFormData {
   email: string;
   phone: string;
   alternativePhone?: string;
+  whatsappId?: string; // WhatsApp JID for direct messaging (e.g., 27831234567@s.whatsapp.net)
   employeeId: string;
   position: Position | string;
   department: Department | string; // Allow string for new departments

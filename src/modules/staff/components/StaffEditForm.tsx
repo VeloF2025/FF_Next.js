@@ -95,6 +95,7 @@ export function StaffEditForm() {
       // Add optional fields only if they exist
       if (staff.id) formUpdate.id = staff.id;
       if (staff.alternativePhone) formUpdate.alternativePhone = staff.alternativePhone;
+      if (staff.whatsappId) formUpdate.whatsappId = staff.whatsappId;
       if (staff.level) formUpdate.level = staff.level;
       if (staff.reportsTo) formUpdate.reportsTo = staff.reportsTo;
       if (staff.specializations) formUpdate.specializations = staff.specializations;
