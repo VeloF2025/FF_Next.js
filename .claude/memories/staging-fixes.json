@@ -4,6 +4,25 @@
     "issue": "Database authentication failed",
     "rootCause": "Wrong DB password in `.env.production`",
     "fixApplied": "Updated DATABASE_URL password via sed",
-    "command": "sshpass -p 'velo2026' ssh velo@100.96.203.105 \"sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' .env.p..."
+    "command": "sshpass -p 'velo2026' ssh velo@100.96.203.105 \"sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' .env.production\""
+  },
+  {
+    "date": "2026-01-19",
+    "issue": "Static assets 404 - _next/static/chunks/*.js and CSS returning 404",
+    "symptoms": [
+      "Page loads but with broken/missing CSS styling",
+      "Console shows 404 for commons-*.js, runtime-*.js, _app-*.js, *.css",
+      "Build manifest (_ssgManifest.js, _buildManifest.js) returns 404"
+    ],
+    "rootCause": "Service started BEFORE build completed - Next.js server running with stale build artifacts",
+    "diagnosis": [
+      "Check service start time: systemctl status fibreflow.service",
+      "Check build time: ls -la .next/BUILD_ID",
+      "Test direct access: curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/_next/static/css/<hash>.css",
+      "Files exist on disk but server returns 404 = timing mismatch"
+    ],
+    "fixApplied": "Restarted service to pick up completed build",
+    "command": "sshpass -p 'velo2026' ssh velo@100.96.203.105 \"echo 'velo2026' | sudo -S systemctl restart fibreflow.service\"",
+    "prevention": "Always run: npm run build && sudo systemctl restart fibreflow.service (build must complete BEFORE restart)"
   }
 ]
