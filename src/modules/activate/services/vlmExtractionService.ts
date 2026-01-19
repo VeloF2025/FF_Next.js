@@ -436,14 +436,70 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
 }
 
 /**
+ * Try extracting Step 9 data from multiple photos, return best result
+ * Tries each photo until successful extraction or exhausts all photos
+ */
+export async function extractStep9WithMultiplePhotos(
+  step9Urls: string[]
+): Promise<{ result: Step9Extraction | null; usedUrl: string | null }> {
+  if (step9Urls.length === 0) {
+    return { result: null, usedUrl: null };
+  }
+
+  log.info('VlmExtraction', `Trying ${step9Urls.length} Step 9 photos for extraction`);
+
+  let bestResult: Step9Extraction | null = null;
+  let bestUrl: string | null = null;
+  let bestScore = 0;
+
+  for (const url of step9Urls) {
+    try {
+      const result = await extractStep9Data(url);
+
+      // Calculate score based on what was successfully extracted
+      let score = 0;
+      if (result.ontSerial.success) score += 2 + result.ontSerial.confidence;
+      if (result.drNumber.success) score += 2 + result.drNumber.confidence;
+      if (result.greenLightsVisible) score += 1;
+
+      log.debug('VlmExtraction', `Step 9 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.ontSerial.serial}, DR=${result.drNumber.drNumber}`);
+
+      // Keep best result
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = result;
+        bestUrl = url;
+      }
+
+      // If we got both serial and DR number with high confidence, stop early
+      if (result.ontSerial.success && result.drNumber.success &&
+          result.ontSerial.confidence >= 0.8 && result.drNumber.confidence >= 0.8) {
+        log.info('VlmExtraction', `Found high-confidence Step 9 result, stopping early`);
+        break;
+      }
+    } catch (error) {
+      log.warn('VlmExtraction', `Failed to extract from ${url}: ${error}`);
+    }
+  }
+
+  if (bestResult) {
+    log.info('VlmExtraction', `Best Step 9 photo: ${bestUrl?.split('/').pop()}, score=${bestScore.toFixed(2)}`);
+  } else {
+    log.warn('VlmExtraction', `No successful Step 9 extraction from ${step9Urls.length} photos`);
+  }
+
+  return { result: bestResult, usedUrl: bestUrl };
+}
+
+/**
  * Run full extraction for a DR
  *
  * @param drNumber - DR number being processed
- * @param photos - Map of step number to photo URL
+ * @param photos - Map of step number to photo URL(s)
  */
 export async function runFullExtraction(
   drNumber: string,
-  photos: { step6Url?: string; step7Url?: string; step9Url?: string }
+  photos: { step6Url?: string; step7Url?: string; step9Url?: string; step9Urls?: string[] }
 ): Promise<FullExtractionResult> {
   const startTime = Date.now();
   log.info('VlmExtraction', `Running full extraction for ${drNumber}`);
@@ -464,8 +520,15 @@ export async function runFullExtraction(
     log.debug('VlmExtraction', `ONT serial Step 6: ${ontSerialStep6.success ? ontSerialStep6.serial : 'failed'}`);
   }
 
-  // Extract Step 9 data (front: serial + DR number)
-  if (photos.step9Url) {
+  // Extract Step 9 data - try multiple photos if provided
+  if (photos.step9Urls && photos.step9Urls.length > 0) {
+    const { result } = await extractStep9WithMultiplePhotos(photos.step9Urls);
+    step9 = result;
+    if (step9) {
+      log.debug('VlmExtraction', `Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
+    }
+  } else if (photos.step9Url) {
+    // Fallback to single URL for backward compatibility
     step9 = await extractStep9Data(photos.step9Url);
     log.debug('VlmExtraction', `Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
   }

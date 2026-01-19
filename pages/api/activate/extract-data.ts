@@ -168,17 +168,20 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // Find photos for each extraction step
     const step6Photo = photos.find((p) => p.step === 6);
     const step7Photo = photos.find((p) => p.step === 7);
-    const step9Photo = photos.find((p) => p.step === 9);
+    // Get ALL Step 9 photos - VLM will try each to find best close-up
+    const step9Photos = photos.filter((p) => p.step === 9);
 
     // Use full OneMap URLs for extraction (relative URLs don't work in server context)
     const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
     const makeOneMapUrl = (filename: string) => `${ONEMAP_HOST}/api/photo/${dropNumber}/${filename}`;
 
-    // Run VLM extraction
+    log.info('ExtractData', `Found photos: Step6=${step6Photo?.filename || 'none'}, Step7=${step7Photo?.filename || 'none'}, Step9=${step9Photos.length} photos`);
+
+    // Run VLM extraction with multiple Step 9 photos
     const extraction = await runFullExtraction(dropNumber, {
       step6Url: step6Photo ? makeOneMapUrl(step6Photo.filename) : undefined,
       step7Url: step7Photo ? makeOneMapUrl(step7Photo.filename) : undefined,
-      step9Url: step9Photo ? makeOneMapUrl(step9Photo.filename) : undefined,
+      step9Urls: step9Photos.length > 0 ? step9Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
     });
 
     // Build validation data
