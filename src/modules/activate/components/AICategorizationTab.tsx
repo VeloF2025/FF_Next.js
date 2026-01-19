@@ -58,6 +58,11 @@ export function AICategorizationTab({
   const [oneMapPhotoCount, setOneMapPhotoCount] = useState<number | null>(null);
   const [isCheckingForNewPhotos, setIsCheckingForNewPhotos] = useState(false);
 
+  // Track expanded state for approved view
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   // Load current categorization state and check for new photos
   useEffect(() => {
     loadCategorizationState();
@@ -247,6 +252,49 @@ export function AICategorizationTab({
     });
   }
 
+  async function updatePhotoStep(filename: string, newStep: number) {
+    setIsSavingEdit(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/activate/update-photo-step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dropNumber,
+          photoFilename: filename,
+          newStep,
+          reason: 'Manual edit',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state
+        setState((prev) => ({
+          ...prev,
+          results: prev.results.map((r) => {
+            if (r.photo_filename === filename) {
+              return {
+                ...r,
+                human_override_step: newStep === r.vlm_predicted_step ? null : newStep,
+                human_approved: newStep === r.vlm_predicted_step,
+              };
+            }
+            return r;
+          }),
+        }));
+        setEditingPhoto(null);
+      } else {
+        setError(data.message || 'Failed to update photo step');
+      }
+    } catch (err) {
+      setError('Failed to update photo step');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
   function getConfidenceColor(confidence: number): string {
     if (confidence >= 0.9) return 'text-green-600 dark:text-green-400';
     if (confidence >= 0.7) return 'text-yellow-600 dark:text-yellow-400';
@@ -377,10 +425,16 @@ export function AICategorizationTab({
               disabled={isProcessing}
               className="px-4 py-2 text-sm bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 transition-colors"
             >
-              Re-categorize
+              {isProcessing ? 'Re-categorizing...' : 'Re-categorize'}
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
 
         {/* Show approved results summary */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -413,7 +467,7 @@ export function AICategorizationTab({
           });
           if (discardedPhotos.length === 0) return null;
           return (
-            <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
               <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
                 <span className="text-lg">🗑️</span>
                 <span className="font-medium">
@@ -423,6 +477,111 @@ export function AICategorizationTab({
             </div>
           );
         })()}
+
+        {/* Toggle to show/edit individual photos */}
+        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setShowAllPhotos(!showAllPhotos)}
+            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📷</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                {showAllPhotos ? 'Hide' : 'Edit'} Individual Photos
+              </span>
+            </div>
+            <span className="text-gray-500 dark:text-gray-400 text-xl">
+              {showAllPhotos ? '▲' : '▼'}
+            </span>
+          </button>
+
+          {showAllPhotos && (
+            <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+              {state.results.map((result) => {
+                const finalStep = result.human_override_step ?? result.vlm_predicted_step;
+                const isEditing = editingPhoto === result.photo_filename;
+                const wasOverridden = result.human_override_step !== null;
+
+                return (
+                  <div
+                    key={result.photo_filename}
+                    className={`border rounded-lg p-3 ${
+                      wasOverridden
+                        ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/10'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex gap-3 items-center">
+                      {/* Thumbnail */}
+                      <img
+                        src={`/api/activate/photo/${dropNumber}/${result.photo_filename}`}
+                        alt={result.photo_filename}
+                        className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-gray-600 flex-shrink-0"
+                      />
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {result.photo_filename}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {isEditing ? (
+                            <select
+                              autoFocus
+                              defaultValue={finalStep}
+                              onChange={(e) => updatePhotoStep(result.photo_filename, parseInt(e.target.value))}
+                              disabled={isSavingEdit}
+                              className="text-sm border border-blue-300 dark:border-blue-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              onBlur={() => !isSavingEdit && setEditingPhoto(null)}
+                            >
+                              <option value="0" className="text-red-600">
+                                0: {STEP_LABELS[0]}
+                              </option>
+                              {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
+                                <option key={step} value={step}>
+                                  {step}: {STEP_LABELS[step]}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                Step {finalStep}: {STEP_LABELS[finalStep]}
+                              </span>
+                              {wasOverridden && (
+                                <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">
+                                  Edited
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        {!isEditing && result.vlm_predicted_step !== finalStep && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            VLM predicted: Step {result.vlm_predicted_step} ({Math.round(result.vlm_confidence * 100)}%)
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Edit button */}
+                      {!isEditing && (
+                        <button
+                          onClick={() => setEditingPhoto(result.photo_filename)}
+                          className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {isEditing && isSavingEdit && (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400 flex-shrink-0"></div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
