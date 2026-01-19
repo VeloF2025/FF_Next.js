@@ -29,6 +29,10 @@
     {
       "path": "/api/cron/sync-onemap-serials",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-onemap-data",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
