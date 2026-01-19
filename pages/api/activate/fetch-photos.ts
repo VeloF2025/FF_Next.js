@@ -71,7 +71,8 @@ async function handlePost(
     // Check if already fetched (skip unless forced)
     if (!force) {
       const existingResult = await pool.query(
-        `SELECT photo_source, photo_count, photos_metadata, ont_serial_scanned, ups_serial_scanned
+        `SELECT photo_source, photo_count, photos_metadata, ont_serial_scanned, ups_serial_scanned,
+                vlm_categorization_results, vlm_categorization_status
          FROM dr_photo_unified_reviews
          WHERE drop_number = $1 AND photo_source IS NOT NULL`,
         [dropNumber]
@@ -82,11 +83,28 @@ async function handlePost(
         log.info(`Photos already fetched for ${dropNumber}, skipping`, {
           source: existing.photo_source,
           count: existing.photo_count,
+          vlmStatus: existing.vlm_categorization_status,
         });
+
+        // Use VLM categorization results for step data if available
+        // This ensures accurate step coverage even if categorization isn't formally approved
+        let photos = existing.photos_metadata || [];
+        const vlmResults = existing.vlm_categorization_results || [];
+
+        if (vlmResults.length > 0 && existing.vlm_categorization_status !== 'pending') {
+          // Build photos array using VLM results for step data
+          photos = vlmResults.map((vlm: any) => ({
+            filename: vlm.photo_filename,
+            step: vlm.human_override_step ?? vlm.vlm_predicted_step ?? null,
+            url: `/api/activate/photo/${dropNumber}/${vlm.photo_filename}`,
+            original_type: vlm.original_type,
+          }));
+          log.info(`Using VLM results for step data (${vlmResults.length} photos)`);
+        }
 
         return apiResponse.success(res, {
           source: existing.photo_source,
-          photos: existing.photos_metadata || [],
+          photos,
           count: existing.photo_count || 0,
           ont_barcode: existing.ont_serial_scanned,
           ups_serial: existing.ups_serial_scanned,
