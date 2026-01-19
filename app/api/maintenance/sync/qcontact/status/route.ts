@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         status,
         sync_type,
         sync_direction
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       ORDER BY synced_at DESC
       LIMIT 1
     `;
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'success') as successful,
         COUNT(*) FILTER (WHERE status = 'failed') as failed
-      FROM qcontact_sync_log
+      FROM maintenance_qcontact_sync_log
       WHERE synced_at >= (NOW() AT TIME ZONE 'UTC')::timestamp - INTERVAL '7 days'
       GROUP BY sync_direction
     `;
