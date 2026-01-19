@@ -81,16 +81,22 @@ export function FinalDecisionPhase({
   // Photo lightbox state
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
 
-  // Evaluate auto-fail on mount
+  // Evaluate auto-fail on mount and when photos change
   useEffect(() => {
     evaluateDecision();
-  }, [wizardState]);
+  }, [wizardState, photos]);
 
   const evaluateDecision = () => {
+    // Map photos to the format expected by evaluateAutoFail
+    const photosForValidation = photos.map((p) => ({
+      filename: p.filename,
+      step: p.step ?? null,
+    }));
+
     const validationData: DrValidationData = {
       drNumber: dropNumber,
       photoCount: wizardState.photoReview.totalPhotos,
-      photos: [],
+      photos: photosForValidation,
       ontSerial: wizardState.prerequisites.ontSerial,
       upsSerial: wizardState.prerequisites.upsSerial,
       powerMeterDbm: wizardState.dataValidation.powerMeter.value,
