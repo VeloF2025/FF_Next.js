@@ -170,11 +170,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const step7Photo = photos.find((p) => p.step === 7);
     const step9Photo = photos.find((p) => p.step === 9);
 
+    // Use full OneMap URLs for extraction (relative URLs don't work in server context)
+    const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+    const makeOneMapUrl = (filename: string) => `${ONEMAP_HOST}/api/photo/${dropNumber}/${filename}`;
+
     // Run VLM extraction
     const extraction = await runFullExtraction(dropNumber, {
-      step6Url: step6Photo?.url,
-      step7Url: step7Photo?.url,
-      step9Url: step9Photo?.url,
+      step6Url: step6Photo ? makeOneMapUrl(step6Photo.filename) : undefined,
+      step7Url: step7Photo ? makeOneMapUrl(step7Photo.filename) : undefined,
+      step9Url: step9Photo ? makeOneMapUrl(step9Photo.filename) : undefined,
     });
 
     // Build validation data
