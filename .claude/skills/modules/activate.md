@@ -106,7 +106,29 @@ detectSwappedSerials(ontSerial, upsSerial)
 // Technician issues (for WhatsApp feedback)
 getTechnicianIssues(data)
 // Returns: TechnicianIssue[] with actionable items only
+
+// Serial masking (show partial for privacy + verification)
+maskSerial(serial)
+// Examples: ALCLB48CC3CA -> ALC***3CA, GU18W12V2508057584 -> GU18***7584
+
+// Detailed serial status for feedback
+getSerialStatus(serial, expectedType: 'ont' | 'ups')
+// Returns: { status: SerialStatus, message: string }
+// Status: 'present_valid' | 'present_swapped' | 'present_invalid' | 'missing'
+
+// Format both serial lines for WhatsApp feedback
+formatSerialFeedback(ontSerial, upsSerial)
+// Returns: { ontLine: string, upsLine: string, hasIssues: boolean }
 ```
+
+### Serial Feedback Format (Jan 2026)
+
+| Status | WhatsApp Message |
+|--------|------------------|
+| **Present & Valid** | `Present in 1Map ✓ (ALC***3CA)` |
+| **Missing** | `❌ Not scanned in 1Map - please scan ONT barcode` |
+| **Swapped** | `⚠️ Wrong field - has Gizzu serial (GU18***5029) instead of ONT` |
+| **Invalid Format** | `⚠️ Invalid format (XYZ***456) - expected ALCL/ALCB serial` |
 
 ### Technician Issues vs Internal QA
 
