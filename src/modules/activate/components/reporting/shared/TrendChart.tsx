@@ -30,6 +30,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 
 export type ChartType = 'line' | 'bar' | 'area';
@@ -76,6 +77,10 @@ export interface TrendChartProps {
   title?: string;
   /** Subtitle/description */
   subtitle?: string;
+  /** Target reference line value */
+  targetValue?: number;
+  /** Target label */
+  targetLabel?: string;
 }
 
 // Default colors for chart series
@@ -105,6 +110,8 @@ export function TrendChart({
   emptyMessage = 'No data available',
   title,
   subtitle,
+  targetValue,
+  targetLabel = 'Target',
 }: TrendChartProps) {
   // Assign default colors to series if not provided
   const seriesWithColors = useMemo(() => {
@@ -298,6 +305,22 @@ export function TrendChart({
             />
             <Tooltip content={<CustomTooltip />} />
             {showLegend && <Legend />}
+            {/* Target reference line */}
+            {targetValue !== undefined && targetValue > 0 && (
+              <ReferenceLine
+                y={targetValue}
+                stroke="#EF4444"
+                strokeDasharray="5 5"
+                strokeWidth={2}
+                label={{
+                  value: `${targetLabel}: ${targetValue}`,
+                  position: 'right',
+                  fill: '#EF4444',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              />
+            )}
             {seriesWithColors.map((s) => (
               <Line
                 key={s.dataKey}

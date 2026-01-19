@@ -13,7 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, BarChart3, Target } from 'lucide-react';
 import type {
   ReportFilters,
   TrendAnalysisResponse,
@@ -33,6 +33,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
   const [error, setError] = useState<string | null>(null);
   const [trendData, setTrendData] = useState<TrendAnalysisResponse | null>(null);
   const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([]);
+  const [dailyTarget, setDailyTarget] = useState<number>(0);
 
   // Fetch trend data
   useEffect(() => {
@@ -75,25 +76,51 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Grouping Toggle */}
-      <div className="flex items-center gap-4">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Group by:
-        </span>
-        <div className="flex gap-2">
-          {(['day', 'week'] as TrendGroupBy[]).map((g) => (
+      {/* Controls Row */}
+      <div className="flex flex-wrap items-center gap-6">
+        {/* Grouping Toggle */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Group by:
+          </span>
+          <div className="flex gap-2">
+            {(['day', 'week'] as TrendGroupBy[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGroupBy(g)}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  groupBy === g
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                {g === 'day' ? 'Daily' : 'Weekly'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Daily Target Input */}
+        <div className="flex items-center gap-3">
+          <Target className="h-4 w-4 text-red-500" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Daily Target:
+          </span>
+          <input
+            type="number"
+            value={dailyTarget || ''}
+            onChange={(e) => setDailyTarget(parseInt(e.target.value) || 0)}
+            placeholder="e.g. 50"
+            className="w-24 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {dailyTarget > 0 && (
             <button
-              key={g}
-              onClick={() => setGroupBy(g)}
-              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                groupBy === g
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+              onClick={() => setDailyTarget(0)}
+              className="text-xs text-gray-500 hover:text-red-500"
             >
-              {g === 'day' ? 'Daily' : 'Weekly'}
+              Clear
             </button>
-          ))}
+          )}
         </div>
       </div>
 
@@ -105,7 +132,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       )}
 
       {/* Velocity Summary Cards */}
-      <ReportCardGrid columns={4}>
+      <ReportCardGrid columns={dailyTarget > 0 ? 5 : 4}>
         <ReportCard
           title="Avg Installs"
           value={trendData?.velocity.avg_installed.toFixed(1) || '-'}
@@ -147,13 +174,34 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
           icon={<BarChart3 className="h-4 w-4" />}
           isLoading={isLoading}
         />
+        {/* Target vs Actual Card - only shown when target is set */}
+        {dailyTarget > 0 && (
+          <ReportCard
+            title="vs Target"
+            value={
+              trendData?.velocity.avg_installed
+                ? `${((trendData.velocity.avg_installed / dailyTarget) * 100).toFixed(0)}%`
+                : '-'
+            }
+            subtitle={`of ${dailyTarget}/day target`}
+            color={
+              trendData?.velocity.avg_installed && trendData.velocity.avg_installed >= dailyTarget
+                ? 'green'
+                : trendData?.velocity.avg_installed && trendData.velocity.avg_installed >= dailyTarget * 0.8
+                  ? 'yellow'
+                  : 'red'
+            }
+            icon={<Target className="h-4 w-4" />}
+            isLoading={isLoading}
+          />
+        )}
       </ReportCardGrid>
 
       {/* Main Trend Chart */}
       <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
         <TrendChart
           title="Installation & Activation Trends"
-          subtitle={`${filters.dateFrom} to ${filters.dateTo}`}
+          subtitle={`${filters.dateFrom} to ${filters.dateTo}${dailyTarget > 0 ? ` • Target: ${dailyTarget}/day` : ''}`}
           data={trendData?.data.map((d) => ({
             date: d.label,
             Installed: d.installed,
@@ -172,6 +220,8 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
           height={350}
           isLoading={isLoading}
           emptyMessage="No trend data available for the selected period"
+          targetValue={dailyTarget > 0 ? dailyTarget : undefined}
+          targetLabel="Daily Target"
         />
       </div>
 
