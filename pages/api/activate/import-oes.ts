@@ -341,6 +341,19 @@ export default async function handler(
 
       log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, errors: errors.length });
 
+      // Trigger QField sync (fire-and-forget) - Added Jan 2026
+      try {
+        fetch('http://100.96.203.105:8095/sync/oes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batchId, totalRows: oesRows.length })
+        }).catch(() => {
+          log.warn('OESImport', 'QField sync webhook failed (non-blocking)');
+        });
+      } catch {
+        // Non-blocking - don't fail import if webhook fails
+      }
+
       return res.status(200).json({
         success: true,
         totalRows: oesRows.length,

@@ -7,11 +7,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { spawn } from 'child_process';
 
-// VPS Configuration
-const VPS_HOST = process.env.VPS_HOST || '72.61.166.168';
-const VPS_USER = process.env.VPS_USER || 'root';
-const VPS_OES_PATH = process.env.VPS_OES_PATH || '/root/oes_sync';
-const SSH_KEY_PATH = process.env.VPS_SSH_KEY_PATH || '/home/louisdup/.ssh/qfield_vps';
+// VPS Configuration - Updated Jan 2026 to use Velocity Server
+const VPS_HOST = process.env.VPS_HOST || '100.96.203.105';
+const VPS_USER = process.env.VPS_USER || 'velo';
+const VPS_OES_PATH = process.env.VPS_OES_PATH || '/opt/qfield-sync';
+const SSH_KEY_PATH = process.env.VPS_SSH_KEY_PATH || '/home/velo/.ssh/id_rsa';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
