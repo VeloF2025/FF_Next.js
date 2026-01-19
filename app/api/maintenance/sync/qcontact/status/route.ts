@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     // (tickets with source='internal' that have no external_id or haven't been synced recently)
     const pendingOutboundSql = `
       SELECT COUNT(*) as count
-      FROM tickets
+      FROM maintenance_tickets
       WHERE source = 'internal'
         AND (external_id IS NULL OR external_id = '')
         AND status NOT IN ('closed', 'resolved')

@@ -284,7 +284,13 @@
       "Bash(npm install:*)",
       "mcp__boss-ghost-mcp__smart_click",
       "Bash(git rm:*)",
-      "Bash({} +)"
+      "Bash({} +)",
+      "Bash(while read hash msg)",
+      "Bash(do if git show $hash:src/modules/activate/components/wizard/FeedbackPhase.tsx)",
+      "Bash(then echo \"$hash $msg\" break fi done)",
+      "Bash(src/modules/staff/components/edit-sections/OverviewEditSection.tsx )",
+      "Bash(src/services/staff/staffApiService.ts )",
+      "Bash(src/types/staff/form.types.ts)"
     ],
     "deny": [],
     "ask": [],

@@ -202,73 +202,59 @@ interface StatusTimelineProps {
 }
 
 /**
- * Shows status badges in sequence showing DR lifecycle progression:
- * [Installed date] → [Activated date] → [QA status] → [Feedback Sent]
+ * Inline status badges for compact card layout
+ * Shows all status badges in a single line that wraps on mobile:
+ * [Installed date] [Activated date] [QA status] [✓ Sent]
  */
-function StatusTimeline({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent }: StatusTimelineProps) {
-  // Format date for display
-  const formatDate = (dateStr: string) => {
+function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent }: StatusTimelineProps) {
+  // Format date - shorter format for inline display
+  const formatShortDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  const formatDateOnly = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric'
     });
   };
 
   return (
-    <div className="flex items-center justify-between mb-2">
-      {/* Left: Date badges (Installed / Activated) */}
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 text-xs font-medium">
-          Installed {formatDate(createdAt)}
+    <>
+      {/* Installed date - always shown */}
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/40 text-blue-300">
+        {formatShortDate(createdAt)}
+      </span>
+
+      {/* Activated date - shown when OES activated */}
+      {isActivated && oesActivationDate && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-900/40 text-green-300">
+          ✓ OES {formatShortDate(oesActivationDate)}
         </span>
+      )}
 
-        {isActivated && oesActivationDate && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-900/50 text-green-300 text-xs font-medium">
-            Activated {formatDateOnly(oesActivationDate)}
-          </span>
-        )}
-      </div>
+      {/* In Review - shown when in final_decision or feedback phase */}
+      {qaPhase && !qaDecision && ['final_decision', 'feedback'].includes(qaPhase) && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-900/40 text-yellow-300">
+          In Review
+        </span>
+      )}
 
-      {/* Right: Status badges (QA status, Feedback) */}
-      <div className="flex items-center gap-2">
-        {/* Show QA phase if in review (not yet decided) */}
-        {qaPhase && !qaDecision && ['final_decision', 'feedback'].includes(qaPhase) && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-900/50 text-yellow-300 text-xs font-medium">
-            In Review
-          </span>
-        )}
+      {/* QA decision */}
+      {qaDecision && (
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+          qaDecision === 'PASS' ? 'bg-green-900/40 text-green-300' :
+          qaDecision === 'FAIL' ? 'bg-red-900/40 text-red-300' :
+          'bg-orange-900/40 text-orange-300'
+        }`}>
+          {qaDecision === 'PASS' ? '✓ PASS' : qaDecision === 'FAIL' ? '✗ FAIL' : 'Rework'}
+        </span>
+      )}
 
-        {/* Show QA decision */}
-        {qaDecision && (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-            qaDecision === 'PASS' ? 'bg-green-900/50 text-green-300' :
-            qaDecision === 'FAIL' ? 'bg-red-900/50 text-red-300' :
-            'bg-orange-900/50 text-orange-300'
-          }`}>
-            QA {qaDecision === 'REWORK_NEEDED' ? 'Rework' : qaDecision}
-          </span>
-        )}
-
-        {/* Show Feedback Sent */}
-        {feedbackSent && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 text-xs font-medium">
-            ✓ Sent
-          </span>
-        )}
-      </div>
-    </div>
+      {/* Feedback Sent */}
+      {feedbackSent && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-900/40 text-purple-300">
+          Sent
+        </span>
+      )}
+    </>
   );
 }
 
@@ -690,42 +676,45 @@ function QaCentrePageContent() {
                 <button
                   key={drop.id}
                   onClick={() => handleSelectDr(drop.dropNumber)}
-                  className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
+                  className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
                 >
-                  {/* Top Row: Project Badge + DR Number */}
-                  <div className="flex items-center gap-3 mb-2">
+                  {/* Header Row: Project + DR + Status Badges (all inline, wraps on mobile) */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
                     <ProjectBadge project={drop.project} />
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white mr-1">
                       {drop.dropNumber}
                     </h3>
+                    <InlineStatusBadges
+                      createdAt={drop.createdAt}
+                      isActivated={drop.isActivated}
+                      oesActivationDate={drop.oesActivationDate}
+                      qaPhase={drop.qaPhase}
+                      qaDecision={drop.qaDecision}
+                      feedbackSent={drop.feedbackSent}
+                    />
+                    {drop.serialsSwapped && (
+                      <span className="text-[10px] text-red-400 font-semibold bg-red-900/30 px-1.5 py-0.5 rounded">
+                        ⚠ SWAP
+                      </span>
+                    )}
                   </div>
 
-                  {/* Status Timeline - shows progression */}
-                  <StatusTimeline
-                    createdAt={drop.createdAt}
-                    isActivated={drop.isActivated}
-                    oesActivationDate={drop.oesActivationDate}
-                    qaPhase={drop.qaPhase}
-                    qaDecision={drop.qaDecision}
-                    feedbackSent={drop.feedbackSent}
-                  />
-
-                  {/* Bottom Row: Agent + Photos + Serials */}
-                  <div className="flex items-center justify-between">
+                  {/* Details Row: Agent + Photos + Serials */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
                     {/* Left: Agent + Photos */}
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-3">
                       <span className="flex items-center gap-1">
-                        <span className="text-gray-400">👤</span>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">{formatAgent(drop.senderPhone)}</span>
+                        <span>👤</span>
+                        <span className="font-medium text-gray-600 dark:text-gray-300">{formatAgent(drop.senderPhone)}</span>
                       </span>
                       <span className="flex items-center gap-1">
-                        <span className="text-gray-400">📷</span>
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">{drop.photoCount || 0}</span>
+                        <span>📷</span>
+                        <span className="font-semibold text-gray-600 dark:text-gray-300">{drop.photoCount || 0}</span>
                       </span>
                     </div>
 
-                    {/* Right: Serials */}
-                    <div className="flex items-center gap-4">
+                    {/* Right: Serials (compact) */}
+                    <div className="flex items-center gap-3">
                       <SerialDisplay
                         label="ONT"
                         serial={drop.ontSerial}
@@ -736,11 +725,6 @@ function QaCentrePageContent() {
                         serial={drop.upsSerial}
                         status={drop.upsSerialStatus}
                       />
-                      {drop.serialsSwapped && (
-                        <span className="text-xs text-red-600 dark:text-red-400 font-semibold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded">
-                          ⚠ SWAPPED
-                        </span>
-                      )}
                     </div>
                   </div>
                 </button>

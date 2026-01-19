@@ -62,7 +62,7 @@ export async function GET(
 
     // Verify ticket exists
     const tickets = await sql`
-      SELECT id FROM tickets WHERE id = ${ticketId}
+      SELECT id FROM maintenance_tickets WHERE id = ${ticketId}
     `;
 
     if (tickets.length === 0) {
@@ -93,7 +93,7 @@ export async function GET(
           n.attachments,
           u.first_name || ' ' || u.last_name as author_name,
           u.email as author_email
-        FROM ticket_notes n
+        FROM maintenance_notes n
         LEFT JOIN users u ON n.created_by = u.id
         WHERE n.ticket_id = ${ticketId}
           AND n.visibility = ${visibility}
@@ -114,7 +114,7 @@ export async function GET(
           n.attachments,
           u.first_name || ' ' || u.last_name as author_name,
           u.email as author_email
-        FROM ticket_notes n
+        FROM maintenance_notes n
         LEFT JOIN users u ON n.created_by = u.id
         WHERE n.ticket_id = ${ticketId}
         ORDER BY n.created_at DESC
@@ -124,7 +124,7 @@ export async function GET(
     // Calculate summary counts
     const allNotes = await sql`
       SELECT visibility, COUNT(*) as count
-      FROM ticket_notes
+      FROM maintenance_notes
       WHERE ticket_id = ${ticketId}
       GROUP BY visibility
     `;
@@ -223,7 +223,7 @@ export async function POST(
 
     // Verify ticket exists
     const tickets = await sql`
-      SELECT id FROM tickets WHERE id = ${ticketId}
+      SELECT id FROM maintenance_tickets WHERE id = ${ticketId}
     `;
 
     if (tickets.length === 0) {
@@ -261,7 +261,7 @@ export async function POST(
     const now = new Date().toISOString();
 
     await sql`
-      INSERT INTO ticket_notes (
+      INSERT INTO maintenance_notes (
         id,
         ticket_id,
         content,
@@ -301,7 +301,7 @@ export async function POST(
         n.attachments,
         u.first_name || ' ' || u.last_name as author_name,
         u.email as author_email
-      FROM ticket_notes n
+      FROM maintenance_notes n
       LEFT JOIN users u ON n.created_by = u.id
       WHERE n.id = ${noteId}
     `;

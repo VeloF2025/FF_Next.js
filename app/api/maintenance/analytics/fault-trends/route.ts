@@ -124,7 +124,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         ${groupBy},
         COUNT(*)::text as count,
         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2)::text as percentage
-      FROM tickets
+      FROM maintenance_tickets
       WHERE 1=1
     `;
 

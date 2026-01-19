@@ -46,7 +46,7 @@ export async function GET(
         n.attachments,
         u.first_name || ' ' || u.last_name as author_name,
         u.email as author_email
-      FROM ticket_notes n
+      FROM maintenance_notes n
       LEFT JOIN users u ON n.created_by = u.id
       WHERE n.id = ${noteId} AND n.ticket_id = ${ticketId}
     `;
@@ -94,7 +94,7 @@ export async function PATCH(
 
     // Verify note exists
     const existingNotes = await sql`
-      SELECT id, created_by FROM ticket_notes
+      SELECT id, created_by FROM maintenance_notes
       WHERE id = ${noteId} AND ticket_id = ${ticketId}
     `;
 
@@ -156,7 +156,7 @@ export async function PATCH(
 
     // Execute update using raw query
     const updateSql = `
-      UPDATE ticket_notes
+      UPDATE maintenance_notes
       SET ${updates.join(', ')}
       WHERE id = $${paramIndex}
     `;
@@ -179,7 +179,7 @@ export async function PATCH(
         n.attachments,
         u.first_name || ' ' || u.last_name as author_name,
         u.email as author_email
-      FROM ticket_notes n
+      FROM maintenance_notes n
       LEFT JOIN users u ON n.created_by = u.id
       WHERE n.id = ${noteId}
     `;
@@ -222,7 +222,7 @@ export async function DELETE(
 
     // Verify note exists
     const existingNotes = await sql`
-      SELECT id FROM ticket_notes
+      SELECT id FROM maintenance_notes
       WHERE id = ${noteId} AND ticket_id = ${ticketId}
     `;
 
@@ -235,7 +235,7 @@ export async function DELETE(
 
     // Delete the note
     await sql`
-      DELETE FROM ticket_notes
+      DELETE FROM maintenance_notes
       WHERE id = ${noteId} AND ticket_id = ${ticketId}
     `;
 
