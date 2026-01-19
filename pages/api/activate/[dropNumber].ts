@@ -77,7 +77,9 @@ async function handleGet(
         reviewed_by,
         reviewed_at,
         created_at,
-        updated_at
+        updated_at,
+        wa_sender_jid,
+        wa_group_jid
       FROM dr_photo_unified_reviews
       WHERE drop_number = $1
       LIMIT 1;

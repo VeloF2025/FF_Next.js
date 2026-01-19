@@ -62,6 +62,8 @@ interface UnifiedDrop {
   qa_phase: string | null;
   qa_decision: string | null;
   is_activated: boolean;
+  // OES activation date (when activated on Nokia OES)
+  oes_activation_date: string | null;
 }
 
 interface ProjectStats {
@@ -204,11 +206,13 @@ async function getPaginatedDrops(
     SELECT u.*,
       u.qa_phase,
       u.qa_decision,
+      oes.activation_date as oes_activation_date,
       EXISTS (
-        SELECT 1 FROM oes_activations oes
-        WHERE oes.drop_number = u.drop_number
+        SELECT 1 FROM oes_activations oes2
+        WHERE oes2.drop_number = u.drop_number
       ) as is_activated
     FROM dr_photo_unified_reviews u
+    LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
     ${whereClause}
     ORDER BY u.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -252,11 +256,14 @@ async function getDropById(id: string): Promise<UnifiedDrop | null> {
     `SELECT u.*,
       u.qa_phase,
       u.qa_decision,
+      oes.activation_date as oes_activation_date,
       EXISTS (
-        SELECT 1 FROM oes_activations oes
-        WHERE oes.drop_number = u.drop_number
+        SELECT 1 FROM oes_activations oes2
+        WHERE oes2.drop_number = u.drop_number
       ) as is_activated
-    FROM dr_photo_unified_reviews u WHERE u.id = $1`,
+    FROM dr_photo_unified_reviews u
+    LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
+    WHERE u.id = $1`,
     [id]
   );
 
@@ -279,11 +286,14 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
     `SELECT u.*,
       u.qa_phase,
       u.qa_decision,
+      oes.activation_date as oes_activation_date,
       EXISTS (
-        SELECT 1 FROM oes_activations oes
-        WHERE oes.drop_number = u.drop_number
+        SELECT 1 FROM oes_activations oes2
+        WHERE oes2.drop_number = u.drop_number
       ) as is_activated
-    FROM dr_photo_unified_reviews u WHERE u.drop_number = $1`,
+    FROM dr_photo_unified_reviews u
+    LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
+    WHERE u.drop_number = $1`,
     [dropNumber]
   );
 

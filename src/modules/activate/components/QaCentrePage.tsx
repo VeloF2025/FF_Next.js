@@ -189,6 +189,86 @@ function ProjectBadge({ project }: { project: string | null }) {
 }
 
 // ============================================================================
+// STATUS TIMELINE COMPONENT
+// ============================================================================
+
+interface StatusTimelineProps {
+  createdAt: string;
+  isActivated: boolean;
+  oesActivationDate: string | null;
+  qaPhase: QaWizardPhase | null;
+  qaDecision: QaDecision | null;
+  feedbackSent: string | null;
+}
+
+/**
+ * Shows status badges in sequence showing DR lifecycle progression:
+ * [Installed date] → [Activated date] → [QA status] → [Feedback Sent]
+ */
+function StatusTimeline({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent }: StatusTimelineProps) {
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDateOnly = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap mb-2">
+      {/* Always show Installed with WA date */}
+      <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 text-xs font-medium">
+        Installed {formatDate(createdAt)}
+      </span>
+
+      {/* Show Activated when OES date exists */}
+      {isActivated && oesActivationDate && (
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-900/50 text-green-300 text-xs font-medium">
+          Activated {formatDateOnly(oesActivationDate)}
+        </span>
+      )}
+
+      {/* Show QA phase if in review (not yet decided) */}
+      {qaPhase && !qaDecision && ['final_decision', 'feedback'].includes(qaPhase) && (
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-900/50 text-yellow-300 text-xs font-medium">
+          In Review
+        </span>
+      )}
+
+      {/* Show QA decision */}
+      {qaDecision && (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+          qaDecision === 'PASS' ? 'bg-green-900/50 text-green-300' :
+          qaDecision === 'FAIL' ? 'bg-red-900/50 text-red-300' :
+          'bg-orange-900/50 text-orange-300'
+        }`}>
+          QA {qaDecision === 'REWORK_NEEDED' ? 'Rework' : qaDecision}
+        </span>
+      )}
+
+      {/* Show Feedback Sent */}
+      {feedbackSent && (
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 text-xs font-medium">
+          ✓ Sent
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // WRAPPER COMPONENT (Provides Context)
 // ============================================================================
 
@@ -608,46 +688,31 @@ function QaCentrePageContent() {
                   onClick={() => handleSelectDr(drop.dropNumber)}
                   className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
                 >
-                  {/* Top Row: Project Badge + DR Number + Status */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <ProjectBadge project={drop.project} />
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                        {drop.dropNumber}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge
-                        isActivated={drop.isActivated}
-                        qaPhase={drop.qaPhase}
-                        qaDecision={drop.qaDecision}
-                        feedbackSent={drop.feedbackSent}
-                      />
-                      {drop.feedbackSent && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                          ✓ Sent
-                        </span>
-                      )}
-                    </div>
+                  {/* Top Row: Project Badge + DR Number */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <ProjectBadge project={drop.project} />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {drop.dropNumber}
+                    </h3>
                   </div>
 
-                  {/* Bottom Row: Details Grid */}
+                  {/* Status Timeline - shows progression */}
+                  <StatusTimeline
+                    createdAt={drop.createdAt}
+                    isActivated={drop.isActivated}
+                    oesActivationDate={drop.oesActivationDate}
+                    qaPhase={drop.qaPhase}
+                    qaDecision={drop.qaDecision}
+                    feedbackSent={drop.feedbackSent}
+                  />
+
+                  {/* Bottom Row: Agent + Photos + Serials */}
                   <div className="flex items-center justify-between">
-                    {/* Left: Agent + Date + Photos */}
+                    {/* Left: Agent + Photos */}
                     <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <span className="text-gray-400">👤</span>
                         <span className="font-medium text-gray-700 dark:text-gray-300">{formatAgent(drop.senderPhone)}</span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="text-gray-400">📅</span>
-                        <span>{new Date(drop.createdAt).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })}</span>
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="text-gray-400">📷</span>

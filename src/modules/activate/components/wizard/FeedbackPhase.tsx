@@ -36,6 +36,8 @@ interface FeedbackData {
   customMessage: string;
 }
 
+type FeedbackDestination = 'group' | 'private' | 'both';
+
 interface StaffOption {
   id: string;
   name: string;
@@ -68,6 +70,27 @@ export function FeedbackPhase({
     wizardState.finalDecision.decision === 'FAIL' ||
     wizardState.finalDecision.decision === 'REWORK_NEEDED'
   );
+
+  // Feedback destination options
+  const [feedbackDestination, setFeedbackDestination] = useState<FeedbackDestination>('group');
+  const [sendStaffPrivate, setSendStaffPrivate] = useState(false);
+  const [hasTechnicianJid, setHasTechnicianJid] = useState(false);
+
+  // Check if technician JID is available (for private messaging)
+  useEffect(() => {
+    const checkTechnicianJid = async () => {
+      try {
+        const response = await fetch(`/api/activate/${encodeURIComponent(dropNumber)}`);
+        const data = await response.json();
+        if (data.success && data.data?.wa_sender_jid) {
+          setHasTechnicianJid(true);
+        }
+      } catch (err) {
+        log.error('FeedbackPhase', 'Failed to check technician JID:', err);
+      }
+    };
+    checkTechnicianJid();
+  }, [dropNumber]);
 
   // Fetch staff for project on mount
   useEffect(() => {
@@ -212,7 +235,9 @@ export function FeedbackPhase({
           project,
           decision: feedback.decision,
           message: feedback.customMessage,
+          destination: feedbackDestination, // 'group' | 'private' | 'both'
           staffId: selectedStaffId, // Staff to @mention in WhatsApp
+          sendStaffPrivate, // Also send private copy to selected staff
           createTask, // Whether to create a follow-up task
           qaFindings: {
             photoCoverage: {
@@ -506,13 +531,70 @@ export function FeedbackPhase({
         </p>
       </div>
 
-      {/* Staff Tagging & Task Options */}
+      {/* Destination & Staff Options */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
         <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
-          Additional Options
+          Message Destination
         </h4>
 
         <div className="space-y-4">
+          {/* Destination Radio Buttons */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Send feedback to:
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="destination"
+                  value="group"
+                  checked={feedbackDestination === 'group'}
+                  onChange={() => setFeedbackDestination('group')}
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Group only ({project || 'Project Group'})
+                </span>
+              </label>
+              <label className={`flex items-center gap-3 ${hasTechnicianJid ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                <input
+                  type="radio"
+                  name="destination"
+                  value="private"
+                  checked={feedbackDestination === 'private'}
+                  onChange={() => setFeedbackDestination('private')}
+                  disabled={!hasTechnicianJid}
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Private message to technician only
+                </span>
+              </label>
+              <label className={`flex items-center gap-3 ${hasTechnicianJid ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                <input
+                  type="radio"
+                  name="destination"
+                  value="both"
+                  checked={feedbackDestination === 'both'}
+                  onChange={() => setFeedbackDestination('both')}
+                  disabled={!hasTechnicianJid}
+                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Both group and private
+                </span>
+              </label>
+            </div>
+            {!hasTechnicianJid && (
+              <p className="text-xs text-yellow-600 mt-2">
+                Private messaging unavailable - technician JID not found for this DR.
+              </p>
+            )}
+          </div>
+
+          <hr className="border-gray-200 dark:border-gray-700" />
+
           {/* Staff Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -542,6 +624,29 @@ export function FeedbackPhase({
               )}
             </p>
           </div>
+
+          {/* Send Private Copy to Staff */}
+          {selectedStaffId && (
+            <div className="flex items-start gap-3 pl-1">
+              <input
+                type="checkbox"
+                id="sendStaffPrivate"
+                checked={sendStaffPrivate}
+                onChange={(e) => setSendStaffPrivate(e.target.checked)}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <div>
+                <label htmlFor="sendStaffPrivate" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Also send private copy to selected staff
+                </label>
+                <p className="text-xs text-gray-500">
+                  Staff will receive a private message in addition to being tagged.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <hr className="border-gray-200 dark:border-gray-700" />
 
           {/* Task Creation Checkbox */}
           <div className="flex items-start gap-3">

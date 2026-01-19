@@ -32,7 +32,9 @@ interface SendFeedbackRequest {
   autoGenerate?: boolean; // Flag to force auto-generation
   decision?: 'PASS' | 'FAIL' | 'REWORK_NEEDED'; // QA decision
   project?: string; // Project name
+  destination?: 'group' | 'private' | 'both'; // Where to send feedback (default: group)
   staffId?: string; // Staff member to @mention (optional)
+  sendStaffPrivate?: boolean; // Also send private copy to selected staff
   createTask?: boolean; // Whether to create follow-up task
   qaFindings?: {
     photoCoverage?: { covered: number; total: number; missing: number[] };
@@ -87,7 +89,9 @@ async function handlePost(
       autoGenerate,
       decision,
       project,
+      destination = 'group', // Default to group for backwards compatibility
       staffId,
+      sendStaffPrivate,
       createTask,
       qaFindings,
     } = req.body as SendFeedbackRequest;
@@ -139,8 +143,24 @@ async function handlePost(
       }
     }
 
-    // 6. Send to WhatsApp via Bridge API (with threading and @mentions)
-    // Build mentions array with technician and optionally staff
+    // 6. Validate destination requirements
+    const needsPrivate = destination === 'private' || destination === 'both';
+    if (needsPrivate && !review.wa_sender_jid) {
+      return apiResponse.error(
+        res,
+        ErrorCode.BAD_REQUEST,
+        'Cannot send private message: technician JID not available for this DR'
+      );
+    }
+
+    // 7. Send to WhatsApp based on destination
+    const sendResults: {
+      group?: SendResult;
+      technicianPrivate?: SendResult;
+      staffPrivate?: SendResult;
+    } = {};
+
+    // Build mentions array for group messages
     const mentionJIDs: string[] = [];
     if (review.wa_sender_jid) {
       mentionJIDs.push(review.wa_sender_jid);
@@ -149,6 +169,7 @@ async function handlePost(
       mentionJIDs.push(staffJid);
     }
 
+    // Build reply params for threading (only used for group messages)
     const replyParams: WhatsAppReplyParams | undefined = review.wa_message_id
       ? {
           replyToId: review.wa_message_id,
@@ -158,8 +179,8 @@ async function handlePost(
         }
       : undefined;
 
-    // Build message with @mentions for technician and optionally staff
-    let messageWithMention = feedbackMessage;
+    // Build message with @mentions for group messages
+    let groupMessage = feedbackMessage;
     const mentionParts: string[] = [];
     if (review.wa_sender_jid) {
       mentionParts.push(`@${extractPhoneFromJid(review.wa_sender_jid)}`);
@@ -168,20 +189,55 @@ async function handlePost(
       mentionParts.push(`@${extractPhoneFromJid(staffJid)}`);
     }
     if (mentionParts.length > 0) {
-      messageWithMention = `${mentionParts.join(' ')} ${feedbackMessage}`;
+      groupMessage = `${mentionParts.join(' ')} ${feedbackMessage}`;
     }
 
-    const sendResult = await sendToWhatsApp(groupId, messageWithMention, replyParams);
-
-    if (!sendResult.success) {
-      throw new Error('Failed to send message via WhatsApp Bridge');
+    // Send to GROUP if destination is 'group' or 'both'
+    if (destination === 'group' || destination === 'both') {
+      log.info(`Sending feedback to group for ${dropNumber}`, { groupId });
+      sendResults.group = await sendToWhatsApp(groupId, groupMessage, replyParams);
+      if (!sendResults.group.success) {
+        log.error('Failed to send to group', { dropNumber, groupId });
+      }
     }
 
-    // 7. Update database with feedback status and store our message ID for future threading
-    // This allows re-reviews to thread off our feedback even if original DR had no message ID
-    await updateFeedbackStatus(dropNumber, feedbackMessage, sendResult.messageId, groupId);
+    // Send PRIVATE to technician if destination is 'private' or 'both'
+    if ((destination === 'private' || destination === 'both') && review.wa_sender_jid) {
+      log.info(`Sending private feedback to technician for ${dropNumber}`, {
+        technicianJid: review.wa_sender_jid,
+      });
+      // Private message - no @mentions needed (it's a direct message)
+      sendResults.technicianPrivate = await sendToWhatsApp(review.wa_sender_jid, feedbackMessage);
+      if (!sendResults.technicianPrivate.success) {
+        log.error('Failed to send private to technician', { dropNumber });
+      }
+    }
 
-    // 8. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
+    // Send PRIVATE copy to staff if requested and staffJid available
+    if (sendStaffPrivate && staffJid) {
+      log.info(`Sending private copy to staff for ${dropNumber}`, { staffJid });
+      sendResults.staffPrivate = await sendToWhatsApp(staffJid, feedbackMessage);
+      if (!sendResults.staffPrivate.success) {
+        log.error('Failed to send private to staff', { dropNumber, staffJid });
+      }
+    }
+
+    // Check if at least one message was sent successfully
+    const anySent =
+      sendResults.group?.success ||
+      sendResults.technicianPrivate?.success ||
+      sendResults.staffPrivate?.success;
+
+    if (!anySent) {
+      throw new Error('Failed to send message via WhatsApp Bridge to any destination');
+    }
+
+    // 8. Update database with feedback status
+    // Use group message ID for threading if available, otherwise use technician private message ID
+    const sentMessageId = sendResults.group?.messageId || sendResults.technicianPrivate?.messageId;
+    await updateFeedbackStatus(dropNumber, feedbackMessage, sentMessageId, groupId);
+
+    // 9. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
     let taskId: string | null = null;
     const shouldCreateTask = createTask || decision === 'FAIL' || decision === 'REWORK_NEEDED';
     if (shouldCreateTask) {
@@ -196,19 +252,28 @@ async function handlePost(
     }
 
     log.info(`Feedback sent successfully for ${dropNumber}`, {
+      destination,
+      sentToGroup: !!sendResults.group?.success,
+      sentToTechnicianPrivate: !!sendResults.technicianPrivate?.success,
+      sentToStaffPrivate: !!sendResults.staffPrivate?.success,
       taskCreated: !!taskId,
-      staffMentioned: !!staffJid,
     });
 
     return apiResponse.success(res, {
       dropNumber,
-      message: messageWithMention, // Return the actual message sent (with @mentions if applicable)
+      destination,
+      sentTo: {
+        group: sendResults.group?.success || false,
+        technicianPrivate: sendResults.technicianPrivate?.success || false,
+        staffPrivate: sendResults.staffPrivate?.success || false,
+      },
+      message: destination === 'group' || destination === 'both' ? groupMessage : feedbackMessage,
       sent: true,
       sentAt: new Date().toISOString(),
       threading: {
-        hadThreading: !!replyParams,
-        technicianMentioned: !!review.wa_sender_jid,
-        staffMentioned: !!staffJid,
+        hadThreading: !!(replyParams && (destination === 'group' || destination === 'both')),
+        technicianMentioned: !!(review.wa_sender_jid && (destination === 'group' || destination === 'both')),
+        staffMentioned: !!(staffJid && (destination === 'group' || destination === 'both')),
       },
       task: taskId ? { id: taskId, created: true } : null,
     });
