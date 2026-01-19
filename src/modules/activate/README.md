@@ -40,10 +40,10 @@ When reviewing a DR (`/activate/[dropNumber]`), users go through:
 | Phase | Name | Purpose |
 |-------|------|---------|
 | 1 | Prerequisites | Validate photos fetched, categorized, step coverage |
-| 2 | Photo Review | Review and approve photo categorizations |
+| 2 | Photo Review | Review photo categorizations (edit mode shows discarded photos) |
 | 3 | Data Validation | Validate power meter, serial numbers |
-| 4 | Final Decision | PASS / FAIL / REWORK_NEEDED with reason codes |
-| 5 | Feedback | Generate and send WhatsApp feedback |
+| 4 | Final Decision | PASS / FAIL / REWORK with swap detection + auto-ticket |
+| 5 | Feedback | Send WhatsApp feedback (technician-actionable issues only) |
 
 ### QA Decision Values
 - `PASS` - All checks passed
@@ -56,6 +56,70 @@ When reviewing a DR (`/activate/[dropNumber]`), users go through:
 - `POWER_OUT_OF_RANGE` - Power meter not in -18 to -24 dBm
 - `PHOTO_QUALITY` - Photos too blurry/dark
 - `WRONG_EQUIPMENT` - Wrong ONT/UPS installed
+- `SERIALS_SWAPPED` - ONT and UPS serials in wrong fields
+
+## Serial Swap Detection (Jan 2026)
+
+**Critical feature for detecting when ONT and UPS serials are entered in wrong fields.**
+
+### Serial Patterns
+
+| Device | Pattern | Example |
+|--------|---------|---------|
+| **Nokia ONT** | `ALCL*` or `ALCB*` | `ALCLB48CC3CA` |
+| **Gizzu UPS** | `GU18W*` | `GU18W12V2508057584` |
+
+### Detection Flow
+
+1. **First WhatsApp Response** - `dr-acknowledgment.ts` detects swap immediately
+   - Returns `serialsSwapped: true` with details
+   - Go Bridge sends warning in threaded reply
+
+2. **QA Wizard Phase 4** - Prominent "🔴 SERIALS SWAPPED" warning
+   - Shows which serial is in which field
+   - Explains correct format for each device
+
+3. **Auto-Ticket Creation** - Creates ticket on submit
+   - `source: 'ont_swap'`
+   - `ticket_type: 'ont_swap'`
+   - `priority: 'high'`
+
+4. **Tracking** - Ticket tracks resolution until technician corrects in 1Map
+
+### Key Functions (`qaAutoFailService.ts`)
+
+```typescript
+// Pattern matching
+looksLikeOntSerial(serial)     // Matches ALCL/ALCB pattern
+looksLikeGizzuSerial(serial)   // Matches GU18W pattern
+
+// Swap detection
+detectSwappedSerials(ontSerial, upsSerial)
+// Returns: { swapped: boolean, details: string }
+
+// Technician issues (for WhatsApp feedback)
+getTechnicianIssues(data)
+// Returns: TechnicianIssue[] with actionable items
+```
+
+### Technician Issues vs Internal QA
+
+**Technician-Actionable (sent via WhatsApp):**
+- `ONT_NOT_SCANNED` - ONT serial missing
+- `UPS_NOT_SCANNED` - UPS serial missing
+- `SERIALS_SWAPPED` - ONT/UPS in wrong fields (CRITICAL)
+- `ONT_INVALID_FORMAT` - ONT serial wrong format
+- `UPS_INVALID_FORMAT` - UPS serial wrong format
+- `MISSING_PHOTOS` - Required photos missing
+- `POWER_OUT_OF_RANGE` - Power meter out of spec
+
+**Internal QA Only (NOT sent to technicians):**
+- VLM extraction comparison (Step 6 vs Step 9 vs OneMap)
+- OCR confidence scores
+- AI categorization mismatches
+- Few-shot learning corrections
+
+This separation ensures technicians only receive actionable feedback, not internal AI debugging info.
 
 ## 10-Step Photo Checklist
 
@@ -305,7 +369,11 @@ Event logging for full DR lifecycle tracking.
 ### Go Bridge (`/home/louis/whatsapp-bridge-go/`)
 - Detects DR pattern in messages
 - Calls `/api/activate/dr-acknowledgment` for photo/serial data
-- Sends threaded reply with photo count, ONT/UPS serials
+- Sends threaded reply with:
+  - Photo count
+  - ONT serial (or "Not scanned" warning)
+  - UPS serial (or "Not scanned" warning)
+  - **🔴 SWAPPED SERIALS alert** if ONT/UPS appear to be in wrong fields
 
 ### WA Feedback Service (Port 8090)
 - Sends QA feedback messages
