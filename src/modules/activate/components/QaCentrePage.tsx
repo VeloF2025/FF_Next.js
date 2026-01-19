@@ -701,35 +701,116 @@ function QaCentrePageContent() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 p-4">
-              {filteredDrops.map((drop) => (
-                <button
-                  key={drop.id}
-                  onClick={() => handleSelectDr(drop.dropNumber)}
-                  className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
-                >
-                  {/* Header Row: Project + DR + Status Badges (all inline, wraps on mobile) */}
-                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                    <ProjectBadge project={drop.project} />
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white mr-1">
-                      {drop.dropNumber}
-                    </h3>
-                    <InlineStatusBadges
-                      createdAt={drop.createdAt}
-                      isActivated={drop.isActivated}
-                      oesActivationDate={drop.oesActivationDate}
-                      qaPhase={drop.qaPhase}
-                      qaDecision={drop.qaDecision}
-                      feedbackSent={drop.feedbackSent}
-                      senderPhone={drop.senderPhone}
-                      hasMaintenanceTicket={drop.hasMaintenanceTicket}
-                    />
-                  </div>
+            <div className="grid gap-2 p-4">
+              {filteredDrops.map((drop) => {
+                // Format dates
+                const formatDate = (dateStr: string | null) => {
+                  if (!dateStr) return '-';
+                  const date = new Date(dateStr);
+                  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                };
 
-                  {/* Details Row: Agent + Photos + Serials */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    {/* Left: Agent + Photos */}
-                    <div className="flex items-center gap-3">
+                // Get QA Review Status (Pending vs Reviewed)
+                const getQaReviewStatus = () => {
+                  if (drop.feedbackSent) return { label: 'Reviewed', color: 'bg-green-600 text-white' };
+                  if (drop.qaDecision) return { label: 'Reviewed', color: 'bg-green-600 text-white' };
+                  return { label: 'Pending', color: 'bg-gray-600 text-white' };
+                };
+
+                // Get Outcome badge
+                const getOutcomeBadge = () => {
+                  if (drop.qaDecision === 'PASS') return { label: 'Pass', color: 'bg-green-600 text-white' };
+                  if (drop.qaDecision === 'FAIL') return { label: 'Fail', color: 'bg-red-600 text-white' };
+                  if (drop.qaDecision === 'REWORK_NEEDED') return { label: 'Rework', color: 'bg-orange-600 text-white' };
+                  if (drop.hasMaintenanceTicket) return { label: 'Maint', color: 'bg-amber-700 text-white' };
+                  return null;
+                };
+
+                // Get serial issue indicator
+                const getSerialIssue = (status: SerialValidationStatus, isSwapped: boolean) => {
+                  if (isSwapped) return { label: 'Swap', color: 'bg-red-700 text-red-100' };
+                  if (status === 'missing') return { label: '?', color: 'bg-yellow-700 text-yellow-100' };
+                  if (status === 'invalid') return { label: '!', color: 'bg-orange-700 text-orange-100' };
+                  if (status === 'valid') return { label: '✓', color: 'text-green-500' };
+                  return null;
+                };
+
+                const qaStatus = getQaReviewStatus();
+                const outcome = getOutcomeBadge();
+                const ontIssue = getSerialIssue(drop.ontSerialStatus, drop.serialsSwapped);
+                const upsIssue = getSerialIssue(drop.upsSerialStatus, false);
+
+                return (
+                  <button
+                    key={drop.id}
+                    onClick={() => handleSelectDr(drop.dropNumber)}
+                    className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
+                  >
+                    {/* Row 1: Project | DR | Installed | Activated | QA Status | Outcome | Serials + Issues */}
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5 text-xs">
+                      {/* Project */}
+                      <ProjectBadge project={drop.project} />
+
+                      {/* DR Number */}
+                      <span className="font-bold text-sm text-gray-900 dark:text-white">
+                        {drop.dropNumber}
+                      </span>
+
+                      {/* Installed Date */}
+                      <span className="px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 font-medium">
+                        {formatDate(drop.submittedDate || drop.createdAt)}
+                      </span>
+
+                      {/* Activated Date */}
+                      {drop.isActivated && drop.oesActivationDate && (
+                        <span className="px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 font-medium">
+                          ✓ {formatDate(drop.oesActivationDate)}
+                        </span>
+                      )}
+
+                      {/* Separator */}
+                      <span className="text-gray-600 dark:text-gray-500">|</span>
+
+                      {/* QA Review Status */}
+                      <span className={`px-1.5 py-0.5 rounded font-medium ${qaStatus.color}`}>
+                        {qaStatus.label}
+                      </span>
+
+                      {/* Outcome */}
+                      {outcome && (
+                        <span className={`px-1.5 py-0.5 rounded font-semibold ${outcome.color}`}>
+                          {outcome.label}
+                        </span>
+                      )}
+
+                      {/* Spacer to push serials right */}
+                      <span className="flex-1" />
+
+                      {/* ONT Serial + Issue */}
+                      <span className="flex items-center gap-1 font-mono">
+                        <span className="text-blue-400 font-semibold">ONT:</span>
+                        <span className="text-gray-300">{drop.ontSerial || '-'}</span>
+                        {ontIssue && (
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${ontIssue.color}`}>
+                            {ontIssue.label}
+                          </span>
+                        )}
+                      </span>
+
+                      {/* UPS Serial + Issue */}
+                      <span className="flex items-center gap-1 font-mono">
+                        <span className="text-purple-400 font-semibold">UPS:</span>
+                        <span className="text-gray-300">{drop.upsSerial || '-'}</span>
+                        {upsIssue && (
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${upsIssue.color}`}>
+                            {upsIssue.label}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Row 2: Technician WA ID | Photos */}
+                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                       <span className="flex items-center gap-1">
                         <span>👤</span>
                         <span className="font-medium text-gray-600 dark:text-gray-300">{formatAgent(drop.senderPhone)}</span>
@@ -739,30 +820,9 @@ function QaCentrePageContent() {
                         <span className="font-semibold text-gray-600 dark:text-gray-300">{drop.photoCount || 0}</span>
                       </span>
                     </div>
-
-                    {/* Right: Serials with alert badges */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <SerialDisplay
-                          label="ONT"
-                          serial={drop.ontSerial}
-                          status={drop.ontSerialStatus}
-                        />
-                        {drop.serialsSwapped && (
-                          <span className="text-[10px] font-semibold bg-red-800 text-red-200 px-1 py-0.5 rounded ml-0.5">
-                            ⚠ SWAP
-                          </span>
-                        )}
-                      </div>
-                      <SerialDisplay
-                        label="UPS"
-                        serial={drop.upsSerial}
-                        status={drop.upsSerialStatus}
-                      />
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
 
