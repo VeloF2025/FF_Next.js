@@ -13,6 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial } from '@/modules/activate/services/qaAutoFailService';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 
@@ -57,6 +58,8 @@ function extractOntSerial(barcodeData: string | null): string | null {
 /**
  * Generate WhatsApp acknowledgment message
  * Returns empty string if DR not found - Go bridge will skip sending
+ *
+ * IMPORTANT: Detects swapped serials (ONT in UPS field or vice versa) and warns immediately
  */
 function generateAckMessage(
   dropNumber: string,
@@ -64,32 +67,77 @@ function generateAckMessage(
   photoCount: number,
   ontSerial: string | null,
   upsSerial: string | null
-): string {
+): { message: string; swapped: boolean; swapDetails: string | null } {
   // If DR not found in 1Map, return empty string
   // Go bridge checks for empty message and won't send anything
   // This prevents confusing "Received!" messages for invalid DRs
   if (!found) {
-    return '';
+    return { message: '', swapped: false, swapDetails: null };
   }
 
+  // Check for swapped serials - this is critical!
+  const swapCheck = detectSwappedSerials(ontSerial, upsSerial);
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`📸 *${dropNumber} Received!*`);
+  lines.push('');
+
+  // CRITICAL: Swapped serials warning at the top
+  if (swapCheck.swapped) {
+    lines.push('🔴 *ALERT: SERIALS APPEAR SWAPPED*');
+    lines.push('');
+    // Show what's in each field
+    if (ontSerial && looksLikeGizzuSerial(ontSerial)) {
+      lines.push(`❌ ONT field has Gizzu serial: ${ontSerial}`);
+    }
+    if (upsSerial && looksLikeOntSerial(upsSerial)) {
+      lines.push(`❌ UPS field has ONT serial: ${upsSerial}`);
+    }
+    lines.push('');
+    lines.push('*Please correct in 1Map:*');
+    lines.push('• ONT should be ALCL/ALCB serial');
+    lines.push('• UPS should be GU18W serial (Gizzu)');
+    lines.push('');
+  }
+
+  // Photo count
   const photoLine =
     photoCount > 0 ? `✅ Photos: ${photoCount}` : `⚠️ Photos: None found - please upload to 1Map`;
+  lines.push(photoLine);
 
-  const ontLine = ontSerial
-    ? `✅ ONT Serial: ${ontSerial}`
-    : `⚠️ ONT Serial: Not scanned - please upload to 1Map`;
+  // Serial status (with swap consideration)
+  if (swapCheck.swapped) {
+    // Already warned above, just show the raw values
+    lines.push(`⚠️ ONT field: ${ontSerial || 'Not scanned'}`);
+    lines.push(`⚠️ UPS field: ${upsSerial || 'Not scanned'}`);
+  } else {
+    // Normal display
+    const ontLine = ontSerial
+      ? `✅ ONT Serial: ${ontSerial}`
+      : `⚠️ ONT Serial: Not scanned - please upload to 1Map`;
+    lines.push(ontLine);
 
-  const upsLine = upsSerial
-    ? `✅ UPS Serial: ${upsSerial}`
-    : `⚠️ UPS Serial: Not scanned - please upload to 1Map`;
+    const upsLine = upsSerial
+      ? `✅ UPS Serial: ${upsSerial}`
+      : `⚠️ UPS Serial: Not scanned - please upload to 1Map`;
+    lines.push(upsLine);
+  }
 
-  return (
-    `📸 *${dropNumber} Received!*\n\n` +
-    `${photoLine}\n` +
-    `${ontLine}\n` +
-    `${upsLine}\n\n` +
-    `Thank you! QA review will follow shortly.`
-  );
+  lines.push('');
+
+  // Footer
+  if (swapCheck.swapped) {
+    lines.push('⚠️ Please correct the swapped serials before QA review.');
+  } else {
+    lines.push('Thank you! QA review will follow shortly.');
+  }
+
+  return {
+    message: lines.join('\n'),
+    swapped: swapCheck.swapped,
+    swapDetails: swapCheck.swapped ? swapCheck.details : null,
+  };
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
@@ -146,11 +194,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Continue with found=false - don't fail the request
     }
 
-    const message = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial);
+    const ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial);
     const duration = Date.now() - startTime;
 
     if (!found) {
       log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map - returning empty message (no ack will be sent)`);
+    } else if (ackResult.swapped) {
+      log.warn('DrAcknowledgment', `SWAPPED SERIALS detected for ${dropNumber}`, {
+        ontSerial,
+        upsSerial,
+        details: ackResult.swapDetails,
+      });
     } else {
       log.info('DrAcknowledgment', `Acknowledgment ready for ${dropNumber} in ${duration}ms`);
     }
@@ -161,7 +215,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       photoCount,
       ontSerial,
       upsSerial,
-      message,
+      message: ackResult.message,
+      serialsSwapped: ackResult.swapped,
+      swapDetails: ackResult.swapDetails,
     });
   } catch (error) {
     log.error('DrAcknowledgment', 'Error generating acknowledgment', { error });

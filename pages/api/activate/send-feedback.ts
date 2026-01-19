@@ -108,16 +108,23 @@ async function handlePost(
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${review.project}`);
     }
 
-    // 5. Send to WhatsApp via Bridge API (with threading if available)
+    // 5. Send to WhatsApp via Bridge API (with threading and @mention if available)
     const replyParams: WhatsAppReplyParams | undefined = review.wa_message_id
       ? {
           replyToId: review.wa_message_id,
           replyToSender: review.wa_sender_jid,
           quotedContent: review.wa_original_text || `${dropNumber}`,
+          // Include sender JID for @mention tagging
+          mentionJIDs: review.wa_sender_jid ? [review.wa_sender_jid] : [],
         }
       : undefined;
 
-    const sendResult = await sendToWhatsApp(groupId, feedbackMessage, replyParams);
+    // Add @mention prefix to message if we have sender info
+    const messageWithMention = review.wa_sender_jid
+      ? `@${extractPhoneFromJid(review.wa_sender_jid)} ${feedbackMessage}`
+      : feedbackMessage;
+
+    const sendResult = await sendToWhatsApp(groupId, messageWithMention, replyParams);
 
     if (!sendResult.success) {
       throw new Error('Failed to send message via WhatsApp Bridge');
@@ -287,6 +294,20 @@ function generateAutoFeedback(review: UnifiedReview): string {
 }
 
 /**
+ * Extract phone/user ID from a WhatsApp JID
+ * JID formats: 218738725019786@lid or 27123456789@s.whatsapp.net
+ */
+function extractPhoneFromJid(jid: string): string {
+  if (!jid) return '';
+  // Extract everything before the @ symbol
+  const atIndex = jid.indexOf('@');
+  if (atIndex > 0) {
+    return jid.substring(0, atIndex);
+  }
+  return jid;
+}
+
+/**
  * Get WhatsApp group ID for a project
  * Note: Using hardcoded mappings from WA Monitor configuration
  * These match the groups configured in /opt/wa-monitor/prod/config/projects.yaml
@@ -306,6 +327,7 @@ interface WhatsAppReplyParams {
   replyToId?: string | null;
   replyToSender?: string | null;
   quotedContent?: string | null;
+  mentionJIDs?: string[];
 }
 
 interface SendResult {
@@ -315,7 +337,7 @@ interface SendResult {
 
 /**
  * Send message to WhatsApp via Bridge API
- * Supports threaded replies when replyParams are provided
+ * Supports threaded replies and @mentions when replyParams are provided
  * Returns the sent message ID for future threading
  */
 async function sendToWhatsApp(
@@ -327,8 +349,8 @@ async function sendToWhatsApp(
     // WhatsApp Bridge API endpoint (running on Velocity Server port 8083)
     const bridgeUrl = process.env.WHATSAPP_BRIDGE_URL || 'http://192.168.1.150:8083';
 
-    // Build request body with optional reply threading
-    const requestBody: Record<string, string> = {
+    // Build request body with optional reply threading and mentions
+    const requestBody: Record<string, string | string[]> = {
       recipient: groupId,
       message: message,
     };
@@ -340,9 +362,14 @@ async function sendToWhatsApp(
       if (replyParams.quotedContent) {
         requestBody.quotedContent = replyParams.quotedContent;
       }
-      log.info('Sending threaded reply', {
+      // Add mentions to tag the original sender
+      if (replyParams.mentionJIDs && replyParams.mentionJIDs.length > 0) {
+        requestBody.mentionJIDs = replyParams.mentionJIDs;
+      }
+      log.info('Sending threaded reply with mention', {
         replyToId: replyParams.replyToId,
         replyToSender: replyParams.replyToSender,
+        hasMention: !!(replyParams.mentionJIDs?.length),
       });
     }
 

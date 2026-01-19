@@ -10,7 +10,12 @@
 import React, { useState, useEffect } from 'react';
 import { log } from '@/lib/logger';
 import type { QaWizardState, QaDecision } from '../../types/unified.types';
-import { getFailReasonDescription } from '../../services/qaAutoFailService';
+import {
+  getTechnicianIssues,
+  getTechnicianIssueDescription,
+  detectSwappedSerials,
+  type TechnicianIssue,
+} from '../../services/qaAutoFailService';
 import { STEP_LABELS } from '../../utils/stepMapper';
 
 interface FeedbackPhaseProps {
@@ -56,18 +61,40 @@ export function FeedbackPhase({
 
     // Header with decision
     if (decision === 'PASS') {
-      lines.push(`*${dropNumber} - APPROVED*`);
+      lines.push(`*${dropNumber} - APPROVED* ✅`);
       lines.push('');
     } else if (decision === 'FAIL') {
-      lines.push(`*${dropNumber} - FAILED*`);
+      lines.push(`*${dropNumber} - FAILED* ❌`);
       lines.push('');
     } else {
-      lines.push(`*${dropNumber} - REWORK NEEDED*`);
+      lines.push(`*${dropNumber} - REWORK NEEDED* ⚠️`);
       lines.push('');
     }
 
-    // Photo coverage summary with SPECIFIC missing steps
+    // Get technician-actionable issues (NOT internal VLM comparison data)
     const missingSteps = wizardState.photoReview.stepsMissing || [];
+    const technicianIssues = getTechnicianIssues({
+      ontSerial: wizardState.prerequisites.ontSerial,
+      upsSerial: wizardState.prerequisites.upsSerial,
+      photoCount: wizardState.photoReview.totalPhotos,
+      missingSteps,
+      powerMeterDbm: wizardState.dataValidation.powerMeter.value,
+    });
+
+    // Check for swapped serials - this is CRITICAL and shown prominently
+    const swapCheck = detectSwappedSerials(
+      wizardState.prerequisites.ontSerial,
+      wizardState.prerequisites.upsSerial
+    );
+
+    if (swapCheck.swapped) {
+      lines.push('🔴 *CRITICAL: SERIALS SWAPPED*');
+      lines.push(swapCheck.details);
+      lines.push('Please correct in 1Map immediately.');
+      lines.push('');
+    }
+
+    // Photo coverage summary
     const coveredSteps = 10 - missingSteps.length;
     lines.push(`*Photo Coverage:* ${coveredSteps}/10 steps`);
 
@@ -79,66 +106,30 @@ export function FeedbackPhase({
     }
     lines.push('');
 
-    // Data validation results
+    // Validation results (technician-actionable only)
     lines.push('*Validation Results:*');
 
     // Power meter
     const pm = wizardState.dataValidation.powerMeter;
     if (pm.value !== null) {
-      const pmStatus = pm.inRange ? 'PASS' : 'FAIL';
-      lines.push(`- Power Meter: ${pm.value} dBm (${pmStatus})`);
+      const pmStatus = pm.inRange ? '✓' : '✗';
+      lines.push(`- Power Meter: ${pm.value} dBm ${pmStatus}`);
     }
 
-    // ONT Serial validation
-    const sv = wizardState.dataValidation.serialValidation;
-    if (sv.ontMatch) {
-      lines.push(`- ONT Serial: Verified ✓`);
-    } else if (sv.onemapSerial || sv.step6Serial || sv.step9Serial) {
-      lines.push(`- ONT Serial: MISMATCH`);
-      if (sv.onemapSerial) lines.push(`  1Map: ${sv.onemapSerial}`);
-      if (sv.step6Serial) lines.push(`  Step 6: ${sv.step6Serial}`);
-      if (sv.step9Serial) lines.push(`  Step 9: ${sv.step9Serial}`);
-    }
-
-    // DR Number validation
-    if (sv.drMatch) {
-      lines.push(`- DR Number: Verified ✓`);
-    } else if (sv.step9DrNumber) {
-      lines.push(`- DR Number: MISMATCH (${sv.step9DrNumber})`);
-    }
-
+    // Serial status (simple pass/fail, no VLM comparison data)
+    const ontPresent = !!wizardState.prerequisites.ontSerial;
+    const upsPresent = !!wizardState.prerequisites.upsSerial;
+    lines.push(`- ONT Serial: ${ontPresent ? (swapCheck.swapped ? 'SWAPPED ✗' : 'Scanned ✓') : 'NOT SCANNED ✗'}`);
+    lines.push(`- UPS Serial: ${upsPresent ? (swapCheck.swapped ? 'SWAPPED ✗' : 'Scanned ✓') : 'NOT SCANNED ✗'}`);
     lines.push('');
 
-    // Issues summary - use specific descriptions, not generic codes
-    const issues: string[] = [];
-
-    // Add specific missing photo details
-    if (missingSteps.length > 0) {
-      const missingLabels = missingSteps
-        .map((s: number) => STEP_LABELS[s] || `Step ${s}`)
-        .join(', ');
-      issues.push(`Missing photos: ${missingLabels}`);
-    }
-
-    // Add serial mismatch if applicable
-    if (!sv.ontMatch && (sv.onemapSerial || sv.step6Serial || sv.step9Serial)) {
-      issues.push('ONT serial mismatch between photos and 1Map');
-    }
-
-    // Add power meter issue if applicable
-    if (pm.value !== null && !pm.inRange) {
-      issues.push(`Power meter reading out of range (${pm.value} dBm)`);
-    }
-
-    // Add DR number mismatch if applicable
-    if (!sv.drMatch && sv.step9DrNumber) {
-      issues.push(`DR number mismatch on label`);
-    }
-
-    if (issues.length > 0) {
-      lines.push('*Issues Found:*');
-      issues.forEach((issue) => {
-        lines.push(`- ${issue}`);
+    // Actionable issues for technician (excluding swap which is shown above)
+    const actionableIssues = technicianIssues.filter(i => i.code !== 'SERIALS_SWAPPED');
+    if (actionableIssues.length > 0) {
+      lines.push('*Action Required:*');
+      actionableIssues.forEach((issue) => {
+        const icon = issue.severity === 'error' ? '❌' : '⚠️';
+        lines.push(`${icon} ${getTechnicianIssueDescription(issue.code)}`);
       });
       lines.push('');
     }
@@ -150,13 +141,11 @@ export function FeedbackPhase({
       lines.push('');
     }
 
-    // Action required
-    if (decision === 'FAIL') {
-      lines.push('*Action Required:*');
-      lines.push('Please address the issues above and resubmit.');
-    } else if (decision === 'REWORK_NEEDED') {
-      lines.push('*Action Required:*');
-      lines.push('Minor corrections needed. Please fix and resubmit.');
+    // Final action prompt
+    if (decision === 'FAIL' || decision === 'REWORK_NEEDED') {
+      if (actionableIssues.length > 0 || swapCheck.swapped) {
+        lines.push('Please address the issues above and resubmit.');
+      }
     }
 
     setFeedback((prev) => ({
@@ -304,6 +293,30 @@ export function FeedbackPhase({
           QA Summary
         </h4>
 
+        {/* Swapped serials warning - prominent display */}
+        {(() => {
+          const swapCheck = detectSwappedSerials(
+            wizardState.prerequisites.ontSerial,
+            wizardState.prerequisites.upsSerial
+          );
+          if (swapCheck.swapped) {
+            return (
+              <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-300 font-semibold mb-2">
+                  <span className="text-xl">🔴</span>
+                  SERIALS SWAPPED
+                </div>
+                <p className="text-sm text-red-600 dark:text-red-400">{swapCheck.details}</p>
+                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                  <div>ONT field: <code className="bg-white/50 px-1 rounded">{wizardState.prerequisites.ontSerial || 'N/A'}</code></div>
+                  <div>UPS field: <code className="bg-white/50 px-1 rounded">{wizardState.prerequisites.upsSerial || 'N/A'}</code></div>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Prerequisites */}
           <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
@@ -338,34 +351,68 @@ export function FeedbackPhase({
             </div>
           </div>
 
-          {/* Serial Check */}
+          {/* Serial Status - simplified, no VLM comparison */}
           <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
             <div className="text-2xl mb-1">
-              {wizardState.dataValidation.serialValidation.ontMatch ? '✅' : '❌'}
+              {(() => {
+                const swapped = detectSwappedSerials(
+                  wizardState.prerequisites.ontSerial,
+                  wizardState.prerequisites.upsSerial
+                ).swapped;
+                const ontPresent = !!wizardState.prerequisites.ontSerial;
+                const upsPresent = !!wizardState.prerequisites.upsSerial;
+                if (swapped) return '🔴';
+                if (ontPresent && upsPresent) return '✅';
+                return '❌';
+              })()}
             </div>
-            <div className="text-sm font-medium">Serial Check</div>
+            <div className="text-sm font-medium">Serials</div>
             <div className="text-xs text-gray-500">
-              3-way validation
+              {(() => {
+                const swapped = detectSwappedSerials(
+                  wizardState.prerequisites.ontSerial,
+                  wizardState.prerequisites.upsSerial
+                ).swapped;
+                if (swapped) return 'SWAPPED';
+                const ontPresent = !!wizardState.prerequisites.ontSerial;
+                const upsPresent = !!wizardState.prerequisites.upsSerial;
+                if (ontPresent && upsPresent) return 'Both scanned';
+                if (!ontPresent && !upsPresent) return 'None scanned';
+                return ontPresent ? 'UPS missing' : 'ONT missing';
+              })()}
             </div>
           </div>
         </div>
 
-        {/* Issues Found */}
-        {feedback.reasons.length > 0 && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <div className="font-medium text-red-700 dark:text-red-300 mb-2">
-              Issues Found ({feedback.reasons.length})
-            </div>
-            <ul className="space-y-1">
-              {feedback.reasons.map((reason, idx) => (
-                <li key={idx} className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
-                  <span>•</span>
-                  {getFailReasonDescription(reason as any)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* Technician-actionable issues */}
+        {(() => {
+          const techIssues = getTechnicianIssues({
+            ontSerial: wizardState.prerequisites.ontSerial,
+            upsSerial: wizardState.prerequisites.upsSerial,
+            photoCount: wizardState.photoReview.totalPhotos,
+            missingSteps: wizardState.photoReview.stepsMissing || [],
+            powerMeterDbm: wizardState.dataValidation.powerMeter.value,
+          });
+
+          if (techIssues.length > 0) {
+            return (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <div className="font-medium text-red-700 dark:text-red-300 mb-2">
+                  Technician Action Required ({techIssues.length})
+                </div>
+                <ul className="space-y-1">
+                  {techIssues.map((issue, idx) => (
+                    <li key={idx} className="text-sm text-red-600 dark:text-red-400 flex items-center gap-2">
+                      <span>{issue.severity === 'error' ? '❌' : '⚠️'}</span>
+                      {getTechnicianIssueDescription(issue.code)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* WhatsApp Message */}

@@ -20,7 +20,11 @@ import type {
 import {
   evaluateAutoFail,
   getFailReasonDescription,
+  getTechnicianIssues,
+  getTechnicianIssueDescription,
+  detectSwappedSerials,
   type DrValidationData,
+  type TechnicianIssue,
 } from '../../services/qaAutoFailService';
 
 interface FinalDecisionPhaseProps {
@@ -267,6 +271,66 @@ export function FinalDecisionPhase({
         </div>
       )}
 
+      {/* Technician-Actionable Issues (shown prominently) */}
+      {(() => {
+        const swapCheck = detectSwappedSerials(
+          wizardState.prerequisites.ontSerial,
+          wizardState.prerequisites.upsSerial
+        );
+        const techIssues = getTechnicianIssues({
+          ontSerial: wizardState.prerequisites.ontSerial,
+          upsSerial: wizardState.prerequisites.upsSerial,
+          photoCount: wizardState.photoReview.totalPhotos,
+          missingSteps: wizardState.photoReview.stepsMissing,
+          powerMeterDbm: wizardState.dataValidation.powerMeter.value,
+        });
+
+        if (swapCheck.swapped || techIssues.length > 0) {
+          return (
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+              <h4 className="font-medium text-red-700 dark:text-red-300 mb-3 flex items-center gap-2">
+                <span>⚠️</span>
+                Technician Issues (will be sent via WhatsApp)
+              </h4>
+
+              {/* Swapped serials - critical error */}
+              {swapCheck.swapped && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/40 rounded-lg border border-red-300 dark:border-red-700">
+                  <div className="flex items-center gap-2 text-red-800 dark:text-red-200 font-semibold">
+                    <span className="text-lg">🔴</span>
+                    SERIALS SWAPPED
+                  </div>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">{swapCheck.details}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
+                      <span className="text-gray-500">ONT field:</span>
+                      <code className="ml-1 font-mono">{wizardState.prerequisites.ontSerial || 'N/A'}</code>
+                    </div>
+                    <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
+                      <span className="text-gray-500">UPS field:</span>
+                      <code className="ml-1 font-mono">{wizardState.prerequisites.upsSerial || 'N/A'}</code>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Other technician issues */}
+              {techIssues.filter(i => i.code !== 'SERIALS_SWAPPED').length > 0 && (
+                <ul className="space-y-2">
+                  {techIssues.filter(i => i.code !== 'SERIALS_SWAPPED').map((issue, idx) => (
+                    <li key={idx} className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+                      <span>{issue.severity === 'error' ? '❌' : '⚠️'}</span>
+                      {getTechnicianIssueDescription(issue.code)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       {/* Decision Summary with Photo Viewer */}
       <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
         <h4 className="font-medium text-gray-900 dark:text-white mb-4">
@@ -289,52 +353,62 @@ export function FinalDecisionPhase({
               <span>{getStatusIcon(wizardState.dataValidation.powerMeter.inRange)} {wizardState.dataValidation.powerMeter.value} dBm</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">DR Number:</span>
-              <span>{getStatusIcon(wizardState.dataValidation.serialValidation.drMatch)}</span>
+              <span className="text-gray-500">Serials Scanned:</span>
+              <span>
+                {(() => {
+                  const swapped = detectSwappedSerials(
+                    wizardState.prerequisites.ontSerial,
+                    wizardState.prerequisites.upsSerial
+                  ).swapped;
+                  if (swapped) return '🔴 SWAPPED';
+                  const ont = !!wizardState.prerequisites.ontSerial;
+                  const ups = !!wizardState.prerequisites.upsSerial;
+                  if (ont && ups) return '✅';
+                  return '❌';
+                })()}
+              </span>
             </div>
           </div>
 
-          {/* ONT Serial Mismatch - Expanded with Photos */}
+          {/* Internal QA: VLM Serial Comparison (collapsible, for QA team only) */}
           {hasSerialMismatch && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-red-600 dark:text-red-400 font-medium">❌ ONT Serial Mismatch</span>
-                <span className="text-xs px-2 py-0.5 bg-red-100 dark:bg-red-800/50 rounded text-red-600 dark:text-red-300">
-                  Needs Review
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                {/* OneMap Serial */}
-                <div className="text-center">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">OneMap Synced</div>
-                  <div className="font-mono text-sm bg-white dark:bg-gray-800 p-2 rounded border">
-                    {wizardState.dataValidation.serialValidation.onemapSerial || 'N/A'}
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                🔍 Internal QA: VLM Serial Comparison (click to expand)
+              </summary>
+              <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  This data is for internal QA/VLM improvement only. NOT sent to technicians.
+                </p>
+                <div className="grid grid-cols-3 gap-4">
+                  {/* OneMap Serial */}
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">OneMap Synced</div>
+                    <div className="font-mono text-sm bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600">
+                      {wizardState.dataValidation.serialValidation.onemapSerial || 'N/A'}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">From 1Map scan</div>
-                </div>
 
-                {/* Step 6 - ONT Back */}
-                <div className="text-center">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Step 6 (ONT Back)</div>
-                  <PhotoThumbnail photo={getPhotoByStep(6)} label="Step 6" />
-                  <div className="font-mono text-sm bg-white dark:bg-gray-800 p-2 rounded border mt-2">
-                    {wizardState.dataValidation.serialValidation.step6Serial || 'N/A'}
+                  {/* Step 6 - ONT Back */}
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">VLM Step 6</div>
+                    <PhotoThumbnail photo={getPhotoByStep(6)} label="Step 6" />
+                    <div className="font-mono text-sm bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 mt-2">
+                      {wizardState.dataValidation.serialValidation.step6Serial || 'N/A'}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">VLM extracted</div>
-                </div>
 
-                {/* Step 9 - Green Lights */}
-                <div className="text-center">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Step 9 (Front)</div>
-                  <PhotoThumbnail photo={getPhotoByStep(9)} label="Step 9" />
-                  <div className="font-mono text-sm bg-white dark:bg-gray-800 p-2 rounded border mt-2">
-                    {wizardState.dataValidation.serialValidation.step9Serial || 'N/A'}
+                  {/* Step 9 - Green Lights */}
+                  <div className="text-center">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">VLM Step 9</div>
+                    <PhotoThumbnail photo={getPhotoByStep(9)} label="Step 9" />
+                    <div className="font-mono text-sm bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 mt-2">
+                      {wizardState.dataValidation.serialValidation.step9Serial || 'N/A'}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-1">VLM extracted</div>
                 </div>
               </div>
-            </div>
+            </details>
           )}
         </div>
       </div>

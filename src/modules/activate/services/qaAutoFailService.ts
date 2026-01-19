@@ -18,7 +18,7 @@ import { log } from '@/lib/logger';
 // ============================================================================
 
 /**
- * Fail reason codes for tracking
+ * Fail reason codes for tracking (INTERNAL QA)
  */
 export type FailReasonCode =
   | 'MISSING_PHOTOS'
@@ -27,6 +27,25 @@ export type FailReasonCode =
   | 'DR_NUMBER_MISMATCH'
   | 'POWER_OUT_OF_RANGE'
   | 'DISCARDED_CRITICAL';
+
+/**
+ * Technician-actionable issue codes (for WhatsApp feedback)
+ * These are issues the technician can actually fix
+ */
+export type TechnicianIssueCode =
+  | 'ONT_NOT_SCANNED'      // ONT serial missing from 1Map
+  | 'UPS_NOT_SCANNED'      // UPS/Gizzu serial missing from 1Map
+  | 'SERIALS_SWAPPED'      // ONT has Gizzu format or vice versa
+  | 'ONT_INVALID_FORMAT'   // ONT serial doesn't match ALCL/ALCB pattern
+  | 'UPS_INVALID_FORMAT'   // UPS serial format invalid
+  | 'MISSING_PHOTOS'       // Missing installation step photos
+  | 'POWER_OUT_OF_RANGE';  // Power meter issue (technician may need to re-test)
+
+export interface TechnicianIssue {
+  code: TechnicianIssueCode;
+  message: string;
+  severity: 'error' | 'warning';
+}
 
 /**
  * Prerequisites check result
@@ -112,10 +131,18 @@ export interface DrValidationData {
 // ============================================================================
 
 /**
- * ONT Serial regex pattern
- * Matches: ALCLB463EE35, ALCB480FE3D
+ * ONT Serial regex pattern (Nokia ONT)
+ * Matches: ALCLB463EE35, ALCB480FE3D, ALCLB48CC3CA
+ * Format: ALCL or ALCB followed by alphanumeric
  */
-const ONT_SERIAL_PATTERN = /^ALCL?B?[A-Z0-9]{7,9}$/i;
+const ONT_SERIAL_PATTERN = /^ALC[LB][A-Z0-9]{7,10}$/i;
+
+/**
+ * Gizzu UPS Serial regex pattern
+ * Matches: GU18W12V2508057584, GU18W12V2508035029
+ * Format: GU18W followed by alphanumeric (typically 15-20 chars total)
+ */
+const GIZZU_SERIAL_PATTERN = /^GU18W[A-Z0-9]{10,16}$/i;
 
 /**
  * Power meter valid range (dBm)
@@ -127,10 +154,10 @@ const POWER_METER_MIN = -24;
 const POWER_METER_MAX = -18;
 
 /**
- * UPS Serial length range
+ * UPS Serial length range (for non-Gizzu UPS)
  */
 const UPS_SERIAL_MIN_LENGTH = 8;
-const UPS_SERIAL_MAX_LENGTH = 12;
+const UPS_SERIAL_MAX_LENGTH = 20;
 
 /**
  * Required steps (all 10 must be present)
@@ -217,6 +244,175 @@ export function validatePowerMeter(dbm: number | null): PowerMeterResult {
     inRange: true,
     message: `${dbm} dBm is within valid range (${POWER_METER_MAX} to ${POWER_METER_MIN} dBm)`,
   };
+}
+
+// ============================================================================
+// SERIAL TYPE DETECTION
+// ============================================================================
+
+/**
+ * Check if a serial looks like a Nokia ONT serial (ALCL/ALCB pattern)
+ */
+export function looksLikeOntSerial(serial: string | null): boolean {
+  if (!serial) return false;
+  return ONT_SERIAL_PATTERN.test(serial.trim());
+}
+
+/**
+ * Check if a serial looks like a Gizzu UPS serial (GU18W pattern)
+ */
+export function looksLikeGizzuSerial(serial: string | null): boolean {
+  if (!serial) return false;
+  return GIZZU_SERIAL_PATTERN.test(serial.trim());
+}
+
+/**
+ * Detect if ONT and UPS serials appear to be swapped
+ * Returns details about the swap if detected
+ */
+export function detectSwappedSerials(
+  ontSerial: string | null,
+  upsSerial: string | null
+): { swapped: boolean; details: string } {
+  if (!ontSerial && !upsSerial) {
+    return { swapped: false, details: 'No serials to check' };
+  }
+
+  const ontLooksLikeGizzu = looksLikeGizzuSerial(ontSerial);
+  const upsLooksLikeOnt = looksLikeOntSerial(upsSerial);
+
+  if (ontLooksLikeGizzu && upsLooksLikeOnt) {
+    // Both are definitely swapped
+    return {
+      swapped: true,
+      details: `Serials appear SWAPPED: ONT field has Gizzu serial (${ontSerial}), UPS field has ONT serial (${upsSerial})`,
+    };
+  }
+
+  if (ontLooksLikeGizzu) {
+    // ONT field has Gizzu serial
+    return {
+      swapped: true,
+      details: `ONT field contains Gizzu serial (${ontSerial}) - please swap in 1Map`,
+    };
+  }
+
+  if (upsLooksLikeOnt) {
+    // UPS field has ONT serial
+    return {
+      swapped: true,
+      details: `UPS field contains ONT serial (${upsSerial}) - please swap in 1Map`,
+    };
+  }
+
+  return { swapped: false, details: 'Serials appear correctly assigned' };
+}
+
+/**
+ * Get technician-actionable issues (for WhatsApp feedback)
+ * These are issues the technician can actually fix - NOT internal VLM comparison data
+ */
+export function getTechnicianIssues(data: {
+  ontSerial: string | null;
+  upsSerial: string | null;
+  photoCount: number;
+  missingSteps: number[];
+  powerMeterDbm: number | null;
+}): TechnicianIssue[] {
+  const issues: TechnicianIssue[] = [];
+
+  // Check for missing serials
+  if (!data.ontSerial) {
+    issues.push({
+      code: 'ONT_NOT_SCANNED',
+      message: 'ONT serial not scanned in 1Map',
+      severity: 'error',
+    });
+  }
+
+  if (!data.upsSerial) {
+    issues.push({
+      code: 'UPS_NOT_SCANNED',
+      message: 'UPS/Gizzu serial not scanned in 1Map',
+      severity: 'error',
+    });
+  }
+
+  // Check for swapped serials (this is a critical error)
+  const swapCheck = detectSwappedSerials(data.ontSerial, data.upsSerial);
+  if (swapCheck.swapped) {
+    issues.push({
+      code: 'SERIALS_SWAPPED',
+      message: swapCheck.details,
+      severity: 'error',
+    });
+  }
+
+  // Check ONT serial format (if present but invalid)
+  if (data.ontSerial && !swapCheck.swapped) {
+    const ontValid = validateOntSerial(data.ontSerial);
+    if (!ontValid.valid) {
+      issues.push({
+        code: 'ONT_INVALID_FORMAT',
+        message: `ONT serial format invalid: ${ontValid.reason}`,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Check UPS serial format (if present but invalid)
+  if (data.upsSerial && !swapCheck.swapped) {
+    // For UPS, accept either Gizzu format or general format
+    const isGizzu = looksLikeGizzuSerial(data.upsSerial);
+    const upsValid = validateUpsSerial(data.upsSerial);
+    if (!isGizzu && !upsValid.valid) {
+      issues.push({
+        code: 'UPS_INVALID_FORMAT',
+        message: `UPS serial format invalid: ${upsValid.reason}`,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Check for missing photos
+  if (data.missingSteps.length > 0) {
+    issues.push({
+      code: 'MISSING_PHOTOS',
+      message: `Missing photos for steps: ${data.missingSteps.join(', ')}`,
+      severity: 'error',
+    });
+  }
+
+  // Check power meter
+  if (data.powerMeterDbm !== null) {
+    const pmResult = validatePowerMeter(data.powerMeterDbm);
+    if (!pmResult.inRange) {
+      issues.push({
+        code: 'POWER_OUT_OF_RANGE',
+        message: pmResult.message,
+        severity: 'error',
+      });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Get human-readable description for technician issue
+ */
+export function getTechnicianIssueDescription(code: TechnicianIssueCode): string {
+  const descriptions: Record<TechnicianIssueCode, string> = {
+    ONT_NOT_SCANNED: 'Please scan the ONT serial barcode in 1Map',
+    UPS_NOT_SCANNED: 'Please scan the UPS/Gizzu serial barcode in 1Map',
+    SERIALS_SWAPPED: 'ONT and UPS serials appear to be swapped - please correct in 1Map',
+    ONT_INVALID_FORMAT: 'ONT serial format is invalid - please rescan',
+    UPS_INVALID_FORMAT: 'UPS serial format is invalid - please rescan',
+    MISSING_PHOTOS: 'Please upload missing installation photos',
+    POWER_OUT_OF_RANGE: 'Power meter reading is out of acceptable range',
+  };
+
+  return descriptions[code] || code;
 }
 
 // ============================================================================
