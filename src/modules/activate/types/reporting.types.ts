@@ -442,6 +442,13 @@ export interface TrendDataPoint {
   reviewed: number;
   /** QA feedback not sent */
   notReviewed: number;
+  /** Per-project breakdown (optional, included when no project filter) */
+  by_project?: Record<string, {
+    installed: number;
+    activated: number;
+    reviewed: number;
+    notReviewed: number;
+  }>;
 }
 
 /**
@@ -457,6 +464,8 @@ export interface TrendAnalysisResponse {
   group_by: TrendGroupBy;
   /** Project filter (if any) */
   project: string | null;
+  /** Available projects in the data (for toggle UI) */
+  available_projects: string[];
   /** Data points for chart */
   data: TrendDataPoint[];
   /** Velocity metrics */

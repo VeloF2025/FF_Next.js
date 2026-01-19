@@ -27,6 +27,38 @@ interface TrendReportsProps {
   refreshKey: number;
 }
 
+// Series visibility state type
+interface SeriesVisibility {
+  installed: boolean;
+  activated: boolean;
+  reviewed: boolean;
+  notReviewed: boolean;
+}
+
+// Generate a consistent color for a project name
+const projectColors: Record<string, string> = {
+  Lawley: '#3B82F6',     // blue
+  Mohadin: '#8B5CF6',    // purple
+  Mamelodi: '#10B981',   // green
+  'Velo Test': '#F59E0B', // amber
+};
+
+const defaultProjectColors = [
+  '#06B6D4', // cyan
+  '#EC4899', // pink
+  '#F97316', // orange
+  '#84CC16', // lime
+  '#14B8A6', // teal
+  '#A855F7', // violet
+];
+
+function getProjectColor(project: string, index: number): string {
+  const color = projectColors[project];
+  if (color) return color;
+  const fallback = defaultProjectColors[index % defaultProjectColors.length];
+  return fallback ?? '#6B7280'; // gray fallback
+}
+
 export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
   const [groupBy, setGroupBy] = useState<TrendGroupBy>('day');
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +66,39 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
   const [trendData, setTrendData] = useState<TrendAnalysisResponse | null>(null);
   const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([]);
   const [dailyTarget, setDailyTarget] = useState<number>(0);
+
+  // Series visibility toggles - all visible by default
+  const [seriesVisibility, setSeriesVisibility] = useState<SeriesVisibility>({
+    installed: true,
+    activated: true,
+    reviewed: true,
+    notReviewed: true,
+  });
+
+  // Project visibility toggles - all visible by default
+  const [projectVisibility, setProjectVisibility] = useState<Record<string, boolean>>({});
+
+  // Toggle a series visibility
+  const toggleSeries = (key: keyof SeriesVisibility) => {
+    setSeriesVisibility((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Toggle a project visibility
+  const toggleProject = (project: string) => {
+    setProjectVisibility((prev) => ({ ...prev, [project]: !prev[project] }));
+  };
+
+  // Initialize project visibility when data loads
+  const availableProjects = trendData?.available_projects || [];
+
+  // Initialize all projects as visible when they first appear
+  if (availableProjects.length > 0) {
+    for (const proj of availableProjects) {
+      if (projectVisibility[proj] === undefined) {
+        projectVisibility[proj] = true;
+      }
+    }
+  }
 
   // Fetch trend data
   useEffect(() => {
@@ -122,7 +187,76 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             </button>
           )}
         </div>
+
+        {/* Series Visibility Toggles */}
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Series:
+          </span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={seriesVisibility.installed}
+              onChange={() => toggleSeries('installed')}
+              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Installed</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={seriesVisibility.activated}
+              onChange={() => toggleSeries('activated')}
+              className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+            />
+            <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">Activated</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={seriesVisibility.reviewed}
+              onChange={() => toggleSeries('reviewed')}
+              className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            <span className="text-sm text-green-600 dark:text-green-400 font-medium">Reviewed</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={seriesVisibility.notReviewed}
+              onChange={() => toggleSeries('notReviewed')}
+              className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">Not Reviewed</span>
+          </label>
+        </div>
       </div>
+
+      {/* Project Visibility Toggles - only show when multiple projects available */}
+      {availableProjects.length > 1 && (
+        <div className="flex flex-wrap items-center gap-4 px-6 -mt-4">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Projects:
+          </span>
+          {availableProjects.map((proj, idx) => (
+            <label key={proj} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={projectVisibility[proj] !== false}
+                onChange={() => toggleProject(proj)}
+                className="w-4 h-4 rounded border-gray-300 focus:ring-2"
+                style={{ accentColor: getProjectColor(proj, idx) }}
+              />
+              <span
+                className="text-sm font-medium"
+                style={{ color: getProjectColor(proj, idx) }}
+              >
+                {proj}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
 
       {/* Error display */}
       {error && (
@@ -202,18 +336,40 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         <TrendChart
           title="Installation & Activation Trends"
           subtitle={`${filters.dateFrom} to ${filters.dateTo}${dailyTarget > 0 ? ` • Target: ${dailyTarget}/day` : ''}`}
-          data={trendData?.data.map((d) => ({
-            date: d.label,
-            Installed: d.installed,
-            Activated: d.activated,
-            Reviewed: d.reviewed,
-            'Not Reviewed': d.notReviewed,
-          })) || []}
+          data={trendData?.data.map((d) => {
+            // If we have per-project data and some projects are toggled off, compute filtered totals
+            if (d.by_project && availableProjects.length > 1) {
+              let installed = 0, activated = 0, reviewed = 0, notReviewed = 0;
+              for (const proj of availableProjects) {
+                if (projectVisibility[proj] !== false && d.by_project[proj]) {
+                  installed += d.by_project[proj].installed;
+                  activated += d.by_project[proj].activated;
+                  reviewed += d.by_project[proj].reviewed;
+                  notReviewed += d.by_project[proj].notReviewed;
+                }
+              }
+              return {
+                date: d.label,
+                Installed: installed,
+                Activated: activated,
+                Reviewed: reviewed,
+                'Not Reviewed': notReviewed,
+              };
+            }
+            // No project breakdown, use totals
+            return {
+              date: d.label,
+              Installed: d.installed,
+              Activated: d.activated,
+              Reviewed: d.reviewed,
+              'Not Reviewed': d.notReviewed,
+            };
+          }) || []}
           series={[
-            { dataKey: 'Installed', name: 'Installed', color: '#3B82F6' },
-            { dataKey: 'Activated', name: 'Activated', color: '#8B5CF6' },
-            { dataKey: 'Reviewed', name: 'Reviewed', color: '#10B981' },
-            { dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#F59E0B' },
+            ...(seriesVisibility.installed ? [{ dataKey: 'Installed', name: 'Installed', color: '#3B82F6' }] : []),
+            ...(seriesVisibility.activated ? [{ dataKey: 'Activated', name: 'Activated', color: '#8B5CF6' }] : []),
+            ...(seriesVisibility.reviewed ? [{ dataKey: 'Reviewed', name: 'Reviewed', color: '#10B981' }] : []),
+            ...(seriesVisibility.notReviewed ? [{ dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#F59E0B' }] : []),
           ]}
           type="line"
           xAxisKey="date"
@@ -229,14 +385,40 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
         <TrendChart
           title="Daily Volume Distribution"
-          data={trendData?.data.map((d) => ({
-            date: d.label,
-            Reviewed: d.reviewed,
-            'Not Reviewed': d.notReviewed,
-          })) || []}
+          data={trendData?.data.map((d) => {
+            // If we have per-project data and some projects are toggled off, compute filtered totals
+            if (d.by_project && availableProjects.length > 1) {
+              let installed = 0, activated = 0, reviewed = 0, notReviewed = 0;
+              for (const proj of availableProjects) {
+                if (projectVisibility[proj] !== false && d.by_project[proj]) {
+                  installed += d.by_project[proj].installed;
+                  activated += d.by_project[proj].activated;
+                  reviewed += d.by_project[proj].reviewed;
+                  notReviewed += d.by_project[proj].notReviewed;
+                }
+              }
+              return {
+                date: d.label,
+                Installed: installed,
+                Activated: activated,
+                Reviewed: reviewed,
+                'Not Reviewed': notReviewed,
+              };
+            }
+            // No project breakdown, use totals
+            return {
+              date: d.label,
+              Installed: d.installed,
+              Activated: d.activated,
+              Reviewed: d.reviewed,
+              'Not Reviewed': d.notReviewed,
+            };
+          }) || []}
           series={[
-            { dataKey: 'Reviewed', name: 'Reviewed', color: '#10B981', stackId: 'stack' },
-            { dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#F59E0B', stackId: 'stack' },
+            ...(seriesVisibility.installed ? [{ dataKey: 'Installed', name: 'Installed', color: '#3B82F6', stackId: 'stack' }] : []),
+            ...(seriesVisibility.activated ? [{ dataKey: 'Activated', name: 'Activated', color: '#8B5CF6', stackId: 'stack' }] : []),
+            ...(seriesVisibility.reviewed ? [{ dataKey: 'Reviewed', name: 'Reviewed', color: '#10B981', stackId: 'stack' }] : []),
+            ...(seriesVisibility.notReviewed ? [{ dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#F59E0B', stackId: 'stack' }] : []),
           ]}
           type="bar"
           xAxisKey="date"
