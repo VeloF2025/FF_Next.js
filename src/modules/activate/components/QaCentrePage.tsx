@@ -646,7 +646,7 @@ function QaCentrePageContent() {
                   >
                     <option value="all">All Projects</option>
                     {projects
-                      .filter(project => !['Test', 'Marketing', 'Velo Test', 'test', 'marketing'].includes(project))
+                      .filter(project => !['Test', 'Marketing', 'Velo Test', 'test', 'marketing', 'Integration Test', 'Test Project'].includes(project))
                       .map(project => (
                         <option key={project} value={project}>{project}</option>
                       ))}
