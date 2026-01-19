@@ -120,6 +120,14 @@ export default function RFQList({
     );
   }
 
+  // Calculate statistics
+  const stats = {
+    total: rfqs.length,
+    draft: rfqs.filter(r => r.status === 'draft').length,
+    active: rfqs.filter(r => r.status === 'active').length,
+    closed: rfqs.filter(r => r.status === 'closed').length,
+  };
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
@@ -143,59 +151,121 @@ export default function RFQList({
         )}
       </div>
 
-      {/* RFQ List */}
+      {/* Statistics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total RFQs</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.total}</p>
+            </div>
+            <FileText className="h-8 w-8 text-[var(--ff-text-tertiary)]" />
+          </div>
+        </div>
+
+        <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Draft</p>
+              <p className="text-2xl font-bold text-yellow-400">{stats.draft}</p>
+            </div>
+            <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <FileText className="h-6 w-6 text-yellow-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Active</p>
+              <p className="text-2xl font-bold text-green-400">{stats.active}</p>
+            </div>
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <FileText className="h-6 w-6 text-green-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Closed</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.closed}</p>
+            </div>
+            <div className="p-2 bg-[var(--ff-bg-tertiary)] rounded-lg">
+              <FileText className="h-6 w-6 text-[var(--ff-text-tertiary)]" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* RFQ Cards Grid */}
       {rfqs.length > 0 ? (
-        <div className="bg-[var(--ff-bg-secondary)] shadow rounded-lg overflow-hidden">
-          <div className="divide-y divide-[var(--ff-border-light)]">
-            {rfqs.map(rfq => (
-              <div
-                key={rfq.id}
-                className={`p-6 hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors ${
-                  selectedRFQId === rfq.id ? 'bg-blue-500/10 border-l-4 border-blue-500' : ''
-                }`}
-                onClick={() => handleRFQClick(rfq)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">
-                        {rfq.title}
-                      </h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(rfq.status)}`}>
-                        {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
-                      </span>
-                    </div>
-                    {rfq.description && (
-                      <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">
-                        {rfq.description}
-                      </p>
-                    )}
-                    <div className="mt-3 flex items-center space-x-6 text-sm text-[var(--ff-text-tertiary)]">
-                      <span>Created: {formatDate(rfq.createdAt)}</span>
-                      {rfq.dueDate && (
-                        <span>Due: {formatDate(rfq.dueDate)}</span>
-                      )}
-                      <span>Suppliers: {rfq.supplierCount || 0}</span>
-                      <span>Responses: {rfq.responseCount || 0}</span>
-                    </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {rfqs.map(rfq => (
+            <div
+              key={rfq.id}
+              onClick={() => handleRFQClick(rfq)}
+              className={`bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)] hover:shadow-lg transition-shadow cursor-pointer ${
+                selectedRFQId === rfq.id ? 'ring-2 ring-blue-500' : ''
+              }`}
+            >
+              {/* Card Header */}
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(rfq.status)}`}>
+                      {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
+                    </span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {onEdit && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEdit(rfq.id);
-                        }}
-                        className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded-md hover:bg-[var(--ff-bg-hover)]"
-                      >
-                        Edit
-                      </button>
-                    )}
+                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                    {rfq.title}
+                  </h3>
+                </div>
+                {onEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(rfq.id);
+                    }}
+                    className="px-3 py-1 text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] rounded-md hover:bg-[var(--ff-bg-hover)]"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {/* Description */}
+              {rfq.description && (
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-4 line-clamp-2">
+                  {rfq.description}
+                </p>
+              )}
+
+              {/* Details */}
+              <div className="space-y-2 text-sm text-[var(--ff-text-secondary)]">
+                <div className="flex items-center justify-between">
+                  <span>Created:</span>
+                  <span className="text-[var(--ff-text-primary)]">{formatDate(rfq.createdAt)}</span>
+                </div>
+                {rfq.dueDate && (
+                  <div className="flex items-center justify-between">
+                    <span>Due:</span>
+                    <span className="text-[var(--ff-text-primary)]">{formatDate(rfq.dueDate)}</span>
                   </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span>Suppliers:</span>
+                  <span className="text-[var(--ff-text-primary)]">{rfq.supplierCount || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Responses:</span>
+                  <span className="text-[var(--ff-text-primary)]">{rfq.responseCount || 0}</span>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       ) : (
         /* Empty State */
