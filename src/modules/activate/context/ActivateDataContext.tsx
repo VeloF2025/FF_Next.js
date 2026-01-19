@@ -38,11 +38,13 @@ import { useAutoRefresh } from '../hooks/useAutoRefresh';
 // TYPES
 // ============================================================================
 
+export type StatusFilter = 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed';
+
 export interface ActivateFilters {
   searchTerm: string;
   dateFrom: string;
   dateTo: string;
-  statusFilter: 'all' | 'reviewed' | 'notReviewed';
+  statusFilter: StatusFilter;
   projectFilter: string;
 }
 
@@ -139,6 +141,7 @@ export function ActivateDataProvider({
   const [projectStats, setProjectStats] = useState<ProjectStat[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>(defaultPagination);
+  const [activeProjects, setActiveProjects] = useState<string[]>([]);
 
   // Filter state
   const [filters, setFilters] = useState<ActivateFilters>(defaultFilters);
@@ -155,10 +158,11 @@ export function ActivateDataProvider({
   // Refs for auto-refresh control
   const isAutoRefreshPausedRef = useRef(false);
 
-  // Get unique projects from drops
-  const projects = Array.from(
-    new Set(drops.map((d) => d.project).filter((p): p is string => Boolean(p)))
-  );
+  // Use activeProjects from API (all active projects for filter dropdown)
+  // Falls back to deriving from drops if API doesn't return activeProjects
+  const projects = activeProjects.length > 0
+    ? activeProjects
+    : Array.from(new Set(drops.map((d) => d.project).filter((p): p is string => Boolean(p))));
 
   // Build API filters from state
   const getApiFilters = useCallback(
@@ -196,6 +200,10 @@ export function ActivateDataProvider({
           setDailyStats(response.summary.dailyStats);
         }
         setPagination(response.pagination);
+        // Set active projects from API (all active projects for filter dropdown)
+        if (response.activeProjects?.length > 0) {
+          setActiveProjects(response.activeProjects);
+        }
         setLastRefreshAt(new Date());
 
         if (isInitialLoad) setIsInitialLoad(false);

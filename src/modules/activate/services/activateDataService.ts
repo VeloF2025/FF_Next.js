@@ -89,6 +89,8 @@ export interface DropsApiResponse {
   pagination: PaginationInfo;
   summary: DashboardStats & { dailyStats?: DailyStat[] };
   projectStats: ProjectStat[];
+  /** All active projects for filter dropdown */
+  activeProjects: string[];
 }
 
 export interface DropsFilters {
@@ -182,6 +184,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
       totalFeedback: transformedDrops.filter((d) => d.feedbackSent).length,
     },
     projectStats: data.projectStats || [],
+    activeProjects: data.activeProjects || [],
   };
 }
 

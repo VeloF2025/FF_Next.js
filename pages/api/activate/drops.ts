@@ -174,11 +174,22 @@ async function getPaginatedDrops(
     paramIndex++;
   }
 
-  // Status filter (reviewed/notReviewed based on feedback_sent)
+  // Status filter - aligned with DRState values
+  // installed: DRs from WhatsApp (already filtered by table)
+  // activated: DRs in OES report (need subquery)
+  // not_reviewed: feedback_sent = false or null
+  // reviewed: feedback_sent = true
   if (filters?.status === 'reviewed') {
     conditions.push('u.feedback_sent = true');
-  } else if (filters?.status === 'notReviewed') {
+  } else if (filters?.status === 'not_reviewed' || filters?.status === 'notReviewed') {
+    // Support both formats for backward compatibility
     conditions.push('(u.feedback_sent IS NULL OR u.feedback_sent = false)');
+  } else if (filters?.status === 'activated') {
+    // Only DRs that are in OES activations
+    conditions.push('EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = u.drop_number)');
+  } else if (filters?.status === 'installed') {
+    // DRs that are NOT in OES activations (installed but not activated)
+    conditions.push('NOT EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = u.drop_number)');
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -581,6 +592,33 @@ async function getProjectStats(filters?: {
   return stats.sort((a, b) => b.total - a.total);
 }
 
+/**
+ * Get all active projects for the filter dropdown
+ * Returns projects that have WhatsApp group mappings (active projects)
+ */
+async function getActiveProjects(): Promise<string[]> {
+  // Get projects that have DR data OR are in the known project mappings
+  const result = await pool.query(`
+    SELECT DISTINCT project_name
+    FROM (
+      -- Projects from unified reviews
+      SELECT DISTINCT project as project_name
+      FROM dr_photo_unified_reviews
+      WHERE project IS NOT NULL AND project != ''
+
+      UNION
+
+      -- Active projects from projects table
+      SELECT project_name
+      FROM projects
+      WHERE project_name IS NOT NULL AND project_name != ''
+    ) combined
+    ORDER BY project_name
+  `);
+
+  return result.rows.map((row: any) => row.project_name);
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
   if (req.method !== 'GET') {
@@ -634,10 +672,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const searchTerm = search && typeof search === 'string' ? search : undefined;
 
     // Run all queries in parallel for faster response
-    const [result, summary, projectStats] = await Promise.all([
+    const [result, summary, projectStats, activeProjects] = await Promise.all([
       getPaginatedDrops(currentPage, pageSize, searchTerm, filters),
       skipSummary === 'true' ? Promise.resolve(null) : calculateSummary(filters),
       getProjectStats(filters),
+      getActiveProjects(),
     ]);
 
     log.info('DrPhotoUnifiedDropsAPI', `Fetched ${result.drops.length} drops`, {
@@ -650,6 +689,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: result.drops,
       summary,
       projectStats,
+      activeProjects,
       pagination: result.pagination,
       meta: {
         timestamp: new Date().toISOString(),
