@@ -124,7 +124,7 @@ export function PhotoReviewPhase({
         setApprovals(new Map());
         log.info('PhotoReviewPhase', `Categorization complete for ${dropNumber}`);
       } else {
-        setError(data.message || 'Categorization failed');
+        setError(data.error?.message || data.message || 'Categorization failed');
       }
     } catch (err) {
       log.error('PhotoReviewPhase', 'Categorization failed', err);
@@ -367,9 +367,16 @@ export function PhotoReviewPhase({
             <button
               onClick={runCategorization}
               disabled={isProcessing}
-              className="px-3 py-1 text-sm border border-green-600 text-green-600 rounded hover:bg-green-100 dark:hover:bg-green-900/30"
+              className="px-3 py-1 text-sm border border-green-600 text-green-600 rounded hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50"
             >
-              Re-categorize
+              {isProcessing ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600" />
+                  Re-categorizing...
+                </span>
+              ) : (
+                'Re-categorize'
+              )}
             </button>
           </div>
         </div>
