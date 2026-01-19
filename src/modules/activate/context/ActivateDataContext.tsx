@@ -171,6 +171,7 @@ export function ActivateDataProvider({
       dateTo: filters.dateTo || undefined,
       project: filters.projectFilter !== 'all' ? filters.projectFilter : undefined,
       status: filters.statusFilter !== 'all' ? filters.statusFilter : undefined,
+      search: filters.searchTerm.trim() || undefined,
       page: page ?? currentPage,
     }),
     [filters, currentPage]
@@ -240,7 +241,7 @@ export function ActivateDataProvider({
     },
   });
 
-  // Initial fetch when filters change
+  // Initial fetch when filters change (including search)
   // Note: Empty dateFrom/dateTo means "All" - still needs to fetch
   useEffect(() => {
     // Only fetch if either both dates are set OR both are empty ("All" filter)
@@ -250,7 +251,7 @@ export function ActivateDataProvider({
       fetchData(true, 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter]);
+  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.searchTerm]);
 
   // Fetch when page changes
   useEffect(() => {

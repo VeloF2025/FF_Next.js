@@ -99,6 +99,7 @@ export interface DropsFilters {
   project?: string;
   status?: string;
   page?: number;
+  search?: string;
 }
 
 // ============================================================================
@@ -136,6 +137,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
   if (filters.project && filters.project !== 'all') params.set('project', filters.project);
   if (filters.status && filters.status !== 'all') params.set('status', filters.status);
+  if (filters.search && filters.search.trim()) params.set('search', filters.search.trim());
 
   const response = await fetch(`/api/activate/drops?${params.toString()}`);
 
