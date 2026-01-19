@@ -148,11 +148,6 @@ export function DrSummaryPage({
               date={formatDate(summary.timeline.installationDate)}
             />
             <TimelineItem
-              icon="📤"
-              label="Submitted"
-              date={formatDate(summary.timeline.submittedAt)}
-            />
-            <TimelineItem
               icon="✅"
               label="Reviewed"
               date={formatDate(summary.timeline.reviewedAt)}

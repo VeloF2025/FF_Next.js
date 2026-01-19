@@ -120,24 +120,44 @@ Only extract the dBm value, not other readings.`;
 
 /**
  * Prompt for ONT serial extraction from back (Step 6)
+ *
+ * CRITICAL: Nokia labels have multiple fields that look similar:
+ * - S/N: ALCLB6A9C97 ← THIS IS THE SERIAL (starts with ALCL or ALCB)
+ * - SSID: ALHN-C397 ← NOT the serial (starts with ALHN)
+ * - ONT P/N: STN0145844A ← NOT the serial (model/part number)
+ * - MAC ID: 804E3CBE680 ← NOT the serial (MAC address)
  */
-const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT (Optical Network Terminal) serial number from the back of the device.
+const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT serial number from a Nokia/Alcatel device label.
 
-Look for a serial number label on the back panel. Nokia/Alcatel ONT serials typically:
-- Start with "ALCL" or "ALCB"
-- Are 11-12 characters long
-- Contain letters and numbers
+CRITICAL: The label has MULTIPLE fields. You must find the CORRECT one:
+
+✅ CORRECT - Find the "S/N:" field (Serial Number):
+   - Starts with "ALCL" or "ALCB" (e.g., ALCLB6A9C97, ALCLB48CC3CA)
+   - Exactly 11-12 alphanumeric characters
+   - Located on a WHITE sticker, usually has a barcode above it
+
+❌ WRONG - Do NOT extract these fields:
+   - SSID fields (start with "ALHN-" like ALHN-C397) - these are WiFi names
+   - ONT P/N (like STN0145844A) - this is the part/model number
+   - MAC ID (like 804E3CBE680) - this is the MAC address
+   - Admin IP (like 192.168.1.254) - this is an IP address
+
+The S/N field is typically:
+- On the main white product label
+- Below the MAC ID line
+- Above or near the barcode
+- Format: S/N: ALCLXXXXXXXX or SN: ALCLXXXXXXXX
 
 Respond in this exact JSON format:
 {
   "found": true/false,
-  "serial": "<serial number or null>",
-  "rawText": "<exact text from label>",
+  "serial": "<serial starting with ALCL or ALCB, or null>",
+  "rawText": "<exact text you read from the S/N field>",
   "confidence": <0.0 to 1.0>
 }
 
-If you find multiple serials, extract the one starting with ALCL or ALCB.
-Only extract what you can clearly read.`;
+IMPORTANT: If you cannot find a field starting with ALCL or ALCB, set found to false.
+Do NOT return SSID values (ALHN-*) as the serial.`;
 
 /**
  * Prompt for Step 9 front panel extraction (ONT serial + DR number)

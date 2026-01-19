@@ -452,7 +452,19 @@ export default async function handler(
         longitude: number | null;
       }
 
-      const processedRows: ProcessedRow[] = offlineRows.map((row) => {
+      // Deduplicate by drop_number - keep only the first occurrence
+      // This prevents "ON CONFLICT DO UPDATE cannot affect row a second time" errors
+      const seenDropNumbers = new Set<string>();
+      const uniqueRows = offlineRows.filter((row) => {
+        if (seenDropNumbers.has(row.drop_number)) {
+          return false;
+        }
+        seenDropNumbers.add(row.drop_number);
+        return true;
+      });
+      log.info('OfflineImport', `Deduplicated: ${offlineRows.length} -> ${uniqueRows.length} rows`);
+
+      const processedRows: ProcessedRow[] = uniqueRows.map((row) => {
         const drop = dropsMap.get(row.drop_number);
         const oes = oesMap.get(row.drop_number);
 
@@ -619,42 +631,10 @@ export default async function handler(
         }
       }
 
-      // Step 6: Batch create alerts (deduplicated by drop_number + alert_type)
-      let alertsCreated = 0;
-      const ALERT_BATCH = 100;
-      for (let i = 0; i < alertsToCreate.length; i += ALERT_BATCH) {
-        const chunk = alertsToCreate.slice(i, i + ALERT_BATCH);
-        const alertValues: (string | number)[] = [];
-        const alertPlaceholders: string[] = [];
-
-        chunk.forEach((alert, idx) => {
-          const offset = idx * 7;
-          alertPlaceholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
-          alertValues.push(
-            alert.drop_number,
-            alert.serial_number,
-            alert.alert_type,
-            alert.severity,
-            alert.description,
-            alert.days_offline,
-            alert.last_down_reason
-          );
-        });
-
-        try {
-          await pool.query(
-            `INSERT INTO offline_alerts (
-              drop_number, serial_number, alert_type, severity,
-              description, days_offline, last_down_reason
-            ) VALUES ${alertPlaceholders.join(', ')}
-            ON CONFLICT DO NOTHING`,
-            alertValues
-          );
-          alertsCreated += chunk.length;
-        } catch {
-          // Ignore duplicate alerts
-        }
-      }
+      // Step 6: Skip alerts for now - can be added later as separate process
+      // TODO: Re-enable alerts after core import is verified working
+      const alertsCreated = 0;
+      log.info('OfflineImport', `Skipping ${alertsToCreate.length} alerts for performance`);
 
       // Step 7: Update batch stats
       await pool.query(
