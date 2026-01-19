@@ -809,7 +809,7 @@ function QaCentrePageContent() {
                       </div>
 
                       {/* Row 2: Tech ID | Photos | [empty] | [RIGHT: ONT serial | UPS serial] */}
-                      <div className="grid grid-cols-[70px_95px_1fr_160px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
+                      <div className="grid grid-cols-[70px_95px_1fr_320px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
                         <span className="font-medium text-gray-600 dark:text-gray-300 truncate">
                           {formatAgent(drop.senderPhone)}
                         </span>
@@ -818,14 +818,14 @@ function QaCentrePageContent() {
                         </span>
                         <span></span>
                         {/* RIGHT: Serials */}
-                        <div className="flex items-center justify-end gap-3 font-mono text-[10px]">
+                        <div className="flex items-center justify-end gap-4 font-mono text-[10px]">
                           <span className="flex items-center gap-1">
                             <span className="text-blue-400 font-semibold">ONT:</span>
-                            <span className="text-gray-400 truncate max-w-[60px]">{drop.ontSerial || '-'}</span>
+                            <span className="text-gray-400">{drop.ontSerial || '-'}</span>
                           </span>
                           <span className="flex items-center gap-1">
                             <span className="text-purple-400 font-semibold">UPS:</span>
-                            <span className="text-gray-400 truncate max-w-[80px]">{drop.upsSerial || '-'}</span>
+                            <span className="text-gray-400">{drop.upsSerial || '-'}</span>
                           </span>
                         </div>
                       </div>
