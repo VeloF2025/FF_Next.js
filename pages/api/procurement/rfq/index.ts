@@ -246,14 +246,15 @@ export default withErrorHandler(async (
 
       // Insert items if provided
       const items = newRFQ.items || [];
+      const rfqProjectId = insertedRFQs[0].project_id;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         await sql`
           INSERT INTO rfq_items (
-            rfq_id, line_number, description, quantity, uom,
-            specifications, estimated_unit_price, stock_item_id, boq_item_id
+            rfq_id, project_id, line_number, description, quantity, uom,
+            specifications, budget_price, stock_item_id, boq_item_id
           ) VALUES (
-            ${rfqId}, ${i + 1}, ${item.description}, ${item.quantity}, ${item.unit || item.uom || 'EA'},
+            ${rfqId}, ${rfqProjectId}, ${i + 1}, ${item.description}, ${item.quantity}, ${item.unit || item.uom || 'EA'},
             ${item.specifications || null}, ${item.estimatedUnitPrice || item.estimated_unit_price || 0},
             ${item.stockItemId || item.stock_item_id || null},
             ${item.boqItemId || item.boq_item_id || null}

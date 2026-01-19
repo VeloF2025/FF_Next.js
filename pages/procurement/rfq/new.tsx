@@ -19,8 +19,10 @@ interface Project {
 
 interface Supplier {
   id: string;
-  company_name: string;
-  email: string;
+  name: string;
+  companyName?: string;
+  email: string | null;
+  phone?: string | null;
   status: string;
 }
 
@@ -431,7 +433,7 @@ export default function NewRFQPage() {
                 ) : (
                   <div className="space-y-4">
                     {items.map((item, index) => (
-                      <div key={index} className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border-light)]">
+                      <div key={index} className="p-4 bg-[var(--ff-bg-primary)] rounded-lg border border-[var(--ff-border-light)]">
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Item #{index + 1}</span>
@@ -470,7 +472,7 @@ export default function NewRFQPage() {
                               value={item.description}
                               onChange={(e) => updateItem(index, 'description', e.target.value)}
                               placeholder="Item description"
-                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                             />
                           </div>
                           <div>
@@ -480,7 +482,7 @@ export default function NewRFQPage() {
                               value={item.quantity}
                               onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
                               min="1"
-                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                             />
                           </div>
                           <div>
@@ -490,7 +492,7 @@ export default function NewRFQPage() {
                               value={item.unit}
                               onChange={(e) => updateItem(index, 'unit', e.target.value)}
                               placeholder="m, unit, kg"
-                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                             />
                           </div>
                         </div>
@@ -502,7 +504,7 @@ export default function NewRFQPage() {
                               value={item.specifications}
                               onChange={(e) => updateItem(index, 'specifications', e.target.value)}
                               placeholder="Technical specs (optional)"
-                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md placeholder:text-[var(--ff-text-tertiary)]"
                             />
                           </div>
                           <div>
@@ -513,7 +515,7 @@ export default function NewRFQPage() {
                               onChange={(e) => updateItem(index, 'estimatedUnitPrice', Number(e.target.value))}
                               min="0"
                               step="0.01"
-                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
+                              className="w-full px-2 py-1.5 text-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-md"
                             />
                           </div>
                         </div>
@@ -580,9 +582,11 @@ export default function NewRFQPage() {
                         />
                         <div className="ml-3">
                           <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                            {supplier.company_name}
+                            {supplier.companyName || supplier.name}
                           </p>
-                          <p className="text-xs text-[var(--ff-text-secondary)]">{supplier.email}</p>
+                          <p className="text-xs text-[var(--ff-text-secondary)]">
+                            {supplier.email || supplier.phone || 'No contact info'}
+                          </p>
                         </div>
                       </label>
                     ))}
