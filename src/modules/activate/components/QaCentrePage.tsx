@@ -128,12 +128,13 @@ interface SerialDisplayProps {
   label: 'ONT' | 'UPS';
   serial: string | null;
   status: SerialValidationStatus;
+  showMissingAlert?: boolean;
 }
 
 /**
- * Shows full serial with validation indicator
+ * Shows full serial with validation indicator and missing alert badge
  */
-function SerialDisplay({ label, serial, status }: SerialDisplayProps) {
+function SerialDisplay({ label, serial, status, showMissingAlert = true }: SerialDisplayProps) {
   const isOnt = label === 'ONT';
 
   // Status indicator
@@ -159,7 +160,14 @@ function SerialDisplay({ label, serial, status }: SerialDisplayProps) {
           {getStatusIcon()}
         </>
       ) : (
-        <span className="text-gray-400 dark:text-gray-500 italic">Not scanned</span>
+        <>
+          <span className="text-gray-400 dark:text-gray-500 italic">-</span>
+          {showMissingAlert && (
+            <span className="text-[10px] font-semibold bg-yellow-800 text-yellow-200 px-1 py-0.5 rounded">
+              {label}?
+            </span>
+          )}
+        </>
       )}
     </div>
   );
@@ -200,6 +208,7 @@ interface StatusTimelineProps {
   qaDecision: QaDecision | null;
   feedbackSent: string | null;
   senderPhone: string | null; // If present, DR was submitted via WhatsApp
+  hasMaintenanceTicket?: boolean; // Whether DR has been referred to maintenance
 }
 
 /**
@@ -210,7 +219,7 @@ interface StatusTimelineProps {
  * For OES-only DRs (no WA submission): Shows [OES Only] + [Activated date]
  * For WA-submitted DRs: Shows [Installed date] + [Activated date]
  */
-function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent, senderPhone }: StatusTimelineProps) {
+function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent, senderPhone, hasMaintenanceTicket }: StatusTimelineProps) {
   // Format date - shorter format for inline display
   const formatShortDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -240,32 +249,39 @@ function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase
       {/* Activated date - shown when OES activated */}
       {isActivated && oesActivationDate && (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-900/40 text-green-300">
-          ✓ OES {formatShortDate(oesActivationDate)}
+          ✓ Act {formatShortDate(oesActivationDate)}
         </span>
       )}
 
-      {/* In Review - shown when in final_decision or feedback phase */}
-      {qaPhase && !qaDecision && ['final_decision', 'feedback'].includes(qaPhase) && (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-900/40 text-yellow-300">
-          In Review
-        </span>
-      )}
-
-      {/* QA decision */}
+      {/* QA decision - shown prominently if exists */}
       {qaDecision && (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-          qaDecision === 'PASS' ? 'bg-green-900/40 text-green-300' :
-          qaDecision === 'FAIL' ? 'bg-red-900/40 text-red-300' :
-          'bg-orange-900/40 text-orange-300'
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+          qaDecision === 'PASS' ? 'bg-green-600 text-white' :
+          qaDecision === 'FAIL' ? 'bg-red-600 text-white' :
+          'bg-orange-600 text-white'
         }`}>
-          {qaDecision === 'PASS' ? '✓ PASS' : qaDecision === 'FAIL' ? '✗ FAIL' : 'Rework'}
+          {qaDecision === 'PASS' ? '✓ PASS' : qaDecision === 'FAIL' ? '✗ FAIL' : '↺ REWORK'}
+        </span>
+      )}
+
+      {/* Maintenance ticket - shown if DR has been referred */}
+      {hasMaintenanceTicket && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-700 text-white">
+          🎫 Maint
+        </span>
+      )}
+
+      {/* Pending QA - shown when no decision yet */}
+      {!qaDecision && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-600 text-white">
+          Pending
         </span>
       )}
 
       {/* Feedback Sent */}
       {feedbackSent && (
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-900/40 text-purple-300">
-          Sent
+          ✓ Sent
         </span>
       )}
     </>
@@ -706,12 +722,8 @@ function QaCentrePageContent() {
                       qaDecision={drop.qaDecision}
                       feedbackSent={drop.feedbackSent}
                       senderPhone={drop.senderPhone}
+                      hasMaintenanceTicket={drop.hasMaintenanceTicket}
                     />
-                    {drop.serialsSwapped && (
-                      <span className="text-[10px] text-red-400 font-semibold bg-red-900/30 px-1.5 py-0.5 rounded">
-                        ⚠ SWAP
-                      </span>
-                    )}
                   </div>
 
                   {/* Details Row: Agent + Photos + Serials */}
@@ -728,13 +740,20 @@ function QaCentrePageContent() {
                       </span>
                     </div>
 
-                    {/* Right: Serials (compact) */}
+                    {/* Right: Serials with alert badges */}
                     <div className="flex items-center gap-3">
-                      <SerialDisplay
-                        label="ONT"
-                        serial={drop.ontSerial}
-                        status={drop.ontSerialStatus}
-                      />
+                      <div className="flex items-center gap-1">
+                        <SerialDisplay
+                          label="ONT"
+                          serial={drop.ontSerial}
+                          status={drop.ontSerialStatus}
+                        />
+                        {drop.serialsSwapped && (
+                          <span className="text-[10px] font-semibold bg-red-800 text-red-200 px-1 py-0.5 rounded ml-0.5">
+                            ⚠ SWAP
+                          </span>
+                        )}
+                      </div>
                       <SerialDisplay
                         label="UPS"
                         serial={drop.upsSerial}

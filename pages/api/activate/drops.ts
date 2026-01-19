@@ -64,6 +64,9 @@ interface UnifiedDrop {
   is_activated: boolean;
   // OES activation date (when activated on Nokia OES)
   oes_activation_date: string | null;
+  // Maintenance ticket (referred to maintenance)
+  has_maintenance_ticket: boolean;
+  maintenance_ticket_uid: string | null;
 }
 
 interface ProjectStats {
@@ -210,9 +213,12 @@ async function getPaginatedDrops(
       EXISTS (
         SELECT 1 FROM oes_activations oes2
         WHERE oes2.drop_number = u.drop_number
-      ) as is_activated
+      ) as is_activated,
+      mt.id IS NOT NULL as has_maintenance_ticket,
+      mt.ticket_uid as maintenance_ticket_uid
     FROM dr_photo_unified_reviews u
     LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
+    LEFT JOIN maintenance_tickets mt ON mt.dr_number = u.drop_number
     ${whereClause}
     ORDER BY u.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -260,9 +266,12 @@ async function getDropById(id: string): Promise<UnifiedDrop | null> {
       EXISTS (
         SELECT 1 FROM oes_activations oes2
         WHERE oes2.drop_number = u.drop_number
-      ) as is_activated
+      ) as is_activated,
+      mt.id IS NOT NULL as has_maintenance_ticket,
+      mt.ticket_uid as maintenance_ticket_uid
     FROM dr_photo_unified_reviews u
     LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
+    LEFT JOIN maintenance_tickets mt ON mt.dr_number = u.drop_number
     WHERE u.id = $1`,
     [id]
   );
@@ -290,9 +299,12 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
       EXISTS (
         SELECT 1 FROM oes_activations oes2
         WHERE oes2.drop_number = u.drop_number
-      ) as is_activated
+      ) as is_activated,
+      mt.id IS NOT NULL as has_maintenance_ticket,
+      mt.ticket_uid as maintenance_ticket_uid
     FROM dr_photo_unified_reviews u
     LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
+    LEFT JOIN maintenance_tickets mt ON mt.dr_number = u.drop_number
     WHERE u.drop_number = $1`,
     [dropNumber]
   );

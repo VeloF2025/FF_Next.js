@@ -87,6 +87,12 @@ export interface DrListItem {
   ontSerialMasked: string;
   /** Masked UPS serial for display */
   upsSerialMasked: string;
+
+  // Maintenance Ticket (new fields)
+  /** Whether DR has been referred to maintenance */
+  hasMaintenanceTicket: boolean;
+  /** UID of the maintenance ticket if exists */
+  maintenanceTicketUid: string | null;
 }
 
 export interface DashboardStats {
@@ -278,6 +284,10 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
       serialsSwapped: swapInfo.swapped,
       ontSerialMasked: maskSerial(ontSerial),
       upsSerialMasked: maskSerial(upsSerial),
+
+      // Maintenance Ticket
+      hasMaintenanceTicket: drop.has_maintenance_ticket || false,
+      maintenanceTicketUid: drop.maintenance_ticket_uid || null,
     };
   });
 
