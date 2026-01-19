@@ -142,12 +142,13 @@ export default async function handler(
         [dropNumber]
       ),
 
-      // QA photo reviews (submitter info)
+      // QA photo reviews (submitter info + review date for installation fallback)
       pool.query(
         `SELECT
            user_name,
            sender_phone,
-           project
+           project,
+           review_date
          FROM qa_photo_reviews
          WHERE drop_number = $1
          ORDER BY created_at DESC
@@ -204,7 +205,12 @@ export default async function handler(
       currentState,
 
       timeline: {
-        installationDate: drop?.installation_date ? String(drop.installation_date) : null,
+        // Installation date: prefer drops table, fallback to WA Monitor review_date
+        installationDate: drop?.installation_date
+          ? String(drop.installation_date)
+          : qa?.review_date
+            ? new Date(qa.review_date).toISOString()
+            : null,
         submittedAt: unified?.created_at ? new Date(unified.created_at).toISOString() : null,
         reviewedAt: unified?.reviewed_at ? new Date(unified.reviewed_at).toISOString() : null,
         feedbackSentAt: unified?.feedback_sent_at ? new Date(unified.feedback_sent_at).toISOString() : null,

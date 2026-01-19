@@ -161,32 +161,94 @@ Do NOT return SSID values (ALHN-*) as the serial.`;
 
 /**
  * Prompt for Step 9 front panel extraction (ONT serial + DR number)
+ *
+ * Step 9 shows the FRONT of the ONT with green lights and labels attached
  */
-const STEP9_FRONT_PROMPT = `You are analyzing the front of a Nokia/Alcatel ONT device with installation labels.
+const STEP9_FRONT_PROMPT = `You are analyzing the FRONT of a Nokia/Alcatel ONT device with installation labels.
 
-Look for these items:
+Look for these THREE items:
+
 1. GREEN STATUS LIGHTS - Are the indicator LEDs illuminated (green)?
-2. ONT SERIAL - A label showing serial starting with "ALCL" or "ALCB" (11-12 chars)
-3. DR NUMBER - A black-on-yellow label with "DR" followed by 6-7 digits (e.g., DR1736721)
+   - Look for lit LEDs labeled POWER, PON, LAN, WLAN, etc.
+
+2. ONT SERIAL NUMBER - A sticker/label with the device serial:
+   ✅ CORRECT: Starts with "ALCL" or "ALCB" (e.g., ALCLB48CC3CA)
+   ❌ WRONG: Do NOT extract SSID (starts with "ALHN-" like ALHN-C397)
+   - The serial is 11-12 alphanumeric characters
+   - May be on a small white sticker on the front
+
+3. DR NUMBER - A handwritten or printed label:
+   - Format: "DR" followed by 6-7 digits (e.g., DR1736721)
+   - Often on a yellow/white sticker or written on tape
+   - This is the drop/installation reference number
 
 Respond in this exact JSON format:
 {
   "greenLightsVisible": true/false,
   "ontSerial": {
     "found": true/false,
-    "serial": "<serial or null>",
-    "rawText": "<text from label>",
+    "serial": "<serial starting with ALCL or ALCB, or null>",
+    "rawText": "<exact text from label>",
     "confidence": <0.0 to 1.0>
   },
   "drNumber": {
     "found": true/false,
-    "drNumber": "<DR number or null>",
-    "rawText": "<text from label>",
+    "drNumber": "<DR number like DR1234567, or null>",
+    "rawText": "<exact text from label>",
     "confidence": <0.0 to 1.0>
   }
 }
 
-Extract only what you can clearly read. Do not guess partial text.`;
+IMPORTANT: Only extract serials starting with ALCL or ALCB. Ignore SSID values (ALHN-*).`;
+
+// ============================================================================
+// VALIDATION HELPERS
+// ============================================================================
+
+/**
+ * Validate ONT serial format
+ * - Must start with ALCL or ALCB
+ * - Must be 11-12 characters
+ * - Must NOT be an SSID (ALHN-*)
+ */
+function isValidOntSerial(serial: string | null): boolean {
+  if (!serial) return false;
+  const s = serial.trim().toUpperCase();
+
+  // Reject SSID patterns (common VLM mistake)
+  if (s.startsWith('ALHN') || s.startsWith('ALH-') || s.includes('-')) {
+    log.debug('VlmExtraction', `Rejected SSID-like value: ${serial}`);
+    return false;
+  }
+
+  // Must start with ALCL or ALCB
+  if (!s.startsWith('ALCL') && !s.startsWith('ALCB')) {
+    log.debug('VlmExtraction', `Rejected non-ALC serial: ${serial}`);
+    return false;
+  }
+
+  // Should be 11-12 chars (allowing some flexibility for OCR errors)
+  if (s.length < 10 || s.length > 14) {
+    log.debug('VlmExtraction', `Rejected serial with wrong length (${s.length}): ${serial}`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Clean and normalize extracted serial
+ * Fixes common OCR errors like missing characters
+ */
+function normalizeSerial(serial: string | null): string | null {
+  if (!serial) return null;
+  let s = serial.trim().toUpperCase();
+
+  // Remove any spaces or dashes that shouldn't be there
+  s = s.replace(/[\s-]/g, '');
+
+  return s;
+}
 
 // ============================================================================
 // VLM API CALL
@@ -343,12 +405,21 @@ async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExt
 
   const { found, serial, rawText, confidence } = result.data;
 
+  // Normalize and validate the extracted serial
+  const normalizedSerial = normalizeSerial(serial);
+  const isValid = isValidOntSerial(normalizedSerial);
+
+  if (found && serial && !isValid) {
+    log.warn('VlmExtraction', `VLM returned invalid serial "${serial}" (likely SSID or wrong field)`);
+  }
+
   return {
-    success: found && !!serial,
-    serial: found ? serial : null,
-    confidence: confidence || 0,
+    success: found && isValid,
+    serial: isValid ? normalizedSerial : null,
+    confidence: isValid ? (confidence || 0) : 0,
     location: 'back',
     rawText: rawText || null,
+    error: found && !isValid ? `Invalid serial format: ${serial}` : undefined,
     extractionMethod: 'vlm',
   };
 }
@@ -483,15 +554,29 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
 
     const { greenLightsVisible, ontSerial, drNumber } = result.data;
 
-    // Use barcode serial if available (higher reliability), otherwise VLM
-    const finalOntSerial: SerialExtraction = barcodeSerial || {
-      success: ontSerial.found && !!ontSerial.serial,
-      serial: ontSerial.found ? ontSerial.serial : null,
-      confidence: ontSerial.confidence || 0,
-      location: 'front_label',
-      rawText: ontSerial.rawText || null,
-      extractionMethod: 'vlm',
-    };
+    // Use barcode serial if available (higher reliability), otherwise VLM with validation
+    let finalOntSerial: SerialExtraction;
+    if (barcodeSerial) {
+      finalOntSerial = barcodeSerial;
+    } else {
+      // Normalize and validate VLM result
+      const normalizedSerial = normalizeSerial(ontSerial.serial);
+      const isValid = isValidOntSerial(normalizedSerial);
+
+      if (ontSerial.found && ontSerial.serial && !isValid) {
+        log.warn('VlmExtraction', `Step 9 VLM returned invalid serial "${ontSerial.serial}" (likely SSID or wrong field)`);
+      }
+
+      finalOntSerial = {
+        success: ontSerial.found && isValid,
+        serial: isValid ? normalizedSerial : null,
+        confidence: isValid ? (ontSerial.confidence || 0) : 0,
+        location: 'front_label',
+        rawText: ontSerial.rawText || null,
+        error: ontSerial.found && !isValid ? `Invalid serial format: ${ontSerial.serial}` : undefined,
+        extractionMethod: 'vlm',
+      };
+    }
 
     return {
       ontSerial: finalOntSerial,

@@ -296,7 +296,8 @@
       "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node:*)",
       "Bash(npm --version:*)",
       "Bash(time curl:*)",
-      "Bash(NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max_old_space_size=4096' npm run build:*)"
+      "Bash(NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max_old_space_size=4096' npm run build:*)",
+      "Bash(NEXT_TELEMETRY_DISABLED=1 npm run build:*)"
     ],
     "deny": [],
     "ask": [],
