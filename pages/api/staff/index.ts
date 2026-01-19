@@ -36,7 +36,8 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
               s.bank_branch_code as "bankBranchCode",
               s.bank_account_type as "bankAccountType",
               s.bank_account_holder as "bankAccountHolder",
-              s.bank_details_verified_at as "bankDetailsVerifiedAt"
+              s.bank_details_verified_at as "bankDetailsVerifiedAt",
+              s.whatsapp_id as "whatsappId"
             FROM staff s
             WHERE s.id = ${id as string}
           `;
@@ -212,7 +213,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
           const newStaff = await sql`
             INSERT INTO staff (
               employee_id, first_name, last_name, email, phone,
-              department, position, join_date, status
+              department, position, join_date, status, whatsapp_id
             )
             VALUES (
               ${staffData.employee_id || staffData.employeeId || `EMP-${Date.now()}`},
@@ -223,11 +224,13 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
               ${staffData.department || 'General'},
               ${staffData.position || 'Staff'},
               ${staffData.join_date || staffData.startDate || new Date().toISOString()},
-              ${staffData.status || 'ACTIVE'}
+              ${staffData.status || 'ACTIVE'},
+              ${staffData.whatsappId || staffData.whatsapp_id || null}
             )
             RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
               sa_id_number as "saIdNumber", passport_number as "passportNumber",
-              passport_country as "passportCountry", passport_expiry as "passportExpiry"
+              passport_country as "passportCountry", passport_expiry as "passportExpiry",
+              whatsapp_id as "whatsappId"
           `;
 
           // Log successful staff creation
@@ -300,6 +303,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
         const passportExpiry = updates.passportExpiry !== undefined ? (updates.passportExpiry || null) : undefined;
         const isRehireable = updates.isRehireable ?? updates.is_rehireable ?? null;
         const exitProcessedBy = updates.exitProcessedBy || updates.exit_processed_by || null;
+        const whatsappId = updates.whatsappId !== undefined ? (updates.whatsappId || null) : undefined;
 
         // Use different SQL based on whether this is an exit update
         let updatedStaff;
@@ -325,11 +329,13 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
                 passport_number = CASE WHEN ${passportNumber !== undefined} THEN ${passportNumber} ELSE passport_number END,
                 passport_country = CASE WHEN ${passportCountry !== undefined} THEN ${passportCountry} ELSE passport_country END,
                 passport_expiry = CASE WHEN ${passportExpiry !== undefined} THEN ${passportExpiry}::timestamp ELSE passport_expiry END,
+                whatsapp_id = CASE WHEN ${whatsappId !== undefined} THEN ${whatsappId} ELSE whatsapp_id END,
                 updated_at = NOW()
             WHERE id = ${req.query.id as string}
             RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
               sa_id_number as "saIdNumber", passport_number as "passportNumber",
-              passport_country as "passportCountry", passport_expiry as "passportExpiry"
+              passport_country as "passportCountry", passport_expiry as "passportExpiry",
+              whatsapp_id as "whatsappId"
           `;
         } else {
           updatedStaff = await sql`
@@ -352,11 +358,13 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
                 passport_number = CASE WHEN ${passportNumber !== undefined} THEN ${passportNumber} ELSE passport_number END,
                 passport_country = CASE WHEN ${passportCountry !== undefined} THEN ${passportCountry} ELSE passport_country END,
                 passport_expiry = CASE WHEN ${passportExpiry !== undefined} THEN ${passportExpiry}::timestamp ELSE passport_expiry END,
+                whatsapp_id = CASE WHEN ${whatsappId !== undefined} THEN ${whatsappId} ELSE whatsapp_id END,
                 updated_at = NOW()
             WHERE id = ${req.query.id as string}
             RETURNING *, CONCAT(first_name, ' ', last_name) as name, CONCAT(first_name, ' ', last_name) as full_name,
               sa_id_number as "saIdNumber", passport_number as "passportNumber",
-              passport_country as "passportCountry", passport_expiry as "passportExpiry"
+              passport_country as "passportCountry", passport_expiry as "passportExpiry",
+              whatsapp_id as "whatsappId"
           `;
         }
 

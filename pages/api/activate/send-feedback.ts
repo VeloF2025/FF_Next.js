@@ -30,6 +30,17 @@ interface SendFeedbackRequest {
   dropNumber: string;
   message?: string; // Optional: if not provided, will auto-generate
   autoGenerate?: boolean; // Flag to force auto-generation
+  decision?: 'PASS' | 'FAIL' | 'REWORK_NEEDED'; // QA decision
+  project?: string; // Project name
+  staffId?: string; // Staff member to @mention (optional)
+  createTask?: boolean; // Whether to create follow-up task
+  qaFindings?: {
+    photoCoverage?: { covered: number; total: number; missing: number[] };
+    powerMeter?: { value: number | null; inRange: boolean };
+    serialValidation?: Record<string, unknown>;
+    reasons?: string[];
+    notes?: string;
+  };
 }
 
 interface Photo {
@@ -70,13 +81,22 @@ async function handlePost(
   res: NextApiResponse
 ): Promise<void> {
   try {
-    const { dropNumber, message, autoGenerate } = req.body as SendFeedbackRequest;
+    const {
+      dropNumber,
+      message,
+      autoGenerate,
+      decision,
+      project,
+      staffId,
+      createTask,
+      qaFindings,
+    } = req.body as SendFeedbackRequest;
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info(`Sending feedback for ${dropNumber}`, { autoGenerate });
+    log.info(`Sending feedback for ${dropNumber}`, { autoGenerate, staffId, createTask });
 
     // 1. Get unified review from database
     const review = await getUnifiedReview(dropNumber);
@@ -108,21 +128,48 @@ async function handlePost(
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${review.project}`);
     }
 
-    // 5. Send to WhatsApp via Bridge API (with threading and @mention if available)
+    // 5. Get staff WhatsApp ID if staffId provided
+    let staffJid: string | null = null;
+    if (staffId) {
+      staffJid = await getStaffWhatsAppJid(staffId);
+      if (staffJid) {
+        log.info('Adding staff to mentions', { staffId, staffJid });
+      } else {
+        log.warn('Staff has no WhatsApp ID configured', { staffId });
+      }
+    }
+
+    // 6. Send to WhatsApp via Bridge API (with threading and @mentions)
+    // Build mentions array with technician and optionally staff
+    const mentionJIDs: string[] = [];
+    if (review.wa_sender_jid) {
+      mentionJIDs.push(review.wa_sender_jid);
+    }
+    if (staffJid && staffJid !== review.wa_sender_jid) {
+      mentionJIDs.push(staffJid);
+    }
+
     const replyParams: WhatsAppReplyParams | undefined = review.wa_message_id
       ? {
           replyToId: review.wa_message_id,
           replyToSender: review.wa_sender_jid,
           quotedContent: review.wa_original_text || `${dropNumber}`,
-          // Include sender JID for @mention tagging
-          mentionJIDs: review.wa_sender_jid ? [review.wa_sender_jid] : [],
+          mentionJIDs: mentionJIDs.length > 0 ? mentionJIDs : undefined,
         }
       : undefined;
 
-    // Add @mention prefix to message if we have sender info
-    const messageWithMention = review.wa_sender_jid
-      ? `@${extractPhoneFromJid(review.wa_sender_jid)} ${feedbackMessage}`
-      : feedbackMessage;
+    // Build message with @mentions for technician and optionally staff
+    let messageWithMention = feedbackMessage;
+    const mentionParts: string[] = [];
+    if (review.wa_sender_jid) {
+      mentionParts.push(`@${extractPhoneFromJid(review.wa_sender_jid)}`);
+    }
+    if (staffJid && staffJid !== review.wa_sender_jid) {
+      mentionParts.push(`@${extractPhoneFromJid(staffJid)}`);
+    }
+    if (mentionParts.length > 0) {
+      messageWithMention = `${mentionParts.join(' ')} ${feedbackMessage}`;
+    }
 
     const sendResult = await sendToWhatsApp(groupId, messageWithMention, replyParams);
 
@@ -130,21 +177,40 @@ async function handlePost(
       throw new Error('Failed to send message via WhatsApp Bridge');
     }
 
-    // 6. Update database with feedback status and store our message ID for future threading
+    // 7. Update database with feedback status and store our message ID for future threading
     // This allows re-reviews to thread off our feedback even if original DR had no message ID
     await updateFeedbackStatus(dropNumber, feedbackMessage, sendResult.messageId, groupId);
 
-    log.info(`Feedback sent successfully for ${dropNumber}`);
+    // 8. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
+    let taskId: string | null = null;
+    const shouldCreateTask = createTask || decision === 'FAIL' || decision === 'REWORK_NEEDED';
+    if (shouldCreateTask) {
+      const projectId = project ? await getProjectId(project) : null;
+      taskId = await createQaReworkTask({
+        dropNumber,
+        projectId,
+        staffId: staffId || null,
+        decision: decision || 'FAIL',
+        qaFindings,
+      });
+    }
+
+    log.info(`Feedback sent successfully for ${dropNumber}`, {
+      taskCreated: !!taskId,
+      staffMentioned: !!staffJid,
+    });
 
     return apiResponse.success(res, {
       dropNumber,
-      message: messageWithMention, // Return the actual message sent (with @mention if applicable)
+      message: messageWithMention, // Return the actual message sent (with @mentions if applicable)
       sent: true,
       sentAt: new Date().toISOString(),
       threading: {
         hadThreading: !!replyParams,
-        hadMention: !!review.wa_sender_jid,
+        technicianMentioned: !!review.wa_sender_jid,
+        staffMentioned: !!staffJid,
       },
+      task: taskId ? { id: taskId, created: true } : null,
     });
   } catch (error) {
     log.error('Error sending feedback:', error);
@@ -309,6 +375,101 @@ function extractPhoneFromJid(jid: string): string {
     return jid.substring(0, atIndex);
   }
   return jid;
+}
+
+/**
+ * Get staff member's WhatsApp ID by staff ID
+ * Returns the whatsapp_id as JID format (with @lid suffix)
+ */
+async function getStaffWhatsAppJid(staffId: string): Promise<string | null> {
+  try {
+    const result = await pool.query(
+      `SELECT whatsapp_id FROM staff WHERE id = $1 AND whatsapp_id IS NOT NULL`,
+      [staffId]
+    );
+    if (result.rows[0]?.whatsapp_id) {
+      const whatsappId = result.rows[0].whatsapp_id;
+      // Add @lid suffix if not present
+      return whatsappId.includes('@') ? whatsappId : `${whatsappId}@lid`;
+    }
+    return null;
+  } catch (error) {
+    log.error('Failed to get staff WhatsApp ID', { staffId, error });
+    return null;
+  }
+}
+
+/**
+ * Get project ID by project name
+ */
+async function getProjectId(projectName: string): Promise<string | null> {
+  try {
+    const result = await pool.query(
+      `SELECT id FROM projects WHERE project_name = $1`,
+      [projectName]
+    );
+    return result.rows[0]?.id || null;
+  } catch (error) {
+    log.error('Failed to get project ID', { projectName, error });
+    return null;
+  }
+}
+
+/**
+ * Create a follow-up task for QA rework
+ */
+async function createQaReworkTask(params: {
+  dropNumber: string;
+  projectId: string | null;
+  staffId: string | null;
+  decision: string;
+  qaFindings?: Record<string, unknown>;
+}): Promise<string | null> {
+  try {
+    const { dropNumber, projectId, staffId, decision, qaFindings } = params;
+
+    const title = `QA Rework: ${dropNumber}`;
+    const priority = decision === 'FAIL' ? 'high' : 'medium';
+
+    // Build description from QA findings
+    let description = `QA decision: ${decision}\n\n`;
+    if (qaFindings?.reasons && Array.isArray(qaFindings.reasons) && qaFindings.reasons.length > 0) {
+      description += `Issues:\n${(qaFindings.reasons as string[]).map(r => `- ${r}`).join('\n')}\n\n`;
+    }
+    if (qaFindings?.notes) {
+      description += `Notes: ${qaFindings.notes}`;
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO tasks (
+        task_code, title, description, project_id, assigned_to,
+        priority, status, category, metadata, created_at, updated_at
+      )
+      VALUES (
+        $1, $2, $3, $4, $5,
+        $6, 'pending', 'QA_REWORK', $7, NOW(), NOW()
+      )
+      RETURNING id
+      `,
+      [
+        `QA-${dropNumber}`,
+        title,
+        description,
+        projectId,
+        staffId,
+        priority,
+        JSON.stringify({ dropNumber, decision, qaFindings }),
+      ]
+    );
+
+    const taskId = result.rows[0]?.id;
+    log.info('Created QA rework task', { taskId, dropNumber, decision });
+    return taskId;
+  } catch (error) {
+    log.error('Failed to create QA rework task', { dropNumber: params.dropNumber, error });
+    return null;
+  }
 }
 
 /**

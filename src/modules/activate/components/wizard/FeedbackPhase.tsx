@@ -36,6 +36,13 @@ interface FeedbackData {
   customMessage: string;
 }
 
+interface StaffOption {
+  id: string;
+  name: string;
+  whatsappId: string | null;
+  position: string | null;
+}
+
 export function FeedbackPhase({
   dropNumber,
   project,
@@ -52,6 +59,38 @@ export function FeedbackPhase({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  // Staff tagging and task creation
+  const [availableStaff, setAvailableStaff] = useState<StaffOption[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [createTask, setCreateTask] = useState(
+    wizardState.finalDecision.decision === 'FAIL' ||
+    wizardState.finalDecision.decision === 'REWORK_NEEDED'
+  );
+
+  // Fetch staff for project on mount
+  useEffect(() => {
+    if (project) {
+      fetchStaffForProject(project);
+    }
+  }, [project]);
+
+  const fetchStaffForProject = async (projectName: string) => {
+    setLoadingStaff(true);
+    try {
+      const response = await fetch(`/api/activate/staff-by-project?project=${encodeURIComponent(projectName)}`);
+      const data = await response.json();
+      if (data.success && data.data?.staff) {
+        setAvailableStaff(data.data.staff);
+        log.info('FeedbackPhase', `Loaded ${data.data.staff.length} staff for ${projectName}`);
+      }
+    } catch (err) {
+      log.error('FeedbackPhase', 'Failed to fetch staff:', err);
+    } finally {
+      setLoadingStaff(false);
+    }
+  };
 
   // Generate feedback template on mount
   useEffect(() => {
@@ -173,6 +212,8 @@ export function FeedbackPhase({
           project,
           decision: feedback.decision,
           message: feedback.customMessage,
+          staffId: selectedStaffId, // Staff to @mention in WhatsApp
+          createTask, // Whether to create a follow-up task
           qaFindings: {
             photoCoverage: {
               covered: 10 - (wizardState.photoReview.stepsMissing?.length || 0),
@@ -463,6 +504,66 @@ export function FeedbackPhase({
         <p className="text-xs text-gray-500 mt-2">
           This message will be sent to the project WhatsApp group.
         </p>
+      </div>
+
+      {/* Staff Tagging & Task Options */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <h4 className="font-semibold text-gray-900 dark:text-white mb-4">
+          Additional Options
+        </h4>
+
+        <div className="space-y-4">
+          {/* Staff Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tag Staff Member (Optional)
+            </label>
+            <select
+              value={selectedStaffId || ''}
+              onChange={(e) => setSelectedStaffId(e.target.value || null)}
+              disabled={loadingStaff}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-900 text-sm"
+            >
+              <option value="">
+                {loadingStaff ? 'Loading staff...' : '-- Select staff to tag --'}
+              </option>
+              {availableStaff
+                .filter((s) => s.whatsappId) // Only show staff with WhatsApp ID
+                .map((staff) => (
+                  <option key={staff.id} value={staff.id}>
+                    {staff.name} {staff.position ? `(${staff.position})` : ''}
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Selected staff will be @mentioned in the WhatsApp message.
+              {availableStaff.filter(s => s.whatsappId).length === 0 && !loadingStaff && (
+                <span className="text-yellow-600"> No staff have WhatsApp IDs configured.</span>
+              )}
+            </p>
+          </div>
+
+          {/* Task Creation Checkbox */}
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="createTask"
+              checked={createTask}
+              onChange={(e) => setCreateTask(e.target.checked)}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div>
+              <label htmlFor="createTask" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Create follow-up task
+              </label>
+              <p className="text-xs text-gray-500">
+                {feedback.decision === 'PASS'
+                  ? 'Optionally create a task for this review.'
+                  : 'A task will be created for rework tracking.'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Error Display */}

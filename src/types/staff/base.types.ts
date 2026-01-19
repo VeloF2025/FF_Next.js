@@ -17,7 +17,8 @@ export interface StaffMember {
   email: string;
   phone: string;
   alternativePhone?: string;
-  
+  whatsappId?: string; // WhatsApp LID for @mention tagging in QA feedback
+
   // Employment Details
   employeeId: string;
   position: Position | string; // Allow Position enum or custom string
