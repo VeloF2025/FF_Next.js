@@ -67,7 +67,7 @@ export default async function handler(
     params.push(parseInt(limit as string) || 50);
     query += ` LIMIT $${params.length}`;
 
-    const rows = await sql(query, params) as QAReviewHistory[];
+    const rows = await sql.query(query, params) as unknown as QAReviewHistory[];
 
     // Calculate step summary for each review
     const reviews = rows.map(row => {
