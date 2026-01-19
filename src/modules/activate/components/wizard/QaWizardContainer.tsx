@@ -29,6 +29,16 @@ const PHASE_LABELS: Record<QaWizardPhase, string> = {
   completed: 'Completed',
 };
 
+// Shorter labels for compact step indicator
+const PHASE_SHORT_LABELS: Record<QaWizardPhase, string> = {
+  prerequisites: 'Prereq',
+  photo_review: 'Photos',
+  data_validation: 'Validate',
+  final_decision: 'Decision',
+  feedback: 'Feedback',
+  completed: 'Done',
+};
+
 const PHASE_ORDER: QaWizardPhase[] = [
   'prerequisites',
   'photo_review',
@@ -337,12 +347,12 @@ export function QaWizardContainer({
     onComplete?.();
   };
 
-  // Render phase indicator
+  // Render compact phase indicator with labels under circles
   const renderPhaseIndicator = () => {
     const currentIndex = PHASE_ORDER.indexOf(state.phase);
 
     return (
-      <div className="flex items-center justify-between mb-6 px-4">
+      <div className="flex items-start justify-between px-2">
         {PHASE_ORDER.map((phase, index) => {
           const isActive = phase === state.phase;
           const isComplete = index < currentIndex;
@@ -350,22 +360,38 @@ export function QaWizardContainer({
 
           return (
             <React.Fragment key={phase}>
-              <button
-                onClick={() => isClickable && goToPhase(phase)}
-                disabled={!isClickable}
-                className={`flex items-center justify-center w-10 h-10 rounded-full text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : isComplete
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                } ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-50'}`}
-              >
-                {isComplete ? '✓' : index + 1}
-              </button>
+              {/* Step with circle and label */}
+              <div className="flex flex-col items-center min-w-[60px]">
+                <button
+                  onClick={() => isClickable && goToPhase(phase)}
+                  disabled={!isClickable}
+                  className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 dark:ring-offset-gray-800'
+                      : isComplete
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  } ${isClickable ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-50'}`}
+                >
+                  {isComplete ? '✓' : index + 1}
+                </button>
+                {/* Label under circle */}
+                <span
+                  className={`mt-1 text-[10px] leading-tight text-center transition-colors ${
+                    isActive
+                      ? 'font-semibold text-blue-600 dark:text-blue-400'
+                      : isComplete
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-400 dark:text-gray-500'
+                  }`}
+                >
+                  {PHASE_SHORT_LABELS[phase]}
+                </span>
+              </div>
+              {/* Connector line */}
               {index < PHASE_ORDER.length - 1 && (
                 <div
-                  className={`flex-1 h-1 mx-2 ${
+                  className={`flex-1 h-0.5 mt-3.5 mx-1 ${
                     index < currentIndex
                       ? 'bg-green-500'
                       : 'bg-gray-200 dark:bg-gray-700'
@@ -379,14 +405,14 @@ export function QaWizardContainer({
     );
   };
 
-  // Render current phase label
+  // Render current phase label (simplified - just the full name on left)
   const renderPhaseHeader = () => (
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+    <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
         {PHASE_LABELS[state.phase]}
       </h3>
-      <span className="text-sm text-gray-500 dark:text-gray-400">
-        Step {PHASE_ORDER.indexOf(state.phase) + 1} of {PHASE_ORDER.length}
+      <span className="text-xs text-gray-400 dark:text-gray-500">
+        {PHASE_ORDER.indexOf(state.phase) + 1}/{PHASE_ORDER.length}
       </span>
     </div>
   );
@@ -494,14 +520,14 @@ export function QaWizardContainer({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-      {/* Phase indicator */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      {/* Compact phase indicator */}
+      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
         {renderPhaseIndicator()}
         {renderPhaseHeader()}
       </div>
 
       {/* Phase content */}
-      <div className="p-4">{renderPhaseContent()}</div>
+      <div className="p-3">{renderPhaseContent()}</div>
     </div>
   );
 }
