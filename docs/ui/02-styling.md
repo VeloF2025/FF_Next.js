@@ -822,6 +822,7 @@ export default function RootLayout({ children }) {
 - ✅ Maintain consistent spacing using the scale
 - ✅ Test in both light and dark modes
 - ✅ Use CSS variables for dynamic values
+- ✅ Compare new pages to existing reference pages (e.g., Suppliers)
 
 ### Don'ts
 - ❌ Don't use arbitrary color values
@@ -829,6 +830,35 @@ export default function RootLayout({ children }) {
 - ❌ Don't forget responsive design
 - ❌ Don't ignore accessibility contrast ratios
 - ❌ Don't create deeply nested selectors
+- ❌ Don't wrap pages in `bg-[var(--ff-bg-tertiary)]` - it creates wrong background
+
+## Page Layout Anti-Patterns (Dark Mode)
+
+### ❌ WRONG: Gray Background Wrapper
+```tsx
+// Creates lighter purple/gray (#334155) - WRONG
+<AppLayout>
+  <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {content}
+    </div>
+  </div>
+</AppLayout>
+```
+
+### ✅ CORRECT: Simple Layout (Inherits from AppLayout)
+```tsx
+// Inherits correct dark background (#0f172a) from AppLayout
+<AppLayout>
+  <div className="p-6 space-y-6">
+    {content}
+  </div>
+</AppLayout>
+```
+
+**Why:** `--ff-bg-tertiary` (#334155) is for inputs/table headers, not page backgrounds. AppLayout already provides the correct dark background.
+
+**Visual test:** Compare your page to `/suppliers` - backgrounds should match exactly.
 
 ## Summary
 

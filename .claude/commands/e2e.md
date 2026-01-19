@@ -242,6 +242,7 @@ Based on E2E testing (Jan 2026), always check for:
 ### Dark Mode Issues
 | Issue | Symptom | Check | Fix |
 |-------|---------|-------|-----|
+| Page bg wrapper | Lighter purple/gray bg (#334155) | Compare to /suppliers page | Remove `bg-[var(--ff-bg-tertiary)]` wrapper, use `p-6 space-y-6` |
 | Input contrast | White inputs on dark bg | Inspect input backgrounds | Use `bg-[var(--ff-bg-primary)]` |
 | Modal visibility | Modal appears but content invisible | Check modal z-index, backgrounds | Portal to `document.body` |
 | Text readability | Text same color as background | Check text color inheritance | Explicit text colors |

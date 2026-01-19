@@ -262,6 +262,51 @@ The preferred card layout uses a responsive grid with consistent spacing:
 </div>
 ```
 
+## COMMON ANTI-PATTERNS (CRITICAL)
+
+### Page Background Wrapper Anti-Pattern
+
+**Bug discovered:** Jan 2026 E2E testing (RFQ module)
+
+❌ **WRONG - Creates lighter background in dark mode:**
+```tsx
+<AppLayout>
+  <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* content */}
+    </div>
+  </div>
+</AppLayout>
+```
+
+This creates a lighter purple/gray background (`#334155`) because `--ff-bg-tertiary` is designed for inputs and table headers, NOT page backgrounds.
+
+✅ **CORRECT - Inherits proper dark background from AppLayout:**
+```tsx
+<AppLayout>
+  <div className="p-6 space-y-6">
+    {/* content */}
+  </div>
+</AppLayout>
+```
+
+**Why it works:**
+- `AppLayout` already sets the correct dark background (`#0f172a`)
+- No need for explicit background wrapper
+- Matches pattern used by Suppliers, BOQ, and other list pages
+
+**Visual test:** Compare your page to `/suppliers` - backgrounds should match exactly.
+
+### Background Color Hierarchy (Dark Mode)
+
+| Variable | Hex | RGB | Use For |
+|----------|-----|-----|---------|
+| `--ff-bg-primary` | `#0f172a` | `15, 23, 42` | Main page bg (via AppLayout) |
+| `--ff-bg-secondary` | `#1e293b` | `30, 41, 59` | Cards, panels |
+| `--ff-bg-tertiary` | `#334155` | `51, 65, 85` | Inputs, table headers, NOT page wrappers |
+
+**Rule:** Never use `--ff-bg-tertiary` for page-level wrappers.
+
 ## FILES LOCATION
 
 - CSS Variables: `src/styles/design-system.css` (lines 125-143 for dark mode)
