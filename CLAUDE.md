@@ -334,9 +334,36 @@ getTechnicianIssues(data)      // Returns actionable issues for technicians
 ### Database Tables
 - `dr_photo_unified_reviews` - Main review table with QA wizard fields
 - `dr_activity_log` - Event tracking for full lifecycle
+- `qa_review_history` - Historic QA reviews (Excel imports, comments)
 - `qa_correction_examples` - Human corrections for few-shot learning
 - `oes_activations` - OES activation data
 - `qa_photo_reviews` - WhatsApp submissions (source)
+
+### Activity Tab (DR Review Page)
+**Location:** `/activate/[dropNumber]` → Activity tab
+
+**Two Views:**
+| View | Data Source | Purpose |
+|------|-------------|---------|
+| **Timeline** | `dr_activity_log` | Real-time workflow events (submissions, categorization, decisions) |
+| **QA History** | `qa_review_history` | Historic manual QA reviews with comments |
+
+**Viewing Comments:**
+1. Click **Activity** tab
+2. Click **"📋 QA History (N)"** toggle
+3. Click on a **review row** to expand and see:
+   - Comment text
+   - QA Steps grid (green=pass, red=fail)
+   - Completed/Outstanding counts
+
+**API Endpoints:**
+- `/api/activate/activity-log?dropNumber=X` - Timeline events
+- `/api/qa-review-history?dropNumber=X` - Historic QA reviews
+
+**Data Flow:**
+- Excel imports → `qa_review_history` table → Activity Tab QA History view
+- QA Wizard actions → `dr_activity_log` table → Activity Tab Timeline view
+- WA Monitor submissions → `qa_photo_reviews` (separate, not in Activity Tab)
 
 ### WhatsApp Integration
 
