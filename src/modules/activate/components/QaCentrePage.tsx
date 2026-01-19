@@ -199,14 +199,18 @@ interface StatusTimelineProps {
   qaPhase: QaWizardPhase | null;
   qaDecision: QaDecision | null;
   feedbackSent: string | null;
+  senderPhone: string | null; // If present, DR was submitted via WhatsApp
 }
 
 /**
  * Inline status badges for compact card layout
  * Shows all status badges in a single line that wraps on mobile:
  * [Installed date] [Activated date] [QA status] [✓ Sent]
+ *
+ * For OES-only DRs (no WA submission): Shows [OES Only] + [Activated date]
+ * For WA-submitted DRs: Shows [Installed date] + [Activated date]
  */
-function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent }: StatusTimelineProps) {
+function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase, qaDecision, feedbackSent, senderPhone }: StatusTimelineProps) {
   // Format date - shorter format for inline display
   const formatShortDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -216,12 +220,22 @@ function InlineStatusBadges({ createdAt, isActivated, oesActivationDate, qaPhase
     });
   };
 
+  // Check if this is a WA-submitted DR (has sender phone)
+  const hasWaSubmission = !!senderPhone;
+
   return (
     <>
-      {/* Installed date - always shown */}
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/40 text-blue-300">
-        {formatShortDate(createdAt)}
-      </span>
+      {/* Installed date - only shown for WA-submitted DRs */}
+      {hasWaSubmission ? (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-900/40 text-blue-300">
+          {formatShortDate(createdAt)}
+        </span>
+      ) : (
+        /* OES-only indicator - shown when no WA submission */
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-700/50 text-gray-400">
+          OES Only
+        </span>
+      )}
 
       {/* Activated date - shown when OES activated */}
       {isActivated && oesActivationDate && (
@@ -691,6 +705,7 @@ function QaCentrePageContent() {
                       qaPhase={drop.qaPhase}
                       qaDecision={drop.qaDecision}
                       feedbackSent={drop.feedbackSent}
+                      senderPhone={drop.senderPhone}
                     />
                     {drop.serialsSwapped && (
                       <span className="text-[10px] text-red-400 font-semibold bg-red-900/30 px-1.5 py-0.5 rounded">

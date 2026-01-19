@@ -69,12 +69,14 @@ async function handlePost(
     log.info(`Fetching photos for ${dropNumber}`, { forceSource, force, skipCategorization });
 
     // Check if already fetched (skip unless forced)
+    // NOTE: 'OES Import' is NOT a real photo source - it means record came from OES import
+    // Only skip if photo_source is an actual photo source (onemap, boss, local)
     if (!force) {
       const existingResult = await pool.query(
         `SELECT photo_source, photo_count, photos_metadata, ont_serial_scanned, ups_serial_scanned,
                 vlm_categorization_results, vlm_categorization_status
          FROM dr_photo_unified_reviews
-         WHERE drop_number = $1 AND photo_source IS NOT NULL`,
+         WHERE drop_number = $1 AND photo_source IN ('onemap', 'boss', 'local')`,
         [dropNumber]
       );
 

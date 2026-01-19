@@ -168,7 +168,53 @@ async function handleGet(
       }
     }
 
-    const review = result.rows[0];
+    let review = result.rows[0];
+
+    // Auto-fetch photos for OES-only DRs (no WhatsApp submission, no photos yet)
+    // This allows OES-imported DRs to get photos from OneMap when opened
+    if (review && (!review.photo_source || review.photo_source === 'OES Import') && (!review.photo_count || review.photo_count === 0)) {
+      try {
+        log.info(`Auto-fetching photos for OES-only DR: ${dropNumber}`);
+        const oneMapData = await fetchFromOneMapRecord(dropNumber);
+
+        if (oneMapData && oneMapData.photos.length > 0) {
+          // Update the record with photos and serial data
+          await pool.query(
+            `UPDATE dr_photo_unified_reviews
+             SET photo_source = $1,
+                 photo_count = $2,
+                 photos_metadata = $3,
+                 ont_serial_scanned = COALESCE($4, ont_serial_scanned),
+                 ups_serial_scanned = COALESCE($5, ups_serial_scanned),
+                 updated_at = NOW()
+             WHERE drop_number = $6`,
+            [
+              'onemap',
+              oneMapData.photos.length,
+              JSON.stringify(oneMapData.photos),
+              oneMapData.ont_barcode || null,
+              oneMapData.ups_serial || null,
+              dropNumber
+            ]
+          );
+
+          // Re-fetch the updated record
+          const updatedResult = await pool.query<UnifiedReview>(
+            `SELECT * FROM dr_photo_unified_reviews WHERE drop_number = $1`,
+            [dropNumber]
+          );
+          review = updatedResult.rows[0] || review;
+
+          log.info(`Auto-fetched ${oneMapData.photos.length} photos for OES-only DR ${dropNumber}`, {
+            ont_barcode: oneMapData.ont_barcode,
+            ups_serial: oneMapData.ups_serial,
+          });
+        }
+      } catch (fetchError) {
+        log.warn(`Auto-fetch failed for OES-only DR ${dropNumber}`, { error: fetchError });
+        // Don't fail the request - return the record without photos
+      }
+    }
 
     log.info(`Successfully fetched unified review: ${dropNumber}`);
     return apiResponse.success(res, review);
