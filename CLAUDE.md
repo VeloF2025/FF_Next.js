@@ -269,10 +269,50 @@ Unified system for DR (Drop Receipt) photo review with AI-powered categorization
 | Phase | Name | Purpose |
 |-------|------|---------|
 | 1 | Prerequisites | Validate photos, categorization, step coverage |
-| 2 | Photo Review | Review and approve photo assignments |
+| 2 | Photo Review | Review and approve photo assignments (edit mode shows discarded photos) |
 | 3 | Data Validation | Validate power (-18 to -24 dBm), serial matches |
-| 4 | Final Decision | PASS / FAIL / REWORK_NEEDED with reason codes |
-| 5 | Feedback | Generate and send WhatsApp feedback |
+| 4 | Final Decision | PASS / FAIL / REWORK_NEEDED with reason codes, auto-ticket for swaps |
+| 5 | Feedback | Generate and send WhatsApp feedback (technician issues only) |
+
+### Serial Swap Detection (Jan 2026)
+**Critical feature for detecting when ONT and UPS serials are in wrong fields.**
+
+**Serial Patterns:**
+| Device | Pattern | Example |
+|--------|---------|---------|
+| Nokia ONT | `ALCL*` or `ALCB*` | `ALCLB48CC3CA` |
+| Gizzu UPS | `GU18W*` | `GU18W12V2508057584` |
+
+**Swap Detection Flow:**
+1. **First WhatsApp Response:** `dr-acknowledgment.ts` detects swap immediately and warns technician
+2. **QA Wizard Phase 4:** Shows prominent "🔴 SERIALS SWAPPED" warning
+3. **Auto-Ticket Creation:** Creates ticket with `source=ont_swap`, `ticket_type=ont_swap`
+4. **Tracking:** Ticket tracks resolution until technician corrects in 1Map
+
+**Key Functions in `qaAutoFailService.ts`:**
+```typescript
+looksLikeOntSerial(serial)    // Matches ALCL/ALCB pattern
+looksLikeGizzuSerial(serial)  // Matches GU18W pattern
+detectSwappedSerials(ont, ups) // Returns { swapped: boolean, details: string }
+getTechnicianIssues(data)      // Returns actionable issues for technicians
+```
+
+### Technician Feedback vs Internal QA
+**Separation of concerns for WhatsApp feedback:**
+
+**Technician-Actionable (sent via WhatsApp):**
+- ONT not scanned
+- UPS not scanned
+- Serials swapped (CRITICAL - with correction instructions)
+- Invalid serial format
+- Missing required photos
+- Power meter out of range
+
+**Internal QA Only (NOT sent to technicians):**
+- VLM extraction comparison (Step 6 vs Step 9 vs OneMap)
+- OCR confidence scores
+- AI categorization mismatches
+- Few-shot learning corrections
 
 ### API Endpoints (Key)
 | Endpoint | Method | Purpose |
@@ -284,8 +324,9 @@ Unified system for DR (Drop Receipt) photo review with AI-powered categorization
 | `/api/activate/extract-data` | POST | VLM data extraction |
 | `/api/activate/validate-prerequisites` | POST | Phase 1 validation |
 | `/api/activate/human-review` | POST | Human corrections |
-| `/api/activate/final-decision` | POST | Phase 4 decision |
-| `/api/activate/send-feedback` | POST | WhatsApp feedback |
+| `/api/activate/final-decision` | POST | Phase 4 decision + auto-ticket for swaps |
+| `/api/activate/send-feedback` | POST | WhatsApp feedback (technician issues only) |
+| `/api/activate/dr-acknowledgment` | POST | **First WA response** - photo count, serials, swap detection |
 | `/api/activate/reporting/*` | GET | 8 report endpoints |
 | `/api/activate/health-check` | GET | 5-service health |
 | `/api/activate/export` | GET | Excel export |
