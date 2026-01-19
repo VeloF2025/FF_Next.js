@@ -264,34 +264,55 @@ async function main() {
     console.log(`  Successfully updated: ${successCount}`);
     console.log(`  Errors: ${errorCount}`);
 
-    // Step 5: Add activity log entries
+    // Step 5: Add activity log entries for historic reviews
     console.log('');
-    console.log('Step 5: Adding activity log entries...');
+    console.log('Step 5: Adding activity log entries for timeline visibility...');
 
-    try {
-      const activityResult = await sql`
-        INSERT INTO dr_activity_log (drop_number, event_type, event_data, created_at)
-        SELECT
-          drop_number,
-          'historic_qa_imported',
-          jsonb_build_object(
-            'source', 'sharepoint_manual_qa',
-            'imported_at', NOW(),
-            'notes', qa_decision_notes
-          ),
-          NOW()
-        FROM dr_photo_unified_reviews
-        WHERE human_review_status = 'historic_import'
-        AND NOT EXISTS (
-          SELECT 1 FROM dr_activity_log
-          WHERE dr_activity_log.drop_number = dr_photo_unified_reviews.drop_number
-          AND event_type = 'historic_qa_imported'
-        )
-      `;
-      console.log(`  Added ${activityResult.length || 'batch'} activity log entries`);
-    } catch (error) {
-      console.log(`  Activity log update: ${error.message}`);
+    let activityCount = 0;
+    for (const update of updates) {
+      try {
+        // Add "human_review_completed" entry so it shows in activity timeline
+        await sql`
+          INSERT INTO dr_activity_log (drop_number, event_type, event_data, actor, created_at)
+          VALUES (
+            ${update.drop_number},
+            'human_review_completed',
+            ${JSON.stringify({
+              source: 'historic_manual_qa',
+              reviewer: update.reviewed_by,
+              comment: update.qa_decision_notes,
+              stepsApproved: Object.entries({
+                step_01: update.step_01_house_photo,
+                step_02: update.step_02_cable_from_pole,
+                step_03: update.step_03_entry_outside,
+                step_04: update.step_04_entry_inside,
+                step_05: update.step_05_wall,
+                step_06: update.step_06_ont_back,
+                step_07: update.step_07_power_meter,
+                step_08: update.step_08_final_installation,
+                step_09: update.step_09_green_lights,
+                step_10: update.step_10_signature,
+              }).filter(([_, v]) => v === true).map(([k]) => k),
+              importedAt: new Date().toISOString(),
+            })}::jsonb,
+            ${update.reviewed_by || 'Historic Import'},
+            ${update.reviewed_at}::timestamptz
+          )
+          ON CONFLICT DO NOTHING
+        `;
+        activityCount++;
+
+        if (activityCount % 100 === 0) {
+          console.log(`  Activity entries: ${activityCount}/${updates.length}...`);
+        }
+      } catch (error) {
+        // Ignore duplicate errors
+        if (!error.message.includes('duplicate')) {
+          console.log(`  Activity log error for ${update.drop_number}: ${error.message}`);
+        }
+      }
     }
+    console.log(`  Added ${activityCount} activity log entries`);
   }
 
   // Summary

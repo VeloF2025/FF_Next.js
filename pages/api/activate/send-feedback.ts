@@ -17,6 +17,7 @@ import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
+import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -258,6 +259,13 @@ async function handlePost(
       sentToStaffPrivate: !!sendResults.staffPrivate?.success,
       taskCreated: !!taskId,
     });
+
+    // Log activity for audit trail
+    try {
+      await logFeedbackSent(dropNumber, groupId || 'private', sentMessageId || undefined);
+    } catch (activityError) {
+      log.warn('SendFeedback', `Failed to log activity for ${dropNumber}`, activityError);
+    }
 
     return apiResponse.success(res, {
       dropNumber,

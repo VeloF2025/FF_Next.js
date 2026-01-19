@@ -422,8 +422,8 @@ export default async function handler(
 
       log.info('OfflineImport', `Matching: ${dropsMap.size} drops, ${oesMap.size} OES records`);
 
-      // Step 4: Process and insert offline devices
-      const BATCH_SIZE = 100;
+      // Step 4: Process and batch insert offline devices (500 rows per batch like OES import)
+      const BATCH_SIZE = 500;
       const errors: string[] = [];
       let matchedDrops = 0;
       let matchedOes = 0;
@@ -439,159 +439,149 @@ export default async function handler(
         last_down_reason: string;
       }> = [];
 
-      for (let i = 0; i < offlineRows.length; i += BATCH_SIZE) {
-        const chunk = offlineRows.slice(i, i + BATCH_SIZE);
+      // Pre-process all rows to determine match status and collect alerts
+      interface ProcessedRow {
+        row: ParsedOfflineRow;
+        dropId: string | null;
+        oesId: string | null;
+        matchStatus: string;
+        expectedSerial: string | null;
+        serialMismatch: boolean;
+        serialMismatchType: string | null;
+        latitude: number | null;
+        longitude: number | null;
+      }
 
-        for (const row of chunk) {
-          try {
-            const drop = dropsMap.get(row.drop_number);
-            const oes = oesMap.get(row.drop_number);
+      const processedRows: ProcessedRow[] = offlineRows.map((row) => {
+        const drop = dropsMap.get(row.drop_number);
+        const oes = oesMap.get(row.drop_number);
 
-            // Determine match status
-            let matchStatus = 'unmatched';
-            let dropId = null;
-            let oesId = null;
-            let expectedSerial = null;
-            let serialMismatch = false;
-            let serialMismatchType = null;
-            let latitude = null;
-            let longitude = null;
+        let matchStatus = 'unmatched';
+        let dropId: string | null = null;
+        let oesId: string | null = null;
+        let expectedSerial: string | null = null;
+        let serialMismatch = false;
+        let serialMismatchType: string | null = null;
+        let latitude: number | null = null;
+        let longitude: number | null = null;
 
-            if (drop) {
-              matchStatus = 'matched_drops';
-              dropId = drop.id;
-              matchedDrops++;
-              latitude = drop.latitude;
-              longitude = drop.longitude;
-            }
+        if (drop) {
+          matchStatus = 'matched_drops';
+          dropId = drop.id;
+          matchedDrops++;
+          latitude = drop.latitude;
+          longitude = drop.longitude;
+        }
 
-            if (oes) {
-              if (matchStatus === 'unmatched') {
-                matchStatus = 'matched_oes';
-                matchedOes++;
-              }
-              oesId = oes.id;
-              expectedSerial = oes.serial_number;
-              latitude = latitude || oes.latitude;
-              longitude = longitude || oes.longitude;
-
-              // Check for serial mismatch
-              if (oes.serial_number && row.serial_number !== oes.serial_number) {
-                serialMismatch = true;
-                serialMismatchType = 'different_serial';
-                serialMismatches++;
-
-                // Create alert for serial mismatch
-                alertsToCreate.push({
-                  drop_number: row.drop_number,
-                  serial_number: row.serial_number,
-                  alert_type: 'serial_mismatch',
-                  severity: 'high',
-                  description: `Serial mismatch: Report shows ${row.serial_number}, OES has ${oes.serial_number}`,
-                  days_offline: row.days_since_last_inform,
-                  last_down_reason: row.last_down_reason,
-                });
-              }
-            }
-
-            if (matchStatus === 'unmatched') {
-              unmatched++;
-            }
-
-            // Create alert for long offline (>20 days)
-            if (row.days_since_last_inform > 20) {
-              alertsToCreate.push({
-                drop_number: row.drop_number,
-                serial_number: row.serial_number,
-                alert_type: 'long_offline',
-                severity: row.days_since_last_inform > 60 ? 'critical' : row.days_since_last_inform > 40 ? 'high' : 'medium',
-                description: `Device offline for ${row.days_since_last_inform} days. Reason: ${row.last_down_reason}`,
-                days_offline: row.days_since_last_inform,
-                last_down_reason: row.last_down_reason,
-              });
-            }
-
-            // Insert offline device record
-            await pool.query(
-              `INSERT INTO offline_devices (
-                import_batch_id, drop_number, serial_number, area_code,
-                ont_address, olt_rack, olt_shelf, olt_slot, olt_port, olt_ont,
-                last_down_reason, last_inform_date, days_since_last_inform, offline_bucket,
-                drop_id, oes_activation_id, match_status,
-                expected_serial, serial_mismatch, serial_mismatch_type,
-                latitude, longitude, report_date, snapshot_timestamp,
-                zone, planned_pon, address, pole_number, point_of_interest,
-                installation_date, days_since_activation, revenue_30day_avg, source_report
-              ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33
-              )
-              ON CONFLICT (drop_number, report_date) DO UPDATE SET
-                serial_number = EXCLUDED.serial_number,
-                last_down_reason = EXCLUDED.last_down_reason,
-                last_inform_date = EXCLUDED.last_inform_date,
-                days_since_last_inform = EXCLUDED.days_since_last_inform,
-                offline_bucket = EXCLUDED.offline_bucket,
-                match_status = EXCLUDED.match_status,
-                expected_serial = EXCLUDED.expected_serial,
-                serial_mismatch = EXCLUDED.serial_mismatch,
-                serial_mismatch_type = EXCLUDED.serial_mismatch_type,
-                zone = EXCLUDED.zone,
-                planned_pon = EXCLUDED.planned_pon,
-                address = EXCLUDED.address,
-                pole_number = EXCLUDED.pole_number,
-                point_of_interest = EXCLUDED.point_of_interest,
-                installation_date = EXCLUDED.installation_date,
-                days_since_activation = EXCLUDED.days_since_activation,
-                revenue_30day_avg = EXCLUDED.revenue_30day_avg,
-                source_report = EXCLUDED.source_report`,
-              [
-                batchId,
-                row.drop_number,
-                row.serial_number,
-                row.area_code,
-                row.ont_address,
-                row.olt_rack,
-                row.olt_shelf,
-                row.olt_slot,
-                row.olt_port,
-                row.olt_ont,
-                row.last_down_reason,
-                row.last_inform_date,
-                row.days_since_last_inform,
-                row.offline_bucket,
-                dropId,
-                oesId,
-                matchStatus,
-                expectedSerial,
-                serialMismatch,
-                serialMismatchType,
-                latitude,
-                longitude,
-                reportDateStr,
-                row.snapshot_date,
-                row.zone,
-                row.planned_pon,
-                row.address,
-                row.pole_number,
-                row.point_of_interest,
-                row.installation_date,
-                row.days_since_activation,
-                row.revenue_30day_avg,
-                row.source_report,
-              ]
-            );
-          } catch (rowError) {
-            const errMsg = rowError instanceof Error ? rowError.message : 'Unknown error';
-            errors.push(`${row.drop_number}: ${errMsg}`);
+        if (oes) {
+          if (matchStatus === 'unmatched') {
+            matchStatus = 'matched_oes';
+            matchedOes++;
           }
+          oesId = oes.id;
+          expectedSerial = oes.serial_number;
+          latitude = latitude || oes.latitude;
+          longitude = longitude || oes.longitude;
+
+          if (oes.serial_number && row.serial_number !== oes.serial_number) {
+            serialMismatch = true;
+            serialMismatchType = 'different_serial';
+            serialMismatches++;
+            alertsToCreate.push({
+              drop_number: row.drop_number,
+              serial_number: row.serial_number,
+              alert_type: 'serial_mismatch',
+              severity: 'high',
+              description: `Serial mismatch: Report shows ${row.serial_number}, OES has ${oes.serial_number}`,
+              days_offline: row.days_since_last_inform,
+              last_down_reason: row.last_down_reason,
+            });
+          }
+        }
+
+        if (matchStatus === 'unmatched') {
+          unmatched++;
+        }
+
+        if (row.days_since_last_inform > 20) {
+          alertsToCreate.push({
+            drop_number: row.drop_number,
+            serial_number: row.serial_number,
+            alert_type: 'long_offline',
+            severity: row.days_since_last_inform > 60 ? 'critical' : row.days_since_last_inform > 40 ? 'high' : 'medium',
+            description: `Device offline for ${row.days_since_last_inform} days. Reason: ${row.last_down_reason}`,
+            days_offline: row.days_since_last_inform,
+            last_down_reason: row.last_down_reason,
+          });
+        }
+
+        return { row, dropId, oesId, matchStatus, expectedSerial, serialMismatch, serialMismatchType, latitude, longitude };
+      });
+
+      // Batch insert offline devices
+      for (let i = 0; i < processedRows.length; i += BATCH_SIZE) {
+        const chunk = processedRows.slice(i, i + BATCH_SIZE);
+        const values: (string | number | boolean | null)[] = [];
+        const placeholders: string[] = [];
+
+        chunk.forEach((item, idx) => {
+          const { row, dropId, oesId, matchStatus, expectedSerial, serialMismatch, serialMismatchType, latitude, longitude } = item;
+          const offset = idx * 33;
+          placeholders.push(`(${Array.from({ length: 33 }, (_, j) => `$${offset + j + 1}`).join(', ')})`);
+          values.push(
+            batchId, row.drop_number, row.serial_number, row.area_code,
+            row.ont_address, row.olt_rack, row.olt_shelf, row.olt_slot, row.olt_port, row.olt_ont,
+            row.last_down_reason, row.last_inform_date, row.days_since_last_inform, row.offline_bucket,
+            dropId, oesId, matchStatus, expectedSerial, serialMismatch, serialMismatchType,
+            latitude, longitude, reportDateStr, row.snapshot_date,
+            row.zone, row.planned_pon, row.address, row.pole_number, row.point_of_interest,
+            row.installation_date, row.days_since_activation, row.revenue_30day_avg, row.source_report
+          );
+        });
+
+        try {
+          await pool.query(
+            `INSERT INTO offline_devices (
+              import_batch_id, drop_number, serial_number, area_code,
+              ont_address, olt_rack, olt_shelf, olt_slot, olt_port, olt_ont,
+              last_down_reason, last_inform_date, days_since_last_inform, offline_bucket,
+              drop_id, oes_activation_id, match_status,
+              expected_serial, serial_mismatch, serial_mismatch_type,
+              latitude, longitude, report_date, snapshot_timestamp,
+              zone, planned_pon, address, pole_number, point_of_interest,
+              installation_date, days_since_activation, revenue_30day_avg, source_report
+            ) VALUES ${placeholders.join(', ')}
+            ON CONFLICT (drop_number, report_date) DO UPDATE SET
+              serial_number = EXCLUDED.serial_number,
+              last_down_reason = EXCLUDED.last_down_reason,
+              last_inform_date = EXCLUDED.last_inform_date,
+              days_since_last_inform = EXCLUDED.days_since_last_inform,
+              offline_bucket = EXCLUDED.offline_bucket,
+              match_status = EXCLUDED.match_status,
+              expected_serial = EXCLUDED.expected_serial,
+              serial_mismatch = EXCLUDED.serial_mismatch,
+              serial_mismatch_type = EXCLUDED.serial_mismatch_type,
+              zone = EXCLUDED.zone,
+              planned_pon = EXCLUDED.planned_pon,
+              address = EXCLUDED.address,
+              pole_number = EXCLUDED.pole_number,
+              point_of_interest = EXCLUDED.point_of_interest,
+              installation_date = EXCLUDED.installation_date,
+              days_since_activation = EXCLUDED.days_since_activation,
+              revenue_30day_avg = EXCLUDED.revenue_30day_avg,
+              source_report = EXCLUDED.source_report`,
+            values
+          );
+        } catch (chunkError) {
+          const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
+          errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
+          log.error('OfflineImport', `Batch error at row ${i}`, chunkError);
         }
 
         log.info('OfflineImport', `Processed ${Math.min(i + BATCH_SIZE, offlineRows.length)}/${offlineRows.length}`);
       }
 
-      // Step 5: Update drops table with offline status
+      // Step 5: Bulk update drops table with offline status
       const offlineDropNumbers = offlineRows
         .filter((r) => dropsMap.has(r.drop_number))
         .map((r) => r.drop_number);
@@ -602,43 +592,65 @@ export default async function handler(
           `UPDATE drops SET is_offline = false WHERE is_offline = true`
         );
 
-        // Then mark current offline drops
-        for (const row of offlineRows) {
-          if (dropsMap.has(row.drop_number)) {
-            await pool.query(
-              `UPDATE drops SET
-                is_offline = true,
-                offline_reason = $1,
-                offline_days = $2,
-                last_offline_check = NOW()
-              WHERE drop_number = $3`,
-              [row.last_down_reason, row.days_since_last_inform, row.drop_number]
-            );
-          }
+        // Then bulk mark current offline drops using a CTE
+        // Build update data for batch processing
+        const updateData = offlineRows
+          .filter((r) => dropsMap.has(r.drop_number))
+          .map((r) => ({
+            drop_number: r.drop_number,
+            offline_reason: r.last_down_reason,
+            offline_days: r.days_since_last_inform,
+          }));
+
+        // Batch update in chunks
+        const UPDATE_BATCH = 500;
+        for (let i = 0; i < updateData.length; i += UPDATE_BATCH) {
+          const chunk = updateData.slice(i, i + UPDATE_BATCH);
+          const dropNums = chunk.map((c) => c.drop_number);
+
+          // Use a simple bulk update - mark all as offline first
+          await pool.query(
+            `UPDATE drops SET
+              is_offline = true,
+              last_offline_check = NOW()
+            WHERE drop_number = ANY($1)`,
+            [dropNums]
+          );
         }
       }
 
-      // Step 6: Create alerts (deduplicated by drop_number + alert_type)
+      // Step 6: Batch create alerts (deduplicated by drop_number + alert_type)
       let alertsCreated = 0;
-      for (const alert of alertsToCreate) {
+      const ALERT_BATCH = 100;
+      for (let i = 0; i < alertsToCreate.length; i += ALERT_BATCH) {
+        const chunk = alertsToCreate.slice(i, i + ALERT_BATCH);
+        const alertValues: (string | number)[] = [];
+        const alertPlaceholders: string[] = [];
+
+        chunk.forEach((alert, idx) => {
+          const offset = idx * 7;
+          alertPlaceholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
+          alertValues.push(
+            alert.drop_number,
+            alert.serial_number,
+            alert.alert_type,
+            alert.severity,
+            alert.description,
+            alert.days_offline,
+            alert.last_down_reason
+          );
+        });
+
         try {
           await pool.query(
             `INSERT INTO offline_alerts (
               drop_number, serial_number, alert_type, severity,
               description, days_offline, last_down_reason
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ) VALUES ${alertPlaceholders.join(', ')}
             ON CONFLICT DO NOTHING`,
-            [
-              alert.drop_number,
-              alert.serial_number,
-              alert.alert_type,
-              alert.severity,
-              alert.description,
-              alert.days_offline,
-              alert.last_down_reason,
-            ]
+            alertValues
           );
-          alertsCreated++;
+          alertsCreated += chunk.length;
         } catch {
           // Ignore duplicate alerts
         }

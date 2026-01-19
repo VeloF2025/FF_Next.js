@@ -89,7 +89,11 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
   };
 
   // Initialize project visibility when data loads
-  const availableProjects = trendData?.available_projects || [];
+  // Filter out test projects from display
+  const testProjectPatterns = ['test', 'velo test', 'test project'];
+  const availableProjects = (trendData?.available_projects || []).filter(
+    (proj) => !testProjectPatterns.some((pattern) => proj.toLowerCase().includes(pattern.toLowerCase()))
+  );
 
   // Initialize all projects as visible when they first appear
   if (availableProjects.length > 0) {
@@ -381,45 +385,58 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         />
       </div>
 
-      {/* Stacked Bar View */}
+      {/* Per-Project Bar View */}
       <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
         <TrendChart
-          title="Daily Volume Distribution"
+          title="Daily Volume Distribution by Project"
+          subtitle={`Showing: ${seriesVisibility.installed ? 'Installed' : seriesVisibility.activated ? 'Activated' : seriesVisibility.reviewed ? 'Reviewed' : 'Not Reviewed'}`}
           data={trendData?.data.map((d) => {
-            // If we have per-project data and some projects are toggled off, compute filtered totals
+            // Build data point with each project as a separate key
+            const dataPoint: Record<string, unknown> = { date: d.label };
+
             if (d.by_project && availableProjects.length > 1) {
-              let installed = 0, activated = 0, reviewed = 0, notReviewed = 0;
+              // Multiple projects - show each project separately
               for (const proj of availableProjects) {
                 if (projectVisibility[proj] !== false && d.by_project[proj]) {
-                  installed += d.by_project[proj].installed;
-                  activated += d.by_project[proj].activated;
-                  reviewed += d.by_project[proj].reviewed;
-                  notReviewed += d.by_project[proj].notReviewed;
+                  const projData = d.by_project[proj];
+                  // Use the first visible series metric
+                  if (seriesVisibility.installed) {
+                    dataPoint[proj] = projData.installed;
+                  } else if (seriesVisibility.activated) {
+                    dataPoint[proj] = projData.activated;
+                  } else if (seriesVisibility.reviewed) {
+                    dataPoint[proj] = projData.reviewed;
+                  } else if (seriesVisibility.notReviewed) {
+                    dataPoint[proj] = projData.notReviewed;
+                  }
                 }
               }
-              return {
-                date: d.label,
-                Installed: installed,
-                Activated: activated,
-                Reviewed: reviewed,
-                'Not Reviewed': notReviewed,
-              };
+            } else {
+              // Single project or no breakdown - show as "Total"
+              if (seriesVisibility.installed) {
+                dataPoint['Total'] = d.installed;
+              } else if (seriesVisibility.activated) {
+                dataPoint['Total'] = d.activated;
+              } else if (seriesVisibility.reviewed) {
+                dataPoint['Total'] = d.reviewed;
+              } else if (seriesVisibility.notReviewed) {
+                dataPoint['Total'] = d.notReviewed;
+              }
             }
-            // No project breakdown, use totals
-            return {
-              date: d.label,
-              Installed: d.installed,
-              Activated: d.activated,
-              Reviewed: d.reviewed,
-              'Not Reviewed': d.notReviewed,
-            };
+
+            return dataPoint;
           }) || []}
-          series={[
-            ...(seriesVisibility.installed ? [{ dataKey: 'Installed', name: 'Installed', color: '#3B82F6', stackId: 'stack' }] : []),
-            ...(seriesVisibility.activated ? [{ dataKey: 'Activated', name: 'Activated', color: '#8B5CF6', stackId: 'stack' }] : []),
-            ...(seriesVisibility.reviewed ? [{ dataKey: 'Reviewed', name: 'Reviewed', color: '#10B981', stackId: 'stack' }] : []),
-            ...(seriesVisibility.notReviewed ? [{ dataKey: 'Not Reviewed', name: 'Not Reviewed', color: '#F59E0B', stackId: 'stack' }] : []),
-          ]}
+          series={
+            availableProjects.length > 1
+              ? availableProjects
+                  .filter((proj) => projectVisibility[proj] !== false)
+                  .map((proj, idx) => ({
+                    dataKey: proj,
+                    name: proj,
+                    color: getProjectColor(proj, idx),
+                  }))
+              : [{ dataKey: 'Total', name: 'Total', color: '#3B82F6' }]
+          }
           type="bar"
           xAxisKey="date"
           height={250}

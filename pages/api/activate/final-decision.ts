@@ -18,6 +18,7 @@ import {
   type DrValidationData,
   type FailReasonCode,
 } from '@/modules/activate/services/qaAutoFailService';
+import { logActivity } from '@/modules/activate/services/activityLogService';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -267,6 +268,27 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       reasons,
       userId,
     });
+
+    // Log activity for audit trail
+    try {
+      await logActivity(
+        dropNumber,
+        'human_review_completed',
+        {
+          decision,
+          reasons,
+          reasonDescriptions,
+          notes: finalNotes || null,
+          stepsApproved: Object.entries(stepCounts)
+            .filter(([_, count]) => count > 0)
+            .map(([step]) => `step_${step.padStart(2, '0')}`),
+        },
+        'user',
+        userId || 'system'
+      );
+    } catch (activityError) {
+      log.warn('FinalDecision', `Failed to log activity for ${dropNumber}`, activityError);
+    }
 
     const response: FinalDecisionResponse = {
       drNumber: dropNumber,
