@@ -748,10 +748,10 @@ export async function getTrendAnalysisReport(
 
     const dateGrouping =
       groupBy === 'day'
-        ? "TO_CHAR(date_val, 'YYYY-MM-DD')"
+        ? "TO_CHAR(ds.date_val, 'YYYY-MM-DD')"
         : groupBy === 'week'
-          ? "TO_CHAR(DATE_TRUNC('week', date_val), 'YYYY-\"W\"IW')"
-          : "TO_CHAR(DATE_TRUNC('month', date_val), 'YYYY-MM')";
+          ? "TO_CHAR(DATE_TRUNC('week', ds.date_val), 'YYYY-\"W\"IW')"
+          : "TO_CHAR(DATE_TRUNC('month', ds.date_val), 'YYYY-MM')";
 
     const result = await pool.query(
       `
@@ -1074,16 +1074,16 @@ export async function getQAFunnelReport(
       `
       SELECT
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE step_1_house = true) as step_1,
-        COUNT(*) FILTER (WHERE step_2_cable_pole = true) as step_2,
-        COUNT(*) FILTER (WHERE step_3_entry_outside = true) as step_3,
-        COUNT(*) FILTER (WHERE step_4_entry_inside = true) as step_4,
-        COUNT(*) FILTER (WHERE step_5_wall = true) as step_5,
-        COUNT(*) FILTER (WHERE step_6_ont_back = true) as step_6,
-        COUNT(*) FILTER (WHERE step_7_power_meter = true) as step_7,
-        COUNT(*) FILTER (WHERE step_8_final = true) as step_8,
-        COUNT(*) FILTER (WHERE step_9_green_lights = true) as step_9,
-        COUNT(*) FILTER (WHERE step_10_signature = true) as step_10
+        COUNT(*) FILTER (WHERE step_01_house_photo IS NOT NULL) as step_1,
+        COUNT(*) FILTER (WHERE step_02_cable_from_pole IS NOT NULL) as step_2,
+        COUNT(*) FILTER (WHERE step_03_entry_outside IS NOT NULL) as step_3,
+        COUNT(*) FILTER (WHERE step_04_entry_inside IS NOT NULL) as step_4,
+        COUNT(*) FILTER (WHERE step_05_wall IS NOT NULL) as step_5,
+        COUNT(*) FILTER (WHERE step_06_ont_back IS NOT NULL) as step_6,
+        COUNT(*) FILTER (WHERE step_07_power_meter IS NOT NULL) as step_7,
+        COUNT(*) FILTER (WHERE step_08_final_installation IS NOT NULL) as step_8,
+        COUNT(*) FILTER (WHERE step_09_green_lights IS NOT NULL) as step_9,
+        COUNT(*) FILTER (WHERE step_10_signature IS NOT NULL) as step_10
       FROM dr_photo_unified_reviews
       WHERE created_at::DATE >= $1::DATE
         AND created_at::DATE <= $2::DATE
@@ -1159,16 +1159,16 @@ export async function getQAFunnelReport(
       WHERE created_at::DATE >= $1::DATE
         AND created_at::DATE <= $2::DATE
         AND ($3::TEXT IS NULL OR project = $3)
-        AND step_1_house = true
-        AND step_2_cable_pole = true
-        AND step_3_entry_outside = true
-        AND step_4_entry_inside = true
-        AND step_5_wall = true
-        AND step_6_ont_back = true
-        AND step_7_power_meter = true
-        AND step_8_final = true
-        AND step_9_green_lights = true
-        AND step_10_signature = true
+        AND step_01_house_photo IS NOT NULL
+        AND step_02_cable_from_pole IS NOT NULL
+        AND step_03_entry_outside IS NOT NULL
+        AND step_04_entry_inside IS NOT NULL
+        AND step_05_wall IS NOT NULL
+        AND step_06_ont_back IS NOT NULL
+        AND step_07_power_meter IS NOT NULL
+        AND step_08_final_installation IS NOT NULL
+        AND step_09_green_lights IS NOT NULL
+        AND step_10_signature IS NOT NULL
       `,
       [dateFrom, dateTo, project || null]
     );
@@ -1307,10 +1307,10 @@ export async function getTeamPerformanceReport(
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as serial_scanned,
         COUNT(*) FILTER (WHERE
-          step_1_house = true AND step_2_cable_pole = true AND step_3_entry_outside = true AND
-          step_4_entry_inside = true AND step_5_wall = true AND step_6_ont_back = true AND
-          step_7_power_meter = true AND step_8_final = true AND step_9_green_lights = true AND
-          step_10_signature = true
+          step_01_house_photo IS NOT NULL AND step_02_cable_from_pole IS NOT NULL AND step_03_entry_outside IS NOT NULL AND
+          step_04_entry_inside IS NOT NULL AND step_05_wall IS NOT NULL AND step_06_ont_back IS NOT NULL AND
+          step_07_power_meter IS NOT NULL AND step_08_final_installation IS NOT NULL AND step_09_green_lights IS NOT NULL AND
+          step_10_signature IS NOT NULL
         ) as photo_complete
       FROM dr_photo_unified_reviews upr
       WHERE upr.created_at::DATE >= $1::DATE
