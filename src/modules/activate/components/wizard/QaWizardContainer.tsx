@@ -377,7 +377,7 @@ export function QaWizardContainer({
                 </button>
                 {/* Label under circle */}
                 <span
-                  className={`mt-1 text-[10px] leading-tight text-center transition-colors ${
+                  className={`mt-1 text-xs leading-tight text-center transition-colors ${
                     isActive
                       ? 'font-semibold text-blue-600 dark:text-blue-400'
                       : isComplete
