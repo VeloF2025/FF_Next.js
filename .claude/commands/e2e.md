@@ -48,6 +48,25 @@ For EACH theme:
    - Missing borders/separators
    - Broken hover states
    - Modal/dropdown visibility
+6. CRITICAL: Compare styling to similar pages
+   - Compare list pages to each other (RFQ vs Suppliers vs BOQ)
+   - Verify stat cards present and styled consistently
+   - Verify card/list layout matches other modules
+   - Check that same CSS variables are used
+```
+
+### Phase 2.5: Cross-Page Styling Consistency
+BEFORE marking theme tests complete:
+```
+1. Open reference page (e.g., /suppliers for procurement modules)
+2. Take screenshot of reference page
+3. Open test page (e.g., /procurement/rfq)
+4. Compare visually:
+   - Same background colors?
+   - Same card/list styling?
+   - Same stat card pattern?
+   - Same header layout?
+5. If mismatch found → FIX before continuing
 ```
 
 ### Phase 3: Functional Tests
