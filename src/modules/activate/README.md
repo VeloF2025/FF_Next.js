@@ -29,8 +29,8 @@ Unified system for DR (Drop Receipt) photo review with:
 |-----|---------|
 | **DR Summary** | Landing page - Project stats with Zone/PON drill-down |
 | **QA Centre** | DR list for review with filters and pagination |
-| **Reports** | 7 report types (Trends, Funnel, Team, etc.) |
-| **OES Import** | Import OES Excel activation reports |
+| **Reports** | 8 report types (Anomalies, Trends, Team Performance, QA Funnel) |
+| **Data Import** | Import OES/ARCH Excel activation reports |
 | **Manual Entry** | Add DRs manually |
 
 ## 5-Phase QA Wizard
@@ -189,6 +189,73 @@ This separation ensures technicians only receive actionable feedback, not intern
 | `/api/activate/reporting/team-performance` | GET | Team leaderboard |
 | `/api/activate/reporting/trends` | GET | Velocity trends |
 | `/api/activate/reporting/user-attribution` | GET | User attribution |
+
+## Trend Reports (Jan 2026)
+
+The Trends report provides installation and activation velocity analysis with interactive toggles.
+
+### Series Visibility Toggles
+
+Users can show/hide individual metrics on the line chart:
+
+| Series | Color | Hex Code | Compared With |
+|--------|-------|----------|---------------|
+| **Installed** | Blue | `#3B82F6` | Activated |
+| **Activated** | Cyan | `#06B6D4` | Installed |
+| **Reviewed** | Green | `#10B981` | Not Reviewed |
+| **Not Reviewed** | Red | `#EF4444` | Reviewed |
+
+**Color rationale:** Paired series (Installed/Activated and Reviewed/Not Reviewed) use contrasting colors for easy visual comparison.
+
+### Project Visibility Toggles
+
+When viewing "All Projects", users can toggle individual projects on/off:
+
+| Project | Color | Hex Code |
+|---------|-------|----------|
+| Lawley | Blue | `#3B82F6` |
+| Mohadin | Purple | `#8B5CF6` |
+| Mamelodi | Green | `#10B981` |
+
+**Excluded from toggles:** Test projects (Velo Test, test project) and Marketing Activations are automatically filtered out.
+
+### Charts
+
+1. **Installation & Activation Trends** (Line Chart)
+   - Shows all 4 metrics over time
+   - Project toggles filter which projects contribute to totals
+   - Optional daily target reference line
+
+2. **Daily Volume Distribution by Project** (Bar Chart)
+   - Shows each project as a separate bar
+   - Displays whichever metric is first selected in series toggles
+   - Subtitle shows which metric is displayed (e.g., "Showing: Installed")
+
+### API Response
+
+`/api/activate/reporting/trends` returns per-project breakdown:
+
+```typescript
+interface TrendDataPoint {
+  label: string;           // Date label
+  installed: number;       // Total installed
+  activated: number;       // Total activated
+  reviewed: number;        // Total reviewed
+  notReviewed: number;     // Total not reviewed
+  by_project?: Record<string, {  // Per-project breakdown
+    installed: number;
+    activated: number;
+    reviewed: number;
+    notReviewed: number;
+  }>;
+}
+
+interface TrendAnalysisResponse {
+  data: TrendDataPoint[];
+  velocity: { ... };
+  available_projects: string[];  // For toggle UI
+}
+```
 
 ### System
 
