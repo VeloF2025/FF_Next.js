@@ -38,6 +38,46 @@ Handle all Activate module operations:
 | **OES Import** | Import OES Excel activation reports |
 | **Manual Entry** | Add DRs manually |
 
+### QA Centre Card Layout (Jan 2026)
+
+Compact 2-row layout with inline status badges:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ [Mohadin] DR1855476 [Jan 19] [✓ OES Jan 14] [✗ FAIL] [Sent] [⚠ SWAP] │
+│ 👤 Unknown  📷 0     ONT: Not scanned  UPS: Not scanned                │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+**Row 1: Header + Status Badges (flex-wrap for mobile)**
+- Project badge (colored by project)
+- DR number (bold)
+- Installed date badge (blue) - always shown
+- Activated/OES date badge (green) - when OES confirmed
+- QA decision badge (green=PASS, red=FAIL, orange=Rework)
+- Feedback sent badge (purple)
+- Serial swap warning (red) - when serials swapped
+
+**Row 2: Details**
+- Agent phone (masked)
+- Photo count
+- ONT serial with validation status (✓/⚠/✗)
+- UPS serial with validation status (✓/⚠/✗)
+
+**Component:** `InlineStatusBadges` in `QaCentrePage.tsx`
+
+**Badge Styling:**
+| Badge | Color | Example |
+|-------|-------|---------|
+| Installed | Blue `bg-blue-900/40` | `[Jan 19]` |
+| Activated | Green `bg-green-900/40` | `[✓ OES Jan 14]` |
+| In Review | Yellow `bg-yellow-900/40` | `[In Review]` |
+| QA PASS | Green `bg-green-900/40` | `[✓ PASS]` |
+| QA FAIL | Red `bg-red-900/40` | `[✗ FAIL]` |
+| Rework | Orange `bg-orange-900/40` | `[Rework]` |
+| Feedback Sent | Purple `bg-purple-900/40` | `[Sent]` |
+| Serial Swap | Red `bg-red-900/30` | `[⚠ SWAP]` |
+
 ### 5-Phase QA Wizard
 | Phase | Name | API Endpoint | Purpose |
 |-------|------|--------------|---------|
@@ -788,7 +828,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3006
 |------|---------|
 | `src/modules/activate/components/DrListPage.tsx` | Main page with tabs |
 | `src/modules/activate/components/DrSummaryPage.tsx` | DR Summary landing tab |
-| `src/modules/activate/components/QaCentrePage.tsx` | QA Centre with filters + Export |
+| `src/modules/activate/components/QaCentrePage.tsx` | QA Centre with filters + Export (includes `InlineStatusBadges`, `ProjectBadge`, `SerialDisplay`) |
 | `src/modules/activate/components/SystemHealthDashboard.tsx` | Health monitoring UI |
 
 ### QA Wizard (5-Phase)
@@ -814,7 +854,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3006
 ### Services
 | File | Purpose |
 |------|---------|
-| `src/modules/activate/services/activateDataService.ts` | Main data fetching |
+| `src/modules/activate/services/activateDataService.ts` | Main data fetching + `DrListItem` type with rich status model |
 | `src/modules/activate/services/reportingService.ts` | Report queries |
 | `src/modules/activate/services/categorizationVlmService.ts` | VLM categorization |
 | `src/modules/activate/services/vlmExtractionService.ts` | VLM data extraction |
