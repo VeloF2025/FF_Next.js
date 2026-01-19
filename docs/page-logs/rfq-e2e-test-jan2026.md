@@ -64,6 +64,32 @@ Complete E2E testing of RFQ creation workflow in both Dark Mode and Light Mode. 
   ```
 - **Status:** FIXED
 
+### 6. RFQ List Page - Incorrect Background Color (Dark Mode)
+- **Symptom:** RFQ list page had lighter purple/gray background (`#334155`) while Suppliers page had correct dark background (`#0f172a`)
+- **Root Cause:** Page wrapper used `min-h-screen bg-[var(--ff-bg-tertiary)]` which applies a lighter slate color
+- **Fix:** Removed the gray wrapper, changed to simple `p-6 space-y-6` layout matching Suppliers page
+- **File:** `pages/procurement/rfq/index.tsx:67-84`
+- **Before:**
+  ```tsx
+  <AppLayout>
+    <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        ...
+      </div>
+    </div>
+  </AppLayout>
+  ```
+- **After:**
+  ```tsx
+  <AppLayout>
+    <div className="p-6 space-y-6">
+      ...
+    </div>
+  </AppLayout>
+  ```
+- **Commit:** `596fd1b5 fix(rfq): remove gray background wrapper for dark mode consistency`
+- **Status:** FIXED & DEPLOYED
+
 ---
 
 ## Test Verification
