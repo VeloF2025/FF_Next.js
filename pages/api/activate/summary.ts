@@ -86,7 +86,8 @@ export default async function handler(
            photos_metadata,
            ont_serial_scanned,
            ups_serial_scanned,
-           final_qa_decision,
+           qa_decision,
+           qa_decision_notes,
            feedback_message,
            feedback_sent_at,
            reviewed_at,
@@ -128,7 +129,7 @@ export default async function handler(
       pool.query(
         `SELECT
            user_name,
-           user_phone,
+           sender_phone,
            project
          FROM qa_photo_reviews
          WHERE drop_number = $1
@@ -168,7 +169,7 @@ export default async function handler(
     // Determine current state
     const hasReview = !!unified;
     const hasActivation = !!oes;
-    const hasDecision = !!unified?.final_qa_decision;
+    const hasDecision = !!unified?.qa_decision;
     const currentState = determineState(hasReview, hasActivation, hasDecision);
 
     // Build the summary response
@@ -178,17 +179,17 @@ export default async function handler(
       currentState,
 
       timeline: {
-        installationDate: drop?.installation_date?.toISOString() || null,
-        submittedAt: unified?.created_at?.toISOString() || null,
-        reviewedAt: unified?.reviewed_at?.toISOString() || null,
-        feedbackSentAt: unified?.feedback_sent_at?.toISOString() || null,
-        activationDate: oes?.activation_date || null,
+        installationDate: drop?.installation_date ? String(drop.installation_date) : null,
+        submittedAt: unified?.created_at ? new Date(unified.created_at).toISOString() : null,
+        reviewedAt: unified?.reviewed_at ? new Date(unified.reviewed_at).toISOString() : null,
+        feedbackSentAt: unified?.feedback_sent_at ? new Date(unified.feedback_sent_at).toISOString() : null,
+        activationDate: oes?.activation_date ? String(oes.activation_date) : null,
       },
 
       team: {
         submitter: {
           name: qa?.user_name || null,
-          phone: qa?.user_phone || null,
+          phone: qa?.sender_phone || null,
         },
         installer: {
           name: drop?.installed_by_name || null,
@@ -203,7 +204,7 @@ export default async function handler(
         totalSteps: 10,
         feedbackSent: !!unified?.feedback_sent_at,
         feedbackMessage: unified?.feedback_message || null,
-        decision: (unified?.final_qa_decision as QADecision) || null,
+        decision: (unified?.qa_decision as QADecision) || null,
       },
 
       equipment: {
