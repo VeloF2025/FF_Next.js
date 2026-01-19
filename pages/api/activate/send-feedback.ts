@@ -117,14 +117,15 @@ async function handlePost(
         }
       : undefined;
 
-    const sent = await sendToWhatsApp(groupId, feedbackMessage, replyParams);
+    const sendResult = await sendToWhatsApp(groupId, feedbackMessage, replyParams);
 
-    if (!sent) {
+    if (!sendResult.success) {
       throw new Error('Failed to send message via WhatsApp Bridge');
     }
 
-    // 6. Update database with feedback status
-    await updateFeedbackStatus(dropNumber, feedbackMessage);
+    // 6. Update database with feedback status and store our message ID for future threading
+    // This allows re-reviews to thread off our feedback even if original DR had no message ID
+    await updateFeedbackStatus(dropNumber, feedbackMessage, sendResult.messageId, groupId);
 
     log.info(`Feedback sent successfully for ${dropNumber}`);
 
@@ -184,7 +185,7 @@ function extractPhotoType(photo: Photo): string | null {
 
   // Fallback: parse from filename (DR1234_ph_prop_001.jpg)
   const match = photo.filename.match(/DR\d+_([a-z_]+\d*)_\d+\./i);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 /**
@@ -307,15 +308,21 @@ interface WhatsAppReplyParams {
   quotedContent?: string | null;
 }
 
+interface SendResult {
+  success: boolean;
+  messageId?: string;
+}
+
 /**
  * Send message to WhatsApp via Bridge API
  * Supports threaded replies when replyParams are provided
+ * Returns the sent message ID for future threading
  */
 async function sendToWhatsApp(
   groupId: string,
   message: string,
   replyParams?: WhatsAppReplyParams
-): Promise<boolean> {
+): Promise<SendResult> {
   try {
     // WhatsApp Bridge API endpoint (running on Velocity Server port 8083)
     const bridgeUrl = process.env.WHATSAPP_BRIDGE_URL || 'http://192.168.1.150:8083';
@@ -353,7 +360,7 @@ async function sendToWhatsApp(
         status: response.status,
         error: errorData,
       });
-      return false;
+      return { success: false };
     }
 
     const data = await response.json();
@@ -362,19 +369,22 @@ async function sendToWhatsApp(
       wasThreadedReply: !!(replyParams?.replyToId),
     });
 
-    return true;
+    return { success: true, messageId: data.messageId };
   } catch (error) {
     log.error('Failed to send message via WhatsApp Bridge', { error });
-    return false;
+    return { success: false };
   }
 }
 
 /**
  * Update database with feedback status
+ * Also stores our sent message ID so future re-reviews can thread off it
  */
 async function updateFeedbackStatus(
   dropNumber: string,
-  message: string
+  message: string,
+  sentMessageId?: string,
+  groupJid?: string
 ): Promise<void> {
   try {
     await pool.query(
@@ -384,13 +394,19 @@ async function updateFeedbackStatus(
         feedback_sent = true,
         feedback_message = $1,
         feedback_sent_at = NOW(),
+        -- Store our feedback message ID for future threading (re-reviews)
+        -- Only update if we don't already have an original message ID
+        wa_message_id = COALESCE(wa_message_id, $3),
+        wa_group_jid = COALESCE(wa_group_jid, $4),
         updated_at = NOW()
       WHERE drop_number = $2;
       `,
-      [message, dropNumber]
+      [message, dropNumber, sentMessageId || null, groupJid || null]
     );
 
-    log.info(`Updated feedback status for ${dropNumber}`);
+    log.info(`Updated feedback status for ${dropNumber}`, {
+      storedMessageId: !!sentMessageId,
+    });
   } catch (error) {
     log.error('Failed to update feedback status', { dropNumber, error });
     throw error;
@@ -405,7 +421,7 @@ export default async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   return handlePost(req, res);
