@@ -16,7 +16,7 @@
 --   repeat_fault_escalations -> maintenance_escalations
 --
 -- Enum value changes:
---   ticket_type: 'maintenance' -> 'fault_repair'
+--   type: 'maintenance' -> 'fault_repair'
 --   ticket_status: 'handed_to_maintenance' -> 'handed_to_ops'
 --   owner_type: 'maintenance' -> 'ops'
 --   handover_type: 'qa_to_maintenance' -> 'qa_to_ops', 'maintenance_complete' -> 'ops_complete'
@@ -51,14 +51,42 @@ ALTER TABLE IF EXISTS handover_snapshots RENAME TO maintenance_handover_snapshot
 ALTER TABLE IF EXISTS repeat_fault_escalations RENAME TO maintenance_escalations;
 
 -- =============================================================================
--- STEP 4: UPDATE ENUM VALUES IN DATA
+-- STEP 4: DROP TYPE AND STATUS CHECK CONSTRAINTS (before updating values)
 -- =============================================================================
 
--- Update ticket_type: 'maintenance' -> 'fault_repair'
-UPDATE maintenance_tickets SET ticket_type = 'fault_repair' WHERE ticket_type = 'maintenance';
+-- Drop type check constraint to allow updating values
+ALTER TABLE maintenance_tickets DROP CONSTRAINT IF EXISTS tickets_type_check;
+ALTER TABLE maintenance_tickets DROP CONSTRAINT IF EXISTS maintenance_tickets_type_check;
+
+-- Drop status check constraint to allow updating values
+ALTER TABLE maintenance_tickets DROP CONSTRAINT IF EXISTS tickets_status_check;
+ALTER TABLE maintenance_tickets DROP CONSTRAINT IF EXISTS maintenance_tickets_status_check;
+
+-- =============================================================================
+-- STEP 5: UPDATE ENUM VALUES IN DATA
+-- =============================================================================
+
+-- Update type: 'maintenance' -> 'fault_repair'
+UPDATE maintenance_tickets SET type = 'fault_repair' WHERE type = 'maintenance';
 
 -- Update ticket status: 'handed_to_maintenance' -> 'handed_to_ops'
 UPDATE maintenance_tickets SET status = 'handed_to_ops' WHERE status = 'handed_to_maintenance';
+
+-- =============================================================================
+-- STEP 6: RECREATE TYPE AND STATUS CHECK CONSTRAINTS (with new values)
+-- =============================================================================
+
+-- Recreate type constraint with all existing + new values
+-- Existing DB values: fault, installation, maintenance, other
+-- New TypeScript enum values: fault_repair, new_installation, modification, ont_swap, incident
+ALTER TABLE maintenance_tickets ADD CONSTRAINT maintenance_tickets_type_check
+  CHECK (type IN ('fault', 'fault_repair', 'installation', 'new_installation', 'modification', 'ont_swap', 'incident', 'other'));
+
+-- Recreate status constraint with all existing + new values
+-- Existing DB values: closed, 'in progress', new, 'pending company', resolved, triaged
+-- New TypeScript enum values: open, assigned, in_progress, pending_qa, qa_in_progress, etc.
+ALTER TABLE maintenance_tickets ADD CONSTRAINT maintenance_tickets_status_check
+  CHECK (status IN ('open', 'new', 'assigned', 'in_progress', 'in progress', 'pending_qa', 'qa_in_progress', 'qa_rejected', 'qa_approved', 'pending_handover', 'handed_to_ops', 'handed_to_maintenance', 'closed', 'cancelled', 'pending_parts', 'pending company', 'on_hold', 'qa_ready', 'qa_failed', 'resolved', 'reopened', 'triaged'));
 
 -- Update handover_snapshots owner types: 'maintenance' -> 'ops'
 UPDATE maintenance_handover_snapshots SET from_owner_type = 'ops' WHERE from_owner_type = 'maintenance';
@@ -215,68 +243,73 @@ ALTER INDEX IF EXISTS idx_escalation_created_at RENAME TO idx_maintenance_escala
 ALTER INDEX IF EXISTS idx_escalation_type RENAME TO idx_maintenance_escalation_type;
 
 -- =============================================================================
--- STEP 18: RENAME FOREIGN KEY CONSTRAINTS
+-- STEP 18: RENAME FOREIGN KEY CONSTRAINTS (if they exist)
+-- Note: Using DO blocks to handle missing constraints gracefully
 -- =============================================================================
 
--- Rename FK constraints on maintenance_tickets
-ALTER TABLE maintenance_tickets RENAME CONSTRAINT fk_tickets_created_by TO fk_maintenance_tickets_created_by;
-ALTER TABLE maintenance_tickets RENAME CONSTRAINT fk_tickets_closed_by TO fk_maintenance_tickets_closed_by;
-ALTER TABLE maintenance_tickets RENAME CONSTRAINT fk_tickets_assigned_to TO fk_maintenance_tickets_assigned_to;
+-- FK constraints on maintenance_tickets
+DO $$ BEGIN ALTER TABLE maintenance_tickets RENAME CONSTRAINT fk_tickets_created_by TO fk_maintenance_tickets_created_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_tickets RENAME CONSTRAINT fk_tickets_closed_by TO fk_maintenance_tickets_closed_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_tickets RENAME CONSTRAINT fk_tickets_assigned_to TO fk_maintenance_tickets_assigned_to; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_verification_steps
-ALTER TABLE maintenance_verification_steps RENAME CONSTRAINT fk_verification_steps_ticket TO fk_maintenance_verification_steps_ticket;
-ALTER TABLE maintenance_verification_steps RENAME CONSTRAINT fk_verification_steps_completed_by TO fk_maintenance_verification_steps_completed_by;
+-- FK constraints on maintenance_verification_steps
+DO $$ BEGIN ALTER TABLE maintenance_verification_steps RENAME CONSTRAINT fk_verification_steps_ticket TO fk_maintenance_verification_steps_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_verification_steps RENAME CONSTRAINT fk_verification_steps_completed_by TO fk_maintenance_verification_steps_completed_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_weekly_reports
-ALTER TABLE maintenance_weekly_reports RENAME CONSTRAINT fk_weekly_reports_imported_by TO fk_maintenance_weekly_reports_imported_by;
+-- FK constraints on maintenance_weekly_reports
+DO $$ BEGIN ALTER TABLE maintenance_weekly_reports RENAME CONSTRAINT fk_weekly_reports_imported_by TO fk_maintenance_weekly_reports_imported_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_qcontact_sync_log
-ALTER TABLE maintenance_qcontact_sync_log RENAME CONSTRAINT fk_qcontact_sync_log_ticket TO fk_maintenance_qcontact_sync_log_ticket;
+-- FK constraints on maintenance_qcontact_sync_log
+DO $$ BEGIN ALTER TABLE maintenance_qcontact_sync_log RENAME CONSTRAINT fk_qcontact_sync_log_ticket TO fk_maintenance_qcontact_sync_log_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_whatsapp_notifications
-ALTER TABLE maintenance_whatsapp_notifications RENAME CONSTRAINT fk_whatsapp_notifications_ticket TO fk_maintenance_whatsapp_notifications_ticket;
+-- FK constraints on maintenance_whatsapp_notifications (table may not exist)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'maintenance_whatsapp_notifications') THEN
+    ALTER TABLE maintenance_whatsapp_notifications RENAME CONSTRAINT fk_whatsapp_notifications_ticket TO fk_maintenance_whatsapp_notifications_ticket;
+  END IF;
+EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_attachments
-ALTER TABLE maintenance_attachments RENAME CONSTRAINT fk_ticket_attachments_ticket TO fk_maintenance_attachments_ticket;
-ALTER TABLE maintenance_attachments RENAME CONSTRAINT fk_ticket_attachments_verification_step TO fk_maintenance_attachments_verification_step;
-ALTER TABLE maintenance_attachments RENAME CONSTRAINT fk_ticket_attachments_uploaded_by TO fk_maintenance_attachments_uploaded_by;
+-- FK constraints on maintenance_attachments
+DO $$ BEGIN ALTER TABLE maintenance_attachments RENAME CONSTRAINT fk_ticket_attachments_ticket TO fk_maintenance_attachments_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_attachments RENAME CONSTRAINT fk_ticket_attachments_verification_step TO fk_maintenance_attachments_verification_step; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_attachments RENAME CONSTRAINT fk_ticket_attachments_uploaded_by TO fk_maintenance_attachments_uploaded_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_notes
-ALTER TABLE maintenance_notes RENAME CONSTRAINT fk_ticket_notes_ticket TO fk_maintenance_notes_ticket;
-ALTER TABLE maintenance_notes RENAME CONSTRAINT fk_ticket_notes_created_by TO fk_maintenance_notes_created_by;
+-- FK constraints on maintenance_notes
+DO $$ BEGIN ALTER TABLE maintenance_notes RENAME CONSTRAINT fk_ticket_notes_ticket TO fk_maintenance_notes_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_notes RENAME CONSTRAINT fk_ticket_notes_created_by TO fk_maintenance_notes_created_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_qa_checks
-ALTER TABLE maintenance_qa_checks RENAME CONSTRAINT fk_qa_readiness_checks_ticket TO fk_maintenance_qa_checks_ticket;
-ALTER TABLE maintenance_qa_checks RENAME CONSTRAINT fk_qa_readiness_checks_checked_by TO fk_maintenance_qa_checks_checked_by;
+-- FK constraints on maintenance_qa_checks
+DO $$ BEGIN ALTER TABLE maintenance_qa_checks RENAME CONSTRAINT fk_qa_readiness_checks_ticket TO fk_maintenance_qa_checks_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_qa_checks RENAME CONSTRAINT fk_qa_readiness_checks_checked_by TO fk_maintenance_qa_checks_checked_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_risk_acceptances
-ALTER TABLE maintenance_risk_acceptances RENAME CONSTRAINT fk_qa_risk_acceptances_ticket TO fk_maintenance_risk_acceptances_ticket;
-ALTER TABLE maintenance_risk_acceptances RENAME CONSTRAINT fk_qa_risk_acceptances_accepted_by TO fk_maintenance_risk_acceptances_accepted_by;
-ALTER TABLE maintenance_risk_acceptances RENAME CONSTRAINT fk_qa_risk_acceptances_resolved_by TO fk_maintenance_risk_acceptances_resolved_by;
+-- FK constraints on maintenance_risk_acceptances
+DO $$ BEGIN ALTER TABLE maintenance_risk_acceptances RENAME CONSTRAINT fk_qa_risk_acceptances_ticket TO fk_maintenance_risk_acceptances_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_risk_acceptances RENAME CONSTRAINT fk_qa_risk_acceptances_accepted_by TO fk_maintenance_risk_acceptances_accepted_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_risk_acceptances RENAME CONSTRAINT fk_qa_risk_acceptances_resolved_by TO fk_maintenance_risk_acceptances_resolved_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_handover_snapshots
-ALTER TABLE maintenance_handover_snapshots RENAME CONSTRAINT fk_handover_snapshots_ticket TO fk_maintenance_handover_snapshots_ticket;
-ALTER TABLE maintenance_handover_snapshots RENAME CONSTRAINT fk_handover_snapshots_handover_by TO fk_maintenance_handover_snapshots_handover_by;
+-- FK constraints on maintenance_handover_snapshots
+DO $$ BEGIN ALTER TABLE maintenance_handover_snapshots RENAME CONSTRAINT fk_handover_snapshots_ticket TO fk_maintenance_handover_snapshots_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_handover_snapshots RENAME CONSTRAINT fk_handover_snapshots_handover_by TO fk_maintenance_handover_snapshots_handover_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
--- Rename FK constraints on maintenance_escalations
-ALTER TABLE maintenance_escalations RENAME CONSTRAINT fk_repeat_fault_escalations_ticket TO fk_maintenance_escalations_ticket;
-ALTER TABLE maintenance_escalations RENAME CONSTRAINT fk_repeat_fault_escalations_resolved_by TO fk_maintenance_escalations_resolved_by;
+-- FK constraints on maintenance_escalations
+DO $$ BEGIN ALTER TABLE maintenance_escalations RENAME CONSTRAINT fk_repeat_fault_escalations_ticket TO fk_maintenance_escalations_ticket; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE maintenance_escalations RENAME CONSTRAINT fk_repeat_fault_escalations_resolved_by TO fk_maintenance_escalations_resolved_by; EXCEPTION WHEN undefined_object OR undefined_table THEN NULL; END $$;
 
 -- =============================================================================
--- STEP 19: UPDATE TABLE COMMENTS
+-- STEP 19: UPDATE TABLE COMMENTS (for tables that exist)
 -- =============================================================================
 
-COMMENT ON TABLE maintenance_tickets IS 'Core maintenance ticket table for managing fiber network issues, faults, and maintenance requests';
-COMMENT ON TABLE maintenance_attachments IS 'File attachments and evidence photos for maintenance tickets';
-COMMENT ON TABLE maintenance_notes IS 'Internal and client notes for maintenance tickets';
-COMMENT ON TABLE maintenance_verification_steps IS '12-step verification checklist for maintenance ticket completion and QA approval';
-COMMENT ON TABLE maintenance_weekly_reports IS 'Weekly report import batch tracking for maintenance tickets';
-COMMENT ON TABLE maintenance_qcontact_sync_log IS 'QContact bidirectional sync audit log for maintenance tickets';
-COMMENT ON TABLE maintenance_guarantee_periods IS 'Project-specific guarantee period configuration for maintenance tickets';
-COMMENT ON TABLE maintenance_whatsapp_notifications IS 'WhatsApp notification delivery tracking for maintenance tickets';
-COMMENT ON TABLE maintenance_qa_checks IS 'Pre-QA validation checks to ensure maintenance tickets are ready for QA review';
-COMMENT ON TABLE maintenance_risk_acceptances IS 'QA risk acceptances for conditional approvals with documented exceptions';
-COMMENT ON TABLE maintenance_handover_snapshots IS 'Immutable snapshots of maintenance ticket state at handover points (Build -> QA -> Ops)';
-COMMENT ON TABLE maintenance_escalations IS 'Tracks repeat fault patterns and escalations to infrastructure-level tickets';
+DO $$ BEGIN COMMENT ON TABLE maintenance_tickets IS 'Core maintenance ticket table for managing fiber network issues, faults, and maintenance requests'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_attachments IS 'File attachments and evidence photos for maintenance tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_notes IS 'Internal and client notes for maintenance tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_verification_steps IS '12-step verification checklist for maintenance ticket completion and QA approval'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_weekly_reports IS 'Weekly report import batch tracking for maintenance tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_qcontact_sync_log IS 'QContact bidirectional sync audit log for maintenance tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_guarantee_periods IS 'Project-specific guarantee period configuration for maintenance tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_whatsapp_notifications IS 'WhatsApp notification delivery tracking for maintenance tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_qa_checks IS 'Pre-QA validation checks to ensure maintenance tickets are ready for QA review'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_risk_acceptances IS 'QA risk acceptances for conditional approvals with documented exceptions'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_handover_snapshots IS 'Immutable snapshots of maintenance ticket state at handover points (Build -> QA -> Ops)'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
+DO $$ BEGIN COMMENT ON TABLE maintenance_escalations IS 'Tracks repeat fault patterns and escalations to infrastructure-level tickets'; EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
 COMMIT;
