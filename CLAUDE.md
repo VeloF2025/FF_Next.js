@@ -233,106 +233,82 @@ nano /opt/wa-monitor/prod/config/projects.yaml
 
 ## Activate Module (Activations Hub)
 
-**Status:** ✅ ACTIVE MODULE - VLM-powered photo categorization
+**Status:** ✅ PRODUCTION - VLM-powered photo categorization with 5-phase QA Wizard
 
 ### Overview
-Unified system for DR (Drop Receipt) photo review with AI-powered categorization using Qwen3 VLM running on the Velocity Server.
+Unified system for DR (Drop Receipt) photo review with AI-powered categorization using Qwen3 VLM, 5-phase QA Wizard, comprehensive reporting, and WhatsApp integration.
 
 ### Quick Reference
-- **Dashboard:** `/activate`
+- **Dashboard:** `/activate` (DR Summary landing tab)
+- **QA Centre:** `/activate/qa-centre`
 - **Monitoring:** `/activate/monitoring`
-- **Review Page:** `/activate/[dropNumber]`
+- **Review Page:** `/activate/[dropNumber]` (5-phase wizard)
 - **API Prefix:** `/api/activate/*`
-- **Table:** `foto_ai_reviews`
+- **Main Table:** `dr_photo_unified_reviews`
 - **VLM:** Qwen3 via VLLM on 100.96.203.105:8100
+- **WA Feedback:** Port 8090 on 100.96.203.105
 
 ### Key Features
-1. **AI Categorization:** Qwen3 VLM analyzes photos against 10-step checklist
-2. **Tab-Based UI:** DR List tab + Manual Entry tab
-3. **System Health Dashboard:** Monitors DB, OneMap, VLM, WhatsApp services
-4. **WhatsApp Feedback:** Send review results to project WhatsApp groups
-5. **Retry Queue:** Failed categorizations auto-queue for retry
+1. **5-Phase QA Wizard:** Prerequisites → Photo Review → Data Validation → Final Decision → Feedback
+2. **AI Categorization:** Qwen3 VLM categorizes photos to 10-step checklist
+3. **Data Extraction:** VLM extracts power meter dBm, ONT serials, DR numbers
+4. **Comprehensive Reporting:** 8 report types (Trends, Funnel, Team, Serial Validation, etc.)
+5. **WhatsApp Integration:** Threaded acknowledgments + QA feedback
+6. **HITL Learning:** Human corrections stored for few-shot prompting
 
-### API Endpoints
+### Tab-Based UI
+| Tab | Purpose |
+|-----|---------|
+| **DR Summary** | Landing page - Project stats with Zone/PON drill-down |
+| **QA Centre** | DR list with filters, pagination, export |
+| **Reports** | 8 report types with date/project filters |
+| **OES Import** | Import OES Excel activation reports |
+| **Manual Entry** | Add DRs manually |
+
+### 5-Phase QA Wizard
+| Phase | Name | Purpose |
+|-------|------|---------|
+| 1 | Prerequisites | Validate photos, categorization, step coverage |
+| 2 | Photo Review | Review and approve photo assignments |
+| 3 | Data Validation | Validate power (-18 to -24 dBm), serial matches |
+| 4 | Final Decision | PASS / FAIL / REWORK_NEEDED with reason codes |
+| 5 | Feedback | Generate and send WhatsApp feedback |
+
+### API Endpoints (Key)
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/activate/health-check` | GET | Service health status |
-| `/api/activate/admin/retry-failed` | GET/POST | Manage failed retries |
-| `/api/activate/categorize-photos` | POST | Trigger VLM categorization |
-| `/api/activate/approve-categorization` | POST | Approve AI results |
-| `/api/activate/process-new-dr` | POST | Process new DR from WA |
-| `/api/activate/dr-acknowledgment` | POST | Get instant acknowledgment data for WA reply |
-| `/api/activate/fetch-photos` | GET | Fetch photos for DR |
-| `/api/activate/send-feedback` | POST | Send WhatsApp feedback |
+| `/api/activate/drops` | GET | Paginated DR list with stats |
+| `/api/activate/summary` | GET | DR summary for detail view |
+| `/api/activate/fetch-photos` | POST | Fetch from OneMap/BOSS |
+| `/api/activate/categorize-photos` | POST | VLM categorization |
+| `/api/activate/extract-data` | POST | VLM data extraction |
+| `/api/activate/validate-prerequisites` | POST | Phase 1 validation |
+| `/api/activate/human-review` | POST | Human corrections |
+| `/api/activate/final-decision` | POST | Phase 4 decision |
+| `/api/activate/send-feedback` | POST | WhatsApp feedback |
+| `/api/activate/reporting/*` | GET | 8 report endpoints |
+| `/api/activate/health-check` | GET | 5-service health |
+| `/api/activate/export` | GET | Excel export |
 
 ### Database Tables
-```sql
--- Main review table
-CREATE TABLE foto_ai_reviews (
-  id UUID PRIMARY KEY,
-  dr_number TEXT NOT NULL,
-  project TEXT,
-  photos JSONB,
-  vlm_categorization JSONB,
-  vlm_status TEXT DEFAULT 'pending',
-  vlm_error TEXT,
-  retry_count INTEGER DEFAULT 0,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
-
--- Migration: scripts/migrations/055_vlm_categorization.sql
-```
-
-### VLM Status Values
-- `pending` - Awaiting categorization
-- `processing` - Currently being analyzed
-- `completed` - Successfully categorized
-- `failed` - Error occurred (check vlm_error)
-- `approved` - Human-approved results
-
-### Key Components
-```
-src/modules/activate/
-├── components/
-│   ├── DrListPage.tsx           # Main page with tabs
-│   ├── UnifiedReviewCard.tsx    # Individual DR review
-│   ├── ManualDREntry.tsx        # Manual DR addition
-│   ├── SystemHealthDashboard.tsx # Health monitoring
-│   └── AICategorizationTab.tsx  # AI results display
-├── services/
-│   └── categorizationVlmService.ts # VLM API calls
-└── types/
-    └── unified.types.ts         # TypeScript interfaces
-```
+- `dr_photo_unified_reviews` - Main review table with QA wizard fields
+- `dr_activity_log` - Event tracking for full lifecycle
+- `qa_correction_examples` - Human corrections for few-shot learning
+- `oes_activations` - OES activation data
+- `qa_photo_reviews` - WhatsApp submissions (source)
 
 ### WhatsApp Integration
 
-**Go WhatsApp Bridge:** Main service for DR processing and acknowledgments
+**Go Bridge:** `/home/louis/whatsapp-bridge-go/`
 ```bash
-# Service location
-/home/louis/whatsapp-bridge-go/main.go
-/home/louis/whatsapp-bridge-go/whatsapp-bridge  # Binary
-
-# Logs
 tail -f /home/louis/whatsapp-bridge-go/bridge.log
-
-# Restart
-ssh velo@100.96.203.105  # Password: velo2026
 echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
-**DR Acknowledgment Flow:**
-When user sends DR to WhatsApp group:
-1. Go bridge detects DR pattern
-2. Calls `/api/activate/dr-acknowledgment` for photo/serial data
-3. Sends threaded reply with photo count, ONT serial, UPS serial
-4. Uses `ContextInfo.QuotedMessage` for proper threading
-
-**Sender Service:** Port 8081 on 100.96.203.105 (for feedback messages)
+**WA Feedback Service:** Port 8090
 ```bash
-curl http://100.96.203.105:8081/health
-echo 'velo2026' | sudo -S systemctl restart whatsapp-sender
+curl http://100.96.203.105:8090/health
+echo 'velo2026' | sudo -S systemctl restart wa-feedback
 ```
 
 **Group Mapping:**
@@ -341,19 +317,19 @@ echo 'velo2026' | sudo -S systemctl restart whatsapp-sender
 - Velo Test: `120363421664266245@g.us`
 - Mamelodi: `120363408849234743@g.us`
 
-### 10-Step Photo Checklist (DR Photo)
-| Step | Label | Description |
-|------|-------|-------------|
-| 1 | House Photo | Property exterior for location verification |
-| 2 | Cable from Pole | Aerial fiber drop from utility pole to house |
-| 3 | Entry Outside | EXTERIOR view of where cable enters building |
-| 4 | Entry Inside | INTERIOR view of cable routing toward ONT |
-| 5 | Wall | Wall surface with mounting bracket before ONT install |
-| 6 | ONT Back | Back panel showing fiber and power cable connections |
-| 7 | Power Meter | Optical power meter display showing dBm reading |
-| 8 | Final Installation | Wide shot of complete setup (ONT + UPS + cables) |
-| 9 | Green Lights | Front panel of ONT with illuminated indicator lights |
-| 10 | Signature | Customer signature on completion form |
+### 10-Step Photo Checklist
+| Step | Label | OneMap Types |
+|------|-------|--------------|
+| 1 | House Photo | `ph_prop` |
+| 2 | Cable from Pole | `ph_pole`, `ph_outs` |
+| 3 | Entry Outside | `ph_entry_out`, `ph_hm_ln` |
+| 4 | Entry Inside | `ph_entry_in`, `ph_hm_en` |
+| 5 | Wall | `ph_wall` |
+| 6 | ONT Back | `ph_ont`, `ph_drop`, `ph_cbl_r`, `ph_bl` |
+| 7 | Power Meter | `ph_powm`, `ph_powm1`, `ph_powm2` |
+| 8 | Final Installation | `ph_after`, `ph_final` |
+| 9 | Green Lights | `ph_lights`, `ph_led` |
+| 10 | Signature | `ph_sign1`, `ph_sign2`, `ph_signature` |
 
 ### Troubleshooting
 
@@ -361,22 +337,15 @@ echo 'velo2026' | sudo -S systemctl restart whatsapp-sender
 ```bash
 ssh velo@100.96.203.105  # Password: velo2026
 echo 'velo2026' | sudo -S systemctl status vllm-qwen.service
-echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
-# Restart: /home/velo/scripts/vllm/startup.sh
+/home/velo/scripts/vllm/startup.sh  # Restart
 ```
 
 **Photos not categorizing:**
 1. Check health dashboard: `/activate/monitoring`
-2. Review failed queue via admin/retry-failed API
-3. Check vlm_error in foto_ai_reviews table
+2. Review failed queue: `/api/activate/admin/retry-failed`
+3. Check `vlm_error` in `dr_photo_unified_reviews`
 
-**Routing Issues:**
-- Dynamic route `[dropNumber].tsx` may catch static routes
-- Always create explicit Pages Router files for static routes (like monitoring.tsx)
-
-**Full Documentation:**
-- `/home/hein/Downloads/DR_PHOTO_UNIFIED_WA_INTEGRATION.md`
-- `src/modules/activate/README.md`
+**Full Documentation:** `src/modules/activate/README.md`
 
 ## QA Learning Module (HITL Few-Shot)
 

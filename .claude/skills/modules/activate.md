@@ -1,17 +1,20 @@
 # Activate Module Skill
 
-Comprehensive guide for the Activate (DR Photo Unified) system - AI-powered photo review with WhatsApp integration.
+Comprehensive guide for the Activate (DR Photo Unified) system - AI-powered photo review with 5-phase QA Wizard and WhatsApp integration.
 
 ## Purpose
 
 Handle all Activate module operations:
-1. DR photo review and AI categorization
-2. System health monitoring (5 services)
-3. WhatsApp acknowledgments and feedback
-4. OES import integration
-5. **Dashboard** - Expandable Project → Zone → PON breakdown
-6. **Reports** - Discrepancy, serial validation, user/team attribution
-7. Troubleshooting and diagnostics
+1. **5-Phase QA Wizard** - Prerequisites → Photo Review → Data Validation → Final Decision → Feedback
+2. DR photo review and AI categorization
+3. VLM data extraction (power meter, serial numbers)
+4. System health monitoring (5 services)
+5. WhatsApp acknowledgments and feedback
+6. **DR Summary** - Landing page with Zone/PON drill-down
+7. **QA Centre** - DR list with filters and export
+8. **Reports** - 8 report types (Trends, Funnel, Team, Serial, etc.)
+9. OES import integration
+10. HITL few-shot learning from human corrections
 
 ## Quick Reference
 
@@ -21,18 +24,42 @@ Handle all Activate module operations:
 | **Dashboard URL** | `https://vf.fibreflow.app/activate` |
 | **Production URL** | `https://app.fibreflow.app/activate` |
 | **API Prefix** | `/api/activate/*` |
-| **Database Tables** | `qa_photo_reviews`, `dr_photo_unified_reviews`, `oes_activations` |
+| **Database Tables** | `dr_photo_unified_reviews`, `dr_activity_log`, `qa_correction_examples`, `oes_activations` |
 | **VLM Server** | `http://100.96.203.105:8100` (Qwen3) |
-| **WA Feedback** | `http://100.96.203.105:8090` (wa-feedback service, created Jan 16 2026) |
+| **WA Feedback** | `http://100.96.203.105:8090` (wa-feedback service) |
 | **Go Bridge** | `/home/louis/whatsapp-bridge-go/` |
 
 ### Tab-Based UI
 | Tab | Purpose |
 |-----|---------|
-| **Dashboard** | DR list with filters, stats, expandable Project → Zone → PON breakdown |
-| **Reports** | Discrepancy, serial validation, user/team attribution reports |
+| **DR Summary** | Landing page - Project stats with expandable Zone → PON breakdown |
+| **QA Centre** | DR list with filters, pagination, Excel export |
+| **Reports** | 8 report types: Trends, Funnel, Team, Discrepancy, Serial, Anomaly, User Attribution, Resubmissions |
 | **OES Import** | Import OES Excel activation reports |
 | **Manual Entry** | Add DRs manually |
+
+### 5-Phase QA Wizard
+| Phase | Name | API Endpoint | Purpose |
+|-------|------|--------------|---------|
+| 1 | Prerequisites | `/validate-prerequisites` | Check photos, categorization, step coverage |
+| 2 | Photo Review | `/human-review` | Review and approve photo assignments |
+| 3 | Data Validation | `/extract-data` | Validate power (-18 to -24 dBm), serial matches |
+| 4 | Final Decision | `/final-decision` | PASS / FAIL / REWORK_NEEDED with reason codes |
+| 5 | Feedback | `/send-feedback` | Generate and send WhatsApp feedback |
+
+### QA Decision Values
+| Decision | Meaning |
+|----------|---------|
+| `PASS` | All checks passed, activation approved |
+| `FAIL` | Critical issues, requires re-installation |
+| `REWORK_NEEDED` | Minor issues, technician can fix |
+
+### Fail Reason Codes
+- `MISSING_PHOTOS` - Required step photos missing
+- `SERIAL_MISMATCH` - ONT serial doesn't match OES
+- `POWER_OUT_OF_RANGE` - Not in -18 to -24 dBm range
+- `PHOTO_QUALITY` - Photos too blurry/dark
+- `WRONG_EQUIPMENT` - Wrong ONT/UPS installed
 
 ## Slash Commands
 
@@ -291,24 +318,64 @@ Extract serial with: `/\(S\)([^(]+)/`
 
 ## API Endpoints
 
+### Core Operations
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/activate/health-check` | GET | System health status |
-| `/api/activate/dr-acknowledgment` | POST | Get acknowledgment data |
-| `/api/activate/process-new-dr` | POST | Validate & process new DR |
-| `/api/activate/admin/retry-failed` | POST | Retry failed categorizations |
-| `/api/activate/import-oes` | POST | Import OES Excel data |
-| `/api/activate/export` | GET | Export filtered data to Excel (.xlsx) |
-| `/api/activate/reporting/daily-counts` | GET | Daily DR counts with zone/PON breakdown |
-| `/api/activate/reporting/discrepancy` | GET | WhatsApp vs OES comparison |
-| `/api/activate/reporting/serial-validation` | GET | ONT/UPS serial matching |
-| `/api/activate/reporting/user-attribution` | GET | User/team performance metrics |
+| `/api/activate/[dropNumber]` | GET/PATCH | Fetch or update unified review |
+| `/api/activate/drops` | GET | Paginated DR list with stats |
+| `/api/activate/summary` | GET | DR summary for detail view |
+| `/api/activate/ensure-data` | POST | Ensure DR exists (idempotent) |
+| `/api/activate/export` | GET | Export filtered data to Excel |
+
+### Photo Processing
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/fetch-photos` | POST | Fetch from OneMap/BOSS/local |
+| `/api/activate/categorize-photos` | POST | Run VLM categorization |
+| `/api/activate/check-photos` | POST | Check if photos exist |
+
+### QA Wizard (5 Phases)
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/validate-prerequisites` | POST | Phase 1: Validate prerequisites |
+| `/api/activate/extract-data` | POST | VLM extraction (power, serials) |
+| `/api/activate/validate-qa` | POST | Separate QA validation |
+| `/api/activate/human-review` | POST | Phase 2-3: Human corrections |
+| `/api/activate/final-decision` | POST | Phase 4: Final decision |
+| `/api/activate/approve-categorization` | POST | Approve AI results |
+
+### WhatsApp Integration
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/dr-acknowledgment` | POST | Get ack data for Go Bridge |
+| `/api/activate/process-new-dr` | POST | Process new DR from WhatsApp |
+| `/api/activate/send-feedback` | POST | Phase 5: Send WA feedback |
+
+### Reporting (8 Types)
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/reporting/daily-counts` | GET | Zone/PON breakdown |
+| `/api/activate/reporting/discrepancy` | GET | WA vs OES comparison |
+| `/api/activate/reporting/funnel` | GET | QA workflow funnel |
+| `/api/activate/reporting/resubmissions` | GET | Failed→Passed analysis |
+| `/api/activate/reporting/serial-validation` | GET | Serial matching |
+| `/api/activate/reporting/team-performance` | GET | Team leaderboard |
+| `/api/activate/reporting/trends` | GET | Velocity trends |
+| `/api/activate/reporting/user-attribution` | GET | User attribution |
+
+### System
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/health-check` | GET | 5-service health status |
+| `/api/activate/activity-log` | GET | DR lifecycle events |
+| `/api/activate/admin/retry-failed` | GET/POST | Manage retry queue |
+| `/api/activate/import-oes` | POST | Import OES Excel |
 
 ### Export API Parameters
 - `dateFrom` - Start date (YYYY-MM-DD)
 - `dateTo` - End date (YYYY-MM-DD)
 - `project` - Filter by project (or 'all')
-- `status` - Filter by completion status ('complete', 'incomplete', or 'all')
+- `status` - Filter by status ('reviewed', 'notReviewed', or 'all')
 - `format` - Output format ('json' for JSON, omit for Excel)
 
 ## Dashboard - Expandable Breakdown
@@ -382,30 +449,54 @@ COALESCE(upr.project, p.project_name, 'Unknown') as project
 
 ## Database Schema
 
-### dr_photo_unified_reviews
-```sql
-CREATE TABLE dr_photo_unified_reviews (
-  id UUID PRIMARY KEY,
-  drop_number VARCHAR(20) NOT NULL,
-  project VARCHAR(100),
-  submitted_by VARCHAR(50),
-  agent_phone VARCHAR(20),
-  photos JSONB,
-  vlm_categorization JSONB,
-  vlm_categorization_status TEXT DEFAULT 'pending',
-  vlm_error TEXT,
-  retry_count INTEGER DEFAULT 0,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
-```
+### dr_photo_unified_reviews (Main Table)
+**Core Fields:**
+- `id` (UUID), `drop_number`, `project`, `photo_source`, `photo_count`, `photos_metadata`
+
+**Manual QA (10 steps):**
+- `step_01_house_photo` through `step_10_signature` (boolean)
+- `incorrect_steps` (text[]), `incorrect_comments` (JSONB)
+
+**VLM Categorization:**
+- `vlm_categorization_status` ('pending' | 'categorized' | 'approved')
+- `vlm_categorization_results` (JSONB), `vlm_categorization_at`
+
+**VLM QA Validation:**
+- `vlm_qa_status`, `vlm_qa_results`, `vlm_qa_validated_at`, `vlm_qa_summary`
+
+**Human Review:**
+- `human_qa_overrides` (JSONB), `human_review_status`, `human_reviewer_id`
+
+**QA Decision (Phase 4):**
+- `qa_decision` ('PASS' | 'FAIL' | 'REWORK_NEEDED')
+- `qa_decision_reasons` (JSONB array of fail codes)
+- `qa_decision_at`, `qa_decision_by`, `qa_decision_notes`
+
+**Data Extraction:**
+- `vlm_power_meter_dbm`, `vlm_power_meter_status` ('pass' | 'fail_high' | 'fail_low')
+- `vlm_ont_serial_step6`, `vlm_ont_serial_step9`, `vlm_dr_number_step9`
+- `serial_validation_status` ('match' | 'mismatch' | 'partial')
+
+**QA Phases:**
+- `qa_phase` ('prerequisites' | 'photo_review' | 'data_validation' | 'final_decision' | 'feedback' | 'completed')
+- Phase completion flags: `prerequisites_passed`, `photo_review_completed`, `data_validation_completed`
+
+**Lifecycle:**
+- `whatsapp_submitted_at`, `acknowledged_at`, `photos_fetched_at`
+- `feedback_sent`, `feedback_message`, `feedback_sent_at`
+
+### dr_activity_log
+Event tracking for DR lifecycle: `whatsapp_submitted`, `acknowledged`, `photos_fetched`, `categorization_*`, `qa_*`, `human_review_*`, `feedback_*`, `resubmission`
+
+### qa_correction_examples
+Human corrections for few-shot learning with `workflow_type`, `vlm_predicted_*`, `correct_*`, `is_canonical`
 
 ### VLM Status Values
 - `pending` - Awaiting categorization
 - `processing` - Being analyzed
-- `completed` - Successfully categorized
-- `failed` - Error occurred
+- `categorized` - VLM assigned steps
 - `approved` - Human-approved
+- `failed` - Error occurred
 
 ## SSH Commands Reference
 
@@ -558,25 +649,63 @@ FROM dr_photo_unified_reviews;
 
 ## Component Files
 
+### Main Pages
 | File | Purpose |
 |------|---------|
-| `src/modules/activate/components/DrListPage.tsx` | Main page with tabs, expandable Zone/PON breakdown, Export Excel |
-| `src/modules/activate/components/QaCentrePage.tsx` | QA Centre page + Export Excel button |
+| `src/modules/activate/components/DrListPage.tsx` | Main page with tabs |
+| `src/modules/activate/components/DrSummaryPage.tsx` | DR Summary landing tab |
+| `src/modules/activate/components/QaCentrePage.tsx` | QA Centre with filters + Export |
 | `src/modules/activate/components/SystemHealthDashboard.tsx` | Health monitoring UI |
-| `src/modules/activate/components/OESImportTab.tsx` | OES import UI |
-| `src/modules/activate/components/ManualDREntry.tsx` | Manual DR addition |
-| `src/modules/activate/components/reporting/ReportsTab.tsx` | Reports tab (Discrepancy, Serial Validation, User/Team) |
-| `src/modules/activate/services/reportingService.ts` | Reporting database queries |
-| `src/modules/activate/types/reporting.types.ts` | Reporting TypeScript interfaces |
-| `pages/api/activate/health-check.ts` | Health check API |
-| `pages/api/activate/dr-acknowledgment.ts` | Acknowledgment data API |
-| `pages/api/activate/process-new-dr.ts` | DR validation & processing |
-| `pages/api/activate/import-oes.ts` | OES import API |
-| `pages/api/activate/export.ts` | Excel export API (filtered data) |
-| `pages/api/activate/reporting/daily-counts.ts` | Daily counts report API |
-| `pages/api/activate/reporting/discrepancy.ts` | Discrepancy report API |
-| `pages/api/activate/reporting/serial-validation.ts` | Serial validation API |
-| `pages/api/activate/reporting/user-attribution.ts` | User attribution API |
+
+### QA Wizard (5-Phase)
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/components/wizard/QaWizardContainer.tsx` | Wizard orchestrator |
+| `src/modules/activate/components/wizard/PrerequisitesPhase.tsx` | Phase 1 |
+| `src/modules/activate/components/wizard/PhotoReviewPhase.tsx` | Phase 2 |
+| `src/modules/activate/components/wizard/DataValidationPhase.tsx` | Phase 3 |
+| `src/modules/activate/components/wizard/FinalDecisionPhase.tsx` | Phase 4 |
+| `src/modules/activate/components/wizard/FeedbackPhase.tsx` | Phase 5 |
+
+### Reporting (8 Types)
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/components/reporting/ReportsDashboard.tsx` | Reports container |
+| `src/modules/activate/components/reporting/ReportsTab.tsx` | Reports tab |
+| `src/modules/activate/components/reporting/TrendReports.tsx` | Velocity trends |
+| `src/modules/activate/components/reporting/FunnelReports.tsx` | Workflow funnel |
+| `src/modules/activate/components/reporting/TeamReports.tsx` | Team leaderboard |
+| `src/modules/activate/components/reporting/AnomalyReports.tsx` | WA-only/OES-only |
+
+### Services
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/services/activateDataService.ts` | Main data fetching |
+| `src/modules/activate/services/reportingService.ts` | Report queries |
+| `src/modules/activate/services/categorizationVlmService.ts` | VLM categorization |
+| `src/modules/activate/services/vlmExtractionService.ts` | VLM data extraction |
+| `src/modules/activate/services/vlmQaValidationService.ts` | VLM QA validation |
+| `src/modules/activate/services/activityLogService.ts` | Event logging |
+| `src/modules/activate/services/photoFetchService.ts` | Photo fetching |
+
+### Types
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/types/unified.types.ts` | Core types |
+| `src/modules/activate/types/summary.types.ts` | Summary types |
+| `src/modules/activate/types/reporting.types.ts` | Report types |
+
+### Context & Hooks
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/context/ActivateDataContext.tsx` | Shared state with auto-refresh |
+| `src/modules/activate/hooks/useUnifiedReview.ts` | Single DR review hook |
+| `src/modules/activate/hooks/useAutoRefresh.ts` | Auto-refresh hook |
+
+### Utilities
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/utils/stepMapper.ts` | Photo type → step mapping |
 
 ## WhatsApp Group Mapping
 

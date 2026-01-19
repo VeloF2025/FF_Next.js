@@ -1,0 +1,363 @@
+# Activate Module (DR Photo Unified)
+
+**Status:** PRODUCTION - VLM-powered photo categorization with 5-phase QA Wizard
+
+## Overview
+
+Unified system for DR (Drop Receipt) photo review with:
+- AI-powered categorization using Qwen3 VLM
+- 5-phase QA Wizard workflow
+- WhatsApp integration for acknowledgments and feedback
+- Comprehensive reporting and analytics
+- HITL (Human-in-the-Loop) few-shot learning
+
+## Quick Reference
+
+| Setting | Value |
+|---------|-------|
+| **Dashboard URL** | `/activate` |
+| **QA Centre** | `/activate/qa-centre` |
+| **Monitoring** | `/activate/monitoring` |
+| **API Prefix** | `/api/activate/*` |
+| **Main Table** | `dr_photo_unified_reviews` |
+| **VLM Server** | `http://100.96.203.105:8100` (Qwen3) |
+| **WA Feedback** | `http://100.96.203.105:8090` |
+
+## Tab-Based UI
+
+| Tab | Purpose |
+|-----|---------|
+| **DR Summary** | Landing page - Project stats with Zone/PON drill-down |
+| **QA Centre** | DR list for review with filters and pagination |
+| **Reports** | 7 report types (Trends, Funnel, Team, etc.) |
+| **OES Import** | Import OES Excel activation reports |
+| **Manual Entry** | Add DRs manually |
+
+## 5-Phase QA Wizard
+
+When reviewing a DR (`/activate/[dropNumber]`), users go through:
+
+| Phase | Name | Purpose |
+|-------|------|---------|
+| 1 | Prerequisites | Validate photos fetched, categorized, step coverage |
+| 2 | Photo Review | Review and approve photo categorizations |
+| 3 | Data Validation | Validate power meter, serial numbers |
+| 4 | Final Decision | PASS / FAIL / REWORK_NEEDED with reason codes |
+| 5 | Feedback | Generate and send WhatsApp feedback |
+
+### QA Decision Values
+- `PASS` - All checks passed
+- `FAIL` - Critical issues found
+- `REWORK_NEEDED` - Minor issues, needs rework
+
+### Fail Reason Codes
+- `MISSING_PHOTOS` - Required photos missing
+- `SERIAL_MISMATCH` - ONT serial doesn't match OES
+- `POWER_OUT_OF_RANGE` - Power meter not in -18 to -24 dBm
+- `PHOTO_QUALITY` - Photos too blurry/dark
+- `WRONG_EQUIPMENT` - Wrong ONT/UPS installed
+
+## 10-Step Photo Checklist
+
+| Step | Label | OneMap Types | Description |
+|------|-------|--------------|-------------|
+| 1 | House Photo | `ph_prop` | Property exterior |
+| 2 | Cable from Pole | `ph_pole`, `ph_outs` | Aerial fiber drop |
+| 3 | Entry Outside | `ph_entry_out`, `ph_hm_ln` | Cable entry point (exterior) |
+| 4 | Entry Inside | `ph_entry_in`, `ph_hm_en` | Cable entry point (interior) |
+| 5 | Wall | `ph_wall` | Wall mounting location |
+| 6 | ONT Back | `ph_ont`, `ph_drop`, `ph_cbl_r`, `ph_bl` | Back panel connections |
+| 7 | Power Meter | `ph_powm`, `ph_powm1`, `ph_powm2` | dBm reading display |
+| 8 | Final Installation | `ph_after`, `ph_final` | Complete setup overview |
+| 9 | Green Lights | `ph_lights`, `ph_led` | Active indicator lights |
+| 10 | Signature | `ph_sign1`, `ph_sign2`, `ph_signature` | Customer signature |
+
+**Note:** Steps 11 & 12 are scanned barcodes (ONT/UPS serial), not photos.
+
+## API Endpoints
+
+### Core Operations
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/[dropNumber]` | GET/PATCH | Fetch or update unified review |
+| `/api/activate/drops` | GET | Paginated DR list with stats |
+| `/api/activate/summary` | GET | DR summary for detail view |
+| `/api/activate/ensure-data` | POST | Ensure DR exists (idempotent) |
+| `/api/activate/export` | GET | Export filtered data to Excel |
+
+### Photo Processing
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/fetch-photos` | POST | Fetch from OneMap/BOSS/local |
+| `/api/activate/categorize-photos` | POST | Run VLM categorization |
+| `/api/activate/check-photos` | POST | Check if photos exist |
+
+### QA Workflow
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/validate-prerequisites` | POST | Phase 1 validation |
+| `/api/activate/extract-data` | POST | VLM data extraction (power, serials) |
+| `/api/activate/validate-qa` | POST | Separate QA validation |
+| `/api/activate/human-review` | POST | Human QA with corrections |
+| `/api/activate/final-decision` | POST | Phase 4 final decision |
+| `/api/activate/approve-categorization` | POST | Approve AI results |
+
+### WhatsApp Integration
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/dr-acknowledgment` | POST | Get ack data for Go Bridge reply |
+| `/api/activate/process-new-dr` | POST | Process new DR from WhatsApp |
+| `/api/activate/send-feedback` | POST | Send WhatsApp feedback message |
+
+### Reporting
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/reporting/daily-counts` | GET | Zone/PON breakdown |
+| `/api/activate/reporting/discrepancy` | GET | WA vs OES comparison |
+| `/api/activate/reporting/funnel` | GET | QA workflow funnel |
+| `/api/activate/reporting/resubmissions` | GET | Failed→Passed analysis |
+| `/api/activate/reporting/serial-validation` | GET | Serial matching |
+| `/api/activate/reporting/team-performance` | GET | Team leaderboard |
+| `/api/activate/reporting/trends` | GET | Velocity trends |
+| `/api/activate/reporting/user-attribution` | GET | User attribution |
+
+### System
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/health-check` | GET | 5-service health status |
+| `/api/activate/activity-log` | GET | DR lifecycle events |
+| `/api/activate/admin/retry-failed` | GET/POST | Manage retry queue |
+| `/api/activate/import-oes` | POST | Import OES Excel |
+
+## Database Tables
+
+### `dr_photo_unified_reviews` (Main Table)
+
+**Core Fields:**
+- `id` (UUID), `drop_number`, `project`, `photo_source`, `photo_count`, `photos_metadata`
+
+**Manual QA (10 steps):**
+- `step_01_house_photo` through `step_10_signature` (boolean)
+- `incorrect_steps` (text[]), `incorrect_comments` (JSONB)
+
+**VLM Categorization:**
+- `vlm_categorization_status` ('pending' | 'categorized' | 'approved')
+- `vlm_categorization_results` (JSONB), `vlm_categorization_at`
+
+**VLM QA Validation (Separate):**
+- `vlm_qa_status` ('pending' | 'processing' | 'validated' | 'failed')
+- `vlm_qa_results` (JSONB), `vlm_qa_validated_at`, `vlm_qa_summary`
+
+**Human Review:**
+- `human_qa_overrides` (JSONB), `human_review_status`, `human_review_completed_at`, `human_reviewer_id`
+
+**QA Decision:**
+- `qa_decision` ('PASS' | 'FAIL' | 'REWORK_NEEDED')
+- `qa_decision_reasons` (JSONB), `qa_decision_at`, `qa_decision_by`, `qa_decision_notes`
+
+**Data Extraction:**
+- `vlm_power_meter_dbm`, `vlm_power_meter_status`
+- `vlm_ont_serial_step6`, `vlm_ont_serial_step9`, `vlm_dr_number_step9`
+- `serial_validation_status`, `serial_validation_details`
+- `onemap_ont_serial`, `onemap_ups_serial`
+
+**QA Phases:**
+- `qa_phase` ('prerequisites' | 'photo_review' | 'data_validation' | 'final_decision' | 'feedback' | 'completed')
+- `prerequisites_passed`, `prerequisites_checked_at`
+- `photo_review_completed`, `photo_review_completed_at`
+- `data_validation_completed`, `data_validation_completed_at`
+
+**Lifecycle:**
+- `whatsapp_submitted_at`, `acknowledged_at`, `photos_fetched_at`
+- `feedback_sent`, `feedback_message`, `feedback_sent_at`
+
+### `dr_activity_log`
+
+Event tracking for full DR lifecycle:
+- Event types: `whatsapp_submitted`, `acknowledged`, `photos_fetched`, `categorization_started/complete`, `qa_started/complete`, `human_review_started/complete`, `feedback_generated/sent`, `resubmission`
+- Fields: `drop_number`, `event_type`, `event_data` (JSONB), `actor`, `created_at`
+
+### `qa_correction_examples`
+
+Human corrections for few-shot learning:
+- `workflow_type` ('dr_photo' | 'civil_works' | 'optical_works')
+- `vlm_predicted_step`, `vlm_predicted_category`, `vlm_confidence`
+- `correct_step`, `correct_category`, `correction_reason`
+- `is_canonical` (curated examples), `reviewed_count`
+
+### Related Tables
+- `qa_photo_reviews` - WhatsApp submissions (source data)
+- `oes_activations` - OES report data (activation status)
+- `drops` - SOW data (zone_no, pon_no for breakdown)
+
+## Module Structure
+
+```
+src/modules/activate/
+├── components/
+│   ├── DrListPage.tsx              # Main page with tabs
+│   ├── DrSummaryPage.tsx           # DR Summary landing tab
+│   ├── QaCentrePage.tsx            # QA Centre tab
+│   ├── UnifiedReviewCard.tsx       # DR card in list
+│   ├── ManualDREntry.tsx           # Manual DR form
+│   ├── OESImportTab.tsx            # OES import UI
+│   ├── SystemHealthDashboard.tsx   # Health monitoring
+│   ├── RolloutMonitoringDashboard.tsx
+│   ├── PhotoGalleryUnified.tsx     # Photo display
+│   ├── ReviewTab.tsx               # Manual review tab
+│   ├── ActivityTab.tsx             # Activity log tab
+│   ├── AICategorizationTab.tsx     # AI results display
+│   ├── ComparisonTable.tsx         # Data comparison
+│   ├── wizard/
+│   │   ├── QaWizardContainer.tsx   # Wizard orchestrator
+│   │   ├── PrerequisitesPhase.tsx  # Phase 1
+│   │   ├── PhotoReviewPhase.tsx    # Phase 2
+│   │   ├── DataValidationPhase.tsx # Phase 3
+│   │   ├── FinalDecisionPhase.tsx  # Phase 4
+│   │   └── FeedbackPhase.tsx       # Phase 5
+│   └── reporting/
+│       ├── ReportsDashboard.tsx    # Reports container
+│       ├── ReportsTab.tsx          # Reports tab
+│       ├── AnomalyReports.tsx      # WA-only/OES-only
+│       ├── TrendReports.tsx        # Velocity trends
+│       ├── FunnelReports.tsx       # Workflow funnel
+│       ├── TeamReports.tsx         # Team leaderboard
+│       └── shared/
+│           ├── ReportCard.tsx
+│           └── TrendChart.tsx
+├── services/
+│   ├── activateDataService.ts      # Main data fetching
+│   ├── reportingService.ts         # Report queries
+│   ├── unifiedDbService.ts         # DB operations
+│   ├── unifiedVlmService.ts        # AI evaluation
+│   ├── categorizationVlmService.ts # Photo categorization
+│   ├── vlmExtractionService.ts     # Data extraction
+│   ├── vlmQaValidationService.ts   # QA validation
+│   ├── photoFetchService.ts        # Photo fetching
+│   ├── unifiedPhotoService.ts      # Photo handling
+│   ├── oneMapIntegrationService.ts # OneMap API
+│   ├── activityLogService.ts       # Event logging
+│   └── qaAutoFailService.ts        # Auto-fail rules
+├── types/
+│   ├── unified.types.ts            # Core types
+│   ├── summary.types.ts            # Summary types
+│   └── reporting.types.ts          # Report types
+├── hooks/
+│   ├── useUnifiedReview.ts         # Review data hook
+│   └── useAutoRefresh.ts           # Auto-refresh hook
+├── context/
+│   └── ActivateDataContext.tsx     # Shared state
+└── utils/
+    └── stepMapper.ts               # Photo type mapping
+```
+
+## Services
+
+### activateDataService
+Main data fetching for DR list, stats, and pagination.
+
+### reportingService
+Database queries for all 8 report types.
+
+### categorizationVlmService
+VLM categorization with batch processing, confidence scoring, retry logic.
+
+### vlmExtractionService
+Data extraction: power meter dBm, ONT serials, DR numbers.
+
+### vlmQaValidationService
+Separate QA validation per photo against FiberTime spec.
+
+### activityLogService
+Event logging for full DR lifecycle tracking.
+
+## Context & Hooks
+
+### ActivateDataContext
+- Shared state across all tabs
+- Auto-refresh (30s interval, pauses when hidden)
+- Filtering, pagination, loading states
+
+### useUnifiedReview
+- Fetch/update single DR
+- Step updates, AI evaluation, feedback
+- Lock/unlock for concurrency
+
+## WhatsApp Integration
+
+### Go Bridge (`/home/louis/whatsapp-bridge-go/`)
+- Detects DR pattern in messages
+- Calls `/api/activate/dr-acknowledgment` for photo/serial data
+- Sends threaded reply with photo count, ONT/UPS serials
+
+### WA Feedback Service (Port 8090)
+- Sends QA feedback messages
+- Health: `curl http://100.96.203.105:8090/health`
+
+### Group Mapping
+| Project | Group JID |
+|---------|-----------|
+| Lawley | `120363418298130331@g.us` |
+| Mohadin | `120363421532174586@g.us` |
+| Velo Test | `120363421664266245@g.us` |
+| Mamelodi | `120363408849234743@g.us` |
+
+## Health Monitoring
+
+5-service health check at `/api/activate/health-check`:
+
+1. **Database** - Neon PostgreSQL connectivity
+2. **OneMap** - Photo storage API (192.168.1.150:8003)
+3. **VLM** - Qwen3 server (100.96.203.105:8100)
+4. **WA Bridge** - Inferred from recent DR activity
+5. **WA Feedback** - Sender service (100.96.203.105:8090)
+
+## Troubleshooting
+
+### VLM Not Responding
+```bash
+ssh velo@100.96.203.105  # Password: velo2026
+echo 'velo2026' | sudo -S systemctl status vllm-qwen.service
+/home/velo/scripts/vllm/startup.sh  # Restart
+```
+
+### WA Bridge Issues
+```bash
+ssh velo@100.96.203.105
+tail -f /home/louis/whatsapp-bridge-go/bridge.log
+echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+```
+
+### WA Feedback Not Sending
+```bash
+curl http://100.96.203.105:8090/health
+echo 'velo2026' | sudo -S systemctl restart wa-feedback
+```
+
+### Photos Not Categorizing
+1. Check health dashboard: `/activate/monitoring`
+2. Review failed queue: `/api/activate/admin/retry-failed`
+3. Check `vlm_error` in database
+
+## Migrations
+
+| Migration | Purpose |
+|-----------|---------|
+| `create-foto-ai-reviews-table.sql` | Legacy AI evaluation |
+| `061_qa_review_history.sql` | Historical QA imports |
+| `083_activity_log_and_qa_validation.sql` | Activity log + VLM QA separation |
+| `084_qa_correction_examples.sql` | Few-shot learning |
+| `085_qa_wizard_final_decision.sql` | 5-phase wizard support |
+
+## Related Skills
+
+- `/activate-reporting` - Reporting terminology and queries
+- `/photo-categorization` - Canonical photo type mappings
+- `/whatsapp` - Full WhatsApp infrastructure
+- `/oes` - OES import operations

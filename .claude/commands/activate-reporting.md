@@ -3,6 +3,19 @@
 This skill provides comprehensive reporting and analytics for the Activate module.
 Use when asking about DR stats, field agent performance, project metrics, or activation data.
 
+## 8 Report Types Available
+
+| Report | Endpoint | Purpose |
+|--------|----------|---------|
+| **Daily Counts** | `/reporting/daily-counts` | Zone/PON breakdown by project |
+| **Trends** | `/reporting/trends` | Velocity trends (day/week/month) |
+| **Funnel** | `/reporting/funnel` | QA workflow funnel analysis |
+| **Team Performance** | `/reporting/team-performance` | Team leaderboard |
+| **Discrepancy** | `/reporting/discrepancy` | WA vs OES comparison |
+| **Serial Validation** | `/reporting/serial-validation` | ONT/UPS serial matching |
+| **User Attribution** | `/reporting/user-attribution` | User performance metrics |
+| **Resubmissions** | `/reporting/resubmissions` | Failed→Passed analysis |
+
 ## Terminology (CRITICAL - Consistent Across All Reports)
 
 | Term | Definition | Source Table | Color |
@@ -10,8 +23,8 @@ Use when asking about DR stats, field agent performance, project metrics, or act
 | **Total** | Unique drops counted once at first install/activation | Derived (max of installed/activated) | Gray |
 | **Installed** | DRs submitted via WhatsApp (installation done) | `qa_photo_reviews` | Blue |
 | **Activated** | DRs confirmed on OES activation report (1-day lag) | `oes_activations` | Purple |
-| **Incomplete** | DRs not yet QA reviewed (missing steps/photos) | `dr_photo_unified_reviews` | Yellow |
-| **Complete** | DRs marked complete by HITL or AI (vlm_status='approved') | `dr_photo_unified_reviews` | Green |
+| **Not Reviewed** | DRs not yet QA reviewed | `dr_photo_unified_reviews` (vlm_status != 'approved') | Yellow |
+| **Reviewed** | DRs QA reviewed and approved | `dr_photo_unified_reviews` (vlm_status = 'approved') | Green |
 
 ## Data Flow
 
@@ -134,6 +147,55 @@ FROM wa FULL OUTER JOIN oes ON wa.drop_number = oes.drop_number
 - Matched to WA
 - Match rate %
 
+### 5. Trends Report
+**Endpoint**: `/api/activate/reporting/trends`
+**Purpose**: Velocity trends with configurable grouping
+
+**Query Params:**
+- `dateFrom`, `dateTo`: Date range
+- `groupBy`: 'day' | 'week' | 'month'
+- `project`: Filter by project
+
+**Returns**: Array of time-grouped metrics:
+- Installed count
+- Activated count
+- Reviewed count
+- Pass/Fail/Rework counts
+
+### 6. Funnel Report
+**Endpoint**: `/api/activate/reporting/funnel`
+**Purpose**: QA workflow funnel analysis
+
+**Stages:**
+1. WhatsApp Submitted → Photos Fetched
+2. Photos Fetched → Categorized
+3. Categorized → QA Reviewed
+4. QA Reviewed → Decision Made
+5. Decision Made → Feedback Sent
+
+**Returns**: Count and drop-off % per stage
+
+### 7. Team Performance Report
+**Endpoint**: `/api/activate/reporting/team-performance`
+**Purpose**: Team leaderboard with velocity metrics
+
+**Metrics per Team:**
+- Total installs
+- Activation rate %
+- QA pass rate %
+- Average time to activation
+- Serial compliance %
+
+### 8. Resubmissions Report
+**Endpoint**: `/api/activate/reporting/resubmissions`
+**Purpose**: Failed→Passed analysis
+
+**Tracks:**
+- DRs that failed QA then passed on resubmission
+- Average resubmission count
+- Common fail reasons that get fixed
+- Time between initial fail and pass
+
 ## Common Queries
 
 ### "Which field agent had the most Complete installs?"
@@ -173,32 +235,55 @@ Navigate to `/activate` → Reports tab → Serial Validation → Check "Show mi
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/activate/drops` | GET | Main dashboard data with stats |
+| `/api/activate/summary` | GET | DR summary for detail view |
 | `/api/activate/export` | GET | Export filtered data to Excel (.xlsx) |
+| `/api/activate/health-check` | GET | Service health status (DB, 1M, VLM, WA Bridge, WA Feedback) |
 | `/api/activate/reporting/daily-counts` | GET | Zone/PON breakdown |
+| `/api/activate/reporting/trends` | GET | Velocity trends (day/week/month) |
+| `/api/activate/reporting/funnel` | GET | QA workflow funnel |
+| `/api/activate/reporting/team-performance` | GET | Team leaderboard |
 | `/api/activate/reporting/discrepancy` | GET | WA vs OES comparison |
 | `/api/activate/reporting/serial-validation` | GET | Serial matching |
 | `/api/activate/reporting/user-attribution` | GET | User/team performance |
+| `/api/activate/reporting/resubmissions` | GET | Failed→Passed analysis |
 
 ### Excel Export
 Export button available on Dashboard and QA Centre pages. Exports filtered data to `.xlsx` file.
 - Respects current date range, project, and status filters
-- Includes: DR number, project, submitted date, photo count, 10 steps, VLM status, sender info, activation status
+- Includes: DR number, project, submitted date, photo count, 10 steps, VLM status, sender info, activation status, QA decision
 
 ## Files
 
 ### Types
-- `src/modules/activate/types/reporting.types.ts` - TypeScript interfaces
+- `src/modules/activate/types/reporting.types.ts` - TypeScript interfaces for all 8 reports
+- `src/modules/activate/types/summary.types.ts` - DR Summary types
 
 ### Services
-- `src/modules/activate/services/reportingService.ts` - Database queries
+- `src/modules/activate/services/reportingService.ts` - Database queries for all reports
 - `src/modules/activate/services/activateDataService.ts` - Main data service
 
 ### Components
-- `src/modules/activate/components/reporting/ReportsTab.tsx` - Main reports UI
-- `src/modules/activate/components/DrListPage.tsx` - Dashboard with stats
+- `src/modules/activate/components/DrListPage.tsx` - Main page with all tabs
+- `src/modules/activate/components/DrSummaryPage.tsx` - DR Summary landing tab
+- `src/modules/activate/components/reporting/ReportsDashboard.tsx` - Reports container
+- `src/modules/activate/components/reporting/ReportsTab.tsx` - Report type selection
+- `src/modules/activate/components/reporting/TrendReports.tsx` - Velocity trends chart
+- `src/modules/activate/components/reporting/FunnelReports.tsx` - Workflow funnel
+- `src/modules/activate/components/reporting/TeamReports.tsx` - Team leaderboard
+- `src/modules/activate/components/reporting/AnomalyReports.tsx` - WA-only/OES-only
+
+### API Endpoints
+- `pages/api/activate/reporting/daily-counts.ts` - Zone/PON breakdown
+- `pages/api/activate/reporting/trends.ts` - Velocity trends
+- `pages/api/activate/reporting/funnel.ts` - Workflow funnel
+- `pages/api/activate/reporting/team-performance.ts` - Team leaderboard
+- `pages/api/activate/reporting/discrepancy.ts` - WA vs OES
+- `pages/api/activate/reporting/serial-validation.ts` - Serial matching
+- `pages/api/activate/reporting/user-attribution.ts` - User metrics
+- `pages/api/activate/reporting/resubmissions.ts` - Failed→Passed
 
 ### Context
-- `src/modules/activate/context/ActivateDataContext.tsx` - Shared state
+- `src/modules/activate/context/ActivateDataContext.tsx` - Shared state with auto-refresh
 
 ## Usage Examples
 
