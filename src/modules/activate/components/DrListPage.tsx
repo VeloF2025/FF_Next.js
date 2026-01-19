@@ -1,7 +1,7 @@
 /**
  * Activate Dashboard Component
  * Main entry page for Activate module
- * Shows stats overview and tabs: Dashboard, Reports, OES Import, Manual Entry
+ * Shows stats overview and tabs: Dashboard, Reports, Data Import (OES/ARCH), Manual Entry
  * DR list has moved to QA Centre (/activate/qa-centre)
  *
  * Uses ActivateDataContext for shared state and auto-refresh
@@ -25,7 +25,8 @@ import {
   getYesterdaySAST,
 } from '../context';
 
-type TabType = 'dashboard' | 'reports' | 'oes-import' | 'offline-import' | 'manual-entry';
+type TabType = 'dashboard' | 'reports' | 'data-import' | 'manual-entry';
+type ImportMode = 'oes' | 'arch';
 
 // ============================================================================
 // WRAPPER COMPONENT (Provides Context)
@@ -61,6 +62,7 @@ function DashboardPageContent() {
 
   // Local UI state
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [importMode, setImportMode] = useState<ImportMode>('oes');
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -318,26 +320,15 @@ function DashboardPageContent() {
               Reports
             </button>
             <button
-              onClick={() => setActiveTab('oes-import')}
+              onClick={() => setActiveTab('data-import')}
               className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
-                activeTab === 'oes-import'
+                activeTab === 'data-import'
                   ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
                   : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
-              <FileSpreadsheet className="h-4 w-4" />
-              OES Import
-            </button>
-            <button
-              onClick={() => setActiveTab('offline-import')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
-                activeTab === 'offline-import'
-                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <WifiOff className="h-4 w-4" />
-              Offline Import
+              <Upload className="h-4 w-4" />
+              Data Import
             </button>
             <button
               onClick={() => setActiveTab('manual-entry')}
@@ -759,21 +750,51 @@ function DashboardPageContent() {
           <ReportsDashboard />
         )}
 
-        {/* OES Import Tab Content */}
-        {activeTab === 'oes-import' && (
+        {/* Data Import Tab Content */}
+        {activeTab === 'data-import' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
-            <OESImportTab onImportComplete={() => {
-              refresh();
-            }} />
-          </div>
-        )}
+            {/* Import Mode Toggle */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-1 bg-gray-100 dark:bg-gray-900">
+                <button
+                  onClick={() => setImportMode('oes')}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
+                    importMode === 'oes'
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    OES Import
+                  </div>
+                </button>
+                <button
+                  onClick={() => setImportMode('arch')}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all ${
+                    importMode === 'arch'
+                      ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    ARCH Import
+                  </div>
+                </button>
+              </div>
+            </div>
 
-        {/* Offline Import Tab Content */}
-        {activeTab === 'offline-import' && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
-            <OfflineImportTab onImportComplete={() => {
-              refresh();
-            }} />
+            {/* Import Content based on mode */}
+            {importMode === 'oes' ? (
+              <OESImportTab onImportComplete={() => {
+                refresh();
+              }} />
+            ) : (
+              <OfflineImportTab onImportComplete={() => {
+                refresh();
+              }} />
+            )}
           </div>
         )}
 

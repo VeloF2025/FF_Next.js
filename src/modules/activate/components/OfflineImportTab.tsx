@@ -48,7 +48,7 @@ interface OfflineImportTabProps {
 export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [reportDate, setReportDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0] as string
   );
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -176,10 +176,10 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <WifiOff className="w-5 h-5 text-red-500" />
-          Offline Devices Import
+          ARCH Import
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Import offline device data from network audit reports. Matches against drops and OES activations,
+          Import ARCH (network audit) reports. Matches offline devices against drops and OES activations,
           detects serial mismatches, and creates alerts for long-offline devices.
         </p>
       </div>
