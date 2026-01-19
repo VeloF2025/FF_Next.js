@@ -283,6 +283,17 @@ Event logging for full DR lifecycle tracking.
 - Shared state across all tabs
 - Auto-refresh (30s interval, pauses when hidden)
 - Filtering, pagination, loading states
+- **Server-side search** - searches all records, not just current page
+
+### QA Centre Filters
+| Filter | Behavior |
+|--------|----------|
+| **Search** | Server-side ILIKE on `drop_number` and `project` |
+| **Date Range** | Filters by `submitted_date` or `created_at` |
+| **Status** | installed / activated / not_reviewed / reviewed |
+| **Project** | Dropdown from active projects |
+
+**Important:** Search is server-side (queries all 6000+ drops), not client-side pagination filtering.
 
 ### useUnifiedReview
 - Fetch/update single DR
@@ -345,6 +356,24 @@ echo 'velo2026' | sudo -S systemctl restart wa-feedback
 2. Review failed queue: `/api/activate/admin/retry-failed`
 3. Check `vlm_error` in database
 
+### DRs Showing "Project: Unknown"
+OES-only imports (activations without WhatsApp submission) may show "Unknown" project because OES uses team names, not projects.
+
+**Fix:** Run the OES project mapping migration:
+```bash
+psql $DATABASE_URL -f scripts/migrations/087_oes_project_mapping.sql
+```
+
+**Team to Project Mapping:**
+| Team Prefix | Project |
+|-------------|---------|
+| `law*` | Lawley |
+| `moa*` / `moh*` | Mohadin |
+| `mam*` | Mamelodi |
+| `etw*` | Etwatwa |
+
+**Note:** "Agent: Unknown" is expected for OES imports (no WhatsApp sender phone).
+
 ## Migrations
 
 | Migration | Purpose |
@@ -354,6 +383,7 @@ echo 'velo2026' | sudo -S systemctl restart wa-feedback
 | `083_activity_log_and_qa_validation.sql` | Activity log + VLM QA separation |
 | `084_qa_correction_examples.sql` | Few-shot learning |
 | `085_qa_wizard_final_decision.sql` | 5-phase wizard support |
+| `087_oes_project_mapping.sql` | Assign project to OES imports from team |
 
 ## Related Skills
 
