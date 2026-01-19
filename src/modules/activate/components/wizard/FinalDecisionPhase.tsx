@@ -535,7 +535,7 @@ export function FinalDecisionPhase({
                 value={d}
                 checked={decision === d}
                 onChange={() => setDecision(d)}
-                className="sr-only"
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
               />
               <span className={`font-medium ${decision === d ? getDecisionColor(d) : 'text-gray-700 dark:text-gray-300'}`}>
                 {d === 'REWORK_NEEDED' ? 'REWORK' : d}

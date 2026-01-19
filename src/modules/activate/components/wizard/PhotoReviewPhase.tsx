@@ -554,35 +554,38 @@ export function PhotoReviewPhase({
                     {result.vlm_identified_as}
                   </p>
 
-                  {/* Approval controls */}
+                  {/* Approval controls - always show override dropdown */}
                   <div className="mt-2 flex items-center gap-3">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={isApproved}
-                        onChange={(e) => setPhotoApproval(result.photo_filename, e.target.checked)}
+                        onChange={(e) => setPhotoApproval(result.photo_filename, e.target.checked, overrideStep)}
                         className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                       />
                       <span className="text-xs text-gray-600 dark:text-gray-400">Approve</span>
                     </label>
 
-                    {!isApproved && (
-                      <select
-                        value={overrideStep ?? ''}
-                        onChange={(e) =>
-                          setPhotoApproval(result.photo_filename, false, e.target.value ? parseInt(e.target.value) : undefined)
-                        }
-                        className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
-                      >
-                        <option value="">Override to...</option>
-                        <option value="0">❌ Discard</option>
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
+                    {/* Always show step override dropdown */}
+                    <select
+                      value={overrideStep ?? ''}
+                      onChange={(e) => {
+                        const newStep = e.target.value ? parseInt(e.target.value) : undefined;
+                        setPhotoApproval(result.photo_filename, isApproved, newStep);
+                      }}
+                      className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
+                      title="Override step assignment"
+                    >
+                      <option value="">Step {result.vlm_predicted_step} (AI)</option>
+                      <option value="0">❌ Discard</option>
+                      {Array.from({ length: 10 }, (_, i) => i + 1)
+                        .filter((step) => step !== result.vlm_predicted_step)
+                        .map((step) => (
                           <option key={step} value={step}>
-                            {step}: {STEP_LABELS[step]}
+                            → {step}: {STEP_LABELS[step]}
                           </option>
                         ))}
-                      </select>
-                    )}
+                    </select>
                   </div>
                 </div>
               </div>

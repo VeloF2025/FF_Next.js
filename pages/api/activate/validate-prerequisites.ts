@@ -36,6 +36,7 @@ import {
 
 interface PrerequisitesResponse {
   drNumber: string;
+  project: string | null;
   prerequisites: PrerequisitesResult;
   photosCheck: {
     exists: boolean;
@@ -68,18 +69,19 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
     // 1. Check if photos exist
     const photosCheck = await checkPhotosExist(dropNumber);
 
-    // 2. Get serials from dr_photo_unified_reviews (OneMap synced data via 1Map app)
+    // 2. Get serials and project from dr_photo_unified_reviews (OneMap synced data via 1Map app)
     const drResult = await pool.query(
-      `SELECT ont_serial_scanned, ups_serial_scanned
+      `SELECT ont_serial_scanned, ups_serial_scanned, project
        FROM dr_photo_unified_reviews
        WHERE drop_number = $1
        LIMIT 1`,
       [dropNumber]
     );
 
-    const drData = drResult.rows[0] || { ont_serial_scanned: null, ups_serial_scanned: null };
+    const drData = drResult.rows[0] || { ont_serial_scanned: null, ups_serial_scanned: null, project: null };
     const ontSerial = drData.ont_serial_scanned;
     const upsSerial = drData.ups_serial_scanned;
+    const project = drData.project;
 
     // 3. Validate serial formats
     const ontValid = validateOntSerial(ontSerial);
@@ -116,6 +118,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 
     const response: PrerequisitesResponse = {
       drNumber: dropNumber,
+      project,
       prerequisites,
       photosCheck,
       serialsFromOneMap: {

@@ -100,6 +100,7 @@ export function QaWizardContainer({
   const [dataStatus, setDataStatus] = useState<string | null>(null); // Loading message for data fetch
   const [error, setError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [project, setProject] = useState<string | null>(null);
 
   // Load initial state from API
   useEffect(() => {
@@ -143,6 +144,11 @@ export function QaWizardContainer({
       if (prereqResponse.ok) {
         const prereqData = await prereqResponse.json();
         const result = prereqData.data;
+
+        // Store project name for feedback phase
+        if (result.project) {
+          setProject(result.project);
+        }
 
         setState((prev) => ({
           ...prev,
@@ -461,6 +467,7 @@ export function QaWizardContainer({
         return (
           <FeedbackPhase
             dropNumber={dropNumber}
+            project={project || undefined}
             wizardState={state}
             onComplete={handleFeedbackSent}
             onBack={goToPreviousPhase}
