@@ -165,22 +165,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       log.warn('ExtractData', `Failed to parse photos for ${dropNumber}: ${e}`);
     }
 
-    // Find photos for each extraction step
-    const step6Photo = photos.find((p) => p.step === 6);
-    const step7Photo = photos.find((p) => p.step === 7);
-    // Get ALL Step 9 photos - VLM will try each to find best close-up
+    // Find ALL photos for each extraction step - VLM will try each to find best result
+    const step6Photos = photos.filter((p) => p.step === 6);
+    const step7Photos = photos.filter((p) => p.step === 7);
     const step9Photos = photos.filter((p) => p.step === 9);
 
     // Use full OneMap URLs for extraction (relative URLs don't work in server context)
     const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
     const makeOneMapUrl = (filename: string) => `${ONEMAP_HOST}/api/photo/${dropNumber}/${filename}`;
 
-    log.info('ExtractData', `Found photos: Step6=${step6Photo?.filename || 'none'}, Step7=${step7Photo?.filename || 'none'}, Step9=${step9Photos.length} photos`);
+    log.info('ExtractData', `Found photos: Step6=${step6Photos.length}, Step7=${step7Photos.length}, Step9=${step9Photos.length}`);
 
-    // Run VLM extraction with multiple Step 9 photos
+    // Run VLM extraction with multiple photos per step
     const extraction = await runFullExtraction(dropNumber, {
-      step6Url: step6Photo ? makeOneMapUrl(step6Photo.filename) : undefined,
-      step7Url: step7Photo ? makeOneMapUrl(step7Photo.filename) : undefined,
+      step6Urls: step6Photos.length > 0 ? step6Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
+      step7Urls: step7Photos.length > 0 ? step7Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
       step9Urls: step9Photos.length > 0 ? step9Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
     });
 

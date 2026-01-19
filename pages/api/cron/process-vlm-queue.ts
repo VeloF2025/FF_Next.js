@@ -186,22 +186,22 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
       };
     });
 
-    const step6Photo = photosWithSteps.find((p) => p.step === 6);
-    const step7Photo = photosWithSteps.find((p) => p.step === 7);
-    // Get ALL Step 9 photos - VLM will try each to find best close-up
+    // Get ALL photos for each step - VLM will try each to find best result
+    const step6Photos = photosWithSteps.filter((p) => p.step === 6);
+    const step7Photos = photosWithSteps.filter((p) => p.step === 7);
     const step9Photos = photosWithSteps.filter((p) => p.step === 9);
 
     // Only run extraction if we have at least one of these photos
-    if (step6Photo || step7Photo || step9Photos.length > 0) {
+    if (step6Photos.length > 0 || step7Photos.length > 0 || step9Photos.length > 0) {
       log.info('ProcessVlmQueue', `Extracting data for ${dropNumber}`, {
-        hasStep6: !!step6Photo,
-        hasStep7: !!step7Photo,
+        step6Count: step6Photos.length,
+        step7Count: step7Photos.length,
         step9Count: step9Photos.length,
       });
 
       const extraction = await runFullExtraction(dropNumber, {
-        step6Url: step6Photo ? `${ONEMAP_HOST}/api/photo/${dropNumber}/${step6Photo.filename}` : undefined,
-        step7Url: step7Photo ? `${ONEMAP_HOST}/api/photo/${dropNumber}/${step7Photo.filename}` : undefined,
+        step6Urls: step6Photos.length > 0 ? step6Photos.map(p => `${ONEMAP_HOST}/api/photo/${dropNumber}/${p.filename}`) : undefined,
+        step7Urls: step7Photos.length > 0 ? step7Photos.map(p => `${ONEMAP_HOST}/api/photo/${dropNumber}/${p.filename}`) : undefined,
         step9Urls: step9Photos.length > 0 ? step9Photos.map(p => `${ONEMAP_HOST}/api/photo/${dropNumber}/${p.filename}`) : undefined,
       });
 

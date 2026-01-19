@@ -436,6 +436,106 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
 }
 
 /**
+ * Try extracting power meter reading from multiple photos, return best result
+ */
+export async function extractPowerMeterWithMultiplePhotos(
+  step7Urls: string[]
+): Promise<{ result: PowerMeterExtraction | null; usedUrl: string | null }> {
+  if (step7Urls.length === 0) {
+    return { result: null, usedUrl: null };
+  }
+
+  log.info('VlmExtraction', `Trying ${step7Urls.length} Step 7 photos for power meter extraction`);
+
+  let bestResult: PowerMeterExtraction | null = null;
+  let bestUrl: string | null = null;
+  let bestScore = 0;
+
+  for (const url of step7Urls) {
+    try {
+      const result = await extractPowerMeterReading(url);
+
+      // Score based on success and confidence
+      let score = result.success ? 2 + result.confidence : 0;
+
+      log.debug('VlmExtraction', `Step 7 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, value=${result.value}`);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = result;
+        bestUrl = url;
+      }
+
+      // Stop early if we got a successful high-confidence extraction
+      if (result.success && result.confidence >= 0.9) {
+        log.info('VlmExtraction', `Found high-confidence power meter reading, stopping early`);
+        break;
+      }
+    } catch (error) {
+      log.warn('VlmExtraction', `Failed to extract power meter from ${url}: ${error}`);
+    }
+  }
+
+  if (bestResult?.success) {
+    log.info('VlmExtraction', `Best Step 7 photo: ${bestUrl?.split('/').pop()}, value=${bestResult.value}`);
+  } else {
+    log.warn('VlmExtraction', `No successful power meter extraction from ${step7Urls.length} photos`);
+  }
+
+  return { result: bestResult, usedUrl: bestUrl };
+}
+
+/**
+ * Try extracting ONT serial from multiple Step 6 photos, return best result
+ */
+export async function extractOntSerialWithMultiplePhotos(
+  step6Urls: string[]
+): Promise<{ result: SerialExtraction | null; usedUrl: string | null }> {
+  if (step6Urls.length === 0) {
+    return { result: null, usedUrl: null };
+  }
+
+  log.info('VlmExtraction', `Trying ${step6Urls.length} Step 6 photos for ONT serial extraction`);
+
+  let bestResult: SerialExtraction | null = null;
+  let bestUrl: string | null = null;
+  let bestScore = 0;
+
+  for (const url of step6Urls) {
+    try {
+      const result = await extractOntSerialFromBack(url);
+
+      // Score based on success and confidence
+      let score = result.success ? 2 + result.confidence : 0;
+
+      log.debug('VlmExtraction', `Step 6 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.serial}`);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = result;
+        bestUrl = url;
+      }
+
+      // Stop early if we got a successful high-confidence extraction
+      if (result.success && result.confidence >= 0.9) {
+        log.info('VlmExtraction', `Found high-confidence ONT serial, stopping early`);
+        break;
+      }
+    } catch (error) {
+      log.warn('VlmExtraction', `Failed to extract ONT serial from ${url}: ${error}`);
+    }
+  }
+
+  if (bestResult?.success) {
+    log.info('VlmExtraction', `Best Step 6 photo: ${bestUrl?.split('/').pop()}, serial=${bestResult.serial}`);
+  } else {
+    log.warn('VlmExtraction', `No successful ONT serial extraction from ${step6Urls.length} photos`);
+  }
+
+  return { result: bestResult, usedUrl: bestUrl };
+}
+
+/**
  * Try extracting Step 9 data from multiple photos, return best result
  * Tries each photo until successful extraction or exhausts all photos
  */
@@ -495,11 +595,18 @@ export async function extractStep9WithMultiplePhotos(
  * Run full extraction for a DR
  *
  * @param drNumber - DR number being processed
- * @param photos - Map of step number to photo URL(s)
+ * @param photos - Map of step number to photo URL(s) - arrays preferred for better extraction
  */
 export async function runFullExtraction(
   drNumber: string,
-  photos: { step6Url?: string; step7Url?: string; step9Url?: string; step9Urls?: string[] }
+  photos: {
+    step6Url?: string;
+    step6Urls?: string[];
+    step7Url?: string;
+    step7Urls?: string[];
+    step9Url?: string;
+    step9Urls?: string[];
+  }
 ): Promise<FullExtractionResult> {
   const startTime = Date.now();
   log.info('VlmExtraction', `Running full extraction for ${drNumber}`);
@@ -508,15 +615,25 @@ export async function runFullExtraction(
   let ontSerialStep6: SerialExtraction | null = null;
   let step9: Step9Extraction | null = null;
 
-  // Extract power meter from Step 7
-  if (photos.step7Url) {
+  // Extract power meter from Step 7 - try multiple photos if provided
+  if (photos.step7Urls && photos.step7Urls.length > 0) {
+    const { result } = await extractPowerMeterWithMultiplePhotos(photos.step7Urls);
+    powerMeter = result;
+  } else if (photos.step7Url) {
     powerMeter = await extractPowerMeterReading(photos.step7Url);
+  }
+  if (powerMeter) {
     log.debug('VlmExtraction', `Power meter result: ${powerMeter.success ? powerMeter.value + ' dBm' : 'failed'}`);
   }
 
-  // Extract ONT serial from Step 6 (back)
-  if (photos.step6Url) {
+  // Extract ONT serial from Step 6 (back) - try multiple photos if provided
+  if (photos.step6Urls && photos.step6Urls.length > 0) {
+    const { result } = await extractOntSerialWithMultiplePhotos(photos.step6Urls);
+    ontSerialStep6 = result;
+  } else if (photos.step6Url) {
     ontSerialStep6 = await extractOntSerialFromBack(photos.step6Url);
+  }
+  if (ontSerialStep6) {
     log.debug('VlmExtraction', `ONT serial Step 6: ${ontSerialStep6.success ? ontSerialStep6.serial : 'failed'}`);
   }
 
@@ -524,12 +641,10 @@ export async function runFullExtraction(
   if (photos.step9Urls && photos.step9Urls.length > 0) {
     const { result } = await extractStep9WithMultiplePhotos(photos.step9Urls);
     step9 = result;
-    if (step9) {
-      log.debug('VlmExtraction', `Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
-    }
   } else if (photos.step9Url) {
-    // Fallback to single URL for backward compatibility
     step9 = await extractStep9Data(photos.step9Url);
+  }
+  if (step9) {
     log.debug('VlmExtraction', `Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
   }
 
