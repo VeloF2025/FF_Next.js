@@ -138,9 +138,13 @@ async function handlePost(
 
     return apiResponse.success(res, {
       dropNumber,
-      message: feedbackMessage,
+      message: messageWithMention, // Return the actual message sent (with @mention if applicable)
       sent: true,
       sentAt: new Date().toISOString(),
+      threading: {
+        hadThreading: !!replyParams,
+        hadMention: !!review.wa_sender_jid,
+      },
     });
   } catch (error) {
     log.error('Error sending feedback:', error);
