@@ -703,15 +703,13 @@ function QaCentrePageContent() {
           ) : (
             <div className="p-4">
               {/* Table Header */}
-              <div className="grid grid-cols-[80px_100px_70px_70px_1fr_80px_70px_1fr] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-300 dark:border-gray-600 mb-2">
+              <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-300 dark:border-gray-600 mb-2">
                 <span>Project</span>
                 <span>DR</span>
                 <span>Installed</span>
                 <span>Activated</span>
-                <span></span>
-                <span className="text-center">QA Status</span>
-                <span className="text-center">Outcome</span>
-                <span className="text-right">ONT / UPS Serials & Issues</span>
+                <span className="text-center">QA Status / Outcome</span>
+                <span className="text-right">ONT / UPS Issues</span>
               </div>
 
               {/* Table Rows */}
@@ -745,7 +743,7 @@ function QaCentrePageContent() {
                     if (isSwapped) return { label: 'Swap', color: 'bg-red-700 text-red-100' };
                     if (status === 'missing') return { label: 'Missing', color: 'bg-yellow-700 text-yellow-100' };
                     if (status === 'invalid') return { label: 'Invalid', color: 'bg-orange-700 text-orange-100' };
-                    if (status === 'valid') return { label: '✓', color: 'text-green-400' };
+                    if (status === 'valid') return null; // Don't show badge for valid
                     return null;
                   };
 
@@ -760,8 +758,8 @@ function QaCentrePageContent() {
                       onClick={() => handleSelectDr(drop.dropNumber)}
                       className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
                     >
-                      {/* Row 1: Main data grid */}
-                      <div className="grid grid-cols-[80px_100px_70px_70px_1fr_80px_70px_1fr] gap-2 items-center text-xs mb-1">
+                      {/* Row 1: Project | DR | Installed | Activated | [CENTER: QA Status | Outcome] | [RIGHT: Issues] */}
+                      <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 items-center text-xs mb-1">
                         {/* Project */}
                         <span className="truncate">
                           <ProjectBadge project={drop.project} />
@@ -782,44 +780,36 @@ function QaCentrePageContent() {
                           {drop.isActivated && drop.oesActivationDate ? formatDate(drop.oesActivationDate) : '-'}
                         </span>
 
-                        {/* Spacer */}
-                        <span></span>
-
-                        {/* QA Status */}
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-center ${qaStatus.color}`}>
-                          {qaStatus.label}
-                        </span>
-
-                        {/* Outcome */}
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-center ${outcome.color}`}>
-                          {outcome.label}
-                        </span>
-
-                        {/* ONT / UPS Serials & Issues */}
-                        <div className="flex items-center justify-end gap-4 font-mono text-[11px]">
-                          <span className="flex items-center gap-1">
-                            <span className="text-blue-400 font-semibold">ONT:</span>
-                            <span className="text-gray-300 truncate max-w-[120px]">{drop.ontSerial || '-'}</span>
-                            {ontIssue && (
-                              <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${ontIssue.color}`}>
-                                {ontIssue.label}
-                              </span>
-                            )}
+                        {/* CENTER: QA Status | Outcome */}
+                        <div className="flex items-center justify-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${qaStatus.color}`}>
+                            {qaStatus.label}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <span className="text-purple-400 font-semibold">UPS:</span>
-                            <span className="text-gray-300 truncate max-w-[140px]">{drop.upsSerial || '-'}</span>
-                            {upsIssue && (
-                              <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${upsIssue.color}`}>
-                                {upsIssue.label}
-                              </span>
-                            )}
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${outcome.color}`}>
+                            {outcome.label}
                           </span>
+                        </div>
+
+                        {/* RIGHT: ONT / UPS Issues */}
+                        <div className="flex items-center justify-end gap-2 text-[10px]">
+                          {ontIssue && (
+                            <span className={`px-1.5 py-0.5 rounded font-bold ${ontIssue.color}`}>
+                              ONT: {ontIssue.label}
+                            </span>
+                          )}
+                          {upsIssue && (
+                            <span className={`px-1.5 py-0.5 rounded font-bold ${upsIssue.color}`}>
+                              UPS: {upsIssue.label}
+                            </span>
+                          )}
+                          {!ontIssue && !upsIssue && (
+                            <span className="text-green-400">✓</span>
+                          )}
                         </div>
                       </div>
 
-                      {/* Row 2: Technician WA ID | Photos */}
-                      <div className="grid grid-cols-[80px_100px_1fr] gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+                      {/* Row 2: Tech ID | Photos | [empty] | [RIGHT: ONT serial | UPS serial] */}
+                      <div className="grid grid-cols-[70px_95px_1fr_160px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
                         <span className="font-medium text-gray-600 dark:text-gray-300 truncate">
                           {formatAgent(drop.senderPhone)}
                         </span>
@@ -827,6 +817,17 @@ function QaCentrePageContent() {
                           📷 {drop.photoCount || 0}
                         </span>
                         <span></span>
+                        {/* RIGHT: Serials */}
+                        <div className="flex items-center justify-end gap-3 font-mono text-[10px]">
+                          <span className="flex items-center gap-1">
+                            <span className="text-blue-400 font-semibold">ONT:</span>
+                            <span className="text-gray-400 truncate max-w-[60px]">{drop.ontSerial || '-'}</span>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="text-purple-400 font-semibold">UPS:</span>
+                            <span className="text-gray-400 truncate max-w-[80px]">{drop.upsSerial || '-'}</span>
+                          </span>
+                        </div>
                       </div>
                     </button>
                   );

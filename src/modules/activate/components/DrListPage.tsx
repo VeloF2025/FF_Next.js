@@ -11,7 +11,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
+import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown, Upload } from 'lucide-react';
 import type { ZoneBreakdown, PonBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
