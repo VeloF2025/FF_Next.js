@@ -742,6 +742,45 @@ NEXT_PUBLIC_APP_URL=http://localhost:3006
 | Velo Test | `120363421664266245@g.us` |
 | Mamelodi | `120363408849234743@g.us` |
 
+## WhatsApp Threading
+
+### How Threading Works
+
+When feedback is sent, it should reply to the original DR submission message.
+
+**Message ID Storage:**
+| Field | Source | Purpose |
+|-------|--------|---------|
+| `wa_message_id` | Go bridge | Original DR message ID for reply threading |
+| `wa_sender_jid` | Go bridge | Original sender JID |
+| `wa_original_text` | Go bridge | Original message text |
+| `wa_group_jid` | Go bridge | WhatsApp group JID |
+
+**Threading Flow:**
+1. User sends DR → Go bridge stores `wa_message_id` in `dr_photo_unified_reviews`
+2. QA review completed → `/send-feedback` called
+3. If `wa_message_id` exists → Send as threaded reply
+4. Our feedback message ID is stored for future threading (re-reviews)
+
+### Historical DRs
+
+DRs created before Jan 2026 don't have `wa_message_id`. For these:
+- First feedback sends as non-threaded message
+- Our feedback message ID is stored in `wa_message_id`
+- Re-reviews thread off our previous feedback
+
+### Serial Validation (Step 6 Priority)
+
+Step 6 (ONT back) is the authoritative serial source because the sticker is clearly visible.
+
+| Scenario | Result |
+|----------|--------|
+| Step 6 matches OneMap | ✅ PASS (ignore Step 9 mismatch) |
+| Step 6 differs, Step 9 matches | ⚠️ PARTIAL (needs review) |
+| Neither matches | ❌ MISMATCH |
+
+**Example:** DR1737336 had Step 6 = `ALCLB48A9CF3` (matches OneMap) but Step 9 = `ALCL146A0CF3` (different). With the new logic, serial validation PASSES.
+
 ## Related Skills
 
 - `/photo-categorization` - **CANONICAL** photo type → step mappings (must reference this for any mapping changes)
