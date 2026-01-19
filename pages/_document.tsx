@@ -28,9 +28,31 @@ const themeInitScript = `
 })();
 `;
 
+// Get build version once at module load time
+function getBuildVersion(): string {
+  // Priority 1: Environment variable
+  if (process.env.NEXT_PUBLIC_BUILD_VERSION) {
+    return process.env.NEXT_PUBLIC_BUILD_VERSION;
+  }
+
+  // Priority 2: Git commit hash
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { execSync } = require('child_process');
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    // Git not available
+  }
+
+  // Priority 3: Static fallback
+  return 'dev';
+}
+
+const BUILD_VERSION = getBuildVersion();
+
 export default function Document() {
-  // Build version for cache busting - changes on every deployment
-  const buildVersion = process.env.NEXT_PUBLIC_BUILD_VERSION || Date.now().toString();
+  // Build version for cache busting - stable per deployment
+  const buildVersion = BUILD_VERSION;
 
   return (
     <Html lang="en" className="dark">
