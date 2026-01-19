@@ -703,13 +703,14 @@ function QaCentrePageContent() {
           ) : (
             <div className="p-4">
               {/* Table Header */}
-              <div className="grid grid-cols-[80px_100px_70px_70px_80px_70px_1fr] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-300 dark:border-gray-600 mb-2">
+              <div className="grid grid-cols-[80px_100px_70px_70px_1fr_80px_70px_1fr] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-300 dark:border-gray-600 mb-2">
                 <span>Project</span>
                 <span>DR</span>
                 <span>Installed</span>
                 <span>Activated</span>
-                <span>QA Status</span>
-                <span>Outcome</span>
+                <span></span>
+                <span className="text-center">QA Status</span>
+                <span className="text-center">Outcome</span>
                 <span className="text-right">ONT / UPS Serials & Issues</span>
               </div>
 
@@ -760,7 +761,7 @@ function QaCentrePageContent() {
                       className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
                     >
                       {/* Row 1: Main data grid */}
-                      <div className="grid grid-cols-[80px_100px_70px_70px_80px_70px_1fr] gap-2 items-center text-xs mb-1">
+                      <div className="grid grid-cols-[80px_100px_70px_70px_1fr_80px_70px_1fr] gap-2 items-center text-xs mb-1">
                         {/* Project */}
                         <span className="truncate">
                           <ProjectBadge project={drop.project} />
@@ -780,6 +781,9 @@ function QaCentrePageContent() {
                         <span className="text-green-400 font-medium">
                           {drop.isActivated && drop.oesActivationDate ? formatDate(drop.oesActivationDate) : '-'}
                         </span>
+
+                        {/* Spacer */}
+                        <span></span>
 
                         {/* QA Status */}
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-center ${qaStatus.color}`}>
