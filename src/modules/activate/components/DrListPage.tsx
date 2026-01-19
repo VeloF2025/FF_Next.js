@@ -11,11 +11,12 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown } from 'lucide-react';
+import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown, WifiOff } from 'lucide-react';
 import type { ZoneBreakdown, PonBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
+import { OfflineImportTab } from './OfflineImportTab';
 import { ReportsDashboard } from './reporting/ReportsDashboard';
 import {
   ActivateDataProvider,
@@ -24,7 +25,7 @@ import {
   getYesterdaySAST,
 } from '../context';
 
-type TabType = 'dashboard' | 'reports' | 'oes-import' | 'manual-entry';
+type TabType = 'dashboard' | 'reports' | 'oes-import' | 'offline-import' | 'manual-entry';
 
 // ============================================================================
 // WRAPPER COMPONENT (Provides Context)
@@ -326,6 +327,17 @@ function DashboardPageContent() {
             >
               <FileSpreadsheet className="h-4 w-4" />
               OES Import
+            </button>
+            <button
+              onClick={() => setActiveTab('offline-import')}
+              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
+                activeTab === 'offline-import'
+                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <WifiOff className="h-4 w-4" />
+              Offline Import
             </button>
             <button
               onClick={() => setActiveTab('manual-entry')}
@@ -751,6 +763,15 @@ function DashboardPageContent() {
         {activeTab === 'oes-import' && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
             <OESImportTab onImportComplete={() => {
+              refresh();
+            }} />
+          </div>
+        )}
+
+        {/* Offline Import Tab Content */}
+        {activeTab === 'offline-import' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
+            <OfflineImportTab onImportComplete={() => {
               refresh();
             }} />
           </div>

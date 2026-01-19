@@ -701,128 +701,133 @@ function QaCentrePageContent() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-2 p-4">
-              {filteredDrops.map((drop) => {
-                // Format dates
-                const formatDate = (dateStr: string | null) => {
-                  if (!dateStr) return '-';
-                  const date = new Date(dateStr);
-                  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-                };
+            <div className="p-4">
+              {/* Table Header */}
+              <div className="grid grid-cols-[80px_100px_70px_70px_80px_70px_1fr] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-300 dark:border-gray-600 mb-2">
+                <span>Project</span>
+                <span>DR</span>
+                <span>Installed</span>
+                <span>Activated</span>
+                <span>QA Status</span>
+                <span>Outcome</span>
+                <span className="text-right">ONT / UPS Serials & Issues</span>
+              </div>
 
-                // Get QA Review Status (Pending vs Reviewed)
-                const getQaReviewStatus = () => {
-                  if (drop.feedbackSent) return { label: 'Reviewed', color: 'bg-green-600 text-white' };
-                  if (drop.qaDecision) return { label: 'Reviewed', color: 'bg-green-600 text-white' };
-                  return { label: 'Pending', color: 'bg-gray-600 text-white' };
-                };
+              {/* Table Rows */}
+              <div className="grid gap-1">
+                {filteredDrops.map((drop) => {
+                  // Format dates
+                  const formatDate = (dateStr: string | null) => {
+                    if (!dateStr) return '-';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                  };
 
-                // Get Outcome badge
-                const getOutcomeBadge = () => {
-                  if (drop.qaDecision === 'PASS') return { label: 'Pass', color: 'bg-green-600 text-white' };
-                  if (drop.qaDecision === 'FAIL') return { label: 'Fail', color: 'bg-red-600 text-white' };
-                  if (drop.qaDecision === 'REWORK_NEEDED') return { label: 'Rework', color: 'bg-orange-600 text-white' };
-                  if (drop.hasMaintenanceTicket) return { label: 'Maint', color: 'bg-amber-700 text-white' };
-                  return null;
-                };
+                  // Get QA Review Status (Pending vs Reviewed)
+                  const getQaReviewStatus = () => {
+                    if (drop.feedbackSent) return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
+                    if (drop.qaDecision) return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
+                    return { label: 'Pending', color: 'bg-gray-600 text-gray-200' };
+                  };
 
-                // Get serial issue indicator
-                const getSerialIssue = (status: SerialValidationStatus, isSwapped: boolean) => {
-                  if (isSwapped) return { label: 'Swap', color: 'bg-red-700 text-red-100' };
-                  if (status === 'missing') return { label: '?', color: 'bg-yellow-700 text-yellow-100' };
-                  if (status === 'invalid') return { label: '!', color: 'bg-orange-700 text-orange-100' };
-                  if (status === 'valid') return { label: '✓', color: 'text-green-500' };
-                  return null;
-                };
+                  // Get Outcome badge
+                  const getOutcomeBadge = () => {
+                    if (drop.qaDecision === 'PASS') return { label: 'Pass', color: 'bg-green-600 text-white' };
+                    if (drop.qaDecision === 'FAIL') return { label: 'Fail', color: 'bg-red-600 text-white' };
+                    if (drop.qaDecision === 'REWORK_NEEDED') return { label: 'Rework', color: 'bg-orange-600 text-white' };
+                    if (drop.hasMaintenanceTicket) return { label: 'Maint', color: 'bg-amber-700 text-white' };
+                    return { label: '-', color: 'text-gray-500' };
+                  };
 
-                const qaStatus = getQaReviewStatus();
-                const outcome = getOutcomeBadge();
-                const ontIssue = getSerialIssue(drop.ontSerialStatus, drop.serialsSwapped);
-                const upsIssue = getSerialIssue(drop.upsSerialStatus, false);
+                  // Get serial issue indicator
+                  const getSerialIssue = (status: SerialValidationStatus, isSwapped: boolean) => {
+                    if (isSwapped) return { label: 'Swap', color: 'bg-red-700 text-red-100' };
+                    if (status === 'missing') return { label: 'Missing', color: 'bg-yellow-700 text-yellow-100' };
+                    if (status === 'invalid') return { label: 'Invalid', color: 'bg-orange-700 text-orange-100' };
+                    if (status === 'valid') return { label: '✓', color: 'text-green-400' };
+                    return null;
+                  };
 
-                return (
-                  <button
-                    key={drop.id}
-                    onClick={() => handleSelectDr(drop.dropNumber)}
-                    className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
-                  >
-                    {/* Row 1: Project | DR | Installed | Activated | QA Status | Outcome | Serials + Issues */}
-                    <div className="flex flex-wrap items-center gap-2 mb-1.5 text-xs">
-                      {/* Project */}
-                      <ProjectBadge project={drop.project} />
+                  const qaStatus = getQaReviewStatus();
+                  const outcome = getOutcomeBadge();
+                  const ontIssue = getSerialIssue(drop.ontSerialStatus, drop.serialsSwapped);
+                  const upsIssue = getSerialIssue(drop.upsSerialStatus, false);
 
-                      {/* DR Number */}
-                      <span className="font-bold text-sm text-gray-900 dark:text-white">
-                        {drop.dropNumber}
-                      </span>
-
-                      {/* Installed Date */}
-                      <span className="px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 font-medium">
-                        {formatDate(drop.submittedDate || drop.createdAt)}
-                      </span>
-
-                      {/* Activated Date */}
-                      {drop.isActivated && drop.oesActivationDate && (
-                        <span className="px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 font-medium">
-                          ✓ {formatDate(drop.oesActivationDate)}
+                  return (
+                    <button
+                      key={drop.id}
+                      onClick={() => handleSelectDr(drop.dropNumber)}
+                      className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
+                    >
+                      {/* Row 1: Main data grid */}
+                      <div className="grid grid-cols-[80px_100px_70px_70px_80px_70px_1fr] gap-2 items-center text-xs mb-1">
+                        {/* Project */}
+                        <span className="truncate">
+                          <ProjectBadge project={drop.project} />
                         </span>
-                      )}
 
-                      {/* Separator */}
-                      <span className="text-gray-600 dark:text-gray-500">|</span>
+                        {/* DR Number */}
+                        <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                          {drop.dropNumber}
+                        </span>
 
-                      {/* QA Review Status */}
-                      <span className={`px-1.5 py-0.5 rounded font-medium ${qaStatus.color}`}>
-                        {qaStatus.label}
-                      </span>
+                        {/* Installed Date */}
+                        <span className="text-blue-400 font-medium">
+                          {formatDate(drop.submittedDate || drop.createdAt)}
+                        </span>
 
-                      {/* Outcome */}
-                      {outcome && (
-                        <span className={`px-1.5 py-0.5 rounded font-semibold ${outcome.color}`}>
+                        {/* Activated Date */}
+                        <span className="text-green-400 font-medium">
+                          {drop.isActivated && drop.oesActivationDate ? formatDate(drop.oesActivationDate) : '-'}
+                        </span>
+
+                        {/* QA Status */}
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-center ${qaStatus.color}`}>
+                          {qaStatus.label}
+                        </span>
+
+                        {/* Outcome */}
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold text-center ${outcome.color}`}>
                           {outcome.label}
                         </span>
-                      )}
 
-                      {/* Spacer to push serials right */}
-                      <span className="flex-1" />
-
-                      {/* ONT Serial + Issue */}
-                      <span className="flex items-center gap-1 font-mono">
-                        <span className="text-blue-400 font-semibold">ONT:</span>
-                        <span className="text-gray-300">{drop.ontSerial || '-'}</span>
-                        {ontIssue && (
-                          <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${ontIssue.color}`}>
-                            {ontIssue.label}
+                        {/* ONT / UPS Serials & Issues */}
+                        <div className="flex items-center justify-end gap-4 font-mono text-[11px]">
+                          <span className="flex items-center gap-1">
+                            <span className="text-blue-400 font-semibold">ONT:</span>
+                            <span className="text-gray-300 truncate max-w-[120px]">{drop.ontSerial || '-'}</span>
+                            {ontIssue && (
+                              <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${ontIssue.color}`}>
+                                {ontIssue.label}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-
-                      {/* UPS Serial + Issue */}
-                      <span className="flex items-center gap-1 font-mono">
-                        <span className="text-purple-400 font-semibold">UPS:</span>
-                        <span className="text-gray-300">{drop.upsSerial || '-'}</span>
-                        {upsIssue && (
-                          <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${upsIssue.color}`}>
-                            {upsIssue.label}
+                          <span className="flex items-center gap-1">
+                            <span className="text-purple-400 font-semibold">UPS:</span>
+                            <span className="text-gray-300 truncate max-w-[140px]">{drop.upsSerial || '-'}</span>
+                            {upsIssue && (
+                              <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${upsIssue.color}`}>
+                                {upsIssue.label}
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                    </div>
+                        </div>
+                      </div>
 
-                    {/* Row 2: Technician WA ID | Photos */}
-                    <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <span>👤</span>
-                        <span className="font-medium text-gray-600 dark:text-gray-300">{formatAgent(drop.senderPhone)}</span>
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span>📷</span>
-                        <span className="font-semibold text-gray-600 dark:text-gray-300">{drop.photoCount || 0}</span>
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+                      {/* Row 2: Technician WA ID | Photos */}
+                      <div className="grid grid-cols-[80px_100px_1fr] gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+                        <span className="font-medium text-gray-600 dark:text-gray-300 truncate">
+                          {formatAgent(drop.senderPhone)}
+                        </span>
+                        <span className="font-medium text-gray-600 dark:text-gray-300">
+                          📷 {drop.photoCount || 0}
+                        </span>
+                        <span></span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
