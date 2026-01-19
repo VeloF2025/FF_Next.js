@@ -39,12 +39,14 @@ import { useAutoRefresh } from '../hooks/useAutoRefresh';
 // ============================================================================
 
 export type StatusFilter = 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed';
+export type QaStatusFilter = 'all' | 'pending' | 'passed' | 'failed' | 'rework';
 
 export interface ActivateFilters {
   searchTerm: string;
   dateFrom: string;
   dateTo: string;
   statusFilter: StatusFilter;
+  qaStatusFilter: QaStatusFilter;
   projectFilter: string;
 }
 
@@ -92,6 +94,7 @@ const defaultFilters: ActivateFilters = {
   dateFrom: getTodaySAST(),
   dateTo: getTodaySAST(),
   statusFilter: 'all',
+  qaStatusFilter: 'all',
   projectFilter: 'all',
 };
 
@@ -171,6 +174,7 @@ export function ActivateDataProvider({
       dateTo: filters.dateTo || undefined,
       project: filters.projectFilter !== 'all' ? filters.projectFilter : undefined,
       status: filters.statusFilter !== 'all' ? filters.statusFilter : undefined,
+      qaStatus: filters.qaStatusFilter !== 'all' ? filters.qaStatusFilter : undefined,
       search: filters.searchTerm.trim() || undefined,
       page: page ?? currentPage,
     }),
@@ -251,7 +255,7 @@ export function ActivateDataProvider({
       fetchData(true, 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.searchTerm]);
+  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.qaStatusFilter, filters.searchTerm]);
 
   // Fetch when page changes
   useEffect(() => {

@@ -15,6 +15,7 @@ import {
   useActivateData,
   getTodaySAST,
   getYesterdaySAST,
+  type QaStatusFilter,
 } from '../context';
 import type {
   QaWizardPhase,
@@ -440,7 +441,7 @@ function QaCentrePageContent() {
   );
 
   const hasActiveFilters = filters.searchTerm || filters.dateFrom || filters.dateTo ||
-    filters.statusFilter !== 'all' || filters.projectFilter !== 'all';
+    filters.statusFilter !== 'all' || filters.qaStatusFilter !== 'all' || filters.projectFilter !== 'all';
 
   if (error) {
     return (
@@ -572,7 +573,7 @@ function QaCentrePageContent() {
 
             {/* Filter Options */}
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 {/* From Date */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -599,21 +600,37 @@ function QaCentrePageContent() {
                   />
                 </div>
 
-                {/* Status Filter */}
+                {/* Install Status Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Status
+                    Install Status
                   </label>
                   <select
                     value={filters.statusFilter}
                     onChange={(e) => updateFilter('statusFilter', e.target.value as 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed')}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="all">All Statuses</option>
-                    <option value="installed">Installed</option>
-                    <option value="activated">Activated</option>
-                    <option value="not_reviewed">Not Reviewed</option>
-                    <option value="reviewed">Reviewed</option>
+                    <option value="all">All</option>
+                    <option value="installed">Installed Only</option>
+                    <option value="activated">Activated Only</option>
+                  </select>
+                </div>
+
+                {/* QA Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    QA Status
+                  </label>
+                  <select
+                    value={filters.qaStatusFilter}
+                    onChange={(e) => updateFilter('qaStatusFilter', e.target.value as QaStatusFilter)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="all">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="passed">Passed</option>
+                    <option value="failed">Failed</option>
+                    <option value="rework">Rework</option>
                   </select>
                 </div>
 
@@ -628,15 +645,17 @@ function QaCentrePageContent() {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="all">All Projects</option>
-                    {projects.map(project => (
-                      <option key={project} value={project}>{project}</option>
-                    ))}
+                    {projects
+                      .filter(project => !['Test', 'Marketing', 'Velo Test', 'test', 'marketing'].includes(project))
+                      .map(project => (
+                        <option key={project} value={project}>{project}</option>
+                      ))}
                   </select>
                 </div>
 
                 {/* Clear Filters Button */}
                 {hasActiveFilters && (
-                  <div className="md:col-span-4 flex justify-end">
+                  <div className="md:col-span-5 flex justify-end">
                     <button
                       onClick={handleClearFilters}
                       className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"

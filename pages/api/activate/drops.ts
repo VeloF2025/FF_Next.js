@@ -149,6 +149,7 @@ async function getPaginatedDrops(
     dateTo?: string;
     project?: string;
     status?: string;
+    qaStatus?: string;
   }
 ): Promise<{ drops: UnifiedDrop[]; pagination: any }> {
   const offset = (page - 1) * pageSize;
@@ -199,6 +200,17 @@ async function getPaginatedDrops(
   } else if (filters?.status === 'installed') {
     // DRs that are NOT in OES activations (installed but not activated)
     conditions.push('NOT EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = u.drop_number)');
+  }
+
+  // QA Status filter - filter by qa_decision field
+  if (filters?.qaStatus === 'pending') {
+    conditions.push('(u.qa_decision IS NULL)');
+  } else if (filters?.qaStatus === 'passed') {
+    conditions.push("u.qa_decision = 'PASS'");
+  } else if (filters?.qaStatus === 'failed') {
+    conditions.push("u.qa_decision = 'FAIL'");
+  } else if (filters?.qaStatus === 'rework') {
+    conditions.push("u.qa_decision = 'REWORK_NEEDED'");
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -672,7 +684,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status } = req.query;
+    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus } = req.query;
 
     // Get single drop by ID
     if (id && typeof id === 'string') {
@@ -713,6 +725,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       dateTo: dateTo && typeof dateTo === 'string' ? dateTo : undefined,
       project: project && typeof project === 'string' ? project : undefined,
       status: status && typeof status === 'string' ? status : undefined,
+      qaStatus: qaStatus && typeof qaStatus === 'string' ? qaStatus : undefined,
     };
 
     const searchTerm = search && typeof search === 'string' ? search : undefined;
@@ -739,7 +752,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pagination: result.pagination,
       meta: {
         timestamp: new Date().toISOString(),
-        filters: (filters.dateFrom || filters.dateTo || filters.project || filters.status) ? filters : null,
+        filters: (filters.dateFrom || filters.dateTo || filters.project || filters.status || filters.qaStatus) ? filters : null,
       },
     });
   } catch (error: any) {
