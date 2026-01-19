@@ -227,43 +227,47 @@ function StatusTimeline({ createdAt, isActivated, oesActivationDate, qaPhase, qa
   };
 
   return (
-    <div className="flex items-center gap-2 flex-wrap mb-2">
-      {/* Always show Installed with WA date */}
-      <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 text-xs font-medium">
-        Installed {formatDate(createdAt)}
-      </span>
-
-      {/* Show Activated when OES date exists */}
-      {isActivated && oesActivationDate && (
-        <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-900/50 text-green-300 text-xs font-medium">
-          Activated {formatDateOnly(oesActivationDate)}
+    <div className="flex items-center justify-between mb-2">
+      {/* Left: Date badges (Installed / Activated) */}
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 text-xs font-medium">
+          Installed {formatDate(createdAt)}
         </span>
-      )}
 
-      {/* Show QA phase if in review (not yet decided) */}
-      {qaPhase && !qaDecision && ['final_decision', 'feedback'].includes(qaPhase) && (
-        <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-900/50 text-yellow-300 text-xs font-medium">
-          In Review
-        </span>
-      )}
+        {isActivated && oesActivationDate && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-900/50 text-green-300 text-xs font-medium">
+            Activated {formatDateOnly(oesActivationDate)}
+          </span>
+        )}
+      </div>
 
-      {/* Show QA decision */}
-      {qaDecision && (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-          qaDecision === 'PASS' ? 'bg-green-900/50 text-green-300' :
-          qaDecision === 'FAIL' ? 'bg-red-900/50 text-red-300' :
-          'bg-orange-900/50 text-orange-300'
-        }`}>
-          QA {qaDecision === 'REWORK_NEEDED' ? 'Rework' : qaDecision}
-        </span>
-      )}
+      {/* Right: Status badges (QA status, Feedback) */}
+      <div className="flex items-center gap-2">
+        {/* Show QA phase if in review (not yet decided) */}
+        {qaPhase && !qaDecision && ['final_decision', 'feedback'].includes(qaPhase) && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded bg-yellow-900/50 text-yellow-300 text-xs font-medium">
+            In Review
+          </span>
+        )}
 
-      {/* Show Feedback Sent */}
-      {feedbackSent && (
-        <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 text-xs font-medium">
-          ✓ Sent
-        </span>
-      )}
+        {/* Show QA decision */}
+        {qaDecision && (
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+            qaDecision === 'PASS' ? 'bg-green-900/50 text-green-300' :
+            qaDecision === 'FAIL' ? 'bg-red-900/50 text-red-300' :
+            'bg-orange-900/50 text-orange-300'
+          }`}>
+            QA {qaDecision === 'REWORK_NEEDED' ? 'Rework' : qaDecision}
+          </span>
+        )}
+
+        {/* Show Feedback Sent */}
+        {feedbackSent && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 text-xs font-medium">
+            ✓ Sent
+          </span>
+        )}
+      </div>
     </div>
   );
 }
