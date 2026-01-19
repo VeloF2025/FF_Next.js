@@ -334,6 +334,8 @@ Extract serial with: `/\(S\)([^(]+)/`
 | `/api/activate/categorize-photos` | POST | Run VLM categorization |
 | `/api/activate/check-photos` | POST | Check if photos exist |
 
+**Important:** `fetch-photos` uses VLM categorization results for step data when available (status ≠ 'pending'). This ensures accurate step coverage even before formal approval, fixing issues where `photos_metadata` had old step assignments but VLM had correct ones.
+
 ### QA Wizard (5 Phases)
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -645,6 +647,30 @@ Query checking wrong table or no DRs submitted yet.
 ```sql
 SELECT COUNT(*), MAX(created_at)
 FROM dr_photo_unified_reviews;
+```
+
+---
+
+### ISSUE: VLM Extraction "fetch failed"
+
+**Symptoms**:
+- Data Validation shows "Not extracted" for all fields
+- API returns `"error": "fetch failed"` in extraction results
+- Power meter, ONT serial, DR number all missing
+
+**Root Cause**:
+Missing environment variables in staging `.env.production`:
+- `VLM_API_URL` - Must use `localhost:8100`, not Tailscale IP
+- `NEXT_PUBLIC_APP_URL` - Must match port (`localhost:3006` for staging)
+
+**Fix**:
+See `/staging` skill → "ISSUE: VLM Extraction Failed" for full solution.
+
+**Quick Fix**:
+```bash
+# Add to .env.production
+VLM_API_URL=http://localhost:8100
+NEXT_PUBLIC_APP_URL=http://localhost:3006
 ```
 
 ## Component Files

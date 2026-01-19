@@ -567,6 +567,7 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 | **Wrong Directory** | 404 on all routes | Fix `WorkingDirectory` in `/etc/systemd/system/fibreflow.service` |
 | **Old Commit** | Missing features, reverted settings | `git reset --hard origin/master` |
 | **Git Permission** | "Permission denied" on git ops | `chown -R louis:louis .git` |
+| **VLM Extraction Failed** | "fetch failed" in Data Validation | Check `VLM_API_URL` and `NEXT_PUBLIC_APP_URL` in .env.production |
 
 **Staging Server Details:**
 - **URL:** https://vf.fibreflow.app
@@ -574,6 +575,12 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 - **Service:** `fibreflow.service`
 - **Location:** `/home/louis/apps/fibreflow`
 - **Correct DB Password:** `npg_MIUZXrg1tEY0`
+
+**Required Environment Variables (.env.production):**
+```bash
+VLM_API_URL=http://localhost:8100          # Must use localhost, not Tailscale IP
+NEXT_PUBLIC_APP_URL=http://localhost:3006  # For internal photo fetching (must match port)
+```
 
 **Quick Recovery:**
 ```bash

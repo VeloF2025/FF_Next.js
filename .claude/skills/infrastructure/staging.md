@@ -445,6 +445,49 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journal
 
 ---
 
+### ISSUE: VLM Extraction Failed ("fetch failed")
+
+**Symptoms:**
+- Data Validation shows "Not extracted" for all VLM fields
+- API returns `"error": "fetch failed"` in extraction results
+- Power meter, ONT serial, DR number all missing
+
+**Root Cause:**
+Missing or incorrect environment variables in `.env.production`:
+1. `VLM_API_URL` - Must use `localhost`, not Tailscale IP (100.96.203.105)
+2. `NEXT_PUBLIC_APP_URL` - Must match the port (3006 for staging)
+
+**Diagnosis:**
+```bash
+sshpass -p '0203' ssh hein@100.96.203.105 "grep -E 'VLM_API_URL|NEXT_PUBLIC_APP_URL' /home/louis/apps/fibreflow/.env.production"
+```
+
+**Expected Values:**
+```
+VLM_API_URL=http://localhost:8100
+NEXT_PUBLIC_APP_URL=http://localhost:3006
+```
+
+**Fix:**
+```bash
+# Add/fix environment variables
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'cat >> /home/louis/apps/fibreflow/.env.production << EOF
+VLM_API_URL=http://localhost:8100
+NEXT_PUBLIC_APP_URL=http://localhost:3006
+EOF
+chown louis:louis /home/louis/apps/fibreflow/.env.production'"
+
+# Restart service
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+```
+
+**Why localhost?**
+- The staging app runs ON the same server as VLM (100.96.203.105)
+- Using Tailscale IP causes network issues from within Node.js
+- `localhost:8100` is always reachable from the same machine
+
+---
+
 ### ISSUE: Site Returning 502 Bad Gateway
 
 **Root Cause:**
@@ -513,6 +556,7 @@ curl -s "https://vf.fibreflow.app/api/ticketing/tickets?pageSize=1" | jq -r '.su
 | 2026-01-16 | Password kept reverting | Old commit with wrong password | Reset to origin/master |
 | 2026-01-16 | Database authentication failed | Wrong DB password in `.env.production` | Updated DATABASE_URL password via sed |
 | 2026-01-16 | Git permission denied | Mixed file ownership | `chown -R louis:louis .git` |
+| 2026-01-19 | VLM extraction "fetch failed" | Missing `VLM_API_URL` and `NEXT_PUBLIC_APP_URL` | Added env vars to .env.production |
 
 **Add new issues here as they're discovered and fixed.**
 
