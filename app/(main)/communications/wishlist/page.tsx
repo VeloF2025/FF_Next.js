@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PageContainer } from '@/components/PageContainer';
 import { WishlistDashboard } from '@/modules/wishlist/WishlistDashboard';
 import { Typography, CircularProgress, Box } from '@mui/material';
 import { getAuth } from '@/lib/auth-mock';
@@ -23,33 +22,28 @@ export default function WishlistPage() {
 
   if (loading) {
     return (
-      <PageContainer title="Loading...">
-        <Box display="flex" justifyContent="center" p={4}>
+      <div className="p-6">
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
           <CircularProgress />
         </Box>
-      </PageContainer>
+      </div>
     );
   }
 
   if (!authenticated) {
     return (
-      <PageContainer title="Access Denied">
-        <Typography>You must be logged in to view this page.</Typography>
-      </PageContainer>
+      <div className="p-6">
+        <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" minHeight="400px">
+          <Typography variant="h5" gutterBottom>Access Denied</Typography>
+          <Typography color="text.secondary">You must be logged in to view this page.</Typography>
+        </Box>
+      </div>
     );
   }
 
   return (
-    <PageContainer
-      title="Feature Wishlist"
-      subtitle="Community-driven feature requests and voting"
-      breadcrumbs={[
-        { label: 'Home', href: '/' },
-        { label: 'Communications', href: '/communications' },
-        { label: 'Wishlist' }
-      ]}
-    >
+    <div className="p-6">
       <WishlistDashboard />
-    </PageContainer>
+    </div>
   );
 }
