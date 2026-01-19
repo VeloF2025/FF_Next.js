@@ -49,6 +49,7 @@ function DashboardPageContent() {
   const {
     dashboardStats,
     projectStats,
+    projects,
     filters,
     setFilters,
     isLoading,
@@ -68,8 +69,11 @@ function DashboardPageContent() {
   const [projectZoneData, setProjectZoneData] = useState<Record<string, ZoneBreakdown[]>>({});
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
-  // Get unique projects from projectStats for filter dropdown
-  const uniqueProjects = projectStats.map(s => s.project).filter(Boolean);
+  // Use projects from context (populated from API's activeProjects)
+  // Falls back to deriving from projectStats if not available
+  const uniqueProjects = projects.length > 0
+    ? projects
+    : projectStats.map(s => s.project).filter(Boolean);
 
   // Quick filter handler for project table
   const handleQuickFilter = useCallback((filter: 'today' | 'yesterday' | 'last7days' | 'all') => {
