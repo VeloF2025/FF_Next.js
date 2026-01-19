@@ -89,10 +89,10 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
   };
 
   // Initialize project visibility when data loads
-  // Filter out test projects from display
-  const testProjectPatterns = ['test', 'velo test', 'test project'];
+  // Filter out test projects and non-relevant projects from display
+  const excludedProjectPatterns = ['test', 'velo test', 'test project', 'marketing activations'];
   const availableProjects = (trendData?.available_projects || []).filter(
-    (proj) => !testProjectPatterns.some((pattern) => proj.toLowerCase().includes(pattern.toLowerCase()))
+    (proj) => !excludedProjectPatterns.some((pattern) => proj.toLowerCase().includes(pattern.toLowerCase()))
   );
 
   // Initialize all projects as visible when they first appear
