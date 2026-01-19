@@ -362,6 +362,85 @@ export function PhotoReviewPhase({
 
     // If in edit mode, show the editing UI
     if (isEditing) {
+      // Separate active photos (steps 1-10) from discarded photos (step 0)
+      const getEffectiveStep = (result: VlmCategorizationResult) => {
+        const approval = approvals.get(result.photo_filename);
+        return approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
+      };
+
+      const activePhotos = state.results.filter((r) => getEffectiveStep(r) >= 1 && getEffectiveStep(r) <= 10);
+      const discardedPhotos = state.results.filter((r) => getEffectiveStep(r) === 0 || getEffectiveStep(r) > 10);
+
+      const renderPhotoCard = (result: VlmCategorizationResult, isDiscarded: boolean = false) => {
+        const approval = approvals.get(result.photo_filename);
+        const currentStep = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
+        const photoUrl = `/api/activate/photo/${dropNumber}/${result.photo_filename}`;
+
+        return (
+          <div
+            key={result.photo_filename}
+            className={`border rounded-lg p-3 ${
+              isDiscarded
+                ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/50 opacity-75 hover:opacity-100'
+                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+            }`}
+          >
+            <div className="flex gap-3">
+              {/* Thumbnail */}
+              <button
+                type="button"
+                onClick={() => setLightboxPhoto(photoUrl)}
+                className="flex-shrink-0 relative group"
+              >
+                <img
+                  src={photoUrl}
+                  alt={result.photo_filename}
+                  className={`w-20 h-20 object-cover rounded border ${
+                    isDiscarded ? 'border-gray-400 dark:border-gray-500 grayscale-[30%]' : 'border-gray-200 dark:border-gray-600'
+                  }`}
+                />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                  <span className="text-white text-xs">View</span>
+                </span>
+              </button>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`font-medium text-sm ${isDiscarded ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                    {isDiscarded ? '❌ Discarded' : `Step ${currentStep}: ${STEP_LABELS[currentStep] || 'Unknown'}`}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
+                  {result.vlm_identified_as}
+                </p>
+
+                {/* Step selector */}
+                <select
+                  value={currentStep}
+                  onChange={(e) => {
+                    const newStep = parseInt(e.target.value);
+                    setPhotoApproval(result.photo_filename, true, newStep);
+                  }}
+                  className={`text-sm border rounded px-2 py-1 w-full ${
+                    isDiscarded
+                      ? 'border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'
+                  }`}
+                >
+                  <option value="0">❌ Discard (Step 0)</option>
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
+                    <option key={step} value={step}>
+                      Step {step}: {STEP_LABELS[step]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
       return (
         <div className="space-y-4">
           {/* Photo lightbox */}
@@ -412,74 +491,32 @@ export function PhotoReviewPhase({
             </div>
           )}
 
-          {/* Photo grid for editing */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
-            {[...state.results]
-              .sort((a, b) => {
-                const stepA = approvals.get(a.photo_filename)?.overrideStep ?? a.human_override_step ?? a.vlm_predicted_step;
-                const stepB = approvals.get(b.photo_filename)?.overrideStep ?? b.human_override_step ?? b.vlm_predicted_step;
-                return stepA - stepB;
-              })
-              .map((result) => {
-              const approval = approvals.get(result.photo_filename);
-              const currentStep = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
-              const photoUrl = `/api/activate/photo/${dropNumber}/${result.photo_filename}`;
-
-              return (
-                <div
-                  key={result.photo_filename}
-                  className="border rounded-lg p-3 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-                >
-                  <div className="flex gap-3">
-                    {/* Thumbnail */}
-                    <button
-                      type="button"
-                      onClick={() => setLightboxPhoto(photoUrl)}
-                      className="flex-shrink-0 relative group"
-                    >
-                      <img
-                        src={photoUrl}
-                        alt={result.photo_filename}
-                        className="w-20 h-20 object-cover rounded border border-gray-200 dark:border-gray-600"
-                      />
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
-                        <span className="text-white text-xs">View</span>
-                      </span>
-                    </button>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-gray-900 dark:text-white text-sm">
-                          Step {currentStep}: {STEP_LABELS[currentStep] || 'Unknown'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
-                        {result.vlm_identified_as}
-                      </p>
-
-                      {/* Step selector */}
-                      <select
-                        value={currentStep}
-                        onChange={(e) => {
-                          const newStep = parseInt(e.target.value);
-                          setPhotoApproval(result.photo_filename, true, newStep);
-                        }}
-                        className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 w-full"
-                      >
-                        <option value="0">❌ Discard (Step 0)</option>
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
-                          <option key={step} value={step}>
-                            Step {step}: {STEP_LABELS[step]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Active photos grid */}
+          <div>
+            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              📷 Active Photos ({activePhotos.length})
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
+              {[...activePhotos]
+                .sort((a, b) => getEffectiveStep(a) - getEffectiveStep(b))
+                .map((result) => renderPhotoCard(result, false))}
+            </div>
           </div>
+
+          {/* Discarded photos section */}
+          {discardedPhotos.length > 0 && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
+                <span>🗑️ Discarded Photos ({discardedPhotos.length})</span>
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
+                  — reassign to a step to include in review
+                </span>
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto pr-2">
+                {discardedPhotos.map((result) => renderPhotoCard(result, true))}
+              </div>
+            </div>
+          )}
 
           {/* Navigation */}
           <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
