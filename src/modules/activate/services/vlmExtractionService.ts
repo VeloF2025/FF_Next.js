@@ -17,6 +17,10 @@
 
 import { log } from '@/lib/logger';
 import { fetchPhotoAsBase64 } from './photoFetchService';
+import { extractOntSerialFromBarcode } from './barcodeExtractionService';
+
+// Feature flag for barcode extraction
+const ENABLE_BARCODE_EXTRACTION = process.env.ENABLE_BARCODE_EXTRACTION !== 'false'; // Enabled by default
 
 // ============================================================================
 // CONFIGURATION
@@ -54,6 +58,8 @@ export interface SerialExtraction {
   location: 'back' | 'front_label' | 'unknown';
   rawText: string | null;
   error?: string;
+  /** How the serial was extracted: 'barcode' (high reliability) or 'vlm' (OCR) */
+  extractionMethod?: 'barcode' | 'vlm';
 }
 
 /**
@@ -292,7 +298,44 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
 }
 
 /**
+ * Extract ONT serial from Step 6 photo (back of ONT) using VLM only
+ * (Internal function - use extractOntSerialFromBack for barcode-first approach)
+ */
+async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExtraction> {
+  const result = await callVlmExtraction<{
+    found: boolean;
+    serial: string | null;
+    rawText: string | null;
+    confidence: number;
+  }>(base64, ONT_SERIAL_BACK_PROMPT, 'ONT serial back extraction');
+
+  if (!result.success || !result.data) {
+    return {
+      success: false,
+      serial: null,
+      confidence: 0,
+      location: 'back',
+      rawText: null,
+      error: result.error || 'Extraction failed',
+      extractionMethod: 'vlm',
+    };
+  }
+
+  const { found, serial, rawText, confidence } = result.data;
+
+  return {
+    success: found && !!serial,
+    serial: found ? serial : null,
+    confidence: confidence || 0,
+    location: 'back',
+    rawText: rawText || null,
+    extractionMethod: 'vlm',
+  };
+}
+
+/**
  * Extract ONT serial from Step 6 photo (back of ONT)
+ * Uses barcode scanning first, falls back to VLM if no barcode found
  */
 export async function extractOntSerialFromBack(photoUrl: string): Promise<SerialExtraction> {
   log.debug('VlmExtraction', `Extracting ONT serial from back: ${photoUrl}`);
@@ -300,33 +343,31 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
   try {
     const base64 = await fetchPhotoAsBase64(photoUrl);
 
-    const result = await callVlmExtraction<{
-      found: boolean;
-      serial: string | null;
-      rawText: string | null;
-      confidence: number;
-    }>(base64, ONT_SERIAL_BACK_PROMPT, 'ONT serial back extraction');
+    // Step 1: Try barcode scanning first (faster, more reliable)
+    if (ENABLE_BARCODE_EXTRACTION) {
+      try {
+        log.debug('VlmExtraction', 'Attempting barcode scan for ONT serial');
+        const barcodeResult = await extractOntSerialFromBarcode(base64);
 
-    if (!result.success || !result.data) {
-      return {
-        success: false,
-        serial: null,
-        confidence: 0,
-        location: 'back',
-        rawText: null,
-        error: result.error || 'Extraction failed',
-      };
+        if (barcodeResult.success && barcodeResult.serial) {
+          log.info('VlmExtraction', `Barcode scan successful: ${barcodeResult.serial} (${barcodeResult.format})`);
+          return {
+            success: true,
+            serial: barcodeResult.serial,
+            confidence: barcodeResult.confidence,
+            location: 'back',
+            rawText: `Barcode (${barcodeResult.format}): ${barcodeResult.serial}`,
+            extractionMethod: 'barcode',
+          };
+        }
+        log.debug('VlmExtraction', 'No barcode found, falling back to VLM');
+      } catch (barcodeError) {
+        log.warn('VlmExtraction', `Barcode scan error: ${barcodeError}, falling back to VLM`);
+      }
     }
 
-    const { found, serial, rawText, confidence } = result.data;
-
-    return {
-      success: found && !!serial,
-      serial: found ? serial : null,
-      confidence: confidence || 0,
-      location: 'back',
-      rawText: rawText || null,
-    };
+    // Step 2: Fall back to VLM extraction
+    return extractOntSerialFromBackViaVlm(base64);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     log.error('VlmExtraction', `ONT serial back extraction failed: ${message}`);
@@ -338,12 +379,14 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
       location: 'back',
       rawText: null,
       error: message,
+      extractionMethod: 'vlm',
     };
   }
 }
 
 /**
  * Extract data from Step 9 photo (front of ONT with labels)
+ * Uses barcode-first approach for ONT serial, VLM for DR number and green lights
  */
 export async function extractStep9Data(photoUrl: string): Promise<Step9Extraction> {
   const startTime = Date.now();
@@ -352,6 +395,32 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
   try {
     const base64 = await fetchPhotoAsBase64(photoUrl);
 
+    // Step 1: Try barcode scanning for ONT serial first (faster, more reliable)
+    let barcodeSerial: SerialExtraction | null = null;
+    if (ENABLE_BARCODE_EXTRACTION) {
+      try {
+        log.debug('VlmExtraction', 'Attempting barcode scan for Step 9 ONT serial');
+        const barcodeResult = await extractOntSerialFromBarcode(base64);
+
+        if (barcodeResult.success && barcodeResult.serial) {
+          log.info('VlmExtraction', `Step 9 barcode scan successful: ${barcodeResult.serial} (${barcodeResult.format})`);
+          barcodeSerial = {
+            success: true,
+            serial: barcodeResult.serial,
+            confidence: barcodeResult.confidence,
+            location: 'front_label',
+            rawText: `Barcode (${barcodeResult.format}): ${barcodeResult.serial}`,
+            extractionMethod: 'barcode',
+          };
+        } else {
+          log.debug('VlmExtraction', 'No barcode found in Step 9, will use VLM');
+        }
+      } catch (barcodeError) {
+        log.warn('VlmExtraction', `Step 9 barcode scan error: ${barcodeError}`);
+      }
+    }
+
+    // Step 2: Always call VLM for DR number and green lights (and serial fallback)
     const result = await callVlmExtraction<{
       greenLightsVisible: boolean;
       ontSerial: {
@@ -369,14 +438,16 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
     }>(base64, STEP9_FRONT_PROMPT, 'Step 9 front extraction');
 
     if (!result.success || !result.data) {
+      // Even if VLM fails, return barcode result if we have it
       return {
-        ontSerial: {
+        ontSerial: barcodeSerial || {
           success: false,
           serial: null,
           confidence: 0,
           location: 'front_label',
           rawText: null,
           error: result.error,
+          extractionMethod: 'vlm',
         },
         drNumber: {
           success: false,
@@ -392,14 +463,18 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
 
     const { greenLightsVisible, ontSerial, drNumber } = result.data;
 
+    // Use barcode serial if available (higher reliability), otherwise VLM
+    const finalOntSerial: SerialExtraction = barcodeSerial || {
+      success: ontSerial.found && !!ontSerial.serial,
+      serial: ontSerial.found ? ontSerial.serial : null,
+      confidence: ontSerial.confidence || 0,
+      location: 'front_label',
+      rawText: ontSerial.rawText || null,
+      extractionMethod: 'vlm',
+    };
+
     return {
-      ontSerial: {
-        success: ontSerial.found && !!ontSerial.serial,
-        serial: ontSerial.found ? ontSerial.serial : null,
-        confidence: ontSerial.confidence || 0,
-        location: 'front_label',
-        rawText: ontSerial.rawText || null,
-      },
+      ontSerial: finalOntSerial,
       drNumber: {
         success: drNumber.found && !!drNumber.drNumber,
         drNumber: drNumber.found ? drNumber.drNumber : null,
@@ -421,6 +496,7 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
         location: 'front_label',
         rawText: null,
         error: message,
+        extractionMethod: 'vlm',
       },
       drNumber: {
         success: false,

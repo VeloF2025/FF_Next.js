@@ -224,6 +224,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          vlm_dr_number_step9,
          serial_validation_status,
          serial_validation_details,
+         serial_extraction_method_step6,
+         serial_extraction_method_step9,
          data_validation_completed,
          data_validation_completed_at,
          qa_phase,
@@ -235,7 +237,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          step_results,
          created_at,
          updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, NOW(), 'final_decision', $9, $10, 'PASS', 0, 0, '[]'::jsonb, NOW(), NOW())
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, NOW(), 'final_decision', $11, $12, 'PASS', 0, 0, '[]'::jsonb, NOW(), NOW())
        ON CONFLICT (dr_number) DO UPDATE SET
          vlm_power_meter_dbm = EXCLUDED.vlm_power_meter_dbm,
          vlm_power_meter_status = EXCLUDED.vlm_power_meter_status,
@@ -244,6 +246,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          vlm_dr_number_step9 = EXCLUDED.vlm_dr_number_step9,
          serial_validation_status = EXCLUDED.serial_validation_status,
          serial_validation_details = EXCLUDED.serial_validation_details,
+         serial_extraction_method_step6 = EXCLUDED.serial_extraction_method_step6,
+         serial_extraction_method_step9 = EXCLUDED.serial_extraction_method_step9,
          data_validation_completed = true,
          data_validation_completed_at = NOW(),
          qa_phase = 'final_decision',
@@ -259,6 +263,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         extraction.step9?.drNumber.drNumber ?? null,
         serialResult.status,
         serialValidationDetails,
+        extraction.ontSerialStep6?.extractionMethod ?? 'vlm',
+        extraction.step9?.ontSerial.extractionMethod ?? 'vlm',
         review.onemap_ont_serial ?? null,
         review.onemap_ups_serial ?? null,
       ]
