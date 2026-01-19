@@ -9,7 +9,6 @@ import {
   Cable,
   Droplets,
   FileSignature,
-  Home,
   LayoutDashboard,
   ArrowDownUp
 } from 'lucide-react';
@@ -56,24 +55,10 @@ export const projectSection: NavSection = {
       permissions: [],
     },
     {
-      to: '/drops/dashboard',
-      icon: BarChart3,
-      label: 'Drop Dashboard',
-      shortLabel: 'Drop Dash',
-      permissions: [],
-    },
-    {
       to: '/sow-management',
       icon: FileSignature,
       label: 'SOW Management',
       shortLabel: 'SOW',
-      permissions: [],
-    },
-    {
-      to: '/installations',
-      icon: Home,
-      label: 'Home Installations',
-      shortLabel: 'Install',
       permissions: [],
     },
     {
