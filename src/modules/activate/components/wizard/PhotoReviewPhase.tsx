@@ -207,17 +207,23 @@ export function PhotoReviewPhase({
 
   const handleProceed = () => {
     // Convert categorization results to Photo array with correct steps
-    const categorizedPhotos: Photo[] = state.results.map((result) => ({
-      filename: result.photo_filename,
-      step: result.human_override_step ?? result.vlm_predicted_step,
-      url: `/api/activate/photo/${dropNumber}/${result.photo_filename}`,
-      original_type: null,
-    }));
+    // Use approvals map for current session overrides, fall back to saved overrides
+    const categorizedPhotos: Photo[] = state.results.map((result) => {
+      const approval = approvals.get(result.photo_filename);
+      const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
+      return {
+        filename: result.photo_filename,
+        step,
+        url: `/api/activate/photo/${dropNumber}/${result.photo_filename}`,
+        original_type: null,
+      };
+    });
 
-    // Calculate step coverage
+    // Calculate step coverage using approvals map for current session overrides
     const stepCounts = new Map<number, number>();
     state.results.forEach((result) => {
-      const step = result.human_override_step ?? result.vlm_predicted_step;
+      const approval = approvals.get(result.photo_filename);
+      const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
       if (step >= 1 && step <= 10) {
         stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
       }
@@ -333,10 +339,11 @@ export function PhotoReviewPhase({
 
   // Approved state - can proceed
   if (state.status === 'approved') {
-    // Count photos per step
+    // Count photos per step - use approvals map for current session overrides
     const stepCounts = new Map<number, number>();
     state.results.forEach((result) => {
-      const step = result.human_override_step ?? result.vlm_predicted_step;
+      const approval = approvals.get(result.photo_filename);
+      const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
       stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
     });
 

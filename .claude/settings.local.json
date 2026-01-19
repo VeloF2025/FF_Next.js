@@ -281,7 +281,8 @@
       "Bash(then echo \"Server ready\" break fi echo \"Waiting...\" sleep 2 done)",
       "Bash(ulimit -n:*)",
       "Bash(NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max_old_space_size=4096' npx next build:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "mcp__boss-ghost-mcp__smart_click"
     ],
     "deny": [],
     "ask": [],
