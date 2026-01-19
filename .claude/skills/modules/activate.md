@@ -42,10 +42,10 @@ Handle all Activate module operations:
 | Phase | Name | API Endpoint | Purpose |
 |-------|------|--------------|---------|
 | 1 | Prerequisites | `/validate-prerequisites` | Check photos, categorization, step coverage |
-| 2 | Photo Review | `/human-review` | Review and approve photo assignments |
+| 2 | Photo Review | `/human-review` | Review photo assignments (edit mode shows discarded photos) |
 | 3 | Data Validation | `/extract-data` | Validate power (-18 to -24 dBm), serial matches |
-| 4 | Final Decision | `/final-decision` | PASS / FAIL / REWORK_NEEDED with reason codes |
-| 5 | Feedback | `/send-feedback` | Generate and send WhatsApp feedback |
+| 4 | Final Decision | `/final-decision` | PASS / FAIL / REWORK + swap detection + auto-ticket |
+| 5 | Feedback | `/send-feedback` | Send WhatsApp feedback (technician-actionable only) |
 
 ### QA Decision Values
 | Decision | Meaning |
@@ -60,6 +60,72 @@ Handle all Activate module operations:
 - `POWER_OUT_OF_RANGE` - Not in -18 to -24 dBm range
 - `PHOTO_QUALITY` - Photos too blurry/dark
 - `WRONG_EQUIPMENT` - Wrong ONT/UPS installed
+- `SERIALS_SWAPPED` - ONT and UPS serials in wrong fields (auto-ticket created)
+
+## Serial Swap Detection (Jan 2026)
+
+**Critical feature for detecting when ONT and UPS serials are entered in wrong fields.**
+
+### Serial Patterns
+
+| Device | Pattern | Example |
+|--------|---------|---------|
+| **Nokia ONT** | `ALCL*` or `ALCB*` | `ALCLB48CC3CA` |
+| **Gizzu UPS** | `GU18W*` | `GU18W12V2508057584` |
+
+### Detection Flow
+
+1. **First WhatsApp Response** - `dr-acknowledgment.ts` detects swap immediately
+   - Returns `serialsSwapped: true` with details
+   - Go Bridge sends warning in threaded reply with correction instructions
+
+2. **QA Wizard Phase 4** - Prominent "🔴 SERIALS SWAPPED" warning
+   - Shows which serial is in which field
+   - Explains correct format for each device
+   - Badge shows "🎫 Auto-ticket on submit"
+
+3. **Auto-Ticket Creation** - Creates ticket on submit via `/api/ticketing/tickets`
+   - `source: 'ont_swap'`
+   - `ticket_type: 'ont_swap'`
+   - `priority: 'high'`
+   - `dr_number: <drop_number>`
+
+4. **Tracking** - Ticket tracks resolution until technician corrects in 1Map
+
+### Key Functions (`qaAutoFailService.ts`)
+
+```typescript
+// Pattern matching
+looksLikeOntSerial(serial)     // Matches ALCL/ALCB pattern
+looksLikeGizzuSerial(serial)   // Matches GU18W pattern
+
+// Swap detection
+detectSwappedSerials(ontSerial, upsSerial)
+// Returns: { swapped: boolean, details: string }
+
+// Technician issues (for WhatsApp feedback)
+getTechnicianIssues(data)
+// Returns: TechnicianIssue[] with actionable items only
+```
+
+### Technician Issues vs Internal QA
+
+**Technician-Actionable (sent via WhatsApp):**
+- `ONT_NOT_SCANNED` - ONT serial missing
+- `UPS_NOT_SCANNED` - UPS serial missing
+- `SERIALS_SWAPPED` - ONT/UPS in wrong fields (CRITICAL)
+- `ONT_INVALID_FORMAT` - ONT serial wrong format
+- `UPS_INVALID_FORMAT` - UPS serial wrong format
+- `MISSING_PHOTOS` - Required photos missing
+- `POWER_OUT_OF_RANGE` - Power meter out of spec
+
+**Internal QA Only (NOT sent to technicians):**
+- VLM extraction comparison (Step 6 vs Step 9 vs OneMap)
+- OCR confidence scores
+- AI categorization mismatches
+- Few-shot learning corrections
+
+This separation ensures technicians only receive actionable feedback, not internal AI debugging info.
 
 ## Slash Commands
 
@@ -276,6 +342,26 @@ Thank you! QA review will follow shortly.
 ⚠️ UPS Serial: Not scanned - please upload to 1Map
 
 Thank you! QA review will follow shortly.
+```
+
+**Swapped Serials (CRITICAL)**:
+```
+📸 *DR123456 Received!*
+
+🔴 *ALERT: SERIALS APPEAR SWAPPED*
+
+❌ ONT field has Gizzu serial: GU18W12V2508035029
+❌ UPS field has ONT serial: ALCLB48CC3CA
+
+*Please correct in 1Map:*
+• ONT should be ALCL/ALCB serial
+• UPS should be GU18W serial (Gizzu)
+
+✅ Photos: 10
+⚠️ ONT field: GU18W12V2508035029
+⚠️ UPS field: ALCLB48CC3CA
+
+⚠️ Please correct the swapped serials before QA review.
 ```
 
 **DR Not in OneMap**:
