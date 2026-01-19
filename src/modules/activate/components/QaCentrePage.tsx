@@ -17,12 +17,10 @@ import {
   getYesterdaySAST,
 } from '../context';
 import type {
-  DrListItem,
   QaWizardPhase,
   QaDecision,
   SerialValidationStatus,
 } from '../services/activateDataService';
-import { QA_PHASE_ORDER, getPhaseIndex } from '../services/activateDataService';
 
 // ============================================================================
 // BADGE COLOR REFERENCE
@@ -126,99 +124,67 @@ function StatusBadge({ isActivated, qaPhase, qaDecision, feedbackSent }: StatusB
 // SERIAL VALIDATION BADGE COMPONENT
 // ============================================================================
 
-interface SerialValidationBadgeProps {
+interface SerialDisplayProps {
   label: 'ONT' | 'UPS';
+  serial: string | null;
   status: SerialValidationStatus;
-  maskedSerial: string;
 }
 
 /**
- * Shows serial badge with validation status indicator
- * | Status | Display | Color |
- * |--------|---------|-------|
- * | valid | `ONT ✓ (ALC***3CA)` | Green border |
- * | swapped | `ONT ⚠️ (GU18***...)` | Yellow border |
- * | missing | `ONT ❌` | Red border |
- * | invalid | `ONT ⚠️ (XYZ...)` | Orange border |
+ * Shows full serial with validation indicator
  */
-function SerialValidationBadge({ label, status, maskedSerial }: SerialValidationBadgeProps) {
+function SerialDisplay({ label, serial, status }: SerialDisplayProps) {
   const isOnt = label === 'ONT';
-  const baseColor = isOnt ? 'text-blue-600 dark:text-blue-400' : 'text-purple-600 dark:text-purple-400';
 
-  if (status === 'missing') {
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.missing} rounded text-xs font-medium ${baseColor}`}>
-        {label} ❌
-      </span>
-    );
-  }
+  // Status indicator
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'valid': return <span className="text-green-500">✓</span>;
+      case 'swapped': return <span className="text-yellow-500">⚠</span>;
+      case 'invalid': return <span className="text-orange-500">⚠</span>;
+      case 'missing': return <span className="text-red-500">✗</span>;
+    }
+  };
 
-  if (status === 'swapped') {
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.swapped} rounded text-xs font-medium ${baseColor}`}>
-        {label} ⚠️ <span className="font-mono">{maskedSerial}</span>
-      </span>
-    );
-  }
+  const labelColor = isOnt
+    ? 'text-blue-600 dark:text-blue-400'
+    : 'text-purple-600 dark:text-purple-400';
 
-  if (status === 'invalid') {
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.invalid} rounded text-xs font-medium ${baseColor}`}>
-        {label} ⚠️ <span className="font-mono">{maskedSerial}</span>
-      </span>
-    );
-  }
-
-  // valid
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 border-2 ${BADGE_COLORS.valid} rounded text-xs font-medium ${baseColor}`}>
-      {label} ✓ <span className="font-mono">{maskedSerial}</span>
-    </span>
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className={`font-semibold ${labelColor}`}>{label}:</span>
+      {serial ? (
+        <>
+          <span className="font-mono text-gray-700 dark:text-gray-300">{serial}</span>
+          {getStatusIcon()}
+        </>
+      ) : (
+        <span className="text-gray-400 dark:text-gray-500 italic">Not scanned</span>
+      )}
+    </div>
   );
 }
 
 // ============================================================================
-// PROGRESS DOTS COMPONENT
+// PROJECT BADGE COMPONENT
 // ============================================================================
 
-interface ProgressDotsProps {
-  qaPhase: QaWizardPhase | null;
-  qaDecision: QaDecision | null;
-}
+const PROJECT_COLORS: Record<string, string> = {
+  'Lawley': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
+  'Mohadin': 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+  'Mamelodi': 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  'Velo Test': 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300',
+  'default': 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
+};
 
-/**
- * Visual workflow phase indicator (● ● ● ○ ○ ○)
- * 6 dots representing workflow phases:
- * 1. prerequisites
- * 2. photo_review
- * 3. data_validation
- * 4. final_decision
- * 5. feedback
- * 6. completed
- */
-function ProgressDots({ qaPhase, qaDecision }: ProgressDotsProps) {
-  // If there's a final decision, show full progress
-  const completedPhases = qaDecision ? 6 : getPhaseIndex(qaPhase) + 1;
+function ProjectBadge({ project }: { project: string | null }) {
+  const projectName = project || 'Unknown';
+  const colorClass = PROJECT_COLORS[projectName] || PROJECT_COLORS['default'];
 
   return (
-    <div className="flex items-center gap-1" title={`Phase: ${qaPhase || 'Not started'}`}>
-      {QA_PHASE_ORDER.map((phase, index) => (
-        <span
-          key={phase}
-          className={`w-2 h-2 rounded-full ${
-            index < completedPhases
-              ? qaDecision === 'PASS'
-                ? 'bg-green-500'
-                : qaDecision === 'FAIL'
-                ? 'bg-red-500'
-                : qaDecision === 'REWORK_NEEDED'
-                ? 'bg-orange-500'
-                : 'bg-blue-500'
-              : 'bg-gray-300 dark:bg-gray-600'
-          }`}
-        />
-      ))}
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${colorClass}`}>
+      {projectName}
+    </span>
   );
 }
 
@@ -635,39 +601,46 @@ function QaCentrePageContent() {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            <div className="grid gap-3 p-4">
               {filteredDrops.map((drop) => (
                 <button
                   key={drop.id}
                   onClick={() => handleSelectDr(drop.dropNumber)}
-                  className="w-full text-left px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors"
+                  className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      {/* Row 1: DR Number + Status Badge */}
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {drop.dropNumber}
-                        </h3>
-                        <StatusBadge
-                          isActivated={drop.isActivated}
-                          qaPhase={drop.qaPhase}
-                          qaDecision={drop.qaDecision}
-                          feedbackSent={drop.feedbackSent}
-                        />
-                        {drop.feedbackSent && (
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                            ✓ Sent
-                          </span>
-                        )}
-                      </div>
+                  {/* Top Row: Project Badge + DR Number + Status */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <ProjectBadge project={drop.project} />
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        {drop.dropNumber}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge
+                        isActivated={drop.isActivated}
+                        qaPhase={drop.qaPhase}
+                        qaDecision={drop.qaDecision}
+                        feedbackSent={drop.feedbackSent}
+                      />
+                      {drop.feedbackSent && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                          ✓ Sent
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                      {/* Row 2: Project • Agent • Date */}
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <span className="font-medium text-gray-900 dark:text-white">{drop.project || 'Unknown'}</span>
-                        <span>•</span>
-                        <span>{formatAgent(drop.senderPhone)}</span>
-                        <span>•</span>
+                  {/* Bottom Row: Details Grid */}
+                  <div className="flex items-center justify-between">
+                    {/* Left: Agent + Date + Photos */}
+                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <span className="text-gray-400">👤</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{formatAgent(drop.senderPhone)}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-gray-400">📅</span>
                         <span>{new Date(drop.createdAt).toLocaleString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -675,40 +648,30 @@ function QaCentrePageContent() {
                           minute: '2-digit',
                           hour12: true
                         })}</span>
-                      </div>
-
-                      {/* Row 3: Photos + Serial Badges with validation */}
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          📷 <span className="font-medium text-gray-900 dark:text-white">{drop.photoCount || 0}</span>
-                        </span>
-                        <SerialValidationBadge
-                          label="ONT"
-                          status={drop.ontSerialStatus}
-                          maskedSerial={drop.ontSerialMasked}
-                        />
-                        <SerialValidationBadge
-                          label="UPS"
-                          status={drop.upsSerialStatus}
-                          maskedSerial={drop.upsSerialMasked}
-                        />
-                        {drop.serialsSwapped && (
-                          <span className="text-xs text-red-600 dark:text-red-400 font-medium">
-                            ⚠️ Swapped
-                          </span>
-                        )}
-                      </div>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-gray-400">📷</span>
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">{drop.photoCount || 0}</span>
+                      </span>
                     </div>
 
-                    {/* Right side: Progress Dots */}
-                    <div className="flex flex-col items-end gap-2">
-                      <ProgressDots
-                        qaPhase={drop.qaPhase}
-                        qaDecision={drop.qaDecision}
+                    {/* Right: Serials */}
+                    <div className="flex items-center gap-4">
+                      <SerialDisplay
+                        label="ONT"
+                        serial={drop.ontSerial}
+                        status={drop.ontSerialStatus}
                       />
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {drop.completedPhotos}/10 steps
-                      </span>
+                      <SerialDisplay
+                        label="UPS"
+                        serial={drop.upsSerial}
+                        status={drop.upsSerialStatus}
+                      />
+                      {drop.serialsSwapped && (
+                        <span className="text-xs text-red-600 dark:text-red-400 font-semibold bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded">
+                          ⚠ SWAPPED
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
