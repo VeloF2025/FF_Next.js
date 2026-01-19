@@ -26,6 +26,9 @@ const STATE_LABELS: Record<DRState, { label: string; color: string; icon: string
   installed: { label: 'Installed', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: '🔧' },
   activated: { label: 'Activated', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: '⚡' },
   reviewed: { label: 'Reviewed', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: '✓' },
+  reviewed_pass: { label: 'Reviewed, Passed', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: '✅' },
+  reviewed_fail: { label: 'Reviewed, Failed', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: '❌' },
+  reviewed_rework: { label: 'Reviewed, Rework', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: '🔄' },
   not_reviewed: { label: 'Not Reviewed', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: '⏳' },
 };
 

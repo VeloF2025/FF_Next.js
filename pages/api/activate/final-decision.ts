@@ -165,6 +165,95 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       [decision, JSON.stringify(reasons), userId || null, finalNotes || null, dropNumber]
     );
 
+    // Also update dr_photo_unified_reviews for DR Review Summary display
+    const vlmQaResults = {
+      power_meter: {
+        value: review.vlm_power_meter_dbm,
+        status: validationData.powerMeterDbm !== null ?
+          (validationData.powerMeterDbm >= -24 && validationData.powerMeterDbm <= -18 ? 'pass' : 'fail') : 'pending',
+        validRange: { min: -24, max: -18 },
+      },
+      ont_serial: {
+        step6: review.vlm_ont_serial_step6,
+        step9: review.vlm_ont_serial_step9,
+        onemap: review.onemap_ont_serial,
+        match: validationData.vlmOntSerialStep6 === validationData.ontSerial ||
+               validationData.vlmOntSerialStep9 === validationData.ontSerial,
+        status: (validationData.vlmOntSerialStep6 === validationData.ontSerial ||
+                validationData.vlmOntSerialStep9 === validationData.ontSerial) ? 'pass' : 'pending',
+      },
+      dr_number: {
+        value: review.vlm_dr_number_step9,
+        match: review.vlm_dr_number_step9 === dropNumber,
+        status: review.vlm_dr_number_step9 === dropNumber ? 'pass' : 'pending',
+      },
+    };
+
+    const vlmQaSummary = {
+      overall: decision,
+      power_meter: vlmQaResults.power_meter.status,
+      serial_match: vlmQaResults.ont_serial.status,
+      dr_match: vlmQaResults.dr_number.status,
+      all_checks_passed: decision === 'PASS',
+    };
+
+    // Calculate step coverage from photos for boolean columns
+    const stepCounts: Record<number, number> = {};
+    for (const photo of photos) {
+      if (photo.step && photo.step >= 1 && photo.step <= 10) {
+        stepCounts[photo.step] = (stepCounts[photo.step] || 0) + 1;
+      }
+    }
+
+    await pool.query(
+      `UPDATE dr_photo_unified_reviews
+       SET
+         vlm_qa_status = 'completed',
+         vlm_qa_results = $1::jsonb,
+         vlm_qa_summary = $2::jsonb,
+         vlm_qa_validated_at = NOW(),
+         qa_decision = $3,
+         qa_decision_reasons = $4::jsonb,
+         qa_decision_at = NOW(),
+         qa_decision_by = $5,
+         qa_decision_notes = $6,
+         human_review_status = 'completed',
+         human_review_completed_at = NOW(),
+         reviewed_at = NOW(),
+         reviewed_by = $5,
+         step_01_house_photo = $8,
+         step_02_cable_from_pole = $9,
+         step_03_entry_outside = $10,
+         step_04_entry_inside = $11,
+         step_05_wall = $12,
+         step_06_ont_back = $13,
+         step_07_power_meter = $14,
+         step_08_final_installation = $15,
+         step_09_green_lights = $16,
+         step_10_signature = $17,
+         updated_at = NOW()
+       WHERE drop_number = $7`,
+      [
+        JSON.stringify(vlmQaResults),
+        JSON.stringify(vlmQaSummary),
+        decision,
+        JSON.stringify(reasons.map(r => ({ check: r, status: 'fail', message: getFailReasonDescription(r) }))),
+        userId || null,
+        finalNotes || null,
+        dropNumber,
+        !!stepCounts[1],
+        !!stepCounts[2],
+        !!stepCounts[3],
+        !!stepCounts[4],
+        !!stepCounts[5],
+        !!stepCounts[6],
+        !!stepCounts[7],
+        !!stepCounts[8],
+        !!stepCounts[9],
+        !!stepCounts[10],
+      ]
+    );
+
     // Generate feedback template based on decision
     const feedbackTemplate = generateFeedbackTemplate(
       dropNumber,

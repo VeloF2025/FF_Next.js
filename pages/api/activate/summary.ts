@@ -34,25 +34,41 @@ const pool = new Pool({
 function determineState(
   hasReview: boolean,
   hasActivation: boolean,
-  hasDecision: boolean
+  qaDecision: string | null
 ): DRState {
-  if (hasDecision) return 'reviewed';
+  if (qaDecision === 'PASS') return 'reviewed_pass';
+  if (qaDecision === 'FAIL') return 'reviewed_fail';
+  if (qaDecision === 'REWORK_NEEDED') return 'reviewed_rework';
+  if (qaDecision) return 'reviewed';
   if (hasActivation) return 'activated';
   if (hasReview) return 'installed';
   return 'not_reviewed';
 }
 
 /**
- * Extract step coverage from photos metadata
+ * Extract step coverage from VLM categorization results (preferred) or photos metadata
  */
-function calculateStepsCovered(photosMetadata: any[]): number {
-  if (!Array.isArray(photosMetadata)) return 0;
-
+function calculateStepsCovered(vlmCategorization: any[], photosMetadata: any[]): number {
   const stepsSet = new Set<number>();
-  for (const photo of photosMetadata) {
-    const step = photo.step || photo.vlm_step;
-    if (step && step >= 1 && step <= 10) {
-      stepsSet.add(step);
+
+  // Prefer VLM categorization results as they are more accurate
+  if (Array.isArray(vlmCategorization) && vlmCategorization.length > 0) {
+    for (const result of vlmCategorization) {
+      const step = result.human_override_step ?? result.vlm_predicted_step;
+      if (step && step >= 1 && step <= 10) {
+        stepsSet.add(step);
+      }
+    }
+    return stepsSet.size;
+  }
+
+  // Fallback to photos_metadata
+  if (Array.isArray(photosMetadata)) {
+    for (const photo of photosMetadata) {
+      const step = photo.step || photo.vlm_step;
+      if (step && step >= 1 && step <= 10) {
+        stepsSet.add(step);
+      }
     }
   }
   return stepsSet.size;
@@ -63,7 +79,7 @@ export default async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   const dropNumber = req.query.dropNumber as string;
@@ -84,6 +100,7 @@ export default async function handler(
            project,
            photo_count,
            photos_metadata,
+           vlm_categorization_results,
            ont_serial_scanned,
            ups_serial_scanned,
            qa_decision,
@@ -149,28 +166,36 @@ export default async function handler(
       return apiResponse.notFound(res, 'DR', dropNumber);
     }
 
-    // Parse photos metadata
+    // Parse photos metadata and VLM categorization
     const photosMetadata = unified?.photos_metadata || [];
+    const vlmCategorization = unified?.vlm_categorization_results || [];
     const photoCount = unified?.photo_count || photosMetadata.length || 0;
-    const stepsComplete = calculateStepsCovered(photosMetadata);
+    const stepsComplete = calculateStepsCovered(vlmCategorization, photosMetadata);
 
-    // Build photo preview (first 6 photos with step info)
+    // Build photo preview (first 6 photos with step info from VLM)
     const photoPreview = photosMetadata
       .slice(0, 6)
-      .map((photo: any) => ({
-        url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
-        step: photo.step || photo.vlm_step || 0,
-        filename: photo.filename,
-      }));
+      .map((photo: any) => {
+        // Get step from VLM categorization if available
+        const vlmResult = vlmCategorization.find(
+          (v: any) => v.photo_filename === photo.filename
+        );
+        const step = vlmResult?.human_override_step ?? vlmResult?.vlm_predicted_step ?? photo.step ?? 0;
+        return {
+          url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
+          step,
+          filename: photo.filename,
+        };
+      });
 
     // Determine project from available sources
     const project = unified?.project || qa?.project || null;
 
-    // Determine current state
+    // Determine current state (includes PASS/FAIL distinction)
     const hasReview = !!unified;
     const hasActivation = !!oes;
-    const hasDecision = !!unified?.qa_decision;
-    const currentState = determineState(hasReview, hasActivation, hasDecision);
+    const qaDecision = unified?.qa_decision || null;
+    const currentState = determineState(hasReview, hasActivation, qaDecision);
 
     // Build the summary response
     const summary: DRSummary = {

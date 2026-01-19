@@ -5,7 +5,7 @@
  * about a drop receipt including timeline, team, QA status, and equipment.
  */
 
-export type DRState = 'installed' | 'activated' | 'reviewed' | 'not_reviewed';
+export type DRState = 'installed' | 'activated' | 'reviewed' | 'reviewed_pass' | 'reviewed_fail' | 'reviewed_rework' | 'not_reviewed';
 
 export type QADecision = 'PASS' | 'FAIL' | 'REWORK_NEEDED' | null;
 
