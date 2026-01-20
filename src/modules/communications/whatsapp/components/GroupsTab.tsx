@@ -144,34 +144,34 @@ const GroupsTab: React.FC = () => {
       {/* Groups Table */}
       <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden overflow-x-auto">
         <table className="w-full min-w-[600px]">
-          <thead className="bg-gray-50 border-b border-[var(--ff-border-light)]">
+          <thead className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
             <tr>
-              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-600">Project</th>
-              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-600">Group JID</th>
-              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
-              <th scope="col" className="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Project</th>
+              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Group JID</th>
+              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Status</th>
+              <th scope="col" className="text-right px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Actions</th>
             </tr>
           </thead>
           <tbody>
             {groups.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   No groups configured. Click &quot;Add Group&quot; to create one.
                 </td>
               </tr>
             ) : (
               groups.map((group) => (
-                <tr key={group.id} className="border-b border-[var(--ff-border-light)] hover:bg-gray-50">
+                <tr key={group.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)]">
                   <td className="px-4 py-3">
                     <div>
                       <p className="font-medium text-[var(--ff-text-primary)]">{group.project_name}</p>
                       {group.group_name && (
-                        <p className="text-xs text-gray-500">{group.group_name}</p>
+                        <p className="text-xs text-[var(--ff-text-secondary)]">{group.group_name}</p>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                    <code className="text-xs bg-[var(--ff-bg-tertiary)] px-2 py-1 rounded">
                       {group.group_jid}
                     </code>
                   </td>
@@ -181,7 +181,7 @@ const GroupsTab: React.FC = () => {
                         <CheckCircle className="w-4 h-4" aria-hidden="true" /> Enabled
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-gray-500 text-sm">
+                      <span className="inline-flex items-center gap-1 text-[var(--ff-text-secondary)] text-sm">
                         <XCircle className="w-4 h-4" aria-hidden="true" /> Disabled
                       </span>
                     )}
@@ -191,7 +191,7 @@ const GroupsTab: React.FC = () => {
                       <button
                         onClick={() => handleTest(group)}
                         disabled={testingGroupId === group.id || !group.enabled}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="p-1.5 text-blue-600 hover:bg-blue-500/10 dark:hover:bg-blue-500/20 rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         aria-label={`Send test message to ${group.project_name}`}
                       >
                         {testingGroupId === group.id ? (
@@ -202,14 +202,14 @@ const GroupsTab: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setEditingGroup(group)}
-                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        className="p-1.5 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                         aria-label={`Edit ${group.project_name}`}
                       >
                         <Edit2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <button
                         onClick={() => setDeletingGroup(group)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="p-1.5 text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
                         aria-label={`Delete ${group.project_name}`}
                       >
                         <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -318,9 +318,9 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
       aria-modal="true"
       aria-labelledby="group-form-title"
     >
-      <div ref={modalRef} className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 id="group-form-title" className="text-lg font-semibold">
+      <div ref={modalRef} className="bg-[var(--ff-bg-card)] rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+          <h3 id="group-form-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">
             {group ? 'Edit Group' : 'Add New Group'}
           </h3>
         </div>
@@ -328,7 +328,7 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
             <div>
-              <label htmlFor="project_name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="project_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                 Project Name *
               </label>
               <input
@@ -337,7 +337,7 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
                 type="text"
                 value={formData.project_name}
                 onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g., Lawley"
                 required
                 aria-required="true"
@@ -345,7 +345,7 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
             </div>
 
             <div>
-              <label htmlFor="group_jid" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="group_jid" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                 Group JID *
               </label>
               <input
@@ -353,19 +353,19 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
                 type="text"
                 value={formData.group_jid}
                 onChange={(e) => setFormData({ ...formData, group_jid: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm"
+                className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm"
                 placeholder="e.g., 120363418298130331@g.us"
                 required
                 aria-required="true"
                 aria-describedby="group_jid_help"
               />
-              <p id="group_jid_help" className="mt-1 text-xs text-gray-500">
+              <p id="group_jid_help" className="mt-1 text-xs text-[var(--ff-text-secondary)]">
                 Must end with @g.us for WhatsApp groups
               </p>
             </div>
 
             <div>
-              <label htmlFor="group_name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="group_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                 Group Name
               </label>
               <input
@@ -373,13 +373,13 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
                 type="text"
                 value={formData.group_name || ''}
                 onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g., Lawley DR Photos"
               />
             </div>
 
             <div>
-              <label htmlFor="phone_number" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="phone_number" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                 Phone Number
               </label>
               <input
@@ -387,7 +387,7 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
                 type="text"
                 value={formData.phone_number || ''}
                 onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="e.g., +27711796125"
               />
             </div>
@@ -398,19 +398,19 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
                 id="enabled"
                 checked={formData.enabled}
                 onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="w-4 h-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
+                className="w-4 h-4 text-green-500 border-[var(--ff-border-medium)] rounded focus:ring-green-500"
               />
-              <label htmlFor="enabled" className="text-sm text-gray-700">
+              <label htmlFor="enabled" className="text-sm text-[var(--ff-text-primary)]">
                 Enabled
               </label>
             </div>
           </div>
 
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-[var(--ff-border-light)] flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               Cancel
             </button>
@@ -476,23 +476,23 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ groupName, onCo
       aria-labelledby="delete-dialog-title"
       aria-describedby="delete-dialog-desc"
     >
-      <div ref={modalRef} className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
+      <div ref={modalRef} className="bg-[var(--ff-bg-card)] rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
             <AlertCircle className="w-6 h-6 text-red-600" aria-hidden="true" />
           </div>
-          <h3 id="delete-dialog-title" className="text-lg font-semibold text-gray-900">
+          <h3 id="delete-dialog-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">
             Delete Group
           </h3>
         </div>
-        <p id="delete-dialog-desc" className="text-gray-600 mb-6">
+        <p id="delete-dialog-desc" className="text-[var(--ff-text-secondary)] mb-6">
           Are you sure you want to delete &quot;{groupName}&quot;? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
           <button
             ref={cancelButtonRef}
             onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="px-4 py-2 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             Cancel
           </button>

@@ -154,7 +154,7 @@ const TemplatesTab: React.FC = () => {
           onClick={() => fetchTemplates(false)}
           disabled={loading}
           aria-label="Refresh templates"
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           Refresh
@@ -170,8 +170,8 @@ const TemplatesTab: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Template List */}
         <div className="lg:col-span-1 border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b border-[var(--ff-border-light)]">
-            <h4 className="font-medium text-gray-700">Templates</h4>
+          <div className="bg-[var(--ff-bg-secondary)] px-4 py-3 border-b border-[var(--ff-border-light)]">
+            <h4 className="font-medium text-[var(--ff-text-primary)]">Templates</h4>
           </div>
           <div className="divide-y divide-[var(--ff-border-light)] max-h-[500px] overflow-y-auto">
             {templates.map((template) => (
@@ -184,8 +184,8 @@ const TemplatesTab: React.FC = () => {
                 }}
                 aria-pressed={selectedTemplate?.id === template.id}
                 aria-label={`Select template: ${template.template_name}`}
-                className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500 ${
-                  selectedTemplate?.id === template.id ? 'bg-green-50 border-l-4 border-green-500' : ''
+                className={`w-full text-left px-4 py-3 hover:bg-[var(--ff-bg-secondary)] transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500 ${
+                  selectedTemplate?.id === template.id ? 'bg-green-500/10 border-l-4 border-green-500' : ''
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -193,7 +193,7 @@ const TemplatesTab: React.FC = () => {
                     <p className="font-medium text-[var(--ff-text-primary)]">
                       {template.template_name}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
                       {template.template_key}
                     </p>
                   </div>
@@ -207,7 +207,7 @@ const TemplatesTab: React.FC = () => {
                       <CheckCircle className="w-3 h-3" /> Enabled
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-1">
                       <XCircle className="w-3 h-3" /> Disabled
                     </span>
                   )}
@@ -225,8 +225,8 @@ const TemplatesTab: React.FC = () => {
           {selectedTemplate ? (
             <>
               {/* Editor Header */}
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-[var(--ff-border-light)]">
-                <h4 className="font-medium text-gray-700">
+              <div className="flex items-center justify-between px-4 py-3 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
+                <h4 className="font-medium text-[var(--ff-text-primary)]">
                   {selectedTemplate.template_name}
                 </h4>
                 <div className="flex items-center gap-2">
@@ -235,7 +235,7 @@ const TemplatesTab: React.FC = () => {
                       <button
                         onClick={handleReset}
                         aria-label="Reset template to original content"
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                       >
                         <RotateCcw className="w-4 h-4" aria-hidden="true" />
                         Reset
@@ -243,7 +243,7 @@ const TemplatesTab: React.FC = () => {
                       <button
                         onClick={() => setEditMode(false)}
                         aria-label="Cancel editing"
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                       >
                         <X className="w-4 h-4" aria-hidden="true" />
                         Cancel
@@ -267,7 +267,7 @@ const TemplatesTab: React.FC = () => {
                       <button
                         onClick={handlePreview}
                         aria-label="Preview template with sample data"
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                       >
                         <Eye className="w-4 h-4" aria-hidden="true" />
                         Preview
@@ -286,11 +286,11 @@ const TemplatesTab: React.FC = () => {
               </div>
 
               {/* Variables */}
-              <div id="template-variables" className="px-4 py-2 bg-gray-50 border-b border-[var(--ff-border-light)]">
-                <p className="text-xs text-gray-500">
+              <div id="template-variables" className="px-4 py-2 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
+                <p className="text-xs text-[var(--ff-text-secondary)]">
                   <strong>Available Variables:</strong>{' '}
                   {selectedTemplate.variables.map((v) => (
-                    <code key={v} className="bg-white px-1 py-0.5 rounded mx-1">
+                    <code key={v} className="bg-[var(--ff-bg-card)] px-1 py-0.5 rounded mx-1">
                       {'{{' + v + '}}'}
                     </code>
                   ))}
@@ -309,7 +309,7 @@ const TemplatesTab: React.FC = () => {
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
                       aria-describedby="template-variables"
-                      className="w-full h-[300px] font-mono text-sm p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full h-[300px] font-mono text-sm p-3 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
                       placeholder="Enter template content..."
                     />
                   </div>
@@ -318,14 +318,14 @@ const TemplatesTab: React.FC = () => {
                     {preview}
                   </div>
                 ) : (
-                  <pre className="bg-gray-100 p-4 rounded-lg text-sm whitespace-pre-wrap overflow-x-auto">
+                  <pre className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] p-4 rounded-lg text-sm whitespace-pre-wrap overflow-x-auto">
                     {selectedTemplate.template_content}
                   </pre>
                 )}
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center py-12 text-gray-500">
+            <div className="flex items-center justify-center py-12 text-[var(--ff-text-secondary)]">
               <FileText className="w-8 h-8 mr-2" />
               Select a template to view or edit
             </div>

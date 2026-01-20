@@ -1,5 +1,5 @@
 /**
- * Services Tab - WhatsApp Service Status and Controls
+ * Services Tab - WhatsApp Service Status, Controls, and Pairing
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -12,18 +12,254 @@ import {
   Phone,
   Clock,
   RotateCcw,
+  Key,
+  LogOut,
+  Copy,
+  CheckCheck,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaServicesStatusResponse, WaServiceStatus, ServiceStatus } from '../types/wa-admin.types';
 
-/* Services Tab - Displays WhatsApp Bridge and Sender service status with restart controls */
+/* Services Tab - Displays WhatsApp Bridge and Sender service status with restart and pairing controls */
+
+// Pairing Modal Component
+interface PairingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  service: 'bridge' | 'sender';
+  serviceName: string;
+  currentPhone: string;
+}
+
+const PairingModal: React.FC<PairingModalProps> = ({
+  isOpen,
+  onClose,
+  service,
+  serviceName,
+  currentPhone,
+}) => {
+  const [phoneNumber, setPhoneNumber] = useState(currentPhone);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [instructions, setInstructions] = useState<string[]>([]);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'connected' | 'failed' | 'expired'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setPairingCode(null);
+      setStatus('idle');
+      setError(null);
+      setPhoneNumber(currentPhone);
+    }
+  }, [isOpen, currentPhone]);
+
+  // Poll for pairing status when waiting
+  useEffect(() => {
+    if (status !== 'waiting') return;
+
+    const pollInterval = setInterval(async () => {
+      const result = await waAdminApi.services.pairingStatus(service);
+      if (result.success && result.data) {
+        if (result.data.status === 'connected') {
+          setStatus('connected');
+          toast.success(`${serviceName} paired successfully!`);
+          setTimeout(onClose, 2000);
+        } else if (result.data.status === 'failed') {
+          setStatus('failed');
+          setError(result.data.error_message || 'Pairing failed');
+        } else if (result.data.status === 'expired') {
+          setStatus('expired');
+          setError('Pairing code expired. Please try again.');
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(pollInterval);
+  }, [status, service, serviceName, onClose]);
+
+  const handleInitiatePairing = async () => {
+    setStatus('generating');
+    setError(null);
+
+    const result = await waAdminApi.services.pair(service, phoneNumber);
+
+    if (result.success && result.data) {
+      setPairingCode(result.data.pairing_code || null);
+      setInstructions(result.data.instructions || []);
+      setExpiresAt(result.data.expires_at || null);
+      setStatus('waiting');
+    } else {
+      setStatus('failed');
+      setError(result.error || 'Failed to initiate pairing');
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (pairingCode) {
+      navigator.clipboard.writeText(pairingCode);
+      setCopied(true);
+      toast.success('Code copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Key className="w-5 h-5 text-green-500" />
+          Pair {serviceName}
+        </h3>
+
+        {status === 'idle' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Enter the phone number to link with this service. This will generate a pairing code.
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Phone Number</label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+27821234567"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">Include country code (e.g., +27 for South Africa)</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInitiatePairing}
+                disabled={!phoneNumber}
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                Generate Code
+              </button>
+            </div>
+          </div>
+        )}
+
+        {status === 'generating' && (
+          <div className="text-center py-8">
+            <Loader2 className="w-12 h-12 animate-spin text-green-500 mx-auto mb-4" />
+            <p className="text-gray-600">Generating pairing code...</p>
+          </div>
+        )}
+
+        {status === 'waiting' && pairingCode && (
+          <div className="space-y-4">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 text-center">
+              <p className="text-sm text-green-700 dark:text-green-400 mb-2">Enter this code in WhatsApp:</p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-3xl font-mono font-bold text-green-600 dark:text-green-400 tracking-widest">
+                  {pairingCode}
+                </span>
+                <button
+                  onClick={handleCopyCode}
+                  className="p-2 hover:bg-green-100 dark:hover:bg-green-800 rounded transition-colors"
+                  title="Copy code"
+                >
+                  {copied ? (
+                    <CheckCheck className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <Copy className="w-5 h-5 text-green-600" />
+                  )}
+                </button>
+              </div>
+              {expiresAt && (
+                <p className="text-xs text-green-600 dark:text-green-500 mt-2">
+                  Expires: {new Date(expiresAt).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+              <p className="text-sm font-medium mb-2">Instructions:</p>
+              <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                {instructions.map((instruction, idx) => (
+                  <li key={idx}>{instruction}</li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Waiting for phone to connect...
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-full px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {status === 'connected' && (
+          <div className="text-center py-8">
+            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <p className="text-lg font-medium text-green-600">Paired Successfully!</p>
+            <p className="text-sm text-gray-500 mt-2">The service is now connected.</p>
+          </div>
+        )}
+
+        {(status === 'failed' || status === 'expired') && (
+          <div className="space-y-4">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-center">
+              <XCircle className="w-12 h-12 text-red-500 mx-auto mb-2" />
+              <p className="text-red-700 dark:text-red-400">{error || 'Pairing failed'}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setStatus('idle')}
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const ServicesTab: React.FC = () => {
   const [status, setStatus] = useState<WaServicesStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [restartingService, setRestartingService] = useState<string | null>(null);
+  const [pairingModal, setPairingModal] = useState<{
+    isOpen: boolean;
+    service: 'bridge' | 'sender';
+    serviceName: string;
+    currentPhone: string;
+  } | null>(null);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -57,7 +293,6 @@ const ServicesTab: React.FC = () => {
 
     if (result.success) {
       toast.success(`${service} service restart initiated`);
-      // Wait a bit then refresh status
       setTimeout(() => {
         fetchStatus();
         setRestartingService(null);
@@ -65,6 +300,30 @@ const ServicesTab: React.FC = () => {
     } else {
       toast.error(result.error || 'Failed to restart service');
       setRestartingService(null);
+    }
+  };
+
+  const handlePair = (service: WaServiceStatus) => {
+    setPairingModal({
+      isOpen: true,
+      service: service.name as 'bridge' | 'sender',
+      serviceName: service.displayName,
+      currentPhone: service.phone_number,
+    });
+  };
+
+  const handleLogout = async (service: 'bridge' | 'sender', serviceName: string) => {
+    if (!confirm(`Are you sure you want to logout ${serviceName}? You will need to re-pair the device.`)) {
+      return;
+    }
+
+    const result = await waAdminApi.services.logout(service);
+
+    if (result.success) {
+      toast.success(`${serviceName} logged out`);
+      fetchStatus();
+    } else {
+      toast.error(result.error || 'Failed to logout');
     }
   };
 
@@ -161,7 +420,7 @@ const ServicesTab: React.FC = () => {
           onClick={fetchStatus}
           disabled={loading}
           aria-label="Refresh service status"
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           Refresh
@@ -175,6 +434,8 @@ const ServicesTab: React.FC = () => {
             <ServiceCard
               service={status.bridge}
               onRestart={() => handleRestart('bridge')}
+              onPair={() => handlePair(status.bridge)}
+              onLogout={() => handleLogout('bridge', 'WhatsApp Bridge')}
               isRestarting={restartingService === 'bridge'}
               getStatusIcon={getStatusIcon}
               getStatusColor={getStatusColor}
@@ -182,6 +443,8 @@ const ServicesTab: React.FC = () => {
             <ServiceCard
               service={status.sender}
               onRestart={() => handleRestart('sender')}
+              onPair={() => handlePair(status.sender)}
+              onLogout={() => handleLogout('sender', 'WhatsApp Sender')}
               isRestarting={restartingService === 'sender'}
               getStatusIcon={getStatusIcon}
               getStatusColor={getStatusColor}
@@ -192,9 +455,23 @@ const ServicesTab: React.FC = () => {
 
       {/* Last checked timestamp */}
       {status && (
-        <p className="text-xs text-gray-500 text-right">
+        <p className="text-xs text-[var(--ff-text-secondary)] text-right">
           Last checked: {new Date(status.checked_at).toLocaleString()}
         </p>
+      )}
+
+      {/* Pairing Modal */}
+      {pairingModal && (
+        <PairingModal
+          isOpen={pairingModal.isOpen}
+          onClose={() => {
+            setPairingModal(null);
+            fetchStatus();
+          }}
+          service={pairingModal.service}
+          serviceName={pairingModal.serviceName}
+          currentPhone={pairingModal.currentPhone}
+        />
       )}
     </div>
   );
@@ -203,6 +480,8 @@ const ServicesTab: React.FC = () => {
 interface ServiceCardProps {
   service: WaServiceStatus;
   onRestart: () => void;
+  onPair: () => void;
+  onLogout: () => void;
   isRestarting: boolean;
   getStatusIcon: (status: ServiceStatus) => React.ReactNode;
   getStatusColor: (status: ServiceStatus) => string;
@@ -211,12 +490,14 @@ interface ServiceCardProps {
 const ServiceCard: React.FC<ServiceCardProps> = ({
   service,
   onRestart,
+  onPair,
+  onLogout,
   isRestarting,
   getStatusIcon,
   getStatusColor,
 }) => {
   return (
-    <div className="border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-5 bg-white">
+    <div className="border border-[var(--ff-border-light)] rounded-lg p-4 sm:p-5 bg-[var(--ff-bg-card)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
@@ -231,37 +512,67 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onRestart}
-          disabled={isRestarting}
-          aria-label={`Restart ${service.displayName}`}
-          className="flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
-        >
-          {isRestarting ? (
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RotateCcw className="w-4 h-4" aria-hidden="true" />
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          {service.needs_auth && (
+            <button
+              onClick={onPair}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-500 hover:bg-green-600 text-white rounded transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+              title="Authenticate this service"
+            >
+              <Key className="w-4 h-4" />
+              Pair
+            </button>
           )}
-          {isRestarting ? 'Restarting...' : 'Restart'}
-        </button>
+
+          {service.session_valid && (
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-1 px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+              title="Logout and clear session"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+
+          <button
+            onClick={onRestart}
+            disabled={isRestarting}
+            aria-label={`Restart ${service.displayName}`}
+            className="flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+            {isRestarting ? (
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <RotateCcw className="w-4 h-4" aria-hidden="true" />
+            )}
+            {isRestarting ? 'Restarting...' : 'Restart'}
+          </button>
+        </div>
       </div>
 
       {/* Details */}
       <div className="space-y-2 text-sm">
-        <div className="flex items-center gap-2 text-gray-600">
+        <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
           <Phone className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span>{service.phone_number}</span>
+          {service.name === 'sender' && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">SENDS</span>
+          )}
+          {service.name === 'bridge' && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">RECEIVES</span>
+          )}
         </div>
 
-        <div className="flex items-start sm:items-center gap-2 text-gray-600">
-          <span className="text-gray-400 flex-shrink-0">URL:</span>
-          <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded break-all">
+        <div className="flex items-start sm:items-center gap-2 text-[var(--ff-text-secondary)]">
+          <span className="text-[var(--ff-text-tertiary)] flex-shrink-0">URL:</span>
+          <code className="text-xs bg-[var(--ff-bg-tertiary)] px-1.5 py-0.5 rounded break-all">
             {service.url}
           </code>
         </div>
 
         {service.last_message_at && (
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
             <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
             <span>Last message: {new Date(service.last_message_at).toLocaleString()}</span>
           </div>
@@ -274,8 +585,9 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         )}
 
         {service.needs_auth && (
-          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-xs" role="alert">
-            ⚠️ Authentication required. Please re-authenticate the device.
+          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-xs flex items-center gap-2" role="alert">
+            <Key className="w-4 h-4" />
+            Authentication required. Click &quot;Pair&quot; to link a WhatsApp device.
           </div>
         )}
       </div>

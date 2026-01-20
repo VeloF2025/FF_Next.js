@@ -173,6 +173,7 @@ export interface WaPaginatedResponse<T> {
     total: number;
     total_pages: number;
   };
+  error?: string;
 }
 
 // ============================================

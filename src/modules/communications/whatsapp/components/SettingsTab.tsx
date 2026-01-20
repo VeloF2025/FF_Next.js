@@ -140,7 +140,7 @@ const SettingsTab: React.FC = () => {
         <button
           onClick={fetchConfigs}
           disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -156,9 +156,9 @@ const SettingsTab: React.FC = () => {
 
         return (
           <div key={category} className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-[var(--ff-border-light)] flex items-center gap-2">
-              <Icon className="w-5 h-5 text-gray-600" />
-              <h4 className="font-medium text-gray-700">
+            <div className="bg-[var(--ff-bg-secondary)] px-4 py-3 border-b border-[var(--ff-border-light)] flex items-center gap-2">
+              <Icon className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+              <h4 className="font-medium text-[var(--ff-text-primary)]">
                 {CATEGORY_LABELS[category] || category}
               </h4>
             </div>
@@ -183,7 +183,7 @@ const SettingsTab: React.FC = () => {
       })}
 
       {/* Warning Notice */}
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+      <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-600 dark:text-yellow-400 text-sm">
         <strong>Note:</strong> Some configuration changes may require a service restart to take effect.
         Use the Services tab to restart WhatsApp services after making changes.
       </div>
@@ -213,13 +213,15 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
   isModified,
 }) => {
   const renderInput = () => {
+    const inputClass = "w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500";
+
     // Handle boolean type
     if (config.config_type === 'boolean') {
       return (
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+          className={inputClass}
         >
           <option value="true">Enabled</option>
           <option value="false">Disabled</option>
@@ -234,7 +236,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
           type="number"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+          className={inputClass}
         />
       );
     }
@@ -246,7 +248,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className={`${inputClass} font-mono text-sm`}
         />
       );
     }
@@ -258,7 +260,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
           type="url"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded font-mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          className={`${inputClass} font-mono text-sm`}
           placeholder="https://..."
         />
       );
@@ -271,7 +273,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
           type="password"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+          className={inputClass}
           placeholder="Enter new value to change"
         />
       );
@@ -283,7 +285,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+        className={inputClass}
       />
     );
   };
@@ -299,9 +301,9 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
             {formatLabel(config.config_key)}
           </label>
           {config.description && (
-            <p id={`${inputId}-desc`} className="text-sm text-gray-500 mt-0.5">{config.description}</p>
+            <p id={`${inputId}-desc`} className="text-sm text-[var(--ff-text-secondary)] mt-0.5">{config.description}</p>
           )}
-          <code className="text-xs text-gray-400 mt-1 block">{config.config_key}</code>
+          <code className="text-xs text-[var(--ff-text-tertiary)] mt-1 block">{config.config_key}</code>
         </div>
 
         {/* Input and Actions */}
@@ -313,7 +315,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
               <>
                 <button
                   onClick={onReset}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded focus:outline-none focus:ring-2 focus:ring-gray-500"
                   aria-label={`Reset ${formatLabel(config.config_key)}`}
                 >
                   <RefreshCw className="w-4 h-4" aria-hidden="true" />
@@ -321,7 +323,7 @@ const ConfigRow: React.FC<ConfigRowProps> = ({
                 <button
                   onClick={onSave}
                   disabled={isSaving}
-                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="p-2 text-green-600 hover:text-green-700 hover:bg-green-500/10 rounded disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
                   aria-label={`Save ${formatLabel(config.config_key)}`}
                 >
                   {isSaving ? (

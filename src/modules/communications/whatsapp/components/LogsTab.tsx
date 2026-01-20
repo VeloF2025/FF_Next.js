@@ -114,7 +114,7 @@ const LogsTab: React.FC = () => {
             onClick={fetchLogs}
             disabled={loading}
             aria-label="Refresh message logs"
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
             Refresh
@@ -124,7 +124,7 @@ const LogsTab: React.FC = () => {
             aria-expanded={showFilters}
             aria-controls="logs-filter-panel"
             className={`flex items-center gap-2 px-3 py-2 text-sm rounded transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 ${
-              showFilters ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              showFilters ? 'bg-green-500/10 text-green-600' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-border-light)]'
             }`}
           >
             <Filter className="w-4 h-4" aria-hidden="true" />
@@ -158,13 +158,13 @@ const LogsTab: React.FC = () => {
 
       {/* Filters */}
       {showFilters && (
-        <div id="logs-filter-panel" className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg border border-[var(--ff-border-light)]">
+        <div id="logs-filter-panel" className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Direction</label>
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Direction</label>
             <select
               value={filters.direction || ''}
               onChange={(e) => handleFilterChange('direction', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+              className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             >
               <option value="">All</option>
               <option value="inbound">Inbound</option>
@@ -172,11 +172,11 @@ const LogsTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Status</label>
             <select
               value={filters.status || ''}
               onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+              className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             >
               <option value="">All</option>
               <option value="sent">Sent</option>
@@ -186,41 +186,41 @@ const LogsTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Project</label>
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Project</label>
             <input
               type="text"
               value={filters.project || ''}
               onChange={(e) => handleFilterChange('project', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+              className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
               placeholder="e.g., Lawley"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Drop Number</label>
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Drop Number</label>
             <input
               type="text"
               value={filters.drop_number || ''}
               onChange={(e) => handleFilterChange('drop_number', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+              className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
               placeholder="e.g., DR1752169"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Date From</label>
             <input
               type="date"
               value={filters.date_from || ''}
               onChange={(e) => handleFilterChange('date_from', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+              className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Date To</label>
+            <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Date To</label>
             <input
               type="date"
               value={filters.date_to || ''}
               onChange={(e) => handleFilterChange('date_to', e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+              className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
             />
           </div>
         </div>
@@ -230,15 +230,15 @@ const LogsTab: React.FC = () => {
       <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-[var(--ff-border-light)]">
+            <thead className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-600">Direction</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-600">Type</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-600">Project</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-600">Drop</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-600">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-600">Timestamp</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-600">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Direction</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Type</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Project</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Drop</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Timestamp</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -251,13 +251,13 @@ const LogsTab: React.FC = () => {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                     No logs found matching your criteria.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="border-b border-[var(--ff-border-light)] hover:bg-gray-50">
+                  <tr key={log.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)]">
                     <td className="px-4 py-3">
                       {log.direction === 'inbound' ? (
                         <span className="inline-flex items-center gap-1 text-blue-600 text-sm">
@@ -270,7 +270,7 @@ const LogsTab: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
+                      <span className="bg-[var(--ff-bg-tertiary)] px-2 py-0.5 rounded text-xs text-[var(--ff-text-primary)]">
                         {log.message_type || 'unknown'}
                       </span>
                     </td>
@@ -279,7 +279,7 @@ const LogsTab: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {log.drop_number ? (
-                        <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+                        <code className="bg-[var(--ff-bg-tertiary)] px-1.5 py-0.5 rounded text-xs">
                           {log.drop_number}
                         </code>
                       ) : (
@@ -292,13 +292,13 @@ const LogsTab: React.FC = () => {
                         {log.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-xs text-[var(--ff-text-secondary)]">
                       {new Date(log.created_at).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setSelectedLog(log)}
-                        className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="p-1.5 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
                         aria-label={`View details for ${log.direction} message${log.drop_number ? ` ${log.drop_number}` : ''}`}
                       >
                         <Eye className="w-4 h-4" aria-hidden="true" />
@@ -312,8 +312,8 @@ const LogsTab: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-[var(--ff-border-light)]">
-          <p className="text-sm text-gray-600">
+        <div className="flex items-center justify-between px-4 py-3 bg-[var(--ff-bg-secondary)] border-t border-[var(--ff-border-light)]">
+          <p className="text-sm text-[var(--ff-text-secondary)]">
             Showing {logs.length} of {pagination.total} logs
           </p>
           <nav className="flex items-center gap-2" aria-label="Log pagination">
@@ -321,18 +321,18 @@ const LogsTab: React.FC = () => {
               onClick={() => handlePageChange(pagination.page - 1)}
               disabled={pagination.page <= 1}
               aria-label="Go to previous page"
-              className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="p-1.5 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <ChevronLeft className="w-5 h-5" aria-hidden="true" />
             </button>
-            <span className="text-sm text-gray-600" aria-live="polite">
+            <span className="text-sm text-[var(--ff-text-secondary)]" aria-live="polite">
               Page {pagination.page} of {pagination.total_pages}
             </span>
             <button
               onClick={() => handlePageChange(pagination.page + 1)}
               disabled={pagination.page >= pagination.total_pages}
               aria-label="Go to next page"
-              className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="p-1.5 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <ChevronRight className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -395,15 +395,15 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ log, onClose }) => {
         role="dialog"
         aria-modal="true"
         aria-labelledby="log-detail-title"
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-[var(--ff-bg-card)] rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 id="log-detail-title" className="text-lg font-semibold">Message Details</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ff-border-light)]">
+          <h3 id="log-detail-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">Message Details</h3>
           <button
             ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close message details"
-            className="p-1 hover:bg-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
@@ -412,58 +412,58 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ log, onClose }) => {
         <div className="px-6 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500">Direction</label>
-              <p className="text-sm">{log.direction}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Direction</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{log.direction}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Service</label>
-              <p className="text-sm">{log.service}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Service</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{log.service}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Status</label>
-              <p className="text-sm">{log.status}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Status</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{log.status}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Type</label>
-              <p className="text-sm">{log.message_type || '-'}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Type</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{log.message_type || '-'}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Project</label>
-              <p className="text-sm">{log.project || '-'}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Project</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{log.project || '-'}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Drop Number</label>
-              <p className="text-sm">{log.drop_number || '-'}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Drop Number</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{log.drop_number || '-'}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Group JID</label>
-              <p className="text-sm font-mono text-xs">{log.group_jid || '-'}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Group JID</label>
+              <p className="text-sm font-mono text-xs text-[var(--ff-text-primary)]">{log.group_jid || '-'}</p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Timestamp</label>
-              <p className="text-sm">{new Date(log.created_at).toLocaleString()}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Timestamp</label>
+              <p className="text-sm text-[var(--ff-text-primary)]">{new Date(log.created_at).toLocaleString()}</p>
             </div>
           </div>
 
           {log.error_message && (
             <div>
-              <label className="text-xs font-medium text-gray-500">Error</label>
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded mt-1">{log.error_message}</p>
+              <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Error</label>
+              <p className="text-sm text-red-600 bg-red-500/10 p-2 rounded mt-1">{log.error_message}</p>
             </div>
           )}
 
           <div>
-            <label className="text-xs font-medium text-gray-500">Message Content</label>
-            <pre className="text-sm bg-gray-100 p-3 rounded mt-1 whitespace-pre-wrap overflow-x-auto max-h-[200px]">
+            <label className="text-xs font-medium text-[var(--ff-text-secondary)]">Message Content</label>
+            <pre className="text-sm bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] p-3 rounded mt-1 whitespace-pre-wrap overflow-x-auto max-h-[200px]">
               {log.message_content || '(No content)'}
             </pre>
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200">
+        <div className="px-6 py-4 border-t border-[var(--ff-border-light)]">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+            className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded hover:bg-[var(--ff-border-light)] transition-colors"
           >
             Close
           </button>

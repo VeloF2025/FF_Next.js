@@ -68,8 +68,11 @@ const WhatsAppPortal: React.FC = () => {
         return;
     }
 
-    setActiveTab(tabs[newIndex].id);
-    tabRefs.current[newIndex]?.focus();
+    const newTab = tabs[newIndex];
+    if (newTab) {
+      setActiveTab(newTab.id);
+      tabRefs.current[newIndex]?.focus();
+    }
   }, []);
 
   return (
