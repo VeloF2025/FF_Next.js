@@ -76,7 +76,7 @@ const categories: CategoryTab[] = [
 
 export function ReportsDashboard() {
   // Get shared filters from context
-  const { filters: sharedFilters, lastRefreshAt, projects } = useActivateData();
+  const { filters: sharedFilters, projects } = useActivateData();
 
   // Active category
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('anomalies');
@@ -100,13 +100,9 @@ export function ReportsDashboard() {
     }));
   }, [sharedFilters.projectFilter]);
 
-  // Track context refresh
-  useEffect(() => {
-    if (lastRefreshAt) {
-      // Trigger refresh on background update
-      setRefreshKey((k) => k + 1);
-    }
-  }, [lastRefreshAt]);
+  // NOTE: Removed auto-refresh on lastRefreshAt change to prevent visual re-renders.
+  // Reports now only refresh when user clicks "Refresh" button or changes filters.
+  // The Dashboard tab still auto-refreshes via ActivateDataContext.
 
   // Quick filter handlers
   const handleQuickFilter = (filter: 'today' | 'yesterday' | 'last7days' | 'last30days') => {
