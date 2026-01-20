@@ -562,6 +562,7 @@ export async function updateCheckRecordStatus(
 
 /**
  * Add a photo to a check record
+ * Supports both legacy local storage and VF Storage Service URLs
  */
 export async function addCheckPhoto(input: {
   recordId: string;
@@ -573,11 +574,13 @@ export async function addCheckPhoto(input: {
   fileSize?: number;
   latitude?: number;
   longitude?: number;
+  storageServiceUrl?: string; // New: Full URL from VF Storage Service
 }): Promise<CheckPhoto> {
   const [row] = await sql`
     INSERT INTO fleet_check_photos (
       record_id, response_id, photo_type, is_required,
-      file_url, file_path, file_size, latitude, longitude
+      file_url, file_path, file_size, latitude, longitude,
+      storage_service_url
     )
     VALUES (
       ${input.recordId},
@@ -588,7 +591,8 @@ export async function addCheckPhoto(input: {
       ${input.filePath || null},
       ${input.fileSize || null},
       ${input.latitude || null},
-      ${input.longitude || null}
+      ${input.longitude || null},
+      ${input.storageServiceUrl || null}
     )
     RETURNING *
   ` as FleetCheckPhotoRow[];

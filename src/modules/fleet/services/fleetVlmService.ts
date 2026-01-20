@@ -10,6 +10,7 @@
 
 import { log } from '@/lib/logger';
 import sharp from 'sharp';
+import { neon } from '@neondatabase/serverless';
 import {
   OdometerExtractionResult,
   LicensePlateExtractionResult,
@@ -18,6 +19,9 @@ import {
   LicenseDiskExtractionResult,
   VlmAnalysisType,
 } from '../types/check-in.types';
+
+// Database connection for calibration queries
+const sql = neon(process.env.DATABASE_URL!);
 
 // VLM API configuration
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
@@ -30,6 +34,21 @@ const VLM_TIMEOUT_MS = 60000; // 1 minute for single image
 const VLM_MAX_WIDTH = 1280;
 const VLM_MAX_HEIGHT = 960;
 const VLM_JPEG_QUALITY = 85;
+
+// ============================================================================
+// Calibration Data Types
+// ============================================================================
+
+export interface VehicleCalibration {
+  id: string;
+  vehicleId: string;
+  calibratedAt: string;
+  calibratedByName: string | null;
+  baselineOdometer: number;
+  baselineFuelLevel: number;
+  dashboardPhotoUrl: string | null;
+  vlmLearningStatus: 'pending' | 'learning' | 'ready';
+}
 
 /**
  * Resize image to fit within VLM limits
@@ -87,6 +106,77 @@ export class FleetVlmError extends Error {
   ) {
     super(message);
     this.name = 'FleetVlmError';
+  }
+}
+
+// ============================================================================
+// Calibration Helpers
+// ============================================================================
+
+/**
+ * Fetch active calibration data for a vehicle
+ * Used for VLM validation and few-shot learning context
+ */
+export async function getVehicleCalibration(vehicleId: string): Promise<VehicleCalibration | null> {
+  try {
+    const result = await sql`
+      SELECT
+        id, vehicle_id, calibrated_at, calibrated_by_name,
+        baseline_odometer, baseline_fuel_level,
+        dashboard_photo_url, vlm_learning_status
+      FROM fleet_vehicle_calibration
+      WHERE vehicle_id = ${vehicleId} AND is_active = true
+      LIMIT 1
+    `;
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    const row = result[0];
+    return {
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      calibratedAt: row.calibrated_at,
+      calibratedByName: row.calibrated_by_name,
+      baselineOdometer: row.baseline_odometer,
+      baselineFuelLevel: row.baseline_fuel_level,
+      dashboardPhotoUrl: row.dashboard_photo_url,
+      vlmLearningStatus: row.vlm_learning_status || 'pending',
+    };
+  } catch (error) {
+    log.error('FleetVlmService', `Failed to fetch calibration: ${error}`);
+    return null;
+  }
+}
+
+/**
+ * Fetch reference photo as base64 for few-shot learning
+ * Returns null if photo not available or fetch fails
+ */
+async function fetchCalibrationPhotoBase64(photoUrl: string | null): Promise<string | null> {
+  if (!photoUrl) return null;
+
+  try {
+    // Construct full URL if relative path
+    const fullUrl = photoUrl.startsWith('http')
+      ? photoUrl
+      : `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}${photoUrl}`;
+
+    const response = await fetch(fullUrl, {
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      log.warn('FleetVlmService', `Failed to fetch calibration photo: ${response.status}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return buffer.toString('base64');
+  } catch (error) {
+    log.error('FleetVlmService', `Error fetching calibration photo: ${error}`);
+    return null;
   }
 }
 
@@ -495,6 +585,157 @@ export async function extractOdometerReading(
 }
 
 /**
+ * Few-shot prompt with calibration reference for better odometer extraction
+ */
+function buildFewShotOdometerPrompt(
+  calibrationBaseline: number,
+  calibrationDate: string
+): string {
+  return `You are a precision OCR system for vehicle odometer readings.
+
+CONTEXT: This vehicle was calibrated on ${calibrationDate} with a baseline odometer reading of ${calibrationBaseline} km.
+The current reading should be >= ${calibrationBaseline} km (odometers only go up).
+
+TASK: Extract the EXACT odometer/mileage reading digit-by-digit.
+
+CRITICAL - DIGIT RECOGNITION:
+- "1" has a single vertical stroke, "6" has a curved loop
+- "2" has a curved top, "3" has two curved bumps on the right
+- "7" has a horizontal top stroke, "1" does not
+- "8" has two stacked loops, "0" has one loop
+- "9" has loop at top with tail, "4" has straight lines meeting
+
+FINDING THE ODOMETER:
+1. The MAIN odometer shows TOTAL kilometers (usually 5-6 digits)
+2. It is typically the LARGEST number display on the dashboard
+3. IGNORE the trip meter (usually smaller, often starts with "A" or "B")
+4. IGNORE the speedometer (has "km/h" or "mph" markings around it)
+5. The odometer often has "km" or "ODO" nearby
+
+EXTRACTION PROCESS:
+1. Locate the main odometer display
+2. Read EACH DIGIT individually from left to right
+3. Double-check digits that look similar (1/6, 2/3, 7/1, 8/0)
+4. Verify: reading should be >= ${calibrationBaseline} km (calibration baseline)
+
+RESPONSE FORMAT (JSON only, no markdown):
+{
+  "reading": 123456,
+  "confidence": 0.95,
+  "raw_text": "123456",
+  "digit_breakdown": "1-2-3-4-5-6",
+  "display_type": "digital|analog"
+}
+
+If odometer not visible/unreadable:
+{
+  "reading": null,
+  "confidence": 0,
+  "raw_text": "unreadable",
+  "digit_breakdown": null,
+  "display_type": null
+}`;
+}
+
+/**
+ * Extract odometer reading with calibration context (few-shot enhanced)
+ * Uses calibration baseline for better validation and optionally reference photo
+ * @param base64Image - Current dashboard photo (base64)
+ * @param vehicleId - Vehicle UUID to fetch calibration data
+ * @returns Enhanced extraction result with calibration-aware validation
+ */
+export async function extractOdometerWithCalibration(
+  base64Image: string,
+  vehicleId: string
+): Promise<OdometerExtractionResult & { calibrationUsed: boolean; baselineOdometer?: number }> {
+  try {
+    // Fetch calibration data for this vehicle
+    const calibration = await getVehicleCalibration(vehicleId);
+
+    if (!calibration) {
+      log.info('FleetVlmService', `No calibration found for vehicle ${vehicleId}, using standard extraction`);
+      const result = await extractOdometerReading(base64Image);
+      return { ...result, calibrationUsed: false };
+    }
+
+    log.info('FleetVlmService', `Using calibration context: baseline=${calibration.baselineOdometer} km`);
+
+    // Build few-shot prompt with calibration context
+    const prompt = buildFewShotOdometerPrompt(
+      calibration.baselineOdometer,
+      new Date(calibration.calibratedAt).toLocaleDateString()
+    );
+
+    // First pass with calibration-aware prompt
+    const content1 = await callVlmApi(base64Image, prompt, 'odometer');
+    const result1 = parseVlmJson<{
+      reading: number | null;
+      confidence: number;
+      raw_text: string;
+      digit_breakdown?: string;
+      display_type?: string;
+    }>(content1);
+
+    log.info('FleetVlmService', `Calibration-aware Pass 1: ${result1.reading} km (${result1.confidence} conf)`);
+
+    // If first pass failed or low confidence, try standard extraction
+    if (!result1.reading || result1.confidence < 0.5) {
+      log.info('FleetVlmService', 'Calibration pass failed, falling back to standard extraction');
+      const fallback = await extractOdometerReading(base64Image);
+      return { ...fallback, calibrationUsed: false };
+    }
+
+    // Validate against calibration baseline
+    if (result1.reading < calibration.baselineOdometer) {
+      log.warn('FleetVlmService', `Reading ${result1.reading} km is below calibration baseline ${calibration.baselineOdometer} km`);
+      // This is suspicious - odometer shouldn't go backwards
+      return {
+        reading: result1.reading,
+        confidence: Math.min(result1.confidence, 0.5), // Reduce confidence
+        rawText: result1.raw_text || '',
+        warning: `Reading below calibration baseline (${calibration.baselineOdometer} km)`,
+        rawResponse: content1,
+        calibrationUsed: true,
+        baselineOdometer: calibration.baselineOdometer,
+      };
+    }
+
+    // Second pass for verification
+    const content2 = await callVlmApi(base64Image, prompt, 'odometer');
+    const result2 = parseVlmJson<{
+      reading: number | null;
+      confidence: number;
+      raw_text: string;
+      digit_breakdown?: string;
+      display_type?: string;
+    }>(content2);
+
+    log.info('FleetVlmService', `Calibration-aware Pass 2: ${result2.reading} km (${result2.confidence} conf)`);
+
+    // Compare results
+    const readingsMatch = result1.reading === result2.reading;
+    const bestResult = result2.confidence > result1.confidence ? result2 : result1;
+    const finalConfidence = readingsMatch
+      ? Math.min(bestResult.confidence + 0.05, 1.0)
+      : Math.max(bestResult.confidence - 0.1, 0.5);
+
+    return {
+      reading: bestResult.reading,
+      confidence: finalConfidence,
+      rawText: bestResult.raw_text || '',
+      rawResponse: `Calibration-aware: Pass1=${result1.reading}, Pass2=${result2.reading}`,
+      calibrationUsed: true,
+      baselineOdometer: calibration.baselineOdometer,
+    };
+  } catch (error) {
+    log.error('FleetVlmService', `Calibration-aware extraction failed: ${error}`);
+    // Fall back to standard extraction
+    const fallback = await extractOdometerReading(base64Image);
+    return { ...fallback, calibrationUsed: false };
+  }
+}
+
+/**
  * Detect common digit confusion patterns between two number strings
  * Returns description of confusion or null if no pattern found
  */
@@ -641,6 +882,63 @@ export async function extractFuelLevel(
 }
 
 /**
+ * Extract fuel level with calibration context
+ * Uses calibration baseline to validate large fuel changes
+ * @param base64Image - Current dashboard photo (base64)
+ * @param vehicleId - Vehicle UUID to fetch calibration data
+ * @param previousFuelLevel - Previous fuel level (0-100) for comparison
+ * @returns Enhanced fuel extraction with calibration awareness
+ */
+export async function extractFuelLevelWithCalibration(
+  base64Image: string,
+  vehicleId: string,
+  previousFuelLevel?: number | null
+): Promise<FuelGaugeExtractionResult & { calibrationUsed: boolean; baselineFuelLevel?: number }> {
+  try {
+    // Standard extraction first
+    const result = await extractFuelLevel(base64Image);
+
+    // Fetch calibration for context
+    const calibration = await getVehicleCalibration(vehicleId);
+
+    if (!calibration) {
+      return { ...result, calibrationUsed: false };
+    }
+
+    log.info('FleetVlmService', `Fuel calibration context: baseline=${calibration.baselineFuelLevel}%`);
+
+    // Validate fuel level changes
+    // Large increases without refueling context might indicate misread
+    const prevLevel = previousFuelLevel ?? calibration.baselineFuelLevel;
+    if (result.level !== null && prevLevel !== null) {
+      const fuelChange = result.level - prevLevel;
+
+      // Fuel increase of more than 60% without being near empty is suspicious
+      if (fuelChange > 60 && prevLevel > 30) {
+        log.warn('FleetVlmService', `Suspicious fuel increase: ${prevLevel}% -> ${result.level}% (+${fuelChange}%)`);
+        return {
+          ...result,
+          confidence: Math.min(result.confidence, 0.7),
+          description: `${result.description} (Warning: Large increase from ${prevLevel}%)`,
+          calibrationUsed: true,
+          baselineFuelLevel: calibration.baselineFuelLevel,
+        };
+      }
+    }
+
+    return {
+      ...result,
+      calibrationUsed: true,
+      baselineFuelLevel: calibration.baselineFuelLevel,
+    };
+  } catch (error) {
+    log.error('FleetVlmService', `Calibration-aware fuel extraction failed: ${error}`);
+    const fallback = await extractFuelLevel(base64Image);
+    return { ...fallback, calibrationUsed: false };
+  }
+}
+
+/**
  * Extract fuel purchase details from receipt photo
  * @param base64Image - Base64-encoded image of fuel receipt
  * @returns Fuel receipt extraction result with amount, litres, date, station info
@@ -717,7 +1015,7 @@ export async function extractLicenseDiskDetails(
     }>(content);
 
     // Validate VIN length if present
-    let vin = result.vin;
+    const vin = result.vin;
     if (vin && vin.length !== 17) {
       log.warn('FleetVlmService', `VIN length invalid (${vin.length}), expected 17 characters`);
       // Keep it but note the issue
@@ -1056,26 +1354,34 @@ function detectDigitConfusionValidation(
 /**
  * Enhanced odometer extraction with validation
  * Gets previous reading from database and validates the extracted value
+ * Now uses calibration data for better accuracy and validation
  */
 export async function extractAndValidateOdometerReading(
   base64Image: string,
   vehicleId: string,
   getPreviousReading: () => Promise<number | null>
-): Promise<OdometerExtractionResult & { validation: OdometerValidationResult }> {
-  // Extract reading using VLM
-  const extractionResult = await extractOdometerReading(base64Image);
+): Promise<OdometerExtractionResult & { validation: OdometerValidationResult; calibrationUsed?: boolean }> {
+  // Try calibration-aware extraction first
+  const extractionResult = await extractOdometerWithCalibration(base64Image, vehicleId);
 
   // Get previous reading for comparison
   const previousReading = await getPreviousReading();
+
+  // Use calibration baseline as fallback for previous reading if available
+  const effectivePrevious = previousReading ?? extractionResult.baselineOdometer ?? null;
 
   // Validate the reading
   const validation = validateOdometerReading(
     extractionResult.reading,
     extractionResult.confidence,
-    previousReading
+    effectivePrevious,
+    {
+      // If calibration is available, we can be more strict
+      minConfidence: extractionResult.calibrationUsed ? 0.80 : 0.85,
+    }
   );
 
-  log.info('FleetVlmService', `ODO validation: extracted=${extractionResult.reading}, previous=${previousReading}, action=${validation.suggestedAction}`);
+  log.info('FleetVlmService', `ODO validation: extracted=${extractionResult.reading}, previous=${effectivePrevious}, calibration=${extractionResult.calibrationUsed}, action=${validation.suggestedAction}`);
 
   if (validation.warning) {
     log.warn('FleetVlmService', `ODO warning: ${validation.warning}`);
@@ -1084,7 +1390,28 @@ export async function extractAndValidateOdometerReading(
   return {
     ...extractionResult,
     validation,
+    calibrationUsed: extractionResult.calibrationUsed,
   };
+}
+
+/**
+ * Update calibration VLM learning status
+ * Call after successful readings to mark calibration as 'ready'
+ */
+export async function updateCalibrationLearningStatus(
+  calibrationId: string,
+  status: 'pending' | 'learning' | 'ready'
+): Promise<void> {
+  try {
+    await sql`
+      UPDATE fleet_vehicle_calibration
+      SET vlm_learning_status = ${status}
+      WHERE id = ${calibrationId}
+    `;
+    log.info('FleetVlmService', `Updated calibration ${calibrationId} learning status to ${status}`);
+  } catch (error) {
+    log.error('FleetVlmService', `Failed to update calibration status: ${error}`);
+  }
 }
 
 /**

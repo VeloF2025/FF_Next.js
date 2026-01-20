@@ -37,8 +37,10 @@ import {
   History,
   Clock,
   ExternalLink,
+  Settings2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { VehicleCalibrationModal } from '@/modules/fleet/check-in/components/VehicleCalibrationModal';
 
 // Types
 interface AssignedDriver {
@@ -123,6 +125,70 @@ export default function VehiclePortalPage() {
   const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null);
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Calibration state
+  const [showCalibration, setShowCalibration] = useState(false);
+  const [needsCalibration, setNeedsCalibration] = useState(false);
+  const [checkingCalibration, setCheckingCalibration] = useState(false);
+
+  // Check calibration status when vehicle is verified
+  React.useEffect(() => {
+    async function checkCalibration() {
+      if (!verifiedVehicle) return;
+
+      setCheckingCalibration(true);
+      try {
+        const response = await fetch(`/api/fleet/vehicles/${verifiedVehicle.id}/calibration`);
+        const data = await response.json();
+
+        if (response.ok && data.data) {
+          setNeedsCalibration(data.data.needsCalibration);
+          if (data.data.needsCalibration) {
+            setShowCalibration(true);
+          }
+        }
+      } catch {
+        // If error checking calibration, allow to proceed (fail open)
+        setNeedsCalibration(false);
+      } finally {
+        setCheckingCalibration(false);
+      }
+    }
+
+    checkCalibration();
+  }, [verifiedVehicle]);
+
+  // Handle calibration completion
+  const handleCalibrationComplete = async (calibration: {
+    baselineOdometer: number;
+    baselineFuelLevel: number;
+    dashboardPhotoDataUrl: string;
+  }) => {
+    if (!verifiedVehicle) return;
+
+    try {
+      const response = await fetch(`/api/fleet/vehicles/${verifiedVehicle.id}/calibration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...calibration,
+          calibratedByName: currentUser?.fullName || 'Unknown Driver',
+          calibratedById: currentUser?.staffId,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Vehicle calibration complete!');
+        setShowCalibration(false);
+        setNeedsCalibration(false);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to save calibration');
+      }
+    } catch {
+      toast.error('Failed to save calibration');
+    }
+  };
 
   // Handle plate photo capture
   const handlePlateCapture = useCallback(async (file: File) => {
@@ -647,27 +713,6 @@ export default function VehiclePortalPage() {
                 </div>
               </div>
 
-              {/* Check-In History Card */}
-              <div
-                onClick={() => router.push(`/fleet/vehicles/${verifiedVehicle.id}/check-in-history`)}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-2 border-transparent hover:border-blue-400 dark:hover:border-blue-500"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                      <History className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-900 dark:text-white">View Check-In History</span>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        See all past inspections for this vehicle
-                      </p>
-                    </div>
-                  </div>
-                  <ExternalLink className="w-5 h-5 text-gray-400" />
-                </div>
-              </div>
-
               {/* Action selection */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -727,9 +772,43 @@ export default function VehiclePortalPage() {
                       </p>
                     </div>
                   </button>
+
+                  {/* Separator */}
+                  <div className="my-2 border-t border-gray-200 dark:border-gray-700" />
+
+                  {/* Check-In History (moved to bottom) */}
+                  <button
+                    onClick={() => router.push(`/fleet/vehicles/${verifiedVehicle.id}/check-in-history`)}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 rounded-xl flex items-center gap-4 transition-colors"
+                  >
+                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
+                      <History className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-gray-700 dark:text-gray-300">
+                        View Check-In History
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        See all past inspections
+                      </p>
+                    </div>
+                    <ExternalLink className="w-5 h-5 text-gray-400" />
+                  </button>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Calibration Modal */}
+          {verifiedVehicle && (
+            <VehicleCalibrationModal
+              isOpen={showCalibration}
+              onComplete={handleCalibrationComplete}
+              vehicleRegistration={verifiedVehicle.registration}
+              vehicleMake={verifiedVehicle.make || undefined}
+              vehicleModel={verifiedVehicle.model || undefined}
+              driverName={currentUser?.fullName || 'Unknown Driver'}
+            />
           )}
 
           {/* Step 3: Fuel Fill-up Form */}
