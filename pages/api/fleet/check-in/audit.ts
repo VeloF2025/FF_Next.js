@@ -178,6 +178,20 @@ export default async function handler(
       ${whereClause}
     `;
 
+    // Build discrepancy stats query with optional date filters
+    const discrepancyFilters: string[] = ['discrepancy_flag = true'];
+    const discrepancyParams: string[] = [];
+    let discrepancyParamIndex = 1;
+
+    if (dateFrom) {
+      discrepancyFilters.push(`recorded_at >= $${discrepancyParamIndex++}`);
+      discrepancyParams.push(dateFrom as string);
+    }
+    if (dateTo) {
+      discrepancyFilters.push(`recorded_at <= $${discrepancyParamIndex++}`);
+      discrepancyParams.push(dateTo as string);
+    }
+
     const discrepancyStatsQuery = `
       SELECT
         COUNT(*) as total_discrepancies,
@@ -185,14 +199,12 @@ export default async function handler(
         COUNT(CASE WHEN discrepancy_reason LIKE '%rollback%' THEN 1 END) as rollback,
         COUNT(CASE WHEN discrepancy_reason LIKE '%Excessive%' THEN 1 END) as excessive_km
       FROM fleet_odometer_history
-      WHERE discrepancy_flag = true
-      ${dateFrom ? `AND recorded_at >= '${dateFrom}'` : ''}
-      ${dateTo ? `AND recorded_at <= '${dateTo}'` : ''}
+      WHERE ${discrepancyFilters.join(' AND ')}
     `;
 
     const [stats, discrepancyStats] = await Promise.all([
       sql.unsafe(statsQuery, params),
-      sql(discrepancyStatsQuery as unknown as TemplateStringsArray),
+      sql.unsafe(discrepancyStatsQuery, discrepancyParams),
     ]);
 
     log.info('FleetAuditApi', `Fetched ${filteredRecords.length} audit records (page ${pageNum})`);
