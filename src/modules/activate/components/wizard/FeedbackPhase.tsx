@@ -76,20 +76,32 @@ export function FeedbackPhase({
   const [sendStaffPrivate, setSendStaffPrivate] = useState(false);
   const [hasTechnicianJid, setHasTechnicianJid] = useState(false);
 
-  // Check if technician JID is available (for private messaging)
+  // Track if feedback was already sent
+  const [feedbackAlreadySent, setFeedbackAlreadySent] = useState(false);
+  const [feedbackSentAt, setFeedbackSentAt] = useState<string | null>(null);
+  const [confirmResend, setConfirmResend] = useState(false);
+
+  // Check if technician JID is available and if feedback was already sent
   useEffect(() => {
-    const checkTechnicianJid = async () => {
+    const checkDrStatus = async () => {
       try {
         const response = await fetch(`/api/activate/${encodeURIComponent(dropNumber)}`);
         const data = await response.json();
-        if (data.success && data.data?.wa_sender_jid) {
-          setHasTechnicianJid(true);
+        if (data.success && data.data) {
+          if (data.data.wa_sender_jid) {
+            setHasTechnicianJid(true);
+          }
+          // Check if feedback was already sent
+          if (data.data.feedback_sent) {
+            setFeedbackAlreadySent(true);
+            setFeedbackSentAt(data.data.feedback_sent_at);
+          }
         }
       } catch (err) {
-        log.error('FeedbackPhase', 'Failed to check technician JID:', err);
+        log.error('FeedbackPhase', 'Failed to check DR status:', err);
       }
     };
-    checkTechnicianJid();
+    checkDrStatus();
   }, [dropNumber]);
 
   // Fetch staff for project on mount
@@ -239,6 +251,7 @@ export function FeedbackPhase({
           staffId: selectedStaffId, // Staff to @mention in WhatsApp
           sendStaffPrivate, // Also send private copy to selected staff
           createTask, // Whether to create a follow-up task
+          autoGenerate: feedbackAlreadySent, // Allow resending if feedback was already sent
           qaFindings: {
             photoCoverage: {
               covered: 10 - (wizardState.photoReview.stepsMissing?.length || 0),
@@ -502,6 +515,45 @@ export function FeedbackPhase({
         })()}
       </div>
 
+      {/* Feedback Already Sent Warning */}
+      {feedbackAlreadySent && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div className="flex-1">
+              <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                Feedback Already Sent
+              </h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                WhatsApp feedback was sent for this DR on{' '}
+                <strong>
+                  {feedbackSentAt
+                    ? new Date(feedbackSentAt).toLocaleDateString('en-ZA', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : 'unknown date'}
+                </strong>
+              </p>
+              <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={confirmResend}
+                  onChange={(e) => setConfirmResend(e.target.checked)}
+                  className="h-4 w-4 text-yellow-600 border-yellow-400 rounded focus:ring-yellow-500"
+                />
+                <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                  Yes, send feedback again (technician will receive a new message)
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* WhatsApp Message */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center justify-between mb-3">
@@ -695,13 +747,18 @@ export function FeedbackPhase({
           </button>
           <button
             onClick={handleSendFeedback}
-            disabled={isSending || !feedback.customMessage.trim()}
+            disabled={isSending || !feedback.customMessage.trim() || (feedbackAlreadySent && !confirmResend)}
             className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isSending ? (
               <>
                 <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                 Sending...
+              </>
+            ) : feedbackAlreadySent ? (
+              <>
+                <span>🔄</span>
+                Resend Feedback
               </>
             ) : (
               <>
