@@ -57,6 +57,8 @@ interface ExtractDataResponse {
     drNumberStatus: string;
     canProceed: boolean;
   };
+  /** Whether confirmation mode was used (OneMap serial available) */
+  usedConfirmationMode: boolean;
   processingTimeMs: number;
 }
 
@@ -134,10 +136,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
                 processingTimeMs: 0,
               }
             : null,
+          usedConfirmationMode: !!review.onemap_ont_serial, // Was confirmation mode used
           totalProcessingTimeMs: 0,
         },
         validation: cachedValidation.validation,
         summary: cachedValidation.summary,
+        usedConfirmationMode: !!review.onemap_ont_serial,
         processingTimeMs: Date.now() - startTime,
         cached: true,
       });
@@ -177,11 +181,25 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     log.info('ExtractData', `Found photos: Step6=${step6Photos.length}, Step7=${step7Photos.length}, Step9=${step9Photos.length}`);
 
     // Run VLM extraction with multiple photos per step
-    const extraction = await runFullExtraction(dropNumber, {
-      step6Urls: step6Photos.length > 0 ? step6Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
-      step7Urls: step7Photos.length > 0 ? step7Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
-      step9Urls: step9Photos.length > 0 ? step9Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
-    });
+    // SMART MODE: If OneMap has serial, use CONFIRMATION mode (more accurate)
+    // Otherwise use EXTRACTION mode (fallback)
+    const onemapOntSerial = review.onemap_ont_serial;
+    log.info('ExtractData', onemapOntSerial
+      ? `Using CONFIRMATION mode with OneMap serial: ${onemapOntSerial}`
+      : 'Using EXTRACTION mode (no OneMap serial)');
+
+    const extraction = await runFullExtraction(
+      dropNumber,
+      {
+        step6Urls: step6Photos.length > 0 ? step6Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
+        step7Urls: step7Photos.length > 0 ? step7Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
+        step9Urls: step9Photos.length > 0 ? step9Photos.map(p => makeOneMapUrl(p.filename)) : undefined,
+      },
+      {
+        // Pass OneMap serial for confirmation mode (when available)
+        expectedOntSerial: onemapOntSerial,
+      }
+    );
 
     // Build validation data
     const validationData: DrValidationData = {
@@ -286,6 +304,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         serialCrossReference: serialResult,
       },
       summary,
+      usedConfirmationMode: extraction.usedConfirmationMode,
       processingTimeMs,
     };
 

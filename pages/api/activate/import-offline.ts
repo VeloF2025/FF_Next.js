@@ -452,17 +452,20 @@ export default async function handler(
         longitude: number | null;
       }
 
-      // Deduplicate by drop_number - keep only the first occurrence
-      // This prevents "ON CONFLICT DO UPDATE cannot affect row a second time" errors
-      const seenDropNumbers = new Set<string>();
+      // Smart deduplication - only skip if ALL these fields match:
+      // - drop_number, pole_number, last_down_reason, last_inform_date
+      // Different pole/reason/time = different offline instance = import both
+      const seenKeys = new Set<string>();
       const uniqueRows = offlineRows.filter((row) => {
-        if (seenDropNumbers.has(row.drop_number)) {
-          return false;
+        const compositeKey = `${row.drop_number}|${row.pole_number || ''}|${row.last_down_reason}|${row.last_inform_date?.toISOString() || ''}`;
+        if (seenKeys.has(compositeKey)) {
+          return false; // Exact duplicate - skip
         }
-        seenDropNumbers.add(row.drop_number);
+        seenKeys.add(compositeKey);
         return true;
       });
-      log.info('OfflineImport', `Deduplicated: ${offlineRows.length} -> ${uniqueRows.length} rows`);
+      const duplicatesSkipped = offlineRows.length - uniqueRows.length;
+      log.info('OfflineImport', `Smart dedup: ${offlineRows.length} rows, ${duplicatesSkipped} exact duplicates skipped, ${uniqueRows.length} unique instances`);
 
       const processedRows: ProcessedRow[] = uniqueRows.map((row) => {
         const drop = dropsMap.get(row.drop_number);
@@ -563,10 +566,8 @@ export default async function handler(
               zone, planned_pon, address, pole_number, point_of_interest,
               installation_date, days_since_activation, revenue_30day_avg, source_report
             ) VALUES ${placeholders.join(', ')}
-            ON CONFLICT (drop_number, report_date) DO UPDATE SET
+            ON CONFLICT (drop_number, report_date, pole_number, last_down_reason, last_inform_date) DO UPDATE SET
               serial_number = EXCLUDED.serial_number,
-              last_down_reason = EXCLUDED.last_down_reason,
-              last_inform_date = EXCLUDED.last_inform_date,
               days_since_last_inform = EXCLUDED.days_since_last_inform,
               offline_bucket = EXCLUDED.offline_bucket,
               match_status = EXCLUDED.match_status,
@@ -576,7 +577,6 @@ export default async function handler(
               zone = EXCLUDED.zone,
               planned_pon = EXCLUDED.planned_pon,
               address = EXCLUDED.address,
-              pole_number = EXCLUDED.pole_number,
               point_of_interest = EXCLUDED.point_of_interest,
               installation_date = EXCLUDED.installation_date,
               days_since_activation = EXCLUDED.days_since_activation,

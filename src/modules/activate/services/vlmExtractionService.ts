@@ -63,6 +63,24 @@ export interface SerialExtraction {
 }
 
 /**
+ * Serial confirmation result (when we have expected serial from OneMap)
+ */
+export interface SerialConfirmation {
+  /** Whether the expected serial is visible in the photo */
+  confirmed: boolean;
+  /** How confident the VLM is (0.0 to 1.0) */
+  confidence: number;
+  /** The expected serial we were looking for */
+  expectedSerial: string;
+  /** What the VLM actually saw (may differ slightly due to angle/blur) */
+  visibleText: string | null;
+  /** If not confirmed, what serial was visible instead (if any) */
+  alternativeSerial: string | null;
+  /** Processing details */
+  details: string;
+}
+
+/**
  * DR number extraction result
  */
 export interface DrNumberExtraction {
@@ -91,6 +109,10 @@ export interface FullExtractionResult {
   powerMeter: PowerMeterExtraction | null;
   ontSerialStep6: SerialExtraction | null;
   step9: Step9Extraction | null;
+  /** Serial confirmation result (when OneMap serial was provided) */
+  serialConfirmation?: SerialConfirmation | null;
+  /** Whether confirmation mode was used (true) or extraction mode (false) */
+  usedConfirmationMode: boolean;
   totalProcessingTimeMs: number;
   error?: string;
 }
@@ -200,6 +222,38 @@ Respond in this exact JSON format:
 }
 
 IMPORTANT: Only extract serials starting with ALCL or ALCB. Ignore SSID values (ALHN-*).`;
+
+/**
+ * Build a confirmation prompt for verifying a known serial is visible
+ * This is used when OneMap already has the serial - we just confirm it's in the photo
+ */
+function buildSerialConfirmationPrompt(expectedSerial: string): string {
+  return `You are verifying that a specific ONT serial number is visible in this photo.
+
+EXPECTED SERIAL: ${expectedSerial}
+
+Your task: Check if this exact serial (or very close match) is visible anywhere in the photo.
+
+The serial should:
+- Start with "ALCL" or "ALCB"
+- Be on a white sticker/label
+- May be near a barcode or under "S/N:" text
+
+Respond in this exact JSON format:
+{
+  "confirmed": true/false,
+  "confidence": <0.0 to 1.0>,
+  "visibleText": "<what you actually see on the label, or null>",
+  "alternativeSerial": "<if you see a DIFFERENT serial starting with ALCL/ALCB, put it here, otherwise null>",
+  "details": "<brief explanation of what you found>"
+}
+
+IMPORTANT:
+- "confirmed": true means you can see "${expectedSerial}" or a very close match (1-2 character difference is OK)
+- If the serial is partially obscured but you can make out most of it matching, that's confirmed
+- If you see a completely different serial, set confirmed=false and put it in alternativeSerial
+- If you can't see any serial clearly, set confirmed=false with null alternativeSerial`;
+}
 
 // ============================================================================
 // VALIDATION HELPERS
@@ -616,6 +670,151 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
   }
 }
 
+// ============================================================================
+// CONFIRMATION FUNCTIONS (when OneMap has the serial)
+// ============================================================================
+
+/**
+ * Confirm that an expected serial is visible in a photo
+ * Use this when OneMap already has the serial - more accurate than extraction
+ *
+ * @param photoUrl - URL of the photo to check
+ * @param expectedSerial - The serial we expect to see (from OneMap)
+ * @returns Confirmation result with details
+ */
+export async function confirmSerialVisible(
+  photoUrl: string,
+  expectedSerial: string
+): Promise<SerialConfirmation> {
+  log.debug('VlmExtraction', `Confirming serial ${expectedSerial} is visible in photo`);
+
+  try {
+    const base64 = await fetchPhotoAsBase64(photoUrl);
+    const prompt = buildSerialConfirmationPrompt(expectedSerial);
+
+    const result = await callVlmExtraction<{
+      confirmed: boolean;
+      confidence: number;
+      visibleText: string | null;
+      alternativeSerial: string | null;
+      details: string;
+    }>(base64, prompt, `Serial confirmation for ${expectedSerial}`);
+
+    if (!result.success || !result.data) {
+      return {
+        confirmed: false,
+        confidence: 0,
+        expectedSerial,
+        visibleText: null,
+        alternativeSerial: null,
+        details: result.error || 'VLM confirmation failed',
+      };
+    }
+
+    const { confirmed, confidence, visibleText, alternativeSerial, details } = result.data;
+
+    // Validate alternativeSerial if provided
+    const validAltSerial = alternativeSerial && isValidOntSerial(alternativeSerial)
+      ? normalizeSerial(alternativeSerial)
+      : null;
+
+    log.info('VlmExtraction', `Serial confirmation: ${confirmed ? '✓' : '✗'} ${expectedSerial} (confidence: ${confidence})`);
+    if (!confirmed && validAltSerial) {
+      log.info('VlmExtraction', `Alternative serial found: ${validAltSerial}`);
+    }
+
+    return {
+      confirmed,
+      confidence: confidence || 0,
+      expectedSerial,
+      visibleText: visibleText || null,
+      alternativeSerial: validAltSerial,
+      details: details || '',
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error('VlmExtraction', `Serial confirmation failed: ${message}`);
+
+    return {
+      confirmed: false,
+      confidence: 0,
+      expectedSerial,
+      visibleText: null,
+      alternativeSerial: null,
+      details: `Error: ${message}`,
+    };
+  }
+}
+
+/**
+ * Confirm serial from multiple photos - returns first confirmed or best alternative
+ */
+export async function confirmSerialFromMultiplePhotos(
+  photoUrls: string[],
+  expectedSerial: string
+): Promise<{ result: SerialConfirmation; usedUrl: string | null }> {
+  if (photoUrls.length === 0) {
+    return {
+      result: {
+        confirmed: false,
+        confidence: 0,
+        expectedSerial,
+        visibleText: null,
+        alternativeSerial: null,
+        details: 'No photos provided',
+      },
+      usedUrl: null,
+    };
+  }
+
+  log.info('VlmExtraction', `Confirming ${expectedSerial} across ${photoUrls.length} photos`);
+
+  let bestResult: SerialConfirmation | null = null;
+  let bestUrl: string | null = null;
+  let bestScore = 0;
+
+  for (const url of photoUrls) {
+    try {
+      const result = await confirmSerialVisible(url, expectedSerial);
+
+      // Score: confirmed=10, else confidence + bonus for alternative
+      const score = result.confirmed
+        ? 10 + result.confidence
+        : result.confidence + (result.alternativeSerial ? 2 : 0);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = result;
+        bestUrl = url;
+      }
+
+      // Stop early if confirmed with high confidence
+      if (result.confirmed && result.confidence >= 0.8) {
+        log.info('VlmExtraction', `Serial confirmed in ${url.split('/').pop()}`);
+        break;
+      }
+    } catch (error) {
+      log.warn('VlmExtraction', `Failed to check ${url}: ${error}`);
+    }
+  }
+
+  return {
+    result: bestResult || {
+      confirmed: false,
+      confidence: 0,
+      expectedSerial,
+      visibleText: null,
+      alternativeSerial: null,
+      details: 'All photo checks failed',
+    },
+    usedUrl: bestUrl,
+  };
+}
+
+// ============================================================================
+// MULTI-PHOTO EXTRACTION FUNCTIONS
+// ============================================================================
+
 /**
  * Try extracting power meter reading from multiple photos, return best result
  */
@@ -775,8 +974,13 @@ export async function extractStep9WithMultiplePhotos(
 /**
  * Run full extraction for a DR
  *
+ * SMART MODE: If expectedOntSerial is provided (from OneMap), uses CONFIRMATION mode
+ * which is more accurate than extraction mode. Only falls back to extraction when
+ * OneMap doesn't have the serial.
+ *
  * @param drNumber - DR number being processed
  * @param photos - Map of step number to photo URL(s) - arrays preferred for better extraction
+ * @param options - Optional configuration including expectedOntSerial from OneMap
  */
 export async function runFullExtraction(
   drNumber: string,
@@ -787,14 +991,22 @@ export async function runFullExtraction(
     step7Urls?: string[];
     step9Url?: string;
     step9Urls?: string[];
+  },
+  options?: {
+    /** If OneMap has the ONT serial, provide it here for confirmation mode */
+    expectedOntSerial?: string | null;
   }
 ): Promise<FullExtractionResult> {
   const startTime = Date.now();
-  log.info('VlmExtraction', `Running full extraction for ${drNumber}`);
+  const expectedSerial = options?.expectedOntSerial;
+  const useConfirmationMode = !!expectedSerial && isValidOntSerial(expectedSerial);
+
+  log.info('VlmExtraction', `Running ${useConfirmationMode ? 'CONFIRMATION' : 'EXTRACTION'} mode for ${drNumber}${useConfirmationMode ? ` (expecting ${expectedSerial})` : ''}`);
 
   let powerMeter: PowerMeterExtraction | null = null;
   let ontSerialStep6: SerialExtraction | null = null;
   let step9: Step9Extraction | null = null;
+  let serialConfirmation: SerialConfirmation | null = null;
 
   // Extract power meter from Step 7 - try multiple photos if provided
   if (photos.step7Urls && photos.step7Urls.length > 0) {
@@ -807,23 +1019,96 @@ export async function runFullExtraction(
     log.debug('VlmExtraction', `Power meter result: ${powerMeter.success ? powerMeter.value + ' dBm' : 'failed'}`);
   }
 
-  // Extract ONT serial from Step 6 (back) - try multiple photos if provided
-  if (photos.step6Urls && photos.step6Urls.length > 0) {
-    const { result } = await extractOntSerialWithMultiplePhotos(photos.step6Urls);
-    ontSerialStep6 = result;
-  } else if (photos.step6Url) {
-    ontSerialStep6 = await extractOntSerialFromBack(photos.step6Url);
-  }
-  if (ontSerialStep6) {
-    log.debug('VlmExtraction', `ONT serial Step 6: ${ontSerialStep6.success ? ontSerialStep6.serial : 'failed'}`);
+  // SMART MODE: Use confirmation when OneMap has serial, otherwise extract
+  if (useConfirmationMode && expectedSerial) {
+    // ============================================
+    // CONFIRMATION MODE: Verify OneMap serial
+    // ============================================
+    log.info('VlmExtraction', `Using CONFIRMATION mode for ${expectedSerial}`);
+
+    // Combine Step 6 and Step 9 photos for confirmation
+    const allSerialPhotos = [
+      ...(photos.step6Urls || []),
+      ...(photos.step6Url ? [photos.step6Url] : []),
+      ...(photos.step9Urls || []),
+      ...(photos.step9Url ? [photos.step9Url] : []),
+    ];
+
+    if (allSerialPhotos.length > 0) {
+      const { result } = await confirmSerialFromMultiplePhotos(allSerialPhotos, expectedSerial);
+      serialConfirmation = result;
+
+      if (serialConfirmation.confirmed) {
+        log.info('VlmExtraction', `✓ Serial ${expectedSerial} CONFIRMED in photos`);
+
+        // Create synthetic extraction result from confirmation
+        ontSerialStep6 = {
+          success: true,
+          serial: expectedSerial,
+          confidence: serialConfirmation.confidence,
+          location: 'back',
+          rawText: serialConfirmation.visibleText || expectedSerial,
+          extractionMethod: 'vlm',
+        };
+      } else {
+        log.warn('VlmExtraction', `✗ Serial ${expectedSerial} NOT confirmed - ${serialConfirmation.details}`);
+
+        // If we found a different serial, report it
+        if (serialConfirmation.alternativeSerial) {
+          log.warn('VlmExtraction', `Found alternative serial: ${serialConfirmation.alternativeSerial}`);
+          ontSerialStep6 = {
+            success: true,
+            serial: serialConfirmation.alternativeSerial,
+            confidence: serialConfirmation.confidence,
+            location: 'back',
+            rawText: serialConfirmation.visibleText || serialConfirmation.alternativeSerial,
+            extractionMethod: 'vlm',
+          };
+        } else {
+          // Couldn't confirm or find alternative - fall back to extraction
+          log.info('VlmExtraction', 'Falling back to extraction mode');
+          if (photos.step6Urls && photos.step6Urls.length > 0) {
+            const { result } = await extractOntSerialWithMultiplePhotos(photos.step6Urls);
+            ontSerialStep6 = result;
+          } else if (photos.step6Url) {
+            ontSerialStep6 = await extractOntSerialFromBack(photos.step6Url);
+          }
+        }
+      }
+    }
+
+    // Still extract Step 9 for DR number and green lights
+    if (photos.step9Urls && photos.step9Urls.length > 0) {
+      const { result } = await extractStep9WithMultiplePhotos(photos.step9Urls);
+      step9 = result;
+    } else if (photos.step9Url) {
+      step9 = await extractStep9Data(photos.step9Url);
+    }
+  } else {
+    // ============================================
+    // EXTRACTION MODE: No OneMap serial, extract from photos
+    // ============================================
+    log.info('VlmExtraction', 'Using EXTRACTION mode (no OneMap serial)');
+
+    // Extract ONT serial from Step 6 (back) - try multiple photos if provided
+    if (photos.step6Urls && photos.step6Urls.length > 0) {
+      const { result } = await extractOntSerialWithMultiplePhotos(photos.step6Urls);
+      ontSerialStep6 = result;
+    } else if (photos.step6Url) {
+      ontSerialStep6 = await extractOntSerialFromBack(photos.step6Url);
+    }
+
+    // Extract Step 9 data - try multiple photos if provided
+    if (photos.step9Urls && photos.step9Urls.length > 0) {
+      const { result } = await extractStep9WithMultiplePhotos(photos.step9Urls);
+      step9 = result;
+    } else if (photos.step9Url) {
+      step9 = await extractStep9Data(photos.step9Url);
+    }
   }
 
-  // Extract Step 9 data - try multiple photos if provided
-  if (photos.step9Urls && photos.step9Urls.length > 0) {
-    const { result } = await extractStep9WithMultiplePhotos(photos.step9Urls);
-    step9 = result;
-  } else if (photos.step9Url) {
-    step9 = await extractStep9Data(photos.step9Url);
+  if (ontSerialStep6) {
+    log.debug('VlmExtraction', `ONT serial Step 6: ${ontSerialStep6.success ? ontSerialStep6.serial : 'failed'}`);
   }
   if (step9) {
     log.debug('VlmExtraction', `Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
@@ -831,13 +1116,15 @@ export async function runFullExtraction(
 
   const totalProcessingTimeMs = Date.now() - startTime;
 
-  log.info('VlmExtraction', `Full extraction complete for ${drNumber} in ${totalProcessingTimeMs}ms`);
+  log.info('VlmExtraction', `Full extraction complete for ${drNumber} in ${totalProcessingTimeMs}ms (mode: ${useConfirmationMode ? 'confirm' : 'extract'})`);
 
   return {
     drNumber,
     powerMeter,
     ontSerialStep6,
     step9,
+    serialConfirmation,
+    usedConfirmationMode: useConfirmationMode,
     totalProcessingTimeMs,
   };
 }

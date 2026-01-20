@@ -131,6 +131,20 @@ export interface DrValidationData {
 // ============================================================================
 
 /**
+ * Fuzzy matching threshold - max character differences allowed
+ * 2 characters allows for common OCR errors like:
+ * - ALCLB48AD3W vs ALCLB48AD39F (2 chars)
+ * - ALCLB4ACB04 vs ALCLB48ACB04 (1 char missing)
+ */
+const FUZZY_MATCH_MAX_DISTANCE = 2;
+
+/**
+ * Minimum confidence for fuzzy match (0-1)
+ * With 12-char serials, 2 errors = 83% confidence
+ */
+const FUZZY_MATCH_MIN_CONFIDENCE = 0.80;
+
+/**
  * ONT Serial regex pattern (Nokia ONT)
  * Matches: ALCLB463EE35, ALCB480FE3D, ALCLB48CC3CA
  * Format: ALCL or ALCB followed by alphanumeric
