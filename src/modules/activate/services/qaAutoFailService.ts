@@ -179,6 +179,166 @@ const UPS_SERIAL_MAX_LENGTH = 20;
 const REQUIRED_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // ============================================================================
+// FUZZY MATCHING FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * Returns the minimum number of single-character edits (insertions, deletions, substitutions)
+ * needed to transform one string into the other.
+ *
+ * Uses optimized space approach with two rows instead of full matrix.
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+
+  // Edge cases
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  // Use two rows instead of full matrix for space efficiency
+  let prevRow: number[] = Array.from({ length: n + 1 }, (_, i) => i);
+  let currRow: number[] = new Array(n + 1).fill(0);
+
+  for (let i = 1; i <= m; i++) {
+    currRow[0] = i;
+
+    for (let j = 1; j <= n; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        currRow[j] = prevRow[j - 1]!;
+      } else {
+        currRow[j] = 1 + Math.min(
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          prevRow[j]!,      // deletion
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          currRow[j - 1]!,  // insertion
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          prevRow[j - 1]!   // substitution
+        );
+      }
+    }
+
+    // Swap rows
+    [prevRow, currRow] = [currRow, prevRow];
+  }
+
+  // Result is in prevRow because we swapped at the end of last iteration
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return prevRow[n]!;
+}
+
+/**
+ * Fuzzy serial matching result
+ */
+export interface FuzzyMatchResult {
+  /** Whether the serials match (exact or fuzzy) */
+  isMatch: boolean;
+  /** Whether this was an exact match */
+  isExactMatch: boolean;
+  /** Whether this was a fuzzy match (close but not exact) */
+  isFuzzyMatch: boolean;
+  /** Number of character differences */
+  distance: number;
+  /** Confidence level (0-1, where 1 = exact match) */
+  confidence: number;
+  /** Human-readable description */
+  details: string;
+}
+
+/**
+ * Fuzzy match two serial numbers
+ *
+ * Handles common OCR errors like:
+ * - ALCLB48AD3W vs ALCLB48AD39F (W vs 9F = 2 chars)
+ * - ALCLB4ACB04 vs ALCLB48ACB04 (missing 8 = 1 char)
+ * - ALCLB48CC3CA vs ALCLB488CC3CA (extra 8 = 1 char)
+ *
+ * @param serial1 - First serial to compare (typically from VLM extraction)
+ * @param serial2 - Second serial to compare (typically from OneMap)
+ * @returns FuzzyMatchResult with match status and confidence
+ */
+export function fuzzySerialMatch(
+  serial1: string | null,
+  serial2: string | null
+): FuzzyMatchResult {
+  // Handle null/empty cases
+  if (!serial1 || !serial2) {
+    return {
+      isMatch: false,
+      isExactMatch: false,
+      isFuzzyMatch: false,
+      distance: -1,
+      confidence: 0,
+      details: serial1 ? 'Second serial is null/empty' : 'First serial is null/empty',
+    };
+  }
+
+  // Normalize both serials (uppercase, no spaces/dashes)
+  const s1 = serial1.trim().toUpperCase().replace(/[\s-]/g, '');
+  const s2 = serial2.trim().toUpperCase().replace(/[\s-]/g, '');
+
+  // Exact match check first
+  if (s1 === s2) {
+    return {
+      isMatch: true,
+      isExactMatch: true,
+      isFuzzyMatch: false,
+      distance: 0,
+      confidence: 1.0,
+      details: 'Exact match',
+    };
+  }
+
+  // Calculate Levenshtein distance
+  const distance = levenshteinDistance(s1, s2);
+
+  // Calculate confidence based on longer string length
+  const maxLen = Math.max(s1.length, s2.length);
+  const confidence = maxLen > 0 ? 1 - distance / maxLen : 0;
+
+  // Check if within fuzzy match threshold
+  const isFuzzyMatch =
+    distance <= FUZZY_MATCH_MAX_DISTANCE &&
+    confidence >= FUZZY_MATCH_MIN_CONFIDENCE;
+
+  // Generate details
+  let details: string;
+  if (isFuzzyMatch) {
+    details = `Fuzzy match: ${distance} character difference(s) (${(confidence * 100).toFixed(0)}% confidence)`;
+  } else if (distance <= FUZZY_MATCH_MAX_DISTANCE) {
+    details = `Near match but below confidence threshold: ${distance} diff, ${(confidence * 100).toFixed(0)}% confidence (min: ${FUZZY_MATCH_MIN_CONFIDENCE * 100}%)`;
+  } else {
+    details = `No match: ${distance} character differences (max allowed: ${FUZZY_MATCH_MAX_DISTANCE})`;
+  }
+
+  log.debug('QaAutoFail', `Fuzzy match: "${s1}" vs "${s2}" = ${isFuzzyMatch ? 'MATCH' : 'NO MATCH'}`, {
+    distance,
+    confidence: `${(confidence * 100).toFixed(1)}%`,
+    maxAllowed: FUZZY_MATCH_MAX_DISTANCE,
+  });
+
+  return {
+    isMatch: isFuzzyMatch,
+    isExactMatch: false,
+    isFuzzyMatch,
+    distance,
+    confidence,
+    details,
+  };
+}
+
+/**
+ * Check if two serials match (exact or fuzzy)
+ * Convenience function that returns just boolean
+ */
+export function serialsMatchFuzzy(serial1: string | null, serial2: string | null): boolean {
+  const result = fuzzySerialMatch(serial1, serial2);
+  return result.isMatch;
+}
+
+// ============================================================================
 // VALIDATION FUNCTIONS
 // ============================================================================
 
@@ -657,13 +817,15 @@ export function checkStepCoverage(
 }
 
 /**
- * Validate 3-way serial cross-reference
+ * Validate 3-way serial cross-reference with FUZZY MATCHING
  *
  * IMPORTANT: Step 6 (ONT back) is the definitive serial source because:
  * - The serial sticker is clearly visible on the back panel
  * - Step 9 (front/green lights) may have different labels or be harder to read
  *
- * Validation logic:
+ * Validation logic with fuzzy matching:
+ * - Exact match → PASS immediately
+ * - Fuzzy match (≤2 chars diff, ≥80% confidence) → PASS with note
  * - If Step 6 matches OneMap → PASS (ignore Step 9 mismatch)
  * - If Step 6 doesn't match but Step 9 does → PARTIAL (flag for review)
  * - If neither matches OneMap → MISMATCH
@@ -689,10 +851,15 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
     };
   }
 
-  // Step 6 is the definitive serial source (ONT back panel sticker)
-  const step6MatchesOnemap = onemapSerial && step6Serial && step6Serial === onemapSerial;
-  const step9MatchesOnemap = onemapSerial && step9Serial && step9Serial === onemapSerial;
-  const step6MatchesStep9 = step6Serial && step9Serial && step6Serial === step9Serial;
+  // Use fuzzy matching for serial comparisons
+  const step6FuzzyMatch = fuzzySerialMatch(step6Serial, onemapSerial);
+  const step9FuzzyMatch = fuzzySerialMatch(step9Serial, onemapSerial);
+  const step6vs9FuzzyMatch = fuzzySerialMatch(step6Serial, step9Serial);
+
+  // Legacy exact match checks (for backwards compatibility in logs)
+  const step6MatchesOnemap = step6FuzzyMatch.isMatch;
+  const step9MatchesOnemap = step9FuzzyMatch.isMatch;
+  const step6MatchesStep9 = step6vs9FuzzyMatch.isMatch;
 
   // Check DR number match
   const drMatch =
@@ -706,39 +873,54 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
   let details: string;
 
   if (step6MatchesOnemap) {
-    // Step 6 matches OneMap - this is the gold standard
+    // Step 6 matches OneMap (exact or fuzzy) - this is the gold standard
     ontMatch = true;
+
+    // Build match type description
+    const matchType = step6FuzzyMatch.isExactMatch ? 'exact' : 'fuzzy';
+    const matchNote = step6FuzzyMatch.isFuzzyMatch
+      ? ` (${step6FuzzyMatch.distance} char diff, ${(step6FuzzyMatch.confidence * 100).toFixed(0)}% confidence)`
+      : '';
+
     if (step6MatchesStep9) {
       // Perfect: all three match
       status = drMatch ? 'match' : 'mismatch';
       details = drMatch
-        ? 'All serial and DR number checks passed'
+        ? `All serial and DR number checks passed (${matchType} match${matchNote})`
         : `DR number mismatch: Expected ${data.drNumber}, Got ${step9DrNumber}`;
     } else if (step9Serial) {
       // Step 6 matches but Step 9 differs - log warning but pass serial check
-      // This could be VLM misread on Step 9 or different front label
       status = drMatch ? 'match' : 'mismatch';
       details = drMatch
-        ? `Serial verified via Step 6 (${step6Serial}). Note: Step 9 shows different value (${step9Serial})`
+        ? `Serial verified via Step 6 (${matchType} match${matchNote}). Note: Step 9 shows different value (${step9Serial})`
         : `DR number mismatch. Serial verified via Step 6.`;
-      log.warn('QaAutoFail', `Step 9 serial differs from Step 6 for ${data.drNumber}`, {
-        step6Serial,
-        step9Serial,
-        onemapSerial,
-        note: 'Step 6 matches OneMap, treating as valid',
-      });
+
+      if (!step6FuzzyMatch.isExactMatch) {
+        log.info('QaAutoFail', `Fuzzy match accepted for ${data.drNumber}`, {
+          onemapSerial,
+          step6Serial,
+          distance: step6FuzzyMatch.distance,
+          confidence: step6FuzzyMatch.confidence,
+        });
+      }
     } else {
       // Step 6 matches but no Step 9 - still valid
       status = drMatch ? 'match' : 'mismatch';
       details = drMatch
-        ? `Serial verified via Step 6 (${step6Serial})`
+        ? `Serial verified via Step 6 (${matchType} match${matchNote})`
         : `DR number mismatch. Serial verified via Step 6.`;
     }
   } else if (step9MatchesOnemap) {
     // Step 6 doesn't match but Step 9 does - flag for manual review
     ontMatch = false;
     status = 'partial';
-    details = `Step 6 serial (${step6Serial || 'N/A'}) doesn't match OneMap (${onemapSerial}), but Step 9 does. Needs review.`;
+
+    const matchType = step9FuzzyMatch.isExactMatch ? 'exact' : 'fuzzy';
+    const matchNote = step9FuzzyMatch.isFuzzyMatch
+      ? ` (${step9FuzzyMatch.distance} char diff)`
+      : '';
+
+    details = `Step 6 serial (${step6Serial || 'N/A'}) doesn't match OneMap (${onemapSerial}), but Step 9 does (${matchType}${matchNote}). Needs review.`;
   } else if (!onemapSerial && (step6Serial || step9Serial)) {
     // No OneMap serial to compare - can't validate
     ontMatch = false;
@@ -746,9 +928,30 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
     details = 'No OneMap serial available for comparison';
   } else {
     // Neither Step 6 nor Step 9 matches OneMap - definite mismatch
+    // But log the closest match for debugging
     ontMatch = false;
     status = 'mismatch';
-    details = `ONT serials don't match OneMap: OneMap=${onemapSerial}, Step6=${step6Serial || 'N/A'}, Step9=${step9Serial || 'N/A'}`;
+
+    const closestMatch = step6FuzzyMatch.confidence > step9FuzzyMatch.confidence
+      ? { source: 'Step6', serial: step6Serial, result: step6FuzzyMatch }
+      : { source: 'Step9', serial: step9Serial, result: step9FuzzyMatch };
+
+    let debugInfo = '';
+    if (closestMatch.result.distance > 0 && closestMatch.result.distance <= 5) {
+      debugInfo = ` [Closest: ${closestMatch.source}=${closestMatch.serial}, ${closestMatch.result.distance} chars diff]`;
+    }
+
+    details = `ONT serials don't match OneMap: OneMap=${onemapSerial}, Step6=${step6Serial || 'N/A'}, Step9=${step9Serial || 'N/A'}${debugInfo}`;
+
+    log.warn('QaAutoFail', `Serial mismatch for ${data.drNumber}`, {
+      onemapSerial,
+      step6Serial,
+      step9Serial,
+      step6Distance: step6FuzzyMatch.distance,
+      step9Distance: step9FuzzyMatch.distance,
+      step6Confidence: step6FuzzyMatch.confidence,
+      step9Confidence: step9FuzzyMatch.confidence,
+    });
   }
 
   return {

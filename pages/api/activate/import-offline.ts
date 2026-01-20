@@ -457,7 +457,10 @@ export default async function handler(
       // Different pole/reason/time = different offline instance = import both
       const seenKeys = new Set<string>();
       const uniqueRows = offlineRows.filter((row) => {
-        const compositeKey = `${row.drop_number}|${row.pole_number || ''}|${row.last_down_reason}|${row.last_inform_date?.toISOString() || ''}`;
+        const dateStr = row.last_inform_date instanceof Date
+          ? row.last_inform_date.toISOString()
+          : String(row.last_inform_date || '');
+        const compositeKey = `${row.drop_number}|${row.pole_number || ''}|${row.last_down_reason}|${dateStr}`;
         if (seenKeys.has(compositeKey)) {
           return false; // Exact duplicate - skip
         }
