@@ -149,10 +149,10 @@ export default async function handler(
       LIMIT ${limit} OFFSET ${offset}
     `;
 
-    // Execute queries
+    // Execute queries - use sql.query() for parameterized dynamic SQL
     const [countResult, records] = await Promise.all([
-      sql.unsafe(countQuery, params),
-      sql.unsafe(dataQuery, params),
+      sql.query(countQuery, params) as Promise<{ total: string }[]>,
+      sql.query(dataQuery, params) as Promise<Record<string, unknown>[]>,
     ]);
 
     const total = parseInt(countResult[0]?.total || '0', 10);
@@ -203,8 +203,8 @@ export default async function handler(
     `;
 
     const [stats, discrepancyStats] = await Promise.all([
-      sql.unsafe(statsQuery, params),
-      sql.unsafe(discrepancyStatsQuery, discrepancyParams),
+      sql.query(statsQuery, params) as Promise<Record<string, unknown>[]>,
+      sql.query(discrepancyStatsQuery, discrepancyParams) as Promise<Record<string, unknown>[]>,
     ]);
 
     log.info('FleetAuditApi', `Fetched ${filteredRecords.length} audit records (page ${pageNum})`);
