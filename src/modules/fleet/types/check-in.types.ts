@@ -37,7 +37,8 @@ export type CheckPhotoType =
   | 'damage'
   | 'fuel_gauge'
   | 'under_vehicle'
-  | 'license_disk';
+  | 'license_disk'
+  | 'odometer_override';  // Verification photo when VLM reading is rejected
 
 /**
  * Check item categories

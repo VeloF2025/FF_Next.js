@@ -116,6 +116,10 @@ interface UseCheckInReturn {
   odometerOverrideConfirmed: boolean;
   fuelOverrideConfirmed: boolean;
 
+  // Verified override (rejected reading with photo proof)
+  odometerVerifiedOverride: boolean;
+  verificationPhotoDataUrl: string | null;
+
   // Form handlers
   setCheckType: (type: CheckType) => void;
   setOdometerReading: (value: string) => void;
@@ -126,6 +130,7 @@ interface UseCheckInReturn {
   overrideVlmValue: (photoType: CheckPhotoType, value: string | number) => void;
   confirmOdometerOverride: () => void;
   confirmFuelOverride: () => void;
+  setOdometerVerifiedOverride: (manualReading: number, verificationPhotoData: string) => void;
 
   // Actions
   loadTemplate: (checkType?: CheckType, templateId?: string) => Promise<void>;
@@ -174,6 +179,10 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   // Manual override confirmation state
   const [odometerOverrideConfirmed, setOdometerOverrideConfirmed] = useState(false);
   const [fuelOverrideConfirmed, setFuelOverrideConfirmed] = useState(false);
+
+  // Verified override state (with photo proof for rejected VLM readings)
+  const [odometerVerifiedOverride, setOdometerVerifiedOverrideState] = useState(false);
+  const [verificationPhotoDataUrl, setVerificationPhotoDataUrl] = useState<string | null>(null);
 
   // Get required photos based on check type
   const requiredPhotos = checkType === 'daily' ? DAILY_PHOTOS : WEEKLY_PHOTOS;
@@ -782,6 +791,45 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     setFuelOverrideConfirmed(true);
   }, []);
 
+  // Verified override handler - for rejected VLM readings that require photo proof
+  const setOdometerVerifiedOverride = useCallback((manualReading: number, verificationPhotoData: string) => {
+    // Update odometer value
+    setFormState(prev => ({ ...prev, odometerReading: String(manualReading) }));
+
+    // Store verification photo
+    setVerificationPhotoDataUrl(verificationPhotoData);
+
+    // Save as odometer_override photo type
+    setFormState(prev => {
+      const newPhotos = new Map(prev.photos);
+      newPhotos.set('odometer_override', { dataUrl: verificationPhotoData });
+      return { ...prev, photos: newPhotos };
+    });
+
+    // Mark VLM result as overridden with verification
+    setVlmResults(prev => {
+      const newResults = new Map(prev);
+      const existing = newResults.get('dashboard');
+      if (existing) {
+        newResults.set('dashboard', {
+          ...existing,
+          extractedNumeric: manualReading,
+          extractedValue: String(manualReading),
+          // Clear the reject validation since user has verified
+          validation: {
+            suggestedAction: 'accept',
+            warning: 'Manually verified with photo proof',
+          },
+        });
+      }
+      return newResults;
+    });
+
+    // Mark as verified
+    setOdometerVerifiedOverrideState(true);
+    setOdometerOverrideConfirmed(true);
+  }, []);
+
   return {
     template,
     formState,
@@ -805,6 +853,10 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     odometerOverrideConfirmed,
     fuelOverrideConfirmed,
 
+    // Verified override (rejected reading with photo proof)
+    odometerVerifiedOverride,
+    verificationPhotoDataUrl,
+
     setCheckType,
     setOdometerReading,
     setFuelLevel,
@@ -814,6 +866,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     overrideVlmValue,
     confirmOdometerOverride,
     confirmFuelOverride,
+    setOdometerVerifiedOverride,
     loadTemplate,
     processPhotoWithVlm,
     submit,

@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Loader2, CheckCircle2, AlertCircle, Edit3, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Edit3, AlertTriangle, XCircle, Camera } from 'lucide-react';
 import type { VlmAnalysisType, CheckPhotoType } from '../../types/check-in.types';
 
 interface VlmValidation {
@@ -36,6 +36,10 @@ interface VlmResultCardProps {
   currentValue: string;
   unit: string;
   onOverride: (value: string) => void;
+  /** Called when reading is rejected and user wants to enter manual override with verification */
+  onRequestVerifiedOverride?: () => void;
+  /** Whether a verified override has been completed (shows green state) */
+  hasVerifiedOverride?: boolean;
 }
 
 export function VlmResultCard({
@@ -45,6 +49,8 @@ export function VlmResultCard({
   currentValue,
   unit,
   onOverride,
+  onRequestVerifiedOverride,
+  hasVerifiedOverride,
 }: VlmResultCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(currentValue);
@@ -90,12 +96,47 @@ export function VlmResultCard({
   const needsVerification = vlmResult.validation?.suggestedAction === 'verify';
   const validationWarning = vlmResult.validation?.warning;
 
+  // Show verified override success state
+  if (hasVerifiedOverride && currentValue) {
+    return (
+      <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-green-100 dark:bg-green-800 rounded-lg text-green-600 dark:text-green-400">
+            {icon}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-green-700 dark:text-green-300">{title}</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                {Number(currentValue).toLocaleString()}
+              </span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{unit}</span>
+              <div className="flex items-center gap-1 ml-2">
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                <span className="text-xs text-green-600 dark:text-green-400">
+                  Manually verified
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+          <Camera className="w-3 h-3" />
+          Verification photo captured
+        </p>
+      </div>
+    );
+  }
+
   // Error state (including validation rejection)
   if (vlmResult.error || isRejected) {
     const isDigitConfusion = validationWarning?.includes('digit confusion');
     const errorMessage = isRejected
       ? (isDigitConfusion ? 'Reading rejected - digit confusion detected' : 'Reading rejected - verify manually')
       : 'Could not read - enter manually';
+
+    // If onRequestVerifiedOverride is provided and reading is rejected, show the "correct this" button
+    const showVerifiedOverrideButton = isRejected && onRequestVerifiedOverride;
 
     return (
       <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -122,15 +163,31 @@ export function VlmResultCard({
               </p>
             )}
           </div>
+          {!showVerifiedOverrideButton && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-800 rounded-lg"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Verified override button (requires photo) */}
+        {showVerifiedOverrideButton && !isEditing && (
           <button
             type="button"
-            onClick={() => setIsEditing(true)}
-            className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-800 rounded-lg"
+            onClick={onRequestVerifiedOverride}
+            className="mt-3 w-full py-3 px-4 bg-red-500 text-white rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-red-600"
           >
-            <Edit3 className="w-4 h-4" />
+            <Camera className="w-5 h-5" />
+            Enter Correct Reading + Take Photo
           </button>
-        </div>
-        {isEditing && (
+        )}
+
+        {/* Fallback inline edit (for non-odometer or when no override handler) */}
+        {isEditing && !showVerifiedOverrideButton && (
           <div className="mt-3 flex gap-2">
             <input
               type="number"

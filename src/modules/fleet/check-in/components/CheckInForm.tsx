@@ -3,7 +3,7 @@
  * Main check-in form for drivers (mobile-first) with daily/weekly modes
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle,
@@ -18,6 +18,7 @@ import { CheckInItemRow } from './CheckInItemRow';
 import { CheckInPhotoGridEnhanced } from './CheckInPhotoGridEnhanced';
 import { OfflineIndicator } from './OfflineIndicator';
 import { VlmResultCard } from './VlmResultCard';
+import { OdometerOverrideModal } from './OdometerOverrideModal';
 import { useCheckIn } from '../hooks/useCheckIn';
 import type { CheckRecord, CheckPhotoType, CheckType } from '../../types/check-in.types';
 
@@ -40,6 +41,9 @@ export function CheckInForm({
   onComplete,
   onCancel,
 }: CheckInFormProps) {
+  // Modal state for odometer override
+  const [showOdometerOverrideModal, setShowOdometerOverrideModal] = useState(false);
+
   const {
     template,
     formState,
@@ -61,6 +65,9 @@ export function CheckInForm({
     fuelOverrideConfirmed,
     confirmOdometerOverride,
     confirmFuelOverride,
+    // Verified override (with photo proof)
+    odometerVerifiedOverride,
+    setOdometerVerifiedOverride,
     setCheckType,
     setOdometerReading,
     setFuelLevel,
@@ -88,6 +95,12 @@ export function CheckInForm({
     if (record) {
       onComplete(record);
     }
+  };
+
+  // Handle odometer override modal confirmation
+  const handleOdometerOverrideConfirm = (manualReading: number, verificationPhotoDataUrl: string) => {
+    setOdometerVerifiedOverride(manualReading, verificationPhotoDataUrl);
+    setShowOdometerOverrideModal(false);
   };
 
   // Handle photo capture with auto-VLM processing
@@ -258,6 +271,8 @@ export function CheckInForm({
               currentValue={formState.odometerReading}
               unit="km"
               onOverride={(value) => overrideVlmValue('dashboard', value)}
+              onRequestVerifiedOverride={() => setShowOdometerOverrideModal(true)}
+              hasVerifiedOverride={odometerVerifiedOverride}
             />
           )}
           {fuelVlm && (
@@ -489,6 +504,17 @@ export function CheckInForm({
           {isSubmitting ? 'Submitting...' : isProcessingVlm ? 'Processing...' : `Submit ${checkType === 'daily' ? 'Daily' : 'Weekly'} Check`}
         </button>
       </div>
+
+      {/* Odometer Override Modal - for rejected VLM readings */}
+      <OdometerOverrideModal
+        isOpen={showOdometerOverrideModal}
+        onClose={() => setShowOdometerOverrideModal(false)}
+        onConfirm={handleOdometerOverrideConfirm}
+        rejectionReason={odometerVlm?.validation?.warning || 'Reading validation failed'}
+        vlmExtractedValue={odometerVlm?.extractedNumeric ?? null}
+        previousReading={lastOdometer?.value ?? null}
+        vehicleRegistration={vehicleRegistration}
+      />
     </div>
   );
 }
