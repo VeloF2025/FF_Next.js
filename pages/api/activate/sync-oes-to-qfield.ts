@@ -29,8 +29,8 @@ const pool = new Pool({
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
 const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'YmFcDD4fNHu5P0j2i2xCn5AVt7JjmSnJOVHntObwCHHlE35nAE0C9LuNF9N0coTk5gNLcUsvYRUb0GH0ZJT2bGcyej5Y3apeVsPS';
 
-// Default project ID (can be overridden in request)
-const DEFAULT_PROJECT_ID = 'baf29cb3-2483-4924-b7c0-47953ac2851e';
+// Default project ID - OES_Project_Progress (updated Jan 2026)
+const DEFAULT_PROJECT_ID = 'ad3b1035-ddb3-42a3-8077-175f9400b38a';
 
 interface OESPoint {
   drop_number: string;
