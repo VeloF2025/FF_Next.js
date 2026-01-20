@@ -20,7 +20,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  ExternalLink,
+  Eye,
+  Ticket,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -463,13 +464,25 @@ function OfflineDevicesTable({
                 <MatchStatusBadge status={record.match_status} serialMismatch={record.serial_mismatch} />
               </td>
               <td className="px-3 py-3 text-sm">
-                <a
-                  href={`/activate/${record.drop_number}`}
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                  title="View DR Details"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
+                <div className="flex items-center gap-1">
+                  {/* View DR Details */}
+                  <a
+                    href={`/activate/${record.drop_number}`}
+                    className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400"
+                    title="View DR Details"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </a>
+
+                  {/* Create Maintenance Ticket */}
+                  <a
+                    href={buildTicketUrl(record)}
+                    className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-orange-600 dark:text-orange-400"
+                    title="Create Maintenance Ticket"
+                  >
+                    <Ticket className="h-4 w-4" />
+                  </a>
+                </div>
               </td>
             </tr>
           ))}
@@ -530,6 +543,37 @@ function getBucketColor(bucket: string): string {
   if (bucket.includes('20')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
   if (bucket.includes('40')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
   return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+}
+
+/**
+ * Build URL for creating a maintenance ticket pre-populated with offline device data
+ */
+function buildTicketUrl(record: OfflineDeviceRecord): string {
+  // Priority based on days offline: >30d = high, 11-30d = normal, ≤10d = low
+  const priority = record.days_since_last_inform > 30 ? 'high'
+    : record.days_since_last_inform > 10 ? 'normal' : 'low';
+
+  const title = `Offline Device: ${record.last_down_reason} (${record.days_since_last_inform} days)`;
+
+  const descriptionParts = [
+    `Device offline for ${record.days_since_last_inform} days.`,
+    `Last down reason: ${record.last_down_reason}`,
+    record.zone ? `Zone: ${record.zone}` : null,
+    record.pole_number ? `Pole: ${record.pole_number}` : null,
+    record.address ? `Address: ${record.address}` : null,
+    record.serial_mismatch ? `⚠️ SERIAL MISMATCH: Expected ${record.expected_serial}` : null,
+  ].filter(Boolean).join('\n');
+
+  const params = new URLSearchParams();
+  params.set('dr_number', record.drop_number);
+  params.set('source', 'manual');
+  params.set('ticket_type', 'fault_repair');
+  params.set('title', title);
+  if (record.serial_number) params.set('ont_serial', record.serial_number);
+  params.set('priority', priority);
+  params.set('description', descriptionParts);
+
+  return `/maintenance/tickets/new?${params.toString()}`;
 }
 
 function LoadingSkeleton() {

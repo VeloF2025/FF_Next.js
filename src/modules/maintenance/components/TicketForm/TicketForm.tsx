@@ -15,8 +15,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { AlertCircle, Loader2, Save, X, RotateCcw } from 'lucide-react';
-import { useTicketForm } from '../../hooks/useTicketForm';
+import { useTicketForm, type TicketFormData } from '../../hooks/useTicketForm';
 import {
   SourceSection,
   DetailsSection,
@@ -29,11 +30,27 @@ import {
 
 interface TicketFormProps {
   onCancel?: () => void;
+  /** Optional initial values to pre-populate the form (e.g., from URL params) */
+  initialValues?: Partial<TicketFormData>;
 }
 
-export function TicketForm({ onCancel }: TicketFormProps) {
+export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
   const router = useRouter();
   const form = useTicketForm();
+  const initializedRef = useRef(false);
+
+  // Pre-populate form with initial values on mount
+  useEffect(() => {
+    if (initialValues && Object.keys(initialValues).length > 0 && !initializedRef.current) {
+      initializedRef.current = true;
+      form.setFields(initialValues);
+
+      // If DR number is provided, trigger lookup to populate location fields
+      if (initialValues.dr_number) {
+        form.lookupDR(initialValues.dr_number);
+      }
+    }
+  }, [initialValues, form]);
 
   const handleCancel = () => {
     if (onCancel) {
