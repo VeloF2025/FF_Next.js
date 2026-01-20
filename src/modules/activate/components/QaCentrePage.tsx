@@ -884,7 +884,7 @@ function QaCentrePageContent() {
                         </span>
                         {/* WA Submission Time (below Installed date) */}
                         <span className="text-blue-400/70 text-[9px]">
-                          {formatTime(drop.submittedDate || drop.createdAt)}
+                          {formatTime(drop.waReceivedAt)}
                         </span>
                         <span></span>
                         <span></span>

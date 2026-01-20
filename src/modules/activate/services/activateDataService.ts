@@ -64,6 +64,8 @@ export interface DrListItem {
   feedbackSent: string | null;
   createdAt: string;
   submittedDate: string | null;
+  /** WhatsApp message received timestamp (actual submission time) */
+  waReceivedAt: string | null;
   senderPhone: string | null;
 
   // Rich Status Model (new fields)
@@ -284,6 +286,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
       feedbackSent: drop.feedback_sent ? drop.feedback_sent_at : null,
       createdAt: drop.created_at,
       submittedDate: drop.submitted_date || null,
+      waReceivedAt: drop.wa_received_at || null,
       senderPhone: drop.sender_phone || null,
 
       // Rich Status Model
