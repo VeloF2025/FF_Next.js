@@ -33,6 +33,11 @@ export interface WishlistItem {
   assigned_to_name?: string;
   created_at: string;
   updated_at: string;
+  // Agent OS Spec fields
+  problem_statement?: string;
+  acceptance_criteria?: string;
+  target_module?: string;
+  test_scenarios?: string;
   // UI state
   has_voted?: boolean;
   comments_count?: number;
@@ -98,6 +103,11 @@ export interface CreateWishlistItemInput {
   priority?: WishlistPriority;
   effort_estimate?: WishlistEffort;
   business_value?: number;
+  // Agent OS Spec fields
+  problem_statement?: string;
+  acceptance_criteria?: string;
+  target_module?: string;
+  test_scenarios?: string;
 }
 
 export interface UpdateWishlistItemInput {
@@ -109,6 +119,11 @@ export interface UpdateWishlistItemInput {
   business_value?: number;
   assigned_to?: string;
   assigned_to_name?: string;
+  // Agent OS Spec fields
+  problem_statement?: string;
+  acceptance_criteria?: string;
+  target_module?: string;
+  test_scenarios?: string;
 }
 
 export interface MoveWishlistItemInput {

@@ -98,7 +98,12 @@ export async function PUT(
       effort_estimate,
       business_value,
       assigned_to,
-      assigned_to_name
+      assigned_to_name,
+      // Agent OS Spec fields
+      problem_statement,
+      acceptance_criteria,
+      target_module,
+      test_scenarios
     } = body;
 
     // Build update query dynamically
@@ -133,6 +138,23 @@ export async function PUT(
       updates.push('assigned_to_name');
       values.push(assigned_to_name);
     }
+    // Agent OS Spec fields
+    if (problem_statement !== undefined) {
+      updates.push('problem_statement');
+      values.push(problem_statement);
+    }
+    if (acceptance_criteria !== undefined) {
+      updates.push('acceptance_criteria');
+      values.push(acceptance_criteria);
+    }
+    if (target_module !== undefined) {
+      updates.push('target_module');
+      values.push(target_module);
+    }
+    if (test_scenarios !== undefined) {
+      updates.push('test_scenarios');
+      values.push(test_scenarios);
+    }
 
     if (updates.length === 0) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
@@ -149,6 +171,10 @@ export async function PUT(
         business_value = COALESCE(${business_value}, business_value),
         assigned_to = COALESCE(${assigned_to}, assigned_to),
         assigned_to_name = COALESCE(${assigned_to_name}, assigned_to_name),
+        problem_statement = COALESCE(${problem_statement}, problem_statement),
+        acceptance_criteria = COALESCE(${acceptance_criteria}, acceptance_criteria),
+        target_module = COALESCE(${target_module}, target_module),
+        test_scenarios = COALESCE(${test_scenarios}, test_scenarios),
         updated_at = NOW()
       WHERE id = ${id}
       RETURNING *

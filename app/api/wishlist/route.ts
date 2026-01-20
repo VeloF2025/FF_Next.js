@@ -60,7 +60,18 @@ export async function POST(req: NextRequest) {
     const userId = auth.userId;
 
     const body: CreateWishlistItemInput = await req.json();
-    const { title, description, priority = 'medium', effortEstimate, businessValue } = body;
+    const {
+      title,
+      description,
+      priority = 'medium',
+      effort_estimate,
+      business_value,
+      // Agent OS Spec fields
+      problem_statement,
+      acceptance_criteria,
+      target_module,
+      test_scenarios
+    } = body;
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
@@ -73,10 +84,12 @@ export async function POST(req: NextRequest) {
       INSERT INTO wishlist_items (
         title, description, status, priority,
         effort_estimate, business_value,
+        problem_statement, acceptance_criteria, target_module, test_scenarios,
         created_by, created_by_name
       ) VALUES (
-        ${title}, ${description}, 'Backlog', ${priority},
-        ${effortEstimate || null}, ${businessValue || null},
+        ${title}, ${description || null}, 'Backlog', ${priority},
+        ${effort_estimate || null}, ${business_value || null},
+        ${problem_statement || null}, ${acceptance_criteria || null}, ${target_module || null}, ${test_scenarios || null},
         ${userId}, ${userName}
       )
       RETURNING *
