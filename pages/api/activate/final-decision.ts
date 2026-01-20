@@ -19,6 +19,10 @@ import {
   type FailReasonCode,
 } from '@/modules/activate/services/qaAutoFailService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
+import {
+  isSharePointDrSyncEnabled,
+  fullDrSync,
+} from '@/lib/sharepointDrSyncService';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -328,6 +332,28 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         );
       } catch (activityError) {
         log.warn('FinalDecision', `Failed to log activity for ${dropNumber}`, activityError);
+      }
+
+      // Trigger SharePoint sync on first QA completion (fire-and-forget)
+      // This creates the folder hierarchy and syncs photos to SharePoint
+      if (isSharePointDrSyncEnabled()) {
+        log.info('FinalDecision', `Triggering SharePoint sync for ${dropNumber}`);
+        fullDrSync(dropNumber, 'qa_completion')
+          .then(result => {
+            if (result.folderResult.success) {
+              log.info('FinalDecision', `SharePoint folder created for ${dropNumber}`, {
+                folderPath: result.folderResult.folderPath,
+                photosUploaded: result.photoResult?.photosUploaded || 0,
+              });
+            } else {
+              log.warn('FinalDecision', `SharePoint sync failed for ${dropNumber}`, {
+                error: result.folderResult.error,
+              });
+            }
+          })
+          .catch(err => {
+            log.warn('FinalDecision', `SharePoint sync error for ${dropNumber}`, err);
+          });
       }
     } else {
       log.info('FinalDecision', `Draft saved for ${dropNumber} - skipping activity log`);
