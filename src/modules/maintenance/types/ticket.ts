@@ -46,6 +46,8 @@ export enum TicketSource {
   REVENUE = 'revenue',
   ONT_SWAP = 'ont_swap',
   MANUAL = 'manual', // Manually created tickets via UI
+  OFFLINE_REPORT = 'offline_report', // From Offline Devices (ARCH) report
+  QA_REVIEW = 'qa_review', // From QA Centre review process
 }
 
 /**

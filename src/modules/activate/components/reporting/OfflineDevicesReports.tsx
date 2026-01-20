@@ -566,7 +566,7 @@ function buildTicketUrl(record: OfflineDeviceRecord): string {
 
   const params = new URLSearchParams();
   params.set('dr_number', record.drop_number);
-  params.set('source', 'manual');
+  params.set('source', 'offline_report');
   params.set('ticket_type', 'fault_repair');
   params.set('title', title);
   if (record.serial_number) params.set('ont_serial', record.serial_number);

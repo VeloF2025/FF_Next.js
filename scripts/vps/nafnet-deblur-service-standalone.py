@@ -253,11 +253,16 @@ def load_nafnet_model():
 
     try:
         # Setup device
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        logger.info(f"Using device: {device}")
+        # Note: RTX 5090 (sm_120) not yet supported by PyTorch, using CPU
+        # TODO: Update PyTorch when sm_120 support is available
+        force_cpu = os.environ.get('NAFNET_FORCE_CPU', 'true').lower() == 'true'
 
-        if not torch.cuda.is_available():
-            logger.warning("CUDA not available, using CPU (will be slow)")
+        if force_cpu or not torch.cuda.is_available():
+            device = torch.device('cpu')
+            logger.info("Using CPU device (NAFNet deblurring)")
+        else:
+            device = torch.device('cuda')
+            logger.info(f"Using device: {device} (GPU: {torch.cuda.get_device_name(0)})")
 
         # Create model
         logger.info(f"Loading NAFNet model from {MODEL_PATH}")
@@ -272,7 +277,7 @@ def load_nafnet_model():
 
         # Load weights
         if os.path.exists(MODEL_PATH):
-            checkpoint = torch.load(MODEL_PATH, map_location=device, weights_only=True)
+            checkpoint = torch.load(MODEL_PATH, map_location=device, weights_only=False)
             if 'params' in checkpoint:
                 model.load_state_dict(checkpoint['params'])
             elif 'state_dict' in checkpoint:

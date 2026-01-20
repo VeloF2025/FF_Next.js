@@ -297,7 +297,16 @@
       "Bash(npm --version:*)",
       "Bash(time curl:*)",
       "Bash(NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS='--max_old_space_size=4096' npm run build:*)",
-      "Bash(NEXT_TELEMETRY_DISABLED=1 npm run build:*)"
+      "Bash(NEXT_TELEMETRY_DISABLED=1 npm run build:*)",
+      "Bash(do sleep 2)",
+      "Bash(if curl -s http://100.96.203.105:3006/api/health)",
+      "Bash(src/modules/fleet/check-in/components/CheckInForm.tsx )",
+      "Bash(src/modules/fleet/check-in/components/VlmResultCard.tsx )",
+      "Bash(src/modules/fleet/check-in/hooks/useCheckIn.ts )",
+      "Bash(src/modules/fleet/types/check-in.types.ts )",
+      "Bash(src/components/layout/sidebar/config/wishlist-menu-item.ts)",
+      "Bash(if curl -s http://100.96.203.105:3005/api/activate/health-check)",
+      "Bash(then echo \"✅ Staging is up\")"
     ],
     "deny": [],
     "ask": [],
