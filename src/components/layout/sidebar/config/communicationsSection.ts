@@ -6,8 +6,8 @@ import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText } from 'lu
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
-// PDFCraft URL - configured per environment
-const PDFCRAFT_URL = process.env.NEXT_PUBLIC_PDFCRAFT_URL || 'http://localhost:3007';
+// PDFCraft URL - proxied via nginx at /pdf-tools/
+const PDFCRAFT_URL = process.env.NEXT_PUBLIC_PDFCRAFT_URL || '/pdf-tools/';
 
 export const communicationsSection: NavSection = {
   section: 'COMMUNICATIONS',
