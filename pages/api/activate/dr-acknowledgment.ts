@@ -11,11 +11,27 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial } from '@/modules/activate/services/qaAutoFailService';
 
+// Configure Neon WebSocket
+neonConfig.webSocketConstructor = ws;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+
+interface ExistingSubmission {
+  submission_count: number;
+  photo_count: number;
+  feedback_message: string | null;
+  qa_decision: string | null;
+}
 
 interface AckRequest {
   dropNumber: string;
@@ -53,6 +69,136 @@ function extractOntSerial(barcodeData: string | null): string | null {
   }
 
   return null;
+}
+
+/**
+ * Check if DR already exists in our database (resubmission detection)
+ */
+async function checkExistingSubmission(dropNumber: string): Promise<ExistingSubmission | null> {
+  try {
+    const result = await pool.query(
+      `SELECT submission_count, photo_count, feedback_message, qa_decision
+       FROM dr_photo_unified_reviews
+       WHERE drop_number = $1`,
+      [dropNumber]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Failed to check existing submission for ${dropNumber}`, { error });
+    return null;
+  }
+}
+
+/**
+ * Mark DR for rework and reset QA workflow for resubmission
+ *
+ * This function:
+ * 1. Snapshots current state into submission_history
+ * 2. Increments submission_count
+ * 3. Resets qa_phase to null (re-enter workflow from start)
+ * 4. Resets feedback_sent to allow new feedback
+ * 5. Sets qa_decision to 'REWORK_NEEDED' temporarily (will be cleared when reviewed)
+ */
+async function markForRework(dropNumber: string, newPhotoCount: number): Promise<void> {
+  try {
+    // First, snapshot current state and reset for new submission
+    await pool.query(
+      `UPDATE dr_photo_unified_reviews
+       SET
+         -- Snapshot current state into submission_history array
+         submission_history = COALESCE(submission_history, '[]'::jsonb) || jsonb_build_object(
+           'submission_number', COALESCE(submission_count, 1),
+           'snapshot_at', NOW(),
+           'photo_count', photo_count,
+           'qa_decision', qa_decision,
+           'qa_decision_at', qa_decision_at,
+           'feedback_sent', feedback_sent,
+           'feedback_sent_at', feedback_sent_at,
+           'feedback_message', feedback_message,
+           'qa_phase', qa_phase,
+           'step_completion', step_completion,
+           'vlm_categorization_status', vlm_categorization_status
+         ),
+         -- Increment submission count
+         submission_count = COALESCE(submission_count, 1) + 1,
+         -- Reset QA workflow state for fresh review
+         qa_phase = NULL,
+         qa_decision = NULL,
+         qa_decision_at = NULL,
+         feedback_sent = false,
+         feedback_sent_at = NULL,
+         -- Keep feedback_message for reference but don't require resending
+         -- Reset categorization to trigger re-processing
+         vlm_categorization_status = 'pending',
+         -- Update photo count with new value from 1Map
+         photo_count = $2,
+         -- Timestamp
+         updated_at = NOW()
+       WHERE drop_number = $1`,
+      [dropNumber, newPhotoCount]
+    );
+    log.info('DrAcknowledgment', `Reset ${dropNumber} for QA re-review (resubmission)`, {
+      newPhotoCount,
+    });
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Failed to mark ${dropNumber} for rework`, { error });
+  }
+}
+
+/**
+ * Generate WhatsApp acknowledgment message for RESUBMISSION
+ */
+function generateResubmissionAckMessage(
+  dropNumber: string,
+  newPhotoCount: number,
+  previousPhotoCount: number,
+  submissionNumber: number,
+  ontSerial: string | null,
+  upsSerial: string | null
+): { message: string; swapped: boolean; swapDetails: string | null } {
+  const swapCheck = detectSwappedSerials(ontSerial, upsSerial);
+  const lines: string[] = [];
+
+  // Header - distinct from normal submission
+  lines.push(`🔄 *${dropNumber} Resubmitted!*`);
+  lines.push('');
+  lines.push(`This is submission #${submissionNumber} for this DR.`);
+  lines.push('');
+
+  // CRITICAL: Swapped serials warning
+  if (swapCheck.swapped) {
+    lines.push('🔴 *ALERT: SERIALS APPEAR SWAPPED*');
+    lines.push('');
+    if (ontSerial && looksLikeGizzuSerial(ontSerial)) {
+      lines.push(`❌ ONT field has Gizzu serial: ${ontSerial}`);
+    }
+    if (upsSerial && looksLikeOntSerial(upsSerial)) {
+      lines.push(`❌ UPS field has ONT serial: ${upsSerial}`);
+    }
+    lines.push('');
+    lines.push('*Please correct in 1Map:*');
+    lines.push('• ONT should be ALCL/ALCB serial');
+    lines.push('• UPS should be GU18W serial (Gizzu)');
+    lines.push('');
+  }
+
+  // Photo count comparison
+  lines.push(`📸 Photos: ${newPhotoCount} (was ${previousPhotoCount})`);
+
+  // Serial status
+  lines.push(`🔌 ONT: ${ontSerial || 'Not scanned'}`);
+  lines.push(`🔋 UPS: ${upsSerial || 'Not scanned'}`);
+  lines.push('');
+
+  // Footer - emphasize rework
+  lines.push('⚠️ Marked for QA re-review.');
+  lines.push('Previous feedback will be considered.');
+
+  return {
+    message: lines.join('\n'),
+    swapped: swapCheck.swapped,
+    swapDetails: swapCheck.swapped ? swapCheck.details : null,
+  };
 }
 
 /**
@@ -152,6 +298,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     log.info('DrAcknowledgment', `Getting acknowledgment data for ${dropNumber}`, { project });
 
+    // Check if this is a resubmission
+    const existingSubmission = await checkExistingSubmission(dropNumber);
+    const isResubmission = existingSubmission !== null;
+    let submissionNumber = 1;
+    let previousPhotoCount = 0;
+
+    if (isResubmission) {
+      submissionNumber = (existingSubmission.submission_count || 1) + 1;
+      previousPhotoCount = existingSubmission.photo_count || 0;
+      log.info('DrAcknowledgment', `RESUBMISSION detected for ${dropNumber}`, {
+        previousSubmissions: existingSubmission.submission_count,
+        previousPhotoCount,
+      });
+    }
+
     let found = false;
     let photoCount = 0;
     let ontSerial: string | null = null;
@@ -194,11 +355,37 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Continue with found=false - don't fail the request
     }
 
-    const ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial);
+    // Generate appropriate message based on whether this is a resubmission
+    let ackResult: { message: string; swapped: boolean; swapDetails: string | null };
+
+    if (isResubmission && found) {
+      // Resubmission - use special template and mark for rework
+      ackResult = generateResubmissionAckMessage(
+        dropNumber,
+        photoCount,
+        previousPhotoCount,
+        submissionNumber,
+        ontSerial,
+        upsSerial
+      );
+      // Mark for QA re-review and reset workflow
+      await markForRework(dropNumber, photoCount);
+    } else {
+      // Normal first submission
+      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial);
+    }
+
     const duration = Date.now() - startTime;
 
     if (!found) {
       log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map - returning empty message (no ack will be sent)`);
+    } else if (isResubmission) {
+      log.info('DrAcknowledgment', `Resubmission acknowledgment ready for ${dropNumber}`, {
+        submissionNumber,
+        photoCount,
+        previousPhotoCount,
+        duration: `${duration}ms`,
+      });
     } else if (ackResult.swapped) {
       log.warn('DrAcknowledgment', `SWAPPED SERIALS detected for ${dropNumber}`, {
         ontSerial,
@@ -218,6 +405,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       message: ackResult.message,
       serialsSwapped: ackResult.swapped,
       swapDetails: ackResult.swapDetails,
+      // Resubmission info
+      isResubmission,
+      submissionNumber,
+      previousPhotoCount: isResubmission ? previousPhotoCount : null,
     });
   } catch (error) {
     log.error('DrAcknowledgment', 'Error generating acknowledgment', { error });
