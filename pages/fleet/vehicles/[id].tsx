@@ -308,7 +308,7 @@ function OverviewTab({
                 type="text"
                 value={editForm.registration || ''}
                 onChange={(e) => setEditForm({ ...editForm, registration: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)] font-medium">{vehicle.registration}</p>
@@ -322,7 +322,7 @@ function OverviewTab({
               <select
                 value={editForm.vehicleType || ''}
                 onChange={(e) => setEditForm({ ...editForm, vehicleType: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               >
                 {Object.entries(vehicleTypeLabels).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -343,7 +343,7 @@ function OverviewTab({
                 type="text"
                 value={editForm.make || ''}
                 onChange={(e) => setEditForm({ ...editForm, make: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)]">{vehicle.make || '-'}</p>
@@ -358,7 +358,7 @@ function OverviewTab({
                 type="text"
                 value={editForm.model || ''}
                 onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)]">{vehicle.model || '-'}</p>
@@ -373,7 +373,7 @@ function OverviewTab({
                 type="number"
                 value={editForm.year || ''}
                 onChange={(e) => setEditForm({ ...editForm, year: parseInt(e.target.value) || null })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)]">{vehicle.year || '-'}</p>
@@ -388,7 +388,7 @@ function OverviewTab({
                 type="text"
                 value={editForm.color || ''}
                 onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)]">{vehicle.color || '-'}</p>
@@ -403,7 +403,7 @@ function OverviewTab({
                 type="text"
                 value={editForm.vin || ''}
                 onChange={(e) => setEditForm({ ...editForm, vin: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)] font-mono">{vehicle.vin || '-'}</p>
@@ -417,7 +417,7 @@ function OverviewTab({
               <select
                 value={editForm.status || ''}
                 onChange={(e) => setEditForm({ ...editForm, status: e.target.value as FleetVehicle['status'] })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               >
                 <option value="active">Active</option>
                 <option value="maintenance">Maintenance</option>
@@ -438,7 +438,7 @@ function OverviewTab({
               <select
                 value={editForm.ownershipType || ''}
                 onChange={(e) => setEditForm({ ...editForm, ownershipType: e.target.value })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               >
                 <option value="company">Company Owned</option>
                 <option value="rental">Rental</option>
@@ -470,7 +470,7 @@ function OverviewTab({
                 step="0.01"
                 value={editForm.fuelRatePerKm || ''}
                 onChange={(e) => setEditForm({ ...editForm, fuelRatePerKm: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)] text-lg font-semibold">
@@ -489,7 +489,7 @@ function OverviewTab({
                 step="0.01"
                 value={editForm.depreciationRatePerKm || ''}
                 onChange={(e) => setEditForm({ ...editForm, depreciationRatePerKm: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+                className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
               />
             ) : (
               <p className="text-[var(--ff-text-primary)] text-lg font-semibold">
@@ -510,7 +510,7 @@ function OverviewTab({
             value={editForm.notes || ''}
             onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
             rows={4}
-            className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg"
+            className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500"
             placeholder="Add notes about this vehicle..."
           />
         ) : (

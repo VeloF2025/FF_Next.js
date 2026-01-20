@@ -329,7 +329,7 @@ export default function FleetVehiclesPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+            className="px-4 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
@@ -339,7 +339,7 @@ export default function FleetVehiclesPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+            className="px-4 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
           >
             <option value="">All Types</option>
             <option value="bakkie">Bakkie</option>
@@ -638,7 +638,7 @@ export default function FleetVehiclesPage() {
                     <select
                       value={newVehicleForm.vehicleType}
                       onChange={(e) => setNewVehicleForm({ ...newVehicleForm, vehicleType: e.target.value })}
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                     >
                       {Object.entries(vehicleTypeLabels).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
@@ -652,7 +652,7 @@ export default function FleetVehiclesPage() {
                     <select
                       value={newVehicleForm.ownershipType}
                       onChange={(e) => setNewVehicleForm({ ...newVehicleForm, ownershipType: e.target.value })}
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                     >
                       <option value="company">Company Owned</option>
                       <option value="rental">Rental</option>
