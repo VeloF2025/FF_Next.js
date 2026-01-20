@@ -21,23 +21,34 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
     business_value: undefined,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
+
+  const handleClose = () => {
+    setTitleError(null);
+    setFormData({
+      title: '',
+      description: '',
+      priority: 'medium',
+      effort_estimate: undefined,
+      business_value: undefined,
+    });
+    onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim()) return;
+
+    // Validate title
+    if (!formData.title.trim()) {
+      setTitleError('Title is required');
+      return;
+    }
+    setTitleError(null);
 
     setSubmitting(true);
     try {
       await onSubmit(formData);
-      // Reset form and close modal
-      setFormData({
-        title: '',
-        description: '',
-        priority: 'medium',
-        effort_estimate: undefined,
-        business_value: undefined,
-      });
-      onClose();
+      handleClose();
     } catch (error) {
       // Error is handled by the hook
     } finally {
@@ -56,7 +67,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
             Add Wishlist Item
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] transition-colors"
           >
             <X className="h-5 w-5" />
@@ -68,16 +79,24 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-              Title *
+              Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)]"
+              onChange={(e) => {
+                setFormData({ ...formData, title: e.target.value });
+                if (titleError) setTitleError(null);
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] ${
+                titleError ? 'border-red-500' : 'border-[var(--ff-border-light)]'
+              }`}
               placeholder="Brief title for the feature"
               required
             />
+            {titleError && (
+              <p className="mt-1 text-sm text-red-500">{titleError}</p>
+            )}
           </div>
 
           {/* Description */}
@@ -152,7 +171,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               Cancel
