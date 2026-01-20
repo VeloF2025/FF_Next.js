@@ -1,0 +1,33 @@
+{
+  "lastUpdated": "2026-01-20T14:45:00Z",
+  "lastTask": "Knowledge base update and migration 096",
+  "status": "completed",
+  "recentChanges": [
+    {
+      "date": "2026-01-20",
+      "feature": "Fleet calibration modal",
+      "files": ["pages/fleet/portal.tsx", "src/modules/fleet/check-in/components/VehicleCalibrationModal.tsx"],
+      "deployed": true
+    },
+    {
+      "date": "2026-01-20",
+      "feature": "WA Admin multi-phone support",
+      "files": ["pages/api/communications/whatsapp/phones/"],
+      "migration": "096_wa_service_fallback.sql",
+      "deployed": true
+    },
+    {
+      "date": "2026-01-20",
+      "feature": "Sidebar external links",
+      "files": ["src/components/layout/sidebar/NavigationMenu.tsx", "src/components/layout/sidebar/types.ts"],
+      "deployed": true
+    },
+    {
+      "date": "2026-01-20",
+      "feature": "NAFNet deblurring (CPU mode)",
+      "note": "RTX 5090 sm_120 not supported by PyTorch 2.2",
+      "deployed": true
+    }
+  ],
+  "pendingTasks": []
+}

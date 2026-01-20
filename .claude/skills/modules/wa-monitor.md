@@ -199,7 +199,7 @@ Prevention: Ensure /opt/wa-monitor/prod/restart-monitor.sh is used
 ➕ Adding New WhatsApp Group (5 minutes):
 
 Prerequisites:
-- WhatsApp bridge in group (064 041 2391)
+- WhatsApp bridge in group (082 418 9511)
 - Group JID: [check if provided]
 
 Steps:
@@ -209,6 +209,70 @@ Steps:
 4. Verify monitoring
 
 [Provide exact commands for each step]
+```
+
+### Trigger 7: Delete Sent Messages (Jan 2026)
+
+**Keywords**:
+- "delete message"
+- "delete last message"
+- "remove sent message"
+- "undo whatsapp"
+- "delete the messages"
+
+**Automatic Actions**:
+1. Invoke WA agent
+2. List recent deletable messages (within 1 hour)
+3. Identify message IDs from logs or user context
+4. Delete via Sender API
+5. Confirm deletion
+
+**Response Template**:
+```
+🗑️ Message Deletion:
+
+Recent Deletable Messages (last hour):
+[List from /list-recent endpoint]
+
+To delete:
+curl -X POST http://localhost:8081/delete-message \
+  -H "Content-Type: application/json" \
+  -d '{"message_id":"XXX","group_jid":"YYY@g.us"}'
+
+[Execute and confirm result]
+```
+
+**Note:** Messages can only be deleted within 1 hour of sending.
+
+### Trigger 8: Duplicate Messages (Jan 2026)
+
+**Keywords**:
+- "duplicate messages"
+- "sending multiple"
+- "infinite loop"
+- "ack loop"
+- "same message twice"
+
+**Automatic Actions**:
+1. Invoke WA agent
+2. Check bridge logs for ack-filter
+3. Verify filter is in main.go
+4. Check sender_proxy.go deduplication
+5. Rebuild bridge if needed
+
+**Response Template**:
+```
+🔄 Duplicate Message Investigation:
+
+Ack Filter Status: ✅/❌
+Deduplication Cache: ✅/❌
+
+If missing, rebuild bridge:
+cd /home/louis/whatsapp-bridge-go
+go build -o whatsapp-bridge *.go
+sudo systemctl restart whatsapp-bridge.service
+
+[Check logs for confirmation]
 ```
 
 ## Auto-Activation Rules

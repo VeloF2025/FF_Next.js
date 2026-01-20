@@ -84,7 +84,7 @@ Next.js App (Port 3005)
 
 **Location:** `/home/louis/whatsapp-bridge-go/`
 **Service:** `whatsapp-bridge.service`
-**Phone:** +27 64 041 2391 (listens only, sends via Sender)
+**Phone:** +27 82 418 9511 (same as Sender - unified number)
 
 **Key Files:**
 - `main.go` - Main bridge logic, message handling
@@ -230,18 +230,96 @@ tail -20 /home/louis/whatsapp-sender/sender.log
 
 ## Architecture History
 
-### Jan 2026 - Unified Number Architecture
-- **Change:** Bridge now routes acks through Sender API
-- **Result:** All messages from same 082 number
+### Jan 2026 - Fully Unified Number Architecture
+- **Change:** Bridge re-paired with 082 418 9511 (same as Sender)
+- **Result:** Single phone number for ALL WhatsApp operations
+- **Previous:** Bridge was paired with 064 041 2391, causing confusion
+- **Fix:** Backed up old session store, re-paired bridge with 082 number
+
+### Jan 2026 (Earlier) - Routing via Sender API
+- **Change:** Bridge routes acks through Sender API
+- **Result:** All outgoing messages from same 082 number
 - **Files:** Added `sender_proxy.go`, modified `main.go`
 
 ### Nov 2025 - Dual Number Architecture
-- Sender (071 number) for feedback with @mentions
-- Bridge (064 number) for listening and fallback
+- Sender (082 number) for feedback with @mentions
+- Bridge (064 number) for listening only
 
 ### Original - Single Bridge
 - Bridge handled both listening and sending
 - No @mention support
+
+---
+
+## WhatsApp Portal (Admin UI)
+
+**URL:** `/communications/whatsapp`
+**Status:** Production - Dark theme compliant (Jan 2026)
+
+### Overview
+
+Web-based admin interface for managing WhatsApp services, phones, and configuration.
+
+### Tabs
+
+| Tab | Purpose |
+|-----|---------|
+| **Services** | View service status (Bridge/Sender), restart services, initiate pairing |
+| **Groups** | Manage monitored WhatsApp groups |
+| **Templates** | Message templates for feedback |
+| **Logs** | View message logs with export |
+| **Settings** | Service configuration |
+
+### Services Tab Features
+
+- **Service Cards:** Show Bridge and Sender status with CONNECTED/ERROR badges
+- **Registered Phone Numbers:** List phones with PRIMARY/paired status
+- **Restart Buttons:** Quick service restart
+- **Pairing:** Initiate phone pairing for re-authentication
+
+### API Endpoints
+
+**Phones API (Jan 2026):**
+```bash
+# List all registered phones
+GET /api/communications/whatsapp/phones
+
+# Register new phone
+POST /api/communications/whatsapp/phones
+
+# Manage specific phone
+GET/PUT/DELETE /api/communications/whatsapp/phones/[id]
+```
+
+**Pairing API (Jan 2026):**
+```bash
+# Initiate pairing
+POST /api/communications/whatsapp/services/[service]/pair
+
+# Check pairing status
+GET /api/communications/whatsapp/services/[service]/pairing-status
+
+# Logout service
+POST /api/communications/whatsapp/services/[service]/logout
+```
+
+### Frontend Service
+
+```typescript
+import { waAdminApi } from '@/modules/communications/whatsapp/services/waAdminApiService';
+
+// Services
+await waAdminApi.services.status();
+await waAdminApi.services.restart('bridge');
+await waAdminApi.services.pair('sender', '+27824189511');
+await waAdminApi.services.pairingStatus('sender');
+await waAdminApi.services.logout('bridge');
+
+// Phones
+await waAdminApi.phones.list();
+await waAdminApi.phones.create({ phone_number: '...', service: 'sender', role: 'primary' });
+await waAdminApi.phones.setPrimary(phoneId);
+```
 
 ---
 
@@ -250,6 +328,7 @@ tail -20 /home/louis/whatsapp-sender/sender.log
 - [WA Monitor README](../../src/modules/wa-monitor/README.md)
 - [Troubleshooting Guide](../../src/modules/wa-monitor/TROUBLESHOOTING.md)
 - [Add New Project (5 Min)](./WA_MONITOR_ADD_PROJECT_5MIN.md)
+- [WhatsApp Portal Components](../../src/modules/communications/whatsapp/)
 
 ---
 
