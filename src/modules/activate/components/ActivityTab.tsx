@@ -311,15 +311,79 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                   {/* Event Card */}
                   <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                     <div className="flex items-start justify-between">
-                      <div>
+                      <div className="flex-1">
                         <h5 className="font-medium text-gray-900 dark:text-white">
                           {entry.title}
                         </h5>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           {entry.description}
                         </p>
+
+                        {/* Show detailed changes for SERIAL_UPDATE events */}
+                        {entry.eventType === 'SERIAL_UPDATE' && entry.metadata?.changes && (
+                          <div className="mt-3 space-y-2 text-sm">
+                            {(entry.metadata.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ont && (
+                              <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
+                                <span className="font-medium text-orange-700 dark:text-orange-300 w-12">ONT:</span>
+                                <span className="text-gray-500 dark:text-gray-400 font-mono text-xs">
+                                  {(entry.metadata.changes as { ont: { old: string; new: string } }).ont.old || 'null'}
+                                </span>
+                                <span className="text-orange-500">→</span>
+                                <span className="text-gray-900 dark:text-white font-mono text-xs font-medium">
+                                  {(entry.metadata.changes as { ont: { old: string; new: string } }).ont.new}
+                                </span>
+                              </div>
+                            )}
+                            {(entry.metadata.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ups && (
+                              <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
+                                <span className="font-medium text-orange-700 dark:text-orange-300 w-12">UPS:</span>
+                                <span className="text-gray-500 dark:text-gray-400 font-mono text-xs">
+                                  {(entry.metadata.changes as { ups: { old: string; new: string } }).ups.old || 'null'}
+                                </span>
+                                <span className="text-orange-500">→</span>
+                                <span className="text-gray-900 dark:text-white font-mono text-xs font-medium">
+                                  {(entry.metadata.changes as { ups: { old: string; new: string } }).ups.new}
+                                </span>
+                              </div>
+                            )}
+                            {entry.metadata.swap_corrected && (
+                              <div className="flex items-center gap-2 mt-2 text-green-600 dark:text-green-400">
+                                <span>✅</span>
+                                <span className="font-medium">Swap was corrected by technician</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Show details for SWAP_DETECTED events */}
+                        {entry.eventType === 'SWAP_DETECTED' && entry.metadata && (
+                          <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                            <div className="flex items-center gap-2 text-red-700 dark:text-red-300 text-sm">
+                              <span>⚠️</span>
+                              <span className="font-medium">Serials appear swapped!</span>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                              <div>ONT field: {entry.metadata.ont_serial as string}</div>
+                              <div>UPS field: {entry.metadata.ups_serial as string}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show details for INSTALLATION_MISMATCH events */}
+                        {entry.eventType === 'INSTALLATION_MISMATCH' && entry.metadata && (
+                          <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                            <div className="flex items-center gap-2 text-red-700 dark:text-red-300 text-sm">
+                              <span>🔴</span>
+                              <span className="font-medium">ONT replaced but not updated in 1Map</span>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                              <div>1Map shows: {entry.metadata.onemap_serial as string}</div>
+                              <div>OES activated: {entry.metadata.oes_serial as string}</div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-right ml-4">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {formatDateTime(entry.timestamp)}
                         </span>
