@@ -18,9 +18,22 @@
 import { log } from '@/lib/logger';
 import { fetchPhotoAsBase64 } from './photoFetchService';
 import { extractOntSerialFromBarcode } from './barcodeExtractionService';
+import {
+  detectBlur,
+  preprocessImage,
+  optimizeForVlm,
+  type BlurDetectionResult,
+  type PreprocessResult,
+} from './imagePreprocessService';
 
 // Feature flag for barcode extraction
 const ENABLE_BARCODE_EXTRACTION = process.env.ENABLE_BARCODE_EXTRACTION !== 'false'; // Enabled by default
+
+// Feature flag for image preprocessing (blur detection + deblur)
+const ENABLE_IMAGE_PREPROCESSING = process.env.ENABLE_IMAGE_PREPROCESSING === 'true'; // Disabled by default until NAFNet is set up
+
+// Feature flag for blur detection only (no deblur, just logging)
+const ENABLE_BLUR_DETECTION = process.env.ENABLE_BLUR_DETECTION !== 'false'; // Enabled by default
 
 // ============================================================================
 // CONFIGURATION
@@ -379,6 +392,56 @@ async function callVlmExtraction<T>(
 }
 
 // ============================================================================
+// IMAGE PREPROCESSING
+// ============================================================================
+
+/**
+ * Preprocess image before VLM extraction
+ * - Detects blur and optionally deblurs
+ * - Optimizes image size for VLM
+ *
+ * @param base64 - Base64 encoded image
+ * @param context - Context for logging
+ * @returns Preprocessed base64 image
+ */
+async function preprocessForVlm(
+  base64: string,
+  context: string
+): Promise<{ base64: string; blurResult?: BlurDetectionResult }> {
+  // If preprocessing is disabled, just optimize size
+  if (!ENABLE_BLUR_DETECTION && !ENABLE_IMAGE_PREPROCESSING) {
+    const optimized = await optimizeForVlm(base64);
+    return { base64: optimized };
+  }
+
+  // Detect blur
+  const blurResult = await detectBlur(base64);
+
+  if (blurResult.isBlurry) {
+    log.warn('VlmExtraction', `${context}: Image is ${blurResult.assessment} (score: ${blurResult.score.toFixed(1)})`, {
+      score: blurResult.score,
+      threshold: blurResult.threshold,
+    });
+
+    // If full preprocessing is enabled, try to deblur
+    if (ENABLE_IMAGE_PREPROCESSING) {
+      const preprocessResult = await preprocessImage(base64, { skipDeblur: false });
+
+      if (preprocessResult.wasPreprocessed && preprocessResult.deblur?.newScore) {
+        log.info('VlmExtraction', `${context}: Deblurred image (${blurResult.score.toFixed(1)} → ${preprocessResult.deblur.newScore.toFixed(1)})`);
+        return { base64: preprocessResult.imageBase64, blurResult };
+      }
+    }
+  } else {
+    log.debug('VlmExtraction', `${context}: Image is ${blurResult.assessment} (score: ${blurResult.score.toFixed(1)})`);
+  }
+
+  // Optimize for VLM (resize if needed)
+  const optimized = await optimizeForVlm(base64);
+  return { base64: optimized, blurResult };
+}
+
+// ============================================================================
 // EXTRACTION FUNCTIONS
 // ============================================================================
 
@@ -389,7 +452,11 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
   log.debug('VlmExtraction', `Extracting power meter reading from ${photoUrl}`);
 
   try {
-    const base64 = await fetchPhotoAsBase64(photoUrl);
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+
+    // Preprocess image (blur detection + optimization)
+    const preprocessed = await preprocessForVlm(base64, 'Power meter');
+    base64 = preprocessed.base64;
 
     const result = await callVlmExtraction<{
       found: boolean;
@@ -486,7 +553,11 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
   log.debug('VlmExtraction', `Extracting ONT serial from back: ${photoUrl}`);
 
   try {
-    const base64 = await fetchPhotoAsBase64(photoUrl);
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+
+    // Preprocess image (blur detection + optimization)
+    const preprocessed = await preprocessForVlm(base64, 'Step 6 ONT serial');
+    base64 = preprocessed.base64;
 
     // Step 1: Try barcode scanning first (faster, more reliable)
     if (ENABLE_BARCODE_EXTRACTION) {
@@ -511,7 +582,7 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
       }
     }
 
-    // Step 2: Fall back to VLM extraction
+    // Step 2: Fall back to VLM extraction (image already preprocessed)
     return extractOntSerialFromBackViaVlm(base64);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -538,7 +609,11 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
   log.debug('VlmExtraction', `Extracting Step 9 data from: ${photoUrl}`);
 
   try {
-    const base64 = await fetchPhotoAsBase64(photoUrl);
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+
+    // Preprocess image (blur detection + optimization)
+    const preprocessed = await preprocessForVlm(base64, 'Step 9 front');
+    base64 = preprocessed.base64;
 
     // Step 1: Try barcode scanning for ONT serial first (faster, more reliable)
     let barcodeSerial: SerialExtraction | null = null;
@@ -689,7 +764,12 @@ export async function confirmSerialVisible(
   log.debug('VlmExtraction', `Confirming serial ${expectedSerial} is visible in photo`);
 
   try {
-    const base64 = await fetchPhotoAsBase64(photoUrl);
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+
+    // Preprocess image (blur detection + optimization)
+    const preprocessed = await preprocessForVlm(base64, 'Serial confirmation');
+    base64 = preprocessed.base64;
+
     const prompt = buildSerialConfirmationPrompt(expectedSerial);
 
     const result = await callVlmExtraction<{
