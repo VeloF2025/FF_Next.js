@@ -1,12 +1,12 @@
 /**
  * OCR Service Client Adapter
- * Connects to the VF Server OCR service (100.96.203.105:8095)
+ * Connects to the VF Server OCR service (100.96.203.105:8093)
  * Provides TypeScript interface for OCR processing with 4-tier cascade
  *
  * PRD Reference: PRD-032 OCR Document Extraction System
  *
  * Environment Variables:
- * - OCR_SERVICE_URL: Override the base URL (default: http://100.96.203.105:8095)
+ * - OCR_SERVICE_URL: Override the base URL (default: http://100.96.203.105:8093)
  * - OCR_SERVICE_MOCK: Set to 'true' to use mock responses for development
  */
 
@@ -32,7 +32,7 @@ import {
 } from '@/config/ocrFieldMappings';
 
 // Default OCR Service URL
-const DEFAULT_OCR_SERVICE_URL = 'http://100.96.203.105:8095';
+const DEFAULT_OCR_SERVICE_URL = 'http://100.96.203.105:8093';
 
 // Use environment variable to override default URL
 const OCR_SERVICE_BASE_URL =
