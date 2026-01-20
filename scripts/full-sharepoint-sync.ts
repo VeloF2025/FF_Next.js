@@ -194,15 +194,15 @@ async function syncSingleDr(dropNumber: string): Promise<{ success: boolean; err
 async function logDrActivity(
   dropNumber: string,
   eventType: string,
-  details: Record<string, unknown>
+  eventData: Record<string, unknown>
 ): Promise<void> {
   try {
     await sql`
-      INSERT INTO dr_activity_log (drop_number, event_type, details, actor_type, actor_id, created_at)
-      VALUES (${dropNumber}, ${eventType}, ${JSON.stringify(details)}::jsonb, 'system', 'full-sync', NOW())
+      INSERT INTO dr_activity_log (drop_number, event_type, event_data, actor, created_at)
+      VALUES (${dropNumber}, ${eventType}, ${JSON.stringify(eventData)}::jsonb, 'full-sync', NOW())
     `;
   } catch (error) {
-    console.error(`  ⚠️ Failed to log activity for ${dropNumber}:`, error);
+    // Silently ignore activity log errors - non-critical
   }
 }
 
