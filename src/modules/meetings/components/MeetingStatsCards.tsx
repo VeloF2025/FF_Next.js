@@ -1,4 +1,5 @@
 import { Calendar, Clock, FileText, Users } from 'lucide-react';
+import { StatCard, StatCardGrid } from '@/components/ui/StatCard';
 import type { Meeting } from '../types/meeting.types';
 
 interface MeetingStatsCardsProps {
@@ -17,54 +18,31 @@ export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--ff-text-secondary)]">Today's Meetings</p>
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.todayMeetings}</p>
-            </div>
-            <Calendar className="w-8 h-8 text-blue-500" />
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--ff-text-secondary)]">This Week</p>
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.weekMeetings}</p>
-            </div>
-            <Clock className="w-8 h-8 text-green-500" />
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--ff-text-secondary)]">Action Items</p>
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.actionItems}</p>
-            </div>
-            <FileText className="w-8 h-8 text-orange-500" />
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-[var(--ff-text-secondary)]">Total Hours</p>
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.totalHours}h</p>
-            </div>
-            <Users className="w-8 h-8 text-purple-500" />
-          </div>
-        </div>
-      </div>
-    </div>
+    <StatCardGrid columns={4} className="mb-6">
+      <StatCard
+        label="Today's Meetings"
+        value={stats.todayMeetings}
+        icon={Calendar}
+        colorType="total"
+      />
+      <StatCard
+        label="This Week"
+        value={stats.weekMeetings}
+        icon={Clock}
+        colorType="active"
+      />
+      <StatCard
+        label="Action Items"
+        value={stats.actionItems}
+        icon={FileText}
+        colorType="warning"
+      />
+      <StatCard
+        label="Total Hours"
+        value={`${stats.totalHours}h`}
+        icon={Users}
+        colorType="financial"
+      />
+    </StatCardGrid>
   );
 }

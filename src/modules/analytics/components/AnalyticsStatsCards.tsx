@@ -1,9 +1,7 @@
 'use client';
 
-import { 
-  TrendingUp, TrendingDown, Home, Wifi, Activity, 
-  Users, DollarSign, CheckCircle 
-} from 'lucide-react';
+import { Home, Wifi, Activity, Users, DollarSign } from 'lucide-react';
+import { StatCard, StatCardGrid } from '@/components/ui/StatCard';
 import { AnalyticsStats } from '../types/analytics.types';
 
 interface AnalyticsStatsCardsProps {
@@ -13,76 +11,42 @@ interface AnalyticsStatsCardsProps {
 
 export function AnalyticsStatsCards({ stats, formatNumber }: AnalyticsStatsCardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[var(--ff-text-secondary)]">Total Poles</span>
-            <Home className="w-5 h-5 text-blue-400" />
-          </div>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{formatNumber(stats.totalPoles)}</p>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingUp className="w-4 h-4 text-green-400" />
-            <span className="text-sm text-green-400">+12% vs last period</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[var(--ff-text-secondary)]">Total Drops</span>
-            <Wifi className="w-5 h-5 text-purple-400" />
-          </div>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{formatNumber(stats.totalDrops)}</p>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingUp className="w-4 h-4 text-green-400" />
-            <span className="text-sm text-green-400">+8% vs last period</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[var(--ff-text-secondary)]">Fiber Installed</span>
-            <Activity className="w-5 h-5 text-orange-400" />
-          </div>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{formatNumber(stats.totalFiber)}m</p>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingDown className="w-4 h-4 text-red-400" />
-            <span className="text-sm text-red-400">-3% vs last period</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[var(--ff-text-secondary)]">Active Teams</span>
-            <Users className="w-5 h-5 text-green-400" />
-          </div>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.activeTeams}</p>
-          <div className="flex items-center gap-1 mt-2">
-            <CheckCircle className="w-4 h-4 text-green-400" />
-            <span className="text-sm text-[var(--ff-text-secondary)]">All operational</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="ff-card">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[var(--ff-text-secondary)]">Revenue</span>
-            <DollarSign className="w-5 h-5 text-green-400" />
-          </div>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)]">R{formatNumber(stats.totalRevenue)}</p>
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingUp className="w-4 h-4 text-green-400" />
-            <span className="text-sm text-green-400">+15% vs last period</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <StatCardGrid columns={5} className="mb-6">
+      <StatCard
+        label="Total Poles"
+        value={formatNumber(stats.totalPoles)}
+        icon={Home}
+        colorType="total"
+        trend={{ value: 12, isPositive: true }}
+      />
+      <StatCard
+        label="Total Drops"
+        value={formatNumber(stats.totalDrops)}
+        icon={Wifi}
+        colorType="financial"
+        trend={{ value: 8, isPositive: true }}
+      />
+      <StatCard
+        label="Fiber Installed"
+        value={`${formatNumber(stats.totalFiber)}m`}
+        icon={Activity}
+        colorType="sent"
+        trend={{ value: 3, isPositive: false }}
+      />
+      <StatCard
+        label="Active Teams"
+        value={stats.activeTeams}
+        icon={Users}
+        colorType="active"
+        subtitle="All operational"
+      />
+      <StatCard
+        label="Revenue"
+        value={`R${formatNumber(stats.totalRevenue)}`}
+        icon={DollarSign}
+        colorType="success"
+        trend={{ value: 15, isPositive: true }}
+      />
+    </StatCardGrid>
   );
 }
