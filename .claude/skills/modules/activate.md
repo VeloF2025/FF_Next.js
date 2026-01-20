@@ -840,6 +840,17 @@ NEXT_PUBLIC_APP_URL=http://localhost:3006
 | `src/modules/activate/components/wizard/DataValidationPhase.tsx` | Phase 3 |
 | `src/modules/activate/components/wizard/FinalDecisionPhase.tsx` | Phase 4 |
 | `src/modules/activate/components/wizard/FeedbackPhase.tsx` | Phase 5 |
+| `src/modules/activate/components/wizard/WizardProgressOverlay.tsx` | Progress spinner for 1Map sync & AI categorization |
+
+### Progress Overlays (Jan 2026)
+| File | Purpose |
+|------|---------|
+| `src/modules/activate/components/ImportProgressOverlay.tsx` | Full-screen spinner for OES/ARCH imports |
+| `src/modules/activate/components/wizard/WizardProgressOverlay.tsx` | Full-screen spinner for 1Map sync & AI categorization |
+
+**Import Phases:** `parsing` → `uploading` → `processing` → `syncing` → `complete`
+**1Map Sync Phases:** `fetching` → `loading_photos` → `checking` → `complete`
+**Categorization Phases:** `analyzing` → `processing` → `saving` → `complete`
 
 ### Reporting (8 Types)
 | File | Purpose |

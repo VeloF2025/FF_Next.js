@@ -351,7 +351,9 @@ src/modules/activate/
 │   │   ├── PhotoReviewPhase.tsx    # Phase 2
 │   │   ├── DataValidationPhase.tsx # Phase 3
 │   │   ├── FinalDecisionPhase.tsx  # Phase 4
-│   │   └── FeedbackPhase.tsx       # Phase 5
+│   │   ├── FeedbackPhase.tsx       # Phase 5
+│   │   └── WizardProgressOverlay.tsx # Progress spinner for 1Map sync & AI categorization
+│   ├── ImportProgressOverlay.tsx   # Progress spinner for OES/ARCH imports
 │   └── reporting/
 │       ├── ReportsDashboard.tsx    # Reports container
 │       ├── ReportsTab.tsx          # Reports tab
@@ -387,6 +389,100 @@ src/modules/activate/
 └── utils/
     └── stepMapper.ts               # Photo type mapping
 ```
+
+## Progress Overlays (Jan 2026)
+
+Visual feedback during async operations with animated step indicators.
+
+### ImportProgressOverlay
+
+Full-screen modal for OES/ARCH Excel imports in the Data Import tab.
+
+**File:** `components/ImportProgressOverlay.tsx`
+
+**Phases:**
+| Phase | Icon | Message | Color |
+|-------|------|---------|-------|
+| `parsing` | FileText | "Parsing Excel file..." | Blue |
+| `uploading` | Upload | "Uploading X records..." | Purple |
+| `processing` | Database | "Processing records..." | Indigo |
+| `syncing` | RefreshCw | "Syncing with database..." | Cyan |
+| `complete` | CheckCircle | "Import complete!" | Green |
+
+**Usage in OESImportTab/OfflineImportTab:**
+```typescript
+const [importPhase, setImportPhase] = useState<ImportPhase | null>(null);
+
+// During import
+setImportPhase('uploading');
+// ... after API call
+setImportPhase('processing');
+setImportPhase('syncing');
+setImportPhase('complete');
+await new Promise(resolve => setTimeout(resolve, 800)); // Show success briefly
+setImportPhase(null); // Hide overlay
+```
+
+### WizardProgressOverlay
+
+Full-screen modal for QA Wizard async operations (1Map sync, AI categorization).
+
+**File:** `components/wizard/WizardProgressOverlay.tsx`
+
+**Operation Types:**
+
+1. **`sync_1map`** - When loading DR data from 1Map
+   | Phase | Icon | Message | Color |
+   |-------|------|---------|-------|
+   | `fetching` | MapPin | "Syncing from 1Map..." | Blue |
+   | `loading_photos` | Camera | "Loading photos..." | Purple |
+   | `checking` | Database | "Checking prerequisites..." | Indigo |
+   | `complete` | CheckCircle | "Data loaded!" | Green |
+
+2. **`categorization`** - When running AI photo categorization
+   | Phase | Icon | Message | Color |
+   |-------|------|---------|-------|
+   | `analyzing` | Brain | "Analyzing photos with AI..." | Purple |
+   | `processing` | Sparkles | "Categorizing photos..." | Indigo |
+   | `saving` | Database | "Saving results..." | Blue |
+   | `complete` | CheckCircle | "Categorization complete!" | Green |
+
+**Usage in QaWizardContainer:**
+```typescript
+const [syncPhase, setSyncPhase] = useState<Sync1MapPhase | null>(null);
+
+// During data loading
+setSyncPhase('fetching');
+// ... API calls
+setSyncPhase('loading_photos');
+setSyncPhase('checking');
+setSyncPhase('complete');
+await new Promise(resolve => setTimeout(resolve, 600));
+setSyncPhase(null);
+```
+
+**Usage in PhotoReviewPhase:**
+```typescript
+const [categorizationPhase, setCategorizationPhase] = useState<CategorizationPhase | null>(null);
+
+// During categorization
+setCategorizationPhase('analyzing');
+setTimeout(() => setCategorizationPhase('processing'), 800);
+// ... API call
+setCategorizationPhase('saving');
+setCategorizationPhase('complete');
+await new Promise(resolve => setTimeout(resolve, 600));
+setCategorizationPhase(null);
+```
+
+### UI Features
+
+Both overlays include:
+- **Backdrop blur** - Semi-transparent dark background
+- **Animated spinner** - Rotating ring around icon
+- **Step progress** - Checkmarks for completed steps, spinner for active
+- **Bouncing dots** - Three pulsing dots during processing
+- **Drop context** - Shows DR number and photo count when applicable
 
 ## Services
 
