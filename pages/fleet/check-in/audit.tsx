@@ -332,14 +332,14 @@ export default function CheckInAuditPage() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-sm"
+                className="px-3 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white text-sm hover:border-gray-500"
               />
               <span className="text-gray-400">to</span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-sm"
+                className="px-3 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white text-sm hover:border-gray-500"
               />
             </div>
 
@@ -347,7 +347,7 @@ export default function CheckInAuditPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-sm"
+              className="px-3 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white text-sm hover:border-gray-500"
             >
               <option value="all">All Status</option>
               <option value="completed">Completed</option>

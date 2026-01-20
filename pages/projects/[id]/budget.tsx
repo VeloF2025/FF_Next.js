@@ -694,7 +694,7 @@ function BudgetCreateModal({ open, onClose, onSubmit, projectId }: BudgetCreateM
                   value={boqId}
                   onChange={(e) => setBoqId(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-600 rounded-md bg-[#1a1d23] text-white focus:ring-1 focus:ring-blue-500 hover:border-gray-500"
                 >
                   <option value="">Select a BOQ...</option>
                   {boqs.map((boq) => (

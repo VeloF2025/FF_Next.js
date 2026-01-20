@@ -288,7 +288,7 @@ export default function QFieldSyncPage() {
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="w-full p-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg mb-2"
+                  className="w-full p-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg mb-2 hover:border-gray-500"
                   disabled={loadingProjects}
                 >
                   <option value="">
