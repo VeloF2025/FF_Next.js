@@ -116,7 +116,6 @@ async function markForRework(dropNumber: string, newPhotoCount: number): Promise
            'feedback_sent_at', feedback_sent_at,
            'feedback_message', feedback_message,
            'qa_phase', qa_phase,
-           'step_completion', step_completion,
            'vlm_categorization_status', vlm_categorization_status
          ),
          -- Increment submission count
