@@ -364,6 +364,7 @@ export async function getActivityTimeline(
   }
 
   // 2. Get DR timestamps from dr_photo_unified_reviews
+  log.info('ActivityLog', `Querying DR timestamps for ${drNumber}`);
   try {
     const drRows = await sql`
       SELECT
@@ -388,8 +389,10 @@ export async function getActivityTimeline(
       WHERE drop_number = ${drNumber}
     `;
 
+    log.info('ActivityLog', `DR query returned ${drRows.length} rows for ${drNumber}`);
     if (drRows.length > 0) {
       const dr = drRows[0];
+      log.info('ActivityLog', `DR timestamps: wa_received=${dr.wa_received_at}, vlm_cat=${dr.vlm_categorized_at}`);
 
       // Add events from DR timestamps (only if not already in activity log)
       const existingEventTypes = new Set(history.map(h => h.event_type));

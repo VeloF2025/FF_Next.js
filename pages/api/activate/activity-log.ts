@@ -37,7 +37,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       }
 
       // Get full timeline
+      log.info('ActivityLog', `Getting timeline for ${dropNumber}, limit ${limitNum}`);
       const timeline = await getActivityTimeline(dropNumber, limitNum);
+      log.info('ActivityLog', `Got ${timeline.length} events for ${dropNumber}`);
 
       return apiResponse.success(res, {
         dropNumber,

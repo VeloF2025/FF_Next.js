@@ -43,7 +43,7 @@ function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       <VersionChecker />
       <AuthProvider>
-        <ThemeProvider>
+        <ThemeProvider enableSystemTheme={false}>
           <QueryClientProvider client={queryClient}>
             <Component {...pageProps} />
             <Toaster
@@ -51,34 +51,35 @@ function MyApp({ Component, pageProps }: AppProps) {
               toastOptions={{
                 duration: 4000,
                 style: {
-                  background: '#fff',
-                  color: '#363636',
+                  background: '#1e2128',
+                  color: '#e5e7eb',
                   padding: '16px',
                   borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  border: '1px solid #374151',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
                 },
                 success: {
                   duration: 3000,
                   iconTheme: {
                     primary: '#10b981',
-                    secondary: '#fff',
+                    secondary: '#1e2128',
                   },
                   style: {
-                    background: '#f0fdf4',
-                    color: '#166534',
-                    border: '1px solid #bbf7d0',
+                    background: '#064e3b',
+                    color: '#a7f3d0',
+                    border: '1px solid #059669',
                   },
                 },
                 error: {
                   duration: 5000,
                   iconTheme: {
                     primary: '#ef4444',
-                    secondary: '#fff',
+                    secondary: '#1e2128',
                   },
                   style: {
-                    background: '#fef2f2',
-                    color: '#991b1b',
-                    border: '1px solid #fecaca',
+                    background: '#7f1d1d',
+                    color: '#fecaca',
+                    border: '1px solid #dc2626',
                   },
                 },
               }}

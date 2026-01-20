@@ -352,7 +352,17 @@
       "Bash(src/modules/activate/components/reporting/ReportsDashboard.tsx )",
       "Bash(src/modules/activate/components/reporting/SerialSwapReports.tsx )",
       "Bash(src/modules/activate/types/reporting.types.ts)",
-      "Skill(kb)"
+      "Skill(kb)",
+      "Bash(pages/api/activate/sharepoint-sync.ts )",
+      "Bash(pages/api/activate/sharepoint-sync-batch.ts )",
+      "Bash(pages/api/activate/import-oes.ts )",
+      "Bash(pages/api/activate/process-new-dr.ts )",
+      "Bash(scripts/cron/sharepoint-dr-sync.ts )",
+      "Bash(scripts/migrations/099_sharepoint_dr_sync.sql )",
+      "Bash(scripts/migrations/run-migration-099.js )",
+      "Bash(src/lib/sharepointDrSyncService.ts )",
+      "Bash(src/modules/activate/types/sharepoint.types.ts)",
+      "Bash(xxd:*)"
     ],
     "deny": [],
     "ask": [],

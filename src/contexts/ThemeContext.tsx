@@ -25,18 +25,18 @@ interface ThemeProviderProps {
   enableSystemTheme?: boolean;
 }
 
-export function ThemeProvider({ 
-  children, 
+export function ThemeProvider({
+  children,
   defaultTheme = DEFAULT_THEME,
-  enableSystemTheme = true 
+  enableSystemTheme = false
 }: ThemeProviderProps) {
   const [currentTheme, setCurrentTheme] = useState<ThemeName>(defaultTheme);
   const [isSystemTheme, setIsSystemTheme] = useState(false);
-  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>('light');
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>('dark');
 
   // Get system theme preference
   const getSystemTheme = useCallback((): 'light' | 'dark' => {
-    if (typeof window === 'undefined') return 'light';
+    if (typeof window === 'undefined') return 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }, []);
 
