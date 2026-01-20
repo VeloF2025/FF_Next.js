@@ -66,6 +66,7 @@
       "Skill(CORE)",
       "Skill(deploy)",
       "Skill(pai)",
+      "Skill(knowledge-base)",
       "mcp__boss-ghost-mcp__new_page",
       "mcp__boss-ghost-mcp__take_snapshot",
       "mcp__boss-ghost-mcp__wait_for",
@@ -306,7 +307,40 @@
       "Bash(src/modules/fleet/types/check-in.types.ts )",
       "Bash(src/components/layout/sidebar/config/wishlist-menu-item.ts)",
       "Bash(if curl -s http://100.96.203.105:3005/api/activate/health-check)",
-      "Bash(then echo \"✅ Staging is up\")"
+      "Bash(then echo \"✅ Staging is up\")",
+      "Bash(scripts/migrations/095_qa_wizard_draft_state.sql )",
+      "Bash(scripts/migrations/run-migration-095.js)",
+      "Bash(then echo 'Server ready')",
+      "Bash(PORT=3005 npm run dev:*)",
+      "WebFetch(domain:docs.stirlingpdf.com)",
+      "Bash(src/modules/communications/whatsapp/components/GroupsTab.tsx )",
+      "Bash(src/modules/communications/whatsapp/components/LogsTab.tsx )",
+      "Bash(src/modules/communications/whatsapp/components/ServicesTab.tsx )",
+      "Bash(src/modules/communications/whatsapp/components/SettingsTab.tsx )",
+      "Bash(src/modules/communications/whatsapp/components/TemplatesTab.tsx )",
+      "Bash(src/modules/communications/whatsapp/types/wa-admin.types.ts)",
+      "WebFetch(domain:agents.md)",
+      "Bash(# Add only the PDF tools files\ngit add pages/communications/pdf-tools/ src/modules/pdf-tools/\n\n# Commit\ngit commit -m \"\"$\\(cat <<''EOF''\nfeat\\(communications\\): add PDF Tools module\n\n- Add 67 PDF tool definitions under /communications/pdf-tools\n- Tool catalog with search, category filters, grid/list views\n- Individual tool pages with tool info and related tools\n- Links to standalone PDFCraft for full functionality\n- FibreFlow AppLayout integration with dark mode support\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\"\")",
+      "Bash(pages/api/activate/drops.ts )",
+      "Bash(pages/api/activate/summary.ts )",
+      "Bash(src/modules/activate/components/QaCentrePage.tsx )",
+      "Bash(src/modules/activate/context/ActivateDataContext.tsx )",
+      "Bash(src/modules/activate/services/reportingService.ts )",
+      "Bash(src/modules/communications/whatsapp/services/waAdminApiService.ts )",
+      "Bash(scripts/migrations/096_wa_service_fallback.sql )",
+      "Bash(scripts/migrations/run-migration-096.js )",
+      "Bash(src/lib/firebase.ts )",
+      "Bash(src/modules/maintenance/services/escalationService.ts )",
+      "Bash(src/modules/maintenance/services/ticketEnrichmentService.ts )",
+      "Bash(src/modules/meetings/components/MeetingDetailModal.tsx )",
+      "Bash(src/modules/workflow/services/WorkflowTemplateService.ts )",
+      "Bash(src/services/analytics/kpiAnalytics.ts )",
+      "Bash(src/services/analytics/staffAnalytics.ts )",
+      "Bash(src/services/procurement/boq/boqCrud.ts )",
+      "Bash(src/services/procurement/rfq/core/RfqQueryService.ts )",
+      "Bash(src/services/procurement/rfq/rfqCrud.ts )",
+      "Bash(docs/wa-monitor/WHATSAPP_ARCHITECTURE.md)",
+      "Bash(./deploy.sh:*)"
     ],
     "deny": [],
     "ask": [],
@@ -316,6 +350,12 @@
     "SessionStart": [
       {
         "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-recovery.js 2>&1 || true",
+            "timeout": 5,
+            "statusMessage": "Checking for session recovery..."
+          },
           {
             "type": "command",
             "command": "npx --yes ts-node .claude/hooks/expert-load.ts 2>&1 || node -e \"console.error('[expert-load] ts-node not available, skipping')\" || true",
@@ -334,6 +374,17 @@
             "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then npx ts-node .claude/hooks/pre-commit.ts; fi",
             "timeout": 120,
             "statusMessage": "Running pre-commit validation..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/module-context-loader.js 2>&1 || true",
+            "timeout": 3,
+            "statusMessage": "Loading module context..."
           }
         ]
       },
@@ -376,6 +427,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"Bash\" node .claude/hooks/session-state-tracker.js 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Updating session state..."
+          },
+          {
+            "type": "command",
             "command": "if echo \"$TOOL_INPUT\" | grep -qE '100.96.203.105|fibreflow.service|/home/louis/apps/fibreflow'; then TOOL_INPUT=\"$TOOL_INPUT\" node .claude/hooks/staging-fix-logger.js 2>/dev/null || true; fi",
             "timeout": 5,
             "statusMessage": "Logging staging fix..."
@@ -387,6 +444,18 @@
         "hooks": [
           {
             "type": "command",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"Edit\" node .claude/hooks/session-state-tracker.js 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Updating session state..."
+          },
+          {
+            "type": "command",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"Edit\" node .claude/hooks/module-learning-capture.js 2>&1 || true",
+            "timeout": 5,
+            "statusMessage": "Capturing module learning..."
+          },
+          {
+            "type": "command",
             "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"$TOOL_NAME\" node .claude/hooks/knowledge-capture.js 2>&1 || true",
             "timeout": 5,
             "statusMessage": "Capturing knowledge..."
@@ -396,6 +465,18 @@
       {
         "matcher": "Write",
         "hooks": [
+          {
+            "type": "command",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"Write\" node .claude/hooks/session-state-tracker.js 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Updating session state..."
+          },
+          {
+            "type": "command",
+            "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"Write\" node .claude/hooks/module-learning-capture.js 2>&1 || true",
+            "timeout": 5,
+            "statusMessage": "Capturing module learning..."
+          },
           {
             "type": "command",
             "command": "TOOL_INPUT=\"$TOOL_INPUT\" TOOL_NAME=\"Write\" node .claude/hooks/knowledge-capture.js 2>&1 || true",

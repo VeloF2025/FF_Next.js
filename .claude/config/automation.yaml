@@ -1,0 +1,161 @@
+# FibreFlow HITL (Human-In-The-Loop) Configuration
+# Defines what actions require confirmation vs auto-accept
+
+version: 1
+last_updated: "2026-01-20"
+
+# ============================================
+# HITL REQUIRED - Always ask for confirmation
+# ============================================
+hitl_required:
+  deployments:
+    - staging           # Confirm before staging deploy
+    - production        # Confirm before production deploy
+    description: "Deployments can affect live users"
+
+  database:
+    - migrations        # Confirm before running migrations
+    - deletions         # Confirm any DELETE operations
+    - schema_changes    # Confirm ALTER TABLE, DROP, etc.
+    description: "Database changes are hard to reverse"
+
+  git:
+    - push              # Confirm before pushing
+    - merge_to_main     # Confirm before merging to main/master
+    - force_push        # ALWAYS confirm force push
+    - rebase            # Confirm interactive rebases
+    description: "Git operations affect team workflow"
+
+  services:
+    - restart           # Confirm service restarts
+    - config_change     # Confirm config file changes
+    - stop              # Confirm stopping services
+    description: "Service changes can cause downtime"
+
+  security:
+    - credentials       # Never auto-handle credentials
+    - api_keys          # Never auto-handle API keys
+    - env_files         # Confirm .env changes
+    description: "Security-sensitive operations"
+
+  external:
+    - api_calls_write   # Confirm POST/PUT/DELETE to external APIs
+    - webhook_setup     # Confirm webhook configurations
+    description: "External integrations need verification"
+
+# ============================================
+# AUTO-ACCEPT - No confirmation needed
+# ============================================
+auto_accept:
+  code_changes:
+    - type_fixes              # TypeScript type errors
+    - lint_fixes              # ESLint auto-fixes
+    - import_organization     # Import sorting/cleanup
+    - comment_updates         # Documentation comments
+    - whitespace_formatting   # Prettier/formatting
+    - unused_import_removal   # Removing unused imports
+    description: "Safe, reversible code quality improvements"
+
+  knowledge:
+    - error_capture           # Recording error→fix in learnings
+    - session_state           # Updating session progress
+    - module_profile_stats    # Updating .claude.md stats (file count, etc.)
+    - learning_consolidation  # Moving learnings to permanent KB
+    description: "Knowledge base updates don't affect code"
+
+  verification:
+    - health_checks           # Service health checks (read-only)
+    - test_runs               # Running tests (not modifying)
+    - build_checks            # Type-check, lint (read-only)
+    - status_checks           # Git status, service status
+    - log_viewing             # Viewing logs (read-only)
+    description: "Read-only verification operations"
+
+  exploration:
+    - file_reading            # Reading files
+    - code_search             # Grep, glob operations
+    - documentation_lookup    # Reading docs
+    description: "Information gathering"
+
+# ============================================
+# CONFIDENCE THRESHOLDS
+# ============================================
+thresholds:
+  auto_accept: 0.9      # 90%+ confidence = auto-accept
+  suggest: 0.7          # 70-90% = suggest, wait for confirmation
+  always_ask: 0.0       # <70% = always ask
+
+# ============================================
+# LEARNING TRIGGERS
+# ============================================
+learning_triggers:
+  # When to auto-capture learnings
+  capture_on:
+    - error_fixed             # Test was failing, now passes
+    - build_succeeded         # Build was failing, now succeeds
+    - deployment_completed    # Successful deployment
+    - migration_completed     # Successful migration
+    - explicit_confirmation   # User says "fixed", "done", "working"
+
+  # What to capture
+  capture_fields:
+    - error_message           # Original error
+    - root_cause              # Identified cause
+    - fix_description         # What was changed
+    - files_modified          # Which files
+    - confidence_level        # HIGH/MEDIUM/LOW
+
+  # Where to store
+  storage:
+    module_learnings: "src/modules/{module}/.claude-learnings.md"
+    global_errors: ".claude/learnings/errors/"
+    deployments: ".claude/learnings/deployments/"
+    patterns: ".claude/learnings/patterns/"
+
+# ============================================
+# SESSION STATE TRIGGERS
+# ============================================
+session_triggers:
+  # When to update session state
+  update_on:
+    - task_started            # New task begun
+    - significant_progress    # Milestone reached
+    - file_modified           # Code changed
+    - command_executed        # Important command run
+    - error_encountered       # Error occurred
+    - task_completed          # Task finished
+
+  # How often to persist
+  persist_frequency: "after_each_tool_use"
+
+  # What to track
+  track:
+    - current_task
+    - progress_checkpoints
+    - files_modified
+    - last_action
+    - pending_tasks
+    - context_variables
+
+# ============================================
+# MODULE-SPECIFIC OVERRIDES
+# ============================================
+module_overrides:
+  wa-monitor:
+    hitl_required:
+      - service_restart       # WhatsApp services are fragile
+      - config_change         # projects.yaml changes need care
+    notes: "WhatsApp services require careful handling"
+
+  activate:
+    auto_accept:
+      - vlm_retry             # Auto-retry VLM calls on timeout
+    hitl_required:
+      - final_decision        # QA pass/fail needs confirmation
+    notes: "VLM operations can auto-retry, but QA decisions need human"
+
+  procurement:
+    hitl_required:
+      - price_changes         # Financial data needs confirmation
+      - supplier_updates      # Supplier info is sensitive
+    notes: "Financial operations need extra care"
