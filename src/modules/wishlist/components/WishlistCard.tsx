@@ -2,17 +2,18 @@
  * Wishlist Card Component
  */
 
-import { ThumbsUp, MessageSquare, Trash2, Clock } from 'lucide-react';
+import { ThumbsUp, MessageSquare, Trash2, Clock, Paperclip } from 'lucide-react';
 import type { WishlistItem } from '../types/wishlist';
 
 interface WishlistCardProps {
   item: WishlistItem;
   onVote: (itemId: string) => Promise<any>;
   onDelete: (itemId: string) => Promise<void>;
+  onAttachments?: (item: WishlistItem) => void;
   isDragging?: boolean;
 }
 
-export function WishlistCard({ item, onVote, onDelete, isDragging }: WishlistCardProps) {
+export function WishlistCard({ item, onVote, onDelete, onAttachments, isDragging }: WishlistCardProps) {
   const handleVote = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await onVote(item.id);
@@ -109,6 +110,21 @@ export function WishlistCard({ item, onVote, onDelete, isDragging }: WishlistCar
               {item.comments_count}
             </span>
           )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAttachments?.(item);
+            }}
+            className={`flex items-center gap-1 text-xs transition-colors ${
+              item.attachments_count && item.attachments_count > 0
+                ? 'text-blue-600'
+                : 'text-[var(--ff-text-tertiary)] hover:text-blue-600'
+            }`}
+            title="Attachments"
+          >
+            <Paperclip className="h-3 w-3" />
+            {item.attachments_count || 0}
+          </button>
         </div>
         <button
           onClick={handleDelete}

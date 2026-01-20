@@ -10,9 +10,10 @@ interface WishlistKanbanProps {
   board: WishlistBoard;
   onVote: (itemId: string) => Promise<any>;
   onDelete: (itemId: string) => Promise<void>;
+  onAttachments?: (item: WishlistItem) => void;
 }
 
-export function WishlistKanban({ board, onVote, onDelete }: WishlistKanbanProps) {
+export function WishlistKanban({ board, onVote, onDelete, onAttachments }: WishlistKanbanProps) {
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
       {board.columns.map((column) => (
@@ -29,6 +30,7 @@ export function WishlistKanban({ board, onVote, onDelete }: WishlistKanbanProps)
                 column={column}
                 onVote={onVote}
                 onDelete={onDelete}
+                onAttachments={onAttachments}
               />
               {provided.placeholder}
             </div>

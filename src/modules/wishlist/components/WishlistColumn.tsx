@@ -4,15 +4,16 @@
 
 import { Draggable } from '@hello-pangea/dnd';
 import { WishlistCard } from './WishlistCard';
-import type { WishlistColumn as Column } from '../types/wishlist';
+import type { WishlistColumn as Column, WishlistItem } from '../types/wishlist';
 
 interface WishlistColumnProps {
   column: Column;
   onVote: (itemId: string) => Promise<any>;
   onDelete: (itemId: string) => Promise<void>;
+  onAttachments?: (item: WishlistItem) => void;
 }
 
-export function WishlistColumn({ column, onVote, onDelete }: WishlistColumnProps) {
+export function WishlistColumn({ column, onVote, onDelete, onAttachments }: WishlistColumnProps) {
   const isOverLimit = column.wip_limit && column.items.length >= column.wip_limit;
 
   return (
@@ -67,6 +68,7 @@ export function WishlistColumn({ column, onVote, onDelete }: WishlistColumnProps
                   item={item}
                   onVote={onVote}
                   onDelete={onDelete}
+                  onAttachments={onAttachments}
                   isDragging={snapshot.isDragging}
                 />
               </div>

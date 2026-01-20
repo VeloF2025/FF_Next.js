@@ -24,7 +24,8 @@ export async function GET(req: NextRequest) {
       SELECT
         wi.*,
         CASE WHEN wv.user_id IS NOT NULL THEN true ELSE false END as has_voted,
-        (SELECT COUNT(*) FROM wishlist_comments WHERE item_id = wi.id) as comments_count
+        (SELECT COUNT(*) FROM wishlist_comments WHERE item_id = wi.id) as comments_count,
+        (SELECT COUNT(*) FROM wishlist_attachments WHERE item_id = wi.id) as attachments_count
       FROM wishlist_items wi
       LEFT JOIN wishlist_votes wv ON wi.id = wv.item_id AND wv.user_id = ${userId}
       ORDER BY wi.column_position, wi.created_at DESC

@@ -36,6 +36,7 @@ export interface WishlistItem {
   // UI state
   has_voted?: boolean;
   comments_count?: number;
+  attachments_count?: number;
 }
 
 export interface WishlistVote {
@@ -52,6 +53,21 @@ export interface WishlistComment {
   user_id: string;
   user_name?: string;
   comment: string;
+  created_at: string;
+}
+
+export type WishlistAttachmentType = 'image' | 'url' | 'file';
+
+export interface WishlistAttachment {
+  id: string;
+  item_id: string;
+  type: WishlistAttachmentType;
+  url: string;
+  filename?: string;
+  file_size?: number;
+  mime_type?: string;
+  uploaded_by: string;
+  uploaded_by_name?: string;
   created_at: string;
 }
 

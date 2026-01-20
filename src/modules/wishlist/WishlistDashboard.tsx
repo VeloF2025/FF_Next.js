@@ -9,8 +9,10 @@ import { useWishlist } from './hooks/useWishlist';
 import { WishlistKanban } from './components/WishlistKanban';
 import { WishlistAnalytics } from './components/WishlistAnalytics';
 import { AddWishlistItemModal } from './components/AddWishlistItemModal';
+import { AttachmentsModal } from './components/AttachmentsModal';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import type { WishlistItem } from './types/wishlist';
 // AppLayout removed - handled by page wrapper
 
 type TabType = 'board' | 'analytics' | 'settings';
@@ -19,6 +21,7 @@ export function WishlistDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('board');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [attachmentsItem, setAttachmentsItem] = useState<WishlistItem | null>(null);
 
   const {
     board,
@@ -166,6 +169,7 @@ export function WishlistDashboard() {
                 board={board}
                 onVote={voteItem}
                 onDelete={deleteItem}
+                onAttachments={setAttachmentsItem}
               />
             </DragDropContext>
           )}
@@ -190,6 +194,17 @@ export function WishlistDashboard() {
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           onSubmit={createItem}
+        />
+
+        {/* Attachments Modal */}
+        <AttachmentsModal
+          isOpen={!!attachmentsItem}
+          onClose={() => {
+            setAttachmentsItem(null);
+            refetch(); // Refresh to update attachment counts
+          }}
+          itemId={attachmentsItem?.id || ''}
+          itemTitle={attachmentsItem?.title || ''}
         />
       </div>
   );
