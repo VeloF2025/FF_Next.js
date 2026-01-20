@@ -82,10 +82,39 @@ Compact 2-row layout with inline status badges:
 | Phase | Name | API Endpoint | Purpose |
 |-------|------|--------------|---------|
 | 1 | Prerequisites | `/validate-prerequisites` | Check photos, categorization, step coverage |
-| 2 | Photo Review | `/human-review` | Review photo assignments (edit mode shows discarded photos) |
+| 2 | Photo Review | `/approve-categorization` | Review + reject photos with Fibertime reasons |
 | 3 | Data Validation | `/extract-data` | Validate power (-18 to -24 dBm), serial matches |
 | 4 | Final Decision | `/final-decision` | PASS / FAIL / REWORK + swap detection + auto-ticket |
 | 5 | Feedback | `/send-feedback` | Send WhatsApp feedback (technician-actionable only) |
+
+### Phase 2: Photo Rejection with Reasons (Jan 2026)
+
+**Allows QA reviewers to reject photos with Fibertime-spec quality reasons.**
+
+| Feature | Behavior |
+|---------|----------|
+| **Reject photo** | Untick "Approve" checkbox → rejection reason dropdown appears |
+| **Rejection reasons** | 7 Fibertime quality criteria (see below) |
+| **Step count update** | Rejected photos excluded from step coverage cards |
+| **Step card display** | Shows "Step N" prefix above label (e.g., "Step 1" + "House Photo") |
+| **Visual indicator** | Rejected photos have red border styling |
+
+**Rejection Reasons (Fibertime Quality Spec):**
+| Code | Label |
+|------|-------|
+| `BLURRY` | Blurry/Out of Focus |
+| `WRONG_ANGLE` | Wrong Angle |
+| `WRONG_SUBJECT` | Wrong Subject |
+| `POOR_LIGHTING` | Poor Lighting |
+| `OBSTRUCTED` | Obstructed View |
+| `DUPLICATE` | Duplicate Photo |
+| `NOT_INSTALLATION` | Not Installation Related |
+
+**API:** `POST /approve-categorization` with `override_reason` field for rejected photos.
+
+**Key files:**
+- `src/modules/activate/utils/stepMapper.ts` - `PHOTO_REJECTION_REASONS` constant
+- `src/modules/activate/components/wizard/PhotoReviewPhase.tsx` - UI implementation
 
 ### Phase 4 Draft State (Jan 2026)
 

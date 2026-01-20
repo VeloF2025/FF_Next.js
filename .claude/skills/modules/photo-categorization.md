@@ -84,12 +84,35 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
 };
 ```
 
+## Photo Rejection Reasons (Jan 2026)
+
+When QA reviewers reject a photo during categorization, they must select a reason:
+
+```typescript
+// CANONICAL - Defined in stepMapper.ts
+export const PHOTO_REJECTION_REASONS = [
+  { code: 'BLURRY', label: 'Blurry/Out of Focus' },
+  { code: 'WRONG_ANGLE', label: 'Wrong Angle' },
+  { code: 'WRONG_SUBJECT', label: 'Wrong Subject' },
+  { code: 'POOR_LIGHTING', label: 'Poor Lighting' },
+  { code: 'OBSTRUCTED', label: 'Obstructed View' },
+  { code: 'DUPLICATE', label: 'Duplicate Photo' },
+  { code: 'NOT_INSTALLATION', label: 'Not Installation Related' },
+] as const;
+```
+
+**Behavior:**
+- Rejected photos (approved=false) are excluded from step coverage counts
+- Rejection reason stored in `human_override_reason` field via API
+- Step cards display "Step N" prefix above labels
+
 ## Critical Files
 
 | File | Purpose | Status |
 |------|---------|--------|
-| `src/modules/activate/utils/stepMapper.ts` | **SOURCE OF TRUTH** - All mappings | CANONICAL |
+| `src/modules/activate/utils/stepMapper.ts` | **SOURCE OF TRUTH** - Mappings + rejection reasons | CANONICAL |
 | `pages/api/activate/fetch-photos.ts` | Uses `photoTypeToStep()` from stepMapper | IMPORTS |
+| `src/modules/activate/components/wizard/PhotoReviewPhase.tsx` | Photo rejection UI | IMPLEMENTS |
 
 ## Important Notes
 
