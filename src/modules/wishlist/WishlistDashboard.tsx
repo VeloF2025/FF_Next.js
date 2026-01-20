@@ -13,6 +13,8 @@ import { AddWishlistItemModal } from './components/AddWishlistItemModal';
 import { AttachmentsModal } from './components/AttachmentsModal';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth.types';
 import type { WishlistItem } from './types/wishlist';
 // AppLayout removed - handled by page wrapper
 
@@ -25,6 +27,11 @@ export function WishlistDashboard() {
   const [attachmentsItem, setAttachmentsItem] = useState<WishlistItem | null>(null);
   // Fix hydration: Only render DragDropContext on client after mount
   const [isMounted, setIsMounted] = useState(false);
+
+  // Check if user can drag items (admin only)
+  const { currentUser } = useAuth();
+  const canDragItems = currentUser?.role === UserRole.SUPER_ADMIN ||
+                       currentUser?.role === UserRole.ADMIN;
 
   useEffect(() => {
     setIsMounted(true);
@@ -184,6 +191,7 @@ export function WishlistDashboard() {
                   onDelete={deleteItem}
                   onEdit={setEditItem}
                   onAttachments={setAttachmentsItem}
+                  canDrag={canDragItems}
                 />
               </DragDropContext>
             ) : (

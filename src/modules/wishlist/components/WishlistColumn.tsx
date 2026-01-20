@@ -12,9 +12,10 @@ interface WishlistColumnProps {
   onDelete: (itemId: string) => Promise<void>;
   onEdit?: (item: WishlistItem) => void;
   onAttachments?: (item: WishlistItem) => void;
+  canDrag?: boolean;
 }
 
-export function WishlistColumn({ column, onVote, onDelete, onEdit, onAttachments }: WishlistColumnProps) {
+export function WishlistColumn({ column, onVote, onDelete, onEdit, onAttachments, canDrag = true }: WishlistColumnProps) {
   const isOverLimit = column.wip_limit && column.items.length >= column.wip_limit;
 
   return (
@@ -55,15 +56,15 @@ export function WishlistColumn({ column, onVote, onDelete, onEdit, onAttachments
       {/* Column Items */}
       <div className="space-y-2 min-h-[100px]">
         {column.items.map((item, index) => (
-          <Draggable key={item.id} draggableId={item.id} index={index}>
+          <Draggable key={item.id} draggableId={item.id} index={index} isDragDisabled={!canDrag}>
             {(provided, snapshot) => (
               <div
                 ref={provided.innerRef}
                 {...provided.draggableProps}
-                {...provided.dragHandleProps}
+                {...(canDrag ? provided.dragHandleProps : {})}
                 className={`transition-transform ${
                   snapshot.isDragging ? 'rotate-2 scale-105' : ''
-                }`}
+                } ${!canDrag ? 'cursor-default' : 'cursor-grab'}`}
               >
                 <WishlistCard
                   item={item}
