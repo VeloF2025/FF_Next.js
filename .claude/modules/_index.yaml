@@ -2,9 +2,9 @@
 # Quick reference for all 34 modules
 # Detailed profiles in individual .md files
 
-version: 1
-last_updated: "2026-01-16"
-total_modules: 35
+version: 2
+last_updated: "2026-01-20"
+total_modules: 36
 
 # Module Categories
 categories:
@@ -26,7 +26,7 @@ categories:
 
   operations:
     description: "Field operations and integrations"
-    modules: [field-app, qfield-sync, barcode-scanner, nokia-equipment, onemap]
+    modules: [field-app, fleet, qfield-sync, barcode-scanner, nokia-equipment, onemap]
 
   communication:
     description: "Communication and collaboration"
@@ -119,6 +119,12 @@ modules:
     purpose: "Mobile field application support"
     complexity: medium
     profile: field-app.md
+
+  fleet:
+    category: operations
+    purpose: "Vehicle fleet management with check-ins and VLM"
+    complexity: high
+    profile: fleet.md
 
   foto-review:
     category: monitoring
@@ -264,6 +270,10 @@ database_mapping:
   rfq: [procurement]
   boq: [procurement]
   tickets: [ticketing]
+  fleet_vehicles: [fleet]
+  fleet_check_records: [fleet]
+  fleet_vehicle_calibration: [fleet]
+  wa_phone_numbers: [wa-monitor, communications]
 
 # Isolation Status
 isolation:

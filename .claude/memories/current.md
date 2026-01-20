@@ -1,56 +1,79 @@
 # FibreFlow Current Session Progress
 
-**Last Updated**: 2026-01-20
-**Session Type**: Progress Overlay Implementation + Documentation
+**Last Updated**: 2026-01-20 14:45
+**Session Type**: Fleet Calibration + WA Admin Multi-Phone Support
 
 ---
 
-## Completed This Session
+## Completed This Session (Jan 20, 2026)
 
-### Progress Overlay Components (Jan 20, 2026)
+### Fleet Vehicle Calibration System
 
-Added visual progress indicators for async operations across the Activate module:
+Added first-time vehicle setup flow for Fleet Portal:
 
-**1. ImportProgressOverlay.tsx** (NEW)
-- Full-screen modal for OES/ARCH Excel imports
-- Phases: parsing → uploading → processing → syncing → complete
-- Used in: `OESImportTab.tsx`, `OfflineImportTab.tsx`
+**1. VehicleCalibrationModal.tsx** (NEW)
+- Full-screen mandatory modal for first-time vehicle check-in
+- Requires: Odometer reading, Fuel level (0-100%), Dashboard photo
+- Supports VLM few-shot learning for dashboard recognition
+- Location: `src/modules/fleet/check-in/components/VehicleCalibrationModal.tsx`
 
-**2. WizardProgressOverlay.tsx** (NEW)
-- Full-screen modal for QA Wizard operations
-- Two operation types:
-  - `sync_1map`: fetching → loading_photos → checking → complete
-  - `categorization`: analyzing → processing → saving → complete
-- Used in: `QaWizardContainer.tsx`, `PhotoReviewPhase.tsx`
+**2. Calibration API** (NEW)
+- GET `/api/fleet/vehicles/[id]/calibration` - Check calibration status
+- POST `/api/fleet/vehicles/[id]/calibration` - Create calibration
+- Logic: `needsCalibration = !calibration && checkCount === 0`
+- Table: `fleet_vehicle_calibration`
 
-### Components Modified
-- [x] `OESImportTab.tsx` - Added import progress overlay
-- [x] `OfflineImportTab.tsx` - Added import progress overlay
-- [x] `QaWizardContainer.tsx` - Added 1Map sync progress overlay
-- [x] `PhotoReviewPhase.tsx` - Added AI categorization progress overlay
+**3. Portal Integration**
+- Updated `pages/fleet/portal.tsx` with calibration check on vehicle verification
+- Modal shows automatically when `needsCalibration: true`
 
-### Documentation Updated
-- [x] `src/modules/activate/README.md` - Added Progress Overlays section
-- [x] `.claude/skills/modules/activate.md` - Added Progress Overlays table
+### WhatsApp Admin Multi-Phone Support
+
+Added primary/fallback phone number tracking for WA services:
+
+**1. Migration 096** (NEW)
+- Created `wa_phone_numbers` table
+- Added config entries for sender/bridge phones
+- Tracks: service, phone_number, role (primary/fallback), status (paired/unpaired)
+
+**2. Phones API** (NEW)
+- `pages/api/communications/whatsapp/phones/index.ts` - List/Create phones
+- `pages/api/communications/whatsapp/phones/[id].ts` - Get/Update/Delete phone
+
+**3. Services Tab Enhancement**
+- Shows registered phone numbers with role badges
+- Added pairing/logout controls for services
+- Updated `ServicesTab.tsx` with phone number display
+
+**4. Type Definitions**
+- Added `WaPhoneNumber`, `WaPhoneNumberInput`, `WaServicePhoneConfig` types
+- Updated `waAdminApiService.ts` with `phonesApi` methods
+
+### NAFNet Deblurring Service
+
+Fixed RTX 5090 compatibility for image deblurring:
+
+**Issue**: CUDA sm_120 (Blackwell) not supported by PyTorch 2.2
+**Solution**: Force CPU mode with `NAFNET_FORCE_CPU=true`
+**Service**: Port 8101 on 100.96.203.105
 
 ---
 
-## Previous Session (Jan 17-19, 2026)
+## Database Changes
 
-### Offline Devices Report
-- Created new report type for offline devices
-- Added QField sync view migration (092_qfield_sync_view.sql)
-- Deployed to staging
+### New Tables
+- `wa_phone_numbers` - WhatsApp phone tracking with primary/fallback roles
 
-### Skills Created (Jan 17)
-- `activate-module.md` - Comprehensive Activate module skill
-- `go-bridge.md` - WhatsApp Go bridge reference skill
+### Modified Tables
+- `wa_service_config` - Added sender/bridge phone config entries
 
-### Health Dashboard UI (Jan 17)
-- Made compact status bar clickable with expandable dropdown
-- Added click-outside to close dropdown
-- Renamed "OneMap" to "1M" in health check
-- Added WhatsApp Sender to services list
+### Vehicle KR27FNGP Reset
+Deleted for fresh portal testing:
+- 18 check records
+- 35 photos
+- 16 responses
+- 5 odometer history
+- 8 fuel history
 
 ---
 
@@ -58,71 +81,51 @@ Added visual progress indicators for async operations across the Activate module
 
 | File | Change |
 |------|--------|
-| `src/modules/activate/components/ImportProgressOverlay.tsx` | NEW - Import progress overlay |
-| `src/modules/activate/components/wizard/WizardProgressOverlay.tsx` | NEW - Wizard progress overlay |
-| `src/modules/activate/components/OESImportTab.tsx` | Added importPhase state + overlay |
-| `src/modules/activate/components/OfflineImportTab.tsx` | Added importPhase state + overlay |
-| `src/modules/activate/components/wizard/QaWizardContainer.tsx` | Added syncPhase state + overlay |
-| `src/modules/activate/components/wizard/PhotoReviewPhase.tsx` | Added categorizationPhase state + overlay |
-| `src/modules/activate/README.md` | Added Progress Overlays documentation |
-| `.claude/skills/modules/activate.md` | Added Progress Overlays section |
-
----
-
-## Progress Overlay Patterns
-
-### Usage Pattern
-```typescript
-// State
-const [phase, setPhase] = useState<PhaseType | null>(null);
-
-// During async operation
-setPhase('step1');
-await someAsyncOperation();
-setPhase('step2');
-await anotherOperation();
-setPhase('complete');
-await new Promise(resolve => setTimeout(resolve, 600)); // Brief success display
-setPhase(null); // Hide overlay
-```
-
-### UI Features
-- Backdrop blur with semi-transparent dark background
-- Animated spinner ring around phase icon
-- Step progress list with checkmarks (completed) and spinner (active)
-- Bouncing dots animation during processing
-- Context display (DR number, photo count) when applicable
+| `src/modules/fleet/check-in/components/VehicleCalibrationModal.tsx` | NEW - First-time setup modal |
+| `pages/api/fleet/vehicles/[id]/calibration.ts` | NEW - Calibration API |
+| `pages/fleet/portal.tsx` | Added calibration check + modal |
+| `scripts/migrations/096_wa_service_fallback.sql` | NEW - WA phone tracking |
+| `pages/api/communications/whatsapp/phones/` | NEW - Phones CRUD API |
+| `src/modules/communications/whatsapp/components/ServicesTab.tsx` | Phone display + pairing |
+| `src/modules/communications/whatsapp/types/wa-admin.types.ts` | Phone type definitions |
+| `src/modules/communications/whatsapp/services/waAdminApiService.ts` | Phones API methods |
+| `scripts/whatsapp/whatsapp-sender-v2.go` | NEW - Go sender implementation |
 
 ---
 
 ## Current State
 
 - **Branch**: master
-- **Health Check**: All 5 services monitored (DB, 1M, VLM, WA Bridge, WA Sender)
-- **Progress Overlays**: Deployed and working
-- **Staging**: vf.fibreflow.app
+- **Deployed**: vf.fibreflow.app (staging)
+- **Migration 096**: Applied to production DB
+- **Fleet Calibration**: Ready for testing
+- **WA Admin Phones**: Visible in Services tab
+
+---
+
+## Phone Numbers Registered
+
+| Service | Phone | Name | Role | Status |
+|---------|-------|------|------|--------|
+| sender | +27824189511 | Hein (082 418 9511) | primary | paired |
+| bridge | +27640412391 | Louis (064 041 2391) | primary | paired |
 
 ---
 
 ## Context for Next Session
 
-### Progress Overlays Added (Jan 20)
-User-facing visual feedback now provided for:
-1. **OES Import** - Shows upload/processing progress
-2. **ARCH Import** - Shows upload/processing progress
-3. **1Map Sync** - Shows fetching/loading/checking phases
-4. **AI Categorization** - Shows analyzing/processing/saving phases
+### Fleet Portal Flow
+1. Driver scans license plate
+2. VLM verifies and identifies vehicle
+3. **If first time**: Calibration modal appears (mandatory)
+4. After calibration: Normal check-in flow
 
-All overlays use consistent design language with lucide-react icons, animated spinners, and step-by-step progress indicators.
+### WA Admin Services Tab
+- Now shows registered phone numbers per service
+- Supports pairing new devices via QR code
+- Logout button clears session
 
-### Files Reference
-```
-src/modules/activate/components/
-├── ImportProgressOverlay.tsx           # OES/ARCH import progress
-├── OESImportTab.tsx                    # Uses ImportProgressOverlay
-├── OfflineImportTab.tsx                # Uses ImportProgressOverlay
-└── wizard/
-    ├── WizardProgressOverlay.tsx       # 1Map sync + categorization progress
-    ├── QaWizardContainer.tsx           # Uses WizardProgressOverlay for sync
-    └── PhotoReviewPhase.tsx            # Uses WizardProgressOverlay for AI
-```
+### NAFNet Status
+- Running on CPU mode (RTX 5090 incompatible with PyTorch 2.2)
+- Service: http://100.96.203.105:8101
+- Used for deblurring photos before VLM extraction
