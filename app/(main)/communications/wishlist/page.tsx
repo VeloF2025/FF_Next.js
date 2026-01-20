@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { WishlistDashboard } from '@/modules/wishlist/WishlistDashboard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Typography, CircularProgress, Box } from '@mui/material';
 import { getAuth } from '@/lib/auth-mock';
 
@@ -43,7 +44,9 @@ export default function WishlistPage() {
 
   return (
     <div className="p-6">
-      <WishlistDashboard />
+      <ErrorBoundary>
+        <WishlistDashboard />
+      </ErrorBoundary>
     </div>
   );
 }

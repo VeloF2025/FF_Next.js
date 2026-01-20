@@ -2,7 +2,7 @@
  * Wishlist Dashboard - Main Kanban board view
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { Plus, RefreshCw, BarChart3, Settings } from 'lucide-react';
 import { useWishlist } from './hooks/useWishlist';
@@ -22,6 +22,12 @@ export function WishlistDashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [attachmentsItem, setAttachmentsItem] = useState<WishlistItem | null>(null);
+  // Fix hydration: Only render DragDropContext on client after mount
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const {
     board,
@@ -164,14 +170,43 @@ export function WishlistDashboard() {
         {/* Tab Content */}
         <div className="min-h-[600px]">
           {activeTab === 'board' && (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <WishlistKanban
-                board={board}
-                onVote={voteItem}
-                onDelete={deleteItem}
-                onAttachments={setAttachmentsItem}
-              />
-            </DragDropContext>
+            // Only render DragDropContext on client to prevent hydration mismatch
+            isMounted ? (
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <WishlistKanban
+                  board={board}
+                  onVote={voteItem}
+                  onDelete={deleteItem}
+                  onAttachments={setAttachmentsItem}
+                />
+              </DragDropContext>
+            ) : (
+              // Server/initial render: show static version without drag-drop
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                {board.columns.map((column) => (
+                  <div key={column.id} className="min-w-[320px]">
+                    <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-medium">{column.name}</h3>
+                        <span className="text-sm text-[var(--ff-text-tertiary)]">
+                          {column.items?.length || 0}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {column.items?.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]"
+                          >
+                            <h4 className="font-medium text-sm">{item.title}</h4>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
 
           {activeTab === 'analytics' && board.stats && (

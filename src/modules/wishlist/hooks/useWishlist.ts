@@ -2,7 +2,7 @@
  * Custom hook for wishlist data management
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { wishlistService } from '../services/wishlistService';
 import { notificationService } from '@/services/core/NotificationService';
 import type { WishlistBoard, CreateWishlistItemInput } from '../types/wishlist';
@@ -21,6 +21,11 @@ export function useWishlist() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Track if component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+  // AbortController for cancelling in-flight requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Calculate stats from columns
   const calculateStats = (columns: any[]) => {
@@ -62,12 +67,26 @@ export function useWishlist() {
     };
   };
 
-  // Fetch board data
+  // Fetch board data with cancellation support
   const fetchBoard = useCallback(async () => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
+
     try {
-      setLoading(true);
-      setError(null);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
+
       const data = await wishlistService.getBoard();
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
 
       // Calculate stats from columns data
       const stats = calculateStats(data.columns || []);
@@ -77,13 +96,26 @@ export function useWishlist() {
         stats,
       });
     } catch (err) {
+      // Ignore abort errors (expected when cancelling)
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+
+      // Only show error if component is still mounted
+      if (!isMountedRef.current) return;
+
       const message = err instanceof Error ? err.message : 'Failed to load wishlist';
       setError(message);
-      notificationService.error(message);
+      // Don't show notification for background refresh failures
+      if (loading) {
+        notificationService.error(message);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [loading]);
 
   // Create new item
   const createItem = useCallback(async (input: CreateWishlistItemInput) => {
@@ -202,14 +234,29 @@ export function useWishlist() {
     }
   }, [fetchBoard]);
 
-  // Load data on mount
+  // Track mounted state and load data on mount
   useEffect(() => {
+    isMountedRef.current = true;
     fetchBoard();
-  }, [fetchBoard]);
 
-  // Auto-refresh every 30 seconds
+    // Cleanup on unmount
+    return () => {
+      isMountedRef.current = false;
+      // Cancel any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-refresh every 30 seconds (only when mounted)
   useEffect(() => {
-    const interval = setInterval(fetchBoard, 30000);
+    const interval = setInterval(() => {
+      if (isMountedRef.current) {
+        fetchBoard();
+      }
+    }, 30000);
+
     return () => clearInterval(interval);
   }, [fetchBoard]);
 
