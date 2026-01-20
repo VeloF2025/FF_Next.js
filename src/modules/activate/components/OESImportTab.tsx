@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Loader2, Database, CloudCog } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface OESRow {
   drop_number: string;
@@ -121,6 +122,55 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       }
 
       setImportResult(result);
+
+      // Show success toast with database sync confirmations
+      toast.custom(
+        (t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <CheckCircle className="h-10 w-10 text-green-500" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    OES Import Complete
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <Database className="h-4 w-4 text-blue-500" />
+                      <span>Uploaded to FibreFlow Database</span>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <CloudCog className="h-4 w-4 text-purple-500" />
+                      <span>Synced to QField Database</span>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    {result.totalRows.toLocaleString()} records processed
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 6000 }
+      );
+
       // Don't call onImportComplete here - let user see results first
       // Will be called when user clicks "Import Another File"
     } catch (err) {
@@ -212,7 +262,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
               </div>
             </div>
             <button
-              onClick={resetForm}
+              onClick={() => resetForm()}
               className="text-sm text-red-600 hover:text-red-700"
             >
               Remove
@@ -299,7 +349,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       {previewData.length > 0 && !importResult && (
         <div className="flex justify-end gap-3">
           <button
-            onClick={resetForm}
+            onClick={() => resetForm()}
             className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800
                        dark:hover:text-gray-200"
           >
