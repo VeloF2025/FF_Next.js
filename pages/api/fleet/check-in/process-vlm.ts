@@ -45,6 +45,8 @@ interface ProcessVlmResponse {
     error?: string;
     // Validation fields for odometer
     validation?: OdometerValidationResult;
+    // Raw VLM response for debugging
+    rawResponse?: string;
   };
   processingTimeMs: number;
 }
@@ -92,31 +94,45 @@ export default async function handler(
       case 'odometer': {
         const odometerResult = await extractOdometerReading(base64Image);
 
-        // Get previous reading for validation
+        // Get previous reading for validation with timestamp
         let previousReading: number | null = null;
+        let daysSinceLast = 1;
         if (!isPreviewMode) {
           const prevHistory = await getLatestOdometerReading(vehicleId);
           previousReading = prevHistory?.reading ?? null;
+          if (prevHistory?.recordedAt) {
+            const prevDate = new Date(prevHistory.recordedAt);
+            const now = new Date();
+            daysSinceLast = Math.max(1, Math.ceil((now.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)));
+          }
         }
 
-        // Validate the reading against previous value
+        // Validate the reading against previous value with time context
         const validation = validateOdometerReading(
           odometerResult.reading,
           odometerResult.confidence,
-          previousReading
+          previousReading,
+          { daysSinceLast }
         );
+
+        // Include extraction warning in result
+        const extractionWarning = odometerResult.warning;
 
         result = {
           extractedValue: odometerResult.rawText,
           extractedNumeric: odometerResult.reading,
           confidence: odometerResult.confidence,
-          error: odometerResult.error,
+          error: odometerResult.error || (extractionWarning ? `⚠️ ${extractionWarning}` : undefined),
           validation,
+          rawResponse: odometerResult.rawResponse,
         };
 
         // Log validation warnings
         if (validation.warning) {
           log.warn('FleetVlmApi', `ODO Validation: ${validation.warning} (action: ${validation.suggestedAction})`);
+        }
+        if (extractionWarning) {
+          log.warn('FleetVlmApi', `ODO Extraction warning: ${extractionWarning}`);
         }
 
         // Only record odometer reading if not in preview mode, extraction succeeded,
@@ -132,6 +148,8 @@ export default async function handler(
               reading: odometerResult.reading,
               source: 'vlm',
               vlmConfidence: odometerResult.confidence,
+              discrepancyFlag: validation.suggestedAction === 'verify',
+              discrepancyReason: validation.warning || undefined,
             });
             log.info('FleetVlmApi', `Recorded odometer reading: ${odometerResult.reading} km (validation: ${validation.suggestedAction})`);
           }
@@ -200,7 +218,7 @@ export default async function handler(
         INSERT INTO fleet_photo_vlm_results (
           photo_id, analysis_type, extracted_value, extracted_numeric,
           confidence, plate_matches_vehicle, expected_plate,
-          vlm_model, processing_time_ms, processing_status, error_message
+          vlm_model, raw_response, processing_time_ms, processing_status, error_message
         )
         VALUES (
           ${photoId},
@@ -211,6 +229,7 @@ export default async function handler(
           ${result.plateMatches ?? null},
           ${expectedPlate ?? null},
           ${'Qwen/Qwen3-VL-8B-Instruct'},
+          ${result.rawResponse ?? null},
           ${processingTimeMs},
           ${result.error ? 'failed' : 'completed'},
           ${result.error ?? null}

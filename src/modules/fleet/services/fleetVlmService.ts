@@ -94,28 +94,46 @@ export class FleetVlmError extends Error {
 // VLM Prompts
 // ============================================================================
 
-const ODOMETER_PROMPT = `You are analyzing a vehicle dashboard/odometer photo.
+const ODOMETER_PROMPT = `You are a precision OCR system for vehicle odometer readings.
 
-TASK: Extract the odometer/mileage reading from this photo.
+TASK: Extract the EXACT odometer/mileage reading digit-by-digit.
 
-INSTRUCTIONS:
-1. Look for the odometer display (digital or analog)
-2. Read the total kilometers/miles shown
-3. Ignore trip meters - we want the TOTAL odometer reading
-4. If there are multiple numbers, identify which one is the main odometer
+CRITICAL - DIGIT RECOGNITION:
+- "1" has a single vertical stroke, "6" has a curved loop
+- "2" has a curved top, "3" has two curved bumps on the right
+- "7" has a horizontal top stroke, "1" does not
+- "8" has two stacked loops, "0" has one loop
+- "9" has loop at top with tail, "4" has straight lines meeting
 
-RESPONSE FORMAT (JSON only, no other text):
+FINDING THE ODOMETER:
+1. The MAIN odometer shows TOTAL kilometers (usually 5-6 digits)
+2. It is typically the LARGEST number display on the dashboard
+3. IGNORE the trip meter (usually smaller, often starts with "A" or "B")
+4. IGNORE the speedometer (has "km/h" or "mph" markings around it)
+5. The odometer often has "km" or "ODO" nearby
+
+EXTRACTION PROCESS:
+1. Locate the main odometer display
+2. Read EACH DIGIT individually from left to right
+3. Double-check digits that look similar (1/6, 2/3, 7/1, 8/0)
+4. Verify the total makes sense (typically 10,000 - 500,000 km for used vehicles)
+
+RESPONSE FORMAT (JSON only, no markdown):
 {
   "reading": 123456,
   "confidence": 0.95,
-  "raw_text": "123,456 km"
+  "raw_text": "123456",
+  "digit_breakdown": "1-2-3-4-5-6",
+  "display_type": "digital|analog"
 }
 
-If the odometer is not visible or unreadable:
+If odometer not visible/unreadable:
 {
   "reading": null,
   "confidence": 0,
-  "raw_text": "unreadable"
+  "raw_text": "unreadable",
+  "digit_breakdown": null,
+  "display_type": null
 }`;
 
 const LICENSE_PLATE_PROMPT = `You are analyzing a vehicle photo to extract the license plate.
@@ -379,27 +397,91 @@ function parseVlmJson<T>(content: string): T {
 // ============================================================================
 
 /**
- * Extract odometer reading from dashboard photo
+ * Extract odometer reading from dashboard photo with multi-pass verification
+ * Runs extraction twice and compares results to catch digit confusion errors
  * @param base64Image - Base64-encoded image of the dashboard/odometer
- * @returns Odometer reading result
+ * @returns Odometer reading result with verification metadata
  */
 export async function extractOdometerReading(
   base64Image: string
 ): Promise<OdometerExtractionResult> {
   try {
-    log.info('FleetVlmService', 'Extracting odometer reading...');
+    log.info('FleetVlmService', 'Extracting odometer reading (multi-pass)...');
 
-    const content = await callVlmApi(base64Image, ODOMETER_PROMPT, 'odometer');
-    const result = parseVlmJson<{
+    // First pass
+    const content1 = await callVlmApi(base64Image, ODOMETER_PROMPT, 'odometer');
+    const result1 = parseVlmJson<{
       reading: number | null;
       confidence: number;
       raw_text: string;
-    }>(content);
+      digit_breakdown?: string;
+      display_type?: string;
+    }>(content1);
+
+    log.info('FleetVlmService', `Pass 1: ${result1.reading} km (${result1.confidence} conf)`);
+
+    // If first pass failed or low confidence, return early
+    if (!result1.reading || result1.confidence < 0.5) {
+      return {
+        reading: result1.reading,
+        confidence: result1.confidence || 0,
+        rawText: result1.raw_text || '',
+        rawResponse: content1,
+      };
+    }
+
+    // Second pass for verification (catches digit confusion)
+    const content2 = await callVlmApi(base64Image, ODOMETER_PROMPT, 'odometer');
+    const result2 = parseVlmJson<{
+      reading: number | null;
+      confidence: number;
+      raw_text: string;
+      digit_breakdown?: string;
+      display_type?: string;
+    }>(content2);
+
+    log.info('FleetVlmService', `Pass 2: ${result2.reading} km (${result2.confidence} conf)`);
+
+    // Compare results
+    const readingsMatch = result1.reading === result2.reading;
+    const diff = Math.abs((result1.reading || 0) - (result2.reading || 0));
+    const percentDiff = (diff / (result1.reading || 1)) * 100;
+
+    if (!readingsMatch) {
+      log.warn('FleetVlmService', `Multi-pass mismatch: ${result1.reading} vs ${result2.reading} (${percentDiff.toFixed(1)}% diff)`);
+
+      // If readings differ significantly (>1%), flag for review
+      if (percentDiff > 1) {
+        // Check for common digit confusion patterns (1↔6, 2↔3)
+        const str1 = String(result1.reading);
+        const str2 = String(result2.reading);
+        const confusionDetected = detectDigitConfusion(str1, str2);
+
+        if (confusionDetected) {
+          log.error('FleetVlmService', `Digit confusion detected: ${confusionDetected}`);
+          // Return lower confidence and flag the issue
+          return {
+            reading: result1.reading, // Use first reading but with warning
+            confidence: Math.min(result1.confidence, 0.6), // Cap confidence
+            rawText: `${result1.raw_text} (VERIFY: pass2=${result2.reading})`,
+            warning: `Digit confusion detected: ${confusionDetected}`,
+            rawResponse: `Pass1: ${content1}\nPass2: ${content2}`,
+          };
+        }
+      }
+    }
+
+    // Use the reading with higher confidence, or first if equal
+    const bestResult = result2.confidence > result1.confidence ? result2 : result1;
+    const finalConfidence = readingsMatch
+      ? Math.min(bestResult.confidence + 0.05, 1.0) // Boost confidence if both passes agree
+      : Math.max(bestResult.confidence - 0.1, 0.5); // Reduce if they disagree
 
     return {
-      reading: result.reading,
-      confidence: result.confidence || 0,
-      rawText: result.raw_text || '',
+      reading: bestResult.reading,
+      confidence: finalConfidence,
+      rawText: bestResult.raw_text || '',
+      rawResponse: `Pass1: ${result1.reading} (${result1.confidence}), Pass2: ${result2.reading} (${result2.confidence})`,
     };
   } catch (error) {
     log.error('FleetVlmService', `Odometer extraction failed: ${error}`);
@@ -410,6 +492,37 @@ export async function extractOdometerReading(
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
+}
+
+/**
+ * Detect common digit confusion patterns between two number strings
+ * Returns description of confusion or null if no pattern found
+ */
+function detectDigitConfusion(str1: string, str2: string): string | null {
+  if (str1.length !== str2.length) return null;
+
+  const confusionPairs: Record<string, string[]> = {
+    '1': ['6', '7'],
+    '6': ['1', '8'],
+    '2': ['3', '7'],
+    '3': ['2', '8'],
+    '7': ['1', '2'],
+    '8': ['3', '6', '0'],
+    '0': ['8', '6'],
+  };
+
+  const differences: string[] = [];
+  for (let i = 0; i < str1.length; i++) {
+    if (str1[i] !== str2[i]) {
+      const d1 = str1[i];
+      const d2 = str2[i];
+      if (confusionPairs[d1]?.includes(d2) || confusionPairs[d2]?.includes(d1)) {
+        differences.push(`position ${i + 1}: ${d1}↔${d2}`);
+      }
+    }
+  }
+
+  return differences.length > 0 ? differences.join(', ') : null;
 }
 
 /**
@@ -732,6 +845,7 @@ export interface OdometerValidationResult {
 /**
  * Validate odometer reading against previous value and VLM confidence
  * Returns validation result with warnings if the reading seems suspicious
+ * STRICT MODE: Rejects readings with impossible jumps (likely VLM digit confusion)
  */
 export function validateOdometerReading(
   extractedReading: number | null,
@@ -741,12 +855,14 @@ export function validateOdometerReading(
     maxDailyKm?: number;      // Max expected km per day (default 500)
     maxSingleTripKm?: number; // Max km for a single check-in difference (default 1000)
     minConfidence?: number;   // Min VLM confidence to auto-accept (default 0.85)
+    daysSinceLast?: number;   // Days since last reading (for proportional validation)
   }
 ): OdometerValidationResult {
   const {
     maxDailyKm = 500,
     maxSingleTripKm = 1000,
     minConfidence = 0.85,
+    daysSinceLast = 1,
   } = options || {};
 
   // No reading extracted
@@ -812,36 +928,44 @@ export function validateOdometerReading(
     };
   }
 
-  // Huge jump that's likely a VLM misread (more than 10x expected daily km)
-  if (kmDifference > maxDailyKm * 10) {
-    // Check if digits might have been transposed/misread
-    const extractedStr = extractedReading.toString();
-    const previousStr = previousReading.toString();
+  // Calculate proportional threshold based on days
+  const proportionalMaxKm = Math.max(maxDailyKm * Math.max(daysSinceLast, 1), maxSingleTripKm);
 
-    // If same length and similar pattern, likely a digit misread
-    if (extractedStr.length === previousStr.length) {
-      let diffDigits = 0;
-      for (let i = 0; i < extractedStr.length; i++) {
-        if (extractedStr[i] !== previousStr[i]) diffDigits++;
-      }
+  // Check for digit confusion pattern (common VLM error)
+  const extractedStr = extractedReading.toString();
+  const previousStr = previousReading.toString();
+  const digitConfusion = detectDigitConfusionValidation(extractedStr, previousStr, kmDifference);
 
-      if (diffDigits <= 2) {
-        return {
-          isValid: false,
-          validatedReading: null,
-          originalReading: extractedReading,
-          warning: `Suspicious reading: ${extractedReading} km differs from previous ${previousReading} km by ${kmDifference} km - possible VLM digit misread`,
-          warningLevel: 'high',
-          suggestedAction: 'reject',
-        };
-      }
-    }
+  if (digitConfusion) {
+    return {
+      isValid: false,
+      validatedReading: null,
+      originalReading: extractedReading,
+      warning: `VLM digit confusion detected: ${digitConfusion.description}. Reading ${extractedReading} km likely misread from ~${digitConfusion.likelyCorrect} km`,
+      warningLevel: 'high',
+      suggestedAction: 'reject',
+    };
+  }
 
+  // Huge jump that's likely a VLM misread (more than 5x proportional max)
+  if (kmDifference > proportionalMaxKm * 5) {
+    return {
+      isValid: false,
+      validatedReading: null,
+      originalReading: extractedReading,
+      warning: `Impossible km jump: ${kmDifference} km in ${daysSinceLast} day(s) (max expected: ${proportionalMaxKm} km). Likely VLM misread.`,
+      warningLevel: 'high',
+      suggestedAction: 'reject',
+    };
+  }
+
+  // Large jump (more than 2x proportional max) - flag for verification
+  if (kmDifference > proportionalMaxKm * 2) {
     return {
       isValid: true,
       validatedReading: extractedReading,
       originalReading: extractedReading,
-      warning: `Large km increase: ${kmDifference} km since last reading - verify if correct`,
+      warning: `Large km increase: ${kmDifference} km in ${daysSinceLast} day(s) - verify if correct`,
       warningLevel: 'high',
       suggestedAction: 'verify',
     };
@@ -868,6 +992,65 @@ export function validateOdometerReading(
     warningLevel: 'none',
     suggestedAction: 'accept',
   };
+}
+
+/**
+ * Detect digit confusion patterns in odometer readings
+ * Common VLM errors: 1↔6, 2↔3, 7↔1, 8↔0
+ */
+function detectDigitConfusionValidation(
+  extractedStr: string,
+  previousStr: string,
+  kmDiff: number
+): { description: string; likelyCorrect: number } | null {
+  // Only check if same length and difference is large
+  if (extractedStr.length !== previousStr.length || kmDiff < 5000) {
+    return null;
+  }
+
+  const confusionMap: Record<string, string[]> = {
+    '1': ['6', '7'],
+    '6': ['1', '8'],
+    '2': ['3', '7'],
+    '3': ['2', '8'],
+    '7': ['1', '2'],
+    '8': ['3', '6', '0'],
+    '0': ['8', '6'],
+  };
+
+  // Find differing digits
+  const diffPositions: { pos: number; extracted: string; previous: string }[] = [];
+  for (let i = 0; i < extractedStr.length; i++) {
+    if (extractedStr[i] !== previousStr[i]) {
+      diffPositions.push({ pos: i, extracted: extractedStr[i], previous: previousStr[i] });
+    }
+  }
+
+  // If only 1-2 digits differ and they're confusion pairs, likely misread
+  if (diffPositions.length >= 1 && diffPositions.length <= 2) {
+    const confusedDigits = diffPositions.filter(d =>
+      confusionMap[d.previous]?.includes(d.extracted) ||
+      confusionMap[d.extracted]?.includes(d.previous)
+    );
+
+    if (confusedDigits.length === diffPositions.length) {
+      // All differences are confusion pairs - very likely a misread
+      const description = confusedDigits
+        .map(d => `${d.extracted}↔${d.previous} at position ${d.pos + 1}`)
+        .join(', ');
+
+      // Calculate what the reading likely should be
+      const correctedStr = extractedStr.split('');
+      confusedDigits.forEach(d => {
+        correctedStr[d.pos] = d.previous;
+      });
+      const likelyCorrect = parseInt(correctedStr.join(''), 10);
+
+      return { description, likelyCorrect };
+    }
+  }
+
+  return null;
 }
 
 /**

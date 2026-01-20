@@ -821,6 +821,8 @@ export async function getFleetCheckInStats(): Promise<{
 
 /**
  * Record an odometer reading
+ * @param input.discrepancyFlag - Optional override from VLM validation
+ * @param input.discrepancyReason - Optional reason from VLM validation
  */
 export async function recordOdometerReading(input: {
   vehicleId: string;
@@ -828,6 +830,8 @@ export async function recordOdometerReading(input: {
   reading: number;
   source: OdometerSource;
   vlmConfidence?: number;
+  discrepancyFlag?: boolean;
+  discrepancyReason?: string;
 }): Promise<OdometerHistory> {
   // Get the previous reading for comparison
   const [previousRow] = await sql`
@@ -840,11 +844,12 @@ export async function recordOdometerReading(input: {
   const previousReading = previousRow?.reading || null;
   const kmSinceLast = previousReading !== null ? input.reading - previousReading : null;
 
-  // Check for discrepancy
-  let discrepancyFlag = false;
-  let discrepancyReason: string | null = null;
+  // Use override from validation if provided, otherwise calculate locally
+  let discrepancyFlag = input.discrepancyFlag ?? false;
+  let discrepancyReason: string | null = input.discrepancyReason ?? null;
 
-  if (kmSinceLast !== null) {
+  // If no override provided, do local check for basic discrepancies
+  if (!input.discrepancyFlag && kmSinceLast !== null) {
     // Get vehicle thresholds
     const threshold = await getVehicleThreshold(input.vehicleId);
     const dailyThreshold = threshold?.dailyKmThreshold || 500;

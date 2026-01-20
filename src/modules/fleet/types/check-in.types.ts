@@ -392,6 +392,10 @@ export interface OdometerExtractionResult {
   confidence: number;
   rawText: string;
   error?: string;
+  /** Warning message if digit confusion or mismatch detected */
+  warning?: string;
+  /** Raw VLM response(s) for debugging */
+  rawResponse?: string;
 }
 
 /**
