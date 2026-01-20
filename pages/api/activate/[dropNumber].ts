@@ -259,6 +259,40 @@ async function quickSyncFromOneMap(
       syncInfo.swapDetails = swapCheck.swapped ? swapCheck.details : null;
     }
 
+    // Log SWAP_DETECTED activity (once per DR)
+    if (swapCheck.swapped) {
+      const existingSwapLog = await pool.query(
+        `SELECT 1 FROM dr_activity_log
+         WHERE drop_number = $1 AND event_type = 'SWAP_DETECTED'
+         LIMIT 1`,
+        [dropNumber]
+      );
+
+      if (existingSwapLog.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO dr_activity_log (id, drop_number, event_type, event_data, actor, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+          [
+            dropNumber,
+            'SWAP_DETECTED',
+            JSON.stringify({
+              source: 'quick_sync',
+              ont_serial: ontSerial || currentOnt,
+              ups_serial: upsSerial || currentUps,
+              details: swapCheck.details,
+            }),
+            'system',
+          ]
+        );
+
+        log.warn(`SWAP_DETECTED logged for ${dropNumber}`, {
+          ont: ontSerial || currentOnt,
+          ups: upsSerial || currentUps,
+          details: swapCheck.details,
+        });
+      }
+    }
+
     // Check for installation mismatch (1Map serial vs OES activated serial)
     // Use the latest serial (either from sync or existing)
     const effectiveOntSerial = ontSerial || currentOnt;
