@@ -383,13 +383,19 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                           </div>
                         )}
                       </div>
-                      <div className="text-right ml-4">
+                      <div className="text-right ml-4 flex-shrink-0">
+                        {/* Show "Detected" label for batch sync events */}
+                        {entry.actor === 'batch_sync' && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500 block">
+                            Detected:
+                          </span>
+                        )}
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {formatDateTime(entry.timestamp)}
                         </span>
-                        {entry.actorId && (
+                        {entry.actor && (
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            by {entry.actorId}
+                            by {entry.actor === 'batch_sync' ? 'Auto Sync' : entry.actor}
                           </p>
                         )}
                       </div>
