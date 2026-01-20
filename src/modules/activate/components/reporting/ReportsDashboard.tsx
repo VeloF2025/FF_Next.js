@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Download,
   WifiOff,
+  Repeat,
 } from 'lucide-react';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
@@ -33,6 +34,7 @@ import { TrendReports } from './TrendReports';
 import { TeamReports } from './TeamReports';
 import { FunnelReports } from './FunnelReports';
 import { OfflineDevicesReports } from './OfflineDevicesReports';
+import { SerialSwapReports } from './SerialSwapReports';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -71,6 +73,12 @@ const categories: CategoryTab[] = [
     label: 'Offline Devices',
     icon: WifiOff,
     description: 'Offline device tracking, serial validation, match status',
+  },
+  {
+    id: 'swaps',
+    label: 'Serial Swaps',
+    icon: Repeat,
+    description: 'ONT/UPS serials in wrong 1Map fields - pending correction',
   },
 ];
 
@@ -308,6 +316,9 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'offline' && (
           <OfflineDevicesReports filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'swaps' && (
+          <SerialSwapReports filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>

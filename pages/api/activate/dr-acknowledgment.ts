@@ -145,6 +145,48 @@ async function markForRework(dropNumber: string, newPhotoCount: number): Promise
 }
 
 /**
+ * Save swap detection to database for tracking
+ * Creates/updates record in dr_photo_unified_reviews with swap status
+ */
+async function saveSwapDetection(
+  dropNumber: string,
+  ontSerial: string | null,
+  upsSerial: string | null,
+  swapDetails: string | null
+): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO dr_photo_unified_reviews (
+         drop_number,
+         ont_serial_scanned,
+         ups_serial_scanned,
+         serial_swap_detected,
+         serial_swap_status,
+         serial_swap_details,
+         serial_swap_detected_at,
+         created_at,
+         updated_at
+       ) VALUES ($1, $2, $3, true, 'pending_correction', $4, NOW(), NOW(), NOW())
+       ON CONFLICT (drop_number) DO UPDATE SET
+         ont_serial_scanned = COALESCE(EXCLUDED.ont_serial_scanned, dr_photo_unified_reviews.ont_serial_scanned),
+         ups_serial_scanned = COALESCE(EXCLUDED.ups_serial_scanned, dr_photo_unified_reviews.ups_serial_scanned),
+         serial_swap_detected = true,
+         serial_swap_status = CASE
+           WHEN dr_photo_unified_reviews.serial_swap_status IS NULL THEN 'pending_correction'
+           ELSE dr_photo_unified_reviews.serial_swap_status
+         END,
+         serial_swap_details = $4,
+         serial_swap_detected_at = COALESCE(dr_photo_unified_reviews.serial_swap_detected_at, NOW()),
+         updated_at = NOW()`,
+      [dropNumber, ontSerial, upsSerial, swapDetails]
+    );
+    log.info('DrAcknowledgment', `Saved swap detection for ${dropNumber}`, { swapDetails });
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Failed to save swap detection for ${dropNumber}`, { error });
+  }
+}
+
+/**
  * Generate WhatsApp acknowledgment message for RESUBMISSION
  */
 function generateResubmissionAckMessage(
@@ -391,6 +433,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         upsSerial,
         details: ackResult.swapDetails,
       });
+      // Save swap detection to database for tracking
+      await saveSwapDetection(dropNumber, ontSerial, upsSerial, ackResult.swapDetails);
     } else {
       log.info('DrAcknowledgment', `Acknowledgment ready for ${dropNumber} in ${duration}ms`);
     }

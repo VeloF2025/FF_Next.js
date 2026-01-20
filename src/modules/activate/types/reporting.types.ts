@@ -416,7 +416,108 @@ export type ReportCategory =
   | 'trends'
   | 'team'
   | 'funnel'
-  | 'offline';
+  | 'offline'
+  | 'swaps';
+
+// ============================================================================
+// SERIAL SWAP TRACKING TYPES
+// ============================================================================
+
+/**
+ * Swap status for 1Map correction workflow
+ */
+export type SwapStatus =
+  | 'pending_correction'   // Detected, waiting for technician to fix in 1Map mobile app
+  | 'corrected_in_1map'    // Technician confirmed they fixed it in 1Map
+  | 'false_positive';      // QA determined the detection was incorrect
+
+/**
+ * Individual serial swap record
+ */
+export interface SerialSwapRecord {
+  /** DR number */
+  drop_number: string;
+  /** Project name */
+  project: string | null;
+  /** Zone number */
+  zone_no: number | null;
+  /** PON number */
+  pon_no: number | null;
+
+  /** ONT serial from 1Map (may be swapped) */
+  ont_serial: string | null;
+  /** UPS serial from 1Map (may be swapped) */
+  ups_serial: string | null;
+
+  /** Human-readable swap details */
+  swap_details: string;
+  /** Current correction status */
+  swap_status: SwapStatus;
+
+  /** When swap was first detected */
+  detected_at: string;
+  /** When marked as corrected */
+  corrected_at: string | null;
+  /** Who marked as corrected */
+  corrected_by: string | null;
+
+  /** Technician name from WhatsApp */
+  technician_name: string | null;
+  /** Technician phone */
+  technician_phone: string | null;
+
+  /** Days since detection (for aging) */
+  days_pending: number;
+}
+
+/**
+ * Serial swap report summary statistics
+ */
+export interface SerialSwapSummary {
+  /** Total swaps detected (all time in range) */
+  total_detected: number;
+  /** Pending correction */
+  pending_correction: number;
+  /** Corrected in 1Map */
+  corrected: number;
+  /** Marked as false positive */
+  false_positive: number;
+  /** Average days to resolve */
+  avg_resolution_days: number | null;
+  /** Swaps pending > 7 days (critical backlog) */
+  backlog_over_7_days: number;
+  /** Breakdown by project */
+  by_project: Record<string, {
+    pending: number;
+    corrected: number;
+    total: number;
+  }>;
+}
+
+/**
+ * Serial swap report API response
+ */
+export interface SerialSwapReportResponse {
+  /** Date range queried */
+  date_range: {
+    from: string;
+    to: string;
+  };
+  /** Project filter (if any) */
+  project: string | null;
+  /** Summary statistics */
+  summary: SerialSwapSummary;
+  /** All swap records (paginated) */
+  records: SerialSwapRecord[];
+  /** Total record count (for pagination) */
+  total_count: number;
+  /** Page number */
+  page: number;
+  /** Page size */
+  page_size: number;
+  /** Available statuses for filtering */
+  available_statuses: SwapStatus[];
+}
 
 // ============================================================================
 // TREND ANALYSIS TYPES
