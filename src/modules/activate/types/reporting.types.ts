@@ -415,7 +415,8 @@ export type ReportCategory =
   | 'anomalies'
   | 'trends'
   | 'team'
-  | 'funnel';
+  | 'funnel'
+  | 'offline';
 
 // ============================================================================
 // TREND ANALYSIS TYPES
@@ -786,4 +787,131 @@ export interface SortConfig {
   field: string;
   /** Sort direction */
   direction: 'asc' | 'desc';
+}
+
+// ============================================================================
+// OFFLINE DEVICES REPORT TYPES
+// ============================================================================
+
+/**
+ * Match status for offline device against existing systems
+ */
+export type OfflineMatchStatus = 'matched_drops' | 'matched_oes' | 'unmatched';
+
+/**
+ * Offline bucket categories
+ */
+export type OfflineBucket =
+  | 'Less than 20 days'
+  | '20 - 40 Days'
+  | '40 - 60 Days'
+  | 'More than 60 Days';
+
+/**
+ * Individual offline device record
+ */
+export interface OfflineDeviceRecord {
+  /** Unique ID */
+  id: string;
+  /** DR number */
+  drop_number: string;
+  /** ONT serial from report */
+  serial_number: string;
+  /** Area code (law, moh, mam) */
+  area_code: string;
+  /** Zone (from summary report) */
+  zone: string | null;
+  /** Planned PON */
+  planned_pon: string | null;
+  /** Full address */
+  address: string | null;
+  /** Pole number */
+  pole_number: string | null;
+  /** Last down reason */
+  last_down_reason: string;
+  /** Last inform date */
+  last_inform_date: string | null;
+  /** Days offline */
+  days_since_last_inform: number;
+  /** Offline bucket category */
+  offline_bucket: string;
+  /** Match status against drops/OES */
+  match_status: OfflineMatchStatus;
+  /** Expected serial from OES */
+  expected_serial: string | null;
+  /** Serial mismatch flag */
+  serial_mismatch: boolean;
+  /** Report date imported from */
+  report_date: string;
+  /** Installation date */
+  installation_date: string | null;
+  /** Revenue 30-day average */
+  revenue_30day_avg: number | null;
+}
+
+/**
+ * Summary statistics for offline devices
+ */
+export interface OfflineDevicesSummary {
+  /** Total offline devices */
+  total_devices: number;
+  /** Matched to drops table */
+  matched_drops: number;
+  /** Matched to OES activations */
+  matched_oes: number;
+  /** No match found */
+  unmatched: number;
+  /** Serial mismatches */
+  serial_mismatches: number;
+  /** Breakdown by offline bucket */
+  by_bucket: Record<string, number>;
+  /** Breakdown by last down reason */
+  by_reason: Record<string, number>;
+  /** Breakdown by zone */
+  by_zone: Record<string, number>;
+}
+
+/**
+ * Offline devices report filters
+ */
+export interface OfflineDevicesFilters extends ReportFilters {
+  /** Filter by zone */
+  zone?: string;
+  /** Filter by offline bucket */
+  offlineBucket?: string;
+  /** Filter by match status */
+  matchStatus?: OfflineMatchStatus;
+  /** Only show serial mismatches */
+  serialMismatchOnly?: boolean;
+  /** Filter by last down reason */
+  lastDownReason?: string;
+}
+
+/**
+ * Offline devices report API response
+ */
+export interface OfflineDevicesReportResponse {
+  /** Date range queried */
+  date_range: {
+    from: string;
+    to: string;
+  };
+  /** Project filter (if any) */
+  project: string | null;
+  /** Summary statistics */
+  summary: OfflineDevicesSummary;
+  /** Available zones for filtering */
+  available_zones: string[];
+  /** Available reasons for filtering */
+  available_reasons: string[];
+  /** Available buckets for filtering */
+  available_buckets: string[];
+  /** Device records (paginated) */
+  records: OfflineDeviceRecord[];
+  /** Total record count (for pagination) */
+  total_count: number;
+  /** Page number */
+  page: number;
+  /** Page size */
+  page_size: number;
 }

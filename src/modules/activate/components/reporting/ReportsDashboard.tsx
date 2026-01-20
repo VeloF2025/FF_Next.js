@@ -22,15 +22,17 @@ import {
   Calendar,
   RefreshCw,
   Download,
+  WifiOff,
 } from 'lucide-react';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
 
-// Import report sections (will be created next)
+// Import report sections
 import { AnomalyReports } from './AnomalyReports';
 import { TrendReports } from './TrendReports';
 import { TeamReports } from './TeamReports';
 import { FunnelReports } from './FunnelReports';
+import { OfflineDevicesReports } from './OfflineDevicesReports';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -63,6 +65,12 @@ const categories: CategoryTab[] = [
     label: 'QA Funnel',
     icon: FilterIcon,
     description: 'Photo completion, VLM rates, cycle times',
+  },
+  {
+    id: 'offline',
+    label: 'Offline Devices',
+    icon: WifiOff,
+    description: 'Offline device tracking, serial validation, match status',
   },
 ];
 
@@ -301,6 +309,9 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'funnel' && (
           <FunnelReports filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'offline' && (
+          <OfflineDevicesReports filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>
