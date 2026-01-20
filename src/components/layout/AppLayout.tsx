@@ -170,6 +170,14 @@ export function AppLayout({ children }: AppLayoutProps) {
       };
     }
 
+    // WhatsApp Portal - uses its own header like Fleet Drivers
+    if (path.includes('communications/whatsapp')) {
+      return {
+        title: 'FibreFlow',
+        breadcrumbs: ['Home'],
+      };
+    }
+
     // Communications
     if (path.includes('communications') || path.includes('meetings')) {
       return {

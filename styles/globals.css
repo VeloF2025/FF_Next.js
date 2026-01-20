@@ -29,6 +29,9 @@
     --radius: 0.5rem;
 
     /* FibreFlow Theme Variables */
+    /* Primary accent color (amber) */
+    --ff-primary: #f59e0b;
+
     /* Colors */
     --ff-primary-50: #eff6ff;
     --ff-primary-100: #dbeafe;
@@ -165,6 +168,9 @@
     --chart-5: 340 75% 55%;
 
     /* FibreFlow Dark Mode Variables */
+    /* Primary accent color (amber) - same in dark mode */
+    --ff-primary: #f59e0b;
+
     --ff-bg-primary: #0f172a;
     --ff-bg-secondary: #1e293b;
     --ff-bg-tertiary: #334155;

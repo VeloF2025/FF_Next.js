@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { waAdminApi } from '../services/waAdminApiService';
-import type { WaServicesStatusResponse, WaServiceStatus, ServiceStatus } from '../types/wa-admin.types';
+import type { WaServicesStatusResponse, WaServiceStatus, ServiceStatus, WaPhoneNumber } from '../types/wa-admin.types';
 
 /* Services Tab - Displays WhatsApp Bridge and Sender service status with restart and pairing controls */
 
@@ -251,6 +251,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
 
 const ServicesTab: React.FC = () => {
   const [status, setStatus] = useState<WaServicesStatusResponse | null>(null);
+  const [phoneNumbers, setPhoneNumbers] = useState<WaPhoneNumber[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [restartingService, setRestartingService] = useState<string | null>(null);
@@ -265,12 +266,19 @@ const ServicesTab: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const result = await waAdminApi.services.status();
+    const [statusResult, phonesResult] = await Promise.all([
+      waAdminApi.services.status(),
+      waAdminApi.phones.list(),
+    ]);
 
-    if (result.success && result.data) {
-      setStatus(result.data);
+    if (statusResult.success && statusResult.data) {
+      setStatus(statusResult.data);
     } else {
-      setError(result.error || 'Failed to fetch service status');
+      setError(statusResult.error || 'Failed to fetch service status');
+    }
+
+    if (phonesResult.success && phonesResult.data) {
+      setPhoneNumbers(phonesResult.data);
     }
 
     setLoading(false);
@@ -345,15 +353,15 @@ const ServicesTab: React.FC = () => {
   const getStatusColor = (serviceStatus: ServiceStatus) => {
     switch (serviceStatus) {
       case 'connected':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'disconnected':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'connecting':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       case 'error':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
 
@@ -361,19 +369,19 @@ const ServicesTab: React.FC = () => {
     switch (overall) {
       case 'healthy':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-800 text-sm font-medium">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 text-sm font-medium">
             <CheckCircle className="w-4 h-4" /> All Systems Operational
           </span>
         );
       case 'degraded':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-100 text-yellow-800 text-sm font-medium">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-sm font-medium">
             <AlertCircle className="w-4 h-4" /> Partial Outage
           </span>
         );
       case 'down':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-100 text-red-800 text-sm font-medium">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium">
             <XCircle className="w-4 h-4" /> Services Down
           </span>
         );
@@ -453,6 +461,65 @@ const ServicesTab: React.FC = () => {
         )}
       </div>
 
+      {/* Phone Numbers Section */}
+      {phoneNumbers.length > 0 && (
+        <div className="border border-[var(--ff-border-light)] rounded-lg p-4 bg-[var(--ff-bg-card)]">
+          <h4 className="font-semibold text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
+            <Phone className="w-4 h-4" />
+            Registered Phone Numbers
+          </h4>
+          <div className="space-y-2">
+            {['sender', 'bridge'].map((service) => {
+              const servicePhones = phoneNumbers.filter((p) => p.service === service);
+              if (servicePhones.length === 0) return null;
+
+              return (
+                <div key={service} className="space-y-1">
+                  <p className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                    {service === 'sender' ? '📤 Sender' : '📥 Bridge'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {servicePhones.map((phone) => (
+                      <div
+                        key={phone.id}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
+                          phone.role === 'primary'
+                            ? 'bg-green-500/10 border border-green-500/30 text-green-400'
+                            : 'bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                        }`}
+                      >
+                        <span className="font-medium">{phone.display_name || phone.phone_number}</span>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${
+                            phone.role === 'primary'
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-tertiary)]'
+                          }`}
+                        >
+                          {phone.role.toUpperCase()}
+                        </span>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${
+                            phone.status === 'paired'
+                              ? 'bg-blue-500/20 text-blue-400'
+                              : 'bg-yellow-500/20 text-yellow-400'
+                          }`}
+                        >
+                          {phone.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-3">
+            💡 To add a fallback number, configure it in Settings tab → Service Config
+          </p>
+        </div>
+      )}
+
       {/* Last checked timestamp */}
       {status && (
         <p className="text-xs text-[var(--ff-text-secondary)] text-right">
@@ -528,7 +595,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
           {service.session_valid && (
             <button
               onClick={onLogout}
-              className="flex items-center gap-1 px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="flex items-center gap-1 px-2 py-1.5 text-sm text-red-400 hover:bg-red-500/10 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
               title="Logout and clear session"
             >
               <LogOut className="w-4 h-4" />
@@ -557,10 +624,10 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
           <Phone className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span>{service.phone_number}</span>
           {service.name === 'sender' && (
-            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">SENDS</span>
+            <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">SENDS</span>
           )}
           {service.name === 'bridge' && (
-            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">RECEIVES</span>
+            <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">RECEIVES</span>
           )}
         </div>
 
@@ -579,13 +646,13 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         )}
 
         {service.error_message && (
-          <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-xs" role="alert">
+          <div className="mt-3 p-2 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-xs" role="alert">
             {service.error_message}
           </div>
         )}
 
         {service.needs_auth && (
-          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-700 text-xs flex items-center gap-2" role="alert">
+          <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-yellow-400 text-xs flex items-center gap-2" role="alert">
             <Key className="w-4 h-4" />
             Authentication required. Click &quot;Pair&quot; to link a WhatsApp device.
           </div>
