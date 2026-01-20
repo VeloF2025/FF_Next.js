@@ -55,11 +55,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       project: projectFilter || 'all',
       activity: recentActivity.map((entry) => ({
         id: entry.id,
-        drNumber: entry.dr_number,
+        drNumber: entry.drop_number,
         eventType: entry.event_type,
         eventData: entry.event_data,
-        actorType: entry.actor_type,
-        actorId: entry.actor_id,
+        actor: entry.actor,
         createdAt: entry.created_at,
       })),
     });

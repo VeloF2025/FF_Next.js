@@ -43,18 +43,20 @@ export type ActivityEventType =
   | 'step_rejected'
   | 'feedback_generated'
   | 'feedback_sent'
-  | 'error';
+  | 'error'
+  | 'SERIAL_UPDATE'
+  | 'SWAP_DETECTED'
+  | 'INSTALLATION_MISMATCH';
 
 /**
  * Activity log entry
  */
 export interface ActivityLogEntry {
   id: string;
-  dr_number: string;
+  drop_number: string;
   event_type: ActivityEventType;
   event_data: Record<string, unknown>;
-  actor_type: 'system' | 'user' | 'vlm';
-  actor_id: string | null;
+  actor: string | null;
   created_at: Date;
 }
 
@@ -69,8 +71,7 @@ export interface TimelineEntry {
   description: string;
   icon: string;
   iconColor: string;
-  actorType: 'system' | 'user' | 'vlm';
-  actorId: string | null;
+  actor: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -172,6 +173,21 @@ const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: string; i
     icon: '⚠️',
     iconColor: 'text-red-500',
   },
+  SERIAL_UPDATE: {
+    title: 'Serial Changed',
+    icon: '🔄',
+    iconColor: 'text-orange-500',
+  },
+  SWAP_DETECTED: {
+    title: 'Serials Swapped',
+    icon: '⚠️',
+    iconColor: 'text-red-500',
+  },
+  INSTALLATION_MISMATCH: {
+    title: 'Installation Mismatch',
+    icon: '🔴',
+    iconColor: 'text-red-500',
+  },
 };
 
 // ============================================================================
@@ -202,15 +218,14 @@ export async function logActivity(
   drNumber: string,
   eventType: ActivityEventType,
   eventData: Record<string, unknown> = {},
-  actorType: 'system' | 'user' | 'vlm' = 'system',
-  actorId: string | null = null
+  actor: string = 'system'
 ): Promise<string> {
   const sql = getDb();
 
   try {
     const result = await sql`
-      INSERT INTO dr_activity_log (dr_number, event_type, event_data, actor_type, actor_id)
-      VALUES (${drNumber}, ${eventType}, ${JSON.stringify(eventData)}, ${actorType}, ${actorId})
+      INSERT INTO dr_activity_log (drop_number, event_type, event_data, actor)
+      VALUES (${drNumber}, ${eventType}, ${JSON.stringify(eventData)}, ${actor})
       RETURNING id
     `;
 
@@ -238,20 +253,19 @@ export async function getActivityHistory(
 
   try {
     const rows = await sql`
-      SELECT id, dr_number, event_type, event_data, actor_type, actor_id, created_at
+      SELECT id, drop_number, event_type, event_data, actor, created_at
       FROM dr_activity_log
-      WHERE dr_number = ${drNumber}
+      WHERE drop_number = ${drNumber}
       ORDER BY created_at DESC
       LIMIT ${limit}
     `;
 
     return rows.map((row) => ({
       id: row.id,
-      dr_number: row.dr_number,
+      drop_number: row.drop_number,
       event_type: row.event_type as ActivityEventType,
       event_data: row.event_data || {},
-      actor_type: row.actor_type as 'system' | 'user' | 'vlm',
-      actor_id: row.actor_id,
+      actor: row.actor,
       created_at: new Date(row.created_at),
     }));
   } catch (error) {
@@ -318,6 +332,15 @@ export async function getActivityTimeline(
       case 'error':
         description = data.message ? String(data.message) : 'An error occurred';
         break;
+      case 'SERIAL_UPDATE':
+        description = data.details ? String(data.details) : 'Serial number was updated';
+        break;
+      case 'SWAP_DETECTED':
+        description = data.details ? String(data.details) : 'ONT and UPS serials appear swapped';
+        break;
+      case 'INSTALLATION_MISMATCH':
+        description = data.details ? String(data.details) : '1Map serial differs from OES activated serial';
+        break;
       default:
         description = JSON.stringify(data).slice(0, 100);
     }
@@ -330,8 +353,7 @@ export async function getActivityTimeline(
       description,
       icon: metadata.icon,
       iconColor: metadata.iconColor,
-      actorType: entry.actor_type,
-      actorId: entry.actor_id,
+      actor: entry.actor,
       metadata: entry.event_data,
     };
   });
@@ -351,7 +373,7 @@ export async function getActivitySummary(drNumber: string): Promise<ActivitySumm
     const rows = await sql`
       SELECT event_type, created_at
       FROM dr_activity_log
-      WHERE dr_number = ${drNumber}
+      WHERE drop_number = ${drNumber}
       ORDER BY created_at ASC
     `;
 
@@ -445,16 +467,16 @@ export async function getRecentActivity(
 
     if (project) {
       rows = await sql`
-        SELECT al.id, al.dr_number, al.event_type, al.event_data, al.actor_type, al.actor_id, al.created_at
+        SELECT al.id, al.drop_number, al.event_type, al.event_data, al.actor, al.created_at
         FROM dr_activity_log al
-        JOIN dr_photo_unified_reviews dr ON al.dr_number = dr.drop_number
+        JOIN dr_photo_unified_reviews dr ON al.drop_number = dr.drop_number
         WHERE dr.project = ${project}
         ORDER BY al.created_at DESC
         LIMIT ${limit}
       `;
     } else {
       rows = await sql`
-        SELECT id, dr_number, event_type, event_data, actor_type, actor_id, created_at
+        SELECT id, drop_number, event_type, event_data, actor, created_at
         FROM dr_activity_log
         ORDER BY created_at DESC
         LIMIT ${limit}
@@ -463,11 +485,10 @@ export async function getRecentActivity(
 
     return rows.map((row) => ({
       id: row.id,
-      dr_number: row.dr_number,
+      drop_number: row.drop_number,
       event_type: row.event_type as ActivityEventType,
       event_data: row.event_data || {},
-      actor_type: row.actor_type as 'system' | 'user' | 'vlm',
-      actor_id: row.actor_id,
+      actor: row.actor,
       created_at: new Date(row.created_at),
     }));
   } catch (error) {
@@ -489,7 +510,7 @@ export async function logWhatsAppSubmission(
   group: string,
   messageId?: string
 ): Promise<string> {
-  return logActivity(drNumber, 'whatsapp_submitted', { sender, group, messageId }, 'system', 'whatsapp-bridge');
+  return logActivity(drNumber, 'whatsapp_submitted', { sender, group, messageId }, 'whatsapp-bridge');
 }
 
 /**
@@ -505,7 +526,6 @@ export async function logAcknowledgment(
     drNumber,
     'dr_acknowledged',
     { photoCount, ontSerial, upsSerial },
-    'system',
     'whatsapp-bridge'
   );
 }
@@ -518,7 +538,7 @@ export async function logPhotosFetched(
   source: string,
   count: number
 ): Promise<string> {
-  return logActivity(drNumber, 'photos_fetched', { source, count }, 'system', 'onemap-api');
+  return logActivity(drNumber, 'photos_fetched', { source, count }, 'onemap-api');
 }
 
 /**
@@ -535,7 +555,6 @@ export async function logAttributeCategorization(
     drNumber,
     'attribute_categorized',
     { total, categorized, needsVlm, processingTimeMs },
-    'system',
     'step-mapper'
   );
 }
@@ -544,7 +563,7 @@ export async function logAttributeCategorization(
  * Log VLM QA started
  */
 export async function logVlmQaStarted(drNumber: string, photoCount: number): Promise<string> {
-  return logActivity(drNumber, 'vlm_qa_started', { photoCount }, 'vlm', 'qwen3-vl');
+  return logActivity(drNumber, 'vlm_qa_started', { photoCount }, 'qwen3-vl');
 }
 
 /**
@@ -561,7 +580,6 @@ export async function logVlmQaCompleted(
     drNumber,
     'vlm_qa_completed',
     { total, passed, passRate, processingTimeMs },
-    'vlm',
     'qwen3-vl'
   );
 }
@@ -570,14 +588,14 @@ export async function logVlmQaCompleted(
  * Log VLM QA failed
  */
 export async function logVlmQaFailed(drNumber: string, error: string): Promise<string> {
-  return logActivity(drNumber, 'vlm_qa_failed', { error }, 'vlm', 'qwen3-vl');
+  return logActivity(drNumber, 'vlm_qa_failed', { error }, 'qwen3-vl');
 }
 
 /**
  * Log human review started
  */
 export async function logHumanReviewStarted(drNumber: string, userId: string): Promise<string> {
-  return logActivity(drNumber, 'human_review_started', {}, 'user', userId);
+  return logActivity(drNumber, 'human_review_started', {}, userId);
 }
 
 /**
@@ -593,7 +611,6 @@ export async function logHumanReviewCompleted(
     drNumber,
     'human_review_completed',
     { reviewer: userId, approved, rejected },
-    'user',
     userId
   );
 }
@@ -607,7 +624,7 @@ export async function logStepApproval(
   stepLabel: string,
   userId: string
 ): Promise<string> {
-  return logActivity(drNumber, 'step_approved', { step, stepLabel }, 'user', userId);
+  return logActivity(drNumber, 'step_approved', { step, stepLabel }, userId);
 }
 
 /**
@@ -620,26 +637,26 @@ export async function logStepRejection(
   reason: string,
   userId: string
 ): Promise<string> {
-  return logActivity(drNumber, 'step_rejected', { step, stepLabel, reason }, 'user', userId);
+  return logActivity(drNumber, 'step_rejected', { step, stepLabel, reason }, userId);
 }
 
 /**
  * Log feedback generated
  */
 export async function logFeedbackGenerated(drNumber: string, feedbackLength: number): Promise<string> {
-  return logActivity(drNumber, 'feedback_generated', { feedbackLength }, 'system', 'feedback-agent');
+  return logActivity(drNumber, 'feedback_generated', { feedbackLength }, 'feedback-agent');
 }
 
 /**
  * Log feedback sent
  */
 export async function logFeedbackSent(drNumber: string, group: string, messageId?: string): Promise<string> {
-  return logActivity(drNumber, 'feedback_sent', { group, messageId }, 'system', 'whatsapp-sender');
+  return logActivity(drNumber, 'feedback_sent', { group, messageId }, 'whatsapp-sender');
 }
 
 /**
  * Log error
  */
 export async function logError(drNumber: string, message: string, details?: unknown): Promise<string> {
-  return logActivity(drNumber, 'error', { message, details }, 'system', 'error-handler');
+  return logActivity(drNumber, 'error', { message, details }, 'error-handler');
 }

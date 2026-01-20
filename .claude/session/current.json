@@ -1,37 +1,39 @@
 {
-  "session_id": "2026-01-20-pdfcraft-deploy",
+  "session_id": "2026-01-20-pdfcraft-worker-fix",
   "started_at": "2026-01-20T10:00:00Z",
-  "last_updated": "2026-01-20T17:00:19.293Z",
+  "last_updated": "2026-01-20T19:00:02.950Z",
   "working_on": {
-    "task": "PDFCraft Deployment & Integration",
+    "task": "PDFCraft pymupdf-wasm worker path fixes",
     "status": "completed",
     "progress": [
-      "✅ PDFCraft deployed to Velocity server",
-      "✅ Nginx proxy configured at /pdf-tools/",
-      "✅ basePath added to next.config.js",
-      "✅ Sidebar link working (external, new tab)",
-      "✅ Knowledge base updated"
+      "✅ Fixed 14 workers with /pdf-tools/pymupdf-wasm/ basePath",
+      "✅ Added cache busting via BUILD_VERSION in config.ts",
+      "✅ PDF to DOCX tested and working",
+      "✅ Word to PDF tested (13.1 MB output)",
+      "✅ All worker paths verified on staging"
     ],
-    "last_action": "Updated KB with PDFCraft deployment info"
+    "last_action": "KB update via /kb"
   },
   "kb_status": {
-    "timestamp": "2026-01-20T18:00:00Z",
+    "timestamp": "2026-01-20T20:30:00Z",
     "total_modules": 40,
     "modules_with_claude_md": 40,
     "coverage": "100%",
-    "learnings_pending": 0
+    "learnings_pending": 0,
+    "modules_updated": [],
+    "update_reason": "PDFCraft pymupdf-wasm worker fix"
   },
   "recent_work": [
-    "PDFCraft nginx proxy deployment at /pdf-tools/",
-    "WhatsApp Portal multi-phone support",
-    "Sidebar external link support",
-    "Wishlist hydration fix"
+    "PDFCraft pymupdf-wasm worker path fix (14 workers)",
+    "Cache busting for Cloudflare CDN bypass",
+    "PDF to DOCX conversion verified working",
+    "Word to PDF conversion tested"
   ],
   "automation_status": {
-    "session_recovery": "✅ ENABLED",
-    "session_tracking": "✅ ENABLED",
-    "learning_capture": "✅ ENABLED",
-    "module_context": "✅ ENABLED"
+    "session_recovery": "ENABLED",
+    "session_tracking": "ENABLED",
+    "learning_capture": "ENABLED",
+    "module_context": "ENABLED"
   },
   "hooks_active": [
     "SessionStart: session-recovery.js",
@@ -43,9 +45,9 @@
     "project": "FibreFlow",
     "branch": "master",
     "recent_commits": [
-      "398cd443 - docs(wa-monitor): update knowledge base",
-      "532457f2 - chore: remove unused BMad commands",
-      "68be122b - fix(sidebar): use nginx proxy path for PDF Tools"
+      "d9bd1d25 - docs: add PDFCraft deployment to knowledge base",
+      "1a142061 - docs(claude): add fleet and activate module profiles",
+      "7d134c70 - feat(wishlist): Add admin-only drag-and-drop permissions"
     ]
   },
   "key_systems": {
@@ -69,12 +71,23 @@
     "service": "pdfcraft.service",
     "port": 3007,
     "basePath": "/pdf-tools",
-    "features": [
-      "Merge PDF",
-      "Split PDF",
-      "Compress PDF",
-      "Edit PDF",
-      "Convert to/from PDF"
-    ]
+    "commit": "1f22522 (local - upstream push failed)",
+    "workers_fixed": [
+      "pdf-to-docx",
+      "epub-to-pdf",
+      "excel-to-pdf",
+      "word-to-pdf",
+      "pptx-to-pdf",
+      "mobi-to-pdf",
+      "fb2-to-pdf",
+      "rtf-to-pdf",
+      "xps-to-pdf",
+      "pdf-to-excel",
+      "pdf-to-pptx",
+      "extract-images",
+      "table-of-contents",
+      "table-of-contents-v2"
+    ],
+    "fix_details": "Changed /pymupdf-wasm/ to /pdf-tools/pymupdf-wasm/ in all workers + cache busting via BUILD_VERSION"
   }
 }

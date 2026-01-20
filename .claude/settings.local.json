@@ -342,7 +342,17 @@
       "Bash(docs/wa-monitor/WHATSAPP_ARCHITECTURE.md)",
       "Bash(./deploy.sh:*)",
       "Bash(rsync:*)",
-      "Bash(tar czf:*)"
+      "Bash(tar czf:*)",
+      "Bash(TOKEN=\"faac7ae2-6e22-40c7-95c2-03649ece63d1\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''DR1738319''''&token=$TOKEN\")",
+      "Bash(git config:*)",
+      "Bash(git submodule add:*)",
+      "Bash(pages/api/activate/dr-acknowledgment.ts )",
+      "Bash(pages/api/activate/reporting/serial-swaps/ )",
+      "Bash(scripts/migrations/097_serial_swap_tracking.sql )",
+      "Bash(src/modules/activate/components/reporting/ReportsDashboard.tsx )",
+      "Bash(src/modules/activate/components/reporting/SerialSwapReports.tsx )",
+      "Bash(src/modules/activate/types/reporting.types.ts)",
+      "Skill(kb)"
     ],
     "deny": [],
     "ask": [],
