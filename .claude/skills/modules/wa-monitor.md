@@ -275,6 +275,46 @@ sudo systemctl restart whatsapp-bridge.service
 [Check logs for confirmation]
 ```
 
+### Trigger 9: WhatsApp Portal Issues (Jan 2026)
+
+**Keywords**:
+- "whatsapp portal"
+- "services tab"
+- "wa admin"
+- "phone pairing"
+- "portal not loading"
+- "dark theme"
+
+**Automatic Actions**:
+1. Check if it's a frontend issue (console errors)
+2. Check if API endpoints are responding
+3. Verify waAdminApi service methods
+4. Check for missing phones API
+
+**Response Template**:
+```
+🖥️ WhatsApp Portal Investigation:
+
+Portal URL: /communications/whatsapp
+API Status: ✅/❌
+
+Services API: /api/communications/whatsapp/services/status
+Phones API: /api/communications/whatsapp/phones
+
+Common Issues:
+- Console errors: Check waAdminApiService.ts has phonesApi
+- Dark theme: Check ServicesTab.tsx uses dark-compatible colors
+- Service status: Bridge/Sender health endpoints
+
+Fix: Ensure all API endpoints are deployed
+```
+
+**Key Files:**
+- `src/modules/communications/whatsapp/components/ServicesTab.tsx`
+- `src/modules/communications/whatsapp/services/waAdminApiService.ts`
+- `pages/api/communications/whatsapp/phones/`
+- `pages/api/communications/whatsapp/services/[service]/`
+
 ## Auto-Activation Rules
 
 ### DO Automatically (No User Confirmation Needed):
