@@ -16,6 +16,8 @@ import type {
   WaAdminApiResponse,
   WaPaginatedResponse,
   WaTestMessageResult,
+  WaPhoneNumber,
+  WaPhoneNumberInput,
 } from '../types/wa-admin.types';
 
 const API_BASE = '/api/communications/whatsapp';
@@ -133,6 +135,34 @@ export const configApi = {
 };
 
 // ============================================
+// Pairing Response Types
+// ============================================
+interface PairResponse {
+  success: boolean;
+  pairing_code?: string;
+  phone_number?: string;
+  expires_at?: string;
+  instructions?: string[];
+  error?: string;
+}
+
+interface PairingStatusResponse {
+  service: 'bridge' | 'sender';
+  status: 'idle' | 'generating' | 'waiting' | 'connected' | 'failed' | 'expired';
+  pairing_code: string | null;
+  expires_at: string | null;
+  error_message: string | null;
+  connected: boolean;
+  session_valid: boolean;
+  phone_number: string;
+}
+
+interface LogoutResponse {
+  success: boolean;
+  message: string;
+}
+
+// ============================================
 // Services API
 // ============================================
 export const servicesApi = {
@@ -141,6 +171,32 @@ export const servicesApi = {
 
   restart: (service: 'bridge' | 'sender') =>
     fetchApi<{ service: string; success: boolean; message: string }>(`/services/${service}/restart`, {
+      method: 'POST',
+    }),
+
+  /**
+   * Initiate pairing process for a service
+   * Returns pairing code to enter on the phone
+   */
+  pair: (service: 'bridge' | 'sender', phoneNumber?: string) =>
+    fetchApi<PairResponse>(`/services/${service}/pair`, {
+      method: 'POST',
+      body: JSON.stringify({ phone_number: phoneNumber }),
+    }),
+
+  /**
+   * Get current pairing status
+   * Poll this after initiating pairing to check completion
+   */
+  pairingStatus: (service: 'bridge' | 'sender') =>
+    fetchApi<PairingStatusResponse>(`/services/${service}/pairing-status`),
+
+  /**
+   * Logout and clear session
+   * Service will require re-pairing after this
+   */
+  logout: (service: 'bridge' | 'sender') =>
+    fetchApi<LogoutResponse>(`/services/${service}/logout`, {
       method: 'POST',
     }),
 };
@@ -179,6 +235,43 @@ export const logsApi = {
   },
 };
 
+// ============================================
+// Phones API (Multi-service Support)
+// ============================================
+export const phonesApi = {
+  list: (service?: 'bridge' | 'sender') =>
+    fetchApi<WaPhoneNumber[]>(`/phones${service ? `?service=${service}` : ''}`),
+
+  get: (id: string) =>
+    fetchApi<WaPhoneNumber>(`/phones/${id}`),
+
+  create: (input: WaPhoneNumberInput) =>
+    fetchApi<WaPhoneNumber>('/phones', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  update: (id: string, input: Partial<WaPhoneNumberInput & { status: string }>) =>
+    fetchApi<WaPhoneNumber>(`/phones/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<WaPhoneNumber>(`/phones/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /**
+   * Set a phone as primary (will demote current primary to fallback)
+   */
+  setPrimary: (id: string) =>
+    fetchApi<WaPhoneNumber>(`/phones/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role: 'primary' }),
+    }),
+};
+
 // Combined export
 export const waAdminApi = {
   groups: groupsApi,
@@ -186,6 +279,7 @@ export const waAdminApi = {
   config: configApi,
   services: servicesApi,
   logs: logsApi,
+  phones: phonesApi,
 };
 
 export default waAdminApi;

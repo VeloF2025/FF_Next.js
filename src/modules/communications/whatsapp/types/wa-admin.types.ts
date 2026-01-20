@@ -192,6 +192,36 @@ export interface WaTestMessageResult {
 }
 
 // ============================================
+// Phone Numbers (Multi-service Support)
+// ============================================
+export interface WaPhoneNumber {
+  id: string;
+  service: 'sender' | 'bridge';
+  phone_number: string;
+  display_name: string | null;
+  role: 'primary' | 'fallback';
+  status: 'active' | 'inactive' | 'paired' | 'unpaired';
+  last_paired_at: string | null;
+  last_disconnected_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WaPhoneNumberInput {
+  service: 'sender' | 'bridge';
+  phone_number: string;
+  display_name?: string;
+  role: 'primary' | 'fallback';
+}
+
+export interface WaServicePhoneConfig {
+  primary_phone: string;
+  fallback_phone: string;
+  auto_failover: boolean;
+  phones: WaPhoneNumber[];
+}
+
+// ============================================
 // Tab Types for UI
 // ============================================
 export type WaAdminTab = 'services' | 'groups' | 'templates' | 'logs' | 'settings';
