@@ -2,9 +2,12 @@
  * Communications section configuration
  */
 
-import { MessageSquare, Users, CheckCircle, ListTodo, Phone } from 'lucide-react';
+import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
+
+// PDFCraft URL - configured per environment
+const PDFCRAFT_URL = process.env.NEXT_PUBLIC_PDFCRAFT_URL || 'http://localhost:3007';
 
 export const communicationsSection: NavSection = {
   section: 'COMMUNICATIONS',
@@ -24,6 +27,14 @@ export const communicationsSection: NavSection = {
       label: 'WhatsApp Portal',
       shortLabel: 'WhatsApp',
       permissions: [Permission.SYSTEM_ADMIN], // Admin only
+    },
+    {
+      to: PDFCRAFT_URL,
+      icon: FileText,
+      label: 'PDF Tools',
+      shortLabel: 'PDF',
+      permissions: [],
+      external: true,
     },
     {
       to: '/meetings',

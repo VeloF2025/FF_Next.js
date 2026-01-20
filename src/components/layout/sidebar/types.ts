@@ -8,6 +8,7 @@ export interface NavItem {
   shortLabel: string;
   permissions: Permission[];
   subItems?: NavItem[];
+  external?: boolean; // Opens in new tab
 }
 
 export interface NavSection {

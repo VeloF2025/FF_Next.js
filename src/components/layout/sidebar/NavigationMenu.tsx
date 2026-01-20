@@ -114,43 +114,47 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
             >
             {section.items.map((item) => {
               // Only highlight the most specific match, not parent routes
-              const isActive = item.to === activeItemPath;
-              return (
-                <Link
-                  key={item.to}
-                  href={item.to}
-                  className={`flex items-center rounded-lg transition-all duration-200 relative group ${
-                    isCollapsed ? 'px-3 py-3 justify-center' : 'px-3 py-2 space-x-3'
-                  }`}
-                  style={{
-                    backgroundColor: isActive
-                      ? themeConfig.colors.primary[500]
-                      : 'transparent',
-                    color: isActive
-                      ? '#ffffff'
-                      : sidebarStyles.textColorSecondary
-                  }}
-                  title={isCollapsed ? item.label : undefined}
-                  onMouseEnter={(e) => {
-                    const navLink = e.currentTarget;
-                    if (!isActive) {
-                      navLink.style.backgroundColor = themeConfig.colors.surface.sidebarSecondary || themeConfig.colors.surface.secondary;
-                      navLink.style.color = sidebarStyles.textColor;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const navLink = e.currentTarget;
-                    if (!isActive) {
-                      navLink.style.backgroundColor = 'transparent';
-                      navLink.style.color = sidebarStyles.textColorSecondary;
-                    }
-                  }}
-                >
+              const isActive = !item.external && item.to === activeItemPath;
+
+              // Common props for both Link and anchor
+              const linkClassName = `flex items-center rounded-lg transition-all duration-200 relative group ${
+                isCollapsed ? 'px-3 py-3 justify-center' : 'px-3 py-2 space-x-3'
+              }`;
+              const linkStyle = {
+                backgroundColor: isActive
+                  ? themeConfig.colors.primary[500]
+                  : 'transparent',
+                color: isActive
+                  ? '#ffffff'
+                  : sidebarStyles.textColorSecondary
+              };
+              const handleMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
+                const navLink = e.currentTarget;
+                if (!isActive) {
+                  navLink.style.backgroundColor = themeConfig.colors.surface.sidebarSecondary || themeConfig.colors.surface.secondary;
+                  navLink.style.color = sidebarStyles.textColor;
+                }
+              };
+              const handleMouseLeave = (e: React.MouseEvent<HTMLElement>) => {
+                const navLink = e.currentTarget;
+                if (!isActive) {
+                  navLink.style.backgroundColor = 'transparent';
+                  navLink.style.color = sidebarStyles.textColorSecondary;
+                }
+              };
+
+              const linkContent = (
+                <>
                   <item.icon className={`${isCollapsed ? 'w-5 h-5' : 'w-5 h-5'} flex-shrink-0`} />
                   {!isCollapsed && (
                     <span className="text-sm font-medium truncate">{item.label}</span>
                   )}
-
+                  {/* External link indicator */}
+                  {!isCollapsed && item.external && (
+                    <svg className="w-3 h-3 ml-auto opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  )}
                   {/* Tooltip for collapsed sidebar */}
                   {isCollapsed && (
                     <div
@@ -161,9 +165,43 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
                         borderColor: themeConfig.colors.border.primary
                       }}
                     >
-                      {item.label}
+                      {item.label}{item.external ? ' ↗' : ''}
                     </div>
                   )}
+                </>
+              );
+
+              // External links use <a> with target="_blank"
+              if (item.external) {
+                return (
+                  <a
+                    key={item.to}
+                    href={item.to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={linkClassName}
+                    style={linkStyle}
+                    title={isCollapsed ? item.label : undefined}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    {linkContent}
+                  </a>
+                );
+              }
+
+              // Internal links use Next.js Link
+              return (
+                <Link
+                  key={item.to}
+                  href={item.to}
+                  className={linkClassName}
+                  style={linkStyle}
+                  title={isCollapsed ? item.label : undefined}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {linkContent}
                 </Link>
               );
             })}
