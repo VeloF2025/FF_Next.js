@@ -113,26 +113,35 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
     setError(null);
 
     try {
-      const response = await fetch('/api/activate/sync-oes-to-qfield', {
+      // Trigger the VPS sync webhook instead of direct API call
+      const response = await fetch('/api/activate/trigger-qfield-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          reportDate: reportDate,
-          statusFilter: 'Active', // Only sync active drops
+          force: true, // Force sync even if recently synced
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Sync to QFieldCloud failed');
+        throw new Error(result.error || 'Sync trigger failed');
       }
 
-      setQFieldSyncResult(result);
+      // Show success with webhook details
+      setQFieldSyncResult({
+        success: true,
+        message: 'QFieldCloud sync triggered successfully via VPS webhook',
+        totalPoints: importResult?.matched || 0,
+        ...result
+      });
+
+      // Show toast notification
+      toast.success('OES data sync to QFieldCloud started! Check QField app in 1-2 minutes.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sync to QFieldCloud');
+      setError(err instanceof Error ? err.message : 'Failed to trigger QFieldCloud sync');
     } finally {
       setIsSyncingToQField(false);
     }
