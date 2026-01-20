@@ -25,6 +25,15 @@ import {
   PhotoInput,
 } from '@/modules/activate/services/categorizationVlmService';
 import { fetchPhotosWithRetry } from '@/modules/activate/services/photoFetchService';
+import {
+  isSharePointDrSyncEnabled,
+  getSharePointDrConfig,
+  getAccessToken,
+  createDrFolderHierarchy,
+  getOrCreateSyncRecord,
+  updateSyncRecordFolder,
+} from '@/lib/sharepointDrSyncService';
+import type { DrFolderInfo } from '@/modules/activate/types/sharepoint.types';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -260,6 +269,66 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Mark as site submitted in drops table
       await markSiteSubmitted(dropNumber, senderPhone || null, project || expectedProject);
       log.info('ProcessNewDr', `Marked ${dropNumber} as site submitted`, { expectedProject });
+
+      // === SHAREPOINT FOLDER CREATION (Non-blocking) ===
+      // Create folder hierarchy in SharePoint when DR is submitted via WhatsApp
+      if (isSharePointDrSyncEnabled()) {
+        // Fire-and-forget: don't block the main flow
+        (async () => {
+          try {
+            const config = getSharePointDrConfig();
+            if (!config) {
+              log.debug('ProcessNewDr', 'SharePoint not configured, skipping folder creation');
+              return;
+            }
+
+            // Get or create sync record
+            const syncRecord = await getOrCreateSyncRecord(dropNumber, 'whatsapp');
+            if (!syncRecord) {
+              log.warn('SharePointSync', `Could not create sync record for ${dropNumber}`);
+              return;
+            }
+
+            // Skip if folder already exists
+            if (syncRecord.folder_created && syncRecord.folder_id) {
+              log.debug('SharePointSync', `Folder already exists for ${dropNumber}`);
+              return;
+            }
+
+            // Build folder info from drops table data
+            const folderInfo: DrFolderInfo = {
+              dropNumber,
+              project: syncRecord.project || expectedProject || 'Unknown',
+              zoneNo: syncRecord.zone_no,
+              ponNo: syncRecord.pon_no,
+              poleNumber: syncRecord.pole_number,
+            };
+
+            // Get access token and create folder hierarchy
+            const accessToken = await getAccessToken(config);
+            const result = await createDrFolderHierarchy(accessToken, config, folderInfo);
+
+            if (result.success && result.folderId && result.parentFolderIds) {
+              await updateSyncRecordFolder(
+                dropNumber,
+                result.folderId,
+                result.folderPath || '',
+                result.parentFolderIds
+              );
+              log.info('SharePointSync', `Created folder for ${dropNumber}`, {
+                folderPath: result.folderPath,
+              });
+            } else {
+              log.warn('SharePointSync', `Failed to create folder for ${dropNumber}`, {
+                error: result.error,
+              });
+            }
+          } catch (spError) {
+            // Non-blocking: log error but don't fail the main request
+            log.error('SharePointSync', `Error creating folder for ${dropNumber}`, spError);
+          }
+        })();
+      }
     } else {
       // STRICT MODE: Block DRs not found in drops table
       log.warn('ProcessNewDr', `DR ${dropNumber} not found in drops table - REJECTING`, {

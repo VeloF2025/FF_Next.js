@@ -374,6 +374,49 @@ export default async function handler(
         log.error('OESImport', 'Failed to call QField sync webhook', error);
       }
 
+      // === SHAREPOINT FOLDER VERIFICATION (Fire-and-forget) ===
+      // Ensure folders exist for all matched DRs after OES import
+      if (process.env.SHAREPOINT_DR_SYNC_ENABLED === 'true' && matched > 0) {
+        try {
+          // Get list of matched DR numbers for folder verification
+          const matchedDrNumbers = oesRows
+            .filter(row => dropsMap.has(row.drop_number))
+            .map(row => row.drop_number);
+
+          if (matchedDrNumbers.length > 0) {
+            log.info('OESImport', `Triggering SharePoint folder verification for ${matchedDrNumbers.length} DRs`);
+
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+            fetch(`${baseUrl}/api/activate/sharepoint-sync-batch`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'verify_folders',
+                dropNumbers: matchedDrNumbers.slice(0, 100) // Limit to first 100
+              })
+            })
+            .then(async (response) => {
+              if (response.ok) {
+                const result = await response.json();
+                log.info('OESImport', 'SharePoint folder verification triggered', {
+                  processed: result.data?.processed,
+                  succeeded: result.data?.succeeded,
+                  failed: result.data?.failed,
+                });
+              } else {
+                log.warn('OESImport', `SharePoint sync returned ${response.status}`);
+              }
+            })
+            .catch((error) => {
+              log.warn('OESImport', 'SharePoint sync failed (non-blocking)', error.message);
+            });
+          }
+        } catch (error) {
+          // Non-blocking - don't fail import if SharePoint sync fails
+          log.error('OESImport', 'Failed to trigger SharePoint folder verification', error);
+        }
+      }
+
       return res.status(200).json({
         success: true,
         totalRows: oesRows.length,
