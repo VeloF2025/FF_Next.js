@@ -87,6 +87,28 @@ Compact 2-row layout with inline status badges:
 | 4 | Final Decision | `/final-decision` | PASS / FAIL / REWORK + swap detection + auto-ticket |
 | 5 | Feedback | `/send-feedback` | Send WhatsApp feedback (technician-actionable only) |
 
+### Phase 4 Draft State (Jan 2026)
+
+**Prevents data loss when navigating back from Final Decision phase.**
+
+| Feature | Behavior |
+|---------|----------|
+| **Auto-save on Back** | Draft saved automatically when clicking "Back" button |
+| **Draft recovery** | State restored when returning to Phase 4 |
+| **Fields saved** | Decision, issue classification, internal notes, technician feedback |
+| **Final submit** | Clears draft flag and advances to Phase 5 |
+
+**Database columns (migration 095):**
+- `qa_decision_is_draft` - Boolean flag for draft vs finalized
+- `qa_internal_notes` - Internal QA team notes
+- `qa_technician_feedback` - Feedback for technician (sent via WhatsApp)
+- `qa_issue_classification` - JSONB with issue type, correct value, ticket flags
+
+**API behavior:**
+- `POST /final-decision` with `isDraft: true` → saves without advancing phase
+- `POST /final-decision` without `isDraft` → finalizes and advances to feedback
+- `GET /final-decision` → returns all draft fields including `issueClassification`
+
 ### QA Decision Values
 | Decision | Meaning |
 |----------|---------|
@@ -635,6 +657,10 @@ COALESCE(upr.project, p.project_name, 'Unknown') as project
 - `qa_decision` ('PASS' | 'FAIL' | 'REWORK_NEEDED')
 - `qa_decision_reasons` (JSONB array of fail codes)
 - `qa_decision_at`, `qa_decision_by`, `qa_decision_notes`
+- `qa_decision_is_draft` (boolean) - True if decision not yet finalized
+- `qa_internal_notes` (text) - Internal QA team notes
+- `qa_technician_feedback` (text) - Feedback for technician (WhatsApp)
+- `qa_issue_classification` (JSONB) - Issue type, correct value, ticket flags
 
 **Data Extraction:**
 - `vlm_power_meter_dbm`, `vlm_power_meter_status` ('pass' | 'fail_high' | 'fail_low')
@@ -848,13 +874,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3006
 ### QA Wizard (5-Phase)
 | File | Purpose |
 |------|---------|
-| `src/modules/activate/components/wizard/QaWizardContainer.tsx` | Wizard orchestrator |
+| `src/modules/activate/components/wizard/QaWizardContainer.tsx` | Wizard orchestrator (loads/passes draft data) |
 | `src/modules/activate/components/wizard/PrerequisitesPhase.tsx` | Phase 1 |
 | `src/modules/activate/components/wizard/PhotoReviewPhase.tsx` | Phase 2 |
 | `src/modules/activate/components/wizard/DataValidationPhase.tsx` | Phase 3 |
-| `src/modules/activate/components/wizard/FinalDecisionPhase.tsx` | Phase 4 |
+| `src/modules/activate/components/wizard/FinalDecisionPhase.tsx` | Phase 4 (draft save on Back, `initialData` prop) |
 | `src/modules/activate/components/wizard/FeedbackPhase.tsx` | Phase 5 |
 | `src/modules/activate/components/wizard/WizardProgressOverlay.tsx` | Progress spinner for 1Map sync & AI categorization |
+| `pages/api/activate/final-decision.ts` | Phase 4 API (supports `isDraft` parameter) |
 
 ### Progress Overlays (Jan 2026)
 | File | Purpose |
