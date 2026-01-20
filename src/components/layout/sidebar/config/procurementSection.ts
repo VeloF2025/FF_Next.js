@@ -20,6 +20,9 @@ import {
   Boxes,
   ArrowLeftRight,
   Package,
+  FolderTree,
+  PackagePlus,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -92,6 +95,13 @@ export const procurementSection: NavSection = {
 
     // Inventory
     {
+      to: '/procurement/stock-categories',
+      icon: FolderTree,
+      label: 'Stock Categories',
+      shortLabel: 'Cats',
+      permissions: []
+    },
+    {
       to: '/procurement/stock-items',
       icon: Boxes,
       label: 'Stock Items',
@@ -99,10 +109,24 @@ export const procurementSection: NavSection = {
       permissions: []
     },
     {
+      to: '/procurement/bundles',
+      icon: PackagePlus,
+      label: 'Bundles / Kits',
+      shortLabel: 'Kits',
+      permissions: []
+    },
+    {
       to: '/procurement/stock',
       icon: ArrowLeftRight,
       label: 'Stock Movement',
       shortLabel: 'Move',
+      permissions: []
+    },
+    {
+      to: '/procurement/stock-takes',
+      icon: ClipboardCheck,
+      label: 'Stock Takes',
+      shortLabel: 'Count',
       permissions: []
     },
     {

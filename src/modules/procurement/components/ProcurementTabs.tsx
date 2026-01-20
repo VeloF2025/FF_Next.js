@@ -57,12 +57,13 @@ export function ProcurementTabs({
   const isLoading = propIsLoading || context?.isLoading || false;
   
   // Define all available tabs with enhanced configuration
+  // All paths use /procurement/* (NOT /app/procurement/*) to match actual page routes
   const allTabs: ProcurementTab[] = useMemo(() => [
     {
       id: 'overview',
       label: 'Dashboard',
       icon: BarChart3,
-      path: '/app/procurement',
+      path: '/procurement',
       requiresProject: false
     },
     {
@@ -77,24 +78,24 @@ export function ProcurementTabs({
       id: 'boq',
       label: 'BOQ',
       icon: FileText,
-      path: '/app/procurement/boq',
-      requiresProject: true,
+      path: '/procurement/boq',
+      requiresProject: false,
       permission: 'canViewBOQ'
     },
-    { 
-      id: 'rfq', 
-      label: 'RFQ', 
-      icon: Send, 
-      path: '/app/procurement/rfq',
-      requiresProject: true,
+    {
+      id: 'rfq',
+      label: 'RFQ',
+      icon: Send,
+      path: '/procurement/rfq',
+      requiresProject: false,
       permission: 'canViewRFQ'
     },
-    { 
-      id: 'quotes', 
-      label: 'Quote Evaluation', 
-      icon: Quote, 
-      path: '/app/procurement/quotes',
-      requiresProject: true,
+    {
+      id: 'quotes',
+      label: 'Quote Evaluation',
+      icon: Quote,
+      path: '/procurement/rfq',  // Quotes are part of RFQ workflow
+      requiresProject: false,
       permission: 'canViewQuotes'
     },
     {
@@ -117,8 +118,8 @@ export function ProcurementTabs({
       id: 'stock',
       label: 'Stock Movement',
       icon: Package,
-      path: '/app/procurement/stock',
-      requiresProject: true,
+      path: '/procurement/stock',
+      requiresProject: false,
       permission: 'canAccessStock'
     },
     {
@@ -133,16 +134,16 @@ export function ProcurementTabs({
       id: 'suppliers',
       label: 'Suppliers',
       icon: Truck,
-      path: '/app/procurement/suppliers',
+      path: '/suppliers',  // Suppliers is at root /suppliers
       requiresProject: false,
       permission: 'canViewSuppliers'
     },
-    { 
-      id: 'reports', 
-      label: 'Reports', 
-      icon: ClipboardList, 
-      path: '/app/procurement/reports',
-      requiresProject: true,
+    {
+      id: 'reports',
+      label: 'Reports',
+      icon: ClipboardList,
+      path: '/procurement/reports',
+      requiresProject: false,
       permission: 'canAccessReports'
     }
   ], []);
@@ -184,10 +185,8 @@ export function ProcurementTabs({
     onTabChange(tab.id);
 
     // Navigate to the tab's path if it exists and differs from current path
-    // Use /procurement as base for 'overview' tab, otherwise use tab.path
-    const targetPath = tab.id === 'overview' ? '/procurement' : tab.path;
-    if (targetPath && !targetPath.startsWith('/app/') && router.pathname !== targetPath) {
-      router.push(targetPath);
+    if (tab.path && router.pathname !== tab.path) {
+      router.push(tab.path);
     }
   };
 
