@@ -242,11 +242,8 @@ export default async function handler(
         oes.current_ont_rx,
         oes.status,
         oes.latitude,
-        oes.longitude,
-        d.project,
-        d.zone
+        oes.longitude
       FROM oes_activations oes
-      LEFT JOIN drops d ON oes.drop_number = d.drop_number
       WHERE oes.latitude IS NOT NULL
         AND oes.longitude IS NOT NULL
         AND oes.latitude != 0
