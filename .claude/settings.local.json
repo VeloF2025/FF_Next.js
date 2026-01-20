@@ -362,7 +362,8 @@
       "Bash(scripts/migrations/run-migration-099.js )",
       "Bash(src/lib/sharepointDrSyncService.ts )",
       "Bash(src/modules/activate/types/sharepoint.types.ts)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "Bash(# Commit and push the fix\ngit add src/lib/sharepointDrSyncService.ts\ngit commit -m \"\"$\\(cat <<''EOF''\nfix\\(sharepoint\\): use correct column name project_name\n\nThe projects table has project_name, not name.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\"\"\n\ngit push origin master)"
     ],
     "deny": [],
     "ask": [],
