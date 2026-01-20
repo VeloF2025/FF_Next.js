@@ -1,0 +1,3 @@
+[submodule "tools/pdfcraft"]
+	path = tools/pdfcraft
+	url = https://github.com/PDFCraftTool/pdfcraft.git
