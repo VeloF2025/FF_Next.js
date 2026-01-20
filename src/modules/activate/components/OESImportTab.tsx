@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle, Loader2, Database, CloudCog } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ImportProgressOverlay, type ImportPhase } from './ImportProgressOverlay';
 
 interface OESRow {
   drop_number: string;
@@ -49,6 +50,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
     message: string;
     totalPoints?: number;
   } | null>(null);
+  const [importPhase, setImportPhase] = useState<ImportPhase | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -77,6 +79,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
 
   const parseExcel = async (file: File) => {
     setIsParsing(true);
+    setImportPhase('parsing');
     setError(null);
 
     try {
@@ -100,6 +103,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
     } finally {
       setIsParsing(false);
+      setImportPhase(null);
     }
   };
 
@@ -138,6 +142,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
     if (!file) return;
 
     setIsLoading(true);
+    setImportPhase('uploading');
     setError(null);
     setImportResult(null);
 
@@ -147,16 +152,26 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       formData.append('action', 'import');
       formData.append('reportDate', reportDate);
 
+      // Show processing phase after short delay
+      setTimeout(() => setImportPhase('processing'), 500);
+
       const response = await fetch('/api/activate/import-oes', {
         method: 'POST',
         body: formData,
       });
+
+      // Show syncing phase
+      setImportPhase('syncing');
 
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.error || 'Import failed');
       }
+
+      // Brief complete animation
+      setImportPhase('complete');
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       setImportResult(result);
 
@@ -214,6 +229,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       setError(err instanceof Error ? err.message : 'Import failed');
     } finally {
       setIsLoading(false);
+      setImportPhase(null);
     }
   };
 
@@ -233,6 +249,16 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Import Progress Overlay */}
+      <ImportProgressOverlay
+        isVisible={importPhase !== null}
+        phase={importPhase || 'parsing'}
+        title="OES Import"
+        recordCount={previewData.length || undefined}
+        showDatabaseSync={true}
+        showQFieldSync={true}
+      />
+
       {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">

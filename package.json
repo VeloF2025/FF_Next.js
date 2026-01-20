@@ -64,6 +64,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@ericblade/quagga2": "^1.12.1",
+    "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.3.0",
     "@livekit/components-react": "^2.9.17",
     "@livekit/components-styles": "^1.2.0",

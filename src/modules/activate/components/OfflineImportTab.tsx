@@ -12,6 +12,7 @@ import {
   WifiOff,
   Clock,
 } from 'lucide-react';
+import { ImportProgressOverlay, type ImportPhase } from './ImportProgressOverlay';
 
 interface OfflineRow {
   drop_number: string;
@@ -55,6 +56,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
   const [isParsing, setIsParsing] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importPhase, setImportPhase] = useState<ImportPhase | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -86,6 +88,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
 
   const parseExcel = async (file: File) => {
     setIsParsing(true);
+    setImportPhase('parsing');
     setError(null);
 
     try {
@@ -109,6 +112,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
     } finally {
       setIsParsing(false);
+      setImportPhase(null);
     }
   };
 
@@ -116,6 +120,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
     if (!file) return;
 
     setIsLoading(true);
+    setImportPhase('uploading');
     setError(null);
     setImportResult(null);
 
@@ -125,10 +130,16 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       formData.append('action', 'import');
       formData.append('reportDate', reportDate);
 
+      // Show processing phase after short delay
+      setTimeout(() => setImportPhase('processing'), 500);
+
       const response = await fetch('/api/activate/import-offline', {
         method: 'POST',
         body: formData,
       });
+
+      // Show syncing phase
+      setImportPhase('syncing');
 
       const result = await response.json();
 
@@ -136,11 +147,16 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
         throw new Error(result.error || 'Import failed');
       }
 
+      // Brief complete animation
+      setImportPhase('complete');
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       setImportResult(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
     } finally {
       setIsLoading(false);
+      setImportPhase(null);
     }
   };
 
@@ -164,7 +180,8 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
     return 'text-gray-600 dark:text-gray-400';
   };
 
-  const getBucketColor = (bucket: string) => {
+  const getBucketColor = (bucket: string | undefined | null) => {
+    if (!bucket) return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     if (bucket.includes('Less than 20')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
     if (bucket.includes('20') || bucket.includes('40')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
     return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
@@ -172,6 +189,16 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Import Progress Overlay */}
+      <ImportProgressOverlay
+        isVisible={importPhase !== null}
+        phase={importPhase || 'parsing'}
+        title="ARCH Import"
+        recordCount={previewData?.totalRows || undefined}
+        showDatabaseSync={true}
+        showQFieldSync={false}
+      />
+
       {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -296,8 +323,8 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                 {'>'} 20 Days Offline
               </div>
               <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
-                {Object.entries(previewData.bucketSummary)
-                  .filter(([k]) => !k.includes('Less than 20'))
+                {Object.entries(previewData.bucketSummary || {})
+                  .filter(([k]) => k && !k.includes('Less than 20'))
                   .reduce((a, [, v]) => a + v, 0)
                   .toLocaleString()}
               </p>
@@ -308,7 +335,8 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <h4 className="font-medium text-gray-900 dark:text-white mb-3">Offline Duration Breakdown</h4>
             <div className="space-y-2">
-              {Object.entries(previewData.bucketSummary)
+              {Object.entries(previewData.bucketSummary || {})
+                .filter(([k]) => k != null)
                 .sort((a, b) => b[1] - a[1])
                 .map(([bucket, count]) => (
                   <div key={bucket} className="flex items-center justify-between">
