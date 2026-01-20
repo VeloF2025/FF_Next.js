@@ -15,6 +15,7 @@ import {
   Users,
   Fuel,
   Trophy,
+  ClipboardList,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -84,6 +85,13 @@ export const fleetSection: NavSection = {
       icon: ScanLine,
       label: 'Vehicle Portal',
       shortLabel: 'Portal',
+      permissions: [],
+    },
+    {
+      to: '/fleet/check-in/audit',
+      icon: ClipboardList,
+      label: 'Check-In Audit',
+      shortLabel: 'Audit',
       permissions: [],
     },
   ],
