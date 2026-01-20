@@ -8,6 +8,18 @@ Skills are automatically loaded when relevant keywords or contexts are detected.
 
 ---
 
+## Knowledge Base Skills
+
+### `knowledge-base/SKILL.md`
+**Trigger:** kb, KB, /kb, update kb, refresh knowledge, scan modules, sync knowledge
+- Scan source modules for missing `.claude.md` files
+- Update module index and skills index
+- Consolidate learnings from `.claude-learnings.md` files
+- Update session state
+- Generate summary report
+
+---
+
 ## Infrastructure Skills
 
 ### `infrastructure/vlm.md`
