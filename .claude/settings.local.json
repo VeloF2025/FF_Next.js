@@ -340,7 +340,9 @@
       "Bash(src/services/procurement/rfq/core/RfqQueryService.ts )",
       "Bash(src/services/procurement/rfq/rfqCrud.ts )",
       "Bash(docs/wa-monitor/WHATSAPP_ARCHITECTURE.md)",
-      "Bash(./deploy.sh:*)"
+      "Bash(./deploy.sh:*)",
+      "Bash(rsync:*)",
+      "Bash(tar czf:*)"
     ],
     "deny": [],
     "ask": [],

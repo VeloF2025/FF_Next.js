@@ -64,6 +64,8 @@ interface UnifiedDrop {
   is_activated: boolean;
   // OES activation date (when activated on Nokia OES)
   oes_activation_date: string | null;
+  // OES import timestamp (when OES report was imported)
+  oes_imported_at: string | null;
   // Maintenance ticket (referred to maintenance)
   has_maintenance_ticket: boolean;
   maintenance_ticket_uid: string | null;
@@ -266,6 +268,7 @@ async function getPaginatedDrops(
       COALESCE(u.submission_count, 1) > 1 as is_resubmission,
       (u.submission_history->0->>'photo_count')::int as previous_photo_count,
       oes.activation_date as oes_activation_date,
+      oes.imported_at as oes_imported_at,
       EXISTS (
         SELECT 1 FROM oes_activations oes2
         WHERE oes2.drop_number = u.drop_number
@@ -325,6 +328,7 @@ async function getDropById(id: string): Promise<UnifiedDrop | null> {
       COALESCE(u.submission_count, 1) > 1 as is_resubmission,
       (u.submission_history->0->>'photo_count')::int as previous_photo_count,
       oes.activation_date as oes_activation_date,
+      oes.imported_at as oes_imported_at,
       EXISTS (
         SELECT 1 FROM oes_activations oes2
         WHERE oes2.drop_number = u.drop_number
@@ -364,6 +368,7 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
       COALESCE(u.submission_count, 1) > 1 as is_resubmission,
       (u.submission_history->0->>'photo_count')::int as previous_photo_count,
       oes.activation_date as oes_activation_date,
+      oes.imported_at as oes_imported_at,
       EXISTS (
         SELECT 1 FROM oes_activations oes2
         WHERE oes2.drop_number = u.drop_number

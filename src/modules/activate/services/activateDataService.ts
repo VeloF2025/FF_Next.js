@@ -77,6 +77,8 @@ export interface DrListItem {
   qaDecision: QaDecision | null;
   /** OES activation date (when activated on Nokia OES) */
   oesActivationDate: string | null;
+  /** OES import timestamp (when OES report was imported) */
+  oesImportedAt: string | null;
 
   // Serial Validation (new fields)
   /** ONT serial validation status */
@@ -294,6 +296,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
       qaPhase: drop.qa_phase || null,
       qaDecision: drop.qa_decision || null,
       oesActivationDate: drop.oes_activation_date || null,
+      oesImportedAt: drop.oes_imported_at || null,
 
       // Serial Validation
       ontSerialStatus: calculateSerialStatus(ontSerial, 'ont', upsSerial),

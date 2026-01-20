@@ -886,7 +886,10 @@ function QaCentrePageContent() {
                         <span className="text-blue-400/70 text-[9px]">
                           {formatTime(drop.waReceivedAt)}
                         </span>
-                        <span></span>
+                        {/* OES Import Time (below Activated date) */}
+                        <span className="text-green-400/70 text-[9px]">
+                          {formatTime(drop.oesImportedAt)}
+                        </span>
                         <span></span>
                         {/* RIGHT: Serials */}
                         <div className="flex items-center justify-end gap-4 font-mono text-[10px]">
