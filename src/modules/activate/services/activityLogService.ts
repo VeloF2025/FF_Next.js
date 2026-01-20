@@ -382,7 +382,7 @@ export async function getActivityTimeline(
         serial_swap_corrected_at,
         last_resubmitted_at,
         photo_count,
-        submitter_id,
+        sender_phone,
         project
       FROM dr_photo_unified_reviews
       WHERE drop_number = ${drNumber}
@@ -401,11 +401,11 @@ export async function getActivityTimeline(
           timestamp: new Date(dr.wa_received_at),
           eventType: 'whatsapp_submitted',
           title: '📱 DR Submitted via WhatsApp',
-          description: dr.submitter_id ? `From ${dr.submitter_id}` : 'Received via WhatsApp',
+          description: dr.sender_phone ? `From ${dr.sender_phone}` : 'Received via WhatsApp',
           icon: '📱',
           iconColor: 'text-green-500',
           actor: 'whatsapp',
-          metadata: { source: 'dr_record', submitter: dr.submitter_id },
+          metadata: { source: 'dr_record', sender: dr.sender_phone },
         });
       }
 
