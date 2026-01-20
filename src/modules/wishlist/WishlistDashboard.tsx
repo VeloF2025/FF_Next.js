@@ -8,6 +8,7 @@ import { Plus, RefreshCw, BarChart3, Settings } from 'lucide-react';
 import { useWishlist } from './hooks/useWishlist';
 import { WishlistKanban } from './components/WishlistKanban';
 import { WishlistAnalytics } from './components/WishlistAnalytics';
+import { WishlistSettings } from './components/WishlistSettings';
 import { AddWishlistItemModal } from './components/AddWishlistItemModal';
 import { AttachmentsModal } from './components/AttachmentsModal';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
@@ -219,13 +220,10 @@ export function WishlistDashboard() {
           )}
 
           {activeTab === 'settings' && (
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6">
-              <h3 className="text-lg font-medium mb-4">Wishlist Settings</h3>
-              <p className="text-[var(--ff-text-secondary)]">
-                Configure wishlist board settings and preferences.
-              </p>
-              {/* TODO: Add settings configuration */}
-            </div>
+            <WishlistSettings
+              columns={board.columns}
+              onColumnsUpdated={refetch}
+            />
           )}
         </div>
 

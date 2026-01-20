@@ -198,6 +198,36 @@ class WishlistService {
       throw error;
     }
   }
+
+  /**
+   * Update column settings (WIP limits, names, positions)
+   */
+  async updateColumns(columns: Array<{
+    id: string;
+    name: string;
+    color: string;
+    wip_limit: number | null;
+    position: number;
+    isNew?: boolean;
+  }>): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/columns`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ columns }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update columns');
+      }
+    } catch (error) {
+      log.error('Error updating columns:', error, 'WishlistService');
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
