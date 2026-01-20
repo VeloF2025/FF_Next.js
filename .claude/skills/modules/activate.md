@@ -501,6 +501,20 @@ Extract serial with: `/\(S\)([^(]+)/`
 | `/api/activate/process-new-dr` | POST | Process new DR from WhatsApp |
 | `/api/activate/send-feedback` | POST | Phase 5: Send WA feedback |
 
+### Maintenance Integration (Jan 2026)
+**Ticket creation from Activate reports uses proper source tracking:**
+
+| Report | Ticket Source | Use Case |
+|--------|--------------|----------|
+| Offline Devices (ARCH) | `offline_report` | Create tickets from offline device report |
+| QA Centre | `qa_review` | Create tickets from QA review failures |
+| Serial Swap | `ont_swap` | Auto-created when serials swapped |
+
+**URL Format:** `/maintenance/tickets/new?source=offline_report&dr_number=DR123&title=...`
+
+See `src/modules/maintenance/types/ticket.ts` for all `TicketSource` enum values:
+- `qcontact`, `weekly_report`, `construction`, `ad_hoc`, `incident`, `revenue`, `ont_swap`, `manual`, `offline_report`, `qa_review`
+
 ### Reporting (8 Types)
 | Endpoint | Method | Purpose |
 |----------|--------|---------|

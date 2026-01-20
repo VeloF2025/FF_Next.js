@@ -133,6 +133,45 @@ export default function TicketsPage() {
 
 ---
 
+## Ticket Sources
+
+Tickets in FibreFlow can originate from multiple sources. The `source` field tracks where each ticket was created:
+
+| Source | Enum Value | Description |
+|--------|------------|-------------|
+| **QContact** | `qcontact` | Synced from QContact ticketing system |
+| **Weekly Report** | `weekly_report` | Imported from weekly Excel reports |
+| **Construction** | `construction` | Construction-related issues |
+| **Ad Hoc** | `ad_hoc` | One-off requests |
+| **Incident** | `incident` | Incident reports |
+| **Revenue** | `revenue` | Revenue/billing related |
+| **ONT Swap** | `ont_swap` | ONT device swap requests |
+| **Manual** | `manual` | Manually created via UI |
+| **Offline Report** | `offline_report` | From Activate → Offline Devices (ARCH) report |
+| **QA Review** | `qa_review` | From QA Centre review process |
+
+### Source-Specific Ticket Creation
+
+When creating tickets from specific modules, always use the appropriate source:
+
+```typescript
+// From Offline Devices report (Activate module)
+const ticketUrl = `/maintenance/tickets/new?source=offline_report&title=...`;
+
+// From QA Centre review
+const ticketUrl = `/maintenance/tickets/new?source=qa_review&dr_number=...`;
+
+// Manually created from UI
+const ticketUrl = `/maintenance/tickets/new?source=manual`;
+```
+
+This enables:
+- **Analytics**: Track ticket volumes by source
+- **Workflow**: Apply source-specific business rules
+- **Reporting**: Filter tickets by origin for targeted reports
+
+---
+
 ## Database Schema
 
 ### Core Tables (8)
@@ -302,6 +341,6 @@ For questions or issues:
 
 ---
 
-**Last Updated:** 2025-12-27
+**Last Updated:** 2026-01-20
 **Current Phase:** Phase 1 - Foundation
 **Next Milestone:** Complete basic ticket CRUD operations
