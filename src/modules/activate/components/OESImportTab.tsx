@@ -41,8 +41,14 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
   const [previewData, setPreviewData] = useState<OESRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isSyncingToQField, setIsSyncingToQField] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [qfieldSyncResult, setQFieldSyncResult] = useState<{
+    success: boolean;
+    message: string;
+    totalPoints?: number;
+  } | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -94,6 +100,37 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
     } finally {
       setIsParsing(false);
+    }
+  };
+
+  const syncToQFieldCloud = async () => {
+    setIsSyncingToQField(true);
+    setQFieldSyncResult(null);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/activate/sync-oes-to-qfield', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reportDate: reportDate,
+          statusFilter: 'Active', // Only sync active drops
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Sync to QFieldCloud failed');
+      }
+
+      setQFieldSyncResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync to QFieldCloud');
+    } finally {
+      setIsSyncingToQField(false);
     }
   };
 
@@ -434,12 +471,59 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                   </ul>
                 </div>
               )}
-              <button
-                onClick={() => resetForm(true)}
-                className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                Import Another File
-              </button>
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => resetForm(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Import Another File
+                </button>
+                <button
+                  onClick={syncToQFieldCloud}
+                  disabled={isSyncingToQField}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700
+                             disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSyncingToQField ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Syncing to QFieldCloud...
+                    </>
+                  ) : (
+                    <>
+                      📍 Sync to QFieldCloud Map
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QFieldCloud Sync Result */}
+      {qfieldSyncResult && (
+        <div className={`${qfieldSyncResult.success ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}
+                        border rounded-lg p-4 mt-4`}>
+          <div className="flex items-start gap-3">
+            {qfieldSyncResult.success ? (
+              <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
+            ) : (
+              <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            )}
+            <div>
+              <p className={`font-medium ${qfieldSyncResult.success ? 'text-blue-800 dark:text-blue-300' : 'text-red-800 dark:text-red-300'}`}>
+                {qfieldSyncResult.message}
+              </p>
+              {qfieldSyncResult.totalPoints && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {qfieldSyncResult.totalPoints} drop locations synced to QFieldCloud as "OES Report" layer with DR number labels
+                </p>
+              )}
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                ✓ Points display with drop numbers visible on map<br/>
+                ✓ Data available in QField mobile app after sync
+              </p>
             </div>
           </div>
         </div>
