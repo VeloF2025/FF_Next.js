@@ -24,6 +24,7 @@ import {
   Download,
   WifiOff,
   Repeat,
+  FileWarning,
 } from 'lucide-react';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
@@ -35,6 +36,7 @@ import { TeamReports } from './TeamReports';
 import { FunnelReports } from './FunnelReports';
 import { OfflineDevicesReports } from './OfflineDevicesReports';
 import { SerialSwapReports } from './SerialSwapReports';
+import { SerialMismatchReports } from './SerialMismatchReports';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -79,6 +81,12 @@ const categories: CategoryTab[] = [
     label: 'Serial Swaps',
     icon: Repeat,
     description: 'ONT/UPS serials in wrong 1Map fields - pending correction',
+  },
+  {
+    id: 'mismatches',
+    label: 'Serial Mismatches',
+    icon: FileWarning,
+    description: 'Installation serial differs from activation serial - potential replacement or theft',
   },
 ];
 
@@ -319,6 +327,9 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'swaps' && (
           <SerialSwapReports filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'mismatches' && (
+          <SerialMismatchReports filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>

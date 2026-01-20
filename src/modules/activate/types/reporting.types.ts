@@ -417,7 +417,125 @@ export type ReportCategory =
   | 'team'
   | 'funnel'
   | 'offline'
-  | 'swaps';
+  | 'swaps'
+  | 'mismatches';
+
+// ============================================================================
+// SERIAL MISMATCH TRACKING TYPES (Installation vs Activation)
+// ============================================================================
+
+/**
+ * Mismatch investigation status
+ */
+export type MismatchStatus =
+  | 'pending_investigation'  // Detected, needs investigation
+  | 'ticket_created'         // Maintenance ticket created
+  | 'resolved'               // Issue resolved
+  | 'false_positive';        // Detection was incorrect
+
+/**
+ * Resolution type for mismatches
+ */
+export type MismatchResolution =
+  | 'ont_replaced'      // ONT was legitimately replaced
+  | 'data_corrected'    // Data entry error fixed
+  | 'theft_confirmed'   // Unauthorized swap confirmed
+  | 'false_alarm'       // No actual mismatch
+  | 'other';            // Other resolution
+
+/**
+ * Individual serial mismatch record
+ */
+export interface SerialMismatchRecord {
+  /** Unique ID */
+  id: string;
+  /** DR number */
+  drop_number: string;
+  /** Zone */
+  zone: string | null;
+  /** PON */
+  pon: string | null;
+  /** Address */
+  address: string | null;
+
+  /** Current serial (from offline report) - may be different ONT */
+  current_serial: string;
+  /** Expected/Original serial (from OES activation) */
+  expected_serial: string;
+  /** Mismatch type */
+  mismatch_type: string;
+
+  /** Investigation status */
+  status: MismatchStatus;
+  /** Resolution type */
+  resolution: MismatchResolution | null;
+  /** Investigation notes */
+  notes: string | null;
+
+  /** Associated maintenance ticket ID */
+  ticket_id: string | null;
+  /** Ticket status (if exists) */
+  ticket_status: string | null;
+
+  /** Activation date from OES */
+  activation_date: string | null;
+  /** Installation team from OES (critical for accountability) */
+  installation_team: string | null;
+  /** Last offline event */
+  last_inform_date: string | null;
+  /** Days since last inform */
+  days_offline: number;
+  /** Last down reason */
+  down_reason: string | null;
+
+  /** Days since mismatch detected */
+  days_pending: number;
+  /** Investigated at */
+  investigated_at: string | null;
+  /** Resolved at */
+  resolved_at: string | null;
+}
+
+/**
+ * Serial mismatch report summary
+ */
+export interface SerialMismatchSummary {
+  /** Total mismatches */
+  total: number;
+  /** Pending investigation */
+  pending_investigation: number;
+  /** Ticket created */
+  ticket_created: number;
+  /** Resolved */
+  resolved: number;
+  /** False positives */
+  false_positive: number;
+  /** Breakdown by zone */
+  by_zone: Record<string, number>;
+  /** Breakdown by down reason */
+  by_reason: Record<string, number>;
+  /** Breakdown by installation team (critical for accountability) */
+  by_team?: Record<string, number>;
+}
+
+/**
+ * Serial mismatch report API response
+ */
+export interface SerialMismatchReportResponse {
+  /** Summary statistics */
+  summary: SerialMismatchSummary;
+  /** Mismatch records */
+  records: SerialMismatchRecord[];
+  /** Total count */
+  total_count: number;
+  /** Pagination */
+  page: number;
+  page_size: number;
+  /** Available statuses */
+  available_statuses: MismatchStatus[];
+  /** Available resolutions */
+  available_resolutions: MismatchResolution[];
+}
 
 // ============================================================================
 // SERIAL SWAP TRACKING TYPES
