@@ -93,7 +93,7 @@ export default async function handler(
 
     // Query all relevant tables in parallel
     const [unifiedResult, oesResult, dropsResult, qaResult] = await Promise.all([
-      // Main unified review data
+      // Main unified review data (including resubmission fields)
       pool.query(
         `SELECT
            drop_number,
@@ -110,7 +110,9 @@ export default async function handler(
            reviewed_at,
            reviewed_by,
            created_at,
-           updated_at
+           updated_at,
+           submission_count,
+           (submission_history->0->>'photo_count')::int as previous_photo_count
          FROM dr_photo_unified_reviews
          WHERE drop_number = $1`,
         [dropNumber]
@@ -244,12 +246,19 @@ export default async function handler(
       },
 
       photoPreview,
+
+      // Resubmission tracking (Jan 2026)
+      submission_count: unified?.submission_count || 1,
+      is_resubmission: (unified?.submission_count || 1) > 1,
+      previous_photo_count: unified?.previous_photo_count || null,
+      feedback_message: unified?.feedback_message || null,
     };
 
     log.info('DRSummary', `Summary fetched for ${dropNumber}`, {
       state: currentState,
       photoCount,
       stepsComplete,
+      isResubmission: (unified?.submission_count || 1) > 1,
     });
 
     return apiResponse.success(res, summary);

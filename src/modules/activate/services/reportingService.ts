@@ -804,7 +804,7 @@ export async function getTrendAnalysisReport(
     );
 
     // Get per-project breakdown (only when no project filter)
-    let projectBreakdown: Map<string, Map<string, { installed: number; activated: number; reviewed: number; notReviewed: number }>> = new Map();
+    const projectBreakdown: Map<string, Map<string, { installed: number; activated: number; reviewed: number; notReviewed: number }>> = new Map();
     let availableProjects: string[] = [];
 
     if (!project) {

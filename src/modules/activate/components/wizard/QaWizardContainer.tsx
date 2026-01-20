@@ -129,6 +129,13 @@ export function QaWizardContainer({
   const [syncPhase, setSyncPhase] = useState<Sync1MapPhase | null>(null);
   // Initial decision data from draft save (for Phase 4)
   const [initialDecisionData, setInitialDecisionData] = useState<InitialDecisionData | null>(null);
+  // Resubmission tracking (Jan 2026)
+  const [resubmissionInfo, setResubmissionInfo] = useState<{
+    isResubmission: boolean;
+    submissionCount: number;
+    previousPhotoCount: number | null;
+    previousFeedback: string | null;
+  } | null>(null);
 
   // Load initial state from API
   useEffect(() => {
@@ -161,6 +168,32 @@ export function QaWizardContainer({
           setDataStatus('Partial data available - some items may be missing');
           log.warn('QaWizard', `Partial data for ${dropNumber}`, ensureResult);
         }
+      }
+
+      // Fetch resubmission info from summary API (includes feedback_message)
+      try {
+        const drResponse = await fetch(`/api/activate/summary?dropNumber=${encodeURIComponent(dropNumber)}`);
+        if (drResponse.ok) {
+          const drData = await drResponse.json();
+          if (drData.success && drData.data) {
+            const dr = drData.data;
+            if (dr.is_resubmission || (dr.submission_count && dr.submission_count > 1)) {
+              setResubmissionInfo({
+                isResubmission: true,
+                submissionCount: dr.submission_count || 2,
+                previousPhotoCount: dr.previous_photo_count || null,
+                previousFeedback: dr.feedback_message || null,
+              });
+              log.info('QaWizard', `Resubmission detected for ${dropNumber}`, {
+                submissionCount: dr.submission_count,
+                previousPhotoCount: dr.previous_photo_count,
+                hasPreviousFeedback: !!dr.feedback_message,
+              });
+            }
+          }
+        }
+      } catch {
+        log.warn('QaWizard', `Could not fetch resubmission info for ${dropNumber}`);
       }
 
       setSyncPhase('checking');
@@ -565,6 +598,46 @@ export function QaWizardContainer({
     }
   };
 
+  // Render resubmission banner
+  const renderResubmissionBanner = () => {
+    if (!resubmissionInfo?.isResubmission) return null;
+
+    return (
+      <div className="mx-3 mt-3 mb-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">🔄</span>
+          <div className="flex-1">
+            <h4 className="font-semibold text-orange-800 dark:text-orange-200 mb-1">
+              Resubmission #{resubmissionInfo.submissionCount}
+            </h4>
+            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              {resubmissionInfo.previousPhotoCount !== null && (
+                <p>
+                  <span className="font-medium">Photos:</span>{' '}
+                  {resubmissionInfo.previousPhotoCount} → {state.prerequisites.photoCount}
+                  {state.prerequisites.photoCount > resubmissionInfo.previousPhotoCount && (
+                    <span className="text-green-600 dark:text-green-400 ml-1">
+                      (+{state.prerequisites.photoCount - resubmissionInfo.previousPhotoCount})
+                    </span>
+                  )}
+                </p>
+              )}
+              {resubmissionInfo.previousFeedback && (
+                <div className="mt-2 p-2 bg-orange-100 dark:bg-orange-900/30 rounded text-xs">
+                  <span className="font-medium">Previous feedback:</span>
+                  <p className="mt-1 italic whitespace-pre-wrap">{resubmissionInfo.previousFeedback}</p>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+              ⚠️ Please verify the technician has addressed the previous feedback.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
       {/* 1Map Sync Progress Overlay */}
@@ -575,6 +648,9 @@ export function QaWizardContainer({
         dropNumber={dropNumber}
         photoCount={state.prerequisites.photoCount || undefined}
       />
+
+      {/* Resubmission Banner */}
+      {renderResubmissionBanner()}
 
       {/* Compact phase indicator */}
       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">

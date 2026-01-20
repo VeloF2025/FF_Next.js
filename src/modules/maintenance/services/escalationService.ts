@@ -221,7 +221,7 @@ function generateTicketContent(escalation: RepeatFaultEscalation): {
   let title: string;
   let description: string;
   let scopeField: string | null = null;
-  let actionType = escalation_type || EscalationType.INVESTIGATION;
+  const actionType = escalation_type || EscalationType.INVESTIGATION;
 
   // Capitalize action type for title
   const actionLabel = actionType.charAt(0).toUpperCase() + actionType.slice(1);

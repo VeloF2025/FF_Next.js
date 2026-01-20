@@ -414,7 +414,7 @@ export class WorkflowTemplateService {
       limit: 50
     });
 
-    let scored = templates.templates.map(template => {
+    const scored = templates.templates.map(template => {
       let score = 0;
 
       // Base score from usage

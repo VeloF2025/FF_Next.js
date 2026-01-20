@@ -20,8 +20,8 @@ export class BOQCrud {
    */
   static async getAll(filter?: { projectId?: string; status?: BOQStatusType }): Promise<BOQ[]> {
     try {
-      let conditions = [];
-      let params: any[] = [];
+      const conditions = [];
+      const params: any[] = [];
       let paramCount = 1;
 
       if (filter?.projectId) {

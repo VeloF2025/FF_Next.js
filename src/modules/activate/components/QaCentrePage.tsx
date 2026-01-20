@@ -442,7 +442,7 @@ function QaCentrePageContent() {
   );
 
   const hasActiveFilters = filters.searchTerm || filters.dateFrom || filters.dateTo ||
-    filters.statusFilter !== 'all' || filters.qaStatusFilter !== 'all' || filters.serialStatusFilter !== 'all' || filters.projectFilter !== 'all';
+    filters.statusFilter !== 'all' || filters.qaStatusFilter !== 'all' || filters.serialStatusFilter !== 'all' || filters.projectFilter !== 'all' || filters.resubmissionsOnly;
 
   if (error) {
     return (
@@ -672,6 +672,22 @@ function QaCentrePageContent() {
                   </select>
                 </div>
 
+                {/* Resubmissions Only Checkbox */}
+                <div className="md:col-span-6 flex items-center gap-4 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.resubmissionsOnly}
+                      onChange={(e) => updateFilter('resubmissionsOnly', e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                      <span className="text-base">🔄</span>
+                      Show Resubmissions Only
+                    </span>
+                  </label>
+                </div>
+
                 {/* Clear Filters Button */}
                 {hasActiveFilters && (
                   <div className="md:col-span-6 flex justify-end">
@@ -803,9 +819,14 @@ function QaCentrePageContent() {
                           <ProjectBadge project={drop.project} />
                         </span>
 
-                        {/* DR Number */}
-                        <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                        {/* DR Number with Resubmission Badge */}
+                        <span className="font-bold text-sm text-gray-900 dark:text-white truncate flex items-center gap-1">
                           {drop.dropNumber}
+                          {drop.isResubmission && (
+                            <span className="text-base" title={`Submission #${drop.submissionCount} (was ${drop.previousPhotoCount || 0} photos)`}>
+                              🔄
+                            </span>
+                          )}
                         </span>
 
                         {/* Installed Date */}

@@ -28,8 +28,8 @@ export class RFQCrud {
     supplierId?: string 
   }): Promise<RFQ[]> {
     try {
-      let conditions = [];
-      let params: any[] = [];
+      const conditions = [];
+      const params: any[] = [];
       let paramCount = 1;
 
       if (filter?.projectId) {

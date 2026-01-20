@@ -21,8 +21,8 @@ export class RfqQueryService {
     limit?: number;
   }): Promise<{ rfqs: RFQ[], total: number }> {
     try {
-      let conditions = [];
-      let params: any[] = [];
+      const conditions = [];
+      const params: any[] = [];
 
       if (filter?.projectId) {
         conditions.push(`project_id = $${params.length + 1}`);
@@ -106,7 +106,7 @@ export class RfqQueryService {
   static async getStatistics(projectId?: string): Promise<any> {
     try {
       let whereClause = '';
-      let params: any[] = [];
+      const params: any[] = [];
 
       if (projectId) {
         whereClause = 'WHERE project_id = $1';
@@ -155,7 +155,7 @@ export class RfqQueryService {
   static async search(keyword: string, projectId?: string): Promise<RFQ[]> {
     try {
       let whereClause = `WHERE (title ILIKE $1 OR rfq_number ILIKE $1 OR description ILIKE $1)`;
-      let params: any[] = [`%${keyword}%`];
+      const params: any[] = [`%${keyword}%`];
 
       if (projectId) {
         whereClause += ` AND project_id = $2`;

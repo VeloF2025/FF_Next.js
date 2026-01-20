@@ -20,7 +20,7 @@ export class KPIAnalyticsService {
       const kpis = await analyticsApi.getKPIs();
       
       // Filter by parameters if provided
-      let filteredKPIs = kpis;
+      const filteredKPIs = kpis;
       if (projectId || dateFrom || dateTo) {
         // API doesn't support these filters yet, so we'll return all KPIs
         // In a real implementation, these would be passed to the API

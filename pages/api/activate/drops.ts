@@ -67,6 +67,10 @@ interface UnifiedDrop {
   // Maintenance ticket (referred to maintenance)
   has_maintenance_ticket: boolean;
   maintenance_ticket_uid: string | null;
+  // Resubmission tracking (Jan 2026)
+  submission_count: number;
+  is_resubmission: boolean;
+  previous_photo_count: number | null;
 }
 
 interface ProjectStats {
@@ -151,6 +155,7 @@ async function getPaginatedDrops(
     status?: string;
     qaStatus?: string;
     serialStatus?: string;
+    resubmissionsOnly?: boolean;
   }
 ): Promise<{ drops: UnifiedDrop[]; pagination: any }> {
   const offset = (page - 1) * pageSize;
@@ -244,6 +249,11 @@ async function getPaginatedDrops(
     )`);
   }
 
+  // Resubmission filter - DRs that have been submitted more than once
+  if (filters?.resubmissionsOnly) {
+    conditions.push('u.submission_count > 1');
+  }
+
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // Build queries - serials are in dr_photo_unified_reviews (synced from 1Map)
@@ -252,6 +262,9 @@ async function getPaginatedDrops(
     SELECT u.*,
       u.qa_phase,
       u.qa_decision,
+      u.submission_count,
+      COALESCE(u.submission_count, 1) > 1 as is_resubmission,
+      (u.submission_history->0->>'photo_count')::int as previous_photo_count,
       oes.activation_date as oes_activation_date,
       EXISTS (
         SELECT 1 FROM oes_activations oes2
@@ -282,6 +295,9 @@ async function getPaginatedDrops(
     is_complete: isDropComplete(row),
     steps_completed: countCompletedSteps(row),
     steps_total: 10,
+    submission_count: row.submission_count || 1,
+    is_resubmission: row.is_resubmission || false,
+    previous_photo_count: row.previous_photo_count || null,
   }));
 
   return {
@@ -305,6 +321,9 @@ async function getDropById(id: string): Promise<UnifiedDrop | null> {
     `SELECT u.*,
       u.qa_phase,
       u.qa_decision,
+      u.submission_count,
+      COALESCE(u.submission_count, 1) > 1 as is_resubmission,
+      (u.submission_history->0->>'photo_count')::int as previous_photo_count,
       oes.activation_date as oes_activation_date,
       EXISTS (
         SELECT 1 FROM oes_activations oes2
@@ -327,6 +346,9 @@ async function getDropById(id: string): Promise<UnifiedDrop | null> {
     is_complete: isDropComplete(row),
     steps_completed: countCompletedSteps(row),
     steps_total: 10,
+    submission_count: row.submission_count || 1,
+    is_resubmission: row.is_resubmission || false,
+    previous_photo_count: row.previous_photo_count || null,
   };
 }
 
@@ -338,6 +360,9 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
     `SELECT u.*,
       u.qa_phase,
       u.qa_decision,
+      u.submission_count,
+      COALESCE(u.submission_count, 1) > 1 as is_resubmission,
+      (u.submission_history->0->>'photo_count')::int as previous_photo_count,
       oes.activation_date as oes_activation_date,
       EXISTS (
         SELECT 1 FROM oes_activations oes2
@@ -360,6 +385,9 @@ async function getDropByDropNumber(dropNumber: string): Promise<UnifiedDrop | nu
     is_complete: isDropComplete(row),
     steps_completed: countCompletedSteps(row),
     steps_total: 10,
+    submission_count: row.submission_count || 1,
+    is_resubmission: row.is_resubmission || false,
+    previous_photo_count: row.previous_photo_count || null,
   };
 }
 
@@ -715,7 +743,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus, serialStatus } = req.query;
+    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus, serialStatus, resubmissionsOnly } = req.query;
 
     // Get single drop by ID
     if (id && typeof id === 'string') {
@@ -758,6 +786,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: status && typeof status === 'string' ? status : undefined,
       qaStatus: qaStatus && typeof qaStatus === 'string' ? qaStatus : undefined,
       serialStatus: serialStatus && typeof serialStatus === 'string' ? serialStatus : undefined,
+      resubmissionsOnly: resubmissionsOnly === 'true',
     };
 
     const searchTerm = search && typeof search === 'string' ? search : undefined;
@@ -784,7 +813,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pagination: result.pagination,
       meta: {
         timestamp: new Date().toISOString(),
-        filters: (filters.dateFrom || filters.dateTo || filters.project || filters.status || filters.qaStatus) ? filters : null,
+        filters: (filters.dateFrom || filters.dateTo || filters.project || filters.status || filters.qaStatus || filters.resubmissionsOnly) ? filters : null,
       },
     });
   } catch (error: any) {

@@ -93,6 +93,14 @@ export interface DrListItem {
   hasMaintenanceTicket: boolean;
   /** UID of the maintenance ticket if exists */
   maintenanceTicketUid: string | null;
+
+  // Resubmission tracking (Jan 2026)
+  /** Number of times this DR has been submitted */
+  submissionCount: number;
+  /** Whether this is a resubmission (submission_count > 1) */
+  isResubmission: boolean;
+  /** Previous submission photo count (if resubmission) */
+  previousPhotoCount: number | null;
 }
 
 export interface DashboardStats {
@@ -159,6 +167,7 @@ export interface DropsFilters {
   status?: string;
   qaStatus?: string;
   serialStatus?: string;
+  resubmissionsOnly?: boolean;
   page?: number;
   search?: string;
 }
@@ -240,6 +249,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
   if (filters.status && filters.status !== 'all') params.set('status', filters.status);
   if (filters.qaStatus && filters.qaStatus !== 'all') params.set('qaStatus', filters.qaStatus);
   if (filters.serialStatus && filters.serialStatus !== 'all') params.set('serialStatus', filters.serialStatus);
+  if (filters.resubmissionsOnly) params.set('resubmissionsOnly', 'true');
   if (filters.search && filters.search.trim()) params.set('search', filters.search.trim());
 
   const response = await fetch(`/api/activate/drops?${params.toString()}`);
@@ -292,6 +302,11 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
       // Maintenance Ticket
       hasMaintenanceTicket: drop.has_maintenance_ticket || false,
       maintenanceTicketUid: drop.maintenance_ticket_uid || null,
+
+      // Resubmission tracking
+      submissionCount: drop.submission_count || 1,
+      isResubmission: drop.is_resubmission || false,
+      previousPhotoCount: drop.previous_photo_count || null,
     };
   });
 

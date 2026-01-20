@@ -50,6 +50,7 @@ export interface ActivateFilters {
   qaStatusFilter: QaStatusFilter;
   serialStatusFilter: SerialStatusFilter;
   projectFilter: string;
+  resubmissionsOnly: boolean;
 }
 
 interface ActivateDataContextValue {
@@ -99,6 +100,7 @@ const defaultFilters: ActivateFilters = {
   qaStatusFilter: 'all',
   serialStatusFilter: 'all',
   projectFilter: 'all',
+  resubmissionsOnly: false,
 };
 
 const defaultDashboardStats: DashboardStats = {
@@ -179,6 +181,7 @@ export function ActivateDataProvider({
       status: filters.statusFilter !== 'all' ? filters.statusFilter : undefined,
       qaStatus: filters.qaStatusFilter !== 'all' ? filters.qaStatusFilter : undefined,
       serialStatus: filters.serialStatusFilter !== 'all' ? filters.serialStatusFilter : undefined,
+      resubmissionsOnly: filters.resubmissionsOnly || undefined,
       search: filters.searchTerm.trim() || undefined,
       page: page ?? currentPage,
     }),
@@ -259,7 +262,7 @@ export function ActivateDataProvider({
       fetchData(true, 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.qaStatusFilter, filters.serialStatusFilter, filters.searchTerm]);
+  }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.qaStatusFilter, filters.serialStatusFilter, filters.resubmissionsOnly, filters.searchTerm]);
 
   // Fetch when page changes
   useEffect(() => {
@@ -283,6 +286,7 @@ export function ActivateDataProvider({
       dateFrom: '',
       dateTo: '',
       serialStatusFilter: 'all',
+      resubmissionsOnly: false,
     });
     setCurrentPage(1);
   }, []);

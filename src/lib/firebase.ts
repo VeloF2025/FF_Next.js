@@ -50,7 +50,7 @@ export const storage = {
 };
 
 // Mock Analytics
-let analytics: any = {
+const analytics: any = {
   logEvent: () => {},
   setUserId: () => {},
   setUserProperties: () => {}

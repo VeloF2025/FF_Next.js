@@ -21,7 +21,7 @@ export class StaffAnalyticsService {
       });
       
       // Filter by projectId if provided (API doesn't support project-level filtering yet)
-      let summaryData = performance.summary || [];
+      const summaryData = performance.summary || [];
       
       // Transform API response to match StaffPerformanceSummary interface
       return summaryData.map((result: any) => ({

@@ -107,7 +107,7 @@ function normalizeDRNumber(drNumber: string): string {
   if (!drNumber) return '';
 
   // Remove leading/trailing whitespace
-  let normalized = drNumber.trim().toUpperCase();
+  const normalized = drNumber.trim().toUpperCase();
 
   // Extract numeric portion if prefixed with DR
   const match = normalized.match(/DR?(\d+)/i);

@@ -916,7 +916,7 @@ export async function extractPowerMeterWithMultiplePhotos(
       const result = await extractPowerMeterReading(url);
 
       // Score based on success and confidence
-      let score = result.success ? 2 + result.confidence : 0;
+      const score = result.success ? 2 + result.confidence : 0;
 
       log.debug('VlmExtraction', `Step 7 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, value=${result.value}`);
 
@@ -966,7 +966,7 @@ export async function extractOntSerialWithMultiplePhotos(
       const result = await extractOntSerialFromBack(url);
 
       // Score based on success and confidence
-      let score = result.success ? 2 + result.confidence : 0;
+      const score = result.success ? 2 + result.confidence : 0;
 
       log.debug('VlmExtraction', `Step 6 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.serial}`);
 

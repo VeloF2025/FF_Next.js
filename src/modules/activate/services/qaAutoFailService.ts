@@ -206,15 +206,15 @@ function levenshteinDistance(str1: string, str2: string): number {
 
     for (let j = 1; j <= n; j++) {
       if (str1[i - 1] === str2[j - 1]) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+         
         currRow[j] = prevRow[j - 1]!;
       } else {
         currRow[j] = 1 + Math.min(
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+           
           prevRow[j]!,      // deletion
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+           
           currRow[j - 1]!,  // insertion
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+           
           prevRow[j - 1]!   // substitution
         );
       }
@@ -225,7 +225,7 @@ function levenshteinDistance(str1: string, str2: string): number {
   }
 
   // Result is in prevRow because we swapped at the end of last iteration
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+   
   return prevRow[n]!;
 }
 

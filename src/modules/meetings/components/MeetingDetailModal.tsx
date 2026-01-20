@@ -158,7 +158,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                   <div className="p-4 bg-amber-500/10 rounded-lg border-l-4 border-amber-400">
                     <div className="text-sm text-[var(--ff-text-primary)] leading-relaxed space-y-2">
                       {(() => {
-                        let rawText = Array.isArray((meeting as any).summary.action_items)
+                        const rawText = Array.isArray((meeting as any).summary.action_items)
                           ? (meeting as any).summary.action_items.join(' ')
                           : String((meeting as any).summary.action_items);
 
