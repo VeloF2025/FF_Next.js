@@ -138,7 +138,7 @@ async function queryDrsToProcess(
       FROM drops d
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN sharepoint_dr_sync s ON d.drop_number = s.drop_number
-      WHERE p.name = ${project}
+      WHERE p.project_name = ${project}
         AND d.created_at::date = ${date}::date
         AND (s.folder_created IS NULL OR s.folder_created = false)
       LIMIT ${limit}
@@ -149,7 +149,7 @@ async function queryDrsToProcess(
       FROM drops d
       LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN sharepoint_dr_sync s ON d.drop_number = s.drop_number
-      WHERE p.name = ${project}
+      WHERE p.project_name = ${project}
         AND (s.folder_created IS NULL OR s.folder_created = false)
       LIMIT ${limit}
     `;
