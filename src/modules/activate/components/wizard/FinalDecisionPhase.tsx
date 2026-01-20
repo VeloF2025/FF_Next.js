@@ -27,10 +27,19 @@ import {
   type TechnicianIssue,
 } from '../../services/qaAutoFailService';
 
+interface InitialDecisionData {
+  decision: QaDecision | null;
+  internalNotes: string | null;
+  technicianFeedback: string | null;
+  issueClassification: IssueClassification | null;
+}
+
 interface FinalDecisionPhaseProps {
   dropNumber: string;
   wizardState: QaWizardState;
   photos?: Photo[];
+  /** Initial data loaded from previous draft save */
+  initialData?: InitialDecisionData;
   onComplete: (
     decision: QaDecision,
     reasons: string[],
@@ -61,29 +70,42 @@ export function FinalDecisionPhase({
   dropNumber,
   wizardState,
   photos = [],
+  initialData,
   onComplete,
   onBack,
 }: FinalDecisionPhaseProps) {
-  const [decision, setDecision] = useState<QaDecision | null>(null);
+  // Initialize state from initialData (draft) if available
+  const [decision, setDecision] = useState<QaDecision | null>(initialData?.decision ?? null);
   const [overrideReason, setOverrideReason] = useState('');
   const [loading, setLoading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [autoFailResult, setAutoFailResult] = useState<AutoFailResult | null>(null);
 
-  // Issue classification state
-  const [issueClassification, setIssueClassification] = useState<IssueClassification>({
-    issueType: null,
-    correctValue: '',
-    createTicket: false,
-    ticketType: null,
-    ticketDescription: '',
-  });
+  // Issue classification state - initialize from draft
+  const [issueClassification, setIssueClassification] = useState<IssueClassification>(
+    initialData?.issueClassification ?? {
+      issueType: null,
+      correctValue: '',
+      createTicket: false,
+      ticketType: null,
+      ticketDescription: '',
+    }
+  );
 
-  // Notes state
-  const [internalNotes, setInternalNotes] = useState('');
-  const [technicianFeedback, setTechnicianFeedback] = useState('');
+  // Notes state - initialize from draft
+  const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes ?? '');
+  const [technicianFeedback, setTechnicianFeedback] = useState(initialData?.technicianFeedback ?? '');
 
   // Photo lightbox state
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+
+  // Track if user has made changes (for draft save prompt)
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Mark as changed when any input is modified
+  useEffect(() => {
+    setHasChanges(true);
+  }, [decision, issueClassification, internalNotes, technicianFeedback]);
 
   // Evaluate auto-fail on mount and when photos change
   useEffect(() => {
@@ -260,6 +282,78 @@ export function FinalDecisionPhase({
       log.error('FinalDecision', 'Failed to create swap ticket', err);
     }
     return null;
+  };
+
+  /**
+   * Save current state as draft when navigating away
+   * This prevents data loss if user clicks Back
+   */
+  const saveDraft = async (): Promise<boolean> => {
+    if (!decision) {
+      // Nothing to save if no decision selected
+      return true;
+    }
+
+    setSavingDraft(true);
+
+    // Build internal notes (for QA team only)
+    const internalParts: string[] = [];
+    if (issueClassification.issueType) {
+      const typeLabels: Record<string, string> = {
+        ai_error: 'AI/OCR Error',
+        photo_quality: 'Photo Quality Issue',
+        real_issue: 'Real Issue Found',
+        no_issue: 'No Issue (False Positive)',
+      };
+      internalParts.push(`[${typeLabels[issueClassification.issueType]}]`);
+    }
+    if (issueClassification.correctValue) {
+      internalParts.push(`Correct value: ${issueClassification.correctValue}`);
+    }
+    if (internalNotes) {
+      internalParts.push(internalNotes);
+    }
+    const finalInternalNotes = internalParts.join(' | ') || null;
+
+    try {
+      const response = await fetch('/api/activate/final-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dropNumber,
+          decision,
+          notes: finalInternalNotes,
+          isDraft: true, // Mark as draft
+          internalNotes: finalInternalNotes,
+          technicianFeedback: technicianFeedback || null,
+          issueClassification,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        log.info('FinalDecision', `Draft saved for ${dropNumber}`);
+        return true;
+      } else {
+        log.warn('FinalDecision', `Failed to save draft: ${data.error?.message || 'Unknown error'}`);
+        return false;
+      }
+    } catch (err) {
+      log.error('FinalDecision', 'Failed to save draft', err);
+      return false;
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  /**
+   * Handle back button - save draft first if there are changes
+   */
+  const handleBack = async () => {
+    if (hasChanges && decision) {
+      await saveDraft();
+    }
+    onBack();
   };
 
   const isOverriding = Boolean(autoFailResult && decision !== autoFailResult.recommendation);
@@ -717,16 +811,24 @@ export function FinalDecisionPhase({
       {/* Actions */}
       <div className="flex justify-between pt-4">
         <button
-          onClick={onBack}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          onClick={handleBack}
+          disabled={savingDraft}
+          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
         >
-          ← Back
+          {savingDraft ? (
+            <span className="flex items-center gap-2">
+              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400" />
+              Saving draft...
+            </span>
+          ) : (
+            '← Back'
+          )}
         </button>
         <button
           onClick={handleSubmit}
-          disabled={!decision || loading || (isOverriding && !overrideReason)}
+          disabled={!decision || loading || savingDraft || (isOverriding && !overrideReason)}
           className={`px-6 py-2 rounded-lg font-medium ${
-            !decision || loading || (isOverriding && !overrideReason)
+            !decision || loading || savingDraft || (isOverriding && !overrideReason)
               ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}

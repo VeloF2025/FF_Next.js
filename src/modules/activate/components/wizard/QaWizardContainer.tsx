@@ -101,6 +101,20 @@ const initialState: QaWizardState = {
   },
 };
 
+// Initial decision data structure for passing to FinalDecisionPhase
+interface InitialDecisionData {
+  decision: 'PASS' | 'FAIL' | 'REWORK_NEEDED' | null;
+  internalNotes: string | null;
+  technicianFeedback: string | null;
+  issueClassification: {
+    issueType: 'ai_error' | 'photo_quality' | 'real_issue' | 'no_issue' | null;
+    correctValue: string;
+    createTicket: boolean;
+    ticketType: 'maintenance' | 'qa' | null;
+    ticketDescription: string;
+  } | null;
+}
+
 export function QaWizardContainer({
   dropNumber,
   onPhaseChange,
@@ -113,6 +127,8 @@ export function QaWizardContainer({
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [project, setProject] = useState<string | null>(null);
   const [syncPhase, setSyncPhase] = useState<Sync1MapPhase | null>(null);
+  // Initial decision data from draft save (for Phase 4)
+  const [initialDecisionData, setInitialDecisionData] = useState<InitialDecisionData | null>(null);
 
   // Load initial state from API
   useEffect(() => {
@@ -230,7 +246,7 @@ export function QaWizardContainer({
         log.warn('QaWizard', `Could not fetch photos for ${dropNumber}`);
       }
 
-      // Check for existing decision
+      // Check for existing decision (including drafts)
       const decisionResponse = await fetch(
         `/api/activate/final-decision?dropNumber=${encodeURIComponent(dropNumber)}`
       );
@@ -240,9 +256,13 @@ export function QaWizardContainer({
         const result = decisionData.data;
 
         if (result.decision) {
+          // Determine phase based on draft status
+          const isDraft = result.isDraft || false;
+          const targetPhase = isDraft ? 'final_decision' : (result.phase || 'feedback');
+
           setState((prev) => ({
             ...prev,
-            phase: result.phase || 'feedback',
+            phase: targetPhase,
             finalDecision: {
               decision: result.decision as QaDecision,
               reasons: result.reasons || [],
@@ -251,6 +271,20 @@ export function QaWizardContainer({
               decidedBy: result.decidedBy,
             },
           }));
+
+          // Store initial decision data for FinalDecisionPhase (draft recovery)
+          if (isDraft || result.decision) {
+            setInitialDecisionData({
+              decision: result.decision,
+              internalNotes: result.internalNotes || null,
+              technicianFeedback: result.technicianFeedback || null,
+              issueClassification: result.issueClassification || null,
+            });
+            log.info('QaWizard', `Loaded ${isDraft ? 'draft' : 'existing'} decision for ${dropNumber}`, {
+              decision: result.decision,
+              isDraft,
+            });
+          }
         }
       }
     // Brief complete animation
@@ -496,6 +530,7 @@ export function QaWizardContainer({
             dropNumber={dropNumber}
             wizardState={state}
             photos={photos}
+            initialData={initialDecisionData || undefined}
             onComplete={handleFinalDecision}
             onBack={goToPreviousPhase}
           />

@@ -31,12 +31,28 @@ const pool = new Pool({
 
 type QaDecision = 'PASS' | 'FAIL' | 'REWORK_NEEDED';
 
+interface IssueClassification {
+  issueType: 'ai_error' | 'photo_quality' | 'real_issue' | 'no_issue' | null;
+  correctValue: string;
+  createTicket: boolean;
+  ticketType: 'maintenance' | 'qa' | null;
+  ticketDescription: string;
+}
+
 interface FinalDecisionRequest {
   dropNumber: string;
   decision: QaDecision;
   notes?: string;
   /** If overriding auto-fail recommendation */
   overrideReason?: string;
+  /** Internal notes for QA team only (not sent to technician) */
+  internalNotes?: string;
+  /** Feedback message to send via WhatsApp */
+  technicianFeedback?: string;
+  /** Structured issue classification */
+  issueClassification?: IssueClassification;
+  /** If true, save as draft without moving to feedback phase */
+  isDraft?: boolean;
 }
 
 interface FinalDecisionResponse {
@@ -46,7 +62,8 @@ interface FinalDecisionResponse {
   reasonDescriptions: string[];
   savedAt: string;
   savedBy: string | null;
-  nextPhase: 'feedback';
+  isDraft: boolean;
+  nextPhase: 'feedback' | 'final_decision';
   feedbackTemplate: string;
 }
 
@@ -55,7 +72,16 @@ interface FinalDecisionResponse {
  */
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {
-    const { dropNumber, decision, notes, overrideReason } = req.body as FinalDecisionRequest;
+    const {
+      dropNumber,
+      decision,
+      notes,
+      overrideReason,
+      internalNotes,
+      technicianFeedback,
+      issueClassification,
+      isDraft = false,
+    } = req.body as FinalDecisionRequest;
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
@@ -76,6 +102,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       userId,
       hasNotes: !!notes,
       hasOverride: !!overrideReason,
+      isDraft,
+      hasIssueClassification: !!issueClassification?.issueType,
     });
 
     // Get current review data from dr_photo_unified_reviews (main table) and foto_ai_reviews (VLM data)
@@ -152,6 +180,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // Save decision to database
     const savedAt = new Date().toISOString();
 
+    // Determine the next phase based on draft status
+    const nextPhase = isDraft ? 'final_decision' : 'feedback';
+
     await pool.query(
       `UPDATE foto_ai_reviews
        SET
@@ -160,10 +191,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          qa_decision_at = NOW(),
          qa_decision_by = $3,
          qa_decision_notes = $4,
-         qa_phase = 'feedback',
+         qa_phase = $6,
          updated_at = NOW()
        WHERE dr_number = $5`,
-      [decision, JSON.stringify(reasons), userId || null, finalNotes || null, dropNumber]
+      [decision, JSON.stringify(reasons), userId || null, finalNotes || null, dropNumber, nextPhase]
     );
 
     // Also update dr_photo_unified_reviews for DR Review Summary display
@@ -209,7 +240,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     await pool.query(
       `UPDATE dr_photo_unified_reviews
        SET
-         vlm_qa_status = 'completed',
+         vlm_qa_status = CASE WHEN $18 THEN 'in_progress' ELSE 'completed' END,
          vlm_qa_results = $1::jsonb,
          vlm_qa_summary = $2::jsonb,
          vlm_qa_validated_at = NOW(),
@@ -218,10 +249,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          qa_decision_at = NOW(),
          qa_decision_by = $5,
          qa_decision_notes = $6,
-         human_review_status = 'completed',
-         human_review_completed_at = NOW(),
-         reviewed_at = NOW(),
-         reviewed_by = $5,
+         qa_decision_is_draft = $18,
+         qa_internal_notes = $19,
+         qa_technician_feedback = $20,
+         qa_issue_classification = $21::jsonb,
+         human_review_status = CASE WHEN $18 THEN 'in_progress' ELSE 'completed' END,
+         human_review_completed_at = CASE WHEN $18 THEN NULL ELSE NOW() END,
+         reviewed_at = CASE WHEN $18 THEN NULL ELSE NOW() END,
+         reviewed_by = CASE WHEN $18 THEN NULL ELSE $5 END,
          step_01_house_photo = $8,
          step_02_cable_from_pole = $9,
          step_03_entry_outside = $10,
@@ -252,6 +287,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         !!stepCounts[8],
         !!stepCounts[9],
         !!stepCounts[10],
+        isDraft,
+        internalNotes || null,
+        technicianFeedback || null,
+        JSON.stringify(issueClassification || {}),
       ]
     );
 
@@ -269,25 +308,29 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       userId,
     });
 
-    // Log activity for audit trail
-    try {
-      await logActivity(
-        dropNumber,
-        'human_review_completed',
-        {
-          decision,
-          reasons,
-          reasonDescriptions,
-          notes: finalNotes || null,
-          stepsApproved: Object.entries(stepCounts)
-            .filter(([_, count]) => count > 0)
-            .map(([step]) => `step_${step.padStart(2, '0')}`),
-        },
-        'user',
-        userId || 'system'
-      );
-    } catch (activityError) {
-      log.warn('FinalDecision', `Failed to log activity for ${dropNumber}`, activityError);
+    // Log activity for audit trail (only for non-draft saves)
+    if (!isDraft) {
+      try {
+        await logActivity(
+          dropNumber,
+          'human_review_completed',
+          {
+            decision,
+            reasons,
+            reasonDescriptions,
+            notes: finalNotes || null,
+            stepsApproved: Object.entries(stepCounts)
+              .filter(([_, count]) => count > 0)
+              .map(([step]) => `step_${step.padStart(2, '0')}`),
+          },
+          'user',
+          userId || 'system'
+        );
+      } catch (activityError) {
+        log.warn('FinalDecision', `Failed to log activity for ${dropNumber}`, activityError);
+      }
+    } else {
+      log.info('FinalDecision', `Draft saved for ${dropNumber} - skipping activity log`);
     }
 
     const response: FinalDecisionResponse = {
@@ -297,7 +340,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       reasonDescriptions,
       savedAt,
       savedBy: userId || null,
-      nextPhase: 'feedback',
+      isDraft,
+      nextPhase: isDraft ? 'final_decision' : 'feedback',
       feedbackTemplate,
     };
 
@@ -354,7 +398,7 @@ function generateFeedbackTemplate(
 
 /**
  * GET /api/activate/final-decision?dropNumber=XXX
- * Get current decision status
+ * Get current decision status including draft state
  */
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {
@@ -364,6 +408,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber query param is required');
     }
 
+    // Get data from dr_photo_unified_reviews (primary table with draft fields)
     const result = await pool.query(
       `SELECT
          qa_decision,
@@ -371,15 +416,50 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
          qa_decision_at,
          qa_decision_by,
          qa_decision_notes,
-         qa_phase
-       FROM foto_ai_reviews
-       WHERE dr_number = $1
+         qa_decision_is_draft,
+         qa_internal_notes,
+         qa_technician_feedback,
+         qa_issue_classification::text
+       FROM dr_photo_unified_reviews
+       WHERE drop_number = $1
        LIMIT 1`,
       [dropNumber]
     );
 
+    // Fallback to foto_ai_reviews if not found
     if (result.rows.length === 0) {
-      return apiResponse.notFound(res, 'DR review', dropNumber);
+      const fallbackResult = await pool.query(
+        `SELECT
+           qa_decision,
+           qa_decision_reasons::text,
+           qa_decision_at,
+           qa_decision_by,
+           qa_decision_notes,
+           qa_phase
+         FROM foto_ai_reviews
+         WHERE dr_number = $1
+         LIMIT 1`,
+        [dropNumber]
+      );
+
+      if (fallbackResult.rows.length === 0) {
+        return apiResponse.notFound(res, 'DR review', dropNumber);
+      }
+
+      const review = fallbackResult.rows[0];
+      return apiResponse.success(res, {
+        drNumber: dropNumber,
+        decision: review.qa_decision,
+        reasons: review.qa_decision_reasons ? JSON.parse(review.qa_decision_reasons) : [],
+        decidedAt: review.qa_decision_at,
+        decidedBy: review.qa_decision_by,
+        notes: review.qa_decision_notes,
+        phase: review.qa_phase,
+        isDraft: false,
+        internalNotes: null,
+        technicianFeedback: null,
+        issueClassification: null,
+      });
     }
 
     const review = result.rows[0];
@@ -391,7 +471,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       decidedAt: review.qa_decision_at,
       decidedBy: review.qa_decision_by,
       notes: review.qa_decision_notes,
-      phase: review.qa_phase,
+      isDraft: review.qa_decision_is_draft || false,
+      internalNotes: review.qa_internal_notes,
+      technicianFeedback: review.qa_technician_feedback,
+      issueClassification: review.qa_issue_classification ? JSON.parse(review.qa_issue_classification) : null,
     });
   } catch (error) {
     log.error('FinalDecision', 'Error getting decision', error);
