@@ -776,6 +776,13 @@ function QaCentrePageContent() {
                     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
                   };
 
+                  // Format time (HH:MM)
+                  const formatTime = (dateStr: string | null) => {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                  };
+
                   // Get QA Review Status (Pending vs Reviewed)
                   const getQaReviewStatus = () => {
                     if (drop.feedbackSent) return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
@@ -867,14 +874,19 @@ function QaCentrePageContent() {
                         </div>
                       </div>
 
-                      {/* Row 2: Tech ID | Photos | [empty] | [RIGHT: ONT serial | UPS serial] */}
-                      <div className="grid grid-cols-[70px_95px_1fr_320px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
+                      {/* Row 2: Tech ID | Photos | WA Time | [empty] | [empty] | [RIGHT: ONT serial | UPS serial] */}
+                      <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
                         <span className="font-medium text-gray-600 dark:text-gray-300 truncate">
                           {formatAgent(drop.senderPhone)}
                         </span>
                         <span className="font-medium text-gray-600 dark:text-gray-300">
                           📷 {drop.photoCount || 0}
                         </span>
+                        {/* WA Submission Time (below Installed date) */}
+                        <span className="text-blue-400/70 text-[9px]">
+                          {formatTime(drop.submittedDate || drop.createdAt)}
+                        </span>
+                        <span></span>
                         <span></span>
                         {/* RIGHT: Serials */}
                         <div className="flex items-center justify-end gap-4 font-mono text-[10px]">
