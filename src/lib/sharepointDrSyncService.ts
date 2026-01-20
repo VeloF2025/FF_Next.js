@@ -496,7 +496,7 @@ export async function getDrFolderInfoFromDb(dropNumber: string): Promise<DrFolde
   const result = await sql`
     SELECT
       d.drop_number,
-      p.name as project,
+      p.project_name as project,
       d.zone_no,
       d.pon_no,
       d.pole_number
