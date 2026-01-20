@@ -20,7 +20,7 @@ export interface PurchaseOrder {
   projectName?: string;
   
   // Supplier
-  supplierId: string;
+  supplierId: number; // Database uses integer
   supplierName: string;
   supplierContact?: string;
   supplierEmail?: string;

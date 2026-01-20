@@ -8,6 +8,7 @@ export * from './requisition.types';
 export * from './grn.types';
 export * from './approval.types';
 export * from './material-catalog.types';
+export * from './quote.types';
 
 // Legacy support - these exports maintain backward compatibility
 export type { StockItem, StockMovement, StockTake } from './stock.types';

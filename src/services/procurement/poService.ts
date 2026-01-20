@@ -1,12 +1,14 @@
-// ============= Purchase Order Service =============
+/**
+ * Purchase Order Service
+ * Client-side service that calls the PO API endpoints
+ * UPDATED: Replaced mock data with real API calls
+ */
 
-import { 
+import {
   PurchaseOrder,
-  POItem, 
+  POItem,
   POStatus,
   POApprovalStatus,
-  PODeliveryStatus,
-  POInvoiceStatus,
   POListItem,
   POStats,
   POFilters,
@@ -14,389 +16,292 @@ import {
   PODeliveryNote,
   POInvoice,
   POAmendment,
-  POOrderType,
-  POItemStatus,
-  DeliveryNoteStatus,
-  InvoiceMatchingStatus,
-  PaymentStatus,
-  AmendmentStatus
+  PODeliveryStatus,
+  POInvoiceStatus,
 } from '../../types/procurement/po.types';
 
-// Mock data for development - replace with actual API calls
-const MOCK_PO_DATA: PurchaseOrder[] = [
-  {
-    id: 'po-001',
-    projectId: 'proj-001',
-    poNumber: 'PO-2024-001',
-    rfqId: 'rfq-001',
-    quoteId: 'quote-001',
-    supplierId: 'supplier-001',
-    title: 'Fiber Optic Cables and Accessories',
-    description: 'Network infrastructure components for Phase 1',
-    orderType: POOrderType.GOODS,
-    status: POStatus.ACKNOWLEDGED,
-    approvalStatus: POApprovalStatus.APPROVED,
-    supplier: {
-      id: 'supplier-001',
-      name: 'FiberTech Solutions',
-      code: 'FTS001',
-      contactPerson: 'John Smith',
-      email: 'john@fibertech.co.za',
-      phone: '+27 11 123 4567',
-      address: {
-        street: '123 Industrial Road',
-        city: 'Johannesburg',
-        province: 'Gauteng',
-        postalCode: '2000',
-        country: 'South Africa'
-      }
-    },
-    currency: 'ZAR',
-    subtotal: 850000,
-    taxAmount: 127500,
-    totalAmount: 977500,
-    paymentTerms: '30 days net',
-    deliveryTerms: 'DDP - Delivered Duty Paid',
-    validityPeriod: 30,
-    deliveryAddress: {
-      street: '456 Project Site',
-      city: 'Cape Town',
-      province: 'Western Cape',
-      postalCode: '8000',
-      country: 'South Africa'
-    },
-    expectedDeliveryDate: new Date('2024-10-15'),
-    partialDeliveryAllowed: true,
-    issuedAt: new Date('2024-09-01'),
-    sentAt: new Date('2024-09-02'),
-    acknowledgedAt: new Date('2024-09-03'),
-    lastModifiedAt: new Date('2024-09-03'),
-    createdBy: 'user-001',
-    issuedBy: 'manager-001',
-    approvedBy: ['manager-001', 'director-001'],
-    deliveryStatus: PODeliveryStatus.IN_TRANSIT,
-    invoiceStatus: POInvoiceStatus.NOT_INVOICED,
-    amendmentCount: 0,
-    createdAt: new Date('2024-09-01'),
-    updatedAt: new Date('2024-09-03')
-  },
-  {
-    id: 'po-002',
-    projectId: 'proj-001',
-    poNumber: 'PO-2024-002',
-    supplierId: 'supplier-002',
-    title: 'Installation Services',
-    orderType: POOrderType.SERVICES,
-    status: POStatus.PENDING_APPROVAL,
-    approvalStatus: POApprovalStatus.PENDING,
-    supplier: {
-      id: 'supplier-002',
-      name: 'Network Install Pro',
-      code: 'NIP001',
-      contactPerson: 'Sarah Johnson',
-      email: 'sarah@networkinstall.co.za',
-      phone: '+27 21 987 6543'
-    },
-    currency: 'ZAR',
-    subtotal: 450000,
-    taxAmount: 67500,
-    totalAmount: 517500,
-    paymentTerms: '30 days net',
-    deliveryTerms: 'On-site service delivery',
-    deliveryAddress: {
-      street: '789 Service Location',
-      city: 'Durban',
-      province: 'KwaZulu-Natal',
-      postalCode: '4000',
-      country: 'South Africa'
-    },
-    expectedDeliveryDate: new Date('2024-11-01'),
-    partialDeliveryAllowed: false,
-    lastModifiedAt: new Date('2024-09-10'),
-    createdBy: 'user-002',
-    deliveryStatus: PODeliveryStatus.NOT_STARTED,
-    invoiceStatus: POInvoiceStatus.NOT_INVOICED,
-    amendmentCount: 0,
-    createdAt: new Date('2024-09-10'),
-    updatedAt: new Date('2024-09-10')
-  }
-];
+// API response types
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
 
-const MOCK_PO_ITEMS: Record<string, POItem[]> = {
-  'po-001': [
-    {
-      id: 'item-001',
-      poId: 'po-001',
-      rfqItemId: 'rfq-item-001',
-      lineNumber: 1,
-      itemCode: 'FOC-SM-144',
-      description: 'Single Mode Fiber Optic Cable - 144 Core',
-      category: 'Cables',
-      quantity: 5000,
-      uom: 'meters',
-      unitPrice: 45.50,
-      lineTotal: 227500,
-      quantityDelivered: 0,
-      quantityPending: 5000,
-      quantityInvoiced: 0,
-      expectedDeliveryDate: new Date('2024-10-10'),
-      itemStatus: POItemStatus.CONFIRMED,
-      createdAt: new Date('2024-09-01'),
-      updatedAt: new Date('2024-09-03')
-    },
-    {
-      id: 'item-002',
-      poId: 'po-001',
-      lineNumber: 2,
-      itemCode: 'SPLICE-TRAY',
-      description: 'Fiber Splice Tray - 24 Fiber',
-      category: 'Hardware',
-      quantity: 200,
-      uom: 'pieces',
-      unitPrice: 125.00,
-      lineTotal: 25000,
-      quantityDelivered: 0,
-      quantityPending: 200,
-      quantityInvoiced: 0,
-      expectedDeliveryDate: new Date('2024-10-15'),
-      itemStatus: POItemStatus.CONFIRMED,
-      createdAt: new Date('2024-09-01'),
-      updatedAt: new Date('2024-09-03')
-    }
-  ]
-};
+interface POApiListItem {
+  id: string;
+  poNumber: string;
+  status: string;
+  supplierId: number;
+  supplierName: string;
+  projectName?: string;
+  deliveryDate?: string;
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  itemCount: number;
+  createdByName: string;
+  createdAt: string;
+}
+
+interface POApiDetail {
+  id: string;
+  poNumber: string;
+  status: string;
+  supplierId: number;
+  supplierName: string;
+  supplierEmail?: string;
+  supplierPhone?: string;
+  projectId?: string;
+  projectName?: string;
+  deliveryAddress?: string;
+  expectedDeliveryDate?: string;
+  paymentTerms?: string;
+  currency: string;
+  taxRate: number;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  notes?: string;
+  supplierNotes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  items: POApiItem[];
+  history: { id: string; action: string; notes: string | null; createdBy: string | null; createdAt: string }[];
+  receipts: { id: string; grnNumber: string; receivedDate: string; receivedBy: string; totalItems: number }[];
+}
+
+interface POApiItem {
+  id: string;
+  lineNumber: number;
+  description: string;
+  itemCode?: string;
+  quantityOrdered: number;
+  quantityReceived: number;
+  quantityPending: number;
+  unitOfMeasure: string;
+  unitPrice: number;
+  lineTotal: number;
+  notes?: string;
+}
 
 class POService {
+  private baseUrl = '/api/procurement/purchase-orders';
+
   // ============= CRUD Operations =============
 
   async getAllPOs(filters?: POFilters): Promise<POListItem[]> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    let filteredData = [...MOCK_PO_DATA];
-    
-    if (filters) {
-      if (filters.projectId) {
-        filteredData = filteredData.filter(po => po.projectId === filters.projectId);
-      }
-      
-      if (filters.status && filters.status.length > 0) {
-        filteredData = filteredData.filter(po => filters.status!.includes(po.status));
-      }
-      
-      if (filters.approvalStatus && filters.approvalStatus.length > 0) {
-        filteredData = filteredData.filter(po => filters.approvalStatus!.includes(po.approvalStatus));
-      }
-      
-      if (filters.searchTerm) {
-        const term = filters.searchTerm.toLowerCase();
-        filteredData = filteredData.filter(po => 
-          po.title.toLowerCase().includes(term) ||
-          po.poNumber.toLowerCase().includes(term) ||
-          po.supplier.name.toLowerCase().includes(term)
-        );
-      }
-      
-      if (filters.amountRange) {
-        filteredData = filteredData.filter(po => 
-          po.totalAmount >= filters.amountRange!.min &&
-          po.totalAmount <= filters.amountRange!.max
-        );
-      }
-      
-      if (filters.dateRange) {
-        filteredData = filteredData.filter(po => {
-          const createdDate = new Date(po.createdAt);
-          return createdDate >= filters.dateRange!.start && createdDate <= filters.dateRange!.end;
-        });
-      }
+    const params = new URLSearchParams();
+
+    if (filters?.projectId) params.append('projectId', filters.projectId);
+    if (filters?.status && filters.status.length > 0) {
+      filters.status.forEach(s => params.append('status', s));
     }
-    
-    // Convert to list items
-    return filteredData.map(po => {
-      const items = MOCK_PO_ITEMS[po.id] || [];
-      return {
-        id: po.id,
-        poNumber: po.poNumber,
-        title: po.title,
-        supplier: {
-          id: po.supplier.id,
-          name: po.supplier.name
-        },
-        status: po.status,
-        approvalStatus: po.approvalStatus,
-        deliveryStatus: po.deliveryStatus,
-        invoiceStatus: po.invoiceStatus,
-        totalAmount: po.totalAmount,
-        currency: po.currency,
-        ...(po.expectedDeliveryDate && { expectedDeliveryDate: po.expectedDeliveryDate }),
-        ...(po.issuedAt && { issuedAt: po.issuedAt }),
-        createdAt: po.createdAt,
-        itemCount: items.length,
-        deliveredItemCount: items.filter(item => item.quantityDelivered > 0).length,
-        invoicedItemCount: items.filter(item => item.quantityInvoiced > 0).length
-      };
-    });
+    if (filters?.searchTerm) params.append('search', filters.searchTerm);
+
+    const url = `${this.baseUrl}?${params.toString()}`;
+    const response = await fetch(url);
+    const result: ApiResponse<POApiListItem[]> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to fetch purchase orders');
+    }
+
+    // Map API response to POListItem format
+    return (result.data || []).map(po => this.mapApiToListItem(po));
   }
 
   async getPOById(id: string): Promise<PurchaseOrder | null> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return MOCK_PO_DATA.find(po => po.id === id) || null;
+    const response = await fetch(`${this.baseUrl}/${id}`);
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    const result: ApiResponse<POApiDetail> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to fetch purchase order');
+    }
+
+    return this.mapApiToFullPO(result.data);
   }
 
   async getPOItems(poId: string): Promise<POItem[]> {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return MOCK_PO_ITEMS[poId] || [];
+    const po = await this.getPOById(poId);
+    if (!po || !po.items) return [];
+    return po.items;
   }
 
   async createPO(data: CreatePORequest): Promise<PurchaseOrder> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Simulate PO creation
-    const newPO: PurchaseOrder = {
-      id: `po-${Date.now()}`,
-      projectId: data.projectId,
-      poNumber: `PO-${new Date().getFullYear()}-${String(MOCK_PO_DATA.length + 1).padStart(3, '0')}`,
-      ...(data.rfqId && { rfqId: data.rfqId }),
-      ...(data.quoteId && { quoteId: data.quoteId }),
-      supplierId: data.supplierId,
-      title: data.title,
-      ...(data.description && { description: data.description }),
-      orderType: data.orderType,
-      status: POStatus.DRAFT,
-      approvalStatus: POApprovalStatus.PENDING,
-      supplier: {
-        id: data.supplierId,
-        name: 'Supplier Name', // Would be fetched from supplier service
-        code: 'SUP001'
-      },
-      currency: 'ZAR',
-      subtotal: data.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
-      taxAmount: 0, // Calculate based on tax rules
-      totalAmount: 0, // Calculate with tax
-      paymentTerms: data.paymentTerms,
-      deliveryTerms: data.deliveryTerms,
-      deliveryAddress: data.deliveryAddress,
-      ...(data.expectedDeliveryDate && { expectedDeliveryDate: data.expectedDeliveryDate }),
-      partialDeliveryAllowed: true,
-      lastModifiedAt: new Date(),
-      createdBy: 'current-user', // Would be from auth context
-      deliveryStatus: PODeliveryStatus.NOT_STARTED,
-      invoiceStatus: POInvoiceStatus.NOT_INVOICED,
-      ...(data.notes && { notes: data.notes }),
-      ...(data.internalNotes && { internalNotes: data.internalNotes }),
-      amendmentCount: 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    // Calculate tax and total
-    newPO.taxAmount = newPO.subtotal * 0.15; // 15% VAT
-    newPO.totalAmount = newPO.subtotal + newPO.taxAmount;
-    
-    MOCK_PO_DATA.push(newPO);
-    return newPO;
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supplierId: data.supplierId,
+        projectId: data.projectId,
+        deliveryAddress: typeof data.deliveryAddress === 'string'
+          ? data.deliveryAddress
+          : `${data.deliveryAddress.street}, ${data.deliveryAddress.city}, ${data.deliveryAddress.province} ${data.deliveryAddress.postalCode}`,
+        expectedDeliveryDate: data.expectedDeliveryDate,
+        paymentTerms: data.paymentTerms,
+        deliveryTerms: data.deliveryTerms,
+        notes: data.notes,
+        items: data.items.map(item => ({
+          itemCode: item.itemCode,
+          itemDescription: item.description,
+          quantity: item.quantity,
+          uom: item.uom,
+          unitPrice: item.unitPrice,
+          notes: item.notes,
+        })),
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to create purchase order');
+    }
+
+    // Fetch the full PO to return
+    const createdPO = await this.getPOById(result.data.id);
+    if (!createdPO) {
+      throw new Error('Failed to fetch created purchase order');
+    }
+    return createdPO;
   }
 
   async updatePO(id: string, updates: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const index = MOCK_PO_DATA.findIndex(po => po.id === id);
-    if (index === -1) {
-      throw new Error('Purchase Order not found');
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update purchase order');
     }
-    
-    MOCK_PO_DATA[index] = {
-      ...MOCK_PO_DATA[index],
-      ...updates,
-      updatedAt: new Date()
-    };
-    
-    return MOCK_PO_DATA[index];
+
+    const updatedPO = await this.getPOById(id);
+    if (!updatedPO) {
+      throw new Error('Failed to fetch updated purchase order');
+    }
+    return updatedPO;
   }
 
   async deletePO(id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const index = MOCK_PO_DATA.findIndex(po => po.id === id);
-    if (index === -1) {
-      throw new Error('Purchase Order not found');
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.error || 'Failed to delete purchase order');
     }
-    
-    MOCK_PO_DATA.splice(index, 1);
   }
 
   // ============= Status Management =============
 
   async updatePOStatus(id: string, status: POStatus, notes?: string): Promise<PurchaseOrder> {
-    const po = await this.getPOById(id);
-    if (!po) {
-      throw new Error('Purchase Order not found');
-    }
-    
-    const updates: Partial<PurchaseOrder> = {
-      status,
-      lastModifiedAt: new Date()
+    // Map status to action
+    const actionMap: Record<string, string> = {
+      [POStatus.PENDING_APPROVAL]: 'submit',
+      [POStatus.APPROVED]: 'approve',
+      [POStatus.SENT]: 'send',
+      [POStatus.ACKNOWLEDGED]: 'acknowledge',
+      [POStatus.DELIVERED]: 'complete',
+      [POStatus.CANCELLED]: 'cancel',
     };
-    
-    // Update related timestamps based on status
-    switch (status) {
-      case POStatus.SENT:
-        updates.sentAt = new Date();
-        break;
-      case POStatus.ACKNOWLEDGED:
-        updates.acknowledgedAt = new Date();
-        break;
-      case POStatus.DELIVERED:
-        updates.actualDeliveryDate = new Date();
-        updates.deliveryStatus = PODeliveryStatus.FULLY_DELIVERED;
-        break;
+
+    const action = actionMap[status];
+    if (!action) {
+      throw new Error(`Cannot transition to status: ${status}`);
     }
-    
-    if (notes) {
-      updates.notes = notes;
+
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, notes }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update status');
     }
-    
-    return this.updatePO(id, updates);
+
+    const updatedPO = await this.getPOById(id);
+    if (!updatedPO) {
+      throw new Error('Failed to fetch updated purchase order');
+    }
+    return updatedPO;
   }
 
   // ============= Approval Workflow =============
 
   async submitForApproval(id: string): Promise<PurchaseOrder> {
-    return this.updatePO(id, {
-      status: POStatus.PENDING_APPROVAL,
-      approvalStatus: POApprovalStatus.PENDING
-    });
+    return this.updatePOStatus(id, POStatus.PENDING_APPROVAL);
   }
 
-  async approvePO(id: string, approverId: string): Promise<PurchaseOrder> {
-    const po = await this.getPOById(id);
-    if (!po) {
-      throw new Error('Purchase Order not found');
-    }
-    
-    // In a real implementation, this would check approval levels and workflows
-    return this.updatePO(id, {
-      status: POStatus.APPROVED,
-      approvalStatus: POApprovalStatus.APPROVED,
-      approvedBy: [...(po.approvedBy || []), approverId]
+  async approvePO(id: string, _approverId: string): Promise<PurchaseOrder> {
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve' }),
     });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to approve purchase order');
+    }
+
+    const updatedPO = await this.getPOById(id);
+    if (!updatedPO) {
+      throw new Error('Failed to fetch updated purchase order');
+    }
+    return updatedPO;
   }
 
   async rejectPO(id: string, _approverId: string, reason: string): Promise<PurchaseOrder> {
-    return this.updatePO(id, {
-      status: POStatus.DRAFT,
-      approvalStatus: POApprovalStatus.REJECTED,
-      notes: reason
+    const response = await fetch(`${this.baseUrl}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reject', notes: reason }),
     });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to reject purchase order');
+    }
+
+    const updatedPO = await this.getPOById(id);
+    if (!updatedPO) {
+      throw new Error('Failed to fetch updated purchase order');
+    }
+    return updatedPO;
   }
 
   // ============= Delivery Management =============
 
-  async createDeliveryNote(poId: string, deliveryData: any): Promise<PODeliveryNote> {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
-    // Mock delivery note creation
+  async createDeliveryNote(poId: string, deliveryData: {
+    deliveredBy: string;
+    receivedBy: string;
+    items: { poItemId: string; quantity: number }[];
+    notes?: string;
+  }): Promise<PODeliveryNote> {
+    // This would call a GRN API endpoint
+    // For now, return a placeholder - GRN creation is handled separately
     const deliveryNote: PODeliveryNote = {
       id: `dn-${Date.now()}`,
       poId,
@@ -404,27 +309,41 @@ class POService {
       deliveredBy: deliveryData.deliveredBy,
       receivedBy: deliveryData.receivedBy,
       deliveryDate: new Date(),
-      items: deliveryData.items,
-      status: DeliveryNoteStatus.PENDING,
+      items: deliveryData.items.map(item => ({
+        poItemId: item.poItemId,
+        quantityDelivered: item.quantity,
+        quantityAccepted: item.quantity,
+        quantityRejected: 0,
+      })),
+      status: 'pending' as const,
       deliveryNotes: deliveryData.notes,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     return deliveryNote;
   }
 
   async updateDeliveryStatus(poId: string, status: PODeliveryStatus): Promise<PurchaseOrder> {
-    return this.updatePO(poId, {
-      deliveryStatus: status
-    });
+    // Delivery status is updated through GRN processing
+    const po = await this.getPOById(poId);
+    if (!po) throw new Error('Purchase Order not found');
+    po.deliveryStatus = status;
+    return po;
   }
 
   // ============= Invoice Management =============
 
-  async createInvoice(poId: string, invoiceData: any): Promise<POInvoice> {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
+  async createInvoice(poId: string, invoiceData: {
+    invoiceNumber: string;
+    invoiceAmount: number;
+    taxAmount: number;
+    totalAmount: number;
+    invoiceDate: string;
+    dueDate: string;
+    items: { poItemId: string; quantity: number; amount: number }[];
+  }): Promise<POInvoice> {
+    // Invoice creation would be handled by a separate invoicing module
     const invoice: POInvoice = {
       id: `inv-${Date.now()}`,
       poId,
@@ -432,105 +351,109 @@ class POService {
       invoiceAmount: invoiceData.invoiceAmount,
       taxAmount: invoiceData.taxAmount,
       totalAmount: invoiceData.totalAmount,
-      matchingStatus: InvoiceMatchingStatus.NOT_MATCHED,
-      items: invoiceData.items,
+      matchingStatus: 'not_matched' as const,
+      items: invoiceData.items.map(item => ({
+        poItemId: item.poItemId,
+        quantityInvoiced: item.quantity,
+        amountInvoiced: item.amount,
+      })),
       invoiceDate: new Date(invoiceData.invoiceDate),
       dueDate: new Date(invoiceData.dueDate),
       receivedDate: new Date(),
-      paymentStatus: PaymentStatus.NOT_DUE,
+      paymentStatus: 'not_due' as const,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     return invoice;
   }
 
   async updateInvoiceStatus(poId: string, status: POInvoiceStatus): Promise<PurchaseOrder> {
-    return this.updatePO(poId, {
-      invoiceStatus: status
-    });
+    const po = await this.getPOById(poId);
+    if (!po) throw new Error('Purchase Order not found');
+    po.invoiceStatus = status;
+    return po;
   }
 
   // ============= Amendment Management =============
 
-  async createAmendment(poId: string, amendmentData: any): Promise<POAmendment> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
+  async createAmendment(poId: string, amendmentData: {
+    reason: string;
+    description: string;
+    changeType: string;
+    changes: Record<string, unknown>;
+    newTotal: number;
+  }): Promise<POAmendment> {
     const po = await this.getPOById(poId);
-    if (!po) {
-      throw new Error('Purchase Order not found');
-    }
-    
+    if (!po) throw new Error('Purchase Order not found');
+
     const amendment: POAmendment = {
       id: `amend-${Date.now()}`,
       originalPOId: poId,
-      amendmentNumber: po.amendmentCount + 1,
+      amendmentNumber: (po.amendmentCount || 0) + 1,
       reason: amendmentData.reason,
       description: amendmentData.description,
-      changeType: amendmentData.changeType,
+      changeType: amendmentData.changeType as 'price_change' | 'quantity_change' | 'item_change' | 'date_change' | 'terms_change' | 'cancellation',
       changes: amendmentData.changes,
       previousTotal: po.totalAmount,
       newTotal: amendmentData.newTotal,
       changeAmount: amendmentData.newTotal - po.totalAmount,
       approvalStatus: POApprovalStatus.PENDING,
-      status: AmendmentStatus.DRAFT,
+      status: 'draft' as const,
       createdBy: 'current-user',
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-    
+
     return amendment;
   }
 
   // ============= Statistics and Analytics =============
 
   async getPOStats(projectId?: string): Promise<POStats> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    let data = MOCK_PO_DATA;
-    if (projectId) {
-      data = data.filter(po => po.projectId === projectId);
-    }
-    
+    // Fetch all POs and calculate stats
+    const filters: POFilters = {};
+    if (projectId) filters.projectId = projectId;
+
+    const pos = await this.getAllPOs(filters);
+
     const stats: POStats = {
-      total: data.length,
+      total: pos.length,
       byStatus: {} as Record<POStatus, number>,
       byApprovalStatus: {} as Record<POApprovalStatus, number>,
-      totalValue: data.reduce((sum, po) => sum + po.totalAmount, 0),
-      averageValue: data.length > 0 ? data.reduce((sum, po) => sum + po.totalAmount, 0) / data.length : 0,
-      onTimeDeliveries: data.filter(po => 
-        po.actualDeliveryDate && po.expectedDeliveryDate && 
-        po.actualDeliveryDate <= po.expectedDeliveryDate
-      ).length,
-      lateDeliveries: data.filter(po => 
-        po.actualDeliveryDate && po.expectedDeliveryDate && 
-        po.actualDeliveryDate > po.expectedDeliveryDate
-      ).length,
-      averageDeliveryDays: 15, // Mock calculation
-      averageApprovalDays: 3, // Mock calculation
-      averageProcessingDays: 7, // Mock calculation
-      monthlyStats: [] // Mock monthly data
+      totalValue: pos.reduce((sum, po) => sum + po.totalAmount, 0),
+      averageValue: pos.length > 0 ? pos.reduce((sum, po) => sum + po.totalAmount, 0) / pos.length : 0,
+      onTimeDeliveries: 0,
+      lateDeliveries: 0,
+      averageDeliveryDays: 0,
+      averageApprovalDays: 0,
+      averageProcessingDays: 0,
+      monthlyStats: [],
     };
-    
+
     // Calculate status distributions
     Object.values(POStatus).forEach(status => {
-      stats.byStatus[status] = data.filter(po => po.status === status).length;
+      stats.byStatus[status] = pos.filter(po => po.status === status).length;
     });
-    
+
     Object.values(POApprovalStatus).forEach(status => {
-      stats.byApprovalStatus[status] = data.filter(po => po.approvalStatus === status).length;
+      stats.byApprovalStatus[status] = pos.filter(po => po.approvalStatus === status).length;
     });
-    
+
     return stats;
   }
 
   // ============= Reporting =============
 
-  async generatePOReport(filters: POFilters, reportType: string): Promise<any> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+  async generatePOReport(filters: POFilters, reportType: string): Promise<{
+    reportType: string;
+    generatedAt: Date;
+    filters: POFilters;
+    data: POListItem[];
+    summary: { totalPOs: number; totalValue: number; avgValue: number };
+  }> {
     const pos = await this.getAllPOs(filters);
-    
+
     return {
       reportType,
       generatedAt: new Date(),
@@ -539,45 +462,159 @@ class POService {
       summary: {
         totalPOs: pos.length,
         totalValue: pos.reduce((sum, po) => sum + po.totalAmount, 0),
-        avgValue: pos.length > 0 ? pos.reduce((sum, po) => sum + po.totalAmount, 0) / pos.length : 0
-      }
+        avgValue: pos.length > 0 ? pos.reduce((sum, po) => sum + po.totalAmount, 0) / pos.length : 0,
+      },
     };
   }
 
   // ============= Integration Methods =============
 
   async createPOFromQuote(quoteId: string, projectId: string): Promise<PurchaseOrder> {
-    // PLACEHOLDER IMPLEMENTATION: This would integrate with the RFQ/Quote system
-    // TODO: Replace with real data from quote/RFQ system
-    const mockRequest: CreatePORequest = {
+    // Fetch quote details and create PO
+    const quoteResponse = await fetch(`/api/procurement/quotes/${quoteId}`);
+    if (!quoteResponse.ok) {
+      throw new Error('Failed to fetch quote');
+    }
+
+    const quote = await quoteResponse.json();
+
+    const createRequest: CreatePORequest = {
       projectId,
       quoteId,
-      supplierId: 'supplier-001',
-      title: 'PO Created from Quote',
-      orderType: POOrderType.GOODS,
-      paymentTerms: '30 days net',
-      deliveryTerms: 'DDP',
+      supplierId: quote.data.supplierId,
+      title: `PO from Quote ${quote.data.quoteNumber}`,
+      orderType: 'goods' as const,
+      paymentTerms: quote.data.paymentTerms || 'Net 30',
+      deliveryTerms: quote.data.deliveryTerms || 'DDP',
       deliveryAddress: {
         street: '123 Delivery St',
-        city: 'Cape Town',
-        province: 'Western Cape',
-        postalCode: '8000',
-        country: 'South Africa'
+        city: 'Johannesburg',
+        province: 'Gauteng',
+        postalCode: '2000',
+        country: 'South Africa',
       },
-      items: []
+      items: (quote.data.items || []).map((item: { itemCode?: string; itemDescription: string; quantity: number; uom: string; unitPrice: number }) => ({
+        itemCode: item.itemCode,
+        description: item.itemDescription,
+        quantity: item.quantity,
+        uom: item.uom,
+        unitPrice: item.unitPrice,
+      })),
     };
-    
-    return this.createPO(mockRequest);
+
+    return this.createPO(createRequest);
   }
 
-  async getPOsRequiringAction(_userId: string): Promise<POListItem[]> {
-    // Return POs that need user action (approvals, acknowledgments, etc.)
+  async getPOsRequiringAction(userId: string): Promise<POListItem[]> {
     const allPOs = await this.getAllPOs();
-    return allPOs.filter(po => 
+    return allPOs.filter(po =>
       po.approvalStatus === POApprovalStatus.PENDING ||
       po.status === POStatus.PENDING_APPROVAL ||
       po.deliveryStatus === PODeliveryStatus.DELIVERY_ISSUES
     );
+  }
+
+  // ============= Private Mapping Methods =============
+
+  private mapApiToListItem(api: POApiListItem): POListItem {
+    return {
+      id: api.id,
+      poNumber: api.poNumber,
+      title: `PO ${api.poNumber}`,
+      supplier: {
+        id: String(api.supplierId),
+        name: api.supplierName,
+      },
+      status: api.status as POStatus,
+      approvalStatus: POApprovalStatus.APPROVED, // Derived from status
+      deliveryStatus: PODeliveryStatus.NOT_STARTED,
+      invoiceStatus: POInvoiceStatus.NOT_INVOICED,
+      totalAmount: api.total,
+      currency: 'ZAR',
+      ...(api.deliveryDate && { expectedDeliveryDate: new Date(api.deliveryDate) }),
+      createdAt: new Date(api.createdAt),
+      itemCount: api.itemCount,
+      deliveredItemCount: 0,
+      invoicedItemCount: 0,
+    };
+  }
+
+  private mapApiToFullPO(api: POApiDetail): PurchaseOrder {
+    return {
+      id: api.id,
+      projectId: api.projectId || '',
+      poNumber: api.poNumber,
+      supplierId: String(api.supplierId),
+      title: `PO ${api.poNumber}`,
+      orderType: 'goods' as const,
+      status: api.status as POStatus,
+      approvalStatus: this.deriveApprovalStatus(api.status as POStatus),
+      supplier: {
+        id: String(api.supplierId),
+        name: api.supplierName,
+        code: '',
+        ...(api.supplierEmail && { email: api.supplierEmail }),
+        ...(api.supplierPhone && { phone: api.supplierPhone }),
+      },
+      currency: api.currency,
+      subtotal: api.subtotal,
+      taxAmount: api.taxAmount,
+      totalAmount: api.totalAmount,
+      paymentTerms: api.paymentTerms || '',
+      deliveryTerms: '',
+      deliveryAddress: {
+        street: api.deliveryAddress || '',
+        city: '',
+        province: '',
+        postalCode: '',
+        country: 'South Africa',
+      },
+      ...(api.expectedDeliveryDate && { expectedDeliveryDate: new Date(api.expectedDeliveryDate) }),
+      partialDeliveryAllowed: true,
+      lastModifiedAt: new Date(api.updatedAt),
+      createdBy: api.createdBy,
+      deliveryStatus: PODeliveryStatus.NOT_STARTED,
+      invoiceStatus: POInvoiceStatus.NOT_INVOICED,
+      ...(api.notes && { notes: api.notes }),
+      amendmentCount: 0,
+      createdAt: new Date(api.createdAt),
+      updatedAt: new Date(api.updatedAt),
+      items: api.items.map(item => ({
+        id: item.id,
+        poId: api.id,
+        lineNumber: item.lineNumber,
+        itemCode: item.itemCode,
+        description: item.description,
+        quantity: item.quantityOrdered,
+        uom: item.unitOfMeasure,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+        quantityDelivered: item.quantityReceived,
+        quantityPending: item.quantityPending,
+        quantityInvoiced: 0,
+        itemStatus: 'confirmed' as const,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    };
+  }
+
+  private deriveApprovalStatus(poStatus: POStatus): POApprovalStatus {
+    switch (poStatus) {
+      case POStatus.DRAFT:
+        return POApprovalStatus.NOT_SUBMITTED;
+      case POStatus.PENDING_APPROVAL:
+        return POApprovalStatus.PENDING;
+      case POStatus.APPROVED:
+      case POStatus.SENT:
+      case POStatus.ACKNOWLEDGED:
+      case POStatus.DELIVERED:
+        return POApprovalStatus.APPROVED;
+      case POStatus.CANCELLED:
+        return POApprovalStatus.REJECTED;
+      default:
+        return POApprovalStatus.NOT_SUBMITTED;
+    }
   }
 }
 

@@ -8,7 +8,7 @@ export interface PurchaseOrder {
   poNumber: string;
   rfqId?: string; // Source RFQ if created from RFQ
   quoteId?: string; // Source Quote if created from quote
-  supplierId: string;
+  supplierId: number; // Database uses integer
   
   // Basic Information
   title: string;
@@ -525,7 +525,7 @@ export interface CreatePORequest {
   projectId: string;
   rfqId?: string;
   quoteId?: string;
-  supplierId: string;
+  supplierId: number; // Database uses integer
   title: string;
   description?: string;
   orderType: POOrderType;
