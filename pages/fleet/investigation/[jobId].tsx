@@ -535,7 +535,7 @@ export default function InvestigationDetailPage() {
                     <select
                       value={classificationFilter}
                       onChange={(e) => setClassificationFilter(e.target.value as ClassificationFilter)}
-                      className="px-3 py-1.5 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+                      className="px-3 py-1.5 bg-[#1a1d23] text-white border border-gray-600 rounded-lg text-sm hover:border-gray-500"
                     >
                       <option value="">All Classifications</option>
                       <option value="AUTHORIZED">Authorized</option>
@@ -544,7 +544,7 @@ export default function InvestigationDetailPage() {
                     <select
                       value={dayTypeFilter}
                       onChange={(e) => setDayTypeFilter(e.target.value as DayTypeFilter)}
-                      className="px-3 py-1.5 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+                      className="px-3 py-1.5 bg-[#1a1d23] text-white border border-gray-600 rounded-lg text-sm hover:border-gray-500"
                     >
                       <option value="">All Days</option>
                       <option value="WEEKDAY">Weekday</option>
@@ -553,7 +553,7 @@ export default function InvestigationDetailPage() {
                     <select
                       value={timeCategoryFilter}
                       onChange={(e) => setTimeCategoryFilter(e.target.value as TimeCategoryFilter)}
-                      className="px-3 py-1.5 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+                      className="px-3 py-1.5 bg-[#1a1d23] text-white border border-gray-600 rounded-lg text-sm hover:border-gray-500"
                     >
                       <option value="">All Times</option>
                       <option value="WORK_HOURS">Work Hours</option>

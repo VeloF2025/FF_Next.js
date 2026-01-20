@@ -348,7 +348,7 @@ export default function FuelAnalyticsPage() {
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value as Period)}
-              className="px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+              className="px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
             >
               <option value="week">Last Week</option>
               <option value="month">Last Month</option>

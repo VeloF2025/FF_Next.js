@@ -183,7 +183,7 @@ export default function FleetInvestigationPage() {
             <select
               value={selectedVehicle}
               onChange={(e) => setSelectedVehicle(e.target.value)}
-              className="w-full md:w-64 px-4 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+              className="w-full md:w-64 px-4 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
             >
               <option value="">Choose a vehicle...</option>
               {vehicles.map((v) => (

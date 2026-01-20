@@ -251,12 +251,12 @@ export default function CheckInTemplatesPage() {
                           value={newItemName}
                           onChange={(e) => setNewItemName(e.target.value)}
                           placeholder="Item name..."
-                          className="flex-1 min-w-[200px] px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+                          className="flex-1 min-w-[200px] px-3 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white hover:border-gray-500"
                         />
                         <select
                           value={newItemCategory}
                           onChange={(e) => setNewItemCategory(e.target.value as CheckItemCategory)}
-                          className="px-3 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
+                          className="px-3 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white hover:border-gray-500"
                         >
                           {Object.entries(categoryLabels).map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>

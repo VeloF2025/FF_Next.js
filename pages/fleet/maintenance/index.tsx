@@ -587,7 +587,7 @@ export default function FleetMaintenancePage() {
                     value={formData.vehicleId}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                    className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                   >
                     <option value="">Select a vehicle...</option>
                     {vehicles.map((v) => (
@@ -608,7 +608,7 @@ export default function FleetMaintenancePage() {
                     value={formData.serviceType}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                    className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                   >
                     {SERVICE_TYPES.map((type) => (
                       <option key={type} value={type}>
@@ -670,7 +670,7 @@ export default function FleetMaintenancePage() {
                       value={formData.lastServiceKm}
                       onChange={handleInputChange}
                       placeholder="Current odometer"
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                     />
                   </div>
                   <div>
@@ -682,7 +682,7 @@ export default function FleetMaintenancePage() {
                       name="lastServiceDate"
                       value={formData.lastServiceDate}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                     />
                   </div>
                 </div>
@@ -699,7 +699,7 @@ export default function FleetMaintenancePage() {
                       value={formData.estimatedCost}
                       onChange={handleInputChange}
                       placeholder="e.g. 3500"
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                     />
                   </div>
                   <div>
@@ -712,7 +712,7 @@ export default function FleetMaintenancePage() {
                       value={formData.providerName}
                       onChange={handleInputChange}
                       placeholder="e.g. Toyota Service"
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]"
+                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
                     />
                   </div>
                 </div>

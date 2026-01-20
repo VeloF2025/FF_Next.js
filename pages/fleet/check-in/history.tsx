@@ -198,7 +198,7 @@ export default function CheckInHistoryPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by vehicle or driver..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700"
+              className="w-full pl-10 pr-4 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white hover:border-gray-500"
             />
           </div>
           <div className="relative">
@@ -206,7 +206,7 @@ export default function CheckInHistoryPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as CheckRecordStatus | '')}
-              className="pl-10 pr-8 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 appearance-none"
+              className="pl-10 pr-8 py-2 border border-gray-600 rounded-lg bg-[#1a1d23] text-white hover:border-gray-500 appearance-none"
             >
               <option value="">All Status</option>
               <option value="pending">Pending</option>

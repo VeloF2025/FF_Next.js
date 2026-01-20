@@ -45,6 +45,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
         dropNumber,
         totalEvents: timeline.length,
         timeline,
+        _version: '2026-01-20-v2',
       });
     }
 
