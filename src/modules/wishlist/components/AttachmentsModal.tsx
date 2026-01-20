@@ -3,7 +3,7 @@
  * Allows viewing, adding, and deleting attachments for wishlist items
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Paperclip, Link, Image, File, Trash2, Upload, ExternalLink } from 'lucide-react';
 import type { WishlistAttachment } from '../types/wishlist';
 
@@ -21,6 +21,23 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
   const [urlInput, setUrlInput] = useState('');
   const [activeTab, setActiveTab] = useState<'list' | 'add-url' | 'add-file'>('list');
   const [error, setError] = useState<string | null>(null);
+
+  // Handle Escape key to close modal
+  const handleEscapeKey = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      onClose();
+    }
+  }, [onClose]);
+
+  // Add/remove escape key listener
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => {
+        document.removeEventListener('keydown', handleEscapeKey);
+      };
+    }
+  }, [isOpen, handleEscapeKey]);
 
   // Fetch attachments
   useEffect(() => {
@@ -150,8 +167,18 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
 
   if (!isOpen) return null;
 
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onClick={handleBackdropClick}
+    >
       <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
@@ -163,8 +190,10 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
             <p className="text-sm text-[var(--ff-text-secondary)] truncate">{itemTitle}</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] transition-colors"
+            className="p-1 rounded-md text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] transition-colors"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
