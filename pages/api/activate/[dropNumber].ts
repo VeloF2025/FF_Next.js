@@ -16,6 +16,7 @@ import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/activate/types/unified.types';
+import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial, fuzzySerialMatch } from '@/modules/activate/services/qaAutoFailService';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 
@@ -26,6 +27,290 @@ neonConfig.webSocketConstructor = ws;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
 });
+
+/**
+ * Quick sync info returned with the response
+ */
+interface QuickSyncInfo {
+  synced: boolean;
+  photosAdded: number;
+  serialChanges: {
+    ontChanged: boolean;
+    upsChanged: boolean;
+    oldOnt: string | null;
+    newOnt: string | null;
+    oldUps: string | null;
+    newUps: string | null;
+  } | null;
+  swapDetected: boolean;
+  swapDetails: string | null;
+  /** Installation mismatch: 1Map serial ≠ OES activated serial */
+  installationMismatch: {
+    detected: boolean;
+    oneMapSerial: string | null;
+    oesSerial: string | null;
+    details: string;
+  } | null;
+  error: string | null;
+}
+
+/**
+ * Check for installation mismatch between 1Map and OES serials
+ * This happens when technician replaces ONT but doesn't update 1Map
+ */
+async function checkInstallationMismatch(
+  dropNumber: string,
+  oneMapOntSerial: string | null
+): Promise<QuickSyncInfo['installationMismatch']> {
+  try {
+    // Query OES for the activated serial
+    const oesResult = await pool.query<{ serial_number: string | null }>(
+      `SELECT serial_number FROM oes_activations WHERE drop_number = $1 LIMIT 1`,
+      [dropNumber]
+    );
+
+    if (oesResult.rows.length === 0) {
+      // DR not activated yet - no mismatch possible
+      return null;
+    }
+
+    const oesSerial = oesResult.rows[0]?.serial_number || null;
+
+    if (!oesSerial || !oneMapOntSerial) {
+      // Can't compare if either is missing
+      return null;
+    }
+
+    // Use fuzzy match to allow for minor OCR/scan differences (1-2 chars)
+    const matchResult = fuzzySerialMatch(oneMapOntSerial, oesSerial);
+
+    if (matchResult.isMatch) {
+      // Serials match (exact or fuzzy) - no mismatch
+      return null;
+    }
+
+    // Installation mismatch detected!
+    return {
+      detected: true,
+      oneMapSerial: oneMapOntSerial,
+      oesSerial: oesSerial,
+      details: `1Map shows ${oneMapOntSerial} but OES activated ${oesSerial} - technician may have replaced ONT without updating 1Map`,
+    };
+  } catch (error) {
+    log.warn(`Failed to check installation mismatch for ${dropNumber}`, { error });
+    return null;
+  }
+}
+
+/**
+ * Quick sync from OneMap - called on every DR view
+ * Compares current data with OneMap and tracks changes
+ */
+async function quickSyncFromOneMap(
+  dropNumber: string,
+  currentReview: UnifiedReview
+): Promise<QuickSyncInfo> {
+  const syncInfo: QuickSyncInfo = {
+    synced: false,
+    photosAdded: 0,
+    serialChanges: null,
+    swapDetected: false,
+    swapDetails: null,
+    installationMismatch: null,
+    error: null,
+  };
+
+  try {
+    // Fetch from OneMap with short timeout (5s)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 422) {
+        // Record not on OneMap yet - that's OK, not an error
+        return syncInfo;
+      }
+      syncInfo.error = `OneMap returned ${response.status}`;
+      return syncInfo;
+    }
+
+    const data = await response.json();
+    const localPhotos = data.local_photos || [];
+
+    // Extract ONT serial from barcode (same logic as sync script)
+    let ontSerial: string | null = null;
+    if (data.ont_barcode) {
+      const match = data.ont_barcode.match(/\(S\)([^(]+)/);
+      if (match) {
+        ontSerial = match[1].trim();
+      } else if (!data.ont_barcode.includes('(')) {
+        ontSerial = data.ont_barcode.trim();
+      }
+    }
+    const upsSerial = data.ups_serial || null;
+
+    // Current values from database
+    const currentOnt = currentReview.ont_serial_scanned || null;
+    const currentUps = currentReview.ups_serial_scanned || null;
+    const currentPhotoCount = currentReview.photo_count || 0;
+
+    // Detect changes
+    const ontChanged = ontSerial !== currentOnt && ontSerial !== null;
+    const upsChanged = upsSerial !== currentUps && upsSerial !== null;
+    const photosChanged = localPhotos.length > currentPhotoCount;
+
+    // Check for swapped serials using the new values
+    const swapCheck = detectSwappedSerials(ontSerial, upsSerial);
+
+    if (ontChanged || upsChanged || photosChanged) {
+      // Map photos
+      const photos = localPhotos.map((photo: { filename: string; type: string; size?: number }) => ({
+        filename: photo.filename,
+        step: mapPhotoTypeToStep(photo.type),
+        url: `/api/activate/photo/${dropNumber}/${photo.filename}`,
+        size: photo.size,
+      }));
+
+      // Update the database
+      await pool.query(
+        `UPDATE dr_photo_unified_reviews
+         SET photo_source = COALESCE(photo_source, $1),
+             photo_count = GREATEST(photo_count, $2),
+             photos_metadata = CASE WHEN $2 > photo_count THEN $3 ELSE photos_metadata END,
+             ont_serial_scanned = COALESCE($4, ont_serial_scanned),
+             ups_serial_scanned = COALESCE($5, ups_serial_scanned),
+             updated_at = NOW()
+         WHERE drop_number = $6`,
+        [
+          'onemap',
+          photos.length,
+          JSON.stringify(photos),
+          ontSerial,
+          upsSerial,
+          dropNumber,
+        ]
+      );
+
+      syncInfo.synced = true;
+      syncInfo.photosAdded = Math.max(0, photos.length - currentPhotoCount);
+
+      // Track serial changes
+      if (ontChanged || upsChanged) {
+        syncInfo.serialChanges = {
+          ontChanged,
+          upsChanged,
+          oldOnt: currentOnt,
+          newOnt: ontSerial,
+          oldUps: currentUps,
+          newUps: upsSerial,
+        };
+
+        // Log to activity log
+        await pool.query(
+          `INSERT INTO dr_activity_log (id, drop_number, event_type, event_data, actor, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+          [
+            dropNumber,
+            'SERIAL_UPDATE',
+            JSON.stringify({
+              source: 'quick_sync',
+              changes: {
+                ont: ontChanged ? { old: currentOnt, new: ontSerial } : null,
+                ups: upsChanged ? { old: currentUps, new: upsSerial } : null,
+              },
+              swap_detected: swapCheck.swapped,
+              swap_details: swapCheck.details,
+            }),
+            'system',
+          ]
+        );
+
+        log.info(`Serial change detected for ${dropNumber}`, {
+          ontChanged,
+          upsChanged,
+          oldOnt: currentOnt,
+          newOnt: ontSerial,
+          oldUps: currentUps,
+          newUps: upsSerial,
+          swapDetected: swapCheck.swapped,
+        });
+      }
+
+      // Track swap detection even if serials didn't change (for existing swapped serials)
+      syncInfo.swapDetected = swapCheck.swapped;
+      syncInfo.swapDetails = swapCheck.swapped ? swapCheck.details : null;
+
+      if (swapCheck.swapped && !ontChanged && !upsChanged) {
+        // Existing swapped serials - log if not already logged
+        log.warn(`Swapped serials detected for ${dropNumber}`, {
+          ont: ontSerial || currentOnt,
+          ups: upsSerial || currentUps,
+          details: swapCheck.details,
+        });
+      }
+    } else {
+      // No data changes, but still check for swap
+      syncInfo.swapDetected = swapCheck.swapped;
+      syncInfo.swapDetails = swapCheck.swapped ? swapCheck.details : null;
+    }
+
+    // Check for installation mismatch (1Map serial vs OES activated serial)
+    // Use the latest serial (either from sync or existing)
+    const effectiveOntSerial = ontSerial || currentOnt;
+    const installationMismatch = await checkInstallationMismatch(dropNumber, effectiveOntSerial);
+
+    if (installationMismatch) {
+      syncInfo.installationMismatch = installationMismatch;
+
+      // Check if already logged (avoid duplicates)
+      const existingLog = await pool.query(
+        `SELECT 1 FROM dr_activity_log
+         WHERE drop_number = $1 AND event_type = 'INSTALLATION_MISMATCH'
+         LIMIT 1`,
+        [dropNumber]
+      );
+
+      if (existingLog.rows.length === 0) {
+        // First time detecting this mismatch - log to activity log
+        await pool.query(
+          `INSERT INTO dr_activity_log (id, drop_number, event_type, event_data, actor, created_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+          [
+            dropNumber,
+            'INSTALLATION_MISMATCH',
+            JSON.stringify({
+              source: 'quick_sync',
+              onemap_serial: installationMismatch.oneMapSerial,
+              oes_serial: installationMismatch.oesSerial,
+              details: installationMismatch.details,
+            }),
+            'system',
+          ]
+        );
+
+        log.warn(`Installation mismatch detected for ${dropNumber}`, {
+          oneMapSerial: installationMismatch.oneMapSerial,
+          oesSerial: installationMismatch.oesSerial,
+        });
+      }
+    }
+
+    return syncInfo;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      syncInfo.error = 'OneMap sync timed out (5s)';
+    } else {
+      syncInfo.error = error instanceof Error ? error.message : 'Unknown error';
+    }
+    log.warn(`Quick sync failed for ${dropNumber}`, { error: syncInfo.error });
+    return syncInfo;
+  }
+}
 
 /**
  * GET /api/activate/[dropNumber]
@@ -216,8 +501,38 @@ async function handleGet(
       }
     }
 
-    log.info(`Successfully fetched unified review: ${dropNumber}`);
-    return apiResponse.success(res, review);
+    // Quick sync from OneMap on every view (checks for new photos and serial changes)
+    let syncInfo: QuickSyncInfo | null = null;
+    if (review) {
+      syncInfo = await quickSyncFromOneMap(dropNumber, review);
+
+      // If sync made changes, re-fetch the updated record
+      if (syncInfo.synced) {
+        const refreshedResult = await pool.query<UnifiedReview>(
+          `SELECT * FROM dr_photo_unified_reviews WHERE drop_number = $1`,
+          [dropNumber]
+        );
+        if (refreshedResult.rows[0]) {
+          review = refreshedResult.rows[0];
+        }
+      }
+    }
+
+    log.info(`Successfully fetched unified review: ${dropNumber}`, {
+      syncInfo: syncInfo ? {
+        synced: syncInfo.synced,
+        photosAdded: syncInfo.photosAdded,
+        serialsChanged: !!syncInfo.serialChanges,
+        swapDetected: syncInfo.swapDetected,
+        installationMismatch: !!syncInfo.installationMismatch,
+      } : null,
+    });
+
+    // Return review with sync info
+    return apiResponse.success(res, {
+      ...review,
+      _syncInfo: syncInfo,
+    });
   } catch (error) {
     log.error('Error fetching unified review:', error);
     return apiResponse.internalError(res, error);
