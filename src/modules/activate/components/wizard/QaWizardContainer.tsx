@@ -13,6 +13,7 @@ import { PhotoReviewPhase } from './PhotoReviewPhase';
 import { DataValidationPhase } from './DataValidationPhase';
 import { FinalDecisionPhase } from './FinalDecisionPhase';
 import { FeedbackPhase } from './FeedbackPhase';
+import { WizardProgressOverlay, type Sync1MapPhase } from './WizardProgressOverlay';
 
 interface QaWizardContainerProps {
   dropNumber: string;
@@ -111,6 +112,7 @@ export function QaWizardContainer({
   const [error, setError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [project, setProject] = useState<string | null>(null);
+  const [syncPhase, setSyncPhase] = useState<Sync1MapPhase | null>(null);
 
   // Load initial state from API
   useEffect(() => {
@@ -120,7 +122,8 @@ export function QaWizardContainer({
   const loadWizardState = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setDataStatus('Ensuring data is up to date...');
+    setSyncPhase('fetching');
+    setDataStatus('Syncing from 1Map...');
 
     try {
       // STEP 0: Ensure data is complete before checking prerequisites
@@ -144,6 +147,7 @@ export function QaWizardContainer({
         }
       }
 
+      setSyncPhase('checking');
       setDataStatus('Checking prerequisites...');
 
       // STEP 1: Check prerequisites
@@ -178,6 +182,8 @@ export function QaWizardContainer({
       }
 
       // Fetch photos for the drop (POST with body, force refresh to get step mappings)
+      setSyncPhase('loading_photos');
+      setDataStatus('Loading photos...');
       try {
         const photosResponse = await fetch('/api/activate/fetch-photos', {
           method: 'POST',
@@ -247,12 +253,16 @@ export function QaWizardContainer({
           }));
         }
       }
+    // Brief complete animation
+      setSyncPhase('complete');
+      await new Promise(resolve => setTimeout(resolve, 600));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load wizard state';
       setError(message);
       log.error('QaWizard', `Failed to load state for ${dropNumber}: ${message}`);
     } finally {
       setLoading(false);
+      setSyncPhase(null);
       setDataStatus(null);
     }
   }, [dropNumber]);
@@ -522,6 +532,15 @@ export function QaWizardContainer({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+      {/* 1Map Sync Progress Overlay */}
+      <WizardProgressOverlay
+        isVisible={syncPhase !== null}
+        operationType="sync_1map"
+        phase={syncPhase || 'fetching'}
+        dropNumber={dropNumber}
+        photoCount={state.prerequisites.photoCount || undefined}
+      />
+
       {/* Compact phase indicator */}
       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
         {renderPhaseIndicator()}

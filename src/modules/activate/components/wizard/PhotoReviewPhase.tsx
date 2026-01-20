@@ -19,6 +19,7 @@ import type {
   Photo,
 } from '../../types/unified.types';
 import { STEP_LABELS } from '../../utils/stepMapper';
+import { WizardProgressOverlay, type CategorizationPhase } from './WizardProgressOverlay';
 
 interface PhotoReviewPhaseProps {
   dropNumber: string;
@@ -60,6 +61,9 @@ export function PhotoReviewPhase({
 
   // Edit mode - allows editing approved categorizations without re-running VLM
   const [isEditing, setIsEditing] = useState(false);
+
+  // Categorization progress phase
+  const [categorizationPhase, setCategorizationPhase] = useState<CategorizationPhase | null>(null);
 
   // Load categorization state on mount
   useEffect(() => {
@@ -108,18 +112,27 @@ export function PhotoReviewPhase({
 
   const runCategorization = async () => {
     setIsProcessing(true);
+    setCategorizationPhase('analyzing');
     setError(null);
 
     try {
+      // Show processing phase after short delay
+      setTimeout(() => setCategorizationPhase('processing'), 800);
+
       const response = await fetch('/api/activate/categorize-photos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dropNumber, force: true }),
       });
 
+      setCategorizationPhase('saving');
       const data = await response.json();
 
       if (data.success) {
+        // Brief complete animation
+        setCategorizationPhase('complete');
+        await new Promise(resolve => setTimeout(resolve, 600));
+
         setState({
           status: 'categorized',
           results: data.data.categorizations || [],
@@ -136,6 +149,7 @@ export function PhotoReviewPhase({
       setError('Failed to run categorization');
     } finally {
       setIsProcessing(false);
+      setCategorizationPhase(null);
     }
   };
 
@@ -281,6 +295,15 @@ export function PhotoReviewPhase({
   if (state.status === 'pending') {
     return (
       <div className="text-center py-8">
+        {/* Categorization Progress Overlay */}
+        <WizardProgressOverlay
+          isVisible={categorizationPhase !== null}
+          operationType="categorization"
+          phase={categorizationPhase || 'analyzing'}
+          dropNumber={dropNumber}
+          photoCount={photoCount}
+        />
+
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 mb-4">
           <span className="text-3xl">🏷️</span>
         </div>
@@ -544,6 +567,15 @@ export function PhotoReviewPhase({
     // Normal approved view (not editing)
     return (
       <div className="space-y-6">
+        {/* Categorization Progress Overlay */}
+        <WizardProgressOverlay
+          isVisible={categorizationPhase !== null}
+          operationType="categorization"
+          phase={categorizationPhase || 'analyzing'}
+          dropNumber={dropNumber}
+          photoCount={photoCount}
+        />
+
         {/* Success banner */}
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -666,6 +698,15 @@ export function PhotoReviewPhase({
   // Categorized state - awaiting review/approval
   return (
     <div className="space-y-4">
+      {/* Categorization Progress Overlay */}
+      <WizardProgressOverlay
+        isVisible={categorizationPhase !== null}
+        operationType="categorization"
+        phase={categorizationPhase || 'analyzing'}
+        dropNumber={dropNumber}
+        photoCount={photoCount}
+      />
+
       {/* Photo lightbox */}
       {lightboxPhoto && (
         <div
