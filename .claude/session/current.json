@@ -1,28 +1,29 @@
 {
-  "session_id": "2026-01-20-kb-update",
+  "session_id": "2026-01-20-pdfcraft-deploy",
   "started_at": "2026-01-20T10:00:00Z",
-  "last_updated": "2026-01-20T17:30:00Z",
+  "last_updated": "2026-01-20T13:59:08.527Z",
   "working_on": {
-    "task": "Knowledge Base Maintenance",
-    "status": "active",
+    "task": "PDFCraft Deployment & Integration",
+    "status": "completed",
     "progress": [
-      "✅ KB System implemented (Phase 1-6)",
-      "✅ All 40 modules have .claude.md context files",
-      "✅ BMad commands removed (conflicting with /kb)",
-      "✅ /kb command created in .claude/commands/"
+      "✅ PDFCraft deployed to Velocity server",
+      "✅ Nginx proxy configured at /pdf-tools/",
+      "✅ basePath added to next.config.js",
+      "✅ Sidebar link working (external, new tab)",
+      "✅ Knowledge base updated"
     ],
-    "last_action": "KB status check and session update"
+    "last_action": "Updated KB with PDFCraft deployment info"
   },
   "kb_status": {
-    "timestamp": "2026-01-20T17:30:00Z",
+    "timestamp": "2026-01-20T18:00:00Z",
     "total_modules": 40,
     "modules_with_claude_md": 40,
     "coverage": "100%",
     "learnings_pending": 0
   },
   "recent_work": [
+    "PDFCraft nginx proxy deployment at /pdf-tools/",
     "WhatsApp Portal multi-phone support",
-    "PDF Tools module with PDFCraft integration",
     "Sidebar external link support",
     "Wishlist hydration fix"
   ],
@@ -44,20 +45,36 @@
     "recent_commits": [
       "398cd443 - docs(wa-monitor): update knowledge base",
       "532457f2 - chore: remove unused BMad commands",
-      "2dc1f085 - feat(claude): add self-maintaining KB system"
+      "68be122b - fix(sidebar): use nginx proxy path for PDF Tools"
     ]
   },
   "key_systems": {
     "activate": "VLM-powered DR photo review with 5-phase QA wizard",
     "wa-monitor": "WhatsApp QA monitoring (fully isolated)",
     "procurement": "BOQ, RFQ, PO workflow",
-    "communications": "WhatsApp admin portal with multi-phone support",
+    "communications": "WhatsApp admin portal + PDFCraft PDF tools",
     "fleet": "Vehicle check-in with VLM plate/odometer extraction"
   },
   "infrastructure": {
     "server": "100.96.203.105 (Velocity)",
     "vlm": "Qwen3-VL-8B on port 8100",
+    "pdfcraft": "Port 3007, nginx proxy at /pdf-tools/",
     "database": "Neon PostgreSQL (production branch)",
     "staging": "vf.fibreflow.app:3006"
+  },
+  "pdfcraft": {
+    "url": "https://vf.fibreflow.app/pdf-tools/",
+    "source": "/home/hein/Workspace/PDFCraft",
+    "deployment": "/home/velo/pdfcraft/out/",
+    "service": "pdfcraft.service",
+    "port": 3007,
+    "basePath": "/pdf-tools",
+    "features": [
+      "Merge PDF",
+      "Split PDF",
+      "Compress PDF",
+      "Edit PDF",
+      "Convert to/from PDF"
+    ]
   }
 }

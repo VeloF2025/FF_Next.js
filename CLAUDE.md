@@ -608,10 +608,27 @@ echo 'velo2026' | sudo -S journalctl -u fibreflow.service -f   # View logs
 ### Additional Services
 | Service | Port | URL |
 |---------|------|-----|
+| **PDFCraft** | 3007 | https://vf.fibreflow.app/pdf-tools/ |
 | **Portainer** | 9443 | https://100.96.203.105:9443 |
 | **Grafana** | 3000 | http://100.96.203.105:3000 |
 | **Ollama** | 11434 | http://100.96.203.105:11434 |
 | **Qdrant** | 6333 | http://100.96.203.105:6333 |
+
+### PDFCraft (PDF Tools)
+**URL:** `https://vf.fibreflow.app/pdf-tools/`
+- **Source:** `/home/hein/Workspace/PDFCraft`
+- **Deployment:** `/home/velo/pdfcraft/out/` (static export)
+- **Service:** `pdfcraft.service` on port 3007
+- **Nginx:** Proxied at `/pdf-tools/` in `/etc/nginx/sites-available/vf-fibreflow`
+- **Config:** `basePath: '/pdf-tools'` in next.config.js
+
+**Rebuild & Deploy:**
+```bash
+cd /home/hein/Workspace/PDFCraft
+npm run build
+tar czf - out | sshpass -p 'velo2026' ssh velo@100.96.203.105 "rm -rf /home/velo/pdfcraft/out && tar xzf - -C /home/velo/pdfcraft/"
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart pdfcraft"
+```
 
 ### Rollback Process
 ```bash
