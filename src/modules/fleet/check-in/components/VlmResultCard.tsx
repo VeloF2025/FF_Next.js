@@ -1,11 +1,21 @@
 /**
  * VlmResultCard Component
  * Displays VLM extraction results with manual override option
+ * Shows validation warnings for flagged or rejected readings
  */
 
 import React, { useState } from 'react';
-import { Loader2, CheckCircle2, AlertCircle, Edit3, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Edit3, AlertTriangle, XCircle } from 'lucide-react';
 import type { VlmAnalysisType, CheckPhotoType } from '../../types/check-in.types';
+
+interface VlmValidation {
+  isValid: boolean;
+  validatedReading: number | null;
+  originalReading: number | null;
+  warning: string | null;
+  warningLevel: 'none' | 'low' | 'medium' | 'high';
+  suggestedAction: 'accept' | 'verify' | 'reject';
+}
 
 interface VlmResult {
   photoType: CheckPhotoType;
@@ -16,6 +26,7 @@ interface VlmResult {
   plateMatches?: boolean;
   isProcessing: boolean;
   error?: string;
+  validation?: VlmValidation;
 }
 
 interface VlmResultCardProps {
@@ -74,8 +85,18 @@ export function VlmResultCard({
     );
   }
 
-  // Error state
-  if (vlmResult.error) {
+  // Check for validation rejection (digit confusion, impossible jump)
+  const isRejected = vlmResult.validation?.suggestedAction === 'reject';
+  const needsVerification = vlmResult.validation?.suggestedAction === 'verify';
+  const validationWarning = vlmResult.validation?.warning;
+
+  // Error state (including validation rejection)
+  if (vlmResult.error || isRejected) {
+    const isDigitConfusion = validationWarning?.includes('digit confusion');
+    const errorMessage = isRejected
+      ? (isDigitConfusion ? 'Reading rejected - digit confusion detected' : 'Reading rejected - verify manually')
+      : 'Could not read - enter manually';
+
     return (
       <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
         <div className="flex items-center gap-3">
@@ -85,11 +106,21 @@ export function VlmResultCard({
           <div className="flex-1">
             <p className="text-sm font-medium text-red-700 dark:text-red-300">{title}</p>
             <div className="flex items-center gap-2 mt-1">
-              <AlertCircle className="w-4 h-4 text-red-500" />
+              {isRejected ? (
+                <XCircle className="w-4 h-4 text-red-500" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-500" />
+              )}
               <span className="text-sm text-red-600 dark:text-red-400">
-                Could not read - enter manually
+                {errorMessage}
               </span>
             </div>
+            {/* Show validation details for rejected readings */}
+            {isRejected && validationWarning && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded">
+                ⚠️ {validationWarning}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -130,23 +161,30 @@ export function VlmResultCard({
   }
 
   // Success state - show extracted value
-  const bgColor = isHighConfidence
-    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-    : isMediumConfidence
-      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-      : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800';
+  // Use amber for verification warnings, green for accepted, orange/yellow for confidence
+  const bgColor = needsVerification
+    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700'
+    : isHighConfidence
+      ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+      : isMediumConfidence
+        ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+        : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800';
 
-  const textColor = isHighConfidence
-    ? 'text-green-700 dark:text-green-300'
-    : isMediumConfidence
-      ? 'text-yellow-700 dark:text-yellow-300'
-      : 'text-orange-700 dark:text-orange-300';
+  const textColor = needsVerification
+    ? 'text-amber-700 dark:text-amber-300'
+    : isHighConfidence
+      ? 'text-green-700 dark:text-green-300'
+      : isMediumConfidence
+        ? 'text-yellow-700 dark:text-yellow-300'
+        : 'text-orange-700 dark:text-orange-300';
 
-  const iconBgColor = isHighConfidence
-    ? 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400'
-    : isMediumConfidence
-      ? 'bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-400'
-      : 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400';
+  const iconBgColor = needsVerification
+    ? 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400'
+    : isHighConfidence
+      ? 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400'
+      : isMediumConfidence
+        ? 'bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-400'
+        : 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400';
 
   return (
     <div className={`p-4 border rounded-lg ${bgColor}`}>
@@ -222,8 +260,20 @@ export function VlmResultCard({
         )}
       </div>
 
+      {/* Validation verification warning (large km jump, etc.) */}
+      {needsVerification && validationWarning && !isEditing && (
+        <div className="mt-3 p-2 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-700 dark:text-amber-300">
+              <strong>Verification needed:</strong> {validationWarning}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Low confidence warning */}
-      {!isHighConfidence && !isEditing && (
+      {!isHighConfidence && !needsVerification && !isEditing && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {isMediumConfidence
             ? 'Please verify this reading is correct'
