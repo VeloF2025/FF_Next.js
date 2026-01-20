@@ -3,7 +3,32 @@ export { StandardModuleHeader } from './StandardModuleHeader';
 export { StandardSummaryCards } from './StandardSummaryCards';
 export { StandardSearchFilter } from './StandardSearchFilter';
 export { StandardDataTable, Pagination } from './StandardDataTable';
-export { StandardActionButtons, StatusBadge, PriorityBadge } from './StandardActionButtons';
+export { StandardActionButtons } from './StandardActionButtons';
+
+// NEW: Unified UI Components (following UI/UX Specification)
+// @see docs/UI_UX_SPECIFICATION.md
+export { StatCard, StatCardGrid, STAT_CARD_COLORS } from './StatCard';
+export type { StatCardProps, StatCardGridProps, StatCardColorType } from './StatCard';
+
+export { Badge, StatusBadge, PriorityBadge, CountBadge, BADGE_COLORS, PRIORITY_COLORS } from './Badge';
+export type { BadgeProps, StatusBadgeProps, PriorityBadgeProps, CountBadgeProps, BadgeVariant, BadgeSize } from './Badge';
+
+export { DarkSelect, InlineSelect } from './DarkSelect';
+export type { DarkSelectProps, InlineSelectProps, SelectOption, SelectOptionGroup, DarkSelectSize } from './DarkSelect';
+
+// Radix UI Select (dark themed)
+export {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectScrollDownButton,
+  SelectScrollUpButton,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from './select';
 
 // Existing UI components
 export { LoadingSpinner } from './LoadingSpinner';

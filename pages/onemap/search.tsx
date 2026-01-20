@@ -37,7 +37,7 @@ export default function OneMapSearchPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">Type</label>
-                  <select className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg">
+                  <select className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option>All Types</option>
                     <option>Poles</option>
                     <option>Cables</option>
@@ -47,7 +47,7 @@ export default function OneMapSearchPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">Status</label>
-                  <select className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg">
+                  <select className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option>All Status</option>
                     <option>Active</option>
                     <option>Planned</option>
@@ -57,7 +57,7 @@ export default function OneMapSearchPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">Date Range</label>
-                  <select className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg">
+                  <select className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option>All Time</option>
                     <option>Last 7 Days</option>
                     <option>Last 30 Days</option>
