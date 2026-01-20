@@ -276,6 +276,7 @@ export async function getActivityHistory(
 
 /**
  * Get activity timeline for UI display
+ * Combines activity log entries with DR timestamp fields for a complete timeline
  *
  * @param drNumber - DR number
  * @param limit - Max entries to return
@@ -285,9 +286,13 @@ export async function getActivityTimeline(
   drNumber: string,
   limit: number = 50
 ): Promise<TimelineEntry[]> {
+  const sql = getDb();
+  const timeline: TimelineEntry[] = [];
+
+  // 1. Get activity log entries
   const history = await getActivityHistory(drNumber, limit);
 
-  return history.map((entry) => {
+  for (const entry of history) {
     const metadata = EVENT_METADATA[entry.event_type] || {
       title: entry.event_type,
       icon: '📌',
@@ -345,7 +350,7 @@ export async function getActivityTimeline(
         description = JSON.stringify(data).slice(0, 100);
     }
 
-    return {
+    timeline.push({
       id: entry.id,
       timestamp: entry.created_at,
       eventType: entry.event_type,
@@ -355,8 +360,268 @@ export async function getActivityTimeline(
       iconColor: metadata.iconColor,
       actor: entry.actor,
       metadata: entry.event_data,
-    };
+    });
+  }
+
+  // 2. Get DR timestamps from dr_photo_unified_reviews
+  try {
+    const drRows = await sql`
+      SELECT
+        wa_received_at,
+        whatsapp_submitted_at,
+        acknowledged_at,
+        photos_fetched_at,
+        vlm_categorized_at,
+        ai_evaluated_at,
+        vlm_qa_validated_at,
+        human_review_completed_at,
+        qa_decision_at,
+        qa_decision,
+        feedback_sent_at,
+        serial_swap_detected_at,
+        serial_swap_corrected_at,
+        last_resubmitted_at,
+        photo_count,
+        submitter_id,
+        project
+      FROM dr_photo_unified_reviews
+      WHERE drop_number = ${drNumber}
+    `;
+
+    if (drRows.length > 0) {
+      const dr = drRows[0];
+
+      // Add events from DR timestamps (only if not already in activity log)
+      const existingEventTypes = new Set(history.map(h => h.event_type));
+
+      // WhatsApp Received
+      if (dr.wa_received_at && !existingEventTypes.has('whatsapp_submitted')) {
+        timeline.push({
+          id: `dr-wa-received-${drNumber}`,
+          timestamp: new Date(dr.wa_received_at),
+          eventType: 'whatsapp_submitted',
+          title: '📱 DR Submitted via WhatsApp',
+          description: dr.submitter_id ? `From ${dr.submitter_id}` : 'Received via WhatsApp',
+          icon: '📱',
+          iconColor: 'text-green-500',
+          actor: 'whatsapp',
+          metadata: { source: 'dr_record', submitter: dr.submitter_id },
+        });
+      }
+
+      // Acknowledgment sent
+      if (dr.acknowledged_at && !existingEventTypes.has('dr_acknowledged')) {
+        timeline.push({
+          id: `dr-ack-${drNumber}`,
+          timestamp: new Date(dr.acknowledged_at),
+          eventType: 'dr_acknowledged',
+          title: '✓ Acknowledgment Sent',
+          description: dr.photo_count ? `${dr.photo_count} photos received` : 'DR acknowledged',
+          icon: '✓',
+          iconColor: 'text-blue-500',
+          actor: 'system',
+          metadata: { source: 'dr_record', photoCount: dr.photo_count },
+        });
+      }
+
+      // Photos fetched
+      if (dr.photos_fetched_at && !existingEventTypes.has('photos_fetched')) {
+        timeline.push({
+          id: `dr-photos-${drNumber}`,
+          timestamp: new Date(dr.photos_fetched_at),
+          eventType: 'photos_fetched',
+          title: '📷 Photos Fetched',
+          description: dr.photo_count ? `${dr.photo_count} photos from OneMap` : 'Photos fetched from OneMap',
+          icon: '📷',
+          iconColor: 'text-purple-500',
+          actor: 'system',
+          metadata: { source: 'dr_record', count: dr.photo_count },
+        });
+      }
+
+      // VLM Categorization
+      if (dr.vlm_categorized_at && !existingEventTypes.has('attribute_categorized')) {
+        timeline.push({
+          id: `dr-categorized-${drNumber}`,
+          timestamp: new Date(dr.vlm_categorized_at),
+          eventType: 'attribute_categorized',
+          title: '🏷️ AI Photo Categorization',
+          description: 'Photos categorized by VLM',
+          icon: '🏷️',
+          iconColor: 'text-indigo-500',
+          actor: 'vlm',
+          metadata: { source: 'dr_record' },
+        });
+      }
+
+      // AI Data Extraction
+      if (dr.ai_evaluated_at) {
+        timeline.push({
+          id: `dr-ai-eval-${drNumber}`,
+          timestamp: new Date(dr.ai_evaluated_at),
+          eventType: 'vlm_qa_completed',
+          title: '🔍 AI Data Extraction',
+          description: 'Power meter, serials extracted by VLM',
+          icon: '🔍',
+          iconColor: 'text-yellow-500',
+          actor: 'vlm',
+          metadata: { source: 'dr_record' },
+        });
+      }
+
+      // VLM QA Validation
+      if (dr.vlm_qa_validated_at) {
+        timeline.push({
+          id: `dr-vlm-qa-${drNumber}`,
+          timestamp: new Date(dr.vlm_qa_validated_at),
+          eventType: 'vlm_qa_completed',
+          title: '✅ VLM QA Validated',
+          description: 'Automated QA validation completed',
+          icon: '✅',
+          iconColor: 'text-green-500',
+          actor: 'vlm',
+          metadata: { source: 'dr_record' },
+        });
+      }
+
+      // Human Review Completed
+      if (dr.human_review_completed_at && !existingEventTypes.has('human_review_completed')) {
+        timeline.push({
+          id: `dr-human-review-${drNumber}`,
+          timestamp: new Date(dr.human_review_completed_at),
+          eventType: 'human_review_completed',
+          title: '👤 Human Review Completed',
+          description: 'Photo assignments reviewed by QA team',
+          icon: '👤',
+          iconColor: 'text-blue-500',
+          actor: 'qa_team',
+          metadata: { source: 'dr_record' },
+        });
+      }
+
+      // QA Decision (Final)
+      if (dr.qa_decision_at && dr.qa_decision) {
+        const decisionIcon = dr.qa_decision === 'PASS' ? '✅' : dr.qa_decision === 'FAIL' ? '❌' : '🔄';
+        const decisionColor = dr.qa_decision === 'PASS' ? 'text-green-500' : dr.qa_decision === 'FAIL' ? 'text-red-500' : 'text-orange-500';
+        timeline.push({
+          id: `dr-decision-${drNumber}`,
+          timestamp: new Date(dr.qa_decision_at),
+          eventType: 'human_review_completed',
+          title: `${decisionIcon} Final Decision: ${dr.qa_decision}`,
+          description: `QA decision recorded`,
+          icon: decisionIcon,
+          iconColor: decisionColor,
+          actor: 'qa_team',
+          metadata: { source: 'dr_record', decision: dr.qa_decision },
+        });
+      }
+
+      // Feedback Sent
+      if (dr.feedback_sent_at && !existingEventTypes.has('feedback_sent')) {
+        timeline.push({
+          id: `dr-feedback-${drNumber}`,
+          timestamp: new Date(dr.feedback_sent_at),
+          eventType: 'feedback_sent',
+          title: '📤 WhatsApp Feedback Sent',
+          description: 'QA feedback sent to technician',
+          icon: '📤',
+          iconColor: 'text-green-500',
+          actor: 'system',
+          metadata: { source: 'dr_record' },
+        });
+      }
+
+      // Serial Swap Detected
+      if (dr.serial_swap_detected_at && !existingEventTypes.has('SWAP_DETECTED')) {
+        timeline.push({
+          id: `dr-swap-detected-${drNumber}`,
+          timestamp: new Date(dr.serial_swap_detected_at),
+          eventType: 'SWAP_DETECTED',
+          title: '⚠️ Serial Swap Detected',
+          description: 'ONT and UPS serials appear swapped',
+          icon: '⚠️',
+          iconColor: 'text-red-500',
+          actor: 'system',
+          metadata: { source: 'dr_record' },
+        });
+      }
+
+      // Serial Swap Corrected
+      if (dr.serial_swap_corrected_at) {
+        timeline.push({
+          id: `dr-swap-fixed-${drNumber}`,
+          timestamp: new Date(dr.serial_swap_corrected_at),
+          eventType: 'SWAP_DETECTED',
+          title: '✅ Serial Swap Corrected',
+          description: 'Technician fixed the swapped serials in 1Map',
+          icon: '✅',
+          iconColor: 'text-green-500',
+          actor: 'technician',
+          metadata: { source: 'dr_record', corrected: true },
+        });
+      }
+
+      // Resubmission
+      if (dr.last_resubmitted_at) {
+        timeline.push({
+          id: `dr-resubmit-${drNumber}`,
+          timestamp: new Date(dr.last_resubmitted_at),
+          eventType: 'whatsapp_submitted',
+          title: '🔄 DR Resubmitted',
+          description: 'Additional photos submitted',
+          icon: '🔄',
+          iconColor: 'text-orange-500',
+          actor: 'whatsapp',
+          metadata: { source: 'dr_record', resubmission: true },
+        });
+      }
+    }
+  } catch (error) {
+    log.warn('ActivityLog', `Failed to get DR timestamps for ${drNumber}: ${error}`);
+  }
+
+  // 3. Get OES activation data
+  try {
+    const oesRows = await sql`
+      SELECT activation_date, serial_number, team, ont_rx_sig_dbm
+      FROM oes_activations
+      WHERE drop_number = ${drNumber}
+      LIMIT 1
+    `;
+
+    if (oesRows.length > 0) {
+      const oes = oesRows[0];
+      if (oes.activation_date) {
+        timeline.push({
+          id: `oes-activation-${drNumber}`,
+          timestamp: new Date(oes.activation_date),
+          eventType: 'feedback_sent', // Using closest event type
+          title: '⚡ OES Activation',
+          description: `Activated by ${oes.team || 'OES'} - Serial: ${oes.serial_number || 'N/A'}`,
+          icon: '⚡',
+          iconColor: 'text-yellow-500',
+          actor: oes.team || 'oes',
+          metadata: {
+            source: 'oes_activations',
+            serial: oes.serial_number,
+            team: oes.team,
+            rxPower: oes.ont_rx_sig_dbm,
+          },
+        });
+      }
+    }
+  } catch (error) {
+    log.warn('ActivityLog', `Failed to get OES data for ${drNumber}: ${error}`);
+  }
+
+  // Sort by timestamp descending (most recent first)
+  timeline.sort((a, b) => {
+    const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+    const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+    return timeB - timeA;
   });
+
+  return timeline.slice(0, limit);
 }
 
 /**
