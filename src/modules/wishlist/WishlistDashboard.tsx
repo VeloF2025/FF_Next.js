@@ -35,10 +35,14 @@ export function WishlistDashboard() {
     error,
     refetch,
     createItem,
+    updateItem,
     moveItem,
     voteItem,
     deleteItem,
   } = useWishlist();
+
+  // State for editing items
+  const [editItem, setEditItem] = useState<WishlistItem | null>(null);
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -177,6 +181,7 @@ export function WishlistDashboard() {
                   board={board}
                   onVote={voteItem}
                   onDelete={deleteItem}
+                  onEdit={setEditItem}
                   onAttachments={setAttachmentsItem}
                 />
               </DragDropContext>
@@ -224,11 +229,16 @@ export function WishlistDashboard() {
           )}
         </div>
 
-        {/* Add Item Modal */}
+        {/* Add/Edit Item Modal */}
         <AddWishlistItemModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
+          isOpen={isAddModalOpen || !!editItem}
+          onClose={() => {
+            setIsAddModalOpen(false);
+            setEditItem(null);
+          }}
           onSubmit={createItem}
+          onUpdate={updateItem}
+          editItem={editItem}
         />
 
         {/* Attachments Modal */}

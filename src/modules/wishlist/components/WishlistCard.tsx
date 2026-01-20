@@ -2,18 +2,25 @@
  * Wishlist Card Component
  */
 
-import { ThumbsUp, MessageSquare, Trash2, Clock, Paperclip } from 'lucide-react';
+import { ThumbsUp, MessageSquare, Trash2, Clock, Paperclip, Pencil } from 'lucide-react';
 import type { WishlistItem } from '../types/wishlist';
 
 interface WishlistCardProps {
   item: WishlistItem;
   onVote: (itemId: string) => Promise<any>;
   onDelete: (itemId: string) => Promise<void>;
+  onEdit?: (item: WishlistItem) => void;
   onAttachments?: (item: WishlistItem) => void;
   isDragging?: boolean;
 }
 
-export function WishlistCard({ item, onVote, onDelete, onAttachments, isDragging }: WishlistCardProps) {
+export function WishlistCard({ item, onVote, onDelete, onEdit, onAttachments, isDragging }: WishlistCardProps) {
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger edit when clicking action buttons
+    if ((e.target as HTMLElement).closest('button')) return;
+    onEdit?.(item);
+  };
+
   const handleVote = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await onVote(item.id);
@@ -57,9 +64,10 @@ export function WishlistCard({ item, onVote, onDelete, onAttachments, isDragging
 
   return (
     <div
-      className={`bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)] hover:shadow-md transition-all cursor-move ${
-        isDragging ? 'opacity-50 shadow-xl' : ''
-      }`}
+      onClick={handleCardClick}
+      className={`bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)] hover:shadow-md transition-all ${
+        onEdit ? 'cursor-pointer hover:border-blue-300' : 'cursor-move'
+      } ${isDragging ? 'opacity-50 shadow-xl' : ''}`}
     >
       {/* Card Header */}
       <div className="mb-3">

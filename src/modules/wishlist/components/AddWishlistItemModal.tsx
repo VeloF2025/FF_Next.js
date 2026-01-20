@@ -1,18 +1,22 @@
 /**
- * Add Wishlist Item Modal Component
+ * Add/Edit Wishlist Item Modal Component
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { CreateWishlistItemInput, WishlistPriority, WishlistEffort } from '../types/wishlist';
+import type { CreateWishlistItemInput, UpdateWishlistItemInput, WishlistPriority, WishlistEffort, WishlistItem } from '../types/wishlist';
 
 interface AddWishlistItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (input: CreateWishlistItemInput) => Promise<any>;
+  onUpdate?: (id: string, input: UpdateWishlistItemInput) => Promise<any>;
+  editItem?: WishlistItem | null;
 }
 
-export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistItemModalProps) {
+export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, editItem }: AddWishlistItemModalProps) {
+  const isEditMode = !!editItem;
+
   const [formData, setFormData] = useState<CreateWishlistItemInput>({
     title: '',
     description: '',
@@ -22,6 +26,27 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
   });
   const [submitting, setSubmitting] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (editItem) {
+      setFormData({
+        title: editItem.title,
+        description: editItem.description || '',
+        priority: editItem.priority,
+        effort_estimate: editItem.effort_estimate,
+        business_value: editItem.business_value,
+      });
+    } else {
+      setFormData({
+        title: '',
+        description: '',
+        priority: 'medium',
+        effort_estimate: undefined,
+        business_value: undefined,
+      });
+    }
+  }, [editItem]);
 
   const handleClose = () => {
     setTitleError(null);
@@ -47,7 +72,11 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
 
     setSubmitting(true);
     try {
-      await onSubmit(formData);
+      if (isEditMode && editItem && onUpdate) {
+        await onUpdate(editItem.id, formData);
+      } else {
+        await onSubmit(formData);
+      }
       handleClose();
     } catch (error) {
       // Error is handled by the hook
@@ -64,7 +93,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
         {/* Modal Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--ff-border-light)]">
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-            Add Wishlist Item
+            {isEditMode ? 'Edit Wishlist Item' : 'Add Wishlist Item'}
           </h2>
           <button
             onClick={handleClose}
@@ -181,7 +210,10 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit }: AddWishlistI
               disabled={submitting || !formData.title.trim()}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? 'Adding...' : 'Add Item'}
+              {submitting
+                ? (isEditMode ? 'Saving...' : 'Adding...')
+                : (isEditMode ? 'Save Changes' : 'Add Item')
+              }
             </button>
           </div>
         </form>

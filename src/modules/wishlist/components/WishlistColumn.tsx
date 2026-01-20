@@ -10,10 +10,11 @@ interface WishlistColumnProps {
   column: Column;
   onVote: (itemId: string) => Promise<any>;
   onDelete: (itemId: string) => Promise<void>;
+  onEdit?: (item: WishlistItem) => void;
   onAttachments?: (item: WishlistItem) => void;
 }
 
-export function WishlistColumn({ column, onVote, onDelete, onAttachments }: WishlistColumnProps) {
+export function WishlistColumn({ column, onVote, onDelete, onEdit, onAttachments }: WishlistColumnProps) {
   const isOverLimit = column.wip_limit && column.items.length >= column.wip_limit;
 
   return (
@@ -68,6 +69,7 @@ export function WishlistColumn({ column, onVote, onDelete, onAttachments }: Wish
                   item={item}
                   onVote={onVote}
                   onDelete={onDelete}
+                  onEdit={onEdit}
                   onAttachments={onAttachments}
                   isDragging={snapshot.isDragging}
                 />

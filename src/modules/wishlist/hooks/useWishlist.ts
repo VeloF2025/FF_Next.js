@@ -234,6 +234,38 @@ export function useWishlist() {
     }
   }, [fetchBoard]);
 
+  // Update item
+  const updateItem = useCallback(async (itemId: string, updates: Parameters<typeof wishlistService.update>[1]) => {
+    try {
+      const updatedItem = await wishlistService.update(itemId, updates);
+      notificationService.success('Item updated successfully');
+
+      // Update the item in the board without full refetch
+      setBoard(prevBoard => {
+        const newColumns = prevBoard.columns.map(column => ({
+          ...column,
+          items: column.items.map(item => {
+            if (item.id === itemId) {
+              return { ...item, ...updatedItem };
+            }
+            return item;
+          }),
+        }));
+
+        return {
+          ...prevBoard,
+          columns: newColumns,
+        };
+      });
+
+      return updatedItem;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update item';
+      notificationService.error(message);
+      throw err;
+    }
+  }, []);
+
   // Track mounted state and load data on mount
   useEffect(() => {
     isMountedRef.current = true;
@@ -266,6 +298,7 @@ export function useWishlist() {
     error,
     refetch: fetchBoard,
     createItem,
+    updateItem,
     moveItem,
     voteItem,
     deleteItem,
