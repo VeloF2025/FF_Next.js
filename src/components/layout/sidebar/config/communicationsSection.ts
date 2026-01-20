@@ -2,8 +2,9 @@
  * Communications section configuration
  */
 
-import { MessageSquare, Users, CheckCircle, ListTodo } from 'lucide-react';
+import { MessageSquare, Users, CheckCircle, ListTodo, Phone } from 'lucide-react';
 import type { NavSection } from './types';
+import { Permission } from '@/types/auth.types';
 
 export const communicationsSection: NavSection = {
   section: 'COMMUNICATIONS',
@@ -16,6 +17,13 @@ export const communicationsSection: NavSection = {
       label: 'Communications Portal',
       shortLabel: 'Comms',
       permissions: [],
+    },
+    {
+      to: '/communications/whatsapp',
+      icon: Phone,
+      label: 'WhatsApp Portal',
+      shortLabel: 'WhatsApp',
+      permissions: [Permission.SYSTEM_ADMIN], // Admin only
     },
     {
       to: '/meetings',
