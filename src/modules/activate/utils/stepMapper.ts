@@ -168,6 +168,24 @@ export const STEP_DESCRIPTIONS: Record<number, string> = {
 };
 
 /**
+ * Photo Rejection Reasons (Fibertime Quality Spec)
+ *
+ * Used when QA reviewer rejects a photo during categorization review.
+ * These reasons align with Fibertime Build Standards quality criteria.
+ */
+export const PHOTO_REJECTION_REASONS = [
+  { code: 'BLURRY', label: 'Blurry/Out of Focus' },
+  { code: 'WRONG_ANGLE', label: 'Wrong Angle' },
+  { code: 'WRONG_SUBJECT', label: 'Wrong Subject' },
+  { code: 'POOR_LIGHTING', label: 'Poor Lighting' },
+  { code: 'OBSTRUCTED', label: 'Obstructed View' },
+  { code: 'DUPLICATE', label: 'Duplicate Photo' },
+  { code: 'NOT_INSTALLATION', label: 'Not Installation Related' },
+] as const;
+
+export type PhotoRejectionReasonCode = typeof PHOTO_REJECTION_REASONS[number]['code'];
+
+/**
  * Step to Photo Types Mapping
  *
  * Maps unified 10 steps to arrays of photo types.

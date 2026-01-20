@@ -18,7 +18,7 @@ import type {
   VlmCategorizationStatus,
   Photo,
 } from '../../types/unified.types';
-import { STEP_LABELS } from '../../utils/stepMapper';
+import { STEP_LABELS, PHOTO_REJECTION_REASONS } from '../../utils/stepMapper';
 import { WizardProgressOverlay, type CategorizationPhase } from './WizardProgressOverlay';
 
 interface PhotoReviewPhaseProps {
@@ -52,7 +52,7 @@ export function PhotoReviewPhase({
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [approvals, setApprovals] = useState<Map<string, { approved: boolean; overrideStep?: number }>>(
+  const [approvals, setApprovals] = useState<Map<string, { approved: boolean; overrideStep?: number; rejectionReason?: string }>>(
     new Map()
   );
 
@@ -194,6 +194,7 @@ export function PhotoReviewPhase({
         photo_filename: result.photo_filename,
         approved: approval?.approved ?? true,
         override_step: approval?.overrideStep,
+        override_reason: approval?.rejectionReason, // Pass rejection reason to API
       };
     });
 
@@ -227,21 +228,29 @@ export function PhotoReviewPhase({
   const handleProceed = () => {
     // Convert categorization results to Photo array with correct steps
     // Use approvals map for current session overrides, fall back to saved overrides
-    const categorizedPhotos: Photo[] = state.results.map((result) => {
-      const approval = approvals.get(result.photo_filename);
-      const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
-      return {
-        filename: result.photo_filename,
-        step,
-        url: `/api/activate/photo/${dropNumber}/${result.photo_filename}`,
-        original_type: null,
-      };
-    });
+    // EXCLUDE rejected photos (approved === false)
+    const categorizedPhotos: Photo[] = state.results
+      .filter((result) => {
+        const approval = approvals.get(result.photo_filename);
+        return approval?.approved !== false; // Include if not explicitly rejected
+      })
+      .map((result) => {
+        const approval = approvals.get(result.photo_filename);
+        const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
+        return {
+          filename: result.photo_filename,
+          step,
+          url: `/api/activate/photo/${dropNumber}/${result.photo_filename}`,
+          original_type: null,
+        };
+      });
 
-    // Calculate step coverage using approvals map for current session overrides
+    // Calculate step coverage - EXCLUDE rejected photos
     const stepCounts = new Map<number, number>();
     state.results.forEach((result) => {
       const approval = approvals.get(result.photo_filename);
+      // Skip explicitly rejected photos
+      if (approval?.approved === false) return;
       const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
       if (step >= 1 && step <= 10) {
         stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
@@ -261,10 +270,10 @@ export function PhotoReviewPhase({
     onComplete(categorizedPhotos, stepsCovered, stepsMissing);
   };
 
-  const setPhotoApproval = (filename: string, approved: boolean, overrideStep?: number) => {
+  const setPhotoApproval = (filename: string, approved: boolean, overrideStep?: number, rejectionReason?: string) => {
     setApprovals((prev) => {
       const newMap = new Map(prev);
-      newMap.set(filename, { approved, overrideStep });
+      newMap.set(filename, { approved, overrideStep, rejectionReason });
       return newMap;
     });
   };
@@ -368,11 +377,16 @@ export function PhotoReviewPhase({
   // Approved state - can proceed (or edit individual assignments)
   if (state.status === 'approved') {
     // Count photos per step - use approvals map for current session overrides
+    // EXCLUDE rejected photos (approved === false) from counts
     const stepCounts = new Map<number, number>();
     state.results.forEach((result) => {
       const approval = approvals.get(result.photo_filename);
+      // Skip explicitly rejected photos
+      if (approval?.approved === false) return;
       const step = approval?.overrideStep ?? result.human_override_step ?? result.vlm_predicted_step;
-      stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
+      if (step >= 1 && step <= 10) {
+        stepCounts.set(step, (stepCounts.get(step) || 0) + 1);
+      }
     });
 
     // Find missing steps (1-10)
@@ -642,6 +656,9 @@ export function PhotoReviewPhase({
                 <div className={`text-xl font-bold ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                   {count}
                 </div>
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-500">
+                  Step {step}
+                </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
                   {STEP_LABELS[step]}
                 </div>
@@ -773,13 +790,16 @@ export function PhotoReviewPhase({
           const approval = approvals.get(result.photo_filename);
           const isApproved = approval?.approved !== false;
           const overrideStep = approval?.overrideStep;
+          const rejectionReason = approval?.rejectionReason;
           const photoUrl = `/api/activate/photo/${dropNumber}/${result.photo_filename}`;
 
           return (
             <div
               key={result.photo_filename}
               className={`border rounded-lg p-3 ${
-                result.vlm_confidence < 0.5
+                !isApproved
+                  ? 'border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-900/20'
+                  : result.vlm_confidence < 0.5
                   ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
                   : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
               }`}
@@ -817,38 +837,68 @@ export function PhotoReviewPhase({
                     {result.vlm_identified_as}
                   </p>
 
-                  {/* Approval controls - always show override dropdown */}
-                  <div className="mt-2 flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isApproved}
-                        onChange={(e) => setPhotoApproval(result.photo_filename, e.target.checked, overrideStep)}
-                        className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
-                      />
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Approve</span>
-                    </label>
+                  {/* Approval controls */}
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isApproved}
+                          onChange={(e) => {
+                            const newApproved = e.target.checked;
+                            // Clear rejection reason when approving
+                            setPhotoApproval(result.photo_filename, newApproved, overrideStep, newApproved ? undefined : rejectionReason);
+                          }}
+                          className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                        />
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Approve</span>
+                      </label>
 
-                    {/* Always show step override dropdown */}
-                    <select
-                      value={overrideStep ?? ''}
-                      onChange={(e) => {
-                        const newStep = e.target.value ? parseInt(e.target.value) : undefined;
-                        setPhotoApproval(result.photo_filename, isApproved, newStep);
-                      }}
-                      className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
-                      title="Override step assignment"
-                    >
-                      <option value="">Step {result.vlm_predicted_step} (AI)</option>
-                      <option value="0">❌ Discard</option>
-                      {Array.from({ length: 10 }, (_, i) => i + 1)
-                        .filter((step) => step !== result.vlm_predicted_step)
-                        .map((step) => (
-                          <option key={step} value={step}>
-                            → {step}: {STEP_LABELS[step]}
-                          </option>
-                        ))}
-                    </select>
+                      {/* Step override dropdown - only show when approved */}
+                      {isApproved && (
+                        <select
+                          value={overrideStep ?? ''}
+                          onChange={(e) => {
+                            const newStep = e.target.value ? parseInt(e.target.value) : undefined;
+                            setPhotoApproval(result.photo_filename, isApproved, newStep, rejectionReason);
+                          }}
+                          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
+                          title="Override step assignment"
+                        >
+                          <option value="">Step {result.vlm_predicted_step} (AI)</option>
+                          <option value="0">❌ Discard</option>
+                          {Array.from({ length: 10 }, (_, i) => i + 1)
+                            .filter((step) => step !== result.vlm_predicted_step)
+                            .map((step) => (
+                              <option key={step} value={step}>
+                                → {step}: {STEP_LABELS[step]}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Rejection reason dropdown - show when NOT approved */}
+                    {!isApproved && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-red-600 dark:text-red-400">❌ Rejected:</span>
+                        <select
+                          value={rejectionReason ?? ''}
+                          onChange={(e) => {
+                            setPhotoApproval(result.photo_filename, false, overrideStep, e.target.value || undefined);
+                          }}
+                          className="text-xs border border-red-300 dark:border-red-600 rounded px-1.5 py-0.5 bg-red-50 dark:bg-red-900/30 flex-1"
+                          title="Select rejection reason"
+                        >
+                          <option value="">Select reason...</option>
+                          {PHOTO_REJECTION_REASONS.map((reason) => (
+                            <option key={reason.code} value={reason.code}>
+                              {reason.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
