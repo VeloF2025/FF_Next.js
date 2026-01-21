@@ -1,6 +1,7 @@
 /**
  * QField Dashboard Component
  * Monitors QFieldCloud infrastructure and provides management controls
+ * Includes Server Controls tab for admin operations
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -19,7 +20,10 @@ import {
   Clock,
   Loader2,
   RotateCcw,
+  Search,
+  Settings,
 } from 'lucide-react';
+import { notificationService } from '@/services/core/NotificationService';
 
 interface HealthStatus {
   services: {
@@ -55,6 +59,38 @@ interface HealthStatus {
     queued: number;
     stuck: Array<{ id: string; type: string; status: string; project: string; createdAt: string }>;
   };
+}
+
+interface JobStats {
+  total: number;
+  success: number;
+  failed: number;
+  pending: number;
+  queued: number;
+  avgDurationSec: number | null;
+  successRate: number;
+}
+
+interface JobDetails {
+  id: string;
+  type: string;
+  status: string;
+  project: string;
+  projectId: string;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  output: string | null;
+}
+
+interface ProjectDetails {
+  id: string;
+  name: string;
+  owner: string;
+  createdAt: string;
+  jobCount: number;
+  lastJobStatus: string | null;
+  lastJobDate: string | null;
 }
 
 const StatusBadge: React.FC<{ status: 'success' | 'error' | 'warning' | 'loading'; label: string }> = ({
@@ -107,6 +143,10 @@ const StatCard: React.FC<{
 };
 
 export const QFieldDashboard: React.FC = () => {
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'monitor' | 'server-controls'>('monitor');
+
+  // Monitor tab state
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -115,6 +155,16 @@ export const QFieldDashboard: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Server Controls tab state
+  const [jobStats, setJobStats] = useState<JobStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [jobLookupId, setJobLookupId] = useState('');
+  const [projectLookupId, setProjectLookupId] = useState('');
+  const [jobDetails, setJobDetails] = useState<JobDetails | null>(null);
+  const [projectDetails, setProjectDetails] = useState<ProjectDetails | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const fetchHealth = useCallback(async () => {
     try {
@@ -217,6 +267,163 @@ export const QFieldDashboard: React.FC = () => {
     return new Date(dateStr).toLocaleString();
   };
 
+  // === SERVER CONTROLS FUNCTIONS ===
+
+  const loadJobStats = useCallback(async () => {
+    setLoadingStats(true);
+    try {
+      const res = await fetch('/api/qfield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'job-stats' }),
+      });
+      const data = await res.json();
+      if (data.data?.stats) {
+        setJobStats(data.data.stats);
+      }
+    } catch (err) {
+      console.error('Failed to load job stats:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'server-controls') {
+      loadJobStats();
+    }
+  }, [activeTab, loadJobStats]);
+
+  const handleRestartWorkers = async () => {
+    if (!confirm('Restart all QFieldCloud workers?\n\nThis will briefly interrupt job processing (10-30 seconds).')) {
+      return;
+    }
+
+    setActionInProgress('restart-workers');
+    try {
+      const res = await fetch('/api/qfield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restart-workers' }),
+      });
+      const data = await res.json();
+
+      if (data.data?.success) {
+        notificationService.success(data.data.message);
+        fetchHealth();
+      } else {
+        notificationService.error(data.data?.message || 'Failed to restart workers');
+      }
+    } catch (err) {
+      notificationService.error('Failed to restart workers');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleRestartApp = async () => {
+    if (!confirm('Restart the QFieldCloud app container?\n\nThis will cause 1-2 minutes of downtime.')) {
+      return;
+    }
+
+    setActionInProgress('restart-app');
+    try {
+      const res = await fetch('/api/qfield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restart-app' }),
+      });
+      const data = await res.json();
+
+      if (data.data?.success) {
+        notificationService.success(data.data.message);
+        fetchHealth();
+      } else {
+        notificationService.error(data.data?.message || 'Failed to restart app');
+      }
+    } catch (err) {
+      notificationService.error('Failed to restart app container');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleJobLookup = async () => {
+    if (!jobLookupId.trim()) {
+      setLookupError('Please enter a Job ID');
+      return;
+    }
+
+    setLookupError(null);
+    setJobDetails(null);
+
+    try {
+      const res = await fetch('/api/qfield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-job', jobId: jobLookupId.trim() }),
+      });
+      const data = await res.json();
+
+      if (data.data?.success && data.data.job) {
+        setJobDetails(data.data.job);
+      } else {
+        setLookupError(data.data?.error || 'Job not found');
+      }
+    } catch (err) {
+      setLookupError('Failed to lookup job');
+    }
+  };
+
+  const handleProjectLookup = async () => {
+    if (!projectLookupId.trim()) {
+      setLookupError('Please enter a Project ID');
+      return;
+    }
+
+    setLookupError(null);
+    setProjectDetails(null);
+
+    try {
+      const res = await fetch('/api/qfield', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get-project', projectId: projectLookupId.trim() }),
+      });
+      const data = await res.json();
+
+      if (data.data?.success && data.data.project) {
+        setProjectDetails(data.data.project);
+      } else {
+        setLookupError(data.data?.error || 'Project not found');
+      }
+    } catch (err) {
+      setLookupError('Failed to lookup project');
+    }
+  };
+
+  const formatDuration = (seconds: number | null): string => {
+    if (seconds === null) return '-';
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  const formatTimeAgo = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
   if (loading && !health) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -276,6 +483,35 @@ export const QFieldDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('monitor')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
+            activeTab === 'monitor'
+              ? 'bg-blue-600 text-white'
+              : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]'
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          Monitor
+        </button>
+        <button
+          onClick={() => setActiveTab('server-controls')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
+            activeTab === 'server-controls'
+              ? 'bg-blue-600 text-white'
+              : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]'
+          }`}
+        >
+          <Server className="w-4 h-4" />
+          Server Controls
+        </button>
+      </div>
+
+      {/* Monitor Tab */}
+      {activeTab === 'monitor' && (
+      <>
       {/* Action Message */}
       {actionMessage && (
         <div
@@ -538,6 +774,278 @@ export const QFieldDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
+
+      {/* Server Controls Tab */}
+      {activeTab === 'server-controls' && (
+        <div className="space-y-6">
+          {/* Top Row - Status, Controls, Lookup */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Service Status Card */}
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+                  <Search className="w-5 h-5" />
+                  Service Status
+                </h2>
+                <button
+                  onClick={fetchHealth}
+                  disabled={loading}
+                  className="text-sm text-blue-500 hover:text-blue-400 disabled:opacity-50 flex items-center gap-1"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+
+              {loading && !health ? (
+                <p className="text-[var(--ff-text-secondary)]">Loading...</p>
+              ) : health ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[var(--ff-text-secondary)]">Workers</span>
+                    <span className={`text-sm font-medium ${
+                      health.containers.list.filter(c => c.name.includes('worker')).length >= 8 ? 'text-green-500' : 'text-yellow-500'
+                    }`}>
+                      {health.containers.list.filter(c => c.name.includes('worker')).length}/8
+                      {health.containers.list.filter(c => c.name.includes('worker')).length >= 8 ? ' ✅' : ' ⚠️'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[var(--ff-text-secondary)]">App Container</span>
+                    <span className={`text-sm font-medium ${
+                      health.containers.list.some(c => c.name.includes('app') && c.status.includes('Up'))
+                        ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {health.containers.list.some(c => c.name.includes('app') && c.status.includes('Up'))
+                        ? 'Running ✅' : 'Down ❌'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[var(--ff-text-secondary)]">Database</span>
+                    <span className={`text-sm font-medium ${
+                      health.database.connected ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {health.database.connected ? 'Connected ✅' : 'Disconnected ❌'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[var(--ff-text-secondary)]">MinIO Storage</span>
+                    <span className={`text-sm font-medium ${
+                      health.minio.live ? 'text-green-500' : 'text-red-500'
+                    }`}>
+                      {health.minio.live ? 'Live ✅' : 'Down ❌'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-[var(--ff-text-secondary)]">Stuck Jobs</span>
+                    <span className={`text-sm font-medium ${
+                      (health.jobs.pending + health.jobs.queued) === 0
+                        ? 'text-green-500' : 'text-yellow-500'
+                    }`}>
+                      {health.jobs.pending + health.jobs.queued}
+                      {(health.jobs.pending + health.jobs.queued) === 0 ? ' ✅' : ' ⚠️'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[var(--ff-text-tertiary)]">Click refresh to load status</p>
+              )}
+            </div>
+
+            {/* Worker Controls Card */}
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+              <h2 className="font-semibold mb-4 text-[var(--ff-text-primary)] flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Worker Controls
+              </h2>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleRestartWorkers}
+                  disabled={actionInProgress !== null}
+                  className="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                >
+                  {actionInProgress === 'restart-workers' ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Restarting...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" /> Restart Workers</>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleClearJobs}
+                  disabled={clearing || !health?.jobs.stuck.length}
+                  className="w-full bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                >
+                  {clearing ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Clearing...</>
+                  ) : (
+                    <><Trash2 className="w-4 h-4" /> Clear Stuck Jobs</>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleRestartApp}
+                  disabled={actionInProgress !== null}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                >
+                  {actionInProgress === 'restart-app' ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Restarting...</>
+                  ) : (
+                    <>🔴 Restart App Container</>
+                  )}
+                </button>
+              </div>
+
+              <p className="text-xs text-[var(--ff-text-tertiary)] mt-4">
+                ⚠️ All actions require confirmation
+              </p>
+            </div>
+
+            {/* Lookup Card */}
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+              <h2 className="font-semibold mb-4 text-[var(--ff-text-primary)] flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                Lookup
+              </h2>
+
+              <div className="space-y-4">
+                {/* Job Lookup */}
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">Job ID</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={jobLookupId}
+                      onChange={(e) => setJobLookupId(e.target.value)}
+                      placeholder="Enter job ID..."
+                      className="flex-1 p-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded text-sm"
+                    />
+                    <button
+                      onClick={handleJobLookup}
+                      className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                    >
+                      Find
+                    </button>
+                  </div>
+                </div>
+
+                {/* Project Lookup */}
+                <div>
+                  <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">Project ID</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={projectLookupId}
+                      onChange={(e) => setProjectLookupId(e.target.value)}
+                      placeholder="Enter project ID..."
+                      className="flex-1 p-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded text-sm"
+                    />
+                    <button
+                      onClick={handleProjectLookup}
+                      className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                    >
+                      Find
+                    </button>
+                  </div>
+                </div>
+
+                {/* Lookup Error */}
+                {lookupError && (
+                  <p className="text-sm text-red-500">{lookupError}</p>
+                )}
+
+                {/* Job Details */}
+                {jobDetails && (
+                  <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded text-sm">
+                    <p className="font-medium text-[var(--ff-text-primary)] mb-2">Job Found:</p>
+                    <div className="space-y-1 text-[var(--ff-text-secondary)]">
+                      <p><span className="text-[var(--ff-text-tertiary)]">ID:</span> {jobDetails.id}</p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Type:</span> {jobDetails.type}</p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Status:</span> <span className={
+                        jobDetails.status === 'finished' ? 'text-green-500' :
+                        jobDetails.status === 'failed' ? 'text-red-500' : 'text-yellow-500'
+                      }>{jobDetails.status}</span></p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Project:</span> {jobDetails.project}</p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Created:</span> {formatTimeAgo(jobDetails.createdAt)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Project Details */}
+                {projectDetails && (
+                  <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded text-sm">
+                    <p className="font-medium text-[var(--ff-text-primary)] mb-2">Project Found:</p>
+                    <div className="space-y-1 text-[var(--ff-text-secondary)]">
+                      <p><span className="text-[var(--ff-text-tertiary)]">ID:</span> {projectDetails.id}</p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Name:</span> {projectDetails.name}</p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Owner:</span> {projectDetails.owner}</p>
+                      <p><span className="text-[var(--ff-text-tertiary)]">Total Jobs:</span> {projectDetails.jobCount}</p>
+                      {projectDetails.lastJobStatus && (
+                        <p><span className="text-[var(--ff-text-tertiary)]">Last Job:</span> <span className={
+                          projectDetails.lastJobStatus === 'finished' ? 'text-green-500' :
+                          projectDetails.lastJobStatus === 'failed' ? 'text-red-500' : 'text-yellow-500'
+                        }>{projectDetails.lastJobStatus}</span></p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Job Timeline Stats */}
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Job Timeline (Last 24h)
+              </h2>
+              <button
+                onClick={loadJobStats}
+                disabled={loadingStats}
+                className="text-sm text-blue-500 hover:text-blue-400 disabled:opacity-50 flex items-center gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${loadingStats ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+
+            {jobStats ? (
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div className="text-center p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{jobStats.total}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Total Jobs</p>
+                </div>
+                <div className="text-center p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-2xl font-bold text-green-500">{jobStats.success}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Successful</p>
+                </div>
+                <div className="text-center p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-2xl font-bold text-red-500">{jobStats.failed}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Failed</p>
+                </div>
+                <div className="text-center p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-2xl font-bold text-yellow-500">{jobStats.pending + jobStats.queued}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Pending</p>
+                </div>
+                <div className="text-center p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{jobStats.successRate}%</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Success Rate</p>
+                </div>
+                <div className="text-center p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{formatDuration(jobStats.avgDurationSec)}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">Avg Duration</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[var(--ff-text-tertiary)]">{loadingStats ? 'Loading stats...' : 'Click refresh to load stats'}</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
