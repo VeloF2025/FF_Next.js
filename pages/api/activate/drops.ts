@@ -166,6 +166,9 @@ async function getPaginatedDrops(
   const params: any[] = [];
   let paramIndex = 1;
 
+  // ALWAYS exclude OES-only records from the list (they have no WhatsApp submission)
+  conditions.push('(u.is_oes_only = FALSE OR u.is_oes_only IS NULL)');
+
   // Search filter
   if (searchTerm) {
     conditions.push(`(u.drop_number ILIKE $${paramIndex} OR u.project ILIKE $${paramIndex})`);
@@ -173,14 +176,15 @@ async function getPaginatedDrops(
     paramIndex++;
   }
 
-  // Date filters
+  // Date filters - use submitted_date (WhatsApp submission date)
+  // Don't fall back to created_at since OES-only records are already excluded
   if (filters?.dateFrom) {
-    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) >= $${paramIndex}::DATE`);
+    conditions.push(`u.submitted_date >= $${paramIndex}::DATE`);
     params.push(filters.dateFrom);
     paramIndex++;
   }
   if (filters?.dateTo) {
-    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) <= $${paramIndex}::DATE`);
+    conditions.push(`u.submitted_date <= $${paramIndex}::DATE`);
     params.push(filters.dateTo);
     paramIndex++;
   }
