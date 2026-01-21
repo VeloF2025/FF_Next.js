@@ -16,9 +16,9 @@ All three environments share the **same production database** (Neon PostgreSQL).
 
 | Environment | Port | Directory | URL | Service |
 |-------------|------|-----------|-----|---------|
-| **Production** | 3000* | `/home/velo/fibreflow-production` | app.fibreflow.app | `fibreflow-production.service` |
+| **Production** | 3008* | `/home/velo/fibreflow-production` | app.fibreflow.app | `fibreflow-production.service` |
 | **Staging** | 3006 | `/home/louis/apps/fibreflow` | vf.fibreflow.app | `fibreflow.service` |
-| **Dev** | 3005 | `/home/velo/fibreflow` | localhost:3005 | manual |
+| **Dev** | 3004 | `/home/velo/fibreflow` | dev.fibreflow.app | `fibreflow-dev.service` |
 
 *Note: Production currently runs on port 3008, should be migrated to 3000.
 

@@ -670,6 +670,13 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 | **Old Commit** | Missing features, reverted settings | `git reset --hard origin/master` |
 | **Git Permission** | "Permission denied" on git ops | `chown -R louis:louis .git` |
 | **VLM Extraction Failed** | "fetch failed" in Data Validation | Check `VLM_API_URL` and `NEXT_PUBLIC_APP_URL` in .env.production |
+| **Cloudflared 502** | 502 via Cloudflare but nginx/app work locally | `sudo systemctl restart cloudflared-tunnel.service` |
+
+**Cloudflared 502 Diagnostic Path:**
+1. Test via Cloudflare: `curl https://vf.fibreflow.app/api/activate/health-check` → 502
+2. Test via nginx: `curl -H 'Host: vf.fibreflow.app' http://127.0.0.1:80/api/activate/health-check` → 200 ✅
+3. Test via app: `curl http://localhost:3006/api/activate/health-check` → 200 ✅
+4. If nginx and app work but Cloudflare fails → Restart cloudflared tunnel
 
 **Staging Server Details:**
 - **URL:** https://vf.fibreflow.app
