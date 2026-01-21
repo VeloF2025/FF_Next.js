@@ -260,6 +260,231 @@ async function restartService(service: 'qfield-sync' | 'cloudflared-qfield'): Pr
   }
 }
 
+// === NEW ADMIN PANEL FUNCTIONS ===
+
+async function restartWorkers(): Promise<{ success: boolean; message: string; restarted: number }> {
+  try {
+    // Get list of worker containers
+    const containerList = await sshCommand("docker ps --filter 'name=qfieldcloud-worker_wrapper' --format '{{.Names}}'");
+    const workers = containerList.split('\n').filter(Boolean);
+
+    if (workers.length === 0) {
+      return { success: false, message: 'No worker containers found', restarted: 0 };
+    }
+
+    // Restart all workers
+    const workerNames = workers.join(' ');
+    await sshCommand(`docker restart ${workerNames}`);
+
+    // Wait for containers to restart
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // Verify they're running
+    const runningCount = await sshCommand("docker ps --filter 'name=qfieldcloud-worker_wrapper' --format '{{.Names}}' | wc -l");
+    const running = parseInt(runningCount.trim(), 10);
+
+    log.info('Workers restarted', { requested: workers.length, running });
+
+    return {
+      success: running > 0,
+      message: `Restarted ${running}/${workers.length} workers`,
+      restarted: running,
+    };
+  } catch (error) {
+    log.error('Worker restart failed', { error });
+    return { success: false, message: 'Failed to restart workers', restarted: 0 };
+  }
+}
+
+async function restartAppContainer(): Promise<{ success: boolean; message: string }> {
+  try {
+    await sshCommand('docker restart qfieldcloud-app-1');
+
+    // Wait for container to restart
+    await new Promise(resolve => setTimeout(resolve, 10000));
+
+    // Verify it's running
+    const status = await sshCommand("docker ps --filter 'name=qfieldcloud-app-1' --format '{{.Status}}'");
+    const isRunning = status.toLowerCase().includes('up');
+
+    log.info('App container restarted', { status, isRunning });
+
+    return {
+      success: isRunning,
+      message: isRunning ? 'App container restarted successfully' : 'App container failed to restart',
+    };
+  } catch (error) {
+    log.error('App container restart failed', { error });
+    return { success: false, message: 'Failed to restart app container' };
+  }
+}
+
+interface JobDetails {
+  id: string;
+  type: string;
+  status: string;
+  project: string;
+  projectId: string;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  output: string | null;
+}
+
+async function getJobById(jobId: string): Promise<{ success: boolean; job?: JobDetails; error?: string }> {
+  try {
+    // Sanitize jobId to prevent SQL injection (UUIDs only)
+    if (!/^[a-f0-9-]+$/i.test(jobId)) {
+      return { success: false, error: 'Invalid job ID format' };
+    }
+
+    const result = await sshCommand(`docker exec qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db -t -c "
+      SELECT j.id, j.type, j.status, COALESCE(p.name, 'unknown'), COALESCE(p.id::text, ''),
+             j.created_at, j.started_at, j.finished_at, LEFT(j.output, 500)
+      FROM core_job j
+      LEFT JOIN core_project p ON j.project_id = p.id
+      WHERE j.id::text LIKE '${jobId}%'
+      LIMIT 1
+    "`);
+
+    if (!result.trim()) {
+      return { success: false, error: 'Job not found' };
+    }
+
+    const parts = result.trim().split('|').map(s => s.trim());
+    if (parts.length < 9) {
+      return { success: false, error: 'Invalid job data' };
+    }
+
+    return {
+      success: true,
+      job: {
+        id: parts[0],
+        type: parts[1],
+        status: parts[2],
+        project: parts[3],
+        projectId: parts[4],
+        createdAt: parts[5],
+        startedAt: parts[6] || null,
+        finishedAt: parts[7] || null,
+        output: parts[8] || null,
+      },
+    };
+  } catch (error) {
+    log.error('Get job failed', { jobId, error });
+    return { success: false, error: 'Failed to fetch job details' };
+  }
+}
+
+interface ProjectDetails {
+  id: string;
+  name: string;
+  owner: string;
+  createdAt: string;
+  jobCount: number;
+  lastJobStatus: string | null;
+  lastJobDate: string | null;
+}
+
+async function getProjectById(projectId: string): Promise<{ success: boolean; project?: ProjectDetails; error?: string }> {
+  try {
+    // Sanitize projectId to prevent SQL injection (UUIDs only)
+    if (!/^[a-f0-9-]+$/i.test(projectId)) {
+      return { success: false, error: 'Invalid project ID format' };
+    }
+
+    const result = await sshCommand(`docker exec qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db -t -c "
+      SELECT p.id, p.name, COALESCE(u.username, 'unknown'), p.created_at,
+             (SELECT COUNT(*) FROM core_job WHERE project_id = p.id),
+             (SELECT status FROM core_job WHERE project_id = p.id ORDER BY created_at DESC LIMIT 1),
+             (SELECT created_at FROM core_job WHERE project_id = p.id ORDER BY created_at DESC LIMIT 1)
+      FROM core_project p
+      LEFT JOIN core_user u ON p.owner_id = u.id
+      WHERE p.id::text LIKE '${projectId}%'
+      LIMIT 1
+    "`);
+
+    if (!result.trim()) {
+      return { success: false, error: 'Project not found' };
+    }
+
+    const parts = result.trim().split('|').map(s => s.trim());
+    if (parts.length < 7) {
+      return { success: false, error: 'Invalid project data' };
+    }
+
+    return {
+      success: true,
+      project: {
+        id: parts[0],
+        name: parts[1],
+        owner: parts[2],
+        createdAt: parts[3],
+        jobCount: parseInt(parts[4], 10) || 0,
+        lastJobStatus: parts[5] || null,
+        lastJobDate: parts[6] || null,
+      },
+    };
+  } catch (error) {
+    log.error('Get project failed', { projectId, error });
+    return { success: false, error: 'Failed to fetch project details' };
+  }
+}
+
+interface JobStats {
+  total: number;
+  success: number;
+  failed: number;
+  pending: number;
+  queued: number;
+  avgDurationSec: number | null;
+  successRate: number;
+}
+
+async function getJobStats(): Promise<{ success: boolean; stats?: JobStats; error?: string }> {
+  try {
+    const result = await sshCommand(`docker exec qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db -t -c "
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'finished') as success,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'queued') as queued,
+        ROUND(AVG(EXTRACT(EPOCH FROM (finished_at - created_at))) FILTER (WHERE finished_at IS NOT NULL)::numeric, 0) as avg_duration
+      FROM core_job
+      WHERE created_at > NOW() - INTERVAL '24 hours'
+    "`);
+
+    const parts = result.trim().split('|').map(s => s.trim());
+    if (parts.length < 6) {
+      return { success: false, error: 'Invalid stats data' };
+    }
+
+    const total = parseInt(parts[0], 10) || 0;
+    const success = parseInt(parts[1], 10) || 0;
+    const failed = parseInt(parts[2], 10) || 0;
+    const pending = parseInt(parts[3], 10) || 0;
+    const queued = parseInt(parts[4], 10) || 0;
+    const avgDuration = parts[5] ? parseInt(parts[5], 10) : null;
+
+    return {
+      success: true,
+      stats: {
+        total,
+        success,
+        failed,
+        pending,
+        queued,
+        avgDurationSec: avgDuration,
+        successRate: total > 0 ? Math.round((success / total) * 100) : 0,
+      },
+    };
+  } catch (error) {
+    log.error('Get job stats failed', { error });
+    return { success: false, error: 'Failed to fetch job stats' };
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
@@ -268,7 +493,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { action, jobIds, service } = req.body;
+      const { action, jobIds, service, jobId, projectId } = req.body;
 
       switch (action) {
         case 'sync':
@@ -285,6 +510,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
           const restartResult = await restartService(service);
           return apiResponse.success(res, restartResult);
+
+        // === NEW ADMIN PANEL ACTIONS ===
+
+        case 'restart-workers':
+          log.info('Restart workers requested');
+          const workersResult = await restartWorkers();
+          return apiResponse.success(res, workersResult);
+
+        case 'restart-app':
+          log.info('Restart app container requested');
+          const appResult = await restartAppContainer();
+          return apiResponse.success(res, appResult);
+
+        case 'get-job':
+          if (!jobId) {
+            return apiResponse.badRequest(res, 'Job ID is required');
+          }
+          const jobResult = await getJobById(jobId);
+          if (!jobResult.success) {
+            return apiResponse.notFound(res, 'Job', jobId);
+          }
+          return apiResponse.success(res, jobResult);
+
+        case 'get-project':
+          if (!projectId) {
+            return apiResponse.badRequest(res, 'Project ID is required');
+          }
+          const projectResult = await getProjectById(projectId);
+          if (!projectResult.success) {
+            return apiResponse.notFound(res, 'Project', projectId);
+          }
+          return apiResponse.success(res, projectResult);
+
+        case 'job-stats':
+          const statsResult = await getJobStats();
+          return apiResponse.success(res, statsResult);
 
         default:
           return apiResponse.badRequest(res, 'Invalid action');
