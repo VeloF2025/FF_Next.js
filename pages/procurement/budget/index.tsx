@@ -258,9 +258,9 @@ export default function ProcurementBudgetDashboard() {
               />
               <StatCard
                 title="Utilization"
-                value={`${dashboardData.summary.utilizationPercent.toFixed(1)}%`}
+                value={`${(dashboardData.summary.utilizationPercent ?? 0).toFixed(1)}%`}
                 icon={Percent}
-                colorType={dashboardData.summary.utilizationPercent > 90 ? 'red' : 'blue'}
+                colorType={(dashboardData.summary.utilizationPercent ?? 0) > 90 ? 'red' : 'blue'}
               />
             </div>
 
@@ -374,14 +374,14 @@ export default function ProcurementBudgetDashboard() {
                           <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
                             <div
                               className={`h-full ${
-                                budget.utilization_percent > 90 ? 'bg-red-500' :
-                                budget.utilization_percent > 70 ? 'bg-yellow-500' : 'bg-green-500'
+                                (budget.utilization_percent ?? 0) > 90 ? 'bg-red-500' :
+                                (budget.utilization_percent ?? 0) > 70 ? 'bg-yellow-500' : 'bg-green-500'
                               }`}
-                              style={{ width: `${Math.min(budget.utilization_percent, 100)}%` }}
+                              style={{ width: `${Math.min(budget.utilization_percent ?? 0, 100)}%` }}
                             />
                           </div>
                           <span className="text-gray-400 text-sm w-12 text-right">
-                            {budget.utilization_percent.toFixed(0)}%
+                            {(budget.utilization_percent ?? 0).toFixed(0)}%
                           </span>
                         </div>
                       </td>
