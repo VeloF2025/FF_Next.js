@@ -24,6 +24,7 @@ import {
   PackagePlus,
   ClipboardCheck,
   Building2,
+  Wallet,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -100,6 +101,13 @@ export const procurementSection: NavSection = {
       icon: Building2,
       label: 'Cost Centers',
       shortLabel: 'Costs',
+      permissions: []
+    },
+    {
+      to: '/procurement/budget',
+      icon: Wallet,
+      label: 'Budget Overview',
+      shortLabel: 'Budget',
       permissions: []
     },
 
