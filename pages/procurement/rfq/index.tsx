@@ -44,7 +44,13 @@ export default function RFQPage({ projectId, projectName, initialData = [] }: RF
       const result = await response.json();
       // API wraps response in { success, data: { rfqs, total } }
       const rfqData = result.data?.rfqs || result.rfqs || [];
-      setRfqs(rfqData);
+      // Transform API fields to match component interface
+      const transformedRfqs = rfqData.map((rfq: any) => ({
+        ...rfq,
+        createdAt: rfq.createdDate || rfq.created_at || rfq.createdAt,
+        dueDate: rfq.dueDate || rfq.response_deadline,
+      }));
+      setRfqs(transformedRfqs);
     } catch (error) {
       console.error('Error loading RFQ data:', error);
     } finally {
