@@ -1,43 +1,42 @@
 {
   "session_id": "2026-01-21-wa-fix",
   "started_at": "2026-01-21T17:25:00Z",
-  "last_updated": "2026-01-21T19:10:10.318Z",
+  "last_updated": "2026-01-21T19:13:04.430Z",
   "working_on": {
-    "task": "Fix WhatsApp acks and DR tracking",
+    "task": "WhatsApp URL standardization",
     "status": "completed",
     "progress": [
-      "Fixed wa-feedback: SENDER_URL 8085 -> 8083",
-      "Fixed wa-feedback: endpoint /send -> /api/send",
-      "Added 13 DRs to database manually",
-      "Sent 83 ack messages for last 24h Lawley DRs",
-      "9 DRs had swapped serials (warned in acks)",
-      "Updated acknowledged_at for all 83 DRs"
+      "Fixed wa-feedback: SENDER_URL to use 8081 (sender-2)",
+      "Fixed wa-feedback: endpoint /api/send -> /send-message",
+      "Updated wa-feedback to use Tailscale IP 100.96.203.105",
+      "Added recipient_jid field for sender-2 compatibility",
+      "Tested full DR flow: DR1738287 received and acked",
+      "Updated all documentation (CLAUDE.md, README, TROUBLESHOOTING)",
+      "Committed documentation changes"
     ],
-    "last_action": "Sent ack messages for 83 DRs"
+    "last_action": "KB update - no new learnings to consolidate"
   },
   "wa_services": {
     "bridge-2": {
       "port": 8083,
       "number": "063 841 2276",
+      "purpose": "Receives incoming WhatsApp messages",
       "status": "running"
     },
     "sender-2": {
       "port": 8081,
       "number": "063 841 2276",
+      "purpose": "Sends WhatsApp messages via /send-message",
       "status": "running"
     },
     "wa-feedback": {
       "port": 8092,
-      "sender_url": "http://localhost:8083",
-      "endpoint": "/api/send",
-      "status": "fixed"
+      "sender_url": "http://100.96.203.105:8081",
+      "bridge_url": "http://100.96.203.105:8083",
+      "endpoint": "/send-message",
+      "purpose": "FibreFlow API proxy -> sender-2",
+      "status": "running"
     }
-  },
-  "ack_stats": {
-    "lawley_total": 4177,
-    "lawley_acked": 100,
-    "lawley_last_24h": 100,
-    "swapped_serials": 9
   },
   "context": {
     "project": "FibreFlow",
