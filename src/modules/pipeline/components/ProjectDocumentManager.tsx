@@ -108,6 +108,43 @@ function getDocTypeIcon(docType: string): string {
   return icons[docType] || '📄';
 }
 
+/**
+ * Convert document URL to proxy URL for viewing
+ * Handles various URL formats:
+ * - https://vf.fibreflow.app/pipeline/{projectId}/{filename}
+ * - http://100.96.203.105:8091/pipeline/{projectId}/{filename}
+ * - External URLs (passed through as-is)
+ */
+function getDocumentViewUrl(fileUrl: string | null, filePath: string | null): string | null {
+  if (!fileUrl && !filePath) return null;
+
+  // If we have a file_path, use it directly with the proxy
+  if (filePath) {
+    return `/api/pipeline/documents/${filePath}`;
+  }
+
+  if (!fileUrl) return null;
+
+  // Check if it's a known storage URL pattern
+  const storagePatterns = [
+    /https?:\/\/vf\.fibreflow\.app\/(pipeline\/[^/]+\/.+)$/,
+    /https?:\/\/dev\.fibreflow\.app\/(pipeline\/[^/]+\/.+)$/,
+    /https?:\/\/app\.fibreflow\.app\/(pipeline\/[^/]+\/.+)$/,
+    /https?:\/\/100\.96\.203\.105:8091\/(pipeline\/[^/]+\/.+)$/,
+    /https?:\/\/localhost:8091\/(pipeline\/[^/]+\/.+)$/,
+  ];
+
+  for (const pattern of storagePatterns) {
+    const match = fileUrl.match(pattern);
+    if (match) {
+      return `/api/pipeline/documents/${match[1]}`;
+    }
+  }
+
+  // For external URLs (like example.com), return as-is
+  return fileUrl;
+}
+
 export function ProjectDocumentManager({
   projectId,
   projectName,
@@ -582,9 +619,9 @@ function DocumentRow({
         )}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {doc.file_url && (
+        {(doc.file_url || doc.file_path) && (
           <a
-            href={doc.file_url}
+            href={getDocumentViewUrl(doc.file_url, doc.file_path) || '#'}
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
