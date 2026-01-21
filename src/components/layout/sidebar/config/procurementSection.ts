@@ -23,6 +23,7 @@ import {
   FolderTree,
   PackagePlus,
   ClipboardCheck,
+  Building2,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -90,6 +91,15 @@ export const procurementSection: NavSection = {
       icon: CheckCircle,
       label: 'Approvals',
       shortLabel: 'Approve',
+      permissions: []
+    },
+
+    // Financial
+    {
+      to: '/procurement/cost-centers',
+      icon: Building2,
+      label: 'Cost Centers',
+      shortLabel: 'Costs',
       permissions: []
     },
 
