@@ -1,57 +1,50 @@
 {
-  "session_id": "2026-01-21-oes-qfield-sync",
-  "started_at": "2026-01-21T17:25:00Z",
-  "last_updated": "2026-01-21T22:06:22.382Z",
+  "session_id": "2026-01-22-pipeline-docs-and-fixes",
+  "started_at": "2026-01-22T00:00:00Z",
+  "last_updated": "2026-01-21T22:12:10.272Z",
   "working_on": {
-    "task": "OES to QField sync implementation",
+    "task": "Pipeline document management and UI fixes",
     "status": "completed",
     "progress": [
-      "Created sync script with GeoPackage + SDK upload",
-      "Fixed gpkg filename to match QGIS project expectations",
-      "Configured webhook on port 8095",
-      "Integrated with OES Import UI (auto-trigger)",
-      "Created dedicated project FibreFlow_OES_Automations",
-      "Synced 6850 OES records to new project",
-      "Added Hein as collaborator to project",
-      "Created /Qfield skill for management",
-      "Updated CLAUDE.md with QField documentation",
-      "Fixed timing issues - added 10s waits between uploads",
-      "Fixed SDK job_status call (only takes job_id)",
-      "Verified end-to-end sync working"
+      "Completed Smartsheet document sync (3,979 docs)",
+      "Added project-level document management API",
+      "Created ProjectDocumentManager component",
+      "Added document proxy API for secure file viewing",
+      "Fixed Projects page layout flash with skeleton loading",
+      "Added Pipeline to sidebar under Project Management",
+      "Deployed to staging (vf.fibreflow.app) and dev (dev.fibreflow.app)"
     ],
-    "last_action": "Deployed fixed sync script with timing"
+    "last_action": "KB update with learnings"
   },
-  "qfield_sync": {
-    "webhook_port": 8095,
-    "current_project": "067b51c8-6e96-4e0c-9462-d4890763758b",
-    "project_name": "FibreFlow_OES_Automations",
-    "gpkg_filename": "OES_Activations_Sync.gpkg",
-    "layer_name": "OES_Activations",
-    "last_sync": "2026-01-21T22:54:26Z",
-    "records_synced": 6850,
-    "status": "operational",
-    "package_job_status": "finished",
-    "fix_applied": "10s waits between uploads + SDK job_status fix",
-    "collaborators": [
-      "Jaun",
-      "Adminuser",
-      "Hein"
-    ]
+  "pipeline_docs": {
+    "total_synced": 3979,
+    "storage_path": "/srv/data/fibreflow-storage/pipeline/{projectId}/",
+    "proxy_endpoint": "/api/pipeline/documents/[...path]",
+    "project_docs_endpoint": "/api/pipeline/projects/[id]/documents"
   },
-  "skills_created": [
-    "/Qfield - QField sync management"
+  "fixes_applied": [
+    {
+      "issue": "Projects page layout flash",
+      "cause": "Conditional rendering of WA stats card caused layout shift",
+      "solution": "Always render container, use skeleton placeholder while loading",
+      "file": "app/(main)/projects/page.tsx"
+    },
+    {
+      "issue": "Document URLs not accessible from browser",
+      "cause": "Direct storage API URLs blocked by CORS/mixed content",
+      "solution": "Created proxy endpoint that fetches server-side and streams to client",
+      "file": "pages/api/pipeline/documents/[...path].ts"
+    }
   ],
-  "kb_updated": {
-    "CLAUDE.md": "Updated QField section with race condition fix, correct default project",
-    "Qfield.md": "Added collaborators, timing fix details, layer validity troubleshooting",
-    "timestamp": "2026-01-21T23:10:00Z"
-  },
   "kb_scan_results": {
-    "timestamp": "2026-01-21T22:05:00Z",
+    "timestamp": "2026-01-22T00:15:00Z",
     "total_modules": 42,
     "modules_with_claude_md": 42,
     "coverage": "100%",
-    "learnings_consolidated": 0
+    "learnings_consolidated": 2,
+    "updated_modules": [
+      "pipeline"
+    ]
   },
   "context": {
     "project": "FibreFlow",
@@ -63,6 +56,7 @@
     "qfield_webhook": "port 8095",
     "database": "Neon PostgreSQL (production branch)",
     "staging": "vf.fibreflow.app:3006",
+    "dev": "dev.fibreflow.app",
     "production": "app.fibreflow.app:3000"
   }
 }

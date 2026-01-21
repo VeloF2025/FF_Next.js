@@ -412,7 +412,8 @@
       "Bash(src/modules/pipeline/services/pipelineDocumentSyncService.ts )",
       "Bash(src/modules/pipeline/services/index.ts )",
       "Bash(pages/api/pipeline/smartsheet/sync-documents.ts)",
-      "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"'' && sudo systemctl restart fibreflow.service\")"
+      "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"'' && sudo systemctl restart fibreflow.service\")",
+      "Bash(if curl -s https://vf.fibreflow.app/api/health)"
     ],
     "deny": [],
     "ask": [],
