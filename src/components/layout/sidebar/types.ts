@@ -9,6 +9,7 @@ export interface NavItem {
   permissions: Permission[];
   subItems?: NavItem[];
   external?: boolean; // Opens in new tab
+  isGroup?: boolean; // If true, this is a collapsible group header (not navigable)
 }
 
 export interface NavSection {

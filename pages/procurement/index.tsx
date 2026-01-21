@@ -7,23 +7,22 @@ import { ProjectType, ProjectStatus, Priority } from '../../src/types/project.ty
 import { AlertCircle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProcurementTabs } from '../../src/modules/procurement/components/ProcurementTabs';
-import { ProjectFilter } from '../../src/modules/procurement/components/ProjectFilter';
+import { ProcurementFilters } from '../../src/modules/procurement/components/ProcurementFilters';
 import { ProcurementPortalProvider } from '../../src/modules/procurement/context/ProcurementPortalProvider';
 import { useProcurementPermissions } from '../../src/modules/procurement/hooks/useProcurementPermissions';
 import { log } from '../../src/lib/logger';
 import Link from 'next/link';
 import {
   FileText,
-  Send,
   Quote,
   ShoppingCart,
   Package,
   Truck,
-  ClipboardList,
-  BarChart3,
   MapPin,
   ArrowRight,
-  Loader2
+  Loader2,
+  Send,
+  ClipboardList
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -31,6 +30,7 @@ import type {
   AggregateProjectMetrics,
   ProjectSummary
 } from '../../src/types/procurement/portal.types';
+import { ProcurementOverview } from '@/modules/procurement/components/ProcurementOverview';
 
 interface ProcurementPageProps {
   initialProject?: Project;
@@ -86,8 +86,9 @@ export default function ProcurementPage({
     try {
       const response = await fetch('/api/procurement/metrics/aggregate');
       if (!response.ok) throw new Error('Failed to load metrics');
-      const data = await response.json();
-      setAggregateMetrics(data);
+      const result = await response.json();
+      // API returns {success: true, data: {...metrics...}}
+      setAggregateMetrics(result.data || result);
     } catch (err) {
       setError('Failed to load aggregate metrics');
       log.error('Failed to load aggregate metrics', { error: err });
@@ -215,13 +216,12 @@ export default function ProcurementPage({
                 </p>
               </div>
 
-              {/* Project Filter */}
+              {/* Filters */}
               <div className="mb-6">
-                <ProjectFilter
+                <ProcurementFilters
                   selectedProject={selectedProject}
                   onProjectChange={handleProjectChange}
-                  viewMode={viewMode}
-                  onViewModeChange={handleViewModeChange}
+                  isLoading={isLoading}
                 />
               </div>
 
@@ -243,7 +243,7 @@ export default function ProcurementPage({
 
               {/* Tab Content */}
               <div className="mt-6">
-                {activeTab === 'overview' && <DashboardTabContent project={selectedProject} />}
+                {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
                 {activeTab === 'boq' && <PlaceholderTab title="Bill of Quantities" icon={FileText} description="Manage project BOQ items" />}
                 {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
                 {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
@@ -286,81 +286,24 @@ function PlaceholderTab({ title, icon: Icon, description }: PlaceholderTabProps)
   );
 }
 
-function DashboardTabContent({ project }: { project?: Project }) {
-  return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <BarChart3 className="h-6 w-6 text-purple-500" />
-        <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">
-          {project ? `${project.name} Overview` : 'Procurement Overview'}
-        </h3>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <QuickLinkCard
-          title="Requisitions"
-          href="/procurement/requisitions"
-          icon={FileText}
-          description="Create and manage purchase requisitions"
-        />
-        <QuickLinkCard
-          title="Purchase Orders"
-          href="/procurement/purchase-orders"
-          icon={ShoppingCart}
-          description="View and track purchase orders"
-        />
-        <QuickLinkCard
-          title="Goods Receipt"
-          href="/procurement/grn"
-          icon={Package}
-          description="Record goods received"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <QuickLinkCard
-          title="Approvals"
-          href="/procurement/approvals"
-          icon={ClipboardList}
-          description="Review pending approvals"
-        />
-        <QuickLinkCard
-          title="Suppliers"
-          href="/suppliers"
-          icon={Truck}
-          description="Manage supplier database"
-        />
-        <QuickLinkCard
-          title="Field Stock"
-          href="/procurement/field-stock"
-          icon={MapPin}
-          description="Track field inventory"
-        />
-      </div>
-    </div>
-  );
-}
-
-function QuickLinkCard({ title, href, icon: Icon, description }: {
-  title: string;
-  href: string;
-  icon: React.ElementType;
-  description: string;
+function DashboardTabContent({
+  project,
+  aggregateMetrics,
+  isLoading
+}: {
+  project?: Project;
+  aggregateMetrics?: AggregateProjectMetrics;
+  isLoading?: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className="block bg-[var(--ff-bg-tertiary)] rounded-lg border border-[var(--ff-border)] p-4 hover:border-purple-500 transition-colors group"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <Icon className="h-5 w-5 text-purple-500" />
-        <ArrowRight className="h-4 w-4 text-[var(--ff-text-tertiary)] group-hover:text-purple-500 transition-colors" />
-      </div>
-      <h4 className="font-medium text-[var(--ff-text-primary)] mb-1">{title}</h4>
-      <p className="text-sm text-[var(--ff-text-secondary)]">{description}</p>
-    </Link>
+    <ProcurementOverview
+      project={project}
+      aggregateMetrics={aggregateMetrics}
+      isLoading={isLoading}
+    />
   );
 }
+
 
 function PurchaseOrdersTabContent() {
   return (
