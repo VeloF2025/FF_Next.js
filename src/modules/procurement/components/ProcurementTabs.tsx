@@ -239,7 +239,7 @@ export function ProcurementTabs({
               relative py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap
               flex items-center gap-2 transition-all duration-200 min-w-fit
               ${isActive
-                ? 'border-purple-500 text-purple-400 bg-purple-500/10'
+                ? 'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10'
                 : isDisabled || !hasPermission
                 ? 'border-transparent text-[var(--ff-text-tertiary)] cursor-not-allowed'
                 : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'

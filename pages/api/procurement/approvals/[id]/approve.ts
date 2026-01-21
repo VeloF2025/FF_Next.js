@@ -16,7 +16,9 @@ export default withErrorHandler(async (
   }
 
   const { id } = req.query;
-  const { userId, userName } = getAuth(req);
+  const session = getAuth(req);
+  const userId = session.userId;
+  const userName = session.user.name;
   const { notes } = req.body || {};
 
   if (!id || typeof id !== 'string') {
@@ -36,7 +38,7 @@ export default withErrorHandler(async (
       return apiResponse.notFound(res, 'Approval request', id);
     }
 
-    const request = existing[0];
+    const request = existing[0]!;
 
     if (request.status !== 'pending') {
       return apiResponse.validationError(res, {

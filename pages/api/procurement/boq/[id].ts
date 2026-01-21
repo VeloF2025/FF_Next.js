@@ -34,7 +34,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       return apiResponse.notFound(res, 'BOQ', id);
     }
 
-    const boq = boqResult[0];
+    const boq = boqResult[0]!;
 
     // Get BOQ items
     const items = await sql`

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { StockItemData, StockStats, StockFilter, StockSortBy } from '../types/stock.types';
+import { log } from '@/lib/logger';
 
 export const useStockManagement = (stockItems: StockItemData[]) => {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
@@ -70,12 +71,12 @@ export const useStockManagement = (stockItems: StockItemData[]) => {
   const handleBulkAction = (action: string) => {
     if (selectedItems.length === 0) return;
     // Implement bulk action logic
-    console.log(`Bulk ${action} for items:`, selectedItems);
+    log.info(`Bulk ${action} for items`, { selectedItems, module: 'procurement:stock' });
   };
 
   const handleStockAction = (itemId: string, action: string) => {
     // Implement stock action logic
-    console.log(`${action} for item:`, itemId);
+    log.info(`${action} for item`, { itemId, module: 'procurement:stock' });
   };
 
   return {

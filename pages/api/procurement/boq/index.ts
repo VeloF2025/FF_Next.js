@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import type { BOQItem } from '../../../../src/types/procurement/boq.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
+import { log } from '@/lib/logger';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -15,8 +16,8 @@ export default withErrorHandler(async (
   if (req.method === 'GET') {
     try {
       // Query real data from database
-      let boqData;
-      let items;
+      let boqData: any[];
+      let items: any[] = [];
       
       if (projectId && projectId !== 'all') {
         // Get BOQ data for specific project
@@ -66,25 +67,27 @@ export default withErrorHandler(async (
       }
       
       // Transform data to match expected format
-      const transformedItems: BOQItem[] = items.map(item => ({
+      const transformedItems: BOQItem[] = (items as any[]).map((item, index) => ({
         id: item.id,
+        boqId: item.boq_id || '',
         projectId: item.project_id,
+        lineNumber: item.line_number || index + 1,
         itemCode: item.item_code || '',
         description: item.description,
-        unit: item.uom,
+        uom: item.uom || 'unit',
         quantity: Number(item.quantity),
         unitPrice: item.unit_price ? Number(item.unit_price) : 0,
         totalPrice: item.total_price ? Number(item.total_price) : 0,
         category: item.category || 'Materials',
-        supplier: item.catalog_item_name || '',
-        status: item.procurement_status || 'pending',
-        createdAt: item.created_at || new Date().toISOString(),
-        updatedAt: item.updated_at || new Date().toISOString(),
+        mappingStatus: item.mapping_status || 'pending',
+        procurementStatus: item.procurement_status || 'pending',
+        createdAt: item.created_at || new Date(),
+        updatedAt: item.updated_at || new Date(),
       }));
       
       // Add aggregated stats
       const stats = {
-        totalValue: transformedItems.reduce((sum, item) => sum + item.totalPrice, 0),
+        totalValue: transformedItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0),
         totalItems: transformedItems.length,
         boqCount: boqData.length,
         categories: [...new Set(transformedItems.map(item => item.category))],
@@ -97,7 +100,7 @@ export default withErrorHandler(async (
         stats
       });
     } catch (error) {
-      console.error('Error fetching BOQ items:', error);
+      log.error('Error fetching BOQ items', { error, module: 'procurement:boq' });
       res.status(500).json({ error: 'Failed to fetch BOQ items' });
     }
   } else if (req.method === 'POST') {
@@ -120,7 +123,7 @@ export default withErrorHandler(async (
         }, 0);
 
         // First create the parent BOQ record
-        const [boq] = await sql`
+        const boqResult = await sql`
           INSERT INTO boqs (
             project_id, version, title, description, status,
             uploaded_by, item_count, total_estimated_value
@@ -138,6 +141,8 @@ export default withErrorHandler(async (
           RETURNING *
         `;
 
+        const boq = boqResult[0]!;
+
         // Log BOQ creation
         logCreate('boq', boq.id, {
           project_id: boq.project_id,
@@ -152,7 +157,7 @@ export default withErrorHandler(async (
           const item = body.items[i];
           const itemTotal = Number(item.totalPrice) || (Number(item.quantity) * Number(item.unitPrice)) || 0;
 
-          const [insertedItem] = await sql`
+          const insertedResult = await sql`
             INSERT INTO boq_items (
               boq_id, project_id, item_code, description, uom, quantity,
               unit_price, total_price, category, line_number
@@ -171,7 +176,7 @@ export default withErrorHandler(async (
             )
             RETURNING *
           `;
-          insertedItems.push(insertedItem);
+          insertedItems.push(insertedResult[0]);
         }
 
         return res.status(201).json({
@@ -191,7 +196,7 @@ export default withErrorHandler(async (
         });
       }
 
-      const [insertedItem] = await sql`
+      const insertResult = await sql`
         INSERT INTO boq_items (
           boq_id, project_id, item_code, description, uom, quantity,
           unit_price, total_price, category, line_number
@@ -211,6 +216,8 @@ export default withErrorHandler(async (
         RETURNING *
       `;
 
+      const insertedItem = insertResult[0]!;
+
       // Log BOQ item creation
       logCreate('boq_item', insertedItem.id, {
         boq_id: insertedItem.boq_id,
@@ -225,7 +232,7 @@ export default withErrorHandler(async (
         item: insertedItem
       });
     } catch (error) {
-      console.error('Error creating BOQ:', error);
+      log.error('Error creating BOQ', { error, module: 'procurement:boq' });
       res.status(500).json({ error: 'Failed to create BOQ' });
     }
   } else {
