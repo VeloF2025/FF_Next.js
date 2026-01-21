@@ -369,6 +369,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Update record with new submission info and preserved history
       // Note: submitted_date is preserved from original submission, not overwritten
       // WhatsApp context is updated for resubmission to enable reply threading on new feedback
+      // Clear is_oes_only flag since this is now a real submission
       await pool.query(
         `UPDATE dr_photo_unified_reviews
          SET
@@ -382,6 +383,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            wa_original_text = COALESCE($7, wa_original_text),
            wa_group_jid = COALESCE($8, wa_group_jid),
            wa_received_at = CASE WHEN $5 IS NOT NULL THEN NOW() ELSE wa_received_at END,
+           is_oes_only = FALSE,
            updated_at = NOW()
          WHERE drop_number = $4`,
         [
@@ -419,8 +421,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date, sender_phone,
            wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
-           created_at, updated_at, submission_history
-         ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10)`,
+           created_at, updated_at, submission_history, is_oes_only
+         ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10, FALSE)`,
         [
           dropNumber,
           project || existingQA.project,
@@ -456,9 +458,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date,
            wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
-           created_at, updated_at
+           created_at, updated_at, is_oes_only
          )
-         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, NOW(), NOW(), NOW())`,
+         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, NOW(), NOW(), NOW(), FALSE)`,
         [
           dropNumber,
           project || null,
