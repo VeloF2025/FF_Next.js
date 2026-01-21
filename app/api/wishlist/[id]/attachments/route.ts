@@ -78,12 +78,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'File is required' }, { status: 400 });
       }
 
-      // Upload to storage API
+      // Upload to storage API - endpoint is /upload/:type/:category
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
-      uploadFormData.append('folder', `wishlist/${itemId}`);
 
-      const uploadResponse = await fetch(`${STORAGE_API_URL}/upload`, {
+      const uploadResponse = await fetch(`${STORAGE_API_URL}/upload/wishlist/${itemId}`, {
         method: 'POST',
         body: uploadFormData,
       });
