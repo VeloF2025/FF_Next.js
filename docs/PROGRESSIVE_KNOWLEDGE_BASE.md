@@ -388,6 +388,151 @@ When invoked with a learning:
 
 ---
 
+## CLAUDE.md Internal Structure
+
+Each CLAUDE.md file should follow a consistent schema. This enables predictable loading and easier maintenance.
+
+### Recommended Section Order
+
+```markdown
+# Project/Module Name
+
+## Overview                    # What is this? (1-2 paragraphs)
+
+## Quick Start                 # How to get running (commands)
+
+## Architecture                # Tech stack, patterns, structure
+
+## Directory Structure         # Key folders and their purpose
+
+## Database                    # Connection strings, key tables
+
+## API Reference               # Endpoints, conventions
+
+## Conventions                 # Patterns to follow
+
+## Common Gotchas              # Problems and solutions (CRITICAL)
+
+## Troubleshooting             # Step-by-step fixes
+
+## Deployment                  # How to ship it
+
+## External Services           # Integrations, hosts, health checks
+```
+
+### Section Priority (What AI Reads First)
+
+When context is limited, AI assistants prioritize:
+
+| Priority | Section | Why |
+|----------|---------|-----|
+| 1 | **Quick Start** | Get productive immediately |
+| 2 | **Common Gotchas** | Avoid known mistakes |
+| 3 | **Architecture** | Understand the system |
+| 4 | **Conventions** | Write consistent code |
+| 5 | **Troubleshooting** | Fix issues fast |
+
+**Tip:** Put the most critical information in these sections.
+
+### Orchestration: How Layers Combine
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AI Context Window                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────────┐                                       │
+│  │ ~/.claude/       │  ALWAYS LOADED                        │
+│  │ CLAUDE.md        │  (Global preferences)                 │
+│  └────────┬─────────┘                                       │
+│           │                                                  │
+│           ▼                                                  │
+│  ┌──────────────────┐                                       │
+│  │ project/         │  ALWAYS LOADED                        │
+│  │ CLAUDE.md        │  (Project context)                    │
+│  └────────┬─────────┘                                       │
+│           │                                                  │
+│           ▼                                                  │
+│  ┌──────────────────┐                                       │
+│  │ module/          │  LOADED ON DEMAND                     │
+│  │ README.md        │  (When working in that module)        │
+│  └────────┬─────────┘                                       │
+│           │                                                  │
+│           ▼                                                  │
+│  ┌──────────────────┐                                       │
+│  │ .claude/session/ │  LOADED AT START                      │
+│  │ current.json     │  (Session recovery)                   │
+│  └──────────────────┘                                       │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Override Rules
+
+When the same topic appears in multiple layers:
+
+```
+Global:   "Use npm for packages"
+Project:  "Use bun for packages"    ← Project wins
+
+Global:   "Max 300 lines per file"
+Project:  (not mentioned)           ← Global applies
+
+Project:  "Use apiResponse helper"
+Module:   "Use raw res.json here"   ← Module wins (for that module)
+```
+
+**Principle:** Most specific context wins.
+
+### Loading Triggers
+
+| Layer | When Loaded | Trigger |
+|-------|-------------|---------|
+| Global | Session start | Automatic |
+| Project | Session start | Automatic (if CLAUDE.md exists) |
+| Module | On demand | When files in that module are read/edited |
+| Session | Session start | Hook checks for recovery file |
+
+### Cross-Referencing Between Layers
+
+Use explicit references to avoid duplication:
+
+```markdown
+# In project CLAUDE.md
+
+## WhatsApp Integration
+See `src/modules/wa-monitor/README.md` for full documentation.
+
+Quick reference:
+- Dashboard: /wa-monitor
+- API prefix: /api/wa-monitor-*
+```
+
+```markdown
+# In module README.md
+
+## Prerequisites
+Assumes familiarity with project conventions in `/CLAUDE.md`:
+- API response helpers
+- Database connection patterns
+```
+
+### Version Control Considerations
+
+```gitignore
+# .gitignore
+
+# DO commit:
+CLAUDE.md                    # Project knowledge
+src/modules/*/README.md      # Module documentation
+
+# DON'T commit:
+.claude/session/             # Ephemeral session state
+~/.claude/                   # Personal global config
+```
+
+---
+
 ## Why This Architecture Works
 
 | Problem | Solution |
