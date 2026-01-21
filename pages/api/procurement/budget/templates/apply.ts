@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -21,7 +22,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
@@ -70,6 +71,7 @@ export default async function handler(
     `;
 
     // Create budget
+    const templateRow = template[0]!;
     const budget = await sql`
       INSERT INTO project_budgets (
         project_id,
@@ -88,18 +90,19 @@ export default async function handler(
         'manual',
         ${data.total_budget},
         ${data.total_budget},
-        ${template[0].default_currency},
-        ${template[0].default_enforce_budget},
-        ${template[0].default_allow_override},
-        ${template[0].default_warning_threshold},
-        ${template[0].default_critical_threshold},
+        ${templateRow.default_currency},
+        ${templateRow.default_enforce_budget},
+        ${templateRow.default_allow_override},
+        ${templateRow.default_warning_threshold},
+        ${templateRow.default_critical_threshold},
         'draft',
         ${data.created_by || null}
       )
       RETURNING *
     `;
 
-    const budgetId = budget[0].id;
+    const budgetRow = budget[0]!;
+    const budgetId = budgetRow.id;
 
     // Create categories from template
     const createdCategories = [];
@@ -152,19 +155,19 @@ export default async function handler(
         'allocation',
         'template',
         ${data.total_budget},
-        ${`Budget created from template: ${template[0].name}`},
+        ${`Budget created from template: ${templateRow.name}`},
         ${data.created_by || 'system'}
       )
     `;
 
     return apiResponse.created(res, {
-      budget: budget[0],
+      budget: budgetRow,
       categories: createdCategories,
-      template: template[0],
-      message: `Budget created from template "${template[0].name}"`,
+      template: templateRow,
+      message: `Budget created from template "${templateRow.name}"`,
     });
   } catch (error) {
-    console.error('Apply Template error:', error);
+    log.error('Apply Template error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }

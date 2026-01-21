@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -108,19 +109,20 @@ export default async function handler(
     `;
 
     // Calculate utilization
-    const totalBudget = parseFloat(totals[0].total_budget as string) || 0;
-    const totalCommitted = parseFloat(totals[0].total_committed as string) || 0;
+    const totalsRow = totals[0] || {};
+    const totalBudget = parseFloat(totalsRow.total_budget as string) || 0;
+    const totalCommitted = parseFloat(totalsRow.total_committed as string) || 0;
     const utilizationPercent = totalBudget > 0
       ? Math.round((totalCommitted / totalBudget * 100) * 100) / 100
       : 0;
 
     return apiResponse.success(res, {
       summary: {
-        projectCount: parseInt(totals[0].project_count as string) || 0,
+        projectCount: parseInt(totalsRow.project_count as string) || 0,
         totalBudget,
         totalCommitted,
-        totalActual: parseFloat(totals[0].total_actual as string) || 0,
-        totalAvailable: parseFloat(totals[0].total_available as string) || 0,
+        totalActual: parseFloat(totalsRow.total_actual as string) || 0,
+        totalAvailable: parseFloat(totalsRow.total_available as string) || 0,
         utilizationPercent,
       },
       healthBreakdown: healthBreakdown.reduce((acc, h) => {
@@ -136,7 +138,7 @@ export default async function handler(
       activeAlerts,
     });
   } catch (error) {
-    console.error('Budget Dashboard API error:', error);
+    log.error('Budget Dashboard API error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }

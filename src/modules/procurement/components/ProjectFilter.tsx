@@ -144,7 +144,7 @@ export function ProjectFilter({
       case ProjectStatus.CANCELLED:
         return `${baseStyles} bg-red-500/20 text-red-400`;
       case ProjectStatus.PLANNING:
-        return `${baseStyles} bg-purple-500/20 text-purple-400`;
+        return `${baseStyles} bg-[var(--ff-accent-500)]/20 text-[var(--ff-accent-400)]`;
       default:
         return `${baseStyles} bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]`;
     }
@@ -238,7 +238,7 @@ export function ProjectFilter({
                   onClick={() => setStatusFilter(status)}
                   className={`px-2 py-1 text-xs font-medium rounded-full transition-colors ${
                     statusFilter === status
-                      ? 'bg-purple-500/20 text-purple-400'
+                      ? 'bg-[var(--ff-accent-500)]/20 text-[var(--ff-accent-400)]'
                       : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
                   }`}
                 >
@@ -283,7 +283,7 @@ export function ProjectFilter({
                     onClick={() => handleProjectSelect(project)}
                     className={`w-full px-4 py-3 text-left hover:bg-[var(--ff-bg-hover)] transition-colors ${
                       selectedProject?.id === project.id && viewMode === 'single'
-                        ? 'bg-purple-500/10 text-purple-400'
+                        ? 'bg-[var(--ff-accent-500)]/10 text-[var(--ff-accent-400)]'
                         : 'text-[var(--ff-text-primary)]'
                     }`}
                   >
@@ -302,7 +302,7 @@ export function ProjectFilter({
                         </div>
                       </div>
                       {selectedProject?.id === project.id && viewMode === 'single' && (
-                        <Check className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                        <Check className="h-4 w-4 text-[var(--ff-accent-400)] flex-shrink-0" />
                       )}
                     </div>
                   </button>
@@ -333,7 +333,7 @@ export function ProjectFilter({
               </span>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-purple-400 hover:text-purple-300"
+                className="text-[var(--ff-accent-400)] hover:text-[var(--ff-accent-300)]"
               >
                 Close
               </button>

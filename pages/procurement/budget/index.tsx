@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout';
 import { StatCard } from '@/components/ui/StatCard';
+import { log } from '@/lib/logger';
 import {
   DollarSign,
   TrendingUp,
@@ -131,7 +132,7 @@ export default function ProcurementBudgetDashboard() {
       }
     } catch (err) {
       setError('Failed to load budget data');
-      console.error(err);
+      log.error('Failed to load budget data', { error: err, module: 'procurement:budget' });
     } finally {
       setLoading(false);
     }
@@ -233,34 +234,34 @@ export default function ProcurementBudgetDashboard() {
             {/* Summary Stats */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <StatCard
-                title="Total Projects"
+                label="Total Projects"
                 value={dashboardData.summary.projectCount}
                 icon={FileText}
-                colorType="blue"
+                colorType="total"
               />
               <StatCard
-                title="Total Budget"
+                label="Total Budget"
                 value={formatCurrency(dashboardData.summary.totalBudget)}
                 icon={DollarSign}
-                colorType="green"
+                colorType="financial"
               />
               <StatCard
-                title="Committed"
+                label="Committed"
                 value={formatCurrency(dashboardData.summary.totalCommitted)}
                 icon={TrendingUp}
-                colorType="yellow"
+                colorType="warning"
               />
               <StatCard
-                title="Available"
+                label="Available"
                 value={formatCurrency(dashboardData.summary.totalAvailable)}
                 icon={CheckCircle}
-                colorType="purple"
+                colorType="success"
               />
               <StatCard
-                title="Utilization"
+                label="Utilization"
                 value={`${(dashboardData.summary.utilizationPercent ?? 0).toFixed(1)}%`}
                 icon={Percent}
-                colorType={(dashboardData.summary.utilizationPercent ?? 0) > 90 ? 'red' : 'blue'}
+                colorType={(dashboardData.summary.utilizationPercent ?? 0) > 90 ? 'critical' : 'info'}
               />
             </div>
 

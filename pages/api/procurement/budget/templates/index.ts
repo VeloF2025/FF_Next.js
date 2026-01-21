@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -20,7 +21,7 @@ export default async function handler(
     case 'POST':
       return handlePost(req, res);
     default:
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
@@ -64,7 +65,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, templates);
   } catch (error) {
-    console.error('Templates GET error:', error);
+    log.error('Templates GET error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -136,7 +137,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       RETURNING *
     `;
 
-    const templateId = template[0].id;
+    const templateRow = template[0]!;
+    const templateId = templateRow.id;
 
     // Create categories if provided
     if (data.categories && data.categories.length > 0) {
@@ -175,11 +177,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     return apiResponse.created(res, {
-      ...result[0],
+      ...result[0]!,
       categories,
     });
   } catch (error) {
-    console.error('Templates POST error:', error);
+    log.error('Templates POST error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }

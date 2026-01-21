@@ -97,9 +97,9 @@ export function ProcurementFilters({
         <button
           type="button"
           onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
-          className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border)] rounded-lg hover:border-purple-500/50 transition-colors text-sm"
+          className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border)] rounded-lg hover:border-[var(--ff-accent-500)]/50 transition-colors text-sm"
         >
-          <Calendar className="h-4 w-4 text-purple-500" />
+          <Calendar className="h-4 w-4 text-[var(--ff-accent-500)]" />
           <span className="text-[var(--ff-text-primary)]">{selectedDateLabel}</span>
           <ChevronDown className={`h-4 w-4 text-[var(--ff-text-tertiary)] transition-transform ${dateDropdownOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -115,7 +115,7 @@ export function ProcurementFilters({
                   setDateDropdownOpen(false);
                 }}
                 className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-[var(--ff-bg-tertiary)] transition-colors ${
-                  dateRange === preset.value ? 'text-purple-400' : 'text-[var(--ff-text-primary)]'
+                  dateRange === preset.value ? 'text-[var(--ff-accent-400)]' : 'text-[var(--ff-text-primary)]'
                 }`}
               >
                 {preset.label}
@@ -132,7 +132,7 @@ export function ProcurementFilters({
           type="button"
           onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
           disabled={isLoading}
-          className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border)] rounded-lg hover:border-purple-500/50 transition-colors text-sm min-w-[180px]"
+          className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border)] rounded-lg hover:border-[var(--ff-accent-500)]/50 transition-colors text-sm min-w-[180px]"
         >
           <Building2 className="h-4 w-4 text-blue-500" />
           <span className="text-[var(--ff-text-primary)] truncate flex-1 text-left">
@@ -183,7 +183,7 @@ export function ProcurementFilters({
                   setProjectDropdownOpen(false);
                 }}
                 className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-[var(--ff-bg-tertiary)] transition-colors ${
-                  selectedProject?.id === project.id ? 'text-purple-400 bg-purple-500/10' : 'text-[var(--ff-text-primary)]'
+                  selectedProject?.id === project.id ? 'text-[var(--ff-accent-400)] bg-[var(--ff-accent-500)]/10' : 'text-[var(--ff-text-primary)]'
                 }`}
               >
                 <div className="min-w-0">

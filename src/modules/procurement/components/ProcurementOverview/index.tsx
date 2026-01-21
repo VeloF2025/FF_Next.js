@@ -186,8 +186,8 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon: Icon, color, subtitle, href }: StatCardProps) {
   const colorStyles = {
-    blue: 'bg-blue-500/10 text-blue-500',
-    purple: 'bg-purple-500/10 text-purple-500',
+    blue: 'bg-[var(--ff-primary-500)]/10 text-[var(--ff-primary-500)]',
+    purple: 'bg-[var(--ff-accent-500)]/10 text-[var(--ff-accent-500)]',
     green: 'bg-green-500/10 text-green-500',
     orange: 'bg-orange-500/10 text-orange-500',
     slate: 'bg-slate-500/10 text-slate-400',
@@ -215,7 +215,7 @@ function StatCard({ label, value, icon: Icon, color, subtitle, href }: StatCardP
 
   if (href) {
     return (
-      <Link href={href} className={`${baseClasses} hover:border-purple-500/50 transition-colors block`}>
+      <Link href={href} className={`${baseClasses} hover:border-[var(--ff-accent-500)]/50 transition-colors block`}>
         {content}
       </Link>
     );
@@ -248,10 +248,10 @@ function WorkflowStepper() {
               href={step.href}
               className="flex flex-col items-center group min-w-[72px]"
             >
-              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center group-hover:bg-purple-500/20 transition-colors">
-                <step.icon className="h-5 w-5 text-purple-500" />
+              <div className="w-10 h-10 rounded-full bg-[var(--ff-accent-500)]/10 flex items-center justify-center group-hover:bg-[var(--ff-accent-500)]/20 transition-colors">
+                <step.icon className="h-5 w-5 text-[var(--ff-accent-500)]" />
               </div>
-              <span className="mt-2 text-xs font-medium text-[var(--ff-text-secondary)] group-hover:text-purple-500 transition-colors">
+              <span className="mt-2 text-xs font-medium text-[var(--ff-text-secondary)] group-hover:text-[var(--ff-accent-500)] transition-colors">
                 {step.label}
               </span>
             </Link>
@@ -281,9 +281,9 @@ interface ActionCardProps {
 
 function ActionCard({ title, description, icon: Icon, href, color, badge, badgeType = 'info' }: ActionCardProps) {
   const colorStyles = {
-    blue: { bg: 'bg-blue-500/10', text: 'text-blue-500', hover: 'hover:border-blue-500/50' },
+    blue: { bg: 'bg-[var(--ff-primary-500)]/10', text: 'text-[var(--ff-primary-500)]', hover: 'hover:border-[var(--ff-primary-500)]/50' },
     cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-500', hover: 'hover:border-cyan-500/50' },
-    purple: { bg: 'bg-purple-500/10', text: 'text-purple-500', hover: 'hover:border-purple-500/50' },
+    purple: { bg: 'bg-[var(--ff-accent-500)]/10', text: 'text-[var(--ff-accent-500)]', hover: 'hover:border-[var(--ff-accent-500)]/50' },
     indigo: { bg: 'bg-indigo-500/10', text: 'text-indigo-500', hover: 'hover:border-indigo-500/50' },
     green: { bg: 'bg-green-500/10', text: 'text-green-500', hover: 'hover:border-green-500/50' },
     teal: { bg: 'bg-teal-500/10', text: 'text-teal-500', hover: 'hover:border-teal-500/50' },
@@ -312,11 +312,11 @@ function ActionCard({ title, description, icon: Icon, href, color, badge, badgeT
           </span>
         )}
       </div>
-      <h3 className="font-semibold text-[var(--ff-text-primary)] mb-1 group-hover:text-purple-400 transition-colors">
+      <h3 className="font-semibold text-[var(--ff-text-primary)] mb-1 group-hover:text-[var(--ff-accent-400)] transition-colors">
         {title}
       </h3>
       <p className="text-sm text-[var(--ff-text-tertiary)]">{description}</p>
-      <div className="mt-3 flex items-center text-xs text-[var(--ff-text-tertiary)] group-hover:text-purple-400 transition-colors">
+      <div className="mt-3 flex items-center text-xs text-[var(--ff-text-tertiary)] group-hover:text-[var(--ff-accent-400)] transition-colors">
         <span>Open</span>
         <ArrowRight className="h-3 w-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>

@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -29,7 +30,7 @@ export default async function handler(
     case 'DELETE':
       return handleDelete(id, res);
     default:
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
   }
 }
 
@@ -54,7 +55,7 @@ async function handleGet(id: string, res: NextApiResponse) {
       categories,
     });
   } catch (error) {
-    console.error('Template GET error:', error);
+    log.error('Template GET error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -73,7 +74,8 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
     }
 
     // System templates can only have limited updates
-    if (existing[0].is_system && (data.code || data.template_type)) {
+    const existingRow = existing[0]!;
+    if (existingRow.is_system && (data.code || data.template_type)) {
       return apiResponse.badRequest(res, 'Cannot change code or type of system templates');
     }
 
@@ -134,7 +136,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
       categories,
     });
   } catch (error) {
-    console.error('Template PUT error:', error);
+    log.error('Template PUT error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -150,7 +152,8 @@ async function handleDelete(id: string, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Template', id);
     }
 
-    if (existing[0].is_system) {
+    const existingTemplate = existing[0]!;
+    if (existingTemplate.is_system) {
       return apiResponse.badRequest(res, 'Cannot delete system templates');
     }
 
@@ -158,7 +161,7 @@ async function handleDelete(id: string, res: NextApiResponse) {
 
     return apiResponse.success(res, { message: 'Template deleted' });
   } catch (error) {
-    console.error('Template DELETE error:', error);
+    log.error('Template DELETE error', { error, module: 'procurement:budget' });
     return apiResponse.internalError(res, error);
   }
 }

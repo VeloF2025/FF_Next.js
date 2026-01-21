@@ -57,7 +57,18 @@
     --ff-secondary-900: #0f172a;
     --ff-secondary-950: #020617;
     
-    --ff-accent-500: #8b5cf6;
+    /* Accent (Purple) - for highlights, active states, accent elements */
+    --ff-accent-50: #faf5ff;
+    --ff-accent-100: #f3e8ff;
+    --ff-accent-200: #e9d5ff;
+    --ff-accent-300: #d8b4fe;
+    --ff-accent-400: #c084fc;
+    --ff-accent-500: #a855f7;
+    --ff-accent-600: #9333ea;
+    --ff-accent-700: #7c3aed;
+    --ff-accent-800: #6b21a8;
+    --ff-accent-900: #581c87;
+
     --ff-success-500: #22c55e;
     --ff-warning-500: #f59e0b;
     --ff-error-500: #ef4444;
