@@ -377,7 +377,10 @@
       "Bash(pages/fleet/check-in/audit.tsx )",
       "Bash(pages/projects/new-test.tsx )",
       "Bash(pages/suppliers/[id].tsx)",
-      "Bash(do if curl -s http://100.96.203.105:3006/api/health)"
+      "Bash(do if curl -s http://100.96.203.105:3006/api/health)",
+      "Skill(Qfield)",
+      "Bash(host:*)",
+      "Bash(for endpoint in /api/procurement/cost-centers /api/procurement/categories /api/procurement/bundles /api/procurement/stock-takes)"
     ],
     "deny": [],
     "ask": [],

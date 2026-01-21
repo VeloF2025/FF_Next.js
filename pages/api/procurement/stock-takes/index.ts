@@ -80,7 +80,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   query += ` ORDER BY created_at DESC`;
 
-  const stockTakes = await sql(query, params) as StockTake[];
+  const stockTakes = await sql.query(query, params) as StockTake[];
 
   return apiResponse.success(res, stockTakes);
 }

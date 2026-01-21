@@ -78,7 +78,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   query += ` ORDER BY sc.level, sc.sort_order, sc.name`;
 
-  const categories = await sql(query, params) as StockCategory[];
+  const categories = await sql.query(query, params) as StockCategory[];
 
   // If tree format requested, build hierarchy
   if (tree === 'true') {

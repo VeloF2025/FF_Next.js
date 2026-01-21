@@ -67,7 +67,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   query += ` ORDER BY is_default DESC, usage_count DESC, name`;
 
-  const bundles = await sql(query, params) as StockBundle[];
+  const bundles = await sql.query(query, params) as StockBundle[];
 
   return apiResponse.success(res, bundles);
 }

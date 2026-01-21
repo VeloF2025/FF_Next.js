@@ -90,7 +90,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Count total
     const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
-    const countResult = await sql(countQuery, params);
+    const countResult = await sql.query(countQuery, params);
     const total = parseInt(countResult[0].count as string) || 0;
 
     // Add pagination and ordering
@@ -102,7 +102,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     params.push(limitNum.toString());
     params.push(offset.toString());
 
-    const costCenters = await sql(query, params);
+    const costCenters = await sql.query(query, params);
 
     return apiResponse.success(res, {
       cost_centers: costCenters,
