@@ -30,17 +30,19 @@ export default async function handler(
 
         -- BOQ Value: Sum of all BOQ items for this project
         COALESCE((
-          SELECT SUM(bi.amount)
+          SELECT SUM(bi.total_price)
           FROM boq_items bi
           JOIN boqs b ON bi.boq_id = b.id
-          WHERE b.project_id::uuid = p.id
+          WHERE b.project_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          AND b.project_id::uuid = p.id
         ), 0) as boq_value,
 
         -- Active RFQs: Count of non-closed/cancelled RFQs
         COALESCE((
           SELECT COUNT(*)
           FROM rfqs r
-          WHERE r.project_id::uuid = p.id
+          WHERE r.project_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          AND r.project_id::uuid = p.id
           AND r.status NOT IN ('closed', 'cancelled', 'awarded')
         ), 0) as active_rfqs,
 
