@@ -10,6 +10,7 @@
  * - VLM Server (Qwen3 for categorization)
  * - WhatsApp Bridge (via recent activity)
  * - WhatsApp Sender (for Send Feedback feature)
+ * - SharePoint (DR photo sync to SharePoint)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -17,6 +18,11 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import {
+  getSharePointDrConfig,
+  isSharePointDrSyncEnabled,
+  getAccessToken,
+} from '@/lib/sharepointDrSyncService';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -48,6 +54,7 @@ interface HealthCheckResponse {
     vlm: ServiceStatus;
     whatsappBridge: ServiceStatus;
     whatsappSender: ServiceStatus;
+    sharepoint: ServiceStatus;
   };
   recentActivity: {
     lastDRProcessed: string | null;
@@ -273,6 +280,84 @@ async function checkWhatsAppSender(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check SharePoint connectivity and configuration
+ */
+async function checkSharePoint(): Promise<ServiceStatus> {
+  const start = Date.now();
+
+  // Check if sync is enabled
+  if (!isSharePointDrSyncEnabled()) {
+    return {
+      status: 'degraded',
+      latencyMs: Date.now() - start,
+      message: 'SharePoint sync disabled',
+      lastCheck: new Date().toISOString(),
+    };
+  }
+
+  // Check configuration
+  const config = getSharePointDrConfig();
+  if (!config) {
+    return {
+      status: 'down',
+      latencyMs: Date.now() - start,
+      message: 'SharePoint not configured - missing env vars',
+      lastCheck: new Date().toISOString(),
+    };
+  }
+
+  // Test OAuth token generation
+  try {
+    const token = await getAccessToken(config);
+    if (!token) {
+      return {
+        status: 'down',
+        latencyMs: Date.now() - start,
+        message: 'Failed to get OAuth token',
+        lastCheck: new Date().toISOString(),
+      };
+    }
+
+    // Test Graph API connectivity by listing drive info
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/drives/${config.driveId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        status: 'healthy',
+        latencyMs: Date.now() - start,
+        message: `SharePoint connected: ${data.name || 'Documents'}`,
+        lastCheck: new Date().toISOString(),
+      };
+    } else {
+      return {
+        status: 'down',
+        latencyMs: Date.now() - start,
+        message: `SharePoint API error: ${response.status}`,
+        lastCheck: new Date().toISOString(),
+      };
+    }
+  } catch (error) {
+    return {
+      status: 'down',
+      latencyMs: Date.now() - start,
+      message: `SharePoint error: ${error instanceof Error ? error.message : 'Unknown'}`,
+      lastCheck: new Date().toISOString(),
+    };
+  }
+}
+
+/**
  * Get recent activity stats
  */
 async function getRecentActivity() {
@@ -324,17 +409,18 @@ async function getRecentActivity() {
 async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {
     // Run all checks in parallel
-    const [database, onemap, vlm, whatsappBridge, whatsappSender, recentActivity] = await Promise.all([
+    const [database, onemap, vlm, whatsappBridge, whatsappSender, sharepoint, recentActivity] = await Promise.all([
       checkDatabase(),
       checkOneMap(),
       checkVLM(),
       checkWhatsAppBridge(),
       checkWhatsAppSender(),
+      checkSharePoint(),
       getRecentActivity(),
     ]);
 
     // Determine overall health
-    const statuses = [database.status, onemap.status, vlm.status, whatsappBridge.status, whatsappSender.status];
+    const statuses = [database.status, onemap.status, vlm.status, whatsappBridge.status, whatsappSender.status, sharepoint.status];
     let overall: 'healthy' | 'degraded' | 'down';
 
     if (statuses.every((s) => s === 'healthy')) {
@@ -353,6 +439,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
         vlm,
         whatsappBridge,
         whatsappSender,
+        sharepoint,
       },
       recentActivity,
     };
