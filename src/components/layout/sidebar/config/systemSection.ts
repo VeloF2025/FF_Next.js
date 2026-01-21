@@ -39,6 +39,13 @@ export const systemSection: NavSection = {
       permissions: [Permission.SYSTEM_ADMIN],
     },
     {
+      to: '/qfield-sync',
+      icon: Activity,
+      label: 'QField Sync',
+      shortLabel: 'Sync',
+      permissions: [Permission.SYSTEM_ADMIN],
+    },
+    {
       to: '/downloads',
       icon: Download,
       label: 'Downloads',
