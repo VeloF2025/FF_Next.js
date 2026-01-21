@@ -367,22 +367,36 @@ getTechnicianIssues(data)      // Returns actionable issues for technicians
 
 ### WhatsApp Integration
 
-**Go Bridge:** `/home/louis/whatsapp-bridge-go/`
+**WhatsApp Services (Updated Jan 2026):**
+
+| Service | Port | Number | Purpose |
+|---------|------|--------|---------|
+| `whatsapp-bridge-2` | 8083 | 063 841 2276 | Receiving & Sending |
+| `whatsapp-sender-2` | 8081 | 063 841 2276 | DB queue sender |
+| `wa-feedback` | 8092 | - | FibreFlow feedback API |
+
+**Bridge-2 (Primary - 063 841 2276):** `/home/louis/whatsapp-bridge-2/`
 ```bash
-tail -f /home/louis/whatsapp-bridge-go/bridge.log
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+tail -f /home/louis/whatsapp-bridge-2/bridge.log
+echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge-2.service
+# Send test message:
+curl -X POST http://localhost:8083/api/send -H "Content-Type: application/json" \
+  -d '{"recipient": "120363418298130331@g.us", "message": "Test"}'
 ```
 
-**WA Feedback Service:** Port 8090
+**WA Feedback Service:** Port 8092
 ```bash
-curl http://100.96.203.105:8090/health
+curl http://localhost:8092/health
 echo 'velo2026' | sudo -S systemctl restart wa-feedback
+# Config: /etc/systemd/system/wa-feedback.service
+# Code: /home/louis/wa-feedback-service/wa-feedback-service.js
+# Uses bridge-2 (8083) with /api/send endpoint
 ```
 
 **Group Mapping:**
 - Lawley: `120363418298130331@g.us`
 - Mohadin: `120363421532174586@g.us`
-- Velo Test: `120363421664266245@g.us`
+- Velo Test: `120363421664266245@g.us` *(063 number NOT in this group)*
 - Mamelodi: `120363408849234743@g.us`
 
 ### 10-Step Photo Checklist
@@ -582,11 +596,9 @@ ssh louis@100.96.203.105
 
 | Environment | URL | Port | Directory | Service |
 |-------------|-----|------|-----------|---------|
-| **Production** | app.fibreflow.app | 3000* | `/home/velo/fibreflow-production` | `fibreflow-production.service` |
+| **Production** | app.fibreflow.app | 3000 | `/home/velo/fibreflow-production` | `fibreflow-production.service` |
 | **Staging** | vf.fibreflow.app | 3006 | `/home/louis/apps/fibreflow` | `fibreflow.service` |
 | **Dev** | localhost:3005 | 3005 | `/home/velo/fibreflow` | manual |
-
-*Note: Production currently runs on port 3008, pending migration to 3000.
 
 ### Deployment Workflow
 1. **Local:** Develop on feature branch
