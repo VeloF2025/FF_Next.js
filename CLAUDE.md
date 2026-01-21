@@ -574,35 +574,52 @@ ssh louis@100.96.203.105
 - **OS:** Ubuntu Server
 - **Tailnet:** velof2025.github
 
-### Dual Environment Setup
-| Environment | URL | Branch | Port | Service |
-|------------|-----|--------|------|---------|
-| **Production** | app.fibreflow.app | `master` | 3005 | `fibreflow.service` |
-| **Development** | dev.fibreflow.app | `develop` | 3006 | `fibreflow-dev.service` |
+### Three Environment Setup
+
+> **Full infrastructure details:** `docs/INFRASTRUCTURE.md`
+
+**IMPORTANT:** All three environments share the **same production database** (Neon PostgreSQL).
+
+| Environment | URL | Port | Directory | Service |
+|-------------|-----|------|-----------|---------|
+| **Production** | app.fibreflow.app | 3000* | `/home/velo/fibreflow-production` | `fibreflow-production.service` |
+| **Staging** | vf.fibreflow.app | 3006 | `/home/louis/apps/fibreflow` | `fibreflow.service` |
+| **Dev** | localhost:3005 | 3005 | `/home/velo/fibreflow` | manual |
+
+*Note: Production currently runs on port 3008, pending migration to 3000.
 
 ### Deployment Workflow
-1. **Local:** Create feature branch from develop
-2. **Dev:** Merge to develop → Deploy to dev.fibreflow.app
-3. **Test:** Verify on dev environment
-4. **Prod:** Merge to master → Deploy to app.fibreflow.app
+1. **Local:** Develop on feature branch
+2. **Staging:** Push to master → Deploy to vf.fibreflow.app (test)
+3. **Production:** After staging verified → Deploy to app.fibreflow.app
 
 ### Deployment Commands (Updated Jan 2026)
-```bash
-# Deploy to PRODUCTION (systemd service)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow && git pull && npm ci && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
 
-# Check deployment status
+**Deploy to STAGING (vf.fibreflow.app):**
+```bash
 sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "echo 'velo2026' | sudo -S systemctl status fibreflow.service"
+  "echo 'velo2026' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
+```
+
+**Deploy to PRODUCTION (app.fibreflow.app):**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ### Server Quick Reference
 ```bash
 ssh velo@100.96.203.105           # Connect to server
-echo 'velo2026' | sudo -S systemctl status fibreflow.service   # Check status
-echo 'velo2026' | sudo -S systemctl restart fibreflow.service  # Restart
-echo 'velo2026' | sudo -S journalctl -u fibreflow.service -f   # View logs
+
+# Staging
+echo 'velo2026' | sudo -S systemctl status fibreflow.service
+echo 'velo2026' | sudo -S systemctl restart fibreflow.service
+echo 'velo2026' | sudo -S journalctl -u fibreflow.service -f
+
+# Production
+echo 'velo2026' | sudo -S systemctl status fibreflow-production.service
+echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service
+echo 'velo2026' | sudo -S journalctl -u fibreflow-production.service -f
 ```
 
 ### Additional Services
