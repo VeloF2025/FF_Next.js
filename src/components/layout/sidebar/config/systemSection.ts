@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, Download, FileDown, Activity, BarChart3 } from 'lucide-react';
+import { Settings, Download, FileDown, Activity, BarChart3, MapPin } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -30,6 +30,13 @@ export const systemSection: NavSection = {
       shortLabel: 'Grafana',
       permissions: [Permission.SYSTEM_ADMIN],
       external: true,
+    },
+    {
+      to: '/system/qfield',
+      icon: MapPin,
+      label: 'QField Monitor',
+      shortLabel: 'QField',
+      permissions: [Permission.SYSTEM_ADMIN],
     },
     {
       to: '/downloads',
