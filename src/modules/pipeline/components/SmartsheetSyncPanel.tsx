@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock, Settings, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
 
 interface SyncResult {
   success: boolean;
@@ -46,6 +46,17 @@ interface SyncHistoryItem {
   triggered_by: string;
 }
 
+interface DocSyncResult {
+  success: boolean;
+  totalAttachments: number;
+  downloaded: number;
+  uploaded: number;
+  linked: number;
+  skipped: number;
+  errors: Array<{ attachmentId: number; name: string; error: string }>;
+  duration_ms: number;
+}
+
 interface SmartsheetSyncPanelProps {
   compact?: boolean;
   onSyncComplete?: () => void;
@@ -58,6 +69,11 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
   const [history, setHistory] = useState<SyncHistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Document sync state
+  const [isDocSyncing, setIsDocSyncing] = useState(false);
+  const [docSyncResult, setDocSyncResult] = useState<DocSyncResult | null>(null);
+  const [docSyncError, setDocSyncError] = useState<string | null>(null);
 
   // Fetch sync configs
   const fetchConfigs = useCallback(async () => {
@@ -111,6 +127,34 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
       setError(e instanceof Error ? e.message : 'Sync failed');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Trigger document sync
+  const handleDocSync = async () => {
+    setIsDocSyncing(true);
+    setDocSyncError(null);
+    setDocSyncResult(null);
+
+    try {
+      const res = await fetch('/api/pipeline/smartsheet/sync-documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skipExisting: true }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Document sync failed');
+      }
+
+      setDocSyncResult(data.data);
+      onSyncComplete?.();
+    } catch (e) {
+      setDocSyncError(e instanceof Error ? e.message : 'Document sync failed');
+    } finally {
+      setIsDocSyncing(false);
     }
   };
 
@@ -247,6 +291,77 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
             )}
           </div>
         )}
+
+        {/* Document Sync Section */}
+        <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <FileDown className="w-4 h-4 text-gray-500" />
+              <span className="font-medium text-gray-900">Document Sync</span>
+            </div>
+            <button
+              onClick={handleDocSync}
+              disabled={isDocSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FileDown className={`w-4 h-4 ${isDocSyncing ? 'animate-pulse' : ''}`} />
+              {isDocSyncing ? 'Syncing Docs...' : 'Sync Documents'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-2">
+            Downloads documents from Smartsheet and stores them on the Velocity server
+          </p>
+
+          {/* Document sync error */}
+          {docSyncError && (
+            <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              <XCircle className="w-3 h-3 inline mr-1" />
+              {docSyncError}
+            </div>
+          )}
+
+          {/* Document sync result */}
+          {docSyncResult && (
+            <div className={`p-2 rounded border ${docSyncResult.success ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+              <div className="flex items-center gap-1 mb-1">
+                {docSyncResult.success ? (
+                  <CheckCircle className="w-3 h-3 text-green-500" />
+                ) : (
+                  <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                )}
+                <span className="text-xs font-medium">
+                  {docSyncResult.success ? 'Documents synced' : 'Sync completed with errors'}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2 text-xs text-center">
+                <div>
+                  <div className="font-semibold">{docSyncResult.totalAttachments}</div>
+                  <div className="text-gray-500">Total</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-blue-600">{docSyncResult.downloaded}</div>
+                  <div className="text-gray-500">Downloaded</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-green-600">{docSyncResult.uploaded}</div>
+                  <div className="text-gray-500">Uploaded</div>
+                </div>
+                <div>
+                  <div className="font-semibold text-purple-600">{docSyncResult.linked}</div>
+                  <div className="text-gray-500">Linked</div>
+                </div>
+              </div>
+              {docSyncResult.errors.length > 0 && (
+                <div className="mt-1 text-xs text-red-600">
+                  {docSyncResult.errors.length} errors
+                </div>
+              )}
+              <div className="mt-1 text-xs text-gray-500">
+                Duration: {formatDuration(docSyncResult.duration_ms)}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Config info */}
         {configs.length > 0 && (

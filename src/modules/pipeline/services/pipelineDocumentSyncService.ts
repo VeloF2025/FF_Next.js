@@ -182,21 +182,27 @@ async function uploadToStorage(
   fileBuffer: Buffer,
   mimeType: string
 ): Promise<{ url: string; path: string }> {
-  // Use node-fetch with proper FormData handling
-  const nodeFetch = (await import('node-fetch')).default;
-  const formData = new FormData();
-  formData.append('file', fileBuffer, {
-    filename,
-    contentType: mimeType,
-    knownLength: fileBuffer.length,
-  });
+  // Create multipart boundary
+  const boundary = `----WebKitFormBoundary${Date.now().toString(16)}`;
 
-  const response = await nodeFetch(
+  // Build multipart form data manually
+  const header = Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
+    `Content-Type: ${mimeType}\r\n\r\n`
+  );
+  const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+  const body = Buffer.concat([header, fileBuffer, footer]);
+
+  const response = await fetch(
     `${STORAGE_API_BASE}/upload/pipeline/${projectId}`,
     {
       method: 'POST',
-      body: formData,
-      headers: formData.getHeaders(),
+      body: body,
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length.toString(),
+      },
     }
   );
 
@@ -344,21 +350,27 @@ export async function syncDocumentsFromSmartsheet(
           }
         }
 
-        // Create document record
+        // Create document record - document_name is required
+        const documentName = attachment.name.replace(/\.[^/.]+$/, ''); // Remove extension
+
         await sql`
           INSERT INTO pipeline_approval_documents (
+            pipeline_project_id,
             approval_id,
             document_type,
+            document_name,
             file_name,
             file_url,
             file_path,
-            file_size_bytes,
+            file_size,
             mime_type,
             smartsheet_attachment_id,
-            uploaded_at
+            created_at
           ) VALUES (
-            ${approvalId},
+            ${projectId},
+            ${approvalId || null},
             ${docType},
+            ${documentName},
             ${attachment.name},
             ${url},
             ${path},
