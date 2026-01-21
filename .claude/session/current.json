@@ -1,104 +1,63 @@
 {
-  "session_id": "2026-01-20-comprehensive-timeline",
-  "started_at": "2026-01-20T20:00:00Z",
-  "last_updated": "2026-01-21T06:09:36.122Z",
+  "session_id": "2026-01-21-serial-swaps-fix",
+  "started_at": "2026-01-21T16:55:00Z",
+  "last_updated": "2026-01-21T17:13:48.769Z",
   "working_on": {
-    "task": "Comprehensive DR lifecycle timeline",
+    "task": "Fix serial swaps API and KB update",
     "status": "completed",
     "progress": [
-      "✅ Expanded getActivityTimeline() to aggregate 3 sources",
-      "✅ Activity log entries from dr_activity_log",
-      "✅ DR timestamps from dr_photo_unified_reviews (12 events)",
-      "✅ OES activation from oes_activations",
-      "✅ Fixed sender_phone column reference",
-      "✅ Deployed and verified on staging"
+      "✅ Fixed serial swaps API - changed from neon() to Pool pattern",
+      "✅ Verified all 8 reporting endpoints working on staging",
+      "✅ KB scan: 42 modules, 42 with .claude.md (100%)",
+      "✅ Created .claude.md for pipeline module"
     ],
-    "last_action": "KB update via /kb"
+    "last_action": "KB update complete"
   },
-  "kb_status": {
-    "timestamp": "2026-01-20T20:45:00Z",
-    "total_modules": 40,
-    "modules_with_claude_md": 40,
-    "coverage": "100%",
-    "learnings_pending": 0,
-    "modules_updated": [],
-    "update_reason": "Comprehensive DR timeline implementation"
+  "kb_scan_results": {
+    "timestamp": "2026-01-21T17:10:00Z",
+    "total_modules": 42,
+    "modules_with_claude_md": 42,
+    "learnings_consolidated": 0,
+    "new_module_docs": [
+      "pipeline"
+    ]
+  },
+  "recent_fixes": {
+    "serial_swaps_api": {
+      "root_cause": "Using neon() which returns template function, but calling .query() on it",
+      "fix": "Changed to Pool pattern from @neondatabase/serverless",
+      "files_changed": [
+        "pages/api/activate/reporting/serial-swaps/index.ts",
+        "pages/api/activate/reporting/serial-swaps/update-status.ts"
+      ],
+      "commit": "0de012b9"
+    }
   },
   "recent_work": [
-    "Comprehensive DR lifecycle timeline (3 sources)",
-    "Activity log + DR timestamps + OES activation merged",
-    "Serial change detection from batch sync",
-    "Fixed staging cache issue (rm -rf .next required)"
-  ],
-  "automation_status": {
-    "session_recovery": "ENABLED",
-    "session_tracking": "ENABLED",
-    "learning_capture": "ENABLED",
-    "module_context": "ENABLED"
-  },
-  "hooks_active": [
-    "SessionStart: session-recovery.js",
-    "PreToolUse[Edit]: module-context-loader.js",
-    "PostToolUse[Edit,Write]: session-state-tracker.js, module-learning-capture.js",
-    "PostToolUse[Bash]: session-state-tracker.js"
+    "KB update - pipeline module documented",
+    "Serial swaps API fixed with Pool pattern",
+    "All 8 reporting endpoints verified working"
   ],
   "context": {
     "project": "FibreFlow",
-    "branch": "master",
-    "recent_commits": [
-      "ecb20224 - chore: remove debug endpoint",
-      "69b9e9bc - chore: add version marker to activity-log API",
-      "5d6759ee - fix(activate): use sender_phone instead of submitter_id",
-      "fe31fd41 - feat(activate): comprehensive DR lifecycle timeline"
-    ]
-  },
-  "key_systems": {
-    "activate": "VLM-powered DR photo review with 5-phase QA wizard + comprehensive timeline",
-    "wa-monitor": "WhatsApp QA monitoring (fully isolated)",
-    "procurement": "BOQ, RFQ, PO workflow",
-    "communications": "WhatsApp admin portal + PDFCraft PDF tools",
-    "fleet": "Vehicle check-in with VLM plate/odometer extraction"
+    "branch": "master"
   },
   "infrastructure": {
     "server": "100.96.203.105 (Velocity)",
     "vlm": "Qwen3-VL-8B on port 8100",
-    "pdfcraft": "Port 3007, nginx proxy at /pdf-tools/",
     "database": "Neon PostgreSQL (production branch)",
-    "staging": "vf.fibreflow.app:3006"
+    "staging": "vf.fibreflow.app:3006 ✅ HEALTHY",
+    "production": "app.fibreflow.app:3008",
+    "qfieldcloud": "qfield.fibreflow.app"
   },
-  "timeline_feature": {
-    "description": "Comprehensive DR lifecycle timeline in Activity tab",
-    "sources": [
-      "dr_activity_log - Manual events, serial changes, swap detection",
-      "dr_photo_unified_reviews - 12 timestamp columns",
-      "oes_activations - OES activation date, team, serial"
-    ],
-    "events": [
-      "whatsapp_submitted - DR received via WhatsApp",
-      "dr_acknowledged - Acknowledgment sent",
-      "photos_fetched - Photos from OneMap",
-      "attribute_categorized - VLM categorization",
-      "vlm_qa_completed - AI data extraction",
-      "vlm_qa_validated - VLM QA validation",
-      "human_review_completed - Human QA review",
-      "qa_decision - Final PASS/FAIL/REWORK",
-      "feedback_sent - WhatsApp feedback",
-      "SWAP_DETECTED/corrected - Serial swap events",
-      "SERIAL_UPDATE - Serial number changes",
-      "oes_activation - OES activation record"
-    ],
-    "key_files": [
-      "src/modules/activate/services/activityLogService.ts:285-625",
-      "pages/api/activate/activity-log.ts",
-      "src/modules/activate/components/ActivityTab.tsx"
-    ]
-  },
-  "last_action": "KB update via /kb",
-  "kb_scan_results": {
-    "timestamp": "2026-01-20T21:35:54.748Z",
-    "total_modules": 40,
-    "modules_with_claude_md": 40,
-    "coverage_percent": 100,
-    "learnings_consolidated": 0
+  "reporting_endpoints": {
+    "trends": "✅ working",
+    "funnel": "✅ working",
+    "team-performance": "✅ working",
+    "serial-validation": "✅ working",
+    "offline-devices": "✅ working",
+    "resubmissions": "✅ working",
+    "discrepancy": "✅ working (uses waDate param)",
+    "serial-swaps": "✅ FIXED"
   }
 }
