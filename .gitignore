@@ -112,3 +112,6 @@ serviceAccountKey.json
 # Auto Claude data directory
 .auto-claude/
 nul
+
+# Server-specific env (has secrets)
+.env.production
