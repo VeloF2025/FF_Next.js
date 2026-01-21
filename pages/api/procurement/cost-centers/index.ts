@@ -98,7 +98,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const limitNum = Math.min(parseInt(limit as string) || 50, 100);
     const offset = (pageNum - 1) * limitNum;
 
-    query += ` ORDER BY hierarchy_path, sort_order LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    query += ` ORDER BY hierarchy_path, name LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limitNum.toString());
     params.push(offset.toString());
 
