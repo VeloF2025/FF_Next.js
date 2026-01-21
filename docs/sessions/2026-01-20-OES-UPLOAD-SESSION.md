@@ -74,10 +74,18 @@ Password: admin123
 - CSV file was uploaded but doesn't display as a map layer
 - **Root cause**: QFieldCloud requires proper GIS formats, not plain CSV
 
-### 11:10 - Final Fix
-- Created GeoJSON file from OES data (proper GIS format)
+### 11:10 - First Fix Attempt with GeoJSON
+- Created GeoJSON file from OES data (3.2 MB)
 - Created QGIS project file (.qgs) to define layer properties
 - Uploaded both files to project
+- **Result**: Jaun reported still not showing in QField mobile
+
+### 11:26 - Final Fix with GeoPackage
+- Jaun advised: "u need to save the file as a geopack file"
+- Created GeoPackage (.gpkg) file (720 KB) - proper SQLite-based GIS format
+- **Critical Learning**: QField mobile REQUIRES GeoPackage format
+- GeoJSON doesn't work reliably in QField mobile
+- Uploaded oes_activations.gpkg
 - Layer now visible with drop numbers as labels
 - Issue fully resolved
 
@@ -97,8 +105,9 @@ DR075657,2025-08-24,ALCLB463F4DC,-34.0035601,18.6741775,UNKNOWN,UNKNOWN,Unknown,
 4. `/scripts/quick-oes-sync.sh` - Interactive sync
 5. `/scripts/create-new-oes-project.py` - Project creator
 6. `/scripts/upload-to-new-project.sh` - Final upload script
-7. `/scripts/create-oes-geopackage.py` - GeoJSON converter with QGIS project
-8. `/scripts/oes-qfield-sync.sh` - Complete utility with all functions
+7. `/scripts/create-oes-geopackage.py` - Initial GeoJSON converter (didn't work in mobile)
+8. `/scripts/create-oes-geopackage-real.py` - GeoPackage converter (WORKING SOLUTION)
+9. `/scripts/oes-qfield-sync.sh` - Complete utility with all functions
 
 ### API Endpoints Used
 - POST `/api/v1/auth/login/` - Authentication
@@ -121,6 +130,11 @@ DR075657,2025-08-24,ALCLB463F4DC,-34.0035601,18.6741775,UNKNOWN,UNKNOWN,Unknown,
 **Issue**: Project not showing in Jaun's app
 **Solution**: Added Jaun as collaborator
 
+### 4. Layer Format Requirements
+**Issue**: GeoJSON doesn't work in QField mobile
+**Impact**: Additional 16 minutes to discover and fix
+**Solution**: GeoPackage (.gpkg) is REQUIRED for QField mobile
+
 ## Lessons Learned
 
 ### DO's ✅
@@ -129,8 +143,9 @@ DR075657,2025-08-24,ALCLB463F4DC,-34.0035601,18.6741775,UNKNOWN,UNKNOWN,Unknown,
 3. **Add collaborators** to ensure access
 4. **Test with simple curl commands** before complex scripts
 5. **Check project ownership** before attempting access
-6. **Use proper GIS formats** (GeoJSON/GeoPackage) for map layers
-7. **Include QGIS project file** to define how layers display
+6. **Use GeoPackage format** (.gpkg) for QField mobile - REQUIRED!
+7. **Don't use GeoJSON** for QField mobile - it doesn't work reliably
+8. **Include QGIS project file** to define how layers display (optional)
 
 ### DON'Ts ❌
 1. **Don't waste time** creating Django tokens programmatically
@@ -139,7 +154,8 @@ DR075657,2025-08-24,ALCLB463F4DC,-34.0035601,18.6741775,UNKNOWN,UNKNOWN,Unknown,
 4. **Don't try to modify** QFieldCloud's authentication system
 5. **Don't forget** to add collaborators after creating projects
 6. **Don't upload CSV** expecting it to show as a map layer
-7. **Don't forget** the QGIS project file (.qgs) for layer definition
+7. **Don't use GeoJSON** for QField mobile (use GeoPackage instead)
+8. **Don't forget** to DELETE and re-download project after format changes
 
 ## Time Analysis
 
@@ -147,18 +163,20 @@ DR075657,2025-08-24,ALCLB463F4DC,-34.0035601,18.6741775,UNKNOWN,UNKNOWN,Unknown,
 - Token creation attempts: 75 minutes
 - Investigation & diagnosis: 20 minutes
 - Getting credentials: 5 minutes
-- Creating project & uploading: 10 minutes
+- Creating project & uploading CSV: 10 minutes
 - Adding collaborator: 1 minute
-**Total: 111 minutes**
+- GeoJSON attempt (failed): 15 minutes
+- GeoPackage fix (successful): 16 minutes
+**Total: 142 minutes (2 hours 22 minutes)**
 
 ### Optimal Time (with skill)
 - Get credentials: 2 minutes
 - Test & create project: 5 minutes
-- Upload data: 2 minutes
+- Upload GeoPackage (not CSV/GeoJSON): 3 minutes
 - Add collaborators: 1 minute
-**Total: 10 minutes**
+**Total: 11 minutes**
 
-**Potential Time Savings: 101 minutes (91% reduction)**
+**Potential Time Savings: 131 minutes (92% reduction)**
 
 ## Final Configuration
 
@@ -178,8 +196,9 @@ Project:
 
 Data:
   Records: 6,682
-  File: oes_activations.csv
-  Size: 640 KB
+  Working File: oes_activations.gpkg (GeoPackage)
+  Size: 720 KB
+  Failed Formats: CSV (no layer), GeoJSON (doesn't work in mobile)
   Fields: [drop_number, coordinates, zone, pon, signal, team]
 ```
 
