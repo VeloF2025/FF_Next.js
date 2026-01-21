@@ -22,8 +22,10 @@ import {
   RotateCcw,
   Search,
   Settings,
+  ArrowDownUp,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
+import { QFieldSyncDashboard } from '@/modules/qfield-sync/components/QFieldSyncDashboard';
 
 interface HealthStatus {
   services: {
@@ -144,7 +146,7 @@ const StatCard: React.FC<{
 
 export const QFieldDashboard: React.FC = () => {
   // Tab state
-  const [activeTab, setActiveTab] = useState<'monitor' | 'server-controls'>('monitor');
+  const [activeTab, setActiveTab] = useState<'monitor' | 'server-controls' | 'sync'>('monitor');
 
   // Monitor tab state
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -506,6 +508,17 @@ export const QFieldDashboard: React.FC = () => {
         >
           <Server className="w-4 h-4" />
           Server Controls
+        </button>
+        <button
+          onClick={() => setActiveTab('sync')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
+            activeTab === 'sync'
+              ? 'bg-blue-600 text-white'
+              : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]'
+          }`}
+        >
+          <ArrowDownUp className="w-4 h-4" />
+          Sync
         </button>
       </div>
 
@@ -1045,6 +1058,11 @@ export const QFieldDashboard: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Sync Tab */}
+      {activeTab === 'sync' && (
+        <QFieldSyncDashboard />
       )}
     </div>
   );
