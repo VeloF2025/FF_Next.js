@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockBundle, StockBundleFormData } from '@/types/procurement/bundle.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -21,10 +22,10 @@ export default async function handler(
     } else if (req.method === 'POST') {
       return handlePost(req, res);
     } else {
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    console.error('Bundles API error:', error);
+    log.error('Bundles API error', { error, module: 'procurement:bundles' });
     return apiResponse.internalError(res, error);
   }
 }

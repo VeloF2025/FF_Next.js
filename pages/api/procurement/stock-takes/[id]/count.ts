@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockTakeLineCountData } from '@/types/procurement/stockTake.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -20,7 +21,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   const { id } = req.query;
@@ -36,7 +37,7 @@ export default async function handler(
       return apiResponse.notFound(res, 'Stock take', id);
     }
 
-    if (stockTake[0].status !== 'in_progress') {
+    if (stockTake[0]!.status !== 'in_progress') {
       return apiResponse.badRequest(res, 'Stock take must be in progress to record counts');
     }
 
@@ -61,7 +62,7 @@ export default async function handler(
     }
 
     // Determine if this is a recount
-    const isRecount = data.is_recount || line[0].status === 'counted';
+    const isRecount = data.is_recount || line[0]!.status === 'counted';
 
     let result;
     if (isRecount) {
@@ -96,7 +97,7 @@ export default async function handler(
 
     return apiResponse.success(res, result[0]);
   } catch (error) {
-    console.error('Stock Take Count API error:', error);
+    log.error('Stock Take Count API error', { error, module: 'procurement:stock-takes' });
     return apiResponse.internalError(res, error);
   }
 }

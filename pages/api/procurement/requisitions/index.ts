@@ -66,7 +66,7 @@ export default withErrorHandler(async (
         {
           page: parseInt(page as string),
           pageSize: parseInt(limit as string),
-          total: countResult[0].total,
+          total: countResult[0]!.total,
         }
       );
     } catch (error) {
@@ -126,7 +126,7 @@ export default withErrorHandler(async (
             suggested_supplier_id,
             notes
           ) VALUES (
-            ${requisition.id},
+            ${requisition!.id},
             ${item.stockItemId || null},
             ${item.itemCode || null},
             ${item.itemDescription},
@@ -141,35 +141,35 @@ export default withErrorHandler(async (
       }
 
       // Log creation
-      logCreate('purchase_requisition', requisition.id, {
-        requisition_number: requisition.requisition_number,
-        project_id: requisition.project_id,
+      logCreate('purchase_requisition', requisition!.id, {
+        requisition_number: requisition!.requisition_number,
+        project_id: requisition!.project_id,
         items_count: body.items.length,
       });
 
       // Fetch the complete requisition with items
       const [fullRequisition] = await sql`
-        SELECT * FROM purchase_requisitions WHERE id = ${requisition.id}
+        SELECT * FROM purchase_requisitions WHERE id = ${requisition!.id}
       `;
 
       const items = await sql`
-        SELECT * FROM purchase_requisition_items WHERE requisition_id = ${requisition.id}
+        SELECT * FROM purchase_requisition_items WHERE requisition_id = ${requisition!.id}
       `;
 
       const result: PurchaseRequisition = {
-        id: fullRequisition.id,
-        requisitionNumber: fullRequisition.requisition_number,
-        projectId: fullRequisition.project_id,
-        department: fullRequisition.department,
-        requestedBy: fullRequisition.requested_by,
-        requestedByName: fullRequisition.requested_by_name,
-        requestedDate: fullRequisition.requested_date,
-        requiredDate: fullRequisition.required_date,
-        status: fullRequisition.status,
-        estimatedTotal: fullRequisition.estimated_total ? Number(fullRequisition.estimated_total) : undefined,
-        currency: fullRequisition.currency || 'ZAR',
-        urgency: fullRequisition.urgency,
-        notes: fullRequisition.notes,
+        id: fullRequisition!.id,
+        requisitionNumber: fullRequisition!.requisition_number,
+        projectId: fullRequisition!.project_id,
+        department: fullRequisition!.department,
+        requestedBy: fullRequisition!.requested_by,
+        requestedByName: fullRequisition!.requested_by_name,
+        requestedDate: fullRequisition!.requested_date,
+        requiredDate: fullRequisition!.required_date,
+        status: fullRequisition!.status,
+        estimatedTotal: fullRequisition!.estimated_total ? Number(fullRequisition!.estimated_total) : undefined,
+        currency: fullRequisition!.currency || 'ZAR',
+        urgency: fullRequisition!.urgency,
+        notes: fullRequisition!.notes,
         items: items.map((item: Record<string, unknown>) => ({
           id: item.id as string,
           requisitionId: item.requisition_id as string,
@@ -188,8 +188,8 @@ export default withErrorHandler(async (
           poId: item.po_id as string | undefined,
           createdAt: item.created_at as string,
         })),
-        createdAt: fullRequisition.created_at,
-        updatedAt: fullRequisition.updated_at,
+        createdAt: fullRequisition!.created_at,
+        updatedAt: fullRequisition!.updated_at,
       };
 
       return apiResponse.created(res, result, 'Purchase requisition created successfully');

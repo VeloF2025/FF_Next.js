@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -21,7 +22,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   const { id } = req.query;
@@ -46,22 +47,22 @@ export default async function handler(
       return apiResponse.notFound(res, 'Stock take', id);
     }
 
-    const current = stockTake[0];
+    const current = stockTake[0]!;
 
     switch (data.action) {
       case 'start':
-        return handleStart(id, current, res);
+        return handleStart(id, current as Record<string, unknown>, res);
       case 'complete':
-        return handleComplete(id, current, res);
+        return handleComplete(id, current as Record<string, unknown>, res);
       case 'approve':
-        return handleApprove(id, current, data, res);
+        return handleApprove(id, current as Record<string, unknown>, data, res);
       case 'cancel':
-        return handleCancel(id, current, res);
+        return handleCancel(id, current as Record<string, unknown>, res);
       default:
         return apiResponse.badRequest(res, `Unknown action: ${data.action}`);
     }
   } catch (error) {
-    console.error('Stock Take Actions API error:', error);
+    log.error('Stock Take Actions API error', { error, module: 'procurement:stock-takes' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -76,7 +77,7 @@ async function handleStart(id: string, current: Record<string, unknown>, res: Ne
     SELECT COUNT(*) as count FROM stock_take_lines WHERE stock_take_id = ${id}
   `;
 
-  if (parseInt(lineCount[0].count as string) === 0) {
+  if (parseInt(lineCount[0]!.count as string) === 0) {
     return apiResponse.badRequest(res, 'Initialize items before starting stock take');
   }
 
@@ -107,8 +108,8 @@ async function handleComplete(id: string, current: Record<string, unknown>, res:
     WHERE stock_take_id = ${id} AND counted_quantity IS NULL
   `;
 
-  if (parseInt(uncounted[0].count as string) > 0) {
-    return apiResponse.badRequest(res, `${uncounted[0].count} items have not been counted yet`);
+  if (parseInt(uncounted[0]!.count as string) > 0) {
+    return apiResponse.badRequest(res, `${uncounted[0]!.count} items have not been counted yet`);
   }
 
   const result = await sql`

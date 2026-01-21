@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -14,7 +15,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -38,11 +39,11 @@ export default async function handler(
 
     query += ` ORDER BY hierarchy_level, sort_order`;
 
-    const types = await sql(query, params);
+    const types = await sql.query(query, params);
 
     return apiResponse.success(res, types);
   } catch (error) {
-    console.error('Cost Center Types API error:', error);
+    log.error('Cost Center Types API error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }

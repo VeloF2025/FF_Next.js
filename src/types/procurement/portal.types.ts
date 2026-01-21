@@ -100,23 +100,32 @@ export interface AggregateProjectMetrics {
   averageCostSavings: number;
   averageCycleDays: number;
   averageSupplierOTIF: number;
-  criticalAlerts: number;
-  pendingApprovals: number;
+  criticalAlerts?: number;
+  pendingApprovals?: number;
+  monthlyProcurementVolume?: {
+    currency: string;
+    value: number;
+  };
 }
 
 /**
  * Project summary for aggregate view
  */
 export interface ProjectSummary {
-  id: string;
-  name: string;
-  code: string;
-  status: 'active' | 'completed' | 'on-hold' | 'cancelled';
+  id?: string;
+  projectId?: string;
+  name?: string;
+  projectName?: string;
+  code?: string;
+  projectCode?: string;
+  status: string;
   boqValue: number;
   activeRFQs: number;
-  completionPercentage: number;
-  lastActivity: string;
-  alertCount: number;
+  pendingPOs?: number;
+  stockAlerts?: number;
+  completionPercentage?: number;
+  lastActivity?: string;
+  alertCount?: number;
 }
 
 /**

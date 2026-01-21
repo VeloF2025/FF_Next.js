@@ -27,7 +27,7 @@ export default withErrorHandler(async (
   }
 
   const { id } = req.query;
-  const { userId, userName } = getAuth(req);
+  const { userId, user } = getAuth(req);
   const body = req.body as ConvertToPORequest;
 
   if (!id || typeof id !== 'string') {
@@ -49,7 +49,7 @@ export default withErrorHandler(async (
       return apiResponse.notFound(res, 'Purchase Requisition', id);
     }
 
-    const requisition = requisitions[0];
+    const requisition = requisitions[0]!;
 
     // Validate status - only approved PRs can be converted
     if (requisition.status !== 'approved') {
@@ -80,7 +80,7 @@ export default withErrorHandler(async (
       return apiResponse.validationError(res, { supplierId: 'Supplier not found' });
     }
 
-    const supplier = suppliers[0];
+    const supplier = suppliers[0]!;
 
     // Fetch requisition items
     let itemsQuery;
@@ -165,17 +165,17 @@ export default withErrorHandler(async (
         ${taxAmount},
         ${totalAmount},
         ${body.notes || `Converted from PR ${requisition.requisition_number}`},
-        ${userName || userId || 'system'},
+        ${user?.name || userId || 'system'},
         ${id}
       )
       RETURNING *
     `;
 
-    const newPO = poResult[0];
+    const newPO = poResult[0]!;
 
     // Insert PO items
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+      const item = items[i]!;
       const unitPrice = Number(item.estimated_unit_price) || 0;
       const quantity = Number(item.quantity) || 0;
       const lineTotal = Math.round(unitPrice * quantity * 100) / 100;

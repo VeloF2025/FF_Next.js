@@ -26,7 +26,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Build dynamic query
     let whereConditions = ['1=1'];
-    const params: (string | number)[] = [];
+    const params: (string | number | string[])[] = [];
     let paramIndex = 1;
 
     if (status && status !== 'all') {
@@ -100,24 +100,21 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       supplierName: row.supplier_name || 'Unknown Supplier',
       projectName: row.project_name,
       deliveryDate: row.delivery_date,
-      subtotal: parseFloat(row.subtotal) || 0,
-      vatAmount: parseFloat(row.vat_amount) || 0,
-      total: parseFloat(row.total) || 0,
+      subtotal: parseFloat(row.subtotal as string) || 0,
+      vatAmount: parseFloat(row.vat_amount as string) || 0,
+      total: parseFloat(row.total as string) || 0,
       itemCount: row.item_count || 0,
       createdByName: row.created_by_name || 'System',
       createdAt: row.created_at,
     }));
 
-    return apiResponse.success(res, purchaseOrders, {
-      pagination: {
-        page: pageNum,
-        pageSize: pageSizeNum,
-        total,
-        totalPages: Math.ceil(total / pageSizeNum),
-      },
+    return apiResponse.paginated(res, purchaseOrders, {
+      page: pageNum,
+      pageSize: pageSizeNum,
+      total,
     });
   } catch (error) {
-    log.error('Failed to fetch purchase orders', error);
+    log.error('Failed to fetch purchase orders', { error, module: 'procurement:purchase-orders' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -249,7 +246,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       createdBy
     ]);
 
-    const poId = poResult[0].id;
+    const poId = poResult[0]!.id;
 
     // Insert items (matching actual schema columns)
     // Note: trigger tr_poi_totals recalculates PO totals from item tax_amounts
@@ -278,7 +275,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       totalAmount,
     });
   } catch (error) {
-    log.error('Failed to create purchase order', error);
+    log.error('Failed to create purchase order', { error, module: 'procurement:purchase-orders' });
     return apiResponse.internalError(res, error);
   }
 }

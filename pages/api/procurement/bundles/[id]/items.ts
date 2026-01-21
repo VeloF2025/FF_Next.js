@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockBundleItemFormData } from '@/types/procurement/bundle.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -37,10 +38,10 @@ export default async function handler(
       case 'PUT':
         return handleBulkUpdate(id, req.body, res);
       default:
-        return apiResponse.methodNotAllowed(res);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT']);
     }
   } catch (error) {
-    console.error('Bundle Items API error:', error);
+    log.error('Bundle Items API error', { error, module: 'procurement:bundle-items' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -110,7 +111,7 @@ async function handlePost(bundleId: string, data: StockBundleItemFormData, res: 
       ${data.min_quantity || null},
       ${data.max_quantity || null},
       ${data.substitute_group || null},
-      ${data.sort_order ?? maxSort[0].next_sort},
+      ${data.sort_order ?? maxSort[0]!.next_sort},
       ${data.notes || null}
     )
     RETURNING *
@@ -145,7 +146,7 @@ async function handleBulkUpdate(
   // Insert new items
   const results = [];
   for (let i = 0; i < data.items.length; i++) {
-    const item = data.items[i];
+    const item = data.items[i]!;
     const result = await sql`
       INSERT INTO stock_bundle_items (
         bundle_id,

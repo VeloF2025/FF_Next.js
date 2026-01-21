@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { CreateAllocationRequest } from '@/types/procurement/costCenter.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -27,7 +28,7 @@ export default async function handler(
     case 'POST':
       return handlePost(id, req, res);
     default:
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
@@ -73,8 +74,8 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
 
     // Count
     const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) FROM');
-    const countResult = await sql(countQuery, params);
-    const total = parseInt(countResult[0].count as string) || 0;
+    const countResult = await sql.query(countQuery, params);
+    const total = parseInt(countResult[0]!.count as string) || 0;
 
     // Pagination
     const pageNum = parseInt(page as string) || 1;
@@ -85,7 +86,7 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
     params.push(limitNum);
     params.push(offset);
 
-    const allocations = await sql(query, params);
+    const allocations = await sql.query(query, params);
 
     // Calculate totals by type
     const totals = await sql`
@@ -106,7 +107,7 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
       limit: limitNum,
     });
   } catch (error) {
-    console.error('Allocations GET error:', error);
+    log.error('Allocations GET error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -124,7 +125,7 @@ async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse)
       return apiResponse.notFound(res, 'Cost center', id);
     }
 
-    if (costCenter[0].is_locked) {
+    if (costCenter[0]!.is_locked) {
       return apiResponse.badRequest(res, 'Cost center is locked');
     }
 
@@ -141,8 +142,8 @@ async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse)
         AND allocation_type = 'commitment'
       `;
 
-      const budget = parseFloat(costCenter[0].allocated_budget as string) || 0;
-      const committed = parseFloat(currentCommitted[0].total as string) || 0;
+      const budget = parseFloat(costCenter[0]!.allocated_budget as string) || 0;
+      const committed = parseFloat(currentCommitted[0]!.total as string) || 0;
       const available = budget - committed;
 
       if (data.amount > available) {
@@ -188,7 +189,7 @@ async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse)
 
     return apiResponse.created(res, result[0]);
   } catch (error) {
-    console.error('Allocations POST error:', error);
+    log.error('Allocations POST error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }

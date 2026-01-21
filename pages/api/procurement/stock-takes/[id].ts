@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockTakeFormData } from '@/types/procurement/stockTake.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -31,10 +32,10 @@ export default async function handler(
       case 'DELETE':
         return handleDelete(id, res);
       default:
-        return apiResponse.methodNotAllowed(res);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    console.error('Stock Take API error:', error);
+    log.error('Stock Take API error', { error, module: 'procurement:stock-takes' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -70,7 +71,7 @@ async function handlePut(id: string, data: StockTakeFormData & { status?: string
   }
 
   // Prevent editing approved stock takes
-  if (existing[0].status === 'approved' && !data.status) {
+  if (existing[0]!.status === 'approved' && !data.status) {
     return apiResponse.badRequest(res, 'Cannot edit approved stock take');
   }
 
@@ -105,7 +106,7 @@ async function handleDelete(id: string, res: NextApiResponse) {
   }
 
   // Prevent deleting approved stock takes
-  if (existing[0].status === 'approved') {
+  if (existing[0]!.status === 'approved') {
     return apiResponse.badRequest(res, 'Cannot delete approved stock take');
   }
 

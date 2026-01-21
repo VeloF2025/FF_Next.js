@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockBundleItemFormData } from '@/types/procurement/bundle.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -34,10 +35,10 @@ export default async function handler(
       case 'DELETE':
         return handleDelete(id, itemId, res);
       default:
-        return apiResponse.methodNotAllowed(res);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    console.error('Bundle Item API error:', error);
+    log.error('Bundle Item API error', { error, module: 'procurement:bundle-items' });
     return apiResponse.internalError(res, error);
   }
 }

@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -14,7 +15,7 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -38,11 +39,11 @@ export default async function handler(
 
     query += ` ORDER BY sort_order, name`;
 
-    const reasons = await sql(query, params);
+    const reasons = await sql.query(query, params);
 
     return apiResponse.success(res, reasons);
   } catch (error) {
-    console.error('Adjustment Reasons API error:', error);
+    log.error('Adjustment Reasons API error', { error, module: 'procurement:stock-takes' });
     return apiResponse.internalError(res, error);
   }
 }

@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockCategory, StockCategoryFormData } from '@/types/procurement/category.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -21,10 +22,10 @@ export default async function handler(
     } else if (req.method === 'POST') {
       return handlePost(req, res);
     } else {
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    console.error('Categories API error:', error);
+    log.error('Categories API error', { error, module: 'procurement:categories' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -114,8 +115,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       SELECT level, path FROM stock_categories WHERE id = ${data.parent_id}
     `;
     if (parent.length > 0) {
-      level = (parent[0].level as number) + 1;
-      parentPath = parent[0].path as string;
+      level = (parent[0]!.level as number) + 1;
+      parentPath = parent[0]!.path as string;
     }
   }
 

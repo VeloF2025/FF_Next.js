@@ -69,7 +69,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       return apiResponse.notFound(res, 'Purchase order', id);
     }
 
-    const po = poResult[0];
+    const po = poResult[0]!;
 
     // Fetch line items
     const itemsResult = await sql`
@@ -160,7 +160,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
       return apiResponse.notFound(res, 'Purchase order', id);
     }
 
-    const currentStatus = currentPO[0].status;
+    const currentStatus = currentPO[0]!.status;
     let newStatus: string | null = null;
     let historyAction: string = action;
 
@@ -266,7 +266,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: strin
       return apiResponse.notFound(res, 'Purchase order', id);
     }
 
-    if (currentPO[0].status !== 'draft') {
+    if (currentPO[0]!.status !== 'draft') {
       return apiResponse.badRequest(res, 'Only draft purchase orders can be deleted');
     }
 

@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -31,12 +32,12 @@ export default async function handler(
       case 'GET':
         return handleGet(id, req, res);
       case 'POST':
-        return handleInitialize(id, stockTake[0].status, res);
+        return handleInitialize(id, stockTake[0]!.status as string, res);
       default:
-        return apiResponse.methodNotAllowed(res);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    console.error('Stock Take Lines API error:', error);
+    log.error('Stock Take Lines API error', { error, module: 'procurement:stock-takes' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -60,7 +61,7 @@ async function handleGet(stockTakeId: string, req: NextApiRequest, res: NextApiR
 
   query += ` ORDER BY item_name`;
 
-  const lines = await sql(query, params);
+  const lines = await sql.query(query, params);
 
   return apiResponse.success(res, lines);
 }
@@ -73,7 +74,7 @@ async function handleInitialize(stockTakeId: string, status: string, res: NextAp
 
   // Call the initialize function
   const result = await sql`SELECT initialize_stock_take_lines(${stockTakeId}) as items_added`;
-  const itemsAdded = result[0].items_added;
+  const itemsAdded = result[0]!.items_added;
 
   return apiResponse.success(res, {
     message: `Initialized ${itemsAdded} items for counting`,

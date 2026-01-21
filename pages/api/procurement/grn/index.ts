@@ -67,7 +67,7 @@ export default withErrorHandler(async (
         {
           page: parseInt(page as string),
           pageSize: parseInt(limit as string),
-          total: countResult[0].total,
+          total: countResult[0]!.total,
         }
       );
     } catch (error) {
@@ -143,7 +143,7 @@ export default withErrorHandler(async (
             unit_cost,
             notes
           ) VALUES (
-            ${grn.id},
+            ${grn!.id},
             ${item.poItemId || null},
             ${item.stockItemId || null},
             ${item.itemCode || null},
@@ -166,13 +166,13 @@ export default withErrorHandler(async (
       }
 
       // Log creation
-      logCreate('goods_receipt_note', grn.id, {
-        grn_number: grn.grn_number,
-        supplier_id: grn.supplier_id,
+      logCreate('goods_receipt_note', grn!.id, {
+        grn_number: grn!.grn_number,
+        supplier_id: grn!.supplier_id,
         items_count: body.items.length,
       });
 
-      return apiResponse.created(res, grn, 'Goods receipt note created successfully');
+      return apiResponse.created(res, grn!, 'Goods receipt note created successfully');
     } catch (error) {
       return apiResponse.databaseError(res, error, 'Failed to create GRN');
     }

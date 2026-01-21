@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockCategoryFormData } from '@/types/procurement/category.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -31,10 +32,10 @@ export default async function handler(
       case 'DELETE':
         return handleDelete(id, res);
       default:
-        return apiResponse.methodNotAllowed(res);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    console.error('Category API error:', error);
+    log.error('Category API error', { error, module: 'procurement:categories' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -70,12 +71,12 @@ async function handlePut(id: string, data: StockCategoryFormData, res: NextApiRe
   }
 
   // Prevent editing system category code
-  if (existing[0].is_system && data.code && data.code.toUpperCase() !== existing[0].code) {
+  if (existing[0]!.is_system && data.code && data.code.toUpperCase() !== existing[0]!.code) {
     return apiResponse.badRequest(res, 'Cannot change code of system category');
   }
 
   // Check for duplicate code (if code is being changed)
-  if (data.code && data.code.toUpperCase() !== existing[0].code) {
+  if (data.code && data.code.toUpperCase() !== existing[0]!.code) {
     const duplicate = await sql`
       SELECT id FROM stock_categories WHERE code = ${data.code.toUpperCase()} AND id != ${id}
     `;
@@ -86,7 +87,7 @@ async function handlePut(id: string, data: StockCategoryFormData, res: NextApiRe
 
   // Calculate new level and path if parent changed
   let level = 1;
-  let path = '/' + (data.code || existing[0].code).toUpperCase() + '/';
+  let path = '/' + (data.code || existing[0]!.code).toUpperCase() + '/';
 
   if (data.parent_id) {
     // Prevent circular reference
@@ -98,8 +99,8 @@ async function handlePut(id: string, data: StockCategoryFormData, res: NextApiRe
       SELECT level, path FROM stock_categories WHERE id = ${data.parent_id}
     `;
     if (parent.length > 0) {
-      level = (parent[0].level as number) + 1;
-      path = parent[0].path + (data.code || existing[0].code).toUpperCase() + '/';
+      level = (parent[0]!.level as number) + 1;
+      path = parent[0]!.path + (data.code || existing[0]!.code).toUpperCase() + '/';
     }
   }
 
@@ -110,7 +111,7 @@ async function handlePut(id: string, data: StockCategoryFormData, res: NextApiRe
       code = COALESCE(${data.code?.toUpperCase()}, code),
       name = COALESCE(${data.name}, name),
       description = COALESCE(${data.description}, description),
-      parent_id = ${data.parent_id === undefined ? existing[0].parent_id : data.parent_id || null},
+      parent_id = ${data.parent_id === undefined ? existing[0]!.parent_id : data.parent_id || null},
       level = ${level},
       path = ${path},
       icon = COALESCE(${data.icon}, icon),
@@ -138,15 +139,15 @@ async function handleDelete(id: string, res: NextApiResponse) {
   }
 
   // Prevent deleting system categories
-  if (existing[0].is_system) {
-    return apiResponse.badRequest(res, `Cannot delete system category '${existing[0].name}'`);
+  if (existing[0]!.is_system) {
+    return apiResponse.badRequest(res, `Cannot delete system category '${existing[0]!.name}'`);
   }
 
   // Check for child categories
   const children = await sql`
     SELECT COUNT(*) as count FROM stock_categories WHERE parent_id = ${id}
   `;
-  if (parseInt(children[0].count as string) > 0) {
+  if (parseInt(children[0]!.count as string) > 0) {
     return apiResponse.badRequest(res, 'Cannot delete category with child categories');
   }
 
@@ -154,10 +155,10 @@ async function handleDelete(id: string, res: NextApiResponse) {
   const items = await sql`
     SELECT COUNT(*) as count FROM stock_items WHERE category_id = ${id}
   `;
-  if (parseInt(items[0].count as string) > 0) {
+  if (parseInt(items[0]!.count as string) > 0) {
     return apiResponse.badRequest(
       res,
-      `Cannot delete category with ${items[0].count} linked items. Reassign items first.`
+      `Cannot delete category with ${items[0]!.count} linked items. Reassign items first.`
     );
   }
 

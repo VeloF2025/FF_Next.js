@@ -59,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.notFound(res, 'RFQ', rfqId);
     }
 
-    const rfq = rfqResult[0];
+    const rfq = rfqResult[0]!;
 
     // Allow conversion from awarded or evaluating status
     if (!['awarded', 'evaluating'].includes(rfq.status)) {
@@ -83,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return apiResponse.badRequest(res, 'Supplier not found');
     }
 
-    const supplier = supplierResult[0];
+    const supplier = supplierResult[0]!;
 
     // Get RFQ items (or use custom items if provided)
     let poItems;
@@ -150,7 +150,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       RETURNING id
     `;
 
-    const poId = poResult[0].id;
+    const poId = poResult[0]!.id;
 
     // Insert PO items
     for (let i = 0; i < poItems.length; i++) {

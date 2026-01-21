@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { UpdateCostCenterRequest } from '@/types/procurement/costCenter.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -30,7 +31,7 @@ export default async function handler(
     case 'DELETE':
       return handleDelete(id, res);
     default:
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
   }
 }
 
@@ -71,7 +72,7 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
 
     return apiResponse.success(res, result);
   } catch (error) {
-    console.error('Cost Center GET error:', error);
+    log.error('Cost Center GET error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -90,7 +91,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
     }
 
     // Check if locked
-    if (existing[0].is_locked && !data.is_locked) {
+    if (existing[0]!.is_locked && !data.is_locked) {
       return apiResponse.badRequest(res, 'Cost center is locked and cannot be modified');
     }
 
@@ -143,7 +144,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
 
     return apiResponse.success(res, result[0]);
   } catch (error) {
-    console.error('Cost Center PUT error:', error);
+    log.error('Cost Center PUT error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -159,7 +160,7 @@ async function handleDelete(id: string, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Cost center', id);
     }
 
-    if (existing[0].is_locked) {
+    if (existing[0]!.is_locked) {
       return apiResponse.badRequest(res, 'Cannot delete a locked cost center');
     }
 
@@ -168,7 +169,7 @@ async function handleDelete(id: string, res: NextApiResponse) {
       SELECT COUNT(*) as count FROM cost_centers WHERE parent_id = ${id}::UUID
     `;
 
-    if (parseInt(children[0].count as string) > 0) {
+    if (parseInt(children[0]!.count as string) > 0) {
       return apiResponse.badRequest(res, 'Cannot delete cost center with children. Delete children first.');
     }
 
@@ -177,7 +178,7 @@ async function handleDelete(id: string, res: NextApiResponse) {
       SELECT COUNT(*) as count FROM cost_center_transactions WHERE cost_center_id = ${id}::UUID
     `;
 
-    if (parseInt(transactions[0].count as string) > 0) {
+    if (parseInt(transactions[0]!.count as string) > 0) {
       return apiResponse.badRequest(res, 'Cannot delete cost center with transactions. Deactivate instead.');
     }
 
@@ -185,7 +186,7 @@ async function handleDelete(id: string, res: NextApiResponse) {
 
     return apiResponse.success(res, { message: 'Cost center deleted' });
   } catch (error) {
-    console.error('Cost Center DELETE error:', error);
+    log.error('Cost Center DELETE error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }

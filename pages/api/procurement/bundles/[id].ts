@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockBundleFormData } from '@/types/procurement/bundle.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -31,10 +32,10 @@ export default async function handler(
       case 'DELETE':
         return handleDelete(id, res);
       default:
-        return apiResponse.methodNotAllowed(res);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    console.error('Bundle API error:', error);
+    log.error('Bundle API error', { error, module: 'procurement:bundles' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -73,7 +74,7 @@ async function handlePut(id: string, data: StockBundleFormData, res: NextApiResp
   }
 
   // Check for duplicate code (if code is being changed)
-  if (data.bundle_code && data.bundle_code.toUpperCase() !== existing[0].bundle_code) {
+  if (data.bundle_code && data.bundle_code.toUpperCase() !== existing[0]!.bundle_code) {
     const duplicate = await sql`
       SELECT id FROM stock_bundles WHERE bundle_code = ${data.bundle_code.toUpperCase()} AND id != ${id}
     `;
@@ -83,7 +84,7 @@ async function handlePut(id: string, data: StockBundleFormData, res: NextApiResp
   }
 
   // If setting as default, unset other defaults in same category
-  const categoryId = data.category_id !== undefined ? data.category_id : existing[0].category_id;
+  const categoryId = data.category_id !== undefined ? data.category_id : existing[0]!.category_id;
   if (data.is_default && categoryId) {
     await sql`
       UPDATE stock_bundles SET is_default = false
@@ -98,7 +99,7 @@ async function handlePut(id: string, data: StockBundleFormData, res: NextApiResp
       bundle_code = COALESCE(${data.bundle_code?.toUpperCase()}, bundle_code),
       name = COALESCE(${data.name}, name),
       description = COALESCE(${data.description}, description),
-      category_id = ${data.category_id === undefined ? existing[0].category_id : data.category_id || null},
+      category_id = ${data.category_id === undefined ? existing[0]!.category_id : data.category_id || null},
       bundle_type = COALESCE(${data.bundle_type}, bundle_type),
       price_type = COALESCE(${data.price_type}, price_type),
       fixed_price = COALESCE(${data.fixed_price}, fixed_price),
@@ -127,10 +128,10 @@ async function handleDelete(id: string, res: NextApiResponse) {
   }
 
   // Warn if bundle has been used
-  if (existing[0].usage_count > 0) {
+  if (existing[0]!.usage_count > 0) {
     return apiResponse.badRequest(
       res,
-      `Bundle '${existing[0].name}' has been used ${existing[0].usage_count} times. Consider deactivating instead of deleting.`
+      `Bundle '${existing[0]!.name}' has been used ${existing[0]!.usage_count} times. Consider deactivating instead of deleting.`
     );
   }
 

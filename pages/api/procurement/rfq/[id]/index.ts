@@ -40,7 +40,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       return apiResponse.notFound(res, 'RFQ', id);
     }
 
-    const rfq = rfqResult[0];
+    const rfq = rfqResult[0]!;
 
     // Get RFQ items with stock item info
     const items = await sql`

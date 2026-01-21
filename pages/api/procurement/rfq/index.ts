@@ -1,8 +1,36 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { RFQ } from '../../../../src/types/procurement/rfq.types';
+import type { RFQStatusType } from '../../../../src/types/procurement/rfq.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse, ErrorCode } from '../../../../src/lib/apiResponse';
+
+// API response interface for RFQ (different from database schema type)
+interface RFQApiResponse {
+  id: string;
+  rfqNumber: string;
+  projectId: string;
+  title: string;
+  description: string;
+  status: RFQStatusType;
+  createdDate: string;
+  dueDate: string;
+  items: Array<{
+    id: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    specifications: string;
+  }>;
+  suppliers: Array<{
+    id: string | number;
+    name: string;
+    email?: string;
+  }>;
+  quotesReceived: number;
+  totalValue: number;
+  createdBy: string;
+  updatedAt: string;
+}
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -221,7 +249,7 @@ export default withErrorHandler(async (
         RETURNING *
       `;
 
-      const rfqId = insertedRFQs[0].id;
+      const rfqId = insertedRFQs[0]!.id;
 
       // Insert suppliers into junction table
       const supplierIds = newRFQ.suppliers || newRFQ.supplierIds || [];
@@ -246,7 +274,7 @@ export default withErrorHandler(async (
 
       // Insert items if provided
       const items = newRFQ.items || [];
-      const rfqProjectId = insertedRFQs[0].project_id;
+      const rfqProjectId = insertedRFQs[0]!.project_id;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         await sql`
@@ -279,10 +307,10 @@ export default withErrorHandler(async (
 
       // Log RFQ creation
       logCreate('rfq', rfqId, {
-        rfq_number: insertedRFQs[0].rfq_number,
-        project_id: insertedRFQs[0].project_id,
-        title: insertedRFQs[0].title,
-        total_budget: insertedRFQs[0].total_budget_estimate,
+        rfq_number: insertedRFQs[0]!.rfq_number,
+        project_id: insertedRFQs[0]!.project_id,
+        title: insertedRFQs[0]!.title,
+        total_budget: insertedRFQs[0]!.total_budget_estimate,
         suppliers_count: insertedSuppliers.length,
         items_count: items.length,
         source_boq_id: sourceBoqId || null
@@ -297,16 +325,16 @@ export default withErrorHandler(async (
         `;
       }
 
-      // Transform the response to match RFQ type
-      const createdRFQ: RFQ = {
+      // Transform the response to match API response format
+      const createdRFQ: RFQApiResponse = {
         id: rfqId,
-        rfqNumber: insertedRFQs[0].rfq_number,
-        projectId: insertedRFQs[0].project_id,
-        title: insertedRFQs[0].title,
-        description: insertedRFQs[0].description || '',
-        status: insertedRFQs[0].status as 'draft' | 'open' | 'evaluating' | 'awarded' | 'cancelled',
-        createdDate: insertedRFQs[0].created_at || new Date().toISOString(),
-        dueDate: insertedRFQs[0].response_deadline || new Date().toISOString(),
+        rfqNumber: insertedRFQs[0]!.rfq_number,
+        projectId: insertedRFQs[0]!.project_id,
+        title: insertedRFQs[0]!.title,
+        description: insertedRFQs[0]!.description || '',
+        status: insertedRFQs[0]!.status as RFQStatusType,
+        createdDate: insertedRFQs[0]!.created_at || new Date().toISOString(),
+        dueDate: insertedRFQs[0]!.response_deadline || new Date().toISOString(),
         items: items.map((item: any, idx: number) => ({
           id: `temp-${idx}`,
           description: item.description,
@@ -320,9 +348,9 @@ export default withErrorHandler(async (
           email: s.email
         })),
         quotesReceived: 0,
-        totalValue: Number(insertedRFQs[0].total_budget_estimate || 0),
-        createdBy: insertedRFQs[0].created_by || 'System',
-        updatedAt: insertedRFQs[0].updated_at || new Date().toISOString()
+        totalValue: Number(insertedRFQs[0]!.total_budget_estimate || 0),
+        createdBy: insertedRFQs[0]!.created_by || 'System',
+        updatedAt: insertedRFQs[0]!.updated_at || new Date().toISOString()
       };
       
       return apiResponse.created(res, createdRFQ, 'RFQ created successfully');

@@ -1,7 +1,31 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { StockItem } from '../../../../src/types/procurement/stock.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
+import { createLoggedSql, logCreate } from '@/lib/db-logger';
+import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
+
+// API response interface for stock items
+interface StockItemResponse {
+  id: string;
+  itemCode: string;
+  name: string;
+  description: string;
+  category: string;
+  projectId: string;
+  warehouse: string;
+  location: string;
+  quantity: number;
+  unit: string;
+  minQuantity: number;
+  maxQuantity: number;
+  unitCost: number;
+  totalValue: number;
+  supplier: string;
+  lastRestocked: string;
+  status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  createdAt: string;
+  updatedAt: string;
+}
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -51,7 +75,7 @@ export default withErrorHandler(async (
       }
       
       // Transform data to match expected format
-      const transformedItems: StockItem[] = stockData.map(stock => ({
+      const transformedItems: StockItemResponse[] = stockData.map(stock => ({
         id: stock.id,
         itemCode: stock.item_code,
         name: stock.item_name,
@@ -74,12 +98,12 @@ export default withErrorHandler(async (
       }));
       
       // Calculate stock statistics
-      const lowStockItems = transformedItems.filter(item => 
-        item.status === 'low' || item.status === 'critical' || 
+      const lowStockItems = transformedItems.filter(item =>
+        item.status === 'low_stock' ||
         (item.minQuantity > 0 && item.quantity <= item.minQuantity)
       );
-      
-      const outOfStockItems = transformedItems.filter(item => 
+
+      const outOfStockItems = transformedItems.filter(item =>
         item.quantity === 0 || item.status === 'out_of_stock'
       );
       
@@ -97,14 +121,14 @@ export default withErrorHandler(async (
         outOfStock: outOfStockItems.length,
         movements: movements.slice(0, 10),
         stats: {
-          totalValue: transformedItems.reduce((sum, item) => sum + item.totalValue, 0),
+          totalValue: transformedItems.reduce((sum, item) => sum + (item.totalValue || 0), 0),
           categories: [...new Set(transformedItems.map(item => item.category))],
           ...movementStats,
         }
       });
     } catch (error) {
-      console.error('Error fetching stock items:', error);
-      res.status(500).json({ error: 'Failed to fetch stock items' });
+      log.error('Error fetching stock items', { error, module: 'procurement:stock' });
+      return apiResponse.internalError(res, error);
     }
   } else if (req.method === 'POST') {
     try {
@@ -140,24 +164,24 @@ export default withErrorHandler(async (
       
       // Log stock item creation
       if (insertedStocks[0]) {
-        logCreate('stock_item', insertedStocks[0].id, {
-          project_id: insertedStocks[0].project_id,
-          item_code: insertedStocks[0].item_code,
-          item_name: insertedStocks[0].item_name,
-          quantity: insertedStocks[0].quantity_on_hand,
-          warehouse: insertedStocks[0].warehouse_location
+        logCreate('stock_item', insertedStocks[0]!.id, {
+          project_id: insertedStocks[0]!.project_id,
+          item_code: insertedStocks[0]!.item_code,
+          item_name: insertedStocks[0]!.item_name,
+          quantity: insertedStocks[0]!.quantity_on_hand,
+          warehouse: insertedStocks[0]!.warehouse_location
         });
       }
-      
-      res.status(201).json({ 
+
+      return apiResponse.created(res, {
         message: 'Stock item added successfully',
         item: insertedStocks[0]
       });
     } catch (error) {
-      console.error('Error adding stock item:', error);
-      res.status(500).json({ error: 'Failed to add stock item' });
+      log.error('Error adding stock item', { error, module: 'procurement:stock' });
+      return apiResponse.internalError(res, error);
     }
   } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 })

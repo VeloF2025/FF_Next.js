@@ -40,7 +40,7 @@ export default withErrorHandler(async (
       SELECT COUNT(*)::int as count FROM purchase_requisition_items WHERE requisition_id = ${id}
     `;
 
-    if (itemCount.count === 0) {
+    if (itemCount!.count === 0) {
       return apiResponse.badRequest(res, 'Cannot submit requisition without items');
     }
 
@@ -98,7 +98,7 @@ export default withErrorHandler(async (
               ${level.id},
               'purchase_requisition',
               ${id},
-              ${updated.requisition_number},
+              ${updated!.requisition_number},
               ${amount},
               ${userId || 'system'},
               'pending'
@@ -111,8 +111,8 @@ export default withErrorHandler(async (
     logUpdate('purchase_requisition', id, { status: newStatus });
 
     return apiResponse.success(res, {
-      id: updated.id,
-      status: updated.status,
+      id: updated!.id,
+      status: updated!.status,
       message: needsApproval
         ? 'Requisition submitted for approval'
         : 'Requisition auto-approved (under threshold)',

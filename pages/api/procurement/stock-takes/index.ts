@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { StockTake, StockTakeFormData } from '@/types/procurement/stockTake.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -21,10 +22,10 @@ export default async function handler(
     } else if (req.method === 'POST') {
       return handlePost(req, res);
     } else {
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
-    console.error('Stock Takes API error:', error);
+    log.error('Stock Takes API error', { error, module: 'procurement:stock-takes' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -94,7 +95,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   // Generate reference number
   const refResult = await sql`SELECT generate_stock_take_reference() as ref`;
-  const referenceNumber = refResult[0].ref;
+  const referenceNumber = refResult[0]!.ref;
 
   // Create stock take
   const result = await sql`

@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import type { CreateCostCenterRequest } from '@/types/procurement/costCenter.types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -21,7 +22,7 @@ export default async function handler(
     case 'POST':
       return handlePost(req, res);
     default:
-      return apiResponse.methodNotAllowed(res);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
@@ -91,7 +92,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     // Count total
     const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
     const countResult = await sql.query(countQuery, params);
-    const total = parseInt(countResult[0].count as string) || 0;
+    const total = parseInt(countResult[0]!.count as string) || 0;
 
     // Add pagination and ordering
     const pageNum = parseInt(page as string) || 1;
@@ -111,7 +112,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       limit: limitNum,
     });
   } catch (error) {
-    console.error('Cost Centers GET error:', error);
+    log.error('Cost Centers GET error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }
@@ -152,7 +153,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
           SELECT id FROM cost_center_types WHERE code = ${typeCode}
         `;
         if (type.length > 0) {
-          typeId = type[0].id as string;
+          typeId = type[0]!.id as string;
         }
       }
     }
@@ -190,7 +191,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.created(res, result[0]);
   } catch (error) {
-    console.error('Cost Centers POST error:', error);
+    log.error('Cost Centers POST error', { error, module: 'procurement:cost-centers' });
     return apiResponse.internalError(res, error);
   }
 }
