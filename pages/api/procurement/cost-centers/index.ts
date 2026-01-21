@@ -53,7 +53,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       SELECT * FROM v_cost_centers_summary
       WHERE 1=1
     `;
-    const params: (string | boolean)[] = [];
+    const params: (string | boolean | number)[] = [];
     let paramIndex = 1;
 
     if (project_id) {
@@ -99,8 +99,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const offset = (pageNum - 1) * limitNum;
 
     query += ` ORDER BY hierarchy_path, name LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limitNum.toString());
-    params.push(offset.toString());
+    params.push(limitNum);
+    params.push(offset);
 
     const costCenters = await sql.query(query, params);
 
