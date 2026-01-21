@@ -112,7 +112,14 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     console.error('Cost Centers GET error:', error);
-    return apiResponse.internalError(res, error);
+    // Return detailed error in dev/staging
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      }
+    });
   }
 }
 
