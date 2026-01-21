@@ -34,7 +34,7 @@ export const systemSection: NavSection = {
     {
       to: '/qfield',
       icon: MapPin,
-      label: 'QField Monitor',
+      label: 'QField',
       shortLabel: 'QField',
       permissions: [Permission.SYSTEM_ADMIN],
     },
