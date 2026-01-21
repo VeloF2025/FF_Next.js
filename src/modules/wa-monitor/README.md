@@ -22,7 +22,9 @@ This module is **fully isolated** and operates independently from the main Fibre
 
 **If feedback sending fails:**
 - See **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for common issues and fixes
-- Most common: WhatsApp Bridge disconnected → Quick fix: `systemctl restart whatsapp-bridge-prod`
+- Check wa-feedback health: `curl http://100.96.203.105:8092/health`
+- Check sender-2 health: `curl http://100.96.203.105:8081/health`
+- Restart services: `echo 'velo2026' | sudo -S systemctl restart wa-feedback whatsapp-sender-2`
 
 ## Overview
 

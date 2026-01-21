@@ -371,32 +371,52 @@ getTechnicianIssues(data)      // Returns actionable issues for technicians
 
 | Service | Port | Number | Purpose |
 |---------|------|--------|---------|
-| `whatsapp-bridge-2` | 8083 | 063 841 2276 | Receiving & Sending |
-| `whatsapp-sender-2` | 8081 | 063 841 2276 | DB queue sender |
-| `wa-feedback` | 8092 | - | FibreFlow feedback API |
+| `whatsapp-sender-2` | 8081 | 063 841 2276 | **SENDING** - REST API `/send-message` |
+| `whatsapp-bridge-2` | 8083 | 063 841 2276 | **RECEIVING** - Incoming messages |
+| `wa-feedback` | 8092 | - | FibreFlow proxy → sender-2 |
 
-**Bridge-2 (Primary - 063 841 2276):** `/home/louis/whatsapp-bridge-2/`
+**Architecture (Jan 2026):**
+```
+FibreFlow APIs → wa-feedback (8092) → sender-2 (8081) → WhatsApp (063 841 2276)
+                                            ↓
+                 bridge-2 (8083) ← WhatsApp incoming messages
+```
+
+**All services use Tailscale IP for consistency across dev/staging/prod:**
+- Sender-2: `http://100.96.203.105:8081`
+- Bridge-2: `http://100.96.203.105:8083`
+- WA Feedback: `http://100.96.203.105:8092`
+
+**Sender-2 (for SENDING):** `/home/louis/whatsapp-sender-2/`
+```bash
+curl http://100.96.203.105:8081/health  # Check connection status
+# Send with @mention:
+curl -X POST http://100.96.203.105:8081/send-message -H "Content-Type: application/json" \
+  -d '{"group_jid": "120363418298130331@g.us", "recipient_jid": "27123456789@s.whatsapp.net", "message": "Test"}'
+# Send without @mention (use dummy recipient):
+curl -X POST http://100.96.203.105:8081/send-message -H "Content-Type: application/json" \
+  -d '{"group_jid": "120363418298130331@g.us", "recipient_jid": "0@s.whatsapp.net", "message": "Test"}'
+```
+
+**Bridge-2 (for RECEIVING):** `/home/louis/whatsapp-bridge-2/`
 ```bash
 tail -f /home/louis/whatsapp-bridge-2/bridge.log
 echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge-2.service
-# Send test message:
-curl -X POST http://localhost:8083/api/send -H "Content-Type: application/json" \
-  -d '{"recipient": "120363418298130331@g.us", "message": "Test"}'
 ```
 
-**WA Feedback Service:** Port 8092
+**WA Feedback Service (FibreFlow proxy):** Port 8092
 ```bash
-curl http://localhost:8092/health
+curl http://100.96.203.105:8092/health
 echo 'velo2026' | sudo -S systemctl restart wa-feedback
 # Config: /etc/systemd/system/wa-feedback.service
 # Code: /home/louis/wa-feedback-service/wa-feedback-service.js
-# Uses bridge-2 (8083) with /api/send endpoint
+# Proxies to sender-2 (8081) with /send-message endpoint
 ```
 
 **Group Mapping:**
 - Lawley: `120363418298130331@g.us`
 - Mohadin: `120363421532174586@g.us`
-- Velo Test: `120363421664266245@g.us` *(063 number NOT in this group)*
+- Velo Test: `120363421664266245@g.us`
 - Mamelodi: `120363408849234743@g.us`
 
 ### 10-Step Photo Checklist

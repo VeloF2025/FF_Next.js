@@ -36,8 +36,9 @@ const pool = new Pool({
 // Service endpoints
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
-// WA Sender (port 8081) - sends QA feedback from FibreFlow Sender number (082 418 9511)
-const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://100.96.203.105:8081';
+// WA Feedback service (port 8092) - proxies to bridge-2 (8083) for all outgoing messages
+// Phone number: 063 841 2276 (bridge-2)
+const WA_FEEDBACK_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
 
 interface ServiceStatus {
   status: 'healthy' | 'degraded' | 'down' | 'unknown';
@@ -237,7 +238,8 @@ async function checkWhatsAppBridge(): Promise<ServiceStatus> {
 }
 
 /**
- * Check WhatsApp Sender API (for Send Feedback feature)
+ * Check WhatsApp Feedback service (for Send Feedback feature)
+ * wa-feedback (8092) proxies to bridge-2 (8083) which uses 063 841 2276
  */
 async function checkWhatsAppSender(): Promise<ServiceStatus> {
   const start = Date.now();
@@ -245,27 +247,26 @@ async function checkWhatsAppSender(): Promise<ServiceStatus> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    const response = await fetch(`${WA_SENDER_URL}/health`, {
+    const response = await fetch(`${WA_FEEDBACK_URL}/health`, {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
-      // Support both formats: {connected: true, phone: "..."} (sender) and {status: "healthy"} (wa-feedback proxy)
-      const isHealthy = data.connected === true || data.status === 'healthy';
-      const phone = data.phone ? ` (${data.phone})` : '';
+      // wa-feedback returns {status: "healthy", service: "wa-feedback-service", bridgeUrl, senderUrl}
+      const isHealthy = data.status === 'healthy';
       return {
         status: isHealthy ? 'healthy' : 'degraded',
         latencyMs: Date.now() - start,
-        message: isHealthy ? `WA Sender connected${phone}` : 'WA Sender not connected',
+        message: isHealthy ? 'WA Feedback service healthy (063 841 2276)' : 'WA Feedback not healthy',
         lastCheck: new Date().toISOString(),
       };
     } else {
       return {
         status: 'degraded',
         latencyMs: Date.now() - start,
-        message: `Sender returned ${response.status}`,
+        message: `WA Feedback returned ${response.status}`,
         lastCheck: new Date().toISOString(),
       };
     }
@@ -273,7 +274,7 @@ async function checkWhatsAppSender(): Promise<ServiceStatus> {
     return {
       status: 'down',
       latencyMs: Date.now() - start,
-      message: `Sender unreachable: ${error instanceof Error ? error.message : 'Unknown'}`,
+      message: `WA Feedback unreachable: ${error instanceof Error ? error.message : 'Unknown'}`,
       lastCheck: new Date().toISOString(),
     };
   }

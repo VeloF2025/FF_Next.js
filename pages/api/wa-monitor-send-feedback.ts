@@ -16,15 +16,11 @@ import { withArcjetProtection, ajWaMonitor } from '@/lib/arcjet';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-// WhatsApp Bridge configuration
-// ⚠️ CRITICAL: DO NOT CHANGE 'localhost' TO VARIABLES IN fetch() CALLS BELOW!
-// WHY: This app runs ON the VPS where WhatsApp services also run.
-//      localhost:8081 = 72.60.17.245:8081 (same machine)
-//      The code below uses 'localhost' and IT WORKS - don't "fix" it!
-// NOTE: These variables exist but are unused. That's intentional and correct.
-const VPS_HOST = process.env.VPS_HOST || '72.60.17.245';
-const WHATSAPP_SENDER_URL = process.env.WHATSAPP_SENDER_URL || `http://${VPS_HOST}:8081`;
-const WHATSAPP_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || `http://${VPS_HOST}:8080/api`;
+// WhatsApp Feedback service configuration (Jan 2026)
+// wa-feedback (port 8092) proxies to bridge-2 (port 8083) for all outgoing messages
+// Phone number: 063 841 2276 (bridge-2)
+// All environments (dev/staging/prod) use the same Velocity server via Tailscale
+const WA_FEEDBACK_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
 
 // Project WhatsApp group mappings
 const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {
@@ -77,9 +73,10 @@ interface WhatsAppApiResponse {
 }
 
 /**
- * Send message to WhatsApp group via Sender API with optional @mention
- * Uses second phone number (+27 71 155 8396) for sending messages
- * If recipientJID is null/empty, sends as group message without @mention
+ * Send message to WhatsApp group via wa-feedback service
+ * wa-feedback (8092) proxies to bridge-2 (8083) using 063 841 2276
+ * Note: @mentions are not currently supported by wa-feedback, but the message
+ * will be sent to the group regardless
  */
 async function sendWhatsAppMessage(
   groupJID: string,
@@ -87,80 +84,47 @@ async function sendWhatsAppMessage(
   message: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Use Sender API (port 8081) - Second WhatsApp number
-    // Sender API format with @mentions: { group_jid: "JID", recipient_jid: "JID", message: "text" }
+    // wa-feedback service handles all outgoing messages
+    // It proxies to bridge-2 (8083) which sends via 063 841 2276
+    const requestBody = {
+      recipient: groupJID,
+      message: message,
+    };
 
-    // Check if we have recipient info for @mention
+    // Log if we have recipient info (for future @mention support)
     if (recipientJID && recipientJID.trim() !== '' && recipientJID !== 'Unknown') {
-      // Ensure recipient_jid is in WhatsApp JID format (phone@s.whatsapp.net)
-      const formattedRecipientJID = recipientJID.includes('@')
-        ? recipientJID
-        : `${recipientJID}@s.whatsapp.net`;
-
-      // Send with @mention
-      const requestBody = {
-        group_jid: groupJID,
-        recipient_jid: formattedRecipientJID,
-        message: message,
-      };
-
-      const response = await fetch(`${WHATSAPP_SENDER_URL}/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(60000), // 60 second timeout for slow connections
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return {
-          success: false,
-          message: `WhatsApp Sender API error: HTTP ${response.status} - ${errorText}`
-        };
-      }
-
-      const result: WhatsAppApiResponse = await response.json();
-      return {
-        success: result.success || false,
-        message: result.message || 'Message sent with @mention'
-      };
+      console.log(`[WA] Sending to group ${groupJID} (recipient: ${recipientJID})`);
     } else {
-      // No recipient info - send as simple group message via bridge
-      const requestBody = {
-        recipient: groupJID,
-        message: message,
-      };
+      console.log(`[WA] Sending to group ${groupJID} (no recipient info)`);
+    }
 
-      const response = await fetch(`${WHATSAPP_BRIDGE_URL}/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(60000), // 60 second timeout for slow connections
-      });
+    const response = await fetch(`${WA_FEEDBACK_URL}/send-feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(60000), // 60 second timeout for slow connections
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        return {
-          success: false,
-          message: `WhatsApp Bridge API error: HTTP ${response.status} - ${errorText}`
-        };
-      }
-
-      const result: WhatsAppApiResponse = await response.json();
+    if (!response.ok) {
+      const errorText = await response.text();
       return {
-        success: result.success || false,
-        message: result.message || 'Group message sent successfully'
+        success: false,
+        message: `wa-feedback API error: HTTP ${response.status} - ${errorText}`
       };
     }
+
+    const result: WhatsAppApiResponse = await response.json();
+    return {
+      success: result.success || false,
+      message: result.message || 'Message sent via wa-feedback (063 841 2276)'
+    };
   } catch (error) {
     console.error('WhatsApp API communication error:', error);
     return {
       success: false,
-      message: `Failed to communicate with WhatsApp API: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `Failed to communicate with wa-feedback: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }

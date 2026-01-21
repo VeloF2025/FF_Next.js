@@ -1,0 +1,102 @@
+/**
+ * Pipeline Project Detail API
+ * GET /api/pipeline/projects/[id] - Get project details
+ * PUT /api/pipeline/projects/[id] - Update project
+ * DELETE /api/pipeline/projects/[id] - Delete project (soft)
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
+import { pipelineProjectService } from '@/modules/pipeline/services/pipelineProjectService';
+import type { UpdatePipelineProjectInput } from '@/modules/pipeline/types';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { id } = req.query;
+
+  if (!id || typeof id !== 'string') {
+    return apiResponse.badRequest(res, 'Project ID is required');
+  }
+
+  switch (req.method) {
+    case 'GET':
+      return handleGet(req, res, id);
+    case 'PUT':
+      return handlePut(req, res, id);
+    case 'DELETE':
+      return handleDelete(req, res, id);
+    default:
+      res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
+      return res.status(405).json({ error: `Method ${req.method} not allowed` });
+  }
+}
+
+/**
+ * GET /api/pipeline/projects/[id]
+ * Get project with relations and approval summary
+ */
+async function handleGet(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  id: string
+) {
+  const project = await pipelineProjectService.getProjectById(id);
+
+  if (!project) {
+    return apiResponse.notFound(res, 'Pipeline project', id);
+  }
+
+  return apiResponse.success(res, project);
+}
+
+/**
+ * PUT /api/pipeline/projects/[id]
+ * Update project fields
+ */
+async function handlePut(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  id: string
+) {
+  const input = req.body as UpdatePipelineProjectInput;
+
+  // Check project exists
+  const existing = await pipelineProjectService.getProjectById(id);
+  if (!existing) {
+    return apiResponse.notFound(res, 'Pipeline project', id);
+  }
+
+  // Update
+  const updated = await pipelineProjectService.updateProject(id, input);
+
+  if (!updated) {
+    return apiResponse.internalError(res, new Error('Failed to update project'));
+  }
+
+  // Fetch with relations
+  const projectWithRelations = await pipelineProjectService.getProjectById(id);
+
+  return apiResponse.success(res, projectWithRelations);
+}
+
+/**
+ * DELETE /api/pipeline/projects/[id]
+ * Soft delete project
+ */
+async function handleDelete(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  id: string
+) {
+  const { deleted_by } = req.body || {};
+
+  const success = await pipelineProjectService.deleteProject(id, deleted_by);
+
+  if (!success) {
+    return apiResponse.notFound(res, 'Pipeline project', id);
+  }
+
+  return apiResponse.success(res, { message: 'Project deleted successfully' });
+}
+
+export default withErrorHandler(handler);

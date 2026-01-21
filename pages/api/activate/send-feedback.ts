@@ -574,9 +574,9 @@ interface SendResult {
 }
 
 /**
- * Send message to WhatsApp via Sender or Bridge API
- * Uses Sender (port 8081) for group messages with @mentions (sends from FibreFlow Sender number)
- * Uses Bridge (port 8083) as fallback for private messages
+ * Send message to WhatsApp via wa-feedback service
+ * All messages (group and private) go through wa-feedback (port 8092) which proxies to bridge-2 (8083)
+ * Bridge-2 uses phone number 063 841 2276
  * Returns the sent message ID for future threading
  */
 async function sendToWhatsApp(
@@ -585,92 +585,51 @@ async function sendToWhatsApp(
   replyParams?: WhatsAppReplyParams
 ): Promise<SendResult> {
   try {
-    // Determine if this is a group message (use Sender) or private message (use Bridge)
-    const isGroupMessage = recipient.includes('@g.us');
+    // wa-feedback service (port 8092) - proxies to bridge-2 (port 8083)
+    // All environments use the same Velocity server via Tailscale
+    const waFeedbackUrl = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
 
-    // WhatsApp Sender (port 8081) for group messages - sends from FibreFlow Sender (082 418 9511)
-    // WhatsApp Bridge (port 8083) for private messages - sends from Bridge number (064 041 2391)
-    const senderUrl = process.env.WHATSAPP_SENDER_URL || 'http://192.168.1.150:8081';
-    const bridgeUrl = process.env.WHATSAPP_BRIDGE_URL || 'http://192.168.1.150:8083';
+    const requestBody: Record<string, string | string[]> = {
+      recipient: recipient,
+      message: message,
+    };
 
-    if (isGroupMessage) {
-      // Use Sender service for group messages (sends from 082 418 9511)
-      // Sender expects: group_jid, recipient_jid (for @mention), message
-      const requestBody: Record<string, string> = {
-        group_jid: recipient,
-        message: message,
-      };
-
-      // Add the first mentionJID for @mention (sender's primary mention)
-      if (replyParams?.mentionJIDs && replyParams.mentionJIDs.length > 0) {
-        requestBody.recipient_jid = replyParams.mentionJIDs[0];
-      }
-
-      log.info('Sending group message via Sender service', {
-        groupJid: recipient,
-        hasMention: !!requestBody.recipient_jid,
-        senderUrl,
-      });
-
-      const response = await fetch(`${senderUrl}/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        log.error('WhatsApp Sender API error', {
-          status: response.status,
-          error: errorData,
-        });
-        return { success: false };
-      }
-
-      const data = await response.json();
-      log.info('Message sent via WhatsApp Sender (082 418 9511)', {
-        success: data.success,
-      });
-
-      return { success: data.success, messageId: data.messageId };
-    } else {
-      // Use Bridge service for private/direct messages
-      const requestBody: Record<string, string | string[]> = {
-        recipient: recipient,
-        message: message,
-      };
-
-      log.info('Sending private message via Bridge', {
-        recipient,
-        bridgeUrl,
-      });
-
-      const response = await fetch(`${bridgeUrl}/api/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        log.error('WhatsApp Bridge API error', {
-          status: response.status,
-          error: errorData,
-        });
-        return { success: false };
-      }
-
-      const data = await response.json();
-      log.info('Message sent via WhatsApp Bridge', {
-        messageId: data.messageId,
-      });
-
-      return { success: true, messageId: data.messageId };
+    // Add mentions if provided (for group messages)
+    if (replyParams?.mentionJIDs && replyParams.mentionJIDs.length > 0) {
+      requestBody.mentionJIDs = replyParams.mentionJIDs;
     }
+
+    log.info('Sending message via wa-feedback', {
+      recipient,
+      isGroup: recipient.includes('@g.us'),
+      hasMentions: !!(replyParams?.mentionJIDs?.length),
+      waFeedbackUrl,
+    });
+
+    const response = await fetch(`${waFeedbackUrl}/send-feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      log.error('wa-feedback API error', {
+        status: response.status,
+        error: errorData,
+      });
+      return { success: false };
+    }
+
+    const data = await response.json();
+    log.info('Message sent via wa-feedback (063 841 2276)', {
+      success: data.success,
+      messageId: data.messageId,
+    });
+
+    return { success: data.success !== false, messageId: data.messageId };
   } catch (error) {
     log.error('Failed to send message via WhatsApp', { error });
     return { success: false };

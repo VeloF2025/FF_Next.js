@@ -163,64 +163,66 @@ systemctl status whatsapp-bridge-watchdog
 - **File:** `pages/api/wa-monitor-send-feedback.ts`
 - **Commit:** `8ddb34e` (Nov 26, 2025)
 
-**Issue:** WhatsApp Sender vs Bridge confusion
-- **Bridge (8080):** Receives WhatsApp messages, stores in DB
-- **Sender (8081):** Sends WhatsApp messages with @mentions
-- **Both needed:** Sender uses Bridge's connection to WhatsApp
+**Issue:** WhatsApp Sender vs Bridge confusion (Updated Jan 2026)
 
-### ⚠️ CRITICAL WARNING: DO NOT "FIX" localhost in Code
+**Current Architecture (Jan 2026):**
+- **sender-2 (8081):** SENDS WhatsApp messages via `/send-message` endpoint
+- **bridge-2 (8083):** RECEIVES incoming WhatsApp messages
+- **wa-feedback (8092):** FibreFlow API proxy → routes to sender-2
+- **Phone Number:** 063 841 2276 (both sender-2 and bridge-2)
 
-**DANGER:** You may be tempted to change `fetch('http://localhost:8081/...')` to use variables.
-
-**DON'T DO IT!** Here's why:
-
-**The code has these variables (lines 19-21):**
-```typescript
-const VPS_HOST = '72.60.17.245';
-const WHATSAPP_SENDER_URL = `http://${VPS_HOST}:8081`;
-const WHATSAPP_BRIDGE_URL = `http://${VPS_HOST}:8080/api`;
+**Architecture Flow:**
+```
+FibreFlow APIs → wa-feedback (8092) → sender-2 (8081) → WhatsApp (063 841 2276)
+                                            ↓
+                 bridge-2 (8083) ← WhatsApp incoming messages
 ```
 
-**But fetch() calls use `localhost` (lines 97, 126):**
+### ✅ Use Tailscale IPs for All Environments
+
+**All code should use Tailscale IP `100.96.203.105` for consistency across dev/staging/prod:**
+
 ```typescript
-fetch('http://localhost:8081/send-message', ...)
-fetch('http://localhost:8080/api/send', ...)
+// Correct - use Tailscale IP
+const WA_FEEDBACK_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
+
+// Then call wa-feedback which proxies to sender-2
+fetch(`${WA_FEEDBACK_URL}/send-feedback`, {
+  method: 'POST',
+  body: JSON.stringify({ recipient: groupJid, message: text })
+});
 ```
 
-**This looks like a bug, but IT'S NOT!**
-
-**Why localhost works:**
-1. The Next.js app runs **ON the VPS** (`/var/www/fibreflow/`)
-2. WhatsApp services **ALSO run on the VPS** (ports 8080, 8081)
-3. From VPS perspective: `localhost:8081` = `72.60.17.245:8081` = **same machine**
-4. `localhost` is faster (no network routing) and more secure (no external exposure)
-
-**The variables exist but are unused** - that's intentional and correct.
-
-**If you change localhost to variables:**
-- ❌ Code still works (same machine)
-- ❌ But you risk breaking it if deployment changes
-- ❌ Unnecessary "fix" for working code
-- ❌ "If it ain't broke, don't fix it!"
-
-**Documented:** Nov 26, 2025 - Almost broke working code trying to "fix" unused variables
+**Service URLs:**
+- Sender-2: `http://100.96.203.105:8081` (for direct sends with @mentions)
+- Bridge-2: `http://100.96.203.105:8083` (for receiving/groups list)
+- WA Feedback: `http://100.96.203.105:8092` (FibreFlow proxy - preferred)
 
 ### Files Involved
 
-- **WhatsApp Bridge Service:** `/etc/systemd/system/whatsapp-bridge-prod.service`
-- **Bridge Binary:** `/opt/velo-test-monitor/services/whatsapp-bridge/whatsapp-bridge`
-- **Bridge Logs:** `/opt/velo-test-monitor/logs/whatsapp-bridge.log`
+- **wa-feedback Service:** `/etc/systemd/system/wa-feedback.service`
+- **wa-feedback Code:** `/home/louis/wa-feedback-service/wa-feedback-service.js`
+- **Sender-2 Service:** `/etc/systemd/system/whatsapp-sender-2.service`
+- **Bridge-2 Service:** `/etc/systemd/system/whatsapp-bridge-2.service`
+- **Bridge-2 Logs:** `/home/louis/whatsapp-bridge-2/bridge.log`
 - **API Endpoint:** `/pages/api/wa-monitor-send-feedback.ts`
-- **Frontend:** `/src/modules/wa-monitor/components/QaReviewCard.tsx`
+- **Activate API:** `/pages/api/activate/send-feedback.ts`
 
-### VPS Connection
+### Velocity Server Connection
 
 ```bash
-# Quick access
-ssh root@72.60.17.245
+# Primary access (use velo user)
+ssh velo@100.96.203.105     # via Tailscale (recommended)
+# Password: velo2026
 
-# Or with password in command
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245
+# Check service health
+curl http://100.96.203.105:8092/health  # wa-feedback
+curl http://100.96.203.105:8081/health  # sender-2
+
+# Restart services
+echo 'velo2026' | sudo -S systemctl restart wa-feedback
+echo 'velo2026' | sudo -S systemctl restart whatsapp-sender-2
+echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge-2
 ```
 
 ### Monitoring

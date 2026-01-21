@@ -35,10 +35,14 @@ const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {
   }
 };
 
+// wa-feedback service configuration (Jan 2026)
+// wa-feedback (port 8092) proxies to bridge-2 (port 8083) for all outgoing messages
+// Phone number: 063 841 2276 (bridge-2)
+const WA_FEEDBACK_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
+
 /**
- * Send message to WhatsApp group
- * Uses Sender API (8081) with @mention if phone number available
- * Falls back to Bridge API (8080) without @mention if no phone number
+ * Send message to WhatsApp group via wa-feedback service
+ * wa-feedback (8092) proxies to bridge-2 (8083) using 063 841 2276
  */
 async function sendWhatsAppFeedback(drNumber: string, message: string, project?: string): Promise<void> {
   // Get project group JID - default to Velo Test if project is unknown/undefined
@@ -56,57 +60,35 @@ async function sendWhatsAppFeedback(drNumber: string, message: string, project?:
     throw new Error(`No WhatsApp group configured for project: ${projectKey}`);
   }
 
-  // Try to get submitter's phone number from qa_photo_reviews (WA Monitor data)
+  // Log recipient info for debugging (wa-feedback doesn't support @mentions yet)
   const submitterPhone = await getDropSubmitterPhone(drNumber);
-
   if (submitterPhone) {
-    // Use Sender API with @mention (port 8081)
-    console.log(`[WhatsApp] Using Sender API with @mention for ${submitterPhone}`);
-
-    const response = await fetch('http://localhost:8081/send-message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        group_jid: groupConfig.jid,
-        recipient_jid: submitterPhone + '@s.whatsapp.net',  // Format for WhatsApp JID
-        message: message,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[WhatsApp] Sender API failed, falling back to Bridge API: ${errorText}`);
-      // Fall through to Bridge API below
-    } else {
-      const result = await response.json();
-      if (result.success) {
-        return; // Success with @mention
-      }
-      console.error(`[WhatsApp] Sender API failed: ${result.message || 'Unknown error'}`);
-    }
+    console.log(`[WhatsApp] Sending to ${projectKey} group (submitter: ${submitterPhone})`);
+  } else {
+    console.log(`[WhatsApp] Sending to ${projectKey} group (no submitter phone)`);
   }
 
-  // Fallback: Use Bridge API without @mention (port 8080)
-  console.log(`[WhatsApp] Using Bridge API without @mention (no phone number found or Sender API failed)`);
-
-  const response = await fetch('http://localhost:8080/api/send', {
+  // Use wa-feedback service for all outgoing messages
+  const response = await fetch(`${WA_FEEDBACK_URL}/send-feedback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      recipient: groupConfig.jid,  // Bridge API uses 'recipient' instead of 'group_jid'
+      recipient: groupConfig.jid,
       message: message,
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`WhatsApp API error: ${response.status} - ${errorText}`);
+    throw new Error(`wa-feedback API error: ${response.status} - ${errorText}`);
   }
 
   const result = await response.json();
   if (!result.success) {
     throw new Error(`Failed to send WhatsApp message: ${result.message || 'Unknown error'}`);
   }
+
+  console.log(`[WhatsApp] Message sent via wa-feedback (063 841 2276) to ${projectKey} group`);
 }
 
 export default async function handler(

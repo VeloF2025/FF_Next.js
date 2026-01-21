@@ -1,43 +1,44 @@
 {
-  "session_id": "2026-01-21-serial-swaps-fix",
-  "started_at": "2026-01-21T16:55:00Z",
-  "last_updated": "2026-01-21T17:13:48.769Z",
+  "session_id": "2026-01-21-wa-fix",
+  "started_at": "2026-01-21T17:25:00Z",
+  "last_updated": "2026-01-21T19:10:10.318Z",
   "working_on": {
-    "task": "Fix serial swaps API and KB update",
+    "task": "Fix WhatsApp acks and DR tracking",
     "status": "completed",
     "progress": [
-      "✅ Fixed serial swaps API - changed from neon() to Pool pattern",
-      "✅ Verified all 8 reporting endpoints working on staging",
-      "✅ KB scan: 42 modules, 42 with .claude.md (100%)",
-      "✅ Created .claude.md for pipeline module"
+      "Fixed wa-feedback: SENDER_URL 8085 -> 8083",
+      "Fixed wa-feedback: endpoint /send -> /api/send",
+      "Added 13 DRs to database manually",
+      "Sent 83 ack messages for last 24h Lawley DRs",
+      "9 DRs had swapped serials (warned in acks)",
+      "Updated acknowledged_at for all 83 DRs"
     ],
-    "last_action": "KB update complete"
+    "last_action": "Sent ack messages for 83 DRs"
   },
-  "kb_scan_results": {
-    "timestamp": "2026-01-21T17:10:00Z",
-    "total_modules": 42,
-    "modules_with_claude_md": 42,
-    "learnings_consolidated": 0,
-    "new_module_docs": [
-      "pipeline"
-    ]
-  },
-  "recent_fixes": {
-    "serial_swaps_api": {
-      "root_cause": "Using neon() which returns template function, but calling .query() on it",
-      "fix": "Changed to Pool pattern from @neondatabase/serverless",
-      "files_changed": [
-        "pages/api/activate/reporting/serial-swaps/index.ts",
-        "pages/api/activate/reporting/serial-swaps/update-status.ts"
-      ],
-      "commit": "0de012b9"
+  "wa_services": {
+    "bridge-2": {
+      "port": 8083,
+      "number": "063 841 2276",
+      "status": "running"
+    },
+    "sender-2": {
+      "port": 8081,
+      "number": "063 841 2276",
+      "status": "running"
+    },
+    "wa-feedback": {
+      "port": 8092,
+      "sender_url": "http://localhost:8083",
+      "endpoint": "/api/send",
+      "status": "fixed"
     }
   },
-  "recent_work": [
-    "KB update - pipeline module documented",
-    "Serial swaps API fixed with Pool pattern",
-    "All 8 reporting endpoints verified working"
-  ],
+  "ack_stats": {
+    "lawley_total": 4177,
+    "lawley_acked": 100,
+    "lawley_last_24h": 100,
+    "swapped_serials": 9
+  },
   "context": {
     "project": "FibreFlow",
     "branch": "master"
@@ -46,18 +47,8 @@
     "server": "100.96.203.105 (Velocity)",
     "vlm": "Qwen3-VL-8B on port 8100",
     "database": "Neon PostgreSQL (production branch)",
-    "staging": "vf.fibreflow.app:3006 ✅ HEALTHY",
-    "production": "app.fibreflow.app:3008",
-    "qfieldcloud": "qfield.fibreflow.app"
-  },
-  "reporting_endpoints": {
-    "trends": "✅ working",
-    "funnel": "✅ working",
-    "team-performance": "✅ working",
-    "serial-validation": "✅ working",
-    "offline-devices": "✅ working",
-    "resubmissions": "✅ working",
-    "discrepancy": "✅ working (uses waDate param)",
-    "serial-swaps": "✅ FIXED"
+    "staging": "vf.fibreflow.app:3006",
+    "production": "app.fibreflow.app:3000",
+    "dev": "localhost:3005"
   }
 }
