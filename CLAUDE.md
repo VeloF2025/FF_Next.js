@@ -575,6 +575,62 @@ echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
 - Verify test images exist in `/home/velo/scripts/vllm/benchmarks/test-images/`
 - Run manually: `/home/velo/scripts/vllm/benchmark.sh`
 
+## QField Sync (OES to QFieldCloud)
+
+**Status:** ✅ PRODUCTION - OES data syncs to QFieldCloud for mobile viewing
+**Last Updated:** Jan 2026 - Race condition fix applied
+
+### Quick Reference
+- **Webhook:** `http://100.96.203.105:8095`
+- **Trigger:** Auto via OES Import UI, or manual
+- **Script:** `/opt/qfield-sync/sync_oes_db_to_qfield.py`
+- **Logs:** `/var/log/qfield-oes-sync.log`
+- **Data Source:** `v_qfield_oes_activations` view
+- **Skill:** `/Qfield` - Full management commands
+
+### Available Projects
+
+| Project | UUID | Notes |
+|---------|------|-------|
+| **FibreFlow_OES_Automations** | `067b51c8-6e96-4e0c-9462-d4890763758b` | **Current default** - Dedicated sync project |
+| Test_Project__Automations | `e849b878-f8a8-4f84-a3f1-9fbd051686c0` | Has .qgs conflicts - DO NOT USE |
+| OES_Project_Progress | `ad3b1035-ddb3-42a3-8077-175f9400b38a` | Reference project (working example) |
+
+**Collaborators (FibreFlow_OES_Automations):** Jaun (owner), Adminuser, Hein
+
+### How It Works
+1. **OES Import** at `/activate` → OES Import tab
+2. **import-oes.ts** inserts data + calls webhook (fire-and-forget)
+3. **Webhook** runs sync script on Velocity server
+4. **Script** queries Neon DB → creates GeoPackage → uploads via SDK
+5. **CRITICAL:** 10-second waits between uploads to avoid race conditions
+6. **QFieldCloud** triggers `process_projectfile` + `package` jobs
+7. **QField app** syncs to see data on mobile
+
+### Commands
+```bash
+# Check status
+ssh velo@100.96.203.105 "curl -s http://localhost:8095/status"
+
+# Manual sync trigger
+ssh velo@100.96.203.105 "curl -s -X POST http://localhost:8095/sync/oes \
+  -H 'Content-Type: application/json' -d '{\"batchId\": \"manual\"}'"
+
+# View logs
+ssh velo@100.96.203.105 "tail -30 /var/log/qfield-oes-sync.log"
+
+# Change target project (edit script)
+ssh velo@100.96.203.105 "nano /opt/qfield-sync/sync_oes_db_to_qfield.py"
+# Update QFIELD_PROJECT_ID variable
+```
+
+### Troubleshooting
+- **Sync not triggering:** Check webhook health at `:8095/health`
+- **Package not updating:** Check `data_last_packaged_at` via API
+- **Layer `is_valid: False`:** Race condition - ensure 10s waits between uploads
+- **Data not visible:** Verify gpkg filename matches QGIS project layer reference
+- **Full guide:** Run `/Qfield` skill for detailed troubleshooting
+
 ## Arcjet Security
 
 API protection with rate limiting and bot detection:

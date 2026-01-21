@@ -1,6 +1,7 @@
 // Procurement Hooks - Index Export
 
 export { useProcurementPermissions } from './useProcurementPermissions';
+export { useTabPersistence } from './useTabPersistence';
 
 // Placeholder hooks - to be implemented in next phases
 export const useProcurement = () => ({ loading: false, error: null });

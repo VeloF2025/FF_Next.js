@@ -1,42 +1,57 @@
 {
-  "session_id": "2026-01-21-wa-fix",
+  "session_id": "2026-01-21-oes-qfield-sync",
   "started_at": "2026-01-21T17:25:00Z",
-  "last_updated": "2026-01-21T19:22:30.359Z",
+  "last_updated": "2026-01-21T21:48:40.111Z",
   "working_on": {
-    "task": "WhatsApp URL standardization",
+    "task": "OES to QField sync implementation",
     "status": "completed",
     "progress": [
-      "Fixed wa-feedback: SENDER_URL to use 8081 (sender-2)",
-      "Fixed wa-feedback: endpoint /api/send -> /send-message",
-      "Updated wa-feedback to use Tailscale IP 100.96.203.105",
-      "Added recipient_jid field for sender-2 compatibility",
-      "Tested full DR flow: DR1738287 received and acked",
-      "Updated all documentation (CLAUDE.md, README, TROUBLESHOOTING)",
-      "Committed documentation changes"
+      "Created sync script with GeoPackage + SDK upload",
+      "Fixed gpkg filename to match QGIS project expectations",
+      "Configured webhook on port 8095",
+      "Integrated with OES Import UI (auto-trigger)",
+      "Created dedicated project FibreFlow_OES_Automations",
+      "Synced 6850 OES records to new project",
+      "Added Hein as collaborator to project",
+      "Created /Qfield skill for management",
+      "Updated CLAUDE.md with QField documentation",
+      "Fixed timing issues - added 10s waits between uploads",
+      "Fixed SDK job_status call (only takes job_id)",
+      "Verified end-to-end sync working"
     ],
-    "last_action": "KB update - no new learnings to consolidate"
+    "last_action": "Deployed fixed sync script with timing"
   },
-  "wa_services": {
-    "bridge-2": {
-      "port": 8083,
-      "number": "063 841 2276",
-      "purpose": "Receives incoming WhatsApp messages",
-      "status": "running"
-    },
-    "sender-2": {
-      "port": 8081,
-      "number": "063 841 2276",
-      "purpose": "Sends WhatsApp messages via /send-message",
-      "status": "running"
-    },
-    "wa-feedback": {
-      "port": 8092,
-      "sender_url": "http://100.96.203.105:8081",
-      "bridge_url": "http://100.96.203.105:8083",
-      "endpoint": "/send-message",
-      "purpose": "FibreFlow API proxy -> sender-2",
-      "status": "running"
-    }
+  "qfield_sync": {
+    "webhook_port": 8095,
+    "current_project": "067b51c8-6e96-4e0c-9462-d4890763758b",
+    "project_name": "FibreFlow_OES_Automations",
+    "gpkg_filename": "OES_Activations_Sync.gpkg",
+    "layer_name": "OES_Activations",
+    "last_sync": "2026-01-21T22:54:26Z",
+    "records_synced": 6850,
+    "status": "operational",
+    "package_job_status": "finished",
+    "fix_applied": "10s waits between uploads + SDK job_status fix",
+    "collaborators": [
+      "Jaun",
+      "Adminuser",
+      "Hein"
+    ]
+  },
+  "skills_created": [
+    "/Qfield - QField sync management"
+  ],
+  "kb_updated": {
+    "CLAUDE.md": "Updated QField section with race condition fix, correct default project",
+    "Qfield.md": "Added collaborators, timing fix details, layer validity troubleshooting",
+    "timestamp": "2026-01-21T23:10:00Z"
+  },
+  "kb_scan_results": {
+    "timestamp": "2026-01-21T22:05:00Z",
+    "total_modules": 42,
+    "modules_with_claude_md": 42,
+    "coverage": "100%",
+    "learnings_consolidated": 0
   },
   "context": {
     "project": "FibreFlow",
@@ -45,9 +60,9 @@
   "infrastructure": {
     "server": "100.96.203.105 (Velocity)",
     "vlm": "Qwen3-VL-8B on port 8100",
+    "qfield_webhook": "port 8095",
     "database": "Neon PostgreSQL (production branch)",
     "staging": "vf.fibreflow.app:3006",
-    "production": "app.fibreflow.app:3000",
-    "dev": "localhost:3005"
+    "production": "app.fibreflow.app:3000"
   }
 }

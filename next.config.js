@@ -100,10 +100,10 @@ const nextConfig = {
     ];
   },
 
-  // Redirects for backwards compatibility (dr-photo-unified → activate)
+  // Redirects for backwards compatibility
   async redirects() {
     return [
-      // Page redirects
+      // dr-photo-unified → activate redirects
       {
         source: '/dr-photo-unified',
         destination: '/activate',
@@ -114,10 +114,90 @@ const nextConfig = {
         destination: '/activate/:path*',
         permanent: true,
       },
-      // API redirects
       {
         source: '/api/dr-photo-unified/:path*',
         destination: '/api/activate/:path*',
+        permanent: true,
+      },
+
+      // Procurement menu restructure redirects (old list pages → new tab pages)
+      // Sourcing
+      {
+        source: '/suppliers',
+        destination: '/procurement/sourcing?tab=suppliers',
+        permanent: true,
+      },
+      {
+        source: '/procurement/boq',
+        destination: '/procurement/sourcing?tab=boq',
+        permanent: true,
+      },
+      {
+        source: '/procurement/rfq',
+        destination: '/procurement/sourcing?tab=rfq',
+        permanent: true,
+      },
+      // Purchasing
+      {
+        source: '/procurement/quotes',
+        destination: '/procurement/purchasing?tab=quotes',
+        permanent: true,
+      },
+      {
+        source: '/procurement/requisitions',
+        destination: '/procurement/purchasing?tab=requisitions',
+        permanent: true,
+      },
+      {
+        source: '/procurement/purchase-orders',
+        destination: '/procurement/purchasing?tab=purchase-orders',
+        permanent: true,
+      },
+      {
+        source: '/procurement/grn',
+        destination: '/procurement/purchasing?tab=grn',
+        permanent: true,
+      },
+      // Inventory
+      {
+        source: '/procurement/stock',
+        destination: '/procurement/inventory?tab=stock',
+        permanent: true,
+      },
+      {
+        source: '/procurement/stock-items',
+        destination: '/procurement/inventory?tab=items',
+        permanent: true,
+      },
+      {
+        source: '/procurement/stock-categories',
+        destination: '/procurement/inventory?tab=categories',
+        permanent: true,
+      },
+      {
+        source: '/procurement/bundles',
+        destination: '/procurement/inventory?tab=bundles',
+        permanent: true,
+      },
+      {
+        source: '/procurement/stock-takes',
+        destination: '/procurement/inventory?tab=takes',
+        permanent: true,
+      },
+      {
+        source: '/procurement/field-stock',
+        destination: '/procurement/inventory?tab=field',
+        permanent: true,
+      },
+      // Financial
+      {
+        source: '/procurement/budget',
+        destination: '/procurement/financial?tab=budget',
+        permanent: true,
+      },
+      {
+        source: '/procurement/cost-centers',
+        destination: '/procurement/financial?tab=cost-centers',
         permanent: true,
       },
     ];

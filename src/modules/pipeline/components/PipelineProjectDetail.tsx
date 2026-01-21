@@ -35,6 +35,7 @@ import type {
   ApprovalStatus,
 } from '../types';
 import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
+import { ProjectDocumentManager } from './ProjectDocumentManager';
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
   new: 'New',
@@ -559,6 +560,16 @@ export function PipelineProjectDetail() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Documents Section */}
+        <div className="mt-6">
+          <ProjectDocumentManager
+            projectId={id as string}
+            projectName={project.project_name}
+            currentUserId={currentUser?.id}
+            readonly={false}
+          />
         </div>
       </div>
 

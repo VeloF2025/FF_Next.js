@@ -405,7 +405,14 @@
       "Bash(do echo \"=== $dr ===\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''$dr''''&token=$TOKEN\")",
       "WebFetch(domain:app.smartsheet.com)",
       "Bash(SMARTSHEET_API_TOKEN='X6McWWfPeBK7G3t7c5qIwQUfJu2gGbtatV2sz' DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node:*)",
-      "Bash(SMARTSHEET_API_TOKEN='X6McWWfPeBK7G3t7c5qIwQUfJu2gGbtatV2sz' DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node scripts/test-smartsheet-sync.js)"
+      "Bash(SMARTSHEET_API_TOKEN='X6McWWfPeBK7G3t7c5qIwQUfJu2gGbtatV2sz' DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node scripts/test-smartsheet-sync.js)",
+      "Bash(TOKEN=\"faac7ae2-6e22-40c7-95c2-03649ece63d1\" for dr in DR1738371 DR1738343 DR1735418)",
+      "Bash(do echo \"=== Checking $dr in OneMap ===\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''$dr''''&token=$TOKEN\")",
+      "Bash(do echo \"=== Checking $dr ===\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''$dr''''&token=$TOKEN\")",
+      "Bash(src/modules/pipeline/services/pipelineDocumentSyncService.ts )",
+      "Bash(src/modules/pipeline/services/index.ts )",
+      "Bash(pages/api/pipeline/smartsheet/sync-documents.ts)",
+      "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"'' && sudo systemctl restart fibreflow.service\")"
     ],
     "deny": [],
     "ask": [],

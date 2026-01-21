@@ -9,3 +9,4 @@ export { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 export { DocumentManager } from './DocumentManager';
 export { AlertsDashboard } from './AlertsDashboard';
 export { SmartsheetSyncPanel } from './SmartsheetSyncPanel';
+export { ProjectDocumentManager } from './ProjectDocumentManager';
