@@ -120,7 +120,7 @@ export const QFieldDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/system/qfield');
+      const response = await fetch('/api/qfield');
       if (!response.ok) throw new Error('Failed to fetch health status');
       const data = await response.json();
       setHealth(data.data);
@@ -142,7 +142,7 @@ export const QFieldDashboard: React.FC = () => {
     try {
       setSyncing(true);
       setActionMessage(null);
-      const response = await fetch('/api/system/qfield', {
+      const response = await fetch('/api/qfield', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync' }),
@@ -168,7 +168,7 @@ export const QFieldDashboard: React.FC = () => {
     try {
       setClearing(true);
       setActionMessage(null);
-      const response = await fetch('/api/system/qfield', {
+      const response = await fetch('/api/qfield', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear-jobs' }),
@@ -193,7 +193,7 @@ export const QFieldDashboard: React.FC = () => {
     try {
       setRestarting(service);
       setActionMessage(null);
-      const response = await fetch('/api/system/qfield', {
+      const response = await fetch('/api/qfield', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'restart-service', service }),

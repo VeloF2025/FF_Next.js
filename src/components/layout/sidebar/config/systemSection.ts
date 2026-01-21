@@ -32,7 +32,7 @@ export const systemSection: NavSection = {
       external: true,
     },
     {
-      to: '/system/qfield',
+      to: '/qfield',
       icon: MapPin,
       label: 'QField Monitor',
       shortLabel: 'QField',
