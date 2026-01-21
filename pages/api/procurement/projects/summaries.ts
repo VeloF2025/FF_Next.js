@@ -33,14 +33,14 @@ export default async function handler(
           SELECT SUM(bi.amount)
           FROM boq_items bi
           JOIN boqs b ON bi.boq_id = b.id
-          WHERE b.project_id = p.id
+          WHERE b.project_id::uuid = p.id
         ), 0) as boq_value,
 
         -- Active RFQs: Count of non-closed/cancelled RFQs
         COALESCE((
           SELECT COUNT(*)
           FROM rfqs r
-          WHERE r.project_id = p.id
+          WHERE r.project_id::uuid = p.id
           AND r.status NOT IN ('closed', 'cancelled', 'awarded')
         ), 0) as active_rfqs,
 

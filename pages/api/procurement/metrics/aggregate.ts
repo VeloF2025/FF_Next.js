@@ -32,7 +32,7 @@ export default async function handler(
       SELECT COALESCE(SUM(bi.amount), 0) as total_value
       FROM boq_items bi
       JOIN boqs b ON bi.boq_id = b.id
-      JOIN projects p ON b.project_id = p.id
+      JOIN projects p ON b.project_id::uuid = p.id
       WHERE p.status = 'active'
     `;
 
