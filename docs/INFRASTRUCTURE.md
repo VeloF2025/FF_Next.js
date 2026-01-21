@@ -99,8 +99,83 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-productio
 | Grafana (Docker) | 3030 | Monitoring dashboards |
 | Prometheus (Docker) | 9091 | Metrics collection |
 | xyOps (Docker) | 5522 | Server monitoring |
-| QFieldCloud (Docker) | 8082 | QField sync server |
 | Qdrant | 6333, 6334 | Vector database |
+
+---
+
+## QFieldCloud Infrastructure
+
+Self-hosted QFieldCloud for mobile GIS field data collection.
+
+**Location:** `/home/louis/qfieldcloud/`
+**Access URL:** `http://100.96.203.105:8082`
+
+### QFieldCloud Docker Containers
+
+| Container | Port | Purpose |
+|-----------|------|---------|
+| `qfieldcloud-nginx-1` | 8082→80 | Web frontend/proxy |
+| `qfieldcloud-app-1` | 8000 (internal) | Django application |
+| `qfieldcloud-db-1` | 5433→5432 | PostgreSQL database |
+| `qfieldcloud-minio-1` | 8009→9000, 8010→9001 | Object storage (S3-compatible) |
+| `qfieldcloud-memcached-1` | 11211 (internal) | Caching |
+| `qfieldcloud-certbot-1` | - | SSL certificates |
+| `qfieldcloud-ofelia-1` | - | Cron scheduler |
+| `qfieldcloud-worker_wrapper-[1-8]` | - | Background workers (8 instances) |
+
+### QFieldCloud Management
+
+```bash
+# Check status
+docker ps --filter 'name=qfieldcloud'
+
+# View logs
+docker logs -f qfieldcloud-app-1
+
+# Restart all services
+cd /home/louis/qfieldcloud/source && docker-compose restart
+
+# Access PostgreSQL
+docker exec -it qfieldcloud-db-1 psql -U qfieldcloud
+```
+
+### QField Sync Module
+
+The FibreFlow QField Sync module provides bidirectional sync between QFieldCloud and FibreFlow.
+
+**Module Documentation:** `src/modules/qfield-sync/README.md`
+**Module Context:** `.claude/modules/qfield-sync.md`
+
+**Key Features:**
+- Sync fiber cables, poles, splice closures from field
+- Conflict detection and resolution
+- Real-time status updates
+
+**API Endpoints:**
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/qfield-sync-dashboard` | Dashboard data |
+| `POST /api/qfield-sync-start` | Start sync job |
+| `GET /api/qfield-sync-current` | Current job status |
+| `GET /api/qfield-sync-history` | Sync history |
+| `POST /api/qfield-sync-cancel` | Cancel sync |
+| `GET /api/qfield-sync-poles` | QField pole data |
+| `GET /api/qfield-sync-cables` | QField cable data |
+
+**Database Tables:**
+- `qfield_sync_jobs` - Sync operation tracking
+- `qfield_sync_conflicts` - Conflict detection
+- `sow_fibre` - Target for cable sync
+- `sow_poles` - Target for pole sync
+
+**Environment Variables:**
+```bash
+NEXT_PUBLIC_QFIELD_URL=https://qfield.fibreflow.app
+NEXT_PUBLIC_QFIELD_PROJECT_ID=your_project_id
+QFIELD_API_KEY=your_api_key
+```
+
+> **Note:** Pole-to-Fiber linking is **PLANNED** but not yet implemented. See `src/modules/qfield-sync/README.md` lines 230-465 for implementation plan.
 
 ---
 
