@@ -12,12 +12,15 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { SwapStatus } from '@/modules/activate/types/reporting.types';
 
-const sql = neon(process.env.DATABASE_URL!);
+// Configure Neon WebSocket
+neonConfig.webSocketConstructor = ws;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 interface UpdateStatusBody {
   dropNumber: string;
@@ -63,9 +66,9 @@ export default async function handler(
       RETURNING drop_number, serial_swap_status
     `;
 
-    const result = await sql(updateQuery, [status, dropNumber]);
+    const result = await pool.query(updateQuery, [status, dropNumber]);
 
-    if (result.length === 0) {
+    if (result.rows.length === 0) {
       return apiResponse.notFound(res, 'Serial swap record', dropNumber);
     }
 
@@ -75,7 +78,7 @@ export default async function handler(
     });
 
     // Also update foto_ai_reviews if it exists
-    await sql(`
+    await pool.query(`
       UPDATE foto_ai_reviews
       SET
         serial_swap_status = $1,

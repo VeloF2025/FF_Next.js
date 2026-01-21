@@ -15,7 +15,8 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type {
@@ -25,7 +26,9 @@ import type {
   SwapStatus,
 } from '@/modules/activate/types/reporting.types';
 
-const sql = neon(process.env.DATABASE_URL!);
+// Configure Neon WebSocket
+neonConfig.webSocketConstructor = ws;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export default async function handler(
   req: NextApiRequest,
@@ -110,8 +113,8 @@ export default async function handler(
       ? [dateFrom, dateTo, project]
       : [dateFrom, dateTo];
 
-    const summaryResult = await sql(summaryQuery, summaryParams);
-    const summaryRow = summaryResult[0] || {};
+    const summaryResult = await pool.query(summaryQuery, summaryParams);
+    const summaryRow = summaryResult.rows[0] || {};
 
     // Get by-project breakdown
     const byProjectQuery = `
@@ -128,9 +131,9 @@ export default async function handler(
       ORDER BY total DESC
     `;
 
-    const byProjectResult = await sql(byProjectQuery, [dateFrom, dateTo]);
+    const byProjectResult = await pool.query(byProjectQuery, [dateFrom, dateTo]);
     const byProject: Record<string, { pending: number; corrected: number; total: number }> = {};
-    for (const row of byProjectResult) {
+    for (const row of byProjectResult.rows) {
       if (row.project) {
         byProject[row.project] = {
           pending: Number(row.pending) || 0,
@@ -158,8 +161,8 @@ export default async function handler(
       FROM dr_photo_unified_reviews
       WHERE ${whereClause}
     `;
-    const countResult = await sql(countQuery, params);
-    const totalCount = Number(countResult[0]?.count) || 0;
+    const countResult = await pool.query(countQuery, params);
+    const totalCount = Number(countResult.rows[0]?.count) || 0;
 
     // Get paginated records
     const recordsQuery = `
@@ -188,9 +191,9 @@ export default async function handler(
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
-    const recordsResult = await sql(recordsQuery, [...params, pageSizeNum, offset]);
+    const recordsResult = await pool.query(recordsQuery, [...params, pageSizeNum, offset]);
 
-    const records: SerialSwapRecord[] = recordsResult.map((row) => ({
+    const records: SerialSwapRecord[] = recordsResult.rows.map((row) => ({
       drop_number: row.drop_number,
       project: row.project,
       zone_no: row.zone_no ? Number(row.zone_no) : null,
