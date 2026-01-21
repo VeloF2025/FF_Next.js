@@ -19,7 +19,7 @@ import {
 } from 'recharts';
 
 // API configuration
-const API_BASE = 'http://localhost:8001/api/dashboard';
+const API_BASE = 'http://100.96.203.105:8001/api/dashboard';
 
 // Color palette
 const COLORS = {

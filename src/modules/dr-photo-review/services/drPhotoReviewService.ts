@@ -15,7 +15,7 @@ import type {
 
 // Use local API proxy to avoid CORS issues
 const API_BASE = '/api/dr-dashboard';
-const BACKEND_BASE = 'http://localhost:8082/api/v1/dr-dashboard';
+const BACKEND_BASE = 'http://100.96.203.105:8082/api/v1/dr-dashboard';
 const DEFAULT_PROJECT = 'VPS';
 
 /**

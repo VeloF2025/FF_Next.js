@@ -12,7 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 
 // Internal dr-photo-api endpoint (accessible from server only)
-const INTERNAL_PHOTO_API = process.env.DR_PHOTO_API_URL || 'http://localhost:8003';
+const INTERNAL_PHOTO_API = process.env.DR_PHOTO_API_URL || 'http://100.96.203.105:8003';
 
 export default async function handler(
   req: NextApiRequest,

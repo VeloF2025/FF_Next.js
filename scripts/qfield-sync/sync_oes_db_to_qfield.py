@@ -58,7 +58,10 @@ QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/
 UPLOAD_QGS = os.environ.get('UPLOAD_QGS', 'false').lower() == 'true'
 
 OUTPUT_DIR = '/tmp/qfield_oes_sync'
-LAYER_NAME = 'OES_Activations'
+# MUST match the existing QGIS project's layer reference:
+# source="./OES_Test_Data.gpkg|layername=OLT_Points"
+GPKG_FILENAME = 'OES_Test_Data.gpkg'  # Filename expected by existing .qgs
+LAYER_NAME = 'OLT_Points'  # Layer name expected by existing .qgs
 PROJECT_NAME = 'OES_Activations_Sync'
 
 
@@ -466,7 +469,7 @@ def main():
         # Step 2: Create output directory
         os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-        gpkg_filename = f"{LAYER_NAME}.gpkg"
+        gpkg_filename = GPKG_FILENAME  # Use configured filename to match existing .qgs
         qgs_filename = f"{PROJECT_NAME}.qgs"
         gpkg_path = os.path.join(OUTPUT_DIR, gpkg_filename)
         qgs_path = os.path.join(OUTPUT_DIR, qgs_filename)

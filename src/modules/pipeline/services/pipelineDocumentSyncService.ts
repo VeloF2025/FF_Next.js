@@ -182,17 +182,20 @@ async function uploadToStorage(
   fileBuffer: Buffer,
   mimeType: string
 ): Promise<{ url: string; path: string }> {
+  // Use node-fetch with proper FormData handling
+  const nodeFetch = (await import('node-fetch')).default;
   const formData = new FormData();
   formData.append('file', fileBuffer, {
     filename,
     contentType: mimeType,
+    knownLength: fileBuffer.length,
   });
 
-  const response = await fetch(
+  const response = await nodeFetch(
     `${STORAGE_API_BASE}/upload/pipeline/${projectId}`,
     {
       method: 'POST',
-      body: formData as unknown as BodyInit,
+      body: formData,
       headers: formData.getHeaders(),
     }
   );
@@ -202,7 +205,7 @@ async function uploadToStorage(
     throw new Error(`Storage upload failed: ${error}`);
   }
 
-  const result = await response.json();
+  const result = await response.json() as { url: string; path: string };
   return {
     url: result.url,
     path: result.path,

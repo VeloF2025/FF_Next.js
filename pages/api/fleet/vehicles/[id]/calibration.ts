@@ -15,7 +15,7 @@ import FormData from 'form-data';
 const sql = neon(process.env.DATABASE_URL!);
 
 // VF Storage Service configuration
-const STORAGE_SERVICE_URL = process.env.STORAGE_SERVICE_URL || 'http://localhost:8091';
+const STORAGE_SERVICE_URL = process.env.STORAGE_SERVICE_URL || 'http://100.96.203.105:8091';
 const STORAGE_PUBLIC_URL = process.env.STORAGE_PUBLIC_URL || '/storage';
 
 interface CalibrationStatus {

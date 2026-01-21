@@ -1,6 +1,6 @@
 /**
  * API Proxy for DR Dashboard Backend
- * Forwards requests to localhost:8082
+ * Forwards requests to 100.96.203.105:8082 (Tailscale)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
