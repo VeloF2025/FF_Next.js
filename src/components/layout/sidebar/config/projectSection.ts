@@ -10,7 +10,8 @@ import {
   Droplets,
   FileSignature,
   LayoutDashboard,
-  ArrowDownUp
+  ArrowDownUp,
+  GitBranch
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -24,6 +25,13 @@ export const projectSection: NavSection = {
       icon: LayoutDashboard,
       label: 'Projects',
       shortLabel: 'Proj',
+      permissions: [],
+    },
+    {
+      to: '/pipeline',
+      icon: GitBranch,
+      label: 'Pipeline',
+      shortLabel: 'Pipe',
       permissions: [],
     },
     {
