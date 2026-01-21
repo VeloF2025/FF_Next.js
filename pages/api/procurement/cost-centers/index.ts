@@ -26,7 +26,6 @@ export default async function handler(
 }
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
-  console.log('[cost-centers] handleGet called');
   try {
     const {
       project_id,
@@ -38,8 +37,6 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       page = '1',
       limit = '50',
     } = req.query;
-
-    console.log('[cost-centers] params:', { project_id, type_code, parent_id, is_active, search, include_tree, page, limit });
 
     // If tree view requested, return hierarchical data
     if (include_tree === 'true') {
@@ -93,12 +90,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Count total
     const countQuery = query.replace('SELECT *', 'SELECT COUNT(*)');
-    console.log('[cost-centers] countQuery:', countQuery);
-    console.log('[cost-centers] params:', params);
     const countResult = await sql.query(countQuery, params);
-    console.log('[cost-centers] countResult:', countResult);
     const total = parseInt(countResult[0].count as string) || 0;
-    console.log('[cost-centers] total:', total);
 
     // Add pagination and ordering
     const pageNum = parseInt(page as string) || 1;
@@ -119,14 +112,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     console.error('Cost Centers GET error:', error);
-    // Return detailed error in dev/staging
-    return res.status(500).json({
-      success: false,
-      error: {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      }
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 

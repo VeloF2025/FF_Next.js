@@ -37,6 +37,7 @@ interface OESRow {
   drop_number: string;
   serial_number: string;
   activation_date: string;
+  activation_datetime: string | null; // Full timestamp if available
   olt_address: string;
   ont_rx_sig_dbm: number | null;
   link_budget_ont_olt_db: number | null;
@@ -50,7 +51,7 @@ interface OESRow {
 }
 
 /**
- * Parse Excel serial date to ISO date string
+ * Parse Excel serial date to ISO date string (date only)
  * Excel serial date is days since 1900-01-01 (with a bug for 1900 leap year)
  */
 function excelDateToISO(serial: number): string {
@@ -59,6 +60,18 @@ function excelDateToISO(serial: number): string {
   const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
   const date = new Date(excelEpoch.getTime() + serial * 24 * 60 * 60 * 1000);
   return date.toISOString().split('T')[0];
+}
+
+/**
+ * Parse Excel serial date to full ISO timestamp
+ * Excel stores datetime as fractional days since 1900-01-01
+ * The fractional part represents the time of day
+ */
+function excelDateTimeToISO(serial: number): string {
+  // Excel's epoch is 1900-01-01, but Excel incorrectly treats 1900 as a leap year
+  const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+  const date = new Date(excelEpoch.getTime() + serial * 24 * 60 * 60 * 1000);
+  return date.toISOString();
 }
 
 /**
@@ -79,10 +92,24 @@ function parseOESExcel(filePath: string): OESRow[] {
     const dropNumber = String(row[0] || '').trim();
     if (!dropNumber.startsWith('DR')) continue; // Skip invalid rows
 
+    // Parse activation date/datetime
+    let activationDate: string;
+    let activationDatetime: string | null = null;
+    if (typeof row[2] === 'number') {
+      activationDate = excelDateToISO(row[2]);
+      // If there's a fractional part, it contains time info
+      if (row[2] % 1 !== 0) {
+        activationDatetime = excelDateTimeToISO(row[2]);
+      }
+    } else {
+      activationDate = String(row[2] || '');
+    }
+
     rows.push({
       drop_number: dropNumber,
       serial_number: String(row[1] || '').trim(),
-      activation_date: typeof row[2] === 'number' ? excelDateToISO(row[2]) : String(row[2] || ''),
+      activation_date: activationDate,
+      activation_datetime: activationDatetime,
       olt_address: String(row[3] || '').trim(),
       ont_rx_sig_dbm: row[4] !== undefined ? parseFloat(row[4]) : null,
       link_budget_ont_olt_db: row[5] !== undefined ? parseFloat(row[5]) : null,
@@ -197,13 +224,14 @@ export default async function handler(
 
         chunk.forEach((row, idx) => {
           const dropId = dropsMap.get(row.drop_number) || null;
-          const offset = idx * 15;
-          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15})`);
+          const offset = idx * 16;
+          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16})`);
           values.push(
             row.drop_number,
             dropId,
             row.serial_number,
             row.activation_date,
+            row.activation_datetime, // Full timestamp if available
             row.olt_address,
             row.ont_rx_sig_dbm,
             row.link_budget_ont_olt_db,
@@ -221,7 +249,7 @@ export default async function handler(
         try {
           await pool.query(
             `INSERT INTO oes_activations (
-               drop_number, drop_id, serial_number, activation_date, olt_address,
+               drop_number, drop_id, serial_number, activation_date, activation_datetime, olt_address,
                ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
                status, latitude, longitude, current_ont_rx, team, import_batch_id
              ) VALUES ${placeholders.join(', ')}
@@ -229,6 +257,7 @@ export default async function handler(
                drop_id = COALESCE(EXCLUDED.drop_id, oes_activations.drop_id),
                serial_number = EXCLUDED.serial_number,
                activation_date = EXCLUDED.activation_date,
+               activation_datetime = COALESCE(EXCLUDED.activation_datetime, oes_activations.activation_datetime),
                olt_address = EXCLUDED.olt_address,
                ont_rx_sig_dbm = EXCLUDED.ont_rx_sig_dbm,
                link_budget_ont_olt_db = EXCLUDED.link_budget_ont_olt_db,
@@ -302,6 +331,7 @@ export default async function handler(
 
         // Batch insert OES-only DRs into unified table
         // Photos will be fetched via ensure-data when user opens for QA review
+        // NOTE: submitted_date is NOT set - these DRs were not "submitted" via WhatsApp
         const OES_BATCH_SIZE = 100;
         let oesOnlyCreated = 0;
 
@@ -312,20 +342,19 @@ export default async function handler(
           const placeholders: string[] = [];
 
           chunk.forEach((row, idx) => {
-            // Try to find project from drops table
-            const dropId = dropsMap.get(row.drop_number) || null;
-            const offset = idx * 3;
-            placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3})`);
+            const offset = idx * 2;
+            // is_oes_only is always TRUE for these records
+            placeholders.push(`($${offset + 1}, $${offset + 2}, TRUE)`);
             values.push(
               row.drop_number,
-              row.activation_date, // Use OES activation date as submitted_date
               'OES Import' // Mark source as OES import
+              // NOTE: submitted_date is NOT set - these are OES-only activations
             );
           });
 
           try {
             await pool.query(
-              `INSERT INTO dr_photo_unified_reviews (drop_number, submitted_date, photo_source)
+              `INSERT INTO dr_photo_unified_reviews (drop_number, photo_source, is_oes_only)
                VALUES ${placeholders.join(', ')}
                ON CONFLICT (drop_number) DO NOTHING`,
               values
@@ -337,6 +366,46 @@ export default async function handler(
         }
 
         log.info('OESImport', `Created ${oesOnlyCreated} OES-only unified records`);
+
+        // Add activity log entries for OES activations
+        log.info('OESImport', 'Adding activity log entries for OES activations');
+        const activityChunks = [];
+        for (let i = 0; i < oesOnlyDRs.length; i += OES_BATCH_SIZE) {
+          activityChunks.push(oesOnlyDRs.slice(i, i + OES_BATCH_SIZE));
+        }
+
+        for (const chunk of activityChunks) {
+          const actValues: any[] = [];
+          const actPlaceholders: string[] = [];
+
+          chunk.forEach((row, idx) => {
+            const offset = idx * 4;
+            actPlaceholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}::jsonb, $${offset + 4})`);
+            actValues.push(
+              row.drop_number,
+              'oes_activated',
+              JSON.stringify({
+                activation_date: row.activation_date,
+                activation_datetime: row.activation_datetime,
+                serial_number: row.serial_number,
+                team: row.team,
+                olt_address: row.olt_address,
+                source: 'OES Import'
+              }),
+              'system'
+            );
+          });
+
+          try {
+            await pool.query(
+              `INSERT INTO dr_activity_log (drop_number, event_type, event_data, actor)
+               VALUES ${actPlaceholders.join(', ')}`,
+              actValues
+            );
+          } catch (actErr) {
+            log.error('OESImport', 'Error adding activity log entries', actErr);
+          }
+        }
       }
 
       log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, errors: errors.length });

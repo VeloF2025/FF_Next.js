@@ -437,14 +437,17 @@ async function calculateSummary(filters?: {
   };
 
   // Conditions for dr_photo_unified_reviews (INSTALLED)
+  // IMPORTANT: Use submitted_date directly, NOT created_at fallback for INSTALLED count
+  // OES-only records have submitted_date = NULL and should NOT be counted as "installed"
   const unifiedCond = buildConditions(
-    'COALESCE(submitted_date, created_at::DATE)',
+    'submitted_date',
     'project'
   );
   // Conditions for OES activations (ACTIVATED - independent date context)
   const oesCond = buildConditions('activation_date', 'upr.project');
 
   // Query 1: INSTALLED - DRs from WhatsApp (dr_photo_unified_reviews)
+  // EXCLUDES OES-only records (is_oes_only = TRUE means no WhatsApp submission)
   // Also gets complete/incomplete counts based on vlm_categorization_status
   const installedQuery = `
     SELECT
@@ -456,7 +459,7 @@ async function calculateSummary(filters?: {
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'categorized' OR vlm_categorization_status = 'approved') as vlm_categorized,
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'failed') as vlm_failed
     FROM dr_photo_unified_reviews
-    ${unifiedCond.whereClause}
+    ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
   `;
 
   // Query 2: ACTIVATED - DRs in OES filtered by OES activation_date (independent)
@@ -579,9 +582,11 @@ async function getProjectStats(filters?: {
   };
 
   // Conditions based on unified table's submitted_date (first submission)
-  const unifiedCond = buildConditions('COALESCE(submitted_date, created_at::DATE)', 'project');
+  // IMPORTANT: Use submitted_date directly - OES-only records have NULL submitted_date
+  const unifiedCond = buildConditions('submitted_date', 'project');
 
   // Query 1: INSTALLED from dr_photo_unified_reviews with reviewed count
+  // EXCLUDES OES-only records (is_oes_only = TRUE means no WhatsApp submission)
   // Reviewed = feedback_sent = true (QA has reviewed and sent feedback)
   const installedQuery = `
     SELECT
@@ -589,7 +594,7 @@ async function getProjectStats(filters?: {
       COUNT(*) as installed,
       COUNT(*) FILTER (WHERE feedback_sent = true) as reviewed
     FROM dr_photo_unified_reviews
-    ${unifiedCond.whereClause}
+    ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
