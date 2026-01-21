@@ -71,35 +71,39 @@ export default function ProjectsPage() {
       </div>
 
       {/* WA Monitor Stats Card */}
-      {waStats && (
-        <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-[var(--ff-text-secondary)]">QA Drops Today</p>
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">
-                {waStats.total.toLocaleString()}
-              </p>
-              {waStats.total > 0 && (
-                <>
-                  <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
-                    {waStats.complete} Complete • {waStats.incomplete} Incomplete
-                  </p>
-                  <div className="flex items-center mt-2">
-                    <span className={`text-sm font-medium ${
-                      waStats.completionRate >= 80 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {waStats.completionRate >= 80 ? '↑' : '↓'} {waStats.completionRate}% Complete
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="h-12 w-12 bg-purple-500/20 rounded-full flex items-center justify-center flex-shrink-0 ml-4">
-              <CheckCircle className="h-6 w-6 text-purple-400" />
-            </div>
+      <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-sm text-[var(--ff-text-secondary)]">QA Drops Today</p>
+            {waStats ? (
+              <>
+                <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">
+                  {waStats.total.toLocaleString()}
+                </p>
+                {waStats.total > 0 && (
+                  <>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+                      {waStats.complete} Complete • {waStats.incomplete} Incomplete
+                    </p>
+                    <div className="flex items-center mt-2">
+                      <span className={`text-sm font-medium ${
+                        waStats.completionRate >= 80 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {waStats.completionRate >= 80 ? '↑' : '↓'} {waStats.completionRate}% Complete
+                      </span>
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="h-8 w-16 bg-[var(--ff-bg-tertiary)] rounded animate-pulse mt-1" />
+            )}
+          </div>
+          <div className="h-12 w-12 bg-purple-500/20 rounded-full flex items-center justify-center flex-shrink-0 ml-4">
+            <CheckCircle className="h-6 w-6 text-purple-400" />
           </div>
         </div>
-      )}
+      </div>
 
       {/* Filters and Actions */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
@@ -204,8 +208,29 @@ export default function ProjectsPage() {
       {/* Projects List */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg overflow-hidden border border-[var(--ff-border-light)]">
         {isLoading ? (
-          <div className="p-8 text-center">
-            <p className="text-[var(--ff-text-secondary)]">Loading projects...</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+              <thead className="bg-[var(--ff-bg-tertiary)]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
+                {[...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-6 py-4"><div className="h-4 w-32 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-48 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /></td>
+                    <td className="px-6 py-4"><div className="h-5 w-16 bg-[var(--ff-bg-tertiary)] rounded-full animate-pulse" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-24 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /></td>
+                    <td className="px-6 py-4 text-right"><div className="h-4 w-12 bg-[var(--ff-bg-tertiary)] rounded animate-pulse ml-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : error ? (
           <div className="p-8 text-center">
