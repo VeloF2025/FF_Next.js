@@ -17,7 +17,7 @@ const pool = new Pool({
 });
 
 // Service URLs - use Tailscale IP for consistency across environments
-const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://100.96.203.105:8081';
+const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://72.61.197.178:8081';
 
 export default async function handler(
   req: NextApiRequest,

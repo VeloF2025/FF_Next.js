@@ -21,8 +21,8 @@ const pool = new Pool({
 
 // Default service URLs
 const DEFAULT_URLS: Record<string, string> = {
-  sender: 'http://100.96.203.105:8081',
-  bridge: 'http://100.96.203.105:8083',
+  sender: 'http://72.61.197.178:8081',
+  bridge: 'http://72.61.197.178:8083',
 };
 
 interface LogoutResponse {

@@ -22,10 +22,11 @@ const pool = new Pool({
 });
 
 // Default service configurations (will be overridden by database values)
-const DEFAULT_BRIDGE_URL = 'http://192.168.1.150:8083';
-const DEFAULT_SENDER_URL = 'http://192.168.1.150:8081';
-const DEFAULT_BRIDGE_PHONE = '+27711796125';
-const DEFAULT_SENDER_PHONE = '+27711558396';
+// VPS URLs (Jan 2026 migration)
+const DEFAULT_BRIDGE_URL = 'http://72.61.197.178:8083';
+const DEFAULT_SENDER_URL = 'http://72.61.197.178:8081';
+const DEFAULT_BRIDGE_PHONE = '+27638412276';
+const DEFAULT_SENDER_PHONE = '+27638412276';
 
 export default async function handler(
   req: NextApiRequest,
