@@ -24,6 +24,7 @@ import type {
   ZoneBreakdown,
   PonBreakdown,
   PoleBreakdown,
+  DrBreakdown,
   AnomalyCounts,
   DiscrepancyReportResponse,
   DiscrepancyRecord,
@@ -88,7 +89,7 @@ export async function getDailyCountsWithBreakdown(
 
     // Query 1: Get INSTALLED DRs with reviewed/notReviewed status
     // Uses dr_photo_unified_reviews.submitted_date (first submission date, preserved on resubmission)
-    // Includes pole_no for pole-level breakdown
+    // Includes pole_no for pole-level breakdown and DR-level details
     const installedResult = await pool.query(
       `
       SELECT
@@ -100,7 +101,9 @@ export async function getDailyCountsWithBreakdown(
         CASE
           WHEN upr.feedback_sent = true THEN true
           ELSE false
-        END as is_reviewed
+        END as is_reviewed,
+        COALESCE(upr.submitted_date, upr.created_at::DATE) as installed_at,
+        upr.qa_decision
       FROM dr_photo_unified_reviews upr
       LEFT JOIN drops d ON d.drop_number = upr.drop_number
       WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
@@ -120,7 +123,7 @@ export async function getDailyCountsWithBreakdown(
         COALESCE(upr.project, 'Unknown') as project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
-        d.pole_no as pole_no
+        d.pole_number as pole_no
       FROM oes_activations oes
       LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
       LEFT JOIN drops d ON d.drop_number = oes.drop_number
@@ -256,6 +259,7 @@ export async function getDailyCountsWithBreakdown(
             activated: 0,
             notReviewed: 0,
             reviewed: 0,
+            drs: [],
             anomalies: emptyAnomalies(),
           };
           pon.poles.push(pole);
@@ -274,6 +278,22 @@ export async function getDailyCountsWithBreakdown(
         } else {
           pole.notReviewed++;
         }
+
+        // Add individual DR to pole
+        if (!pole.drs) pole.drs = [];
+        const qaDecision = row.qa_decision?.toLowerCase() || null;
+        pole.drs.push({
+          drop_number: row.drop_number,
+          is_installed: true,
+          is_activated: isActivated,
+          is_reviewed: isReviewed,
+          installed_at: row.installed_at ? String(row.installed_at) : null,
+          activated_at: null, // Will be populated from OES query if needed
+          qa_status: qaDecision === 'pass' ? 'pass'
+            : qaDecision === 'fail' ? 'fail'
+            : qaDecision === 'rework' || qaDecision === 'rework_needed' ? 'rework'
+            : 'pending',
+        });
       }
     }
 
@@ -362,6 +382,7 @@ export async function getDailyCountsWithBreakdown(
             activated: 0,
             notReviewed: 0,
             reviewed: 0,
+            drs: [],
             anomalies: emptyAnomalies(),
           };
           pon.poles.push(pole);
@@ -371,10 +392,22 @@ export async function getDailyCountsWithBreakdown(
         pole.total++;
         pole.activated++;
         pole.anomalies!.oes_only++;
+
+        // Add individual DR to pole (OES-only - activated but not installed via WA)
+        if (!pole.drs) pole.drs = [];
+        pole.drs.push({
+          drop_number: row.drop_number,
+          is_installed: false,
+          is_activated: true,
+          is_reviewed: false,
+          installed_at: null,
+          activated_at: null, // Would need OES activation_date from query
+          qa_status: 'pending',
+        });
       }
     }
 
-    // Sort zones, PONs, and poles
+    // Sort zones, PONs, poles, and DRs
     for (const projectData of projectMap.values()) {
       projectData.zones.sort((a, b) => a.zone_no - b.zone_no);
       for (const zone of projectData.zones) {
@@ -382,6 +415,12 @@ export async function getDailyCountsWithBreakdown(
         for (const pon of zone.pons) {
           if (pon.poles) {
             pon.poles.sort((a, b) => a.pole_no.localeCompare(b.pole_no));
+            // Sort DRs within each pole by drop_number
+            for (const pole of pon.poles) {
+              if (pole.drs) {
+                pole.drs.sort((a, b) => a.drop_number.localeCompare(b.drop_number));
+              }
+            }
           }
         }
       }

@@ -37,6 +37,26 @@ export interface AnomalyCounts {
 // ============================================================================
 
 /**
+ * Individual DR within a pole
+ */
+export interface DrBreakdown {
+  /** DR number (e.g., "DR1731114") */
+  drop_number: string;
+  /** Installation status */
+  is_installed: boolean;
+  /** Activation status */
+  is_activated: boolean;
+  /** QA review status */
+  is_reviewed: boolean;
+  /** Installation date */
+  installed_at: string | null;
+  /** Activation date */
+  activated_at: string | null;
+  /** QA status label */
+  qa_status: 'pending' | 'pass' | 'fail' | 'rework';
+}
+
+/**
  * Pole breakdown within a PON
  */
 export interface PoleBreakdown {
@@ -54,6 +74,8 @@ export interface PoleBreakdown {
   notReviewed: number;
   /** QA feedback has been sent */
   reviewed: number;
+  /** Individual DRs on this pole (expanded when clicked) */
+  drs?: DrBreakdown[];
   /** Anomaly counts (for Reports tab) */
   anomalies?: AnomalyCounts;
 }

@@ -12,7 +12,7 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown, Upload } from 'lucide-react';
-import type { ZoneBreakdown, PonBreakdown, PoleBreakdown } from '../types/reporting.types';
+import type { ZoneBreakdown, PonBreakdown, PoleBreakdown, DrBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
@@ -70,6 +70,7 @@ function DashboardPageContent() {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
   const [expandedPons, setExpandedPons] = useState<Set<string>>(new Set());
+  const [expandedPoles, setExpandedPoles] = useState<Set<string>>(new Set());
   const [projectZoneData, setProjectZoneData] = useState<Record<string, ZoneBreakdown[]>>({});
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
@@ -199,6 +200,17 @@ function DashboardPageContent() {
     }
     setExpandedPons(newExpanded);
   }, [expandedPons]);
+
+  // Toggle Pole expansion to show individual DRs
+  const togglePole = useCallback((poleKey: string) => {
+    const newExpanded = new Set(expandedPoles);
+    if (newExpanded.has(poleKey)) {
+      newExpanded.delete(poleKey);
+    } else {
+      newExpanded.add(poleKey);
+    }
+    setExpandedPoles(newExpanded);
+  }, [expandedPoles]);
 
   // Export filtered data to CSV
   const handleExport = useCallback(async () => {
@@ -708,24 +720,92 @@ function DashboardPageContent() {
                                           </tr>
 
                                           {/* Pole Rows (when PON expanded) */}
-                                          {isPonExpanded && pon.poles?.map((pole) => (
-                                            <tr
-                                              key={`${ponKey}_${pole.pole_no}`}
-                                              className="bg-gray-150 dark:bg-gray-900/60"
-                                            >
-                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">
-                                                <div className="pl-20 flex items-center gap-2">
-                                                  <span className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full" />
-                                                  {pole.pole_name}
-                                                </div>
-                                              </td>
-                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">{pole.total}</td>
-                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-300 dark:text-blue-400">{pole.installed}</td>
-                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-300 dark:text-purple-400">{pole.activated}</td>
-                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-300 dark:text-yellow-400">{pole.notReviewed}</td>
-                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-green-300 dark:text-green-400">{pole.reviewed}</td>
-                                            </tr>
-                                          ))}
+                                          {isPonExpanded && pon.poles?.map((pole) => {
+                                            const poleKey = `${ponKey}_${pole.pole_no}`;
+                                            const isPoleExpanded = expandedPoles.has(poleKey);
+                                            const hasDrs = pole.drs && pole.drs.length > 0;
+
+                                            return (
+                                              <React.Fragment key={poleKey}>
+                                                <tr
+                                                  className={`bg-gray-150 dark:bg-gray-900/60 ${hasDrs ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-900/80' : ''}`}
+                                                  onClick={(e) => { if (hasDrs) { e.stopPropagation(); togglePole(poleKey); } }}
+                                                >
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">
+                                                    <div className="pl-20 flex items-center gap-2">
+                                                      {hasDrs ? (
+                                                        isPoleExpanded ? (
+                                                          <ChevronDown className="h-3 w-3 text-gray-400" />
+                                                        ) : (
+                                                          <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                        )
+                                                      ) : (
+                                                        <span className="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded-full" style={{ width: '8px', height: '8px' }} />
+                                                      )}
+                                                      {pole.pole_name}
+                                                    </div>
+                                                  </td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">{pole.total}</td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-300 dark:text-blue-400">{pole.installed}</td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-300 dark:text-purple-400">{pole.activated}</td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-300 dark:text-yellow-400">{pole.notReviewed}</td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-green-300 dark:text-green-400">{pole.reviewed}</td>
+                                                </tr>
+
+                                                {/* DR Rows (when Pole expanded) */}
+                                                {isPoleExpanded && pole.drs?.map((dr) => (
+                                                  <tr
+                                                    key={`${poleKey}_${dr.drop_number}`}
+                                                    className="bg-gray-200 dark:bg-gray-900/80 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      router.push(`/activate/qa-centre/${dr.drop_number}`);
+                                                    }}
+                                                  >
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                      <div className="pl-28 flex items-center gap-2">
+                                                        <span className="text-blue-500 dark:text-blue-400 hover:underline font-mono">
+                                                          {dr.drop_number}
+                                                        </span>
+                                                        {dr.qa_status === 'pass' && <span className="text-green-500 text-xs">✓</span>}
+                                                        {dr.qa_status === 'fail' && <span className="text-red-500 text-xs">✗</span>}
+                                                        {dr.qa_status === 'rework' && <span className="text-yellow-500 text-xs">↻</span>}
+                                                      </div>
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">-</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                      {dr.is_installed ? (
+                                                        <span className="text-blue-400">✓</span>
+                                                      ) : (
+                                                        <span className="text-gray-500">-</span>
+                                                      )}
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                      {dr.is_activated ? (
+                                                        <span className="text-purple-400">✓</span>
+                                                      ) : (
+                                                        <span className="text-gray-500">-</span>
+                                                      )}
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                      {!dr.is_reviewed ? (
+                                                        <span className="text-yellow-400">●</span>
+                                                      ) : (
+                                                        <span className="text-gray-500">-</span>
+                                                      )}
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                      {dr.is_reviewed ? (
+                                                        <span className="text-green-400">✓</span>
+                                                      ) : (
+                                                        <span className="text-gray-500">-</span>
+                                                      )}
+                                                    </td>
+                                                  </tr>
+                                                ))}
+                                              </React.Fragment>
+                                            );
+                                          })}
                                         </React.Fragment>
                                       );
                                     })}
