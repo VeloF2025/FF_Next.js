@@ -32,7 +32,7 @@ export function DashboardCharts({ projectTrends, kpiDashboard }: DashboardCharts
                 />
                 <YAxis />
                 <Tooltip 
-                  labelFormatter={(value: string | number) => new Date(value).toLocaleDateString()}
+                  labelFormatter={(value: string | number) => new Date(value).toISOString().split('T')[0]}
                 />
                 <Line 
                   type="monotone" 

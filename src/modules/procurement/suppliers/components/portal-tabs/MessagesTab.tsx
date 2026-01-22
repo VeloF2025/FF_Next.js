@@ -61,7 +61,7 @@ export const MessagesTab: React.FC = () => {
                 <p className="text-gray-700">{message.content}</p>
               </div>
               <div className="text-sm text-gray-500">
-                {new Date(message.date).toLocaleDateString()}
+                {new Date(message.date).toISOString().split('T')[0]}
               </div>
             </div>
           </GlassCard>

@@ -92,8 +92,8 @@ export function SOWTable({ sows }: SOWTableProps) {
                   <div className="text-sm text-[var(--ff-text-secondary)]">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {new Date(sow.startDate).toLocaleDateString()} -
-                      {new Date(sow.endDate).toLocaleDateString()}
+                      {new Date(sow.startDate).toISOString().split('T')[0]} -
+                      {new Date(sow.endDate).toISOString().split('T')[0]}
                     </div>
                   </div>
                 </td>

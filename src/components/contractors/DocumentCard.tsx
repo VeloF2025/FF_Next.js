@@ -109,17 +109,17 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
               }`}>
                 <Clock className="h-3.5 w-3.5" />
                 {isExpired ? (
-                  <span>Expired {new Date(document.expiryDate).toLocaleDateString()}</span>
+                  <span>Expired {new Date(document.expiryDate).toISOString().split('T')[0]}</span>
                 ) : isExpiringSoon ? (
-                  <span>Expires in {document.daysUntilExpiry} days ({new Date(document.expiryDate).toLocaleDateString()})</span>
+                  <span>Expires in {document.daysUntilExpiry} days ({new Date(document.expiryDate).toISOString().split('T')[0]})</span>
                 ) : (
-                  <span>Expires {new Date(document.expiryDate).toLocaleDateString()}</span>
+                  <span>Expires {new Date(document.expiryDate).toISOString().split('T')[0]}</span>
                 )}
               </div>
             )}
 
             <div className="text-xs text-[var(--ff-text-tertiary)]">
-              Uploaded {new Date(document.createdAt).toLocaleDateString()} • {
+              Uploaded {new Date(document.createdAt).toISOString().split('T')[0]} • {
                 document.fileSize
                   ? `${(document.fileSize / 1024 / 1024).toFixed(2)} MB`
                   : 'Size unknown'

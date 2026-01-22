@@ -164,11 +164,11 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
           <div className="flex items-center space-x-4 text-sm text-gray-500">
             <span className="flex items-center">
               <Calendar className="w-4 h-4 mr-1" />
-              Sent: {new Date(rfq.sentDate).toLocaleDateString()}
+              Sent: {new Date(rfq.sentDate).toISOString().split('T')[0]}
             </span>
             <span className={cn("flex items-center", isOverdue ? 'text-red-600' : '')}>
               <Clock className="w-4 h-4 mr-1" />
-              Due: {new Date(rfq.dueDate).toLocaleDateString()}
+              Due: {new Date(rfq.dueDate).toISOString().split('T')[0]}
               {isOverdue ? ' (Overdue)' : ` (${daysUntilDue} days)`}
             </span>
             <span className="flex items-center">
@@ -215,7 +215,7 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm text-green-800">
             <CheckCircle className="w-4 h-4 inline mr-1" />
-            Responded on {new Date(rfq.responseDate).toLocaleDateString()}
+            Responded on {new Date(rfq.responseDate).toISOString().split('T')[0]}
           </p>
         </div>
       )}
@@ -278,16 +278,16 @@ function RFQDetailModal({ rfq, onClose }: RFQDetailModalProps) {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Sent Date</label>
-                  <p className="text-sm text-gray-600">{new Date(rfq.sentDate).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-600">{new Date(rfq.sentDate).toISOString().split('T')[0]}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Due Date</label>
-                  <p className="text-sm text-gray-600">{new Date(rfq.dueDate).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-600">{new Date(rfq.dueDate).toISOString().split('T')[0]}</p>
                 </div>
                 {rfq.responseDate && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Response Date</label>
-                    <p className="text-sm text-gray-600">{new Date(rfq.responseDate).toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-600">{new Date(rfq.responseDate).toISOString().split('T')[0]}</p>
                   </div>
                 )}
                 <div>

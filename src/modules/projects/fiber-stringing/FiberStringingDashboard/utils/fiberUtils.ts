@@ -41,7 +41,7 @@ export const calculateStats = (sectionData: FiberSection[]): FiberStats => {
     sectionsInProgress: inProgress,
     sectionsWithIssues: withIssues,
     averageSpeed: avgSpeed,
-    estimatedCompletion: estimatedDate.toLocaleDateString(),
+    estimatedCompletion: estimatedDate.toISOString().split('T')[0],
   };
 };
 

@@ -284,7 +284,7 @@ export function ExitEmployeeModal({
               <div className="flex justify-between">
                 <span>Last Day:</span>
                 <span className="font-medium text-[var(--ff-text-primary)]">
-                  {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                  {endDate ? new Date(endDate).toISOString().split('T')[0] : '-'}
                 </span>
               </div>
               <div className="flex justify-between">

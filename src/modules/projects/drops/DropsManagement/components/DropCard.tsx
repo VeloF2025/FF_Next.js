@@ -73,7 +73,7 @@ export function DropCard({ drop, onDropClick }: DropCardProps) {
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
             <span className="text-[var(--ff-text-secondary)]">
-              {new Date(drop.scheduledDate).toLocaleDateString()}
+              {new Date(drop.scheduledDate).toISOString().split('T')[0]}
             </span>
           </div>
         )}

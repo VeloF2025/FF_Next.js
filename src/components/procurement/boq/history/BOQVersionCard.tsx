@@ -70,7 +70,7 @@ export default function BOQVersionCard({
               <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500">
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-1" />
-                  {new Date(version.createdAt).toLocaleDateString()}
+                  {new Date(version.createdAt).toISOString().split('T')[0]}
                 </div>
                 <div className="flex items-center">
                   <User className="h-4 w-4 mr-1" />

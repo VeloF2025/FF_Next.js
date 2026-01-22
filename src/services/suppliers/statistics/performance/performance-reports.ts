@@ -51,7 +51,7 @@ export class PerformanceReportsGenerator {
   static generateBenchmarksSummaryReport(benchmarks: PerformanceBenchmarks): string {
     let report = `Performance Benchmarks Report\n`;
     report += `${'='.repeat(40)}\n`;
-    report += `Generated: ${new Date(benchmarks.lastUpdated).toLocaleDateString()}\n\n`;
+    report += `Generated: ${new Date(benchmarks.lastUpdated).toISOString().split('T')[0]}\n\n`;
 
     report += `Overall Performance:\n`;
     report += this.formatBenchmarkStats(benchmarks.overall);
@@ -113,7 +113,7 @@ export class PerformanceReportsGenerator {
   ): string {
     let report = `COMPREHENSIVE PERFORMANCE ANALYSIS REPORT\n`;
     report += `${'='.repeat(50)}\n`;
-    report += `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n\n`;
+    report += `Generated: ${new Date().toISOString().split('T')[0]} ${new Date().toTimeString().slice(0, 5)}\n\n`;
 
     // Executive Summary
     report += `EXECUTIVE SUMMARY\n`;

@@ -23,7 +23,7 @@ export function PoleQuality({ qualityChecks }: PoleQualityProps) {
             <h4 className="ff-quality-title">{check.checkType.replace('_', ' ').toUpperCase()}</h4>
             <p className="ff-quality-meta">
               {check.checkedBy ? `Checked by ${check.checkedBy}` : 'Not checked yet'}
-              {check.checkedAt && ` on ${check.checkedAt.toLocaleDateString()}`}
+              {check.checkedAt && ` on ${check.checkedAt.toISOString().split('T')[0]}`}
             </p>
           </div>
           <div className="ff-quality-badge">

@@ -334,9 +334,9 @@ export function StaffProjectAssignment({ staffId, staffName }: StaffProjectAssig
                       {assignment.startDate && (
                         <span className="inline-flex items-center gap-1 text-xs text-[var(--ff-text-secondary)]">
                           <Calendar className="h-3 w-3" />
-                          {new Date(assignment.startDate).toLocaleDateString()}
+                          {new Date(assignment.startDate).toISOString().split('T')[0]}
                           {assignment.endDate && (
-                            <> - {new Date(assignment.endDate).toLocaleDateString()}</>
+                            <> - {new Date(assignment.endDate).toISOString().split('T')[0]}</>
                           )}
                         </span>
                       )}

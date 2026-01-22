@@ -559,7 +559,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div>
-                          <div>{rfq.responseDeadline.toLocaleDateString()}</div>
+                          <div>{rfq.responseDeadline.toISOString().split('T')[0]}</div>
                           <div className={`text-xs ${rfq.isOverdue ? 'text-red-600' : rfq.daysRemaining <= 2 ? 'text-yellow-600' : 'text-gray-500'}`}>
                             {rfq.isOverdue 
                               ? `${Math.abs(rfq.daysRemaining)} days overdue`

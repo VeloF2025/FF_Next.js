@@ -227,7 +227,7 @@ export async function exportStaffToExcelSecure(staff: StaffMember[]): Promise<Bl
       'Position': member.position || '',
       'Department': member.department || '',
       'Status': member.status,
-      'Start Date': member.startDate ? safeToDate(member.startDate).toLocaleDateString() : '',
+      'Start Date': member.startDate ? safeToDate(member.startDate).toISOString().split('T')[0] : '',
       'Manager': member.managerName || '',
       'Alternative Phone': member.alternativePhone || '',
       'Address': member.address || '',
@@ -239,8 +239,8 @@ export async function exportStaffToExcelSecure(staff: StaffMember[]): Promise<Bl
       'Contract Type': member.contractType || '',
       'Working Hours': member.workingHours || '',
       'Skills': member.skills || '',
-      'Created At': safeToDate(member.createdAt).toLocaleDateString(),
-      'Updated At': safeToDate(member.updatedAt).toLocaleDateString()
+      'Created At': safeToDate(member.createdAt).toISOString().split('T')[0],
+      'Updated At': safeToDate(member.updatedAt).toISOString().split('T')[0]
     }));
     
     // Use secure Excel processor with streaming for large exports

@@ -48,5 +48,5 @@ export function formatRelativeTime(date: Date): string {
   if (diffWeeks < 4) return `${diffWeeks}w ago`;
   if (diffMonths < 12) return `${diffMonths}mo ago`;
   
-  return date.toLocaleDateString();
+  return date.toISOString().split('T')[0];
 }

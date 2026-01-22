@@ -99,7 +99,7 @@ export default function RFQList({
     if (!dateString) return '-';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString();
+    return date.toISOString().split('T')[0];
   };
 
   const handleRFQClick = (rfq: RFQ) => {

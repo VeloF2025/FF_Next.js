@@ -301,7 +301,7 @@ export function RemindersTab() {
                   {reminder.due_date && (
                     <div className="flex items-center text-xs text-[var(--ff-text-tertiary)]">
                       <Calendar className="w-3 h-3 mr-1" />
-                      Due: {new Date(reminder.due_date).toLocaleDateString()}
+                      Due: {new Date(reminder.due_date).toISOString().split('T')[0]}
                     </div>
                   )}
                 </div>

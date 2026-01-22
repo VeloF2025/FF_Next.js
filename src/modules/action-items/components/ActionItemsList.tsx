@@ -130,7 +130,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                         : 'text-[var(--ff-text-secondary)]'
                     }`}
                   >
-                    Due: {new Date(item.due_date).toLocaleDateString()}
+                    Due: {new Date(item.due_date).toISOString().split('T')[0]}
                   </span>
                 )}
               </div>

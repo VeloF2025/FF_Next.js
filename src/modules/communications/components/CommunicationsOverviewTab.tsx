@@ -30,7 +30,7 @@ export function CommunicationsOverviewTab({
                   <h4 className="font-medium">{meeting.title}</h4>
                   <div className="flex items-center mt-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4 mr-1" />
-                    {meeting.date.toLocaleDateString()}
+                    {meeting.date.toISOString().split('T')[0]}
                     <Clock className="w-4 h-4 ml-3 mr-1" />
                     {meeting.time}
                     <Users className="w-4 h-4 ml-3 mr-1" />
@@ -59,7 +59,7 @@ export function CommunicationsOverviewTab({
                     <User className="w-4 h-4 mr-1" />
                     {item.assignee}
                     <Calendar className="w-4 h-4 ml-3 mr-1" />
-                    {item.dueDate.toLocaleDateString()}
+                    {item.dueDate.toISOString().split('T')[0]}
                   </div>
                 </div>
                 <span className={`px-2 py-1 text-xs rounded-full ${getPriorityColor(item.priority)}`}>

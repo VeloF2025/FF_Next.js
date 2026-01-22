@@ -35,17 +35,17 @@ export function ProjectScheduleCard({ project }: ProjectScheduleCardProps) {
             <span className="text-sm">Start Date</span>
           </div>
           <span className="text-sm font-medium text-gray-900">
-            {startDate ? startDate.toLocaleDateString() : 'Not set'}
+            {startDate ? startDate.toISOString().split('T')[0] : 'Not set'}
           </span>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center text-gray-600">
             <Calendar className="h-4 w-4 mr-2" />
             <span className="text-sm">End Date</span>
           </div>
           <span className="text-sm font-medium text-gray-900">
-            {endDate ? endDate.toLocaleDateString() : 'Not set'}
+            {endDate ? endDate.toISOString().split('T')[0] : 'Not set'}
           </span>
         </div>
         

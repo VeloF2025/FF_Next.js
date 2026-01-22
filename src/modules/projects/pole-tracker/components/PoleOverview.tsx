@@ -99,7 +99,7 @@ export function PoleOverview({ pole }: PoleOverviewProps) {
         <div className="ff-info-grid">
           <div className="ff-info-item">
             <span className="ff-info-label">Created:</span>
-            <span className="ff-info-value">{pole.createdAt.toLocaleDateString()}</span>
+            <span className="ff-info-value">{pole.createdAt.toISOString().split('T')[0]}</span>
           </div>
           <div className="ff-info-item">
             <span className="ff-info-label">Created By:</span>
@@ -107,15 +107,15 @@ export function PoleOverview({ pole }: PoleOverviewProps) {
           </div>
           <div className="ff-info-item">
             <span className="ff-info-label">Installed:</span>
-            <span className="ff-info-value">{pole.dateInstalled.toLocaleDateString()}</span>
+            <span className="ff-info-value">{pole.dateInstalled.toISOString().split('T')[0]}</span>
           </div>
           <div className="ff-info-item">
             <span className="ff-info-label">Completed:</span>
-            <span className="ff-info-value">{pole.actualCompletionDate?.toLocaleDateString()}</span>
+            <span className="ff-info-value">{pole.actualCompletionDate?.toISOString().split('T')[0]}</span>
           </div>
           <div className="ff-info-item">
             <span className="ff-info-label">Last Updated:</span>
-            <span className="ff-info-value">{pole.updatedAt.toLocaleDateString()}</span>
+            <span className="ff-info-value">{pole.updatedAt.toISOString().split('T')[0]}</span>
           </div>
           <div className="ff-info-item">
             <span className="ff-info-label">Updated By:</span>

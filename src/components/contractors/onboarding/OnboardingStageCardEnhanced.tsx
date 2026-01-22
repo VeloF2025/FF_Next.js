@@ -219,7 +219,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
                     </p>
                     {isUploaded && doc && (
                       <p className="text-xs text-gray-500">
-                        Uploaded {new Date(doc.createdAt).toLocaleDateString()}
+                        Uploaded {new Date(doc.createdAt).toISOString().split('T')[0]}
                       </p>
                     )}
                   </div>
@@ -242,13 +242,13 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
       {/* Timestamps */}
       <div className="text-xs text-gray-600 space-y-1 mb-3">
         {stage.startedAt && (
-          <div>Started: {new Date(stage.startedAt).toLocaleDateString()}</div>
+          <div>Started: {new Date(stage.startedAt).toISOString().split('T')[0]}</div>
         )}
         {stage.completedAt && (
-          <div>Completed: {new Date(stage.completedAt).toLocaleDateString()}</div>
+          <div>Completed: {new Date(stage.completedAt).toISOString().split('T')[0]}</div>
         )}
         {stage.dueDate && !stage.completedAt && (
-          <div>Due: {new Date(stage.dueDate).toLocaleDateString()}</div>
+          <div>Due: {new Date(stage.dueDate).toISOString().split('T')[0]}</div>
         )}
       </div>
 

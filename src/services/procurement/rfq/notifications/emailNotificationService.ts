@@ -267,7 +267,7 @@ export class EmailNotificationService {
             
             Title: ${rfq[0].title}
             Description: ${rfq[0].description}
-            Response Deadline: ${new Date(rfq[0].response_deadline).toLocaleDateString()}
+            Response Deadline: ${new Date(rfq[0].response_deadline).toISOString().split('T')[0]}
             
             Please log in to the procurement portal to view details and submit your response.
           `,

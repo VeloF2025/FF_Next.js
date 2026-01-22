@@ -214,15 +214,15 @@ export class ProcurementErrorFactory {
     switch (type) {
       case 'expired':
         code = 'QUOTE_EXPIRED';
-        message = deadline 
-          ? `Quote expired on ${deadline.toLocaleDateString()}`
+        message = deadline
+          ? `Quote expired on ${deadline.toISOString().split('T')[0]}`
           : 'Quote has expired';
         break;
-      
+
       case 'deadline_passed':
         code = 'RFQ_DEADLINE_PASSED';
         message = deadline
-          ? `Deadline passed on ${deadline.toLocaleDateString()}`
+          ? `Deadline passed on ${deadline.toISOString().split('T')[0]}`
           : 'Deadline has passed';
         break;
       

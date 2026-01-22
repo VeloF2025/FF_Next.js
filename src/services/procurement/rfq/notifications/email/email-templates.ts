@@ -29,7 +29,7 @@ export class RFQEmailTemplates {
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>RFQ Number:</strong> ${rfq.rfqNumber}</p>
             <p style="margin: 5px 0;"><strong>Project:</strong> ${rfq.projectId}</p>
-            <p style="margin: 5px 0;"><strong>Response Deadline:</strong> ${rfq.responseDeadline?.toLocaleDateString()}</p>
+            <p style="margin: 5px 0;"><strong>Response Deadline:</strong> ${rfq.responseDeadline?.toISOString().split('T')[0]}</p>
           </div>
           
           <p style="color: #666; line-height: 1.5;"><strong>Description:</strong> ${rfq.description}</p>
@@ -68,8 +68,8 @@ export class RFQEmailTemplates {
           
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>RFQ Number:</strong> ${rfq.rfqNumber}</p>
-            <p style="margin: 5px 0;"><strong>Original Deadline:</strong> ${rfq.responseDeadline?.toLocaleDateString()}</p>
-            <p style="margin: 5px 0; color: #28a745;"><strong>New Deadline:</strong> ${newDeadline?.toLocaleDateString() || 'TBD'}</p>
+            <p style="margin: 5px 0;"><strong>Original Deadline:</strong> ${rfq.responseDeadline?.toISOString().split('T')[0]}</p>
+            <p style="margin: 5px 0; color: #28a745;"><strong>New Deadline:</strong> ${newDeadline?.toISOString().split('T')[0] || 'TBD'}</p>
             ${reason ? `<p style="margin: 5px 0;"><strong>Reason:</strong> ${reason}</p>` : ''}
           </div>
           

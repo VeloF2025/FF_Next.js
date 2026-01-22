@@ -317,10 +317,10 @@ export function WaMonitorDashboard() {
               {(filters.dateFrom || filters.dateTo) && (
                 <Typography variant="caption" sx={{ color: 'var(--ff-text-secondary)' }}>
                   {filters.dateFrom && filters.dateTo
-                    ? `${new Date(filters.dateFrom).toLocaleDateString()} - ${new Date(filters.dateTo).toLocaleDateString()}`
+                    ? `${new Date(filters.dateFrom).toISOString().split('T')[0]} - ${new Date(filters.dateTo).toISOString().split('T')[0]}`
                     : filters.dateFrom
-                    ? `From ${new Date(filters.dateFrom).toLocaleDateString()}`
-                    : `Until ${new Date(filters.dateTo!).toLocaleDateString()}`}
+                    ? `From ${new Date(filters.dateFrom).toISOString().split('T')[0]}`
+                    : `Until ${new Date(filters.dateTo!).toISOString().split('T')[0]}`}
                 </Typography>
               )}
             </CardContent>

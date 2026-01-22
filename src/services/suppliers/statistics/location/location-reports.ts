@@ -322,7 +322,7 @@ export class LocationReportsGenerator {
   ): string {
     let report = `LOCATION ANALYSIS - EXECUTIVE SUMMARY\n`;
     report += `${'='.repeat(42)}\n`;
-    report += `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n\n`;
+    report += `Generated: ${new Date().toISOString().split('T')[0]} ${new Date().toTimeString().slice(0, 5)}\n\n`;
 
     // Key findings
     report += `KEY FINDINGS:\n`;

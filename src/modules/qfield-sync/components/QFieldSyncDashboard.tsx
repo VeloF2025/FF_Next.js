@@ -238,7 +238,7 @@ export function QFieldSyncDashboard() {
                     <p className="text-sm text-[var(--ff-text-secondary)] mb-2">{project.description}</p>
                     <div className="flex items-center text-xs text-[var(--ff-text-tertiary)]">
                       <Clock className="h-3 w-3 mr-1" />
-                      {new Date(project.lastModified).toLocaleDateString()}
+                      {new Date(project.lastModified).toISOString().split('T')[0]}
                     </div>
                   </div>
                 ))}

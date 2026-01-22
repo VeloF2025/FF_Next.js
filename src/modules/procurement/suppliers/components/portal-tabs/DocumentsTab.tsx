@@ -74,9 +74,9 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = () => {
                 <div>
                   <h3 className="font-medium text-gray-900">{doc.name}</h3>
                   <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                    <span>Uploaded: {new Date(doc.uploadedDate).toLocaleDateString()}</span>
+                    <span>Uploaded: {new Date(doc.uploadedDate).toISOString().split('T')[0]}</span>
                     {doc.expiryDate && (
-                      <span>Expires: {new Date(doc.expiryDate).toLocaleDateString()}</span>
+                      <span>Expires: {new Date(doc.expiryDate).toISOString().split('T')[0]}</span>
                     )}
                   </div>
                 </div>

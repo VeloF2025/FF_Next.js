@@ -136,8 +136,30 @@ export function ThreeWayAlignmentReport() {
     mutationFn: async (file: File) => {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
+
+      // Auto-detect sheet with FT refs (look for "MNT Tickets Logged" or sheet with FT data)
+      let targetSheet = workbook.SheetNames[0];
+      for (const name of workbook.SheetNames) {
+        // Prefer "MNT Tickets Logged" sheet
+        if (name.toLowerCase().includes('tickets') || name.toLowerCase().includes('mnt')) {
+          const sheet = workbook.Sheets[name];
+          const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+          // Check if this sheet has FT refs
+          for (let r = 1; r < Math.min(10, rows.length); r++) {
+            const row = rows[r] || [];
+            for (const cell of row) {
+              if (String(cell).startsWith('FT')) {
+                targetSheet = name;
+                break;
+              }
+            }
+            if (targetSheet === name) break;
+          }
+        }
+        if (targetSheet !== workbook.SheetNames[0]) break;
+      }
+
+      const sheet = workbook.Sheets[targetSheet];
       const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
 
       // First row is headers

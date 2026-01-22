@@ -121,7 +121,7 @@ export class RfqLifecycleService {
         type: 'deadline_extended',
         recipientType: 'all',
         subject: `RFQ Deadline Extended`,
-        message: `The deadline for RFQ ${rfq.rfqNumber} has been extended to ${newDeadline.toLocaleDateString()}`
+        message: `The deadline for RFQ ${rfq.rfqNumber} has been extended to ${newDeadline.toISOString().split('T')[0]}`
       });
 
       log.info('RFQ deadline extended', { rfqId, newDeadline }, 'RfqLifecycleService');

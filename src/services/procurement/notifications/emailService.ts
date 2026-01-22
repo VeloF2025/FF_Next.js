@@ -59,7 +59,7 @@ export class EmailService {
             supplierName: supplier.company_name,
             rfqNumber: rfq[0].rfq_number,
             rfqTitle: rfq[0].title,
-            responseDeadline: new Date(rfq[0].response_deadline).toLocaleDateString(),
+            responseDeadline: new Date(rfq[0].response_deadline).toISOString().split('T')[0],
             projectName: await this.getProjectName(rfq[0].project_id),
             viewRfqUrl: `${process.env.NEXT_PUBLIC_APP_URL}/supplier/rfq/${rfqId}`,
             description: rfq[0].description,

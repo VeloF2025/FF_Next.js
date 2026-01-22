@@ -67,8 +67,8 @@ export function ProjectHierarchyView({ hierarchy, isLoading }: ProjectHierarchyV
                 <h3 className="ml-3 text-lg font-medium text-gray-900">{phase.name}</h3>
               </div>
               <span className="text-sm text-gray-500">
-                {toDate(phase.startDate)?.toLocaleDateString()} - 
-                {toDate(phase.endDate)?.toLocaleDateString()}
+                {toDate(phase.startDate)?.toISOString().split('T')[0]} -
+                {toDate(phase.endDate)?.toISOString().split('T')[0]}
               </span>
             </div>
             {phase.description && (

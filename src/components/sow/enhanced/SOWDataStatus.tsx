@@ -28,7 +28,7 @@ export function SOWDataStatus({
         <div>
           <span className="text-[var(--ff-text-secondary)]">Last Updated:</span>
           <span className="ml-2 font-medium">
-            {sowData?.poles?.uploadedAt ? new Date(sowData.poles.uploadedAt).toLocaleDateString() : 'Unknown'}
+            {sowData?.poles?.uploadedAt ? new Date(sowData.poles.uploadedAt).toISOString().split('T')[0] : 'Unknown'}
           </span>
         </div>
         <div>

@@ -8,7 +8,7 @@ export const formatFileSize = (bytes: number): string => {
 };
 
 export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString();
+  return new Date(dateString).toISOString().split('T')[0];
 };
 
 export const getDaysUntilExpiry = (expiryDate: string | undefined): number | null => {

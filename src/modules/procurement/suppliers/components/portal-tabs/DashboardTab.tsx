@@ -98,7 +98,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
                     <span className={`text-xs px-2 py-1 rounded-full ${getUrgencyColor(rfq.urgency)}`}>
                       {rfq.urgency}
                     </span>
-                    <span className="text-xs text-gray-500">Due: {new Date(rfq.dueDate).toLocaleDateString()}</span>
+                    <span className="text-xs text-gray-500">Due: {new Date(rfq.dueDate).toISOString().split('T')[0]}</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

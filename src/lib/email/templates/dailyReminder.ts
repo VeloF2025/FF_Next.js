@@ -187,8 +187,8 @@ function formatDate(dateString: string): string {
   } else if (date.getTime() === tomorrow.getTime()) {
     return 'Tomorrow';
   } else if (date < today) {
-    return `Overdue (${date.toLocaleDateString()})`;
+    return `Overdue (${date.toISOString().split('T')[0]})`;
   } else {
-    return date.toLocaleDateString();
+    return date.toISOString().split('T')[0];
   }
 }

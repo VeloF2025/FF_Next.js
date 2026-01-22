@@ -275,7 +275,7 @@ export class RFQLifecycle {
         type: 'rfq_deadline',
         recipientType: 'all',
         subject: 'RFQ Deadline Extended',
-        message: `Deadline extended from ${new Date(previousDeadline).toLocaleDateString()} to ${newDeadline.toLocaleDateString()}. ${reason || ''}`,
+        message: `Deadline extended from ${new Date(previousDeadline).toISOString().split('T')[0]} to ${newDeadline.toISOString().split('T')[0]}. ${reason || ''}`,
         metadata: {
           previousDeadline,
           newDeadline: newDeadline.toISOString(),

@@ -86,7 +86,7 @@ export function ActionItemsByMeeting() {
                 <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">{group.meeting_title}</h2>
                 {group.meeting_date && (
                   <p className="text-sm text-[var(--ff-text-secondary)]">
-                    {new Date(group.meeting_date).toLocaleDateString()}
+                    {new Date(group.meeting_date).toISOString().split('T')[0]}
                   </p>
                 )}
                 <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{group.items.length} action items</p>

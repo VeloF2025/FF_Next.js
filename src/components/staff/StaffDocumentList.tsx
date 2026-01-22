@@ -543,7 +543,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
                     {getExpiryWarning(doc.expiryDate)}
                     {doc.expiryDate && !getExpiryWarning(doc.expiryDate) && (
                       <p className="text-xs text-[var(--ff-text-secondary)] opacity-70 mt-0.5">
-                        Expires: {new Date(doc.expiryDate).toLocaleDateString()}
+                        Expires: {new Date(doc.expiryDate).toISOString().split('T')[0]}
                       </p>
                     )}
                   </div>

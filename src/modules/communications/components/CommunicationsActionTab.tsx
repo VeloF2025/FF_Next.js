@@ -60,7 +60,7 @@ export function CommunicationsActionTab({
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900">
-                  {item.dueDate.toLocaleDateString()}
+                  {item.dueDate.toISOString().split('T')[0]}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">

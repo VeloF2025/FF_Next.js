@@ -110,7 +110,7 @@ export function exportToExcel(staff: StaffMember[]): void {
     'Position': member.position || '',
     'Department': member.department || '',
     'Status': member.status,
-    'Start Date': member.startDate ? safeToDate(member.startDate).toLocaleDateString() : '',
+    'Start Date': member.startDate ? safeToDate(member.startDate).toISOString().split('T')[0] : '',
     'Manager': member.managerName || '',
     'Alternative Phone': member.alternativePhone || '',
     'Contract Type': member.contractType || ''

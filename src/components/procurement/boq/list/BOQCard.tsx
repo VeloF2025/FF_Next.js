@@ -105,7 +105,7 @@ export default function BOQCard({
           <div className="mt-3 flex items-center space-x-4 text-sm text-[var(--ff-text-secondary)]">
             <div className="flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
-              {new Date(boq.createdAt).toLocaleDateString()}
+              {new Date(boq.createdAt).toISOString().split('T')[0]}
             </div>
             <div className="flex items-center">
               <User className="h-4 w-4 mr-1" />

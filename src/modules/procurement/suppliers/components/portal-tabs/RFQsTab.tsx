@@ -64,7 +64,7 @@ export const RFQsTab: React.FC<RFQsTabProps> = ({ rfqInvitations, onOpenQuoteMod
                   </div>
                   <div>
                     <span className="text-gray-500">Due Date:</span>
-                    <p className="font-medium">{new Date(rfq.dueDate).toLocaleDateString()}</p>
+                    <p className="font-medium">{new Date(rfq.dueDate).toISOString().split('T')[0]}</p>
                   </div>
                   <div>
                     <span className="text-gray-500">Est. Value:</span>

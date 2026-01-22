@@ -47,7 +47,7 @@ export function CommunicationsMeetingsTab({ meetings, getStatusColor }: Communic
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900">
-                  {meeting.date.toLocaleDateString()}
+                  {meeting.date.toISOString().split('T')[0]}
                 </div>
                 <div className="text-sm text-gray-500">
                   {meeting.time} ({meeting.duration})

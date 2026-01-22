@@ -167,11 +167,11 @@ function ProjectCard({ project, onUpdate }: ProjectCardProps) {
               <Calendar className="h-4 w-4" />
               <div>
                 <div className="font-medium text-gray-900">
-                  {new Date(project.startDate).toLocaleDateString()}
+                  {new Date(project.startDate).toISOString().split('T')[0]}
                 </div>
                 {project.endDate && (
                   <div className="text-xs text-gray-500">
-                    Until {new Date(project.endDate).toLocaleDateString()}
+                    Until {new Date(project.endDate).toISOString().split('T')[0]}
                   </div>
                 )}
               </div>
