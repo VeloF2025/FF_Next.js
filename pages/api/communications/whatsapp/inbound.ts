@@ -83,7 +83,7 @@ export default async function handler(
         body.group_jid,
         body.sender_jid,
         body.message_content,
-        'received',
+        'delivered',
         projectName,
         JSON.stringify({
           sender_name: body.sender_name,
