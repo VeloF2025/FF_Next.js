@@ -53,11 +53,23 @@ function isValidUUID(id: string): boolean {
 }
 
 /**
- * Generate unique report UID (WR + YEAR + W + week number)
- * Format: WR2024-W51
+ * Generate unique report UID (WR + YEAR + W + week number + sequence)
+ * Format: WR2024-W51-001 (allows multiple imports per week)
  */
-function generateReportUID(year: number, weekNumber: number): string {
-  return `WR${year}-W${weekNumber}`;
+async function generateReportUID(year: number, weekNumber: number): Promise<string> {
+  const baseUID = `WR${year}-W${weekNumber}`;
+
+  // Count existing reports for this week to generate sequence
+  const existing = await query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM maintenance_weekly_reports
+     WHERE report_uid LIKE $1`,
+    [`${baseUID}%`]
+  );
+
+  const count = parseInt(existing[0]?.count || '0', 10);
+  const sequence = String(count + 1).padStart(3, '0');
+
+  return `${baseUID}-${sequence}`;
 }
 
 /**
@@ -100,8 +112,8 @@ export async function createWeeklyReport(
     throw new Error('week_number must be between 1 and 53');
   }
 
-  // 🟢 WORKING: Generate report UID
-  const reportUID = generateReportUID(payload.year, payload.week_number);
+  // 🟢 WORKING: Generate unique report UID (with sequence for multiple imports per week)
+  const reportUID = await generateReportUID(payload.year, payload.week_number);
 
   logger.info('Creating weekly report', {
     reportUID,
