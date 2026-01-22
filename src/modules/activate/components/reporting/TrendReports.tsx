@@ -13,7 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Minus, BarChart3, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, BarChart3, Target, Clock } from 'lucide-react';
 import type {
   ReportFilters,
   TrendAnalysisResponse,
@@ -21,6 +21,26 @@ import type {
   ProjectProgress,
 } from '../../types/reporting.types';
 import { ReportCard, ReportCardGrid, TrendChart } from './shared';
+
+interface TimeToActivationResponse {
+  summary: {
+    total_matched: number;
+    avg_hours: number;
+    median_hours: number;
+    same_day_percent: number;
+    within_24h_percent: number;
+  };
+  buckets: Array<{
+    bucket: string;
+    count: number;
+    avg_hours: number;
+  }>;
+  daily_averages: Array<{
+    date: string;
+    count: number;
+    avg_hours: number;
+  }>;
+}
 
 interface TrendReportsProps {
   filters: ReportFilters;
@@ -66,6 +86,8 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
   const [trendData, setTrendData] = useState<TrendAnalysisResponse | null>(null);
   const [projectProgress, setProjectProgress] = useState<ProjectProgress[]>([]);
   const [dailyTarget, setDailyTarget] = useState<number>(0);
+  const [timeToActivation, setTimeToActivation] = useState<TimeToActivationResponse | null>(null);
+  const [ttaLoading, setTtaLoading] = useState(true);
 
   // Series visibility toggles - all visible by default
   const [seriesVisibility, setSeriesVisibility] = useState<SeriesVisibility>({
@@ -136,6 +158,30 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
 
     fetchData();
   }, [filters, groupBy, refreshKey]);
+
+  // Fetch time-to-activation data
+  useEffect(() => {
+    const fetchTTA = async () => {
+      setTtaLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set('dateFrom', filters.dateFrom);
+        params.set('dateTo', filters.dateTo);
+        if (filters.project) params.set('project', filters.project);
+
+        const res = await fetch(`/api/activate/reporting/time-to-activation?${params}`);
+        if (!res.ok) throw new Error('Failed to fetch time-to-activation data');
+        setTimeToActivation(await res.json());
+      } catch (err) {
+        // Silently fail - this is supplementary data
+        setTimeToActivation(null);
+      } finally {
+        setTtaLoading(false);
+      }
+    };
+
+    fetchTTA();
+  }, [filters, refreshKey]);
 
   const TrendIcon = trendData?.velocity.installed_trend === 'up'
     ? TrendingUp
@@ -522,8 +568,107 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
           </div>
         </div>
       )}
+
+      {/* Time-to-Activation Section */}
+      <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <Clock className="h-5 w-5 text-purple-500" />
+          Time-to-Activation Metrics
+        </h3>
+
+        {ttaLoading ? (
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />
+            ))}
+          </div>
+        ) : timeToActivation ? (
+          <>
+            {/* Summary Cards */}
+            <ReportCardGrid columns={4}>
+              <ReportCard
+                title="Avg Time"
+                value={formatDuration(timeToActivation.summary.avg_hours)}
+                subtitle="WA → OES"
+                color="purple"
+                icon={<Clock className="h-4 w-4" />}
+              />
+              <ReportCard
+                title="Median Time"
+                value={formatDuration(timeToActivation.summary.median_hours)}
+                subtitle="50th percentile"
+                color="blue"
+              />
+              <ReportCard
+                title="Same Day"
+                value={`${timeToActivation.summary.same_day_percent.toFixed(0)}%`}
+                subtitle={`${timeToActivation.summary.total_matched} total`}
+                color="green"
+              />
+              <ReportCard
+                title="Within 24h"
+                value={`${timeToActivation.summary.within_24h_percent.toFixed(0)}%`}
+                subtitle="Including same day"
+                color="cyan"
+              />
+            </ReportCardGrid>
+
+            {/* Time Distribution */}
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+              <TrendChart
+                title="Time-to-Activation Distribution"
+                subtitle="How long from WA submission to OES activation"
+                data={timeToActivation.buckets.map((b) => ({
+                  bucket: b.bucket,
+                  Count: b.count,
+                }))}
+                series={[{ dataKey: 'Count', name: 'Activations', color: '#8B5CF6' }]}
+                type="bar"
+                xAxisKey="bucket"
+                height={200}
+                emptyMessage="No activation data available"
+              />
+            </div>
+
+            {/* Daily Average Trend */}
+            {timeToActivation.daily_averages.length > 1 && (
+              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                <TrendChart
+                  title="Daily Average Time-to-Activation"
+                  subtitle="Trend over selected period (lower is better)"
+                  data={timeToActivation.daily_averages.map((d) => ({
+                    date: d.date,
+                    'Avg Hours': d.avg_hours,
+                    Count: d.count,
+                  }))}
+                  series={[
+                    { dataKey: 'Avg Hours', name: 'Avg Hours', color: '#8B5CF6' },
+                  ]}
+                  type="line"
+                  xAxisKey="date"
+                  height={200}
+                  emptyMessage="Not enough data for trend"
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            No time-to-activation data available for the selected period
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function formatDuration(hours: number): string {
+  if (hours < 1) return '<1h';
+  if (hours < 24) return `${hours.toFixed(0)}h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = Math.round(hours % 24);
+  if (remainingHours === 0) return `${days}d`;
+  return `${days}d ${remainingHours}h`;
 }
 
 export default TrendReports;

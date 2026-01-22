@@ -121,8 +121,11 @@ export function ReportsDashboard() {
   // The Dashboard tab still auto-refreshes via ActivateDataContext.
 
   // Quick filter handlers
-  const handleQuickFilter = (filter: 'today' | 'yesterday' | 'last7days' | 'last30days') => {
+  type QuickFilterType = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'last7days' | 'last30days';
+
+  const handleQuickFilter = (filter: QuickFilterType) => {
     const todayStr = getTodaySAST();
+    const today = new Date(todayStr);
 
     switch (filter) {
       case 'today':
@@ -131,6 +134,44 @@ export function ReportsDashboard() {
       case 'yesterday': {
         const yesterdayStr = getYesterdaySAST();
         setFilters({ ...filters, dateFrom: yesterdayStr, dateTo: yesterdayStr });
+        break;
+      }
+      case 'thisWeek': {
+        // Start of current week (Monday)
+        const startOfWeek = new Date(today);
+        const day = startOfWeek.getDay();
+        const diff = day === 0 ? -6 : 1 - day; // Monday as start
+        startOfWeek.setDate(startOfWeek.getDate() + diff);
+        setFilters({
+          ...filters,
+          dateFrom: startOfWeek.toISOString().split('T')[0] as string,
+          dateTo: todayStr,
+        });
+        break;
+      }
+      case 'lastWeek': {
+        // Last week Monday to Sunday
+        const startOfLastWeek = new Date(today);
+        const day = startOfLastWeek.getDay();
+        const diff = day === 0 ? -13 : -6 - day; // Previous Monday
+        startOfLastWeek.setDate(startOfLastWeek.getDate() + diff);
+        const endOfLastWeek = new Date(startOfLastWeek);
+        endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
+        setFilters({
+          ...filters,
+          dateFrom: startOfLastWeek.toISOString().split('T')[0] as string,
+          dateTo: endOfLastWeek.toISOString().split('T')[0] as string,
+        });
+        break;
+      }
+      case 'thisMonth': {
+        // First of current month to today
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        setFilters({
+          ...filters,
+          dateFrom: startOfMonth.toISOString().split('T')[0] as string,
+          dateTo: todayStr,
+        });
         break;
       }
       case 'last7days': {
@@ -157,18 +198,47 @@ export function ReportsDashboard() {
   };
 
   // Get active quick filter
-  const getActiveQuickFilter = (): string | null => {
+  const getActiveQuickFilter = (): QuickFilterType | null => {
     const todayStr = getTodaySAST();
     const yesterdayStr = getYesterdaySAST();
+    const today = new Date(todayStr);
+
+    // Last 7 days
     const last7 = new Date(todayStr);
     last7.setDate(last7.getDate() - 7);
     const last7Str = last7.toISOString().split('T')[0] as string;
+
+    // Last 30 days
     const last30 = new Date(todayStr);
     last30.setDate(last30.getDate() - 30);
     const last30Str = last30.toISOString().split('T')[0] as string;
 
+    // This week (Monday to today)
+    const startOfWeek = new Date(today);
+    const day = startOfWeek.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    startOfWeek.setDate(startOfWeek.getDate() + diff);
+    const thisWeekStr = startOfWeek.toISOString().split('T')[0] as string;
+
+    // Last week (Monday to Sunday)
+    const startOfLastWeek = new Date(today);
+    const dayLw = startOfLastWeek.getDay();
+    const diffLw = dayLw === 0 ? -13 : -6 - dayLw;
+    startOfLastWeek.setDate(startOfLastWeek.getDate() + diffLw);
+    const endOfLastWeek = new Date(startOfLastWeek);
+    endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
+    const lastWeekStartStr = startOfLastWeek.toISOString().split('T')[0] as string;
+    const lastWeekEndStr = endOfLastWeek.toISOString().split('T')[0] as string;
+
+    // This month
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const thisMonthStr = startOfMonth.toISOString().split('T')[0] as string;
+
     if (filters.dateFrom === todayStr && filters.dateTo === todayStr) return 'today';
     if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) return 'yesterday';
+    if (filters.dateFrom === thisWeekStr && filters.dateTo === todayStr) return 'thisWeek';
+    if (filters.dateFrom === lastWeekStartStr && filters.dateTo === lastWeekEndStr) return 'lastWeek';
+    if (filters.dateFrom === thisMonthStr && filters.dateTo === todayStr) return 'thisMonth';
     if (filters.dateFrom === last7Str && filters.dateTo === todayStr) return 'last7days';
     if (filters.dateFrom === last30Str && filters.dateTo === todayStr) return 'last30days';
 
@@ -222,30 +292,32 @@ export function ReportsDashboard() {
         </p>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+      {/* Filters Bar - Sticky */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4 sticky top-0 z-10">
         <div className="flex flex-wrap items-center gap-4">
           {/* Quick Filters */}
-          <div className="flex flex-wrap gap-2">
-            {['today', 'yesterday', 'last7days', 'last30days'].map((filter) => (
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                { key: 'today', label: 'Today' },
+                { key: 'yesterday', label: 'Yesterday' },
+                { key: 'thisWeek', label: 'This Week' },
+                { key: 'lastWeek', label: 'Last Week' },
+                { key: 'thisMonth', label: 'This Month' },
+                { key: 'last7days', label: '7 Days' },
+                { key: 'last30days', label: '30 Days' },
+              ] as const
+            ).map(({ key, label }) => (
               <button
-                key={filter}
-                onClick={() =>
-                  handleQuickFilter(filter as 'today' | 'yesterday' | 'last7days' | 'last30days')
-                }
-                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  getActiveQuickFilter() === filter
+                key={key}
+                onClick={() => handleQuickFilter(key)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  getActiveQuickFilter() === key
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                {filter === 'today'
-                  ? 'Today'
-                  : filter === 'yesterday'
-                    ? 'Yesterday'
-                    : filter === 'last7days'
-                      ? 'Last 7 Days'
-                      : 'Last 30 Days'}
+                {label}
               </button>
             ))}
           </div>

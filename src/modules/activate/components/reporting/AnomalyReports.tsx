@@ -13,7 +13,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Hash, RotateCcw, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Hash, RotateCcw, ExternalLink, Clock } from 'lucide-react';
 import type {
   ReportFilters,
   DiscrepancyReportResponse,
@@ -27,7 +27,31 @@ interface AnomalyReportsProps {
   refreshKey: number;
 }
 
-type AnomalySubReport = 'discrepancy' | 'serial' | 'resubmission';
+type AnomalySubReport = 'discrepancy' | 'pending' | 'serial' | 'resubmission';
+
+interface PendingAgingResponse {
+  summary: {
+    total_pending: number;
+    critical_30plus: number;
+    warning_15_30: number;
+    recent_0_7: number;
+  };
+  buckets: Array<{
+    bucket: string;
+    count: number;
+    min_days: number;
+    max_days: number;
+  }>;
+  records: Array<{
+    drop_number: string;
+    project: string;
+    wa_submitted: string;
+    days_pending: number;
+    sender_name: string | null;
+    sender_phone: string | null;
+    photo_count: number;
+  }>;
+}
 
 export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
   const [activeSubReport, setActiveSubReport] = useState<AnomalySubReport>('discrepancy');
@@ -36,6 +60,7 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
 
   // Data states
   const [discrepancyData, setDiscrepancyData] = useState<DiscrepancyReportResponse | null>(null);
+  const [pendingData, setPendingData] = useState<PendingAgingResponse | null>(null);
   const [serialData, setSerialData] = useState<SerialValidationReportResponse | null>(null);
   const [resubmissionData, setResubmissionData] = useState<ResubmissionAnalysisResponse | null>(
     null
@@ -62,6 +87,14 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
             setDiscrepancyData(await res.json());
             break;
           }
+          case 'pending': {
+            const pendingParams = new URLSearchParams();
+            if (filters.project) pendingParams.set('project', filters.project);
+            const res = await fetch(`/api/activate/reporting/pending-aging?${pendingParams}`);
+            if (!res.ok) throw new Error('Failed to fetch pending aging report');
+            setPendingData(await res.json());
+            break;
+          }
           case 'serial': {
             const res = await fetch(`/api/activate/reporting/serial-validation?${params}`);
             if (!res.ok) throw new Error('Failed to fetch serial validation report');
@@ -85,8 +118,9 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
     fetchData();
   }, [activeSubReport, filters, refreshKey]);
 
-  const subReports: { id: AnomalySubReport; label: string; icon: typeof AlertTriangle }[] = [
+  const subReports: { id: AnomalySubReport; label: string; icon: typeof AlertTriangle; badge?: number }[] = [
     { id: 'discrepancy', label: 'Discrepancy', icon: AlertTriangle },
+    { id: 'pending', label: 'Pending Aging', icon: Clock, badge: pendingData?.summary.critical_30plus },
     { id: 'serial', label: 'Serial Mismatch', icon: Hash },
     { id: 'resubmission', label: 'Resubmissions', icon: RotateCcw },
   ];
@@ -109,6 +143,11 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
             >
               <Icon className="h-4 w-4" />
               {sub.label}
+              {sub.badge && sub.badge > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                  {sub.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -125,6 +164,9 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
       {activeSubReport === 'discrepancy' && (
         <DiscrepancySection data={discrepancyData} isLoading={isLoading} />
       )}
+      {activeSubReport === 'pending' && (
+        <PendingAgingSection data={pendingData} isLoading={isLoading} />
+      )}
       {activeSubReport === 'serial' && (
         <SerialSection data={serialData} isLoading={isLoading} />
       )}
@@ -139,6 +181,8 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
 // DISCREPANCY SECTION
 // ============================================================================
 
+type DiscrepancyFilter = 'all_anomalies' | 'wa_only' | 'oes_only' | 'matched' | 'all';
+
 function DiscrepancySection({
   data,
   isLoading,
@@ -146,7 +190,7 @@ function DiscrepancySection({
   data: DiscrepancyReportResponse | null;
   isLoading: boolean;
 }) {
-  const [showMatched, setShowMatched] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<DiscrepancyFilter>('all_anomalies');
 
   if (isLoading) {
     return <LoadingSkeleton cards={5} />;
@@ -156,9 +200,30 @@ function DiscrepancySection({
     return <EmptyState message="No discrepancy data available" />;
   }
 
-  const filteredRecords = showMatched
-    ? data.records
-    : data.records.filter((r) => r.discrepancy_type !== 'matched');
+  // Filter records based on active filter
+  const filteredRecords = data.records.filter((r) => {
+    switch (activeFilter) {
+      case 'wa_only':
+        return r.discrepancy_type === 'wa_only';
+      case 'oes_only':
+        return r.discrepancy_type === 'oes_only';
+      case 'matched':
+        return r.discrepancy_type === 'matched';
+      case 'all_anomalies':
+        return r.discrepancy_type !== 'matched';
+      case 'all':
+      default:
+        return true;
+    }
+  });
+
+  const filterButtons: { id: DiscrepancyFilter; label: string; count: number; color: string }[] = [
+    { id: 'all_anomalies', label: 'All Anomalies', count: data.summary.wa_only + data.summary.oes_only, color: 'gray' },
+    { id: 'wa_only', label: 'WA Only', count: data.summary.wa_only, color: 'yellow' },
+    { id: 'oes_only', label: 'OES Only', count: data.summary.oes_only, color: 'orange' },
+    { id: 'matched', label: 'Matched', count: data.summary.matched, color: 'green' },
+    { id: 'all', label: 'All Records', count: data.records.length, color: 'blue' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -180,39 +245,51 @@ function DiscrepancySection({
           value={data.summary.matched}
           color="green"
           subtitle={`${Math.round((data.summary.matched / Math.max(data.summary.total_wa_submissions, 1)) * 100)}% match rate`}
+          onClick={() => setActiveFilter('matched')}
         />
         <ReportCard
           title="WA Only"
           value={data.summary.wa_only}
           color="yellow"
           subtitle="Not yet activated"
-          onClick={() => setShowMatched(false)}
+          onClick={() => setActiveFilter('wa_only')}
         />
         <ReportCard
           title="OES Only"
           value={data.summary.oes_only}
           color="orange"
           subtitle="Manual install?"
-          onClick={() => setShowMatched(false)}
+          onClick={() => setActiveFilter('oes_only')}
         />
       </ReportCardGrid>
 
-      {/* Toggle and Table */}
-      <div className="space-y-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={showMatched}
-            onChange={(e) => setShowMatched(e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
-            Show matched records ({data.summary.matched})
-          </span>
-        </label>
+      {/* Filter Buttons */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</span>
+        {filterButtons.map((btn) => {
+          const isActive = activeFilter === btn.id;
+          const colorStyles: Record<string, string> = {
+            gray: isActive ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600',
+            yellow: isActive ? 'bg-yellow-500 text-white' : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/40',
+            orange: isActive ? 'bg-orange-500 text-white' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40',
+            green: isActive ? 'bg-green-600 text-white' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40',
+            blue: isActive ? 'bg-blue-600 text-white' : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40',
+          };
 
-        <DiscrepancyTable records={filteredRecords} />
+          return (
+            <button
+              key={btn.id}
+              onClick={() => setActiveFilter(btn.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${colorStyles[btn.color]}`}
+            >
+              {btn.label} ({btn.count})
+            </button>
+          );
+        })}
       </div>
+
+      {/* Table */}
+      <DiscrepancyTable records={filteredRecords} />
     </div>
   );
 }
@@ -301,6 +378,214 @@ function DiscrepancyTable({
       )}
     </div>
   );
+}
+
+// ============================================================================
+// PENDING AGING SECTION
+// ============================================================================
+
+function PendingAgingSection({
+  data,
+  isLoading,
+}: {
+  data: PendingAgingResponse | null;
+  isLoading: boolean;
+}) {
+  const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
+
+  if (isLoading) {
+    return <LoadingSkeleton cards={4} />;
+  }
+
+  if (!data) {
+    return <EmptyState message="No pending activation data available" />;
+  }
+
+  // Filter records by selected bucket
+  const filteredRecords = selectedBucket
+    ? data.records.filter((r) => {
+        if (selectedBucket === '30+ days') return r.days_pending > 30;
+        if (selectedBucket === '15-30 days') return r.days_pending >= 15 && r.days_pending <= 30;
+        if (selectedBucket === '8-14 days') return r.days_pending >= 8 && r.days_pending <= 14;
+        if (selectedBucket === '4-7 days') return r.days_pending >= 4 && r.days_pending <= 7;
+        if (selectedBucket === '2-3 days') return r.days_pending >= 2 && r.days_pending <= 3;
+        if (selectedBucket === '0-1 days') return r.days_pending <= 1;
+        return true;
+      })
+    : data.records;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <ReportCardGrid columns={4}>
+        <ReportCard
+          title="Total Pending"
+          value={data.summary.total_pending}
+          color="gray"
+          icon={<Clock className="h-4 w-4" />}
+          subtitle="Not yet activated"
+        />
+        <ReportCard
+          title="Critical (30+ days)"
+          value={data.summary.critical_30plus}
+          color="red"
+          subtitle="Forgotten activations"
+          onClick={() => setSelectedBucket(selectedBucket === '30+ days' ? null : '30+ days')}
+        />
+        <ReportCard
+          title="Warning (15-30 days)"
+          value={data.summary.warning_15_30}
+          color="orange"
+          subtitle="Getting stale"
+          onClick={() => setSelectedBucket(selectedBucket === '15-30 days' ? null : '15-30 days')}
+        />
+        <ReportCard
+          title="Recent (0-7 days)"
+          value={data.summary.recent_0_7}
+          color="green"
+          subtitle="Normal processing"
+        />
+      </ReportCardGrid>
+
+      {/* Aging Buckets Distribution */}
+      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+          Aging Distribution
+        </h4>
+        <div className="flex flex-wrap gap-2">
+          {data.buckets.map((bucket) => {
+            const isSelected = selectedBucket === bucket.bucket;
+            const colorClass = getBucketColorClass(bucket.bucket);
+            return (
+              <button
+                key={bucket.bucket}
+                onClick={() => setSelectedBucket(isSelected ? null : bucket.bucket)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  isSelected
+                    ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900'
+                    : ''
+                } ${colorClass}`}
+              >
+                {bucket.bucket}: <span className="font-bold">{bucket.count}</span>
+              </button>
+            );
+          })}
+          {selectedBucket && (
+            <button
+              onClick={() => setSelectedBucket(null)}
+              className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Records Table */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-900/50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                DR Number
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Project
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                WA Submitted
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Days Pending
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Submitted By
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Photos
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                Action
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredRecords.slice(0, 50).map((record) => (
+              <tr
+                key={record.drop_number}
+                className={`${
+                  record.days_pending > 30
+                    ? 'bg-red-50 dark:bg-red-900/10'
+                    : record.days_pending > 14
+                      ? 'bg-orange-50 dark:bg-orange-900/10'
+                      : record.days_pending > 7
+                        ? 'bg-yellow-50 dark:bg-yellow-900/10'
+                        : ''
+                }`}
+              >
+                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  {record.drop_number}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  {record.project}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  {new Date(record.wa_submitted).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  <span
+                    className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                      record.days_pending > 30
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
+                        : record.days_pending > 14
+                          ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200'
+                          : record.days_pending > 7
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                            : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+                    }`}
+                  >
+                    {record.days_pending} days
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  {record.sender_name || record.sender_phone || '-'}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  {record.photo_count}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  <a
+                    href={`/activate/${record.drop_number}`}
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredRecords.length > 50 && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+            Showing first 50 of {filteredRecords.length} records
+          </p>
+        )}
+        {filteredRecords.length === 0 && (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            No pending activations in this category
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getBucketColorClass(bucket: string): string {
+  if (bucket.includes('30+')) return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200';
+  if (bucket.includes('15-30')) return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200';
+  if (bucket.includes('8-14')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200';
+  if (bucket.includes('4-7')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200';
+  return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200';
 }
 
 // ============================================================================
@@ -467,10 +752,18 @@ function ResubmissionSection({
     return <EmptyState message="No resubmission data available" />;
   }
 
+  const firstTimePassRate = 100 - data.summary.resubmission_rate;
+
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <ReportCardGrid columns={4}>
+      <ReportCardGrid columns={5}>
+        <ReportCard
+          title="First-time Pass"
+          value={`${firstTimePassRate.toFixed(1)}%`}
+          color={firstTimePassRate >= 80 ? 'green' : firstTimePassRate >= 60 ? 'yellow' : 'red'}
+          subtitle="Got it right first time"
+        />
         <ReportCard title="Total DRs" value={data.summary.total_drs} color="gray" />
         <ReportCard
           title="Resubmitted DRs"
