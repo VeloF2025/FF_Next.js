@@ -47,6 +47,33 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     offset = '0',
   } = req.query;
 
+  // Check if tickets table exists (maintenance module dependency)
+  const ticketsTableExists = await sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_name = 'tickets'
+    ) as exists
+  `;
+
+  if (!ticketsTableExists[0]?.exists) {
+    // Return empty results if tickets table doesn't exist
+    return apiResponse.success(res, {
+      incidents: [],
+      total: 0,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string),
+      stats: {
+        total: 0,
+        critical: 0,
+        major: 0,
+        open: 0,
+        dol_reportable: 0,
+        dol_pending: 0,
+        ca_pending: 0,
+      },
+    });
+  }
+
   const incidents = await sql`
     SELECT
       t.id,
@@ -128,6 +155,18 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
+  // Check if tickets table exists first
+  const ticketsTableExists = await sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_name = 'tickets'
+    ) as exists
+  `;
+
+  if (!ticketsTableExists[0]?.exists) {
+    return apiResponse.badRequest(res, 'Incident reporting requires the maintenance module to be installed');
+  }
+
   const {
     // Ticket fields
     title,
