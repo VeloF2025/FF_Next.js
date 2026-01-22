@@ -8,7 +8,7 @@ import type { ProcurementPermissions } from '@/types/procurement/portal.types';
  */
 export function useProcurementPermissions(projectId?: string): ProcurementPermissions {
   // Mock permissions - will be replaced with real auth integration
-  const mockPermissions = {
+  const mockPermissions: ProcurementPermissions = {
     canViewBOQ: true,
     canEditBOQ: true,
     canViewRFQ: true,
@@ -17,6 +17,11 @@ export function useProcurementPermissions(projectId?: string): ProcurementPermis
     canEvaluateQuotes: true,
     canViewPurchaseOrders: true,
     canCreatePurchaseOrders: true,
+    canViewRequisitions: true,
+    canCreateRequisitions: true,
+    canApproveRequisitions: true,
+    canViewGRN: true,
+    canCreateGRN: true,
     canAccessStock: true,
     canManageStock: true,
     canAccessFieldStock: true,
@@ -31,25 +36,32 @@ export function useProcurementPermissions(projectId?: string): ProcurementPermis
   };
 
   return useMemo(() => {
+    // When no project is selected (All Projects view), allow VIEW permissions
+    // so tabs are visible. Edit/create permissions require a project.
     if (!projectId) {
       return {
-        canViewBOQ: false,
-        canEditBOQ: false,
-        canViewRFQ: false,
+        canViewBOQ: true,           // View tabs are visible
+        canEditBOQ: false,          // Edit requires project
+        canViewRFQ: true,
         canCreateRFQ: false,
-        canViewQuotes: false,
+        canViewQuotes: true,
         canEvaluateQuotes: false,
-        canViewPurchaseOrders: false,
+        canViewPurchaseOrders: true,
         canCreatePurchaseOrders: false,
-        canAccessStock: false,
+        canAccessStock: true,
         canManageStock: false,
-        canAccessFieldStock: true, // Field stock doesn't require project
+        canAccessFieldStock: true,
         canManageFieldStock: true,
         canApproveOrders: false,
-        canAccessReports: false,
-        canViewSuppliers: false,
+        canAccessReports: true,
+        canViewSuppliers: true,
         canEditSuppliers: false,
         canManageSuppliers: false,
+        canViewRequisitions: true,
+        canCreateRequisitions: false,
+        canApproveRequisitions: false,
+        canViewGRN: true,
+        canCreateGRN: false,
         role: 'viewer' as const,
         approvalLimit: 0
       };
