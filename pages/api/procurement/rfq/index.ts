@@ -9,6 +9,8 @@ interface RFQApiResponse {
   id: string;
   rfqNumber: string;
   projectId: string;
+  requisitionId?: string;
+  requisitionNumber?: string;
   title: string;
   description: string;
   status: RFQStatusType;
@@ -76,12 +78,15 @@ export default withErrorHandler(async (
           itemsData = [];
         }
       } else {
-        // Get all RFQs with quotes count
+        // Get all RFQs with quotes count and requisition info
         rfqData = await sql`
           SELECT
             r.*,
+            pr.requisition_number,
+            pr.status as requisition_status,
             (SELECT COUNT(*) FROM quotes WHERE quotes.rfq_id = r.id)::int as quotes_received
           FROM rfqs r
+          LEFT JOIN purchase_requisitions pr ON r.requisition_id = pr.id
           ORDER BY r.created_at DESC
           LIMIT 100
         `;
@@ -134,6 +139,8 @@ export default withErrorHandler(async (
         id: rfq.id,
         rfqNumber: rfq.rfq_number,
         projectId: rfq.project_id,
+        requisitionId: rfq.requisition_id || null,
+        requisitionNumber: rfq.requisition_number || null,
         title: rfq.title,
         description: rfq.description || '',
         status: rfq.status as 'draft' | 'open' | 'evaluating' | 'awarded' | 'cancelled',
@@ -233,12 +240,13 @@ export default withErrorHandler(async (
       // Insert new RFQ into database (no longer storing invited_suppliers JSON)
       const insertedRFQs = await sql`
         INSERT INTO rfqs (
-          rfq_number, project_id, title, description, status,
+          rfq_number, project_id, requisition_id, title, description, status,
           response_deadline, total_budget_estimate, created_by
         )
         VALUES (
           ${rfqNumber},
           ${newRFQ.projectId || projectId},
+          ${newRFQ.requisitionId || null},
           ${newRFQ.title},
           ${newRFQ.description || ''},
           ${newRFQ.status || 'draft'},
@@ -330,6 +338,7 @@ export default withErrorHandler(async (
         id: rfqId,
         rfqNumber: insertedRFQs[0]!.rfq_number,
         projectId: insertedRFQs[0]!.project_id,
+        requisitionId: insertedRFQs[0]!.requisition_id || undefined,
         title: insertedRFQs[0]!.title,
         description: insertedRFQs[0]!.description || '',
         status: insertedRFQs[0]!.status as RFQStatusType,

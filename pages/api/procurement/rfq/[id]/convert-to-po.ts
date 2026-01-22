@@ -49,9 +49,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rfqResult = await sql`
       SELECT
         r.id, r.rfq_number, r.title, r.project_id, r.status, r.total_budget_estimate,
+        r.requisition_id,
+        pr.requisition_number,
         p.project_name
       FROM rfqs r
       LEFT JOIN projects p ON r.project_id::text = p.id::text
+      LEFT JOIN purchase_requisitions pr ON r.requisition_id = pr.id
       WHERE r.id::text = ${rfqId}
     `;
 
@@ -134,15 +137,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const sequence = parseInt(seqResult[0]?.seq || '1', 10);
     const poNumber = `PO-${year}-${String(sequence).padStart(4, '0')}`;
 
-    // Create the Purchase Order
+    // Create the Purchase Order (with requisition_id for full lineage tracking)
     const poResult = await sql`
       INSERT INTO purchase_orders (
-        po_number, status, rfq_id, quote_id, supplier_id,
+        po_number, status, rfq_id, quote_id, requisition_id, supplier_id,
         project_id, delivery_address, expected_delivery_date,
         payment_terms, currency, tax_rate, subtotal, tax_amount, total_amount,
         internal_notes, created_by, created_at, updated_at
       ) VALUES (
-        ${poNumber}, 'draft', ${rfqId}::uuid, ${quoteId || null}, ${parseInt(supplierId, 10)},
+        ${poNumber}, 'draft', ${rfqId}::uuid, ${quoteId || null}, ${rfq.requisition_id || null}, ${parseInt(supplierId, 10)},
         ${rfq.project_id}, ${deliveryAddress}, ${expectedDeliveryDate || null},
         ${paymentTerms}, 'ZAR', ${taxRate}, ${subtotal}, ${taxAmount}, ${totalAmount},
         ${internalNotes || `Created from RFQ ${rfq.rfq_number}`}, ${createdBy}, NOW(), NOW()
@@ -199,6 +202,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         supplierName: supplier.company_name,
         projectId: rfq.project_id,
         projectName: rfq.project_name,
+        requisitionId: rfq.requisition_id || null,
+        requisitionNumber: rfq.requisition_number || null,
         totalAmount,
         itemCount: poItems.length,
       },
@@ -207,6 +212,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         rfqNumber: rfq.rfq_number,
         title: rfq.title,
       },
+      sourceRequisition: rfq.requisition_id ? {
+        id: rfq.requisition_id,
+        requisitionNumber: rfq.requisition_number,
+      } : null,
     }, 'RFQ successfully converted to Purchase Order');
   } catch (error) {
     log.error('Failed to convert RFQ to PO', { rfqId, error });
