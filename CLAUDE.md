@@ -86,14 +86,23 @@ SELECT * FROM qa_photo_reviews WHERE project = 'Lawley';
 
 ## 🚨 Starting the Server
 
-**ALWAYS use production mode locally:**
+**Use dev mode for local development:**
 ```bash
-npm run build
-PORT=3005 npm start
-# Access at http://localhost:3005
+PORT=3004 npm run dev
+# Access at http://localhost:3004
 ```
 
-Dev mode now works after removing duplicate routes in src/app/ and src/pages/
+**Benefits of dev mode:**
+- Hot Module Replacement (HMR) - no chunk caching issues
+- Instant refresh on file changes - no manual rebuild needed
+- Better error messages (not minified)
+
+**Only use production mode for final testing before deploy:**
+```bash
+npm run build && PORT=3005 npm start
+```
+
+> **Note:** Production mode causes `ChunkLoadError` on rebuilds because browser caches old chunk URLs. Dev mode avoids this entirely.
 
 ## Key Commands
 ```bash
