@@ -543,7 +543,7 @@ function BundlesTabContent() {
 
   const totalBundles = bundles.length;
   const activeBundles = bundles.filter(b => b.is_active).length;
-  const totalValue = bundles.reduce((sum, b) => sum + (b.calculated_price || 0), 0);
+  const totalValue = bundles.reduce((sum, b) => sum + Number(b.calculated_price || 0), 0);
 
   if (isLoading) return <LoadingState message="Loading bundles..." />;
 
@@ -564,7 +564,7 @@ function BundlesTabContent() {
         />
         <StatCard
           label="Total Value"
-          value={`R ${totalValue.toLocaleString()}`}
+          value={`R ${totalValue.toFixed(2)}`}
           icon={DollarSign}
           colorType="value"
         />
@@ -610,7 +610,7 @@ function BundlesTabContent() {
                   {bundle.is_active ? 'Active' : 'Inactive'}
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{bundle.item_count || 0} items</span>
-                <span className="font-medium text-[var(--ff-text-primary)]">R {(bundle.calculated_price || 0).toLocaleString()}</span>
+                <span className="font-medium text-[var(--ff-text-primary)]">R {Number(bundle.calculated_price || 0).toFixed(2)}</span>
                 <button
                   onClick={(e) => openItemsModal(bundle, e)}
                   className="p-1 text-[var(--ff-text-tertiary)] hover:text-indigo-400 transition-colors"
