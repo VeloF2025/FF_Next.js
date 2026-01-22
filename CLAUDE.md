@@ -803,17 +803,21 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 
 **Cloudflared Fix (Jan 2026):**
 ```bash
-# Final fix: Use HTTP/2 protocol and run as root
+# Final fix: Use HTTP/2 protocol, run as root, set HOME for certs
 # Service file: /etc/systemd/system/cloudflared-tunnel.service
+#
+# [Service]
+# User=root
+# Group=root
+# Environment=HOME=/home/louis  # CRITICAL: root needs this to find certs in /home/louis/.cloudflared/
 # ExecStart=/home/louis/cloudflared --config /home/louis/.cloudflared/config.yml --protocol http2 tunnel run vf-downloads
-# User=root, Group=root
 
 # If buffer errors occur, also ensure:
 sudo sysctl -w net.core.rmem_max=7340032
 sudo sysctl -w net.core.wmem_max=7340032
 
-# Restart tunnel
-sudo systemctl restart cloudflared-tunnel.service
+# Restart all services (sometimes needed to clear stale state)
+sudo systemctl restart nginx fibreflow.service cloudflared-tunnel.service
 ```
 
 **Staging Server Details:**

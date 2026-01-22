@@ -14,6 +14,10 @@ import {
   getImportProgress,
 } from '@/modules/maintenance/services/weeklyReportService';
 
+// Disable Next.js caching for this dynamic polling endpoint
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const logger = createLogger('maintenance:api:weekly-import-progress');
 
 // UUID validation regex
@@ -69,26 +73,33 @@ export async function GET(
     // Get progress information
     const progress = await getImportProgress(id);
 
-    // Return focused progress response
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: report.id,
-        status: report.status,
-        total_rows: report.total_rows,
-        imported_count: report.imported_count,
-        skipped_count: report.skipped_count,
-        error_count: report.error_count,
-        progress_percentage: progress.progress_percentage,
-        estimated_time_remaining_seconds: progress.estimated_time_remaining_seconds,
-        current_batch: progress.current_batch,
-        total_batches: progress.total_batches,
-        errors: report.errors || [],
+    // Return focused progress response with no-cache headers
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          id: report.id,
+          status: report.status,
+          total_rows: report.total_rows,
+          imported_count: report.imported_count,
+          skipped_count: report.skipped_count,
+          error_count: report.error_count,
+          progress_percentage: progress.progress_percentage,
+          estimated_time_remaining_seconds: progress.estimated_time_remaining_seconds,
+          current_batch: progress.current_batch,
+          total_batches: progress.total_batches,
+          errors: report.errors || [],
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
       },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   } catch (error) {
     const resolvedParams = await params.catch(() => ({ id: 'unknown' }));
     logger.error('Error fetching import progress', {

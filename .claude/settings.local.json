@@ -419,7 +419,10 @@
       "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && rm -rf .next node_modules/.cache && su louis -c \"\"npm run build\"\"'' && sudo systemctl restart fibreflow.service\")",
       "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"''\")",
       "Bash(\"cd /home/louis/apps/fibreflow && echo ''velo2026'' | sudo -S chown -R louis:louis .git && su louis -c ''git pull origin master && npm run build'' && echo ''velo2026'' | sudo -S systemctl restart fibreflow.service\")",
-      "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && rm -rf .next && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"'' && sudo systemctl restart fibreflow.service\")"
+      "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && rm -rf .next && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"'' && sudo systemctl restart fibreflow.service\")",
+      "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/communications/whatsapp)",
+      "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/)",
+      "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/api/health)"
     ],
     "deny": [],
     "ask": [],

@@ -1,25 +1,21 @@
 {
   "session_id": "2026-01-22-weekly-import-fix",
   "started_at": "2026-01-22T05:30:00Z",
-  "last_updated": "2026-01-22T07:09:31.613Z",
+  "last_updated": "2026-01-22T08:10:23.291Z",
   "working_on": {
-    "task": "Weekly Import fix and testing",
+    "task": "Cloudflared QUIC buffer fix + production port fix",
     "status": "completed",
     "progress": [
-      "Fixed sheetNameParam bug in parse route (line 118)",
-      "Fixed database column aliasing (error_message→errors, completed_at→imported_at)",
-      "Created system user for imports (created_by NOT NULL)",
-      "Fixed TicketType enum (FAULT_REPAIR not 'maintenance')",
-      "Deployed to staging - all fixes working",
-      "Verified 37 tickets imported successfully",
-      "Browser tested UI at vf.fibreflow.app/maintenance/data-sync"
+      "Fixed 502 errors on staging - QUIC buffer size issue",
+      "Increased UDP buffers: rmem_max/wmem_max to 7340032",
+      "Persisted in /etc/sysctl.conf",
+      "Fixed production port: 3008 → 3000 in systemd service",
+      "Updated CLAUDE.md with QUIC troubleshooting docs"
     ],
-    "last_action": "Verified weekly import working on staging via API and browser"
+    "last_action": "KB scan via /kb - 100% coverage maintained"
   },
   "commits": {
-    "cfb94432": "Database column alias mapping",
-    "168c8b1b": "System user for imports",
-    "18fe1362": "TicketType enum fix"
+    "1356312a": "docs: add cloudflared QUIC buffer fix to troubleshooting"
   },
   "context": {
     "project": "FibreFlow",
@@ -29,5 +25,13 @@
     "server": "100.96.203.105 (Velocity)",
     "staging": "vf.fibreflow.app:3006",
     "production": "app.fibreflow.app:3000"
+  },
+  "kb_scan_results": {
+    "timestamp": "2026-01-22T09:10:00Z",
+    "total_modules": 42,
+    "modules_with_claude_md": 42,
+    "coverage": "100%",
+    "learnings_pending": 1,
+    "learnings_note": "activate module has fresh learning from today (port conflict)"
   }
 }

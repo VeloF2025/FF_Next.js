@@ -239,8 +239,13 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
           const progress: ImportProgressUpdate = result.data;
           setImportProgress(progress);
 
-          // Check if import is complete
-          if (progress.progress_percentage >= 100) {
+          // Check if import is complete - check BOTH status AND percentage
+          // Status check is critical for when all rows are duplicates (0 imported = 0% progress)
+          const isComplete = progress.progress_percentage >= 100 ||
+                            (result.data.status === 'completed') ||
+                            (result.data.status === 'failed');
+
+          if (isComplete) {
             // Stop polling
             if (progressIntervalRef.current) {
               clearInterval(progressIntervalRef.current);
