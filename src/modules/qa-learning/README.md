@@ -1,18 +1,30 @@
 # QA Learning Module
 
-HITL (Human-In-The-Loop) few-shot learning for VLM photo categorization.
+HITL (Human-In-The-Loop) few-shot learning for VLM tasks without fine-tuning.
 
-## Overview
+## Two Learning Systems
 
-When humans correct VLM mistakes, corrections are captured and injected as few-shot examples into future prompts. Improves accuracy without fine-tuning (VLLM is inference-only).
-
-## How It Works
+### 1. Photo Categorization Learning (Step-Based)
+For photo categorization workflows (DR Photo QA, Civil Works, Optical Works).
 
 ```
-Human Override → qa_correction_examples → Next VLM Call → Enriched Prompt
+VLM predicted Step X → Human corrected to Step Y → Few-shot examples
 ```
 
-## Quick Start
+**Table:** `qa_correction_examples`
+**Migration:** `scripts/migrations/084_qa_correction_examples.sql`
+
+### 2. OCR Field Extraction Learning (Field-Based) - NEW
+For document OCR across any module (Staff Documents, Fleet Check-in, Activate).
+
+```
+VLM extracted "ABC" → Human corrected to "XYZ" → Few-shot examples
+```
+
+**Table:** `ocr_field_corrections`
+**Migration:** `scripts/migrations/110_ocr_field_corrections.sql`
+
+## Quick Start - Photo Categorization
 
 ```typescript
 import {
@@ -22,7 +34,6 @@ import {
   hasCorrections,
 } from '@/modules/qa-learning';
 
-// Check if corrections exist
 if (await hasCorrections('dr_photo')) {
   const { examples } = await getRelevantExamples({
     workflowType: 'dr_photo',
@@ -32,7 +43,55 @@ if (await hasCorrections('dr_photo')) {
 }
 ```
 
-## Selection Strategy
+## Quick Start - OCR Field Extraction
+
+```typescript
+import {
+  recordOcrCorrection,
+  getOcrFewShotExamples,
+  buildOcrFewShotPrompt,
+} from '@/modules/qa-learning';
+
+// Record a correction when human edits OCR data
+await recordOcrCorrection({
+  moduleName: 'staff_documents',
+  documentType: 'sa_id',
+  fieldName: 'saIdNumber',
+  vlmExtractedValue: '780203S087081', // VLM's extraction (S vs 5 error)
+  correctedValue: '7802035087081',    // Human's correction
+  correctedBy: 'user@example.com',
+});
+
+// Get few-shot examples for VLM prompt
+const examples = await getOcrFewShotExamples('staff_documents', 'sa_id');
+const promptSection = buildOcrFewShotPrompt(examples, 'sa_id');
+```
+
+## Supported Modules
+
+### Staff Documents (`staff_documents`)
+- `sa_id` - SA ID number, full name, DOB
+- `passport` - Passport number, expiry, country
+- `drivers_license` - License number, codes, expiry
+- `bank_confirmation` - Account number, bank name, branch code
+
+### Fleet Check-in (`fleet_checkin`)
+- `license_plate` - Vehicle registration
+- `odometer` - Odometer reading
+- `fuel_gauge` - Fuel level
+
+### Activate (`activate`)
+- `power_meter` - dBm readings
+- `ont_serial` - ONT serial numbers
+- `ups_serial` - UPS serial numbers
+
+## Integration Points
+
+- **Staff Documents:** `pages/api/staff-documents/[documentId]/verify.ts` - Records corrections on approval
+- **Fleet Check-in:** `src/modules/fleet/services/fleetVlmService.ts` - Enhances VLM prompts
+- **Activate:** `src/modules/activate/services/vlmExtractionService.ts` - Enhances extraction prompts
+
+## Selection Strategy (Photo Categorization)
 
 Priority order:
 1. **Canonical** - Curated high-quality examples
@@ -40,21 +99,18 @@ Priority order:
 3. **High-confidence mistakes** - VLM >80% confident but wrong
 4. **Recent** - Last 30 days
 
-## Workflows
+## Selection Strategy (OCR Field Extraction)
 
-Each workflow has isolated learning:
-- `dr_photo` - 10 steps (active)
-- `civil_works` - Future
-- `optical_works` - Future
-
-## Database
-
-**Tables:** `qa_correction_examples`, `qa_workflow_steps`
-**Migration:** `scripts/migrations/084_qa_correction_examples.sql`
+Priority order:
+1. **Canonical** - Curated high-quality examples
+2. **High reviewed count** - Multiple reviewers agreed
+3. **High confidence mistakes** - VLM confident but wrong
+4. **Recent** - Latest corrections
 
 ## Files
 
-- `types/learning.types.ts` - Types and converters
-- `services/correctionService.ts` - Store/retrieve corrections
-- `services/fewShotService.ts` - Select examples for prompts
+- `types/learning.types.ts` - Photo categorization types
+- `services/correctionService.ts` - Photo correction storage
+- `services/fewShotService.ts` - Photo few-shot selection
+- `services/ocrLearningService.ts` - **NEW** OCR field extraction learning
 - `index.ts` - Public exports

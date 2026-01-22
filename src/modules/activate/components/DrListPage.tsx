@@ -12,7 +12,7 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, Calendar, LayoutDashboard, PlusCircle, FileSpreadsheet, BarChart3, Filter, X, Download, ChevronRight, ChevronDown, Upload } from 'lucide-react';
-import type { ZoneBreakdown, PonBreakdown } from '../types/reporting.types';
+import type { ZoneBreakdown, PonBreakdown, PoleBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ManualDREntry } from './ManualDREntry';
 import { OESImportTab } from './OESImportTab';
@@ -69,6 +69,7 @@ function DashboardPageContent() {
   // Expandable project rows state
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+  const [expandedPons, setExpandedPons] = useState<Set<string>>(new Set());
   const [projectZoneData, setProjectZoneData] = useState<Record<string, ZoneBreakdown[]>>({});
   const [loadingProjects, setLoadingProjects] = useState<Set<string>>(new Set());
 
@@ -187,6 +188,17 @@ function DashboardPageContent() {
     }
     setExpandedZones(newExpanded);
   }, [expandedZones]);
+
+  // Toggle PON expansion to show poles
+  const togglePon = useCallback((ponKey: string) => {
+    const newExpanded = new Set(expandedPons);
+    if (newExpanded.has(ponKey)) {
+      newExpanded.delete(ponKey);
+    } else {
+      newExpanded.add(ponKey);
+    }
+    setExpandedPons(newExpanded);
+  }, [expandedPons]);
 
   // Export filtered data to CSV
   const handleExport = useCallback(async () => {
@@ -663,21 +675,60 @@ function DashboardPageContent() {
                                     </tr>
 
                                     {/* PON Rows (when zone expanded) */}
-                                    {isZoneExpanded && zone.pons?.map((pon) => (
-                                      <tr
-                                        key={`${zoneKey}_${pon.pon_no}`}
-                                        className="bg-gray-100 dark:bg-gray-900/40"
-                                      >
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                          <div className="pl-14">{pon.pon_name}</div>
-                                        </td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{pon.total}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-400 dark:text-blue-300">{pon.installed}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-400 dark:text-purple-300">{pon.activated}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-400 dark:text-yellow-300">{pon.notReviewed}</td>
-                                        <td className="px-4 py-2 whitespace-nowrap text-sm text-green-400 dark:text-green-300">{pon.reviewed}</td>
-                                      </tr>
-                                    ))}
+                                    {isZoneExpanded && zone.pons?.map((pon) => {
+                                      const ponKey = `${zoneKey}_${pon.pon_no}`;
+                                      const isPonExpanded = expandedPons.has(ponKey);
+                                      const hasPoles = pon.poles && pon.poles.length > 0;
+
+                                      return (
+                                        <React.Fragment key={ponKey}>
+                                          <tr
+                                            className={`bg-gray-100 dark:bg-gray-900/40 ${hasPoles ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-900/60' : ''}`}
+                                            onClick={(e) => { if (hasPoles) { e.stopPropagation(); togglePon(ponKey); } }}
+                                          >
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                              <div className="flex items-center gap-2 pl-12">
+                                                {hasPoles ? (
+                                                  isPonExpanded ? (
+                                                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                                                  ) : (
+                                                    <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                  )
+                                                ) : (
+                                                  <span className="w-3" />
+                                                )}
+                                                {pon.pon_name}
+                                              </div>
+                                            </td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{pon.total}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-400 dark:text-blue-300">{pon.installed}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-400 dark:text-purple-300">{pon.activated}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-400 dark:text-yellow-300">{pon.notReviewed}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-green-400 dark:text-green-300">{pon.reviewed}</td>
+                                          </tr>
+
+                                          {/* Pole Rows (when PON expanded) */}
+                                          {isPonExpanded && pon.poles?.map((pole) => (
+                                            <tr
+                                              key={`${ponKey}_${pole.pole_no}`}
+                                              className="bg-gray-150 dark:bg-gray-900/60"
+                                            >
+                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">
+                                                <div className="pl-20 flex items-center gap-2">
+                                                  <span className="w-2 h-2 bg-gray-300 dark:bg-gray-600 rounded-full" />
+                                                  {pole.pole_name}
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">{pole.total}</td>
+                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-300 dark:text-blue-400">{pole.installed}</td>
+                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-300 dark:text-purple-400">{pole.activated}</td>
+                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-300 dark:text-yellow-400">{pole.notReviewed}</td>
+                                              <td className="px-4 py-2 whitespace-nowrap text-sm text-green-300 dark:text-green-400">{pole.reviewed}</td>
+                                            </tr>
+                                          ))}
+                                        </React.Fragment>
+                                      );
+                                    })}
                                   </React.Fragment>
                                 );
                               })}

@@ -67,6 +67,16 @@ interface WizardState {
   fieldOverrides: Record<string, unknown>;
 }
 
+// Validation mismatch interface
+interface ValidationMismatch {
+  field: string;
+  label: string;
+  documentValue: string | null;
+  recordValue: string | null;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+}
+
 // OCR Preview API response interface
 interface OcrPreviewResult {
   success: boolean;
@@ -88,6 +98,20 @@ interface OcrPreviewResult {
   rawText: string;
   tierUsed: string;
   processingTimeMs: number;
+  // Staff record validation
+  validation?: {
+    isValid: boolean;
+    matchScore: number;
+    mismatches: ValidationMismatch[];
+    matches: string[];
+    staffRecord: {
+      name: string;
+      saIdNumber: string | null;
+      position: string | null;
+      department: string | null;
+      startDate: string | null;
+    } | null;
+  };
 }
 
 interface StaffDocumentUploadWizardProps {
@@ -469,6 +493,41 @@ export function StaffDocumentUploadWizard({
         if (bankAccountHolder) formData.append('bankAccountHolder', bankAccountHolder);
       }
 
+      // Add employment contract specific fields
+      const isEmploymentContract = state.selectedDocumentType === 'employment_contract';
+      if (isEmploymentContract) {
+        const employeeName = extractValue(finalFields.employeeName);
+        const employeeIdNumber = extractValue(finalFields.employeeIdNumber);
+        const companyName = extractValue(finalFields.companyName);
+        const jobTitle = extractValue(finalFields.jobTitle);
+        const startDate = extractValue(finalFields.startDate);
+        const employmentType = extractValue(finalFields.employmentType);
+        const salary = extractValue(finalFields.salary);
+        const salaryPeriod = extractValue(finalFields.salaryPeriod);
+
+        if (employeeName) formData.append('employeeName', employeeName);
+        if (employeeIdNumber) formData.append('employeeIdNumber', employeeIdNumber);
+        if (companyName) formData.append('companyName', companyName);
+        if (jobTitle) formData.append('jobTitle', jobTitle);
+        if (startDate) formData.append('startDate', startDate);
+        if (employmentType) formData.append('employmentType', employmentType);
+        if (salary) formData.append('salary', salary);
+        if (salaryPeriod) formData.append('salaryPeriod', salaryPeriod);
+      }
+
+      // Add all OCR-extracted fields as JSON (for verification panel display)
+      // This preserves fields like fullName, dateOfBirth, surname, etc. that aren't in main form fields
+      const ocrExtractedData: Record<string, string> = {};
+      for (const [key, value] of Object.entries(finalFields)) {
+        const strValue = extractValue(value);
+        if (strValue) {
+          ocrExtractedData[key] = strValue;
+        }
+      }
+      if (Object.keys(ocrExtractedData).length > 0) {
+        formData.append('ocrExtractedData', JSON.stringify(ocrExtractedData));
+      }
+
       // Upload document
       const response = await fetch('/api/staff-documents-upload', {
         method: 'POST',
@@ -662,7 +721,12 @@ export function StaffDocumentUploadWizard({
   const renderOcrPreview = () => {
     if (!state.ocrResult) return null;
 
-    const { classification, extractedFields } = state.ocrResult;
+    const { classification, extractedFields, validation } = state.ocrResult;
+
+    // Separate mismatches by severity
+    const criticalMismatches = validation?.mismatches.filter(m => m.severity === 'critical') || [];
+    const warningMismatches = validation?.mismatches.filter(m => m.severity === 'warning') || [];
+    const infoMismatches = validation?.mismatches.filter(m => m.severity === 'info') || [];
 
     return (
       <div className="space-y-4">
@@ -678,6 +742,100 @@ export function StaffDocumentUploadWizard({
             </p>
           </div>
         </div>
+
+        {/* Validation Results */}
+        {validation && (
+          <div className="space-y-3">
+            {/* Critical Mismatches - Red Alert */}
+            {criticalMismatches.length > 0 && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-5 w-5 text-red-400" />
+                  <span className="text-sm font-semibold text-red-400">
+                    ❌ Critical Mismatch - Review Required
+                  </span>
+                </div>
+                {criticalMismatches.map((m, i) => (
+                  <div key={i} className="ml-7 text-sm text-red-300 mb-1">
+                    <strong>{m.label}:</strong> Document has "{m.documentValue || 'N/A'}" but staff record shows "{m.recordValue || 'N/A'}"
+                  </div>
+                ))}
+                <p className="ml-7 text-xs text-red-400/80 mt-2">
+                  This document may belong to a different person. Please verify before proceeding.
+                </p>
+              </div>
+            )}
+
+            {/* Warning Mismatches - Yellow Alert */}
+            {warningMismatches.length > 0 && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-5 w-5 text-amber-400" />
+                  <span className="text-sm font-semibold text-amber-400">
+                    ⚠️ Data Differences Found
+                  </span>
+                </div>
+                {warningMismatches.map((m, i) => (
+                  <div key={i} className="ml-7 text-sm text-amber-300 mb-1">
+                    <strong>{m.label}:</strong> Document shows "{m.documentValue || 'N/A'}", record has "{m.recordValue || 'N/A'}"
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Info Notes - Blue/Gray */}
+            {infoMismatches.length > 0 && (
+              <div className="p-3 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg">
+                <p className="text-xs font-medium text-[var(--ff-text-secondary)] mb-2">ℹ️ Notes</p>
+                {infoMismatches.map((m, i) => (
+                  <p key={i} className="text-xs text-[var(--ff-text-secondary)] mb-1">
+                    {m.message}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {/* All Matched - Green Success */}
+            {validation.matches.length > 0 && criticalMismatches.length === 0 && warningMismatches.length === 0 && (
+              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                  <span className="text-sm font-medium text-green-400">
+                    ✅ Validated - All fields match staff record
+                  </span>
+                </div>
+                <p className="ml-7 text-xs text-green-400/80">
+                  Matched: {validation.matches.join(', ')}
+                </p>
+              </div>
+            )}
+
+            {/* Staff Record Reference */}
+            {validation.staffRecord && (
+              <div className="p-3 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg">
+                <p className="text-xs font-medium text-[var(--ff-text-secondary)] mb-2">📋 Staff Record Reference</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-[var(--ff-text-secondary)]">Name:</span>{' '}
+                    <span className="text-[var(--ff-text-primary)]">{validation.staffRecord.name}</span>
+                  </div>
+                  {validation.staffRecord.saIdNumber && (
+                    <div>
+                      <span className="text-[var(--ff-text-secondary)]">ID:</span>{' '}
+                      <span className="text-[var(--ff-text-primary)] font-mono">{validation.staffRecord.saIdNumber}</span>
+                    </div>
+                  )}
+                  {validation.staffRecord.position && (
+                    <div>
+                      <span className="text-[var(--ff-text-secondary)]">Position:</span>{' '}
+                      <span className="text-[var(--ff-text-primary)]">{validation.staffRecord.position}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3">
           <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">
@@ -731,10 +889,13 @@ export function StaffDocumentUploadWizard({
     const isSaId = state.selectedDocumentType === 'sa_id';
     const isPassport = state.selectedDocumentType === 'passport';
 
+    const isEmploymentContract = state.selectedDocumentType === 'employment_contract';
+
     const getEntryTitle = () => {
       if (isDriversLicense) return "Enter Driver's License Details";
       if (isSaId) return 'Enter SA ID Details';
       if (isPassport) return 'Enter Passport Details';
+      if (isEmploymentContract) return 'Enter Employment Contract Details';
       return 'Manual Entry Required';
     };
 
@@ -953,6 +1114,127 @@ export function StaffDocumentUploadWizard({
                   onChange={(e) => handleManualFieldChange('validTo', e.target.value)}
                   className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Employment Contract specific fields */}
+        {state.selectedDocumentType === 'employment_contract' && (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Employee Name *
+                </label>
+                <input
+                  type="text"
+                  value={String(state.fieldOverrides.employeeName ?? (state.extractedFields.employeeName as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('employeeName', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Full name of employee"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Employee ID Number
+                </label>
+                <input
+                  type="text"
+                  maxLength={13}
+                  value={String(state.fieldOverrides.employeeIdNumber ?? (state.extractedFields.employeeIdNumber as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('employeeIdNumber', e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="13-digit SA ID"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Company Name *
+                </label>
+                <input
+                  type="text"
+                  value={String(state.fieldOverrides.companyName ?? (state.extractedFields.companyName as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('companyName', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Employer company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Job Title *
+                </label>
+                <input
+                  type="text"
+                  value={String(state.fieldOverrides.jobTitle ?? (state.extractedFields.jobTitle as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('jobTitle', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Position/role"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Start Date *
+                </label>
+                <input
+                  type="date"
+                  value={String(state.fieldOverrides.startDate ?? (state.extractedFields.startDate as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('startDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Employment Type
+                </label>
+                <select
+                  value={String(state.fieldOverrides.employmentType ?? (state.extractedFields.employmentType as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('employmentType', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select type</option>
+                  <option value="permanent">Permanent</option>
+                  <option value="fixed-term">Fixed-term</option>
+                  <option value="contract">Contract</option>
+                  <option value="temporary">Temporary</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Salary
+                </label>
+                <input
+                  type="text"
+                  value={String(state.fieldOverrides.salary ?? (state.extractedFields.salary as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('salary', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., R15,000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Salary Period
+                </label>
+                <select
+                  value={String(state.fieldOverrides.salaryPeriod ?? (state.extractedFields.salaryPeriod as { value?: unknown })?.value ?? '')}
+                  onChange={(e) => handleManualFieldChange('salaryPeriod', e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select period</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                </select>
               </div>
             </div>
           </>

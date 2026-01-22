@@ -175,9 +175,14 @@ export default function StaffPage() {
   };
 
   const filteredStaff = staff.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          member.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          member.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const search = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm ||
+                          (member.name?.toLowerCase().includes(search)) ||
+                          (member.employeeId?.toLowerCase().includes(search)) ||
+                          (member.email?.toLowerCase().includes(search)) ||
+                          (member.phone?.toLowerCase().includes(search)) ||
+                          (member.position?.toLowerCase().includes(search)) ||
+                          (member.department?.toLowerCase().includes(search));
     const matchesDepartment = filterDepartment === 'all' || member.department === filterDepartment;
     const matchesStatus = filterStatus === 'all' || member.status === filterStatus;
 

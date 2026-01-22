@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
+import { ProjectHSTab } from '@/modules/health-safety/components';
 
 // Import split components
 import { ProjectInfoCard } from './detail/ProjectInfoCard';
@@ -23,7 +24,7 @@ interface ProjectDetailProps {
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const router = useRouter();
   const id = projectId;
-  type TabId = 'overview' | 'hierarchy' | 'sow' | 'timeline' | 'budget';
+  type TabId = 'overview' | 'hierarchy' | 'sow' | 'timeline' | 'budget' | 'hs';
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   
   const { data: project, isLoading, error } = useProject(id!);
@@ -112,6 +113,15 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {activeTab === 'hs' && (
+        <ProjectHSTab
+          projectId={id!}
+          projectName={project.name}
+          onStartAudit={() => router.push(`/health-safety/project/${id}/audits/new`)}
+          onConfigureHS={() => router.push(`/health-safety/project/${id}/configure`)}
+        />
       )}
     </div>
   );

@@ -1,20 +1,22 @@
 /**
  * QA Learning Module
  *
- * Purpose: HITL (Human-In-The-Loop) few-shot learning for VLM categorization
+ * Purpose: HITL (Human-In-The-Loop) few-shot learning for VLM tasks
  *
- * How it works:
- * 1. Human corrects VLM categorization → recorded as correction example
- * 2. Next VLM request → few-shot examples injected into prompt
- * 3. VLM learns from corrections without fine-tuning
+ * Two learning systems:
  *
- * Workflow Support:
- * - dr_photo: DR Photo QA (current)
- * - civil_works: Civil Works QA (future)
- * - optical_works: Optical Works QA (future)
+ * 1. PHOTO CATEGORIZATION LEARNING (step-based)
+ *    - VLM predicted step X → Human corrected to step Y
+ *    - Used for: DR Photo QA, Civil Works, Optical Works
+ *    - Table: qa_correction_examples
  *
- * Each workflow has isolated learning - corrections from one workflow
- * won't pollute another workflow's prompts.
+ * 2. OCR FIELD EXTRACTION LEARNING (field-based) - NEW
+ *    - VLM extracted "ABC" for fieldName → Human corrected to "XYZ"
+ *    - Used for: Staff documents, Fleet check-in, Activate data extraction
+ *    - Table: ocr_field_corrections
+ *
+ * Both systems work without fine-tuning - corrections are injected as
+ * few-shot examples into future VLM prompts.
  */
 
 // ============================================================================
@@ -54,7 +56,7 @@ export {
 } from './services/correctionService';
 
 // ============================================================================
-// FEW-SHOT SERVICE
+// FEW-SHOT SERVICE (Photo Categorization)
 // ============================================================================
 
 export {
@@ -62,3 +64,31 @@ export {
   buildFewShotPromptSection,
   hasCorrections,
 } from './services/fewShotService';
+
+// ============================================================================
+// OCR LEARNING SERVICE (Field Extraction) - NEW
+// ============================================================================
+
+export type {
+  OcrModuleName,
+  OcrDocumentType,
+  StaffDocumentType,
+  FleetDocumentType,
+  ActivateDocumentType,
+  OcrCorrectionInput,
+  OcrCorrectionRecord,
+  OcrFewShotExample,
+  OcrFieldDefinition,
+} from './services/ocrLearningService';
+
+export {
+  recordOcrCorrection,
+  recordOcrCorrections,
+  getOcrFewShotExamples,
+  hasOcrCorrections,
+  buildOcrFewShotPrompt,
+  getOcrFieldDefinitions,
+  buildExtractionHintsPrompt,
+  getOcrCorrectionStats,
+  OcrLearningError,
+} from './services/ocrLearningService';

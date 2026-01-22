@@ -25,6 +25,7 @@ import { execSync } from 'child_process';
 import sharp from 'sharp';
 import { log } from '@/lib/logger';
 import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '@/services/vfStorageAdapter';
+import { validateDocument, type ValidationResult } from '@/services/staff/documentValidationService';
 
 // Max image dimensions for VLM (to stay under token limit)
 const MAX_IMAGE_WIDTH = 1280;
@@ -60,6 +61,27 @@ interface OcrPreviewResponse {
   rawText: string;
   tierUsed: 'tesseract' | 'paddleocr' | 'ocrspace' | 'gemini' | 'qwen3-vl';
   processingTimeMs: number;
+  // Staff record validation
+  validation?: {
+    isValid: boolean;
+    matchScore: number;
+    mismatches: Array<{
+      field: string;
+      label: string;
+      documentValue: string | null;
+      recordValue: string | null;
+      severity: 'critical' | 'warning' | 'info';
+      message: string;
+    }>;
+    matches: string[];
+    staffRecord: {
+      name: string;
+      saIdNumber: string | null;
+      position: string | null;
+      department: string | null;
+      startDate: string | null;
+    } | null;
+  };
 }
 
 // Document type specific prompts for VLM extraction
@@ -127,6 +149,26 @@ Return ONLY valid JSON, no other text.`,
 - branchCode: Branch code (if visible)
 - accountType: Type of account (savings, cheque, etc.)
 - statementDate: Statement date (YYYY-MM-DD) if visible
+Return ONLY valid JSON, no other text.`,
+
+  employment_contract: `Extract key details from this employment contract/agreement. Focus on the front page, summary sections, and signature page. Return JSON with:
+- employeeName: Full name of the employee
+- employeeIdNumber: Employee's ID number if visible
+- companyName: Name of the employer/company
+- companyRegistration: Company registration number if visible
+- jobTitle: Position/job title
+- department: Department if mentioned
+- startDate: Employment start date (YYYY-MM-DD)
+- endDate: Contract end date if fixed-term (YYYY-MM-DD), null if permanent
+- employmentType: Type (permanent, fixed-term, contract, etc.)
+- salary: Salary/wage amount if visible
+- salaryPeriod: Payment period (monthly, weekly, hourly)
+- workLocation: Work location/address
+- signatureDate: Date contract was signed (YYYY-MM-DD)
+- employeeSigned: Boolean - true if employee signature is present
+- employerSigned: Boolean - true if employer/company representative signature is present
+- witnessesSigned: Boolean - true if witness signatures are present (check for witness signature lines)
+- signatureNotes: Brief notes about signature status (e.g., "Employee and employer signed, witnesses not signed")
 Return ONLY valid JSON, no other text.`,
 
   proof_of_residence: `Extract address information from this proof of residence document. Return JSON with:
@@ -208,6 +250,25 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     accountType: 'accountType',
     statementDate: 'documentDate',
   },
+  employment_contract: {
+    employeeName: 'employeeName',
+    employeeIdNumber: 'employeeIdNumber',
+    companyName: 'companyName',
+    companyRegistration: 'companyRegistration',
+    jobTitle: 'jobTitle',
+    department: 'department',
+    startDate: 'startDate',
+    endDate: 'endDate',
+    employmentType: 'employmentType',
+    salary: 'salary',
+    salaryPeriod: 'salaryPeriod',
+    workLocation: 'workLocation',
+    signatureDate: 'signatureDate',
+    employeeSigned: 'employeeSigned',
+    employerSigned: 'employerSigned',
+    witnessesSigned: 'witnessesSigned',
+    signatureNotes: 'signatureNotes',
+  },
   proof_of_residence: {
     fullName: 'fullName',
     streetAddress: 'streetAddress',
@@ -221,48 +282,116 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
 };
 
 /**
- * Resize image to fit within VLM token limits
- * Returns path to resized image (or original if no resize needed)
+ * Detect if image needs rotation using VLM
+ * Returns rotation angle: 0, 90, 180, or 270
  */
-async function resizeImageForVlm(imagePath: string): Promise<string> {
+async function detectImageOrientation(imageUrl: string): Promise<number> {
+  try {
+    const orientationPrompt = `Look at this image. Is the text/content rotated or sideways?
+Answer with ONLY one of these options:
+- "0" if text is upright and readable normally
+- "90" if text is rotated 90 degrees clockwise (need to rotate counter-clockwise to read)
+- "180" if text is upside down
+- "270" if text is rotated 90 degrees counter-clockwise (need to rotate clockwise to read)
+Return ONLY the number, nothing else.`;
+
+    const response = await fetch(`${VLLM_ENDPOINT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'Qwen/Qwen3-VL-8B-Instruct',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: orientationPrompt },
+            { type: 'image_url', image_url: { url: imageUrl } },
+          ],
+        }],
+        max_tokens: 10,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '0';
+      log.info('VLM orientation response', { rawContent: content });
+      // Extract just the number from response (VLM might include extra text)
+      const match = content.match(/\b(0|90|180|270)\b/);
+      const rotation = match ? parseInt(match[1], 10) : 0;
+      log.info('Detected image orientation', { rotation, rawContent: content.substring(0, 100) });
+      return rotation;
+    } else {
+      log.warn('Orientation detection request failed', { status: response.status });
+    }
+  } catch (error) {
+    log.warn('Orientation detection failed, assuming upright', { error: String(error) });
+  }
+  return 0;
+}
+
+/**
+ * Resize and auto-rotate image to fit within VLM token limits
+ * Returns path to processed image (or original if no processing needed)
+ */
+async function resizeImageForVlm(imagePath: string, rotationDegrees: number = 0): Promise<string> {
   const inputBuffer = fs.readFileSync(imagePath);
   const metadata = await sharp(inputBuffer).metadata();
   const { width = 0, height = 0 } = metadata;
 
-  // Only resize if image is too large
-  if (width <= MAX_IMAGE_WIDTH && height <= MAX_IMAGE_HEIGHT) {
-    log.info('Image within limits, no resize needed', { width, height });
+  const needsResize = width > MAX_IMAGE_WIDTH || height > MAX_IMAGE_HEIGHT;
+  const needsRotation = rotationDegrees !== 0;
+
+  // Return original if no processing needed
+  if (!needsResize && !needsRotation) {
+    log.info('Image within limits, no processing needed', { width, height });
     return imagePath;
   }
 
-  log.info('Resizing large image for VLM OCR', {
+  log.info('Processing image for VLM OCR', {
     originalWidth: width,
     originalHeight: height,
-    targetMax: `${MAX_IMAGE_WIDTH}x${MAX_IMAGE_HEIGHT}`
+    targetMax: `${MAX_IMAGE_WIDTH}x${MAX_IMAGE_HEIGHT}`,
+    rotation: rotationDegrees,
   });
 
-  // Create temp file for resized image
+  // Create temp file for processed image
   const tempDir = os.tmpdir();
-  const resizedPath = path.join(tempDir, `resized-${Date.now()}.jpg`);
+  const processedPath = path.join(tempDir, `processed-${Date.now()}.jpg`);
 
-  // Resize maintaining aspect ratio
-  await sharp(inputBuffer)
-    .resize(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT, {
+  // Build sharp pipeline
+  let pipeline = sharp(inputBuffer)
+    .rotate(); // Auto-rotate based on EXIF orientation first
+
+  // Apply explicit rotation if detected
+  if (needsRotation) {
+    // Convert detected rotation to correction: if image is rotated 90° CW, we need to rotate 270° CW (or 90° CCW)
+    const correctionAngle = (360 - rotationDegrees) % 360;
+    log.info('Applying rotation correction', { detected: rotationDegrees, correction: correctionAngle });
+    pipeline = pipeline.rotate(correctionAngle);
+  }
+
+  // Resize if needed
+  if (needsResize) {
+    pipeline = pipeline.resize(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT, {
       fit: 'inside',
       withoutEnlargement: true,
-    })
-    .jpeg({ quality: 90 })
-    .toFile(resizedPath);
+    });
+  }
 
-  const newMetadata = await sharp(fs.readFileSync(resizedPath)).metadata();
-  log.info('Image resized for OCR', {
+  await pipeline.jpeg({ quality: 90 }).toFile(processedPath);
+
+  const newMetadata = await sharp(fs.readFileSync(processedPath)).metadata();
+  log.info('Image processed for OCR', {
     newWidth: newMetadata.width,
     newHeight: newMetadata.height,
     originalSize: inputBuffer.length,
-    newSize: fs.statSync(resizedPath).size
+    newSize: fs.statSync(processedPath).size,
+    rotationApplied: rotationDegrees,
   });
 
-  return resizedPath;
+  return processedPath;
 }
 
 /**
@@ -413,19 +542,41 @@ export default async function handler(
         tempFilePaths.push(uploadedFile.filepath); // Add original PDF for cleanup
       }
 
-      // Resize image to fit VLM token limits (high-res photos can exceed limits)
+      // First pass: resize without rotation and upload to get URL for orientation detection
       const originalPath = filePathForOcr;
-      filePathForOcr = await resizeImageForVlm(filePathForOcr);
-      if (filePathForOcr !== originalPath) {
-        tempFilePaths.push(filePathForOcr); // Add resized image for cleanup
+      let tempResizedPath = await resizeImageForVlm(filePathForOcr, 0); // No rotation yet
+      if (tempResizedPath !== originalPath) {
+        tempFilePaths.push(tempResizedPath);
       }
 
-      // Upload file (or converted image) and get URL for VLM
-      const fileUrl = await uploadAndGetUrl(
-        filePathForOcr,
+      // Upload for orientation detection
+      let fileUrl = await uploadAndGetUrl(
+        tempResizedPath,
         uploadedFile.originalFilename || 'document',
-        'single'
+        'orient-check'
       );
+
+      // Detect if image is rotated/sideways
+      log.info('Detecting image orientation');
+      const detectedRotation = await detectImageOrientation(fileUrl);
+
+      // If rotation needed, reprocess the image with rotation correction
+      if (detectedRotation !== 0) {
+        log.info('Image rotation detected, applying correction', { rotation: detectedRotation });
+
+        // Reprocess with rotation
+        const rotatedPath = await resizeImageForVlm(originalPath, detectedRotation);
+        if (rotatedPath !== originalPath && rotatedPath !== tempResizedPath) {
+          tempFilePaths.push(rotatedPath);
+        }
+
+        // Re-upload the rotated image
+        fileUrl = await uploadAndGetUrl(
+          rotatedPath,
+          uploadedFile.originalFilename || 'document',
+          'rotated'
+        );
+      }
 
       // Check if VLLM is available
       let vllmAvailable = false;
@@ -527,6 +678,23 @@ export default async function handler(
       const detectedType = documentType || 'unknown';
       const fieldCount = Object.keys(extractedFields).length;
 
+      // Validate extracted data against staff record
+      let validation: ValidationResult | undefined;
+      try {
+        validation = await validateDocument(staffId, detectedType, extractedData);
+        log.info('Document validation completed', {
+          staffId,
+          documentType: detectedType,
+          isValid: validation.isValid,
+          matchScore: validation.matchScore,
+          mismatches: validation.mismatches.length,
+          matches: validation.matches.length,
+        });
+      } catch (validationError) {
+        log.warn('Document validation failed', { staffId, documentType: detectedType, error: validationError });
+        // Continue without validation - non-critical
+      }
+
       const response: OcrPreviewResponse = {
         success: true,
         classification: {
@@ -539,6 +707,7 @@ export default async function handler(
         rawText: content,
         tierUsed: 'qwen3-vl',
         processingTimeMs,
+        validation,
       };
 
       log.info('OCR Preview completed', {

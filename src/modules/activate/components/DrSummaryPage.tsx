@@ -172,16 +172,16 @@ export function DrSummaryPage({
           </h3>
           <div className="space-y-2">
             <TeamItem
-              icon="👷"
-              role="Submitter"
+              icon="📱"
+              role="Activations Team"
               name={summary.team.submitter.name}
-              detail={summary.team.submitter.phone}
+              detail={summary.team.submitter.phone ? `WA: ${summary.team.submitter.phone}` : undefined}
             />
             <TeamItem
               icon="🔧"
-              role="Installer"
+              role="Installation Team"
               name={summary.team.installer.name}
-              detail={summary.team.installer.id}
+              detail={summary.team.installer.id ? `ID: ${summary.team.installer.id}` : 'From OneMap'}
             />
             <TeamItem icon="👥" role="OES Team" name={summary.team.oesTeam} />
             <TeamItem icon="🔍" role="Reviewer" name={summary.team.reviewer} />

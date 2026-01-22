@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { staffImportService } from '@/services/staff/staffImportService';
 import { StaffImportAdvancedState, ImportProgress } from '../types/importAdvanced.types';
 import { validateImportFile, getFileTypeFromFile } from '../utils/importUtils';
@@ -35,7 +35,7 @@ export function useStaffImportAdvanced() {
 
     const validation = validateImportFile(file);
     if (!validation.valid) {
-      toast.error(validation.error || 'Invalid file');
+      notificationService.error(validation.error || 'Invalid file');
       return;
     }
 
@@ -49,7 +49,7 @@ export function useStaffImportAdvanced() {
 
   const handleImport = async () => {
     if (!state.selectedFile) {
-      toast.error('Please select a file first');
+      notificationService.error('Please select a file first');
       return;
     }
 
@@ -86,9 +86,9 @@ export function useStaffImportAdvanced() {
       }));
 
       if (result.success) {
-        toast.success(`Successfully imported ${result.imported} staff members!`);
+        notificationService.success(`Successfully imported ${result.imported} staff members`);
       } else {
-        toast.error(`Import completed with ${result.failed} errors. Check details below.`);
+        notificationService.warning(`Import completed with ${result.failed} errors. Check details below.`);
       }
 
     } catch (error: any) {
@@ -97,7 +97,7 @@ export function useStaffImportAdvanced() {
         ...prev,
         progress: { ...prev.progress, status: 'error' }
       }));
-      toast.error(error.message || 'Failed to import staff data');
+      notificationService.operationError('import', error.message || 'Unknown error', 'staff data');
     } finally {
       setState(prev => ({ ...prev, importing: false }));
     }
@@ -114,7 +114,7 @@ export function useStaffImportAdvanced() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('Template downloaded successfully');
+    notificationService.success('Template downloaded');
   };
 
   const clearFile = () => {

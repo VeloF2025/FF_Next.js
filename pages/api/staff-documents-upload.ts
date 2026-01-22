@@ -78,6 +78,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const bankAccountType = Array.isArray(fields.bankAccountType) ? fields.bankAccountType[0] : fields.bankAccountType;
     const bankAccountHolder = Array.isArray(fields.bankAccountHolder) ? fields.bankAccountHolder[0] : fields.bankAccountHolder;
 
+    // Employment contract specific fields (from OCR extraction)
+    const employeeName = Array.isArray(fields.employeeName) ? fields.employeeName[0] : fields.employeeName;
+    const employeeIdNumber = Array.isArray(fields.employeeIdNumber) ? fields.employeeIdNumber[0] : fields.employeeIdNumber;
+    const companyName = Array.isArray(fields.companyName) ? fields.companyName[0] : fields.companyName;
+    const jobTitle = Array.isArray(fields.jobTitle) ? fields.jobTitle[0] : fields.jobTitle;
+    const startDate = Array.isArray(fields.startDate) ? fields.startDate[0] : fields.startDate;
+    const employmentType = Array.isArray(fields.employmentType) ? fields.employmentType[0] : fields.employmentType;
+    const salary = Array.isArray(fields.salary) ? fields.salary[0] : fields.salary;
+    const salaryPeriod = Array.isArray(fields.salaryPeriod) ? fields.salaryPeriod[0] : fields.salaryPeriod;
+
     // Use expiryDate, or validTo for driver's licenses
     const rawExpiryDate = Array.isArray(fields.expiryDate) ? fields.expiryDate[0] : fields.expiryDate;
     const expiryDate = rawExpiryDate || validTo; // validTo is used for driver's licenses
@@ -89,6 +99,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // OCR-first flow fields (PRD-033)
     const ocrConfirmedRaw = Array.isArray(fields.ocrConfirmed) ? fields.ocrConfirmed[0] : fields.ocrConfirmed;
     const ocrConfirmed = ocrConfirmedRaw === 'true';
+
+    // All OCR-extracted data as JSON (preserves all fields for verification panel)
+    const ocrExtractedDataRaw = Array.isArray(fields.ocrExtractedData) ? fields.ocrExtractedData[0] : fields.ocrExtractedData;
+    let ocrExtractedData: Record<string, string> = {};
+    if (ocrExtractedDataRaw) {
+      try {
+        ocrExtractedData = JSON.parse(ocrExtractedDataRaw);
+      } catch {
+        logger.warn('Failed to parse ocrExtractedData', { raw: ocrExtractedDataRaw });
+      }
+    }
 
     // Validate required fields
     if (!staffId || !documentType || !documentName) {
@@ -248,9 +269,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Build OCR metadata object (synced to staff on verification only)
     // All compulsory docs with OCR-extracted fields store data here until verified
-    const ocrMetadata: Record<string, string | undefined> = {};
+    // Start with all extracted OCR data (fullName, dateOfBirth, surname, etc.)
+    const ocrMetadata: Record<string, string | undefined> = { ...ocrExtractedData };
 
-    // Bank details
+    // Bank details - add specific fields
     if (documentType === 'bank_details' || documentType === 'bank_statement') {
       if (bankName) ocrMetadata.bankName = bankName;
       if (bankAccountNumber) ocrMetadata.bankAccountNumber = bankAccountNumber;
@@ -262,20 +284,176 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // SA ID - store ID number in metadata, sync to staff on verification
     if (documentType === 'sa_id') {
       if (effectiveDocumentNumber) ocrMetadata.saIdNumber = effectiveDocumentNumber;
+      // Map common OCR field names to expected names
+      if (ocrExtractedData.documentNumber && !ocrMetadata.saIdNumber) {
+        ocrMetadata.saIdNumber = ocrExtractedData.documentNumber;
+      }
+      // Combine firstName + surname into fullName if not present
+      if (!ocrMetadata.fullName && (ocrExtractedData.firstName || ocrExtractedData.surname)) {
+        const parts = [ocrExtractedData.firstName, ocrExtractedData.surname].filter(Boolean);
+        if (parts.length > 0) {
+          ocrMetadata.fullName = parts.join(' ');
+        }
+      }
     }
 
     // Passport - store passport details in metadata, sync to staff on verification
     if (documentType === 'passport') {
+      // Map passport number from various sources
       if (effectiveDocumentNumber) ocrMetadata.passportNumber = effectiveDocumentNumber;
+      if (!ocrMetadata.passportNumber && ocrExtractedData.passportNumber) {
+        ocrMetadata.passportNumber = ocrExtractedData.passportNumber;
+      }
+      if (!ocrMetadata.passportNumber && ocrExtractedData.documentNumber) {
+        ocrMetadata.passportNumber = ocrExtractedData.documentNumber;
+      }
+
+      // Map expiry date
       if (expiryDate) ocrMetadata.passportExpiry = expiryDate;
+      if (!ocrMetadata.passportExpiry && ocrExtractedData.expiryDate) {
+        ocrMetadata.passportExpiry = ocrExtractedData.expiryDate;
+      }
+      if (!ocrMetadata.passportExpiry && ocrExtractedData.expirationDate) {
+        ocrMetadata.passportExpiry = ocrExtractedData.expirationDate;
+      }
+
+      // Map country from various sources
       if (issuingAuthority) ocrMetadata.passportCountry = issuingAuthority;
+      if (!ocrMetadata.passportCountry && ocrExtractedData.issuingCountry) {
+        ocrMetadata.passportCountry = ocrExtractedData.issuingCountry;
+      }
+      if (!ocrMetadata.passportCountry && ocrExtractedData.nationality) {
+        ocrMetadata.passportCountry = ocrExtractedData.nationality;
+      }
+      if (!ocrMetadata.passportCountry && ocrExtractedData.countryOfBirth) {
+        ocrMetadata.passportCountry = ocrExtractedData.countryOfBirth;
+      }
+
+      // Combine firstName + surname into fullName if not present
+      if (!ocrMetadata.fullName && (ocrExtractedData.firstName || ocrExtractedData.surname)) {
+        const parts = [ocrExtractedData.firstName, ocrExtractedData.surname].filter(Boolean);
+        if (parts.length > 0) {
+          ocrMetadata.fullName = parts.join(' ');
+        }
+      }
     }
 
     // Driver's License - store license details in metadata, sync to staff on verification
     if (documentType === 'drivers_license') {
+      // Map license number from various sources
       if (effectiveDocumentNumber) ocrMetadata.driversLicenseNumber = effectiveDocumentNumber;
+      if (!ocrMetadata.driversLicenseNumber && ocrExtractedData.licenseNumber) {
+        ocrMetadata.driversLicenseNumber = ocrExtractedData.licenseNumber;
+      }
+      if (!ocrMetadata.driversLicenseNumber && ocrExtractedData.documentNumber) {
+        ocrMetadata.driversLicenseNumber = ocrExtractedData.documentNumber;
+      }
+
+      // Map expiry date from various sources
       if (expiryDate) ocrMetadata.driversLicenseExpiry = expiryDate;
+      if (!ocrMetadata.driversLicenseExpiry && ocrExtractedData.expiryDate) {
+        ocrMetadata.driversLicenseExpiry = ocrExtractedData.expiryDate;
+      }
+      if (!ocrMetadata.driversLicenseExpiry && ocrExtractedData.expirationDate) {
+        ocrMetadata.driversLicenseExpiry = ocrExtractedData.expirationDate;
+      }
+      if (!ocrMetadata.driversLicenseExpiry && ocrExtractedData.validUntil) {
+        ocrMetadata.driversLicenseExpiry = ocrExtractedData.validUntil;
+      }
+
+      // Map license codes from various sources
       if (licenseCodes) ocrMetadata.driversLicenseCodes = licenseCodes;
+      if (!ocrMetadata.driversLicenseCodes && ocrExtractedData.licenseCodes) {
+        ocrMetadata.driversLicenseCodes = ocrExtractedData.licenseCodes;
+      }
+      if (!ocrMetadata.driversLicenseCodes && ocrExtractedData.vehicleCodes) {
+        ocrMetadata.driversLicenseCodes = ocrExtractedData.vehicleCodes;
+      }
+      if (!ocrMetadata.driversLicenseCodes && ocrExtractedData.codes) {
+        ocrMetadata.driversLicenseCodes = ocrExtractedData.codes;
+      }
+
+      // Map ID number (SA ID on license)
+      if (ocrExtractedData.idNumber) {
+        ocrMetadata.idNumber = ocrExtractedData.idNumber;
+      }
+      if (!ocrMetadata.idNumber && ocrExtractedData.saIdNumber) {
+        ocrMetadata.idNumber = ocrExtractedData.saIdNumber;
+      }
+
+      // Combine firstName + surname into fullName if not present
+      if (!ocrMetadata.fullName && (ocrExtractedData.firstName || ocrExtractedData.surname)) {
+        const parts = [ocrExtractedData.firstName, ocrExtractedData.surname].filter(Boolean);
+        if (parts.length > 0) {
+          ocrMetadata.fullName = parts.join(' ');
+        }
+      }
+    }
+
+    // Employment Contract - store contract details in metadata
+    if (documentType === 'employment_contract') {
+      // Map employee details
+      if (employeeName) ocrMetadata.employeeName = employeeName;
+      if (!ocrMetadata.employeeName && ocrExtractedData.employeeName) {
+        ocrMetadata.employeeName = ocrExtractedData.employeeName;
+      }
+
+      if (employeeIdNumber) ocrMetadata.employeeIdNumber = employeeIdNumber;
+      if (!ocrMetadata.employeeIdNumber && ocrExtractedData.employeeIdNumber) {
+        ocrMetadata.employeeIdNumber = ocrExtractedData.employeeIdNumber;
+      }
+
+      // Map company details
+      if (companyName) ocrMetadata.companyName = companyName;
+      if (!ocrMetadata.companyName && ocrExtractedData.companyName) {
+        ocrMetadata.companyName = ocrExtractedData.companyName;
+      }
+
+      if (ocrExtractedData.companyRegistration) {
+        ocrMetadata.companyRegistration = ocrExtractedData.companyRegistration;
+      }
+
+      // Map job details
+      if (jobTitle) ocrMetadata.jobTitle = jobTitle;
+      if (!ocrMetadata.jobTitle && ocrExtractedData.jobTitle) {
+        ocrMetadata.jobTitle = ocrExtractedData.jobTitle;
+      }
+
+      if (ocrExtractedData.department) {
+        ocrMetadata.department = ocrExtractedData.department;
+      }
+
+      // Map dates
+      if (startDate) ocrMetadata.startDate = startDate;
+      if (!ocrMetadata.startDate && ocrExtractedData.startDate) {
+        ocrMetadata.startDate = ocrExtractedData.startDate;
+      }
+
+      if (ocrExtractedData.endDate) {
+        ocrMetadata.endDate = ocrExtractedData.endDate;
+      }
+
+      // Map employment type
+      if (employmentType) ocrMetadata.employmentType = employmentType;
+      if (!ocrMetadata.employmentType && ocrExtractedData.employmentType) {
+        ocrMetadata.employmentType = ocrExtractedData.employmentType;
+      }
+
+      // Map salary
+      if (salary) ocrMetadata.salary = salary;
+      if (!ocrMetadata.salary && ocrExtractedData.salary) {
+        ocrMetadata.salary = ocrExtractedData.salary;
+      }
+
+      if (salaryPeriod) ocrMetadata.salaryPeriod = salaryPeriod;
+      if (!ocrMetadata.salaryPeriod && ocrExtractedData.salaryPeriod) {
+        ocrMetadata.salaryPeriod = ocrExtractedData.salaryPeriod;
+      }
+
+      // Map work location
+      if (ocrExtractedData.workLocation) {
+        ocrMetadata.workLocation = ocrExtractedData.workLocation;
+      }
     }
 
     // Save metadata to Neon

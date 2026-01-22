@@ -39,3 +39,52 @@ npm run build && PORT=3005 npm start
 - Reproducing production-only bugs
 
 **Affected Areas:** All modules - this is a Next.js/webpack behavior, not module-specific.
+
+---
+
+## 2026-01-22: Null-Safe Search Pattern (TODO: Global Implementation)
+
+**Issue:** Search functionality crashed with `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` when filtering data with potentially null/undefined fields.
+
+**Bad Pattern:**
+```typescript
+// ❌ Crashes if member.name or member.employeeId is undefined
+const filtered = staff.filter(member => {
+  return member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         member.employeeId.toLowerCase().includes(searchTerm.toLowerCase());
+});
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Null-safe search with early return and optional chaining
+const filtered = staff.filter(item => {
+  const search = searchTerm.toLowerCase();
+  return !searchTerm ||  // Early return if no search term
+    item.name?.toLowerCase().includes(search) ||
+    item.employeeId?.toLowerCase().includes(search) ||
+    item.email?.toLowerCase().includes(search) ||
+    item.phone?.toLowerCase().includes(search) ||
+    item.position?.toLowerCase().includes(search) ||
+    item.department?.toLowerCase().includes(search);
+});
+```
+
+**Key Principles:**
+1. **Always use optional chaining (`?.`)** on any field that could be null/undefined
+2. **Early return for empty search** - `!searchTerm ||` prevents unnecessary processing
+3. **Search multiple fields** - name, ID, email, phone, position, department for better UX
+4. **Case insensitive** - convert both search term and values to lowercase
+
+**TODO: Audit and fix search in these pages:**
+- [ ] `/staff` - ✅ Fixed (2026-01-22)
+- [ ] `/projects` - needs audit
+- [ ] `/suppliers` - needs audit
+- [ ] `/contractors` - needs audit
+- [ ] `/clients` - needs audit
+- [ ] `/fleet/vehicles` - needs audit
+- [ ] `/assets` - needs audit
+- [ ] `/procurement/*` tables - needs audit
+- [ ] Any DataGrid/table with search functionality
+
+**Affected Areas:** All list pages with search/filter functionality.

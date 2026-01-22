@@ -65,4 +65,5 @@ export const getTabConfig = () => [
   { id: 'sow', label: 'SOW Data' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'budget', label: 'Budget' },
+  { id: 'hs', label: 'Health & Safety' },
 ];

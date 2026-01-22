@@ -134,6 +134,8 @@ function mapDbToDocument(row: Record<string, unknown>) {
     verifiedBy: row.verified_by,
     verifiedAt: row.verified_at ? new Date(row.verified_at as string).toISOString() : undefined,
     verificationNotes: row.verification_notes,
+    // OCR-extracted metadata for document verification review
+    ocrMetadata: row.ocr_metadata || undefined,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
     staff: row.staff_name ? { id: row.staff_id, name: row.staff_name } : undefined,

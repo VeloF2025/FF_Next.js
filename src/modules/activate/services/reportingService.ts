@@ -23,6 +23,7 @@ import type {
   ProjectDailyCount,
   ZoneBreakdown,
   PonBreakdown,
+  PoleBreakdown,
   AnomalyCounts,
   DiscrepancyReportResponse,
   DiscrepancyRecord,
@@ -87,6 +88,7 @@ export async function getDailyCountsWithBreakdown(
 
     // Query 1: Get INSTALLED DRs with reviewed/notReviewed status
     // Uses dr_photo_unified_reviews.submitted_date (first submission date, preserved on resubmission)
+    // Includes pole_no for pole-level breakdown
     const installedResult = await pool.query(
       `
       SELECT
@@ -94,6 +96,7 @@ export async function getDailyCountsWithBreakdown(
         upr.project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
+        d.pole_number as pole_no,
         CASE
           WHEN upr.feedback_sent = true THEN true
           ELSE false
@@ -109,13 +112,15 @@ export async function getDailyCountsWithBreakdown(
 
     // Query 2: Get ACTIVATED DRs from OES (independent date context)
     // Uses oes_activations.activation_date (when ONT was activated on OES)
+    // Includes pole_no for pole-level breakdown
     const activatedResult = await pool.query(
       `
       SELECT DISTINCT
         oes.drop_number,
         COALESCE(upr.project, 'Unknown') as project,
         COALESCE(d.zone_no, 0) as zone_no,
-        COALESCE(d.pon_no, 0) as pon_no
+        COALESCE(d.pon_no, 0) as pon_no,
+        d.pole_no as pole_no
       FROM oes_activations oes
       LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
       LEFT JOIN drops d ON d.drop_number = oes.drop_number
@@ -217,6 +222,7 @@ export async function getDailyCountsWithBreakdown(
           activated: 0,
           notReviewed: 0,
           reviewed: 0,
+          poles: [],
           anomalies: emptyAnomalies(),
         };
         zone.pons.push(pon);
@@ -234,6 +240,40 @@ export async function getDailyCountsWithBreakdown(
         pon.reviewed++;
       } else {
         pon.notReviewed++;
+      }
+
+      // Find or create Pole (pole_no can be null/empty)
+      const poleNo = row.pole_no || null;
+      if (poleNo) {
+        if (!pon.poles) pon.poles = [];
+        let pole = pon.poles.find((p) => p.pole_no === poleNo);
+        if (!pole) {
+          pole = {
+            pole_no: poleNo,
+            pole_name: poleNo,
+            total: 0,
+            installed: 0,
+            activated: 0,
+            notReviewed: 0,
+            reviewed: 0,
+            anomalies: emptyAnomalies(),
+          };
+          pon.poles.push(pole);
+        }
+
+        // Update Pole totals
+        pole.total++;
+        pole.installed++;
+        if (isActivated) {
+          pole.activated++;
+        } else {
+          pole.anomalies!.wa_only++;
+        }
+        if (isReviewed) {
+          pole.reviewed++;
+        } else {
+          pole.notReviewed++;
+        }
       }
     }
 
@@ -298,6 +338,7 @@ export async function getDailyCountsWithBreakdown(
           activated: 0,
           notReviewed: 0,
           reviewed: 0,
+          poles: [],
           anomalies: emptyAnomalies(),
         };
         zone.pons.push(pon);
@@ -306,13 +347,43 @@ export async function getDailyCountsWithBreakdown(
       pon.total++;
       pon.activated++;
       pon.anomalies!.oes_only++;
+
+      // Find or create Pole for OES-only (pole_no can be null/empty)
+      const poleNo = row.pole_no || null;
+      if (poleNo) {
+        if (!pon.poles) pon.poles = [];
+        let pole = pon.poles.find((p) => p.pole_no === poleNo);
+        if (!pole) {
+          pole = {
+            pole_no: poleNo,
+            pole_name: poleNo,
+            total: 0,
+            installed: 0,
+            activated: 0,
+            notReviewed: 0,
+            reviewed: 0,
+            anomalies: emptyAnomalies(),
+          };
+          pon.poles.push(pole);
+        }
+
+        // OES-only pole stats
+        pole.total++;
+        pole.activated++;
+        pole.anomalies!.oes_only++;
+      }
     }
 
-    // Sort zones and PONs
+    // Sort zones, PONs, and poles
     for (const projectData of projectMap.values()) {
       projectData.zones.sort((a, b) => a.zone_no - b.zone_no);
       for (const zone of projectData.zones) {
         zone.pons.sort((a, b) => a.pon_no - b.pon_no);
+        for (const pon of zone.pons) {
+          if (pon.poles) {
+            pon.poles.sort((a, b) => a.pole_no.localeCompare(b.pole_no));
+          }
+        }
       }
     }
 

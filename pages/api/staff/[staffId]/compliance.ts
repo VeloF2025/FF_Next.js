@@ -12,14 +12,15 @@ const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffComplianceAPI');
 
 // Required documents for full compliance
+// Note: Some types have alternatives (e.g., sa_id OR passport for ID requirement)
 const REQUIRED_DOCUMENTS = [
-  { type: 'id_document', label: 'ID Document / Passport', required: true },
-  { type: 'employment_contract', label: 'Employment Contract', required: true },
-  { type: 'bank_details', label: 'Bank Confirmation Letter', required: true },
-  { type: 'tax_document', label: 'Tax Document (IRP5/IT3a)', required: false },
-  { type: 'police_clearance', label: 'Police Clearance', required: false },
-  { type: 'drivers_license', label: "Driver's License", required: false },
-  { type: 'medical_certificate', label: 'Medical Certificate', required: false },
+  { type: 'id_document', alternativeTypes: ['sa_id', 'passport'], label: 'ID Document / Passport', required: true },
+  { type: 'employment_contract', alternativeTypes: [], label: 'Employment Contract', required: true },
+  { type: 'bank_details', alternativeTypes: ['bank_statement'], label: 'Bank Confirmation Letter', required: true },
+  { type: 'tax_document', alternativeTypes: [], label: 'Tax Document (IRP5/IT3a)', required: false },
+  { type: 'police_clearance', alternativeTypes: [], label: 'Police Clearance', required: false },
+  { type: 'drivers_license', alternativeTypes: [], label: "Driver's License", required: false },
+  { type: 'medical_certificate', alternativeTypes: [], label: 'Medical Certificate', required: false },
 ] as const;
 
 interface DocumentStatus {
@@ -86,7 +87,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Build compliance status for each required document type
       const documentStatuses: DocumentStatus[] = REQUIRED_DOCUMENTS.map(reqDoc => {
-        const doc = documentsByType.get(reqDoc.type);
+        // Check primary type first, then alternatives
+        let doc = documentsByType.get(reqDoc.type);
+        if (!doc && reqDoc.alternativeTypes.length > 0) {
+          for (const altType of reqDoc.alternativeTypes) {
+            doc = documentsByType.get(altType);
+            if (doc) break;
+          }
+        }
+
         const now = new Date();
 
         if (!doc) {

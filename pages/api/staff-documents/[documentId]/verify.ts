@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { getAuth } from '@/lib/auth-mock';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
+import { recordOcrCorrections } from '@/modules/qa-learning';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentVerifyAPI');
@@ -25,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { status, notes } = req.body;
+    const { status, notes, ocrMetadata: editedOcrMetadata } = req.body;
 
     // Validate status
     if (!status || !['verified', 'rejected'].includes(status)) {
@@ -34,8 +35,43 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Get the current user for verifier ID from Clerk
+    // Get original document to compare OCR values for HITL learning
+    const [originalDoc] = await sql`
+      SELECT document_type, ocr_metadata, staff_id FROM staff_documents WHERE id = ${documentId}
+    `;
+
+    if (!originalDoc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const documentType = originalDoc.document_type as string;
+    const originalOcrMetadata = (originalDoc.ocr_metadata || {}) as Record<string, string>;
+
+    // Get the current user for verifier ID from Clerk (needed for HITL recording)
     const { userId } = getAuth(req);
+
+    // If edited OCR metadata provided, update the document first
+    if (editedOcrMetadata && Object.keys(editedOcrMetadata).length > 0) {
+      await sql`
+        UPDATE staff_documents
+        SET ocr_metadata = ${JSON.stringify(editedOcrMetadata)}::jsonb,
+            updated_at = NOW()
+        WHERE id = ${documentId}
+      `;
+      logger.info('Updated OCR metadata before verification', { documentId, fields: Object.keys(editedOcrMetadata) });
+
+      // Record HITL corrections for any fields that were changed
+      // This helps improve future VLM OCR extractions
+      if (status === 'verified') {
+        await recordOcrCorrectionsFromVerification(
+          documentType,
+          originalOcrMetadata,
+          editedOcrMetadata,
+          documentId,
+          userId || 'unknown'
+        );
+      }
+    }
 
     // Find staff member by user_id if available
     // Note: userId might be a demo/mock value, so we handle gracefully
@@ -125,6 +161,7 @@ function mapDbToDocument(row: Record<string, unknown>) {
     verifiedBy: row.verified_by,
     verifiedAt: row.verified_at ? new Date(row.verified_at as string).toISOString() : undefined,
     verificationNotes: row.verification_notes,
+    ocrMetadata: row.ocr_metadata || undefined,
     createdAt: new Date(row.created_at as string).toISOString(),
     updatedAt: new Date(row.updated_at as string).toISOString(),
     staff: row.staff_name ? { id: row.staff_id, name: row.staff_name } : undefined,
@@ -236,6 +273,63 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
     logger.warn('Failed to sync OCR metadata to staff table', {
       staffId,
       documentType,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Record HITL corrections when a human edits OCR-extracted values during verification
+ * These corrections are used as few-shot examples to improve future VLM extractions
+ */
+async function recordOcrCorrectionsFromVerification(
+  documentType: string,
+  originalOcr: Record<string, string>,
+  editedOcr: Record<string, string>,
+  documentId: string,
+  correctedBy: string
+): Promise<void> {
+  try {
+    const corrections = [];
+
+    // Compare all fields and record any that were changed
+    for (const [fieldName, correctedValue] of Object.entries(editedOcr)) {
+      const originalValue = originalOcr[fieldName];
+
+      // Skip if values are the same (no correction made)
+      if (originalValue === correctedValue) continue;
+
+      // Skip empty corrections
+      if (!correctedValue || correctedValue.trim() === '') continue;
+
+      corrections.push({
+        moduleName: 'staff_documents',
+        documentType,
+        fieldName,
+        vlmExtractedValue: originalValue || null,
+        correctedValue: correctedValue.trim(),
+        correctedBy,
+        sourceRecordId: documentId,
+        sourceTable: 'staff_documents',
+        correctionReason: originalValue
+          ? `Human corrected "${originalValue}" to "${correctedValue}" during document verification`
+          : `Human added value "${correctedValue}" that was not detected by OCR`,
+      });
+    }
+
+    if (corrections.length > 0) {
+      await recordOcrCorrections(corrections);
+      logger.info('Recorded HITL OCR corrections', {
+        documentType,
+        correctionCount: corrections.length,
+        fields: corrections.map(c => c.fieldName),
+      });
+    }
+  } catch (error) {
+    // Don't fail verification if HITL recording fails
+    logger.warn('Failed to record HITL OCR corrections', {
+      documentType,
+      documentId,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

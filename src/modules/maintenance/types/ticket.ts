@@ -48,6 +48,7 @@ export enum TicketSource {
   MANUAL = 'manual', // Manually created tickets via UI
   OFFLINE_REPORT = 'offline_report', // From Offline Devices (ARCH) report
   QA_REVIEW = 'qa_review', // From QA Centre review process
+  HSE_REPORT = 'hse_report', // From Health & Safety module
 }
 
 /**
@@ -59,6 +60,9 @@ export enum TicketType {
   MODIFICATION = 'modification',
   ONT_SWAP = 'ont_swap',
   INCIDENT = 'incident',
+  // Health & Safety ticket types
+  HSE_INCIDENT = 'hse_incident', // H&S incident requiring investigation
+  HSE_NEAR_MISS = 'hse_near_miss', // Near miss for tracking and prevention
 }
 
 /**

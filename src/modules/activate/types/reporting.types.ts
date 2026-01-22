@@ -37,6 +37,28 @@ export interface AnomalyCounts {
 // ============================================================================
 
 /**
+ * Pole breakdown within a PON
+ */
+export interface PoleBreakdown {
+  /** Pole identifier (e.g., "LAW.P.A453") */
+  pole_no: string;
+  /** Pole display name */
+  pole_name: string;
+  /** Total unique drops on this pole */
+  total: number;
+  /** DRs submitted via WhatsApp (installation done) */
+  installed: number;
+  /** Confirmed active on OES report */
+  activated: number;
+  /** QA feedback not yet sent */
+  notReviewed: number;
+  /** QA feedback has been sent */
+  reviewed: number;
+  /** Anomaly counts (for Reports tab) */
+  anomalies?: AnomalyCounts;
+}
+
+/**
  * PON breakdown within a zone
  */
 export interface PonBreakdown {
@@ -54,6 +76,8 @@ export interface PonBreakdown {
   notReviewed: number;
   /** QA feedback has been sent */
   reviewed: number;
+  /** Pole breakdowns within this PON (expanded when clicked) */
+  poles?: PoleBreakdown[];
   /** Anomaly counts (for Reports tab) */
   anomalies?: AnomalyCounts;
 }

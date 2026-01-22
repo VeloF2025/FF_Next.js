@@ -38,6 +38,8 @@ export interface StaffDocument {
   verificationNotes?: string;
   createdAt: string;
   updatedAt: string;
+  // OCR-extracted metadata (pending sync to staff table on verification)
+  ocrMetadata?: OcrMetadata;
   // Joined data
   verifier?: {
     id: string;
@@ -47,6 +49,33 @@ export interface StaffDocument {
     id: string;
     name: string;
   };
+}
+
+/**
+ * OCR-extracted metadata structure
+ * Fields vary by document type - all optional
+ */
+export interface OcrMetadata {
+  // SA ID
+  saIdNumber?: string;
+  // Passport
+  passportNumber?: string;
+  passportExpiry?: string;
+  passportCountry?: string;
+  // Driver's License
+  driversLicenseNumber?: string;
+  driversLicenseExpiry?: string;
+  driversLicenseCodes?: string;
+  // Bank Details
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankBranchCode?: string;
+  bankAccountType?: string;
+  bankAccountHolder?: string;
+  // Generic fields
+  fullName?: string;
+  dateOfBirth?: string;
+  [key: string]: string | undefined;
 }
 
 export interface StaffDocumentUpload {
@@ -86,6 +115,8 @@ export interface StaffDocumentUpdate {
 export interface DocumentVerification {
   status: 'verified' | 'rejected';
   notes?: string;
+  /** Edited OCR metadata to save before syncing to staff table */
+  ocrMetadata?: OcrMetadata;
 }
 
 export interface DocumentExpiryAlert {

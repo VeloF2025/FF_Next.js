@@ -379,7 +379,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       pending: 'bg-yellow-500/20 text-yellow-400',
       verified: 'bg-green-500/20 text-green-400',
       rejected: 'bg-red-500/20 text-red-400',
-      expired: 'bg-gray-500/20 text-gray-400',
+      expired: 'bg-red-500/20 text-red-400',
     };
 
     const icons: Record<VerificationStatus, React.ReactNode> = {
