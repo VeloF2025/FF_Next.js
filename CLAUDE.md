@@ -790,7 +790,7 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 | **Git Permission** | "Permission denied" on git ops | `chown -R louis:louis .git` |
 | **VLM Extraction Failed** | "fetch failed" in Data Validation | Check `VLM_API_URL` and `NEXT_PUBLIC_APP_URL` in .env.production |
 | **Cloudflared 502** | 502 via Cloudflare but nginx/app work locally | `sudo systemctl restart cloudflared-tunnel.service` |
-| **Cloudflared QUIC Buffer** | 502s persist after restart, logs show "accept stream listener failure" | Fix UDP buffer sizes (see below) |
+| **Cloudflared QUIC/Perm** | 502s persist, "accept stream listener failure" or "Connection terminated" | Use HTTP/2 + run as root (see below) |
 | **Port 3006 In Use** | 500 errors, service keeps restarting | `sudo fuser -k 3006/tcp && sudo systemctl restart fibreflow.service` |
 
 **Cloudflared 502 Diagnostic Path:**
@@ -801,14 +801,19 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 5. If restart doesn't fix, check logs: `sudo journalctl -u cloudflared-tunnel.service -n 30`
 6. If logs show "accept stream listener encountered a failure" → QUIC buffer issue
 
-**QUIC Buffer Fix (Jan 2026):**
+**Cloudflared Fix (Jan 2026):**
 ```bash
-# Increase UDP buffer sizes for QUIC protocol
+# Final fix: Use HTTP/2 protocol and run as root
+# Service file: /etc/systemd/system/cloudflared-tunnel.service
+# ExecStart=/home/louis/cloudflared --config /home/louis/.cloudflared/config.yml --protocol http2 tunnel run vf-downloads
+# User=root, Group=root
+
+# If buffer errors occur, also ensure:
 sudo sysctl -w net.core.rmem_max=7340032
 sudo sysctl -w net.core.wmem_max=7340032
-sudo systemctl restart cloudflared-tunnel.service
 
-# Already persisted in /etc/sysctl.conf on Velocity server
+# Restart tunnel
+sudo systemctl restart cloudflared-tunnel.service
 ```
 
 **Staging Server Details:**
