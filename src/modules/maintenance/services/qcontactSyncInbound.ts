@@ -30,6 +30,7 @@ import {
   TicketType,
   TicketPriority,
 } from '../types/ticket';
+import { mapQContactStatusToFibreFlow } from '../constants/qcontactStatusMapping';
 import {
   SyncDirection,
   SyncType,
@@ -343,6 +344,9 @@ export async function syncSingleInboundTicket(
     // Map QContact ticket to FibreFlow format
     const ticketPayload = mapQContactTicketToFibreFlow(qcontactTicket);
 
+    // Map QContact status to FibreFlow status
+    const mappedStatus = mapQContactStatusToFibreFlow(qcontactTicket.status);
+
     // Create ticket in FibreFlow with all available fields
     // Note: Database uses 'type' not 'ticket_type', 'zone' not 'zone_id', 'pon' not 'pon_number'
     const sql = `
@@ -368,7 +372,7 @@ export async function syncSingleInboundTicket(
         created_by
       ) VALUES (
         'FF' || LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0'),
-        $1, $2, $3, $4, $5, $6, 'new', $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
       )
       RETURNING *
     `;
@@ -380,6 +384,7 @@ export async function syncSingleInboundTicket(
       ticketPayload.description || null,
       ticketPayload.ticket_type,
       ticketPayload.priority,
+      mappedStatus, // Now using mapped status from QContact
       ticketPayload.dr_number || null,
       ticketPayload.project_id || null,
       ticketPayload.zone_id || null,
