@@ -47,9 +47,9 @@ interface PendingAgingResponse {
     project: string;
     wa_submitted: string;
     days_pending: number;
-    sender_name: string | null;
+    submitted_by: string | null;
     sender_phone: string | null;
-    photo_count: number;
+    completed_photos: number;
   }>;
 }
 
@@ -548,10 +548,10 @@ function PendingAgingSection({
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                  {record.sender_name || record.sender_phone || '-'}
+                  {record.submitted_by || record.sender_phone || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                  {record.photo_count}
+                  {record.completed_photos}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <a

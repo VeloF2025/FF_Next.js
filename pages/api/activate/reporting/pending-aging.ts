@@ -28,9 +28,9 @@ interface PendingRecord {
   project: string;
   wa_submitted: string;
   days_pending: number;
-  sender_name: string | null;
+  submitted_by: string | null;
   sender_phone: string | null;
-  photo_count: number;
+  completed_photos: number;
 }
 
 interface PendingAgingResponse {
@@ -101,9 +101,9 @@ export default async function handler(
           q.project,
           q.created_at::date as wa_submitted,
           CURRENT_DATE - q.created_at::date as days_pending,
-          q.sender_name,
+          q.submitted_by,
           q.sender_phone,
-          q.photo_count
+          q.completed_photos
         FROM qa_photo_reviews q
         WHERE NOT EXISTS (
           SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number
@@ -115,9 +115,9 @@ export default async function handler(
         project,
         wa_submitted,
         days_pending,
-        sender_name,
+        submitted_by,
         sender_phone,
-        photo_count
+        completed_photos
       FROM wa_only
       ORDER BY drop_number, days_pending DESC
     `;
