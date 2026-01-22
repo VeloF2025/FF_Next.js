@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { getAuth } from '../../lib/auth-mock';
 
 // Lazy load ProjectCreationWizard to reduce initial bundle size
@@ -16,7 +17,11 @@ const ProjectCreationWizard = dynamic(
 );
 
 export default function NewProjectPage() {
-  return <ProjectCreationWizard />;
+  return (
+    <AppLayout>
+      <ProjectCreationWizard />
+    </AppLayout>
+  );
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
