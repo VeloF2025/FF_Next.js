@@ -10,7 +10,7 @@
  */
 
 import { createLogger } from '@/lib/logger';
-import { query, queryOne } from '@/lib/db';
+import { query } from '../utils/db';
 import {
   createFiberTimeQContactClient,
   FiberTimeCase,
