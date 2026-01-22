@@ -4,32 +4,36 @@
  * 🟢 WORKING: Production-ready import wizard component
  *
  * Features:
- * - Step 1: File upload with validation
+ * - Step 1: File upload with validation (auto-parses on select)
  * - Step 2: Preview parsed data with validation errors
  * - Step 3: Confirm and start import
  * - Step 4: Show import results
- * - Progress tracking during import
+ * - Progress overlay with phases (parsing, uploading, processing, complete)
+ * - Toast notifications for success/failure
  * - Error handling at each step
- * - Navigation between steps
  */
 
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import toast from 'react-hot-toast';
 import {
   Upload,
   FileSpreadsheet,
   AlertCircle,
   Loader2,
   ArrowLeft,
-  Check,
-  X,
+  CheckCircle,
+  XCircle,
   RefreshCw,
+  Database,
+  FileCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ImportPreview } from './ImportPreview';
 import { ImportResults } from './ImportResults';
+import { ImportProgressOverlay, type ImportPhase } from '@/modules/activate/components/ImportProgressOverlay';
 import type {
   ImportPreviewResult,
   ImportProgressUpdate,
@@ -65,6 +69,9 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Progress overlay phase
+  const [importPhase, setImportPhase] = useState<ImportPhase | null>(null);
+
   // Progress polling
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -92,16 +99,19 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
     if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
       setError('Only Excel files (.xlsx, .xls) are allowed');
+      toast.error('Only Excel files (.xlsx, .xls) are allowed');
       setSelectedFile(null);
       return;
     }
 
     setError(null);
     setSelectedFile(file);
+    setImportPhase('parsing');
 
     // Auto-parse immediately after selection
     if (!currentUser?.id) {
       setError('User not authenticated');
+      setImportPhase(null);
       return;
     }
 
@@ -133,10 +143,14 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
       setPreviewData(result.data);
       setCurrentStep('preview');
+      toast.success(`Parsed ${result.data.total_rows} rows from ${file.name}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse file');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to parse file';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsParsing(false);
+      setImportPhase(null);
     }
   }, [currentUser]);
 
@@ -149,12 +163,16 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
     setIsImporting(true);
     setError(null);
     setCurrentStep('importing');
+    setImportPhase('uploading');
 
     try {
       // Use FormData for efficient file upload
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('user_id', currentUser.id);
+
+      // Show processing phase after short delay
+      setTimeout(() => setImportPhase('processing'), 500);
 
       // Create weekly report and start import
       const response = await fetch('/api/maintenance/import/weekly', {
@@ -184,12 +202,18 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
       const report: WeeklyReport = result.data;
       setReportId(report.id);
 
+      // Show syncing phase
+      setImportPhase('syncing');
+
       // Start polling for progress
       startProgressPolling(report.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start import');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to start import';
+      setError(errorMsg);
+      toast.error(errorMsg);
       setCurrentStep('preview');
       setIsImporting(false);
+      setImportPhase(null);
     }
   }, [selectedFile, currentUser, previewData]);
 
@@ -223,11 +247,15 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
               progressIntervalRef.current = null;
             }
 
+            // Show complete phase briefly
+            setImportPhase('complete');
+            await new Promise(resolve => setTimeout(resolve, 800));
+
             // Fetch final results
             fetchImportResults(id);
           }
         }
-      } catch (err) {
+      } catch {
         // Silent fail - keep polling
       }
     }, 2000);
@@ -260,12 +288,76 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
         setImportResult(finalResult);
         setCurrentStep('results');
         setIsImporting(false);
+        setImportPhase(null);
+
+        // Show success toast with import stats
+        const hasErrors = finalResult.error_count > 0;
+        toast.custom(
+          (t) => (
+            <div
+              className={`${
+                t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+            >
+              <div className="flex-1 w-0 p-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 pt-0.5">
+                    {hasErrors ? (
+                      <AlertCircle className="h-10 w-10 text-yellow-500" />
+                    ) : (
+                      <CheckCircle className="h-10 w-10 text-green-500" />
+                    )}
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {hasErrors ? 'Import Complete with Warnings' : 'Weekly Import Complete'}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <Database className="h-4 w-4 text-blue-500" />
+                        <span>{finalResult.imported_count} tickets imported</span>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </div>
+                      {finalResult.skipped_count > 0 && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                          <FileCheck className="h-4 w-4 text-gray-400" />
+                          <span>{finalResult.skipped_count} skipped (duplicates)</span>
+                        </div>
+                      )}
+                      {finalResult.error_count > 0 && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                          <XCircle className="h-4 w-4 text-red-500" />
+                          <span>{finalResult.error_count} errors</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      {finalResult.total_rows.toLocaleString()} total rows processed
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex border-l border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ),
+          { duration: 6000 }
+        );
 
         onComplete?.(finalResult);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch results');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch results';
+      setError(errorMsg);
+      toast.error(errorMsg);
       setIsImporting(false);
+      setImportPhase(null);
     }
   }, [onComplete]);
 
@@ -280,6 +372,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
     setError(null);
     setIsParsing(false);
     setIsImporting(false);
+    setImportPhase(null);
 
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
@@ -298,6 +391,16 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
   return (
     <div className="space-y-6">
+      {/* Import Progress Overlay */}
+      <ImportProgressOverlay
+        isVisible={importPhase !== null}
+        phase={importPhase || 'parsing'}
+        title="Weekly Report Import"
+        recordCount={previewData?.total_rows || undefined}
+        showDatabaseSync={true}
+        showQFieldSync={false}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -312,13 +415,13 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
         {/* Step indicator */}
         <div className="flex items-center gap-2">
-          <StepIndicator step={1} current={currentStep === 'upload'} label="Upload" />
+          <StepIndicator step={1} current={currentStep === 'upload'} completed={currentStep !== 'upload'} label="Upload" />
           <div className="w-8 h-0.5 bg-[var(--ff-border-light)]" />
-          <StepIndicator step={2} current={currentStep === 'preview'} label="Preview" />
+          <StepIndicator step={2} current={currentStep === 'preview'} completed={['importing', 'results'].includes(currentStep)} label="Preview" />
           <div className="w-8 h-0.5 bg-[var(--ff-border-light)]" />
-          <StepIndicator step={3} current={currentStep === 'importing'} label="Import" />
+          <StepIndicator step={3} current={currentStep === 'importing'} completed={currentStep === 'results'} label="Import" />
           <div className="w-8 h-0.5 bg-[var(--ff-border-light)]" />
-          <StepIndicator step={4} current={currentStep === 'results'} label="Results" />
+          <StepIndicator step={4} current={currentStep === 'results'} completed={false} label="Results" />
         </div>
       </div>
 
@@ -369,10 +472,12 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 function StepIndicator({
   step,
   current,
+  completed,
   label,
 }: {
   step: number;
   current: boolean;
+  completed: boolean;
   label: string;
 }) {
   return (
@@ -382,10 +487,12 @@ function StepIndicator({
           'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all',
           current
             ? 'bg-blue-600 text-white'
-            : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]'
+            : completed
+              ? 'bg-green-600 text-white'
+              : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]'
         )}
       >
-        {step}
+        {completed ? <CheckCircle className="w-4 h-4" /> : step}
       </div>
       <span className={cn('text-xs', current ? 'text-[var(--ff-text-primary)]' : 'text-[var(--ff-text-tertiary)]')}>
         {label}
@@ -511,7 +618,7 @@ function PreviewStep({
               <span>Starting Import...</span>
             </span>
           ) : (
-            'Start Import'
+            `Import ${preview.valid_rows} Tickets`
           )}
         </button>
       </div>
@@ -596,27 +703,4 @@ function ResultsStep({
       </div>
     </div>
   );
-}
-
-/**
- * 🟢 WORKING: Read file as array buffer
- */
-function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      if (event.target?.result instanceof ArrayBuffer) {
-        resolve(event.target.result);
-      } else {
-        reject(new Error('Failed to read file'));
-      }
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
 }
