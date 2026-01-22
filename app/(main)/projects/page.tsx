@@ -29,7 +29,10 @@ export default function ProjectsPage() {
 
   const { projectFilters, setProjectFilters, setSelectedProject } = useStore();
 
-  const { data: projects, isLoading, error } = useProjects();
+  const { data: projects, isLoading, isFetching, error } = useProjects();
+
+  // Show loading state if loading OR if data hasn't been fetched yet
+  const showLoading = isLoading || (isFetching && !projects);
   const createProjectMutation = useCreateProject();
   const deleteProjectMutation = useDeleteProject();
 
@@ -207,7 +210,7 @@ export default function ProjectsPage() {
 
       {/* Projects List */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg overflow-hidden border border-[var(--ff-border-light)]">
-        {isLoading ? (
+        {showLoading ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
               <thead className="bg-[var(--ff-bg-tertiary)]">
