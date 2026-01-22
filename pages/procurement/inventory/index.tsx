@@ -28,6 +28,7 @@ import {
   TrendingUp,
   DollarSign,
   Box,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
@@ -113,10 +114,18 @@ const statusColors: Record<string, string> = {
 
 // Categories Tab Content
 function CategoriesTabContent() {
-  const router = useRouter();
   const [categories, setCategories] = useState<StockCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<StockCategory | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    description: '',
+    is_active: true,
+  });
 
   useEffect(() => {
     fetchCategories();
@@ -134,6 +143,83 @@ function CategoriesTabContent() {
       log.error('Failed to fetch categories', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openNewModal = () => {
+    setEditingCategory(null);
+    setFormData({ code: '', name: '', description: '', is_active: true });
+    setShowModal(true);
+  };
+
+  const openEditModal = (cat: StockCategory) => {
+    setEditingCategory(cat);
+    setFormData({
+      code: cat.code,
+      name: cat.name,
+      description: cat.description || '',
+      is_active: cat.is_active,
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingCategory(null);
+    setFormData({ code: '', name: '', description: '', is_active: true });
+  };
+
+  const handleSave = async () => {
+    if (!formData.code.trim() || !formData.name.trim()) {
+      toast.error('Code and name are required');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const url = editingCategory
+        ? `/api/procurement/categories/${editingCategory.id}`
+        : '/api/procurement/categories';
+      const method = editingCategory ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(editingCategory ? 'Category updated' : 'Category created');
+        closeModal();
+        fetchCategories();
+      } else {
+        toast.error(data.error || 'Failed to save category');
+      }
+    } catch (err) {
+      toast.error('Failed to save category');
+      log.error('Failed to save category', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (cat: StockCategory) => {
+    if (!confirm(`Delete category "${cat.name}"? This cannot be undone.`)) return;
+
+    try {
+      const res = await fetch(`/api/procurement/categories/${cat.id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Category deleted');
+        fetchCategories();
+      } else {
+        toast.error(data.error || 'Failed to delete category');
+      }
+    } catch (err) {
+      toast.error('Failed to delete category');
+      log.error('Failed to delete category', err);
     }
   };
 
@@ -184,7 +270,7 @@ function CategoriesTabContent() {
           />
         </div>
         <button
-          onClick={() => router.push('/procurement/stock-categories?action=new')}
+          onClick={openNewModal}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
         >
           <Plus className="h-4 w-4" />
@@ -196,7 +282,8 @@ function CategoriesTabContent() {
         {filtered.map((cat) => (
           <div
             key={cat.id}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors"
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
+            onClick={() => openEditModal(cat)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -211,6 +298,13 @@ function CategoriesTabContent() {
                   {cat.is_active ? 'Active' : 'Inactive'}
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{cat.item_count || 0} items</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(cat); }}
+                  className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -221,16 +315,104 @@ function CategoriesTabContent() {
           </div>
         )}
       </div>
+
+      {/* Category Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
+          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-default)]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                {editingCategory ? 'Edit Category' : 'New Category'}
+              </h2>
+              <button onClick={closeModal} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Code *</label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g., ONT, CABLE"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., ONT Devices"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional description"
+                  rows={3}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="cat-is-active"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="rounded border-[var(--ff-border-default)]"
+                />
+                <label htmlFor="cat-is-active" className="text-sm text-[var(--ff-text-secondary)]">Active</label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : (editingCategory ? 'Update' : 'Create')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // Bundles Tab Content
 function BundlesTabContent() {
-  const router = useRouter();
   const [bundles, setBundles] = useState<StockBundle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingBundle, setEditingBundle] = useState<StockBundle | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    description: '',
+    bundle_type: 'installation',
+    is_active: true,
+  });
 
   useEffect(() => {
     fetchBundles();
@@ -248,6 +430,83 @@ function BundlesTabContent() {
       log.error('Failed to fetch bundles', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openNewModal = () => {
+    setEditingBundle(null);
+    setFormData({ code: '', name: '', description: '', bundle_type: 'installation', is_active: true });
+    setShowModal(true);
+  };
+
+  const openEditModal = (bundle: StockBundle) => {
+    setEditingBundle(bundle);
+    setFormData({
+      code: bundle.code,
+      name: bundle.name,
+      description: bundle.description || '',
+      bundle_type: bundle.bundle_type,
+      is_active: bundle.is_active,
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingBundle(null);
+  };
+
+  const handleSave = async () => {
+    if (!formData.code.trim() || !formData.name.trim()) {
+      toast.error('Code and name are required');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const url = editingBundle
+        ? `/api/procurement/bundles/${editingBundle.id}`
+        : '/api/procurement/bundles';
+      const method = editingBundle ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(editingBundle ? 'Bundle updated' : 'Bundle created');
+        closeModal();
+        fetchBundles();
+      } else {
+        toast.error(data.error || 'Failed to save bundle');
+      }
+    } catch (err) {
+      toast.error('Failed to save bundle');
+      log.error('Failed to save bundle', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (bundle: StockBundle) => {
+    if (!confirm(`Delete bundle "${bundle.name}"? This cannot be undone.`)) return;
+
+    try {
+      const res = await fetch(`/api/procurement/bundles/${bundle.id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Bundle deleted');
+        fetchBundles();
+      } else {
+        toast.error(data.error || 'Failed to delete bundle');
+      }
+    } catch (err) {
+      toast.error('Failed to delete bundle');
+      log.error('Failed to delete bundle', err);
     }
   };
 
@@ -298,7 +557,7 @@ function BundlesTabContent() {
           />
         </div>
         <button
-          onClick={() => router.push('/procurement/bundles?action=new')}
+          onClick={openNewModal}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
         >
           <Plus className="h-4 w-4" />
@@ -310,7 +569,8 @@ function BundlesTabContent() {
         {filtered.map((bundle) => (
           <div
             key={bundle.id}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors"
+            onClick={() => openEditModal(bundle)}
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -326,6 +586,13 @@ function BundlesTabContent() {
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{bundle.item_count || 0} items</span>
                 <span className="font-medium text-[var(--ff-text-primary)]">R {(bundle.total_cost || 0).toLocaleString()}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(bundle); }}
+                  className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -336,16 +603,115 @@ function BundlesTabContent() {
           </div>
         )}
       </div>
+
+      {/* Bundle Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
+          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-default)]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                {editingBundle ? 'Edit Bundle' : 'New Bundle'}
+              </h2>
+              <button onClick={closeModal} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Code *</label>
+                <input
+                  type="text"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  placeholder="e.g., INST-FTTH"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., FTTH Installation Kit"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Bundle Type</label>
+                <select
+                  value={formData.bundle_type}
+                  onChange={(e) => setFormData({ ...formData, bundle_type: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="installation">Installation</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="repair">Repair</option>
+                  <option value="project">Project</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional description"
+                  rows={3}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="bundle-is-active"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="rounded border-[var(--ff-border-default)]"
+                />
+                <label htmlFor="bundle-is-active" className="text-sm text-[var(--ff-text-secondary)]">Active</label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : (editingBundle ? 'Update' : 'Create')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // Stock Takes Tab Content
 function StockTakesTabContent() {
-  const router = useRouter();
   const [stockTakes, setStockTakes] = useState<StockTake[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    stock_take_type: 'full',
+    notes: '',
+  });
 
   useEffect(() => {
     fetchStockTakes();
@@ -363,6 +729,63 @@ function StockTakesTabContent() {
       log.error('Failed to fetch stock takes', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openNewModal = () => {
+    setFormData({ stock_take_type: 'full', notes: '' });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+  };
+
+  const handleCreate = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/procurement/stock-takes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Stock take created');
+        closeModal();
+        fetchStockTakes();
+      } else {
+        toast.error(data.error || 'Failed to create stock take');
+      }
+    } catch (err) {
+      toast.error('Failed to create stock take');
+      log.error('Failed to create stock take', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (take: StockTake) => {
+    if (take.status !== 'draft') {
+      toast.error('Only draft stock takes can be deleted');
+      return;
+    }
+    if (!confirm(`Delete stock take "${take.reference_number}"? This cannot be undone.`)) return;
+
+    try {
+      const res = await fetch(`/api/procurement/stock-takes/${take.id}`, { method: 'DELETE' });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Stock take deleted');
+        fetchStockTakes();
+      } else {
+        toast.error(data.error || 'Failed to delete stock take');
+      }
+    } catch (err) {
+      toast.error('Failed to delete stock take');
+      log.error('Failed to delete stock take', err);
     }
   };
 
@@ -411,7 +834,7 @@ function StockTakesTabContent() {
           />
         </div>
         <button
-          onClick={() => router.push('/procurement/stock-takes?action=new')}
+          onClick={openNewModal}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
         >
           <Plus className="h-4 w-4" />
@@ -423,8 +846,7 @@ function StockTakesTabContent() {
         {filtered.map((take) => (
           <div
             key={take.id}
-            onClick={() => router.push(`/procurement/stock-takes/${take.id}`)}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 cursor-pointer transition-colors"
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -439,6 +861,15 @@ function StockTakesTabContent() {
                   {take.status.replace('_', ' ')}
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{take.item_count || 0} items</span>
+                {take.status === 'draft' && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(take); }}
+                    className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
                 <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
               </div>
             </div>
@@ -450,6 +881,64 @@ function StockTakesTabContent() {
           </div>
         )}
       </div>
+
+      {/* Stock Take Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
+          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-default)]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Stock Take</h2>
+              <button onClick={closeModal} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Stock Take Type</label>
+                <select
+                  value={formData.stock_take_type}
+                  onChange={(e) => setFormData({ ...formData, stock_take_type: e.target.value })}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="full">Full Stock Take</option>
+                  <option value="partial">Partial Stock Take</option>
+                  <option value="cycle">Cycle Count</option>
+                  <option value="spot">Spot Check</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Notes</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Optional notes about this stock take"
+                  rows={3}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={isSaving}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'Creating...' : 'Create Stock Take'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

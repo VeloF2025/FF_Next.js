@@ -74,6 +74,10 @@ export default function CostCentersPage() {
   // Expanded tree nodes
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<CostCenterSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Stats
   const [stats, setStats] = useState({
     total: 0,
@@ -184,6 +188,29 @@ export default function CostCentersPage() {
     }).format(num || 0);
   };
 
+  // Delete handler
+  const handleDelete = async (center: CostCenterSummary) => {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/procurement/cost-centers/${center.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setDeleteConfirm(null);
+        fetchCostCenters();
+      } else {
+        setError(data.error || 'Failed to delete cost center');
+      }
+    } catch (err) {
+      setError('Failed to delete cost center');
+      console.error(err);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Tree node renderer
   const renderTreeNode = (
     node: CostCenterSummary & { children?: CostCenterSummary[] },
@@ -230,15 +257,29 @@ export default function CostCentersPage() {
             <Lock className="w-4 h-4 text-yellow-400" />
           )}
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditingCenter(node);
-            }}
-            className="p-1 hover:bg-[#3d4149] rounded"
-          >
-            <MoreVertical className="w-4 h-4 text-gray-400" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingCenter(node);
+              }}
+              className="p-1 hover:bg-[#3d4149] rounded"
+              title="Edit"
+            >
+              <Pencil className="w-4 h-4 text-gray-400" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirm(node);
+              }}
+              className="p-1 hover:bg-red-500/20 rounded"
+              title="Delete"
+              disabled={node.is_locked}
+            >
+              <Trash2 className={`w-4 h-4 ${node.is_locked ? 'text-gray-600' : 'text-gray-400 hover:text-red-400'}`} />
+            </button>
+          </div>
         </div>
 
         {hasChildren && isExpanded && (
@@ -487,6 +528,14 @@ export default function CostCentersPage() {
                           >
                             <Pencil className="w-4 h-4 text-gray-400" />
                           </button>
+                          <button
+                            onClick={() => setDeleteConfirm(center)}
+                            className="p-1.5 hover:bg-red-500/20 rounded"
+                            title="Delete"
+                            disabled={center.is_locked}
+                          >
+                            <Trash2 className={`w-4 h-4 ${center.is_locked ? 'text-gray-600' : 'text-gray-400 hover:text-red-400'}`} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -513,6 +562,56 @@ export default function CostCentersPage() {
               fetchCostCenters();
             }}
           />
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div
+              className="w-full max-w-md rounded-lg p-6"
+              style={{ backgroundColor: COLORS.bg.secondary, border: `1px solid ${COLORS.border.primary}` }}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-full bg-red-500/20">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Delete Cost Center</h2>
+              </div>
+
+              <p className="text-gray-300 mb-2">
+                Are you sure you want to delete <strong className="text-white">{deleteConfirm.code}</strong>?
+              </p>
+              <p className="text-gray-400 text-sm mb-4">
+                {deleteConfirm.name}
+              </p>
+
+              {(parseFloat(String(deleteConfirm.committed_amount)) > 0 ||
+                parseFloat(String(deleteConfirm.actual_amount)) > 0) && (
+                <div className="p-3 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm mb-4">
+                  <strong>Warning:</strong> This cost center has committed or actual amounts.
+                  Deleting will remove all associated tracking data.
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 rounded-lg text-gray-400 hover:text-white transition-colors"
+                  style={{ border: `1px solid ${COLORS.border.primary}` }}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteConfirm)}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>

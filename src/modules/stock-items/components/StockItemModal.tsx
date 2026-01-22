@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react';
-import { X, Package, Trash2, AlertCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { X, Package, Trash2, AlertCircle, ExternalLink, Loader2, ChevronDown, Search } from 'lucide-react';
 import { useStockItemMutations } from '../hooks/useStockItems';
 import type { StockItem, CreateStockItemInput } from '@/types/stockItem.types';
 import { CATEGORY_COLORS, TRACKING_TYPE_LABELS } from '@/types/stockItem.types';
+
+interface StockCategory {
+  id: string;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
 
 interface StockItemModalProps {
   item: StockItem | null;
@@ -37,6 +44,27 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'inventory' | 'suppliers'>('details');
+
+  // Categories for dropdown
+  const [categories, setCategories] = useState<StockCategory[]>([]);
+  const [categorySearch, setCategorySearch] = useState('');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch('/api/procurement/categories');
+        const data = await res.json();
+        if (data.success) {
+          setCategories(data.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+      }
+    }
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     if (item) {
@@ -191,18 +219,81 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
                     />
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Category *
                     </label>
-                    <input
-                      type="text"
-                      value={formData.category}
-                      onChange={(e) => handleChange('category', e.target.value)}
-                      required
-                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., optical, stringing"
-                    />
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] rounded-lg text-left text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between"
+                      >
+                        <span className={formData.category ? '' : 'text-[var(--ff-text-tertiary)]'}>
+                          {formData.category
+                            ? categories.find(c => c.code === formData.category)?.name || formData.category
+                            : 'Select a category'}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 text-[var(--ff-text-tertiary)] transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showCategoryDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-lg max-h-60 overflow-hidden">
+                          {/* Search input */}
+                          <div className="p-2 border-b border-[var(--ff-border-light)]">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                              <input
+                                type="text"
+                                value={categorySearch}
+                                onChange={(e) => setCategorySearch(e.target.value)}
+                                placeholder="Search categories..."
+                                className="w-full pl-8 pr-3 py-1.5 text-sm border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+
+                          {/* Category list */}
+                          <div className="max-h-48 overflow-y-auto">
+                            {categories
+                              .filter(c => c.is_active)
+                              .filter(c =>
+                                c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                                c.code.toLowerCase().includes(categorySearch.toLowerCase())
+                              )
+                              .map(cat => (
+                                <button
+                                  key={cat.id}
+                                  type="button"
+                                  onClick={() => {
+                                    handleChange('category', cat.code);
+                                    setShowCategoryDropdown(false);
+                                    setCategorySearch('');
+                                  }}
+                                  className={`w-full px-3 py-2 text-left text-sm hover:bg-[var(--ff-bg-hover)] flex items-center justify-between ${
+                                    formData.category === cat.code ? 'bg-blue-500/10 text-blue-400' : 'text-[var(--ff-text-primary)]'
+                                  }`}
+                                >
+                                  <span>{cat.name}</span>
+                                  <span className="text-xs text-[var(--ff-text-tertiary)]">{cat.code}</span>
+                                </button>
+                              ))
+                            }
+                            {categories.filter(c => c.is_active).filter(c =>
+                              c.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                              c.code.toLowerCase().includes(categorySearch.toLowerCase())
+                            ).length === 0 && (
+                              <div className="px-3 py-4 text-sm text-[var(--ff-text-tertiary)] text-center">
+                                No categories found
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Hidden input for form validation */}
+                    <input type="hidden" value={formData.category} required />
                   </div>
 
                   <div>
