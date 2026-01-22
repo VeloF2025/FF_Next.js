@@ -17,6 +17,8 @@ export interface WishlistColumn {
   updated_at: string;
 }
 
+export type MvpBuildStatus = 'pending' | 'building' | 'complete' | 'failed';
+
 export interface WishlistItem {
   id: string;
   title: string;
@@ -29,6 +31,7 @@ export interface WishlistItem {
   votes: number;
   created_by?: string;
   created_by_name?: string;
+  creator_email?: string;
   assigned_to?: string;
   assigned_to_name?: string;
   created_at: string;
@@ -38,6 +41,14 @@ export interface WishlistItem {
   acceptance_criteria?: string;
   target_module?: string;
   test_scenarios?: string;
+  // MVP Pipeline fields
+  github_issue_url?: string;
+  github_pr_url?: string;
+  build_status?: MvpBuildStatus;
+  build_progress?: number;
+  build_started_at?: string;
+  build_completed_at?: string;
+  build_error?: string;
   // UI state
   has_voted?: boolean;
   comments_count?: number;

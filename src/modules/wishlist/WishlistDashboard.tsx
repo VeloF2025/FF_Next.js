@@ -4,11 +4,12 @@
 
 import { useState, useEffect } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { Plus, RefreshCw, BarChart3, Settings } from 'lucide-react';
+import { Plus, RefreshCw, BarChart3, Settings, GitBranch } from 'lucide-react';
 import { useWishlist } from './hooks/useWishlist';
 import { WishlistKanban } from './components/WishlistKanban';
 import { WishlistAnalytics } from './components/WishlistAnalytics';
 import { WishlistSettings } from './components/WishlistSettings';
+import { WishlistPipeline } from './components/WishlistPipeline';
 import { AddWishlistItemModal } from './components/AddWishlistItemModal';
 import { AttachmentsModal } from './components/AttachmentsModal';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
@@ -18,7 +19,7 @@ import { UserRole } from '@/types/auth.types';
 import type { WishlistItem } from './types/wishlist';
 // AppLayout removed - handled by page wrapper
 
-type TabType = 'board' | 'analytics' | 'settings';
+type TabType = 'board' | 'pipeline' | 'analytics' | 'settings';
 
 export function WishlistDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('board');
@@ -151,6 +152,19 @@ export function WishlistDashboard() {
               </span>
             </button>
             <button
+              onClick={() => setActiveTab('pipeline')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'pipeline'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <GitBranch className="h-4 w-4" />
+                Pipeline
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('analytics')}
               className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'analytics'
@@ -221,6 +235,13 @@ export function WishlistDashboard() {
                 ))}
               </div>
             )
+          )}
+
+          {activeTab === 'pipeline' && (
+            <WishlistPipeline
+              items={board.columns.flatMap((col) => col.items || [])}
+              onRefresh={refetch}
+            />
           )}
 
           {activeTab === 'analytics' && board.stats && (

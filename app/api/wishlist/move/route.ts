@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
+import {
+  isEligibleForMvp,
+  createMvpIssue,
+} from '@/modules/wishlist/services/githubMvpSync';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -37,9 +42,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
+    // MVP Pipeline Trigger: When item moves to "Approved" with XS/S/M effort
+    let mvpTriggered = false;
+    let githubIssue: { issueNumber: number; issueUrl: string } | null = null;
+
+    if (targetColumn === 'Approved' && isEligibleForMvp(updatedItem.effort_estimate)) {
+      log.info(
+        `Item ${itemId} approved with effort ${updatedItem.effort_estimate} - triggering MVP pipeline`,
+        'WishlistMove'
+      );
+
+      // Create GitHub Issue to trigger the MVP build
+      githubIssue = await createMvpIssue({
+        id: updatedItem.id,
+        title: updatedItem.title,
+        description: updatedItem.description,
+        priority: updatedItem.priority,
+        effort_estimate: updatedItem.effort_estimate,
+        business_value: updatedItem.business_value,
+        votes: updatedItem.votes,
+        created_by_name: updatedItem.created_by_name,
+        creator_email: updatedItem.creator_email,
+        problem_statement: updatedItem.problem_statement,
+        acceptance_criteria: updatedItem.acceptance_criteria,
+        target_module: updatedItem.target_module,
+        test_scenarios: updatedItem.test_scenarios,
+      });
+
+      if (githubIssue) {
+        // Update wishlist item with GitHub issue URL and build status
+        await sql`
+          UPDATE wishlist_items
+          SET
+            github_issue_url = ${githubIssue.issueUrl},
+            build_status = 'pending',
+            build_progress = 0
+          WHERE id = ${itemId}
+        `;
+
+        mvpTriggered = true;
+        log.info(
+          `MVP pipeline triggered for item ${itemId} - GitHub Issue #${githubIssue.issueNumber}`,
+          'WishlistMove'
+        );
+      } else {
+        log.warn(
+          `Failed to create GitHub issue for item ${itemId} - MVP pipeline not triggered`,
+          'WishlistMove'
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: { item: updatedItem }
+      data: {
+        item: updatedItem,
+        mvpTriggered,
+        githubIssue: githubIssue ? {
+          number: githubIssue.issueNumber,
+          url: githubIssue.issueUrl,
+        } : null,
+      }
     });
   } catch (error: any) {
     console.error('Wishlist move error:', error);
