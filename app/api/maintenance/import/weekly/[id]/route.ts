@@ -21,6 +21,10 @@ import {
   getImportProgress,
 } from '@/modules/maintenance/services/weeklyReportService';
 
+// Disable Next.js caching for this dynamic endpoint
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const logger = createLogger('maintenance:api:weekly-import-status');
 
 // UUID validation regex
@@ -108,13 +112,20 @@ export async function GET(
       imported_by: report.imported_by,
     };
 
-    return NextResponse.json({
-      success: true,
-      data: responseData,
-      meta: {
-        timestamp: new Date().toISOString(),
+    return NextResponse.json(
+      {
+        success: true,
+        data: responseData,
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   } catch (error) {
     logger.error('Error fetching weekly import status', {
       error: error instanceof Error ? error.message : 'Unknown error',
