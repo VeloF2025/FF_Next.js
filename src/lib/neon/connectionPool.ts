@@ -90,6 +90,37 @@ export async function testConnection(): Promise<{ success: boolean; error?: stri
 }
 
 /**
+ * Reset the cached connection (call on socket errors)
+ */
+export function resetConnection(): void {
+  if (simpleConnection) {
+    log.info('Resetting stale Neon connection', {}, 'connectionPool');
+    simpleConnection = null;
+  }
+}
+
+/**
+ * Check if error is a recoverable socket/connection error
+ */
+function isRecoverableError(error: Error): boolean {
+  const recoverablePatterns = [
+    'socket hang up',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'fetch failed',
+    'network error',
+    'connection terminated',
+    'Connection terminated unexpectedly',
+  ];
+
+  return recoverablePatterns.some(pattern =>
+    error.message.toLowerCase().includes(pattern.toLowerCase())
+  );
+}
+
+/**
  * Execute a query with automatic retry logic
  */
 export async function executeQuery<T = any>(
@@ -97,24 +128,28 @@ export async function executeQuery<T = any>(
   maxRetries: number = 2
 ): Promise<T> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const sql = getNeonConnection();
       return await queryFn(sql);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      
-      log.warn(`Query attempt ${attempt + 1} failed:`, { 
-        data: { error: lastError.message, attempt } 
+
+      log.warn(`Query attempt ${attempt + 1} failed:`, {
+        data: { error: lastError.message, attempt }
       }, 'connectionPool');
-      
-      // Don't retry on authentication or connection errors
-      if (lastError.message.includes('password authentication failed') || 
-          lastError.message.includes('connection refused')) {
+
+      // Don't retry on authentication errors
+      if (lastError.message.includes('password authentication failed')) {
         break;
       }
-      
+
+      // Reset connection on recoverable socket errors
+      if (isRecoverableError(lastError)) {
+        resetConnection();
+      }
+
       // Wait before retrying (exponential backoff)
       if (attempt < maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
@@ -122,7 +157,7 @@ export async function executeQuery<T = any>(
       }
     }
   }
-  
+
   throw lastError || new Error('Query failed after retries');
 }
 
