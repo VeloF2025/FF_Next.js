@@ -5,6 +5,7 @@
 export type WishlistPriority = 'low' | 'medium' | 'high';
 export type WishlistEffort = 'XS' | 'S' | 'M' | 'L' | 'XL';
 export type WishlistStatus = 'Backlog' | 'Under Review' | 'Approved' | 'In Progress' | 'Testing' | 'Completed';
+export type WishlistWorkType = 'feature' | 'fix' | 'amendment' | 'refactor';
 
 export interface WishlistColumn {
   id: string;
@@ -27,6 +28,7 @@ export interface WishlistItem {
   column_position: number;
   priority: WishlistPriority;
   effort_estimate?: WishlistEffort;
+  work_type?: WishlistWorkType;
   business_value?: number;
   votes: number;
   created_by?: string;
@@ -113,6 +115,7 @@ export interface CreateWishlistItemInput {
   description?: string;
   priority?: WishlistPriority;
   effort_estimate?: WishlistEffort;
+  work_type?: WishlistWorkType;
   business_value?: number;
   // Agent OS Spec fields
   problem_statement?: string;
@@ -127,6 +130,7 @@ export interface UpdateWishlistItemInput {
   status?: WishlistStatus;
   priority?: WishlistPriority;
   effort_estimate?: WishlistEffort;
+  work_type?: WishlistWorkType;
   business_value?: number;
   assigned_to?: string;
   assigned_to_name?: string;

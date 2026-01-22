@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, FileText, Target } from 'lucide-react';
-import type { CreateWishlistItemInput, UpdateWishlistItemInput, WishlistPriority, WishlistEffort, WishlistItem } from '../types/wishlist';
+import type { CreateWishlistItemInput, UpdateWishlistItemInput, WishlistPriority, WishlistEffort, WishlistWorkType, WishlistItem } from '../types/wishlist';
 
 interface AddWishlistItemModalProps {
   isOpen: boolean;
@@ -29,6 +29,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
     description: '',
     priority: 'medium',
     effort_estimate: undefined,
+    work_type: 'feature',
     business_value: undefined,
     problem_statement: '',
     acceptance_criteria: '',
@@ -46,6 +47,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
         description: editItem.description || '',
         priority: editItem.priority,
         effort_estimate: editItem.effort_estimate,
+        work_type: editItem.work_type || 'feature',
         business_value: editItem.business_value,
         problem_statement: editItem.problem_statement || '',
         acceptance_criteria: editItem.acceptance_criteria || '',
@@ -64,6 +66,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
         description: '',
         priority: 'medium',
         effort_estimate: undefined,
+        work_type: 'feature',
         business_value: undefined,
         problem_statement: '',
         acceptance_criteria: '',
@@ -82,6 +85,7 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
       description: '',
       priority: 'medium',
       effort_estimate: undefined,
+      work_type: 'feature',
       business_value: undefined,
       problem_statement: '',
       acceptance_criteria: '',
@@ -218,8 +222,8 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
                   />
                 </div>
 
-                {/* Priority and Effort */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Priority, Effort, and Work Type */}
+                <div className="grid grid-cols-3 gap-4">
                   {/* Priority */}
                   <div>
                     <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
@@ -252,6 +256,23 @@ export function AddWishlistItemModal({ isOpen, onClose, onSubmit, onUpdate, edit
                       <option value="M">M (1-2 days)</option>
                       <option value="L">L (3-5 days)</option>
                       <option value="XL">XL (Week+)</option>
+                    </select>
+                  </div>
+
+                  {/* Work Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                      Work Type
+                    </label>
+                    <select
+                      value={formData.work_type || 'feature'}
+                      onChange={(e) => setFormData({ ...formData, work_type: e.target.value as WishlistWorkType })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)]"
+                    >
+                      <option value="feature">✨ Feature</option>
+                      <option value="fix">🐛 Bug Fix</option>
+                      <option value="amendment">📝 Amendment</option>
+                      <option value="refactor">🔧 Refactor</option>
                     </select>
                   </div>
                 </div>

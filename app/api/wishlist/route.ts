@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       description,
       priority = 'medium',
       effort_estimate,
+      work_type = 'feature',
       business_value,
       // Agent OS Spec fields
       problem_statement,
@@ -83,12 +84,12 @@ export async function POST(req: NextRequest) {
     const [newItem] = await sql`
       INSERT INTO wishlist_items (
         title, description, status, priority,
-        effort_estimate, business_value,
+        effort_estimate, work_type, business_value,
         problem_statement, acceptance_criteria, target_module, test_scenarios,
         created_by, created_by_name
       ) VALUES (
         ${title}, ${description || null}, 'Backlog', ${priority},
-        ${effort_estimate || null}, ${business_value || null},
+        ${effort_estimate || null}, ${work_type}, ${business_value || null},
         ${problem_statement || null}, ${acceptance_criteria || null}, ${target_module || null}, ${test_scenarios || null},
         ${userId}, ${userName}
       )

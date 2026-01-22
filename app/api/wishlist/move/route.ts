@@ -6,6 +6,7 @@ import {
   isEligibleForMvp,
   createMvpIssue,
 } from '@/modules/wishlist/services/githubMvpSync';
+import { triggerHarnessBuild } from '@/modules/wishlist/services/harnessTrigger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -85,6 +86,28 @@ export async function POST(req: NextRequest) {
           `MVP pipeline triggered for item ${itemId} - GitHub Issue #${githubIssue.issueNumber}`,
           'WishlistMove'
         );
+
+        // Trigger harness build (async, fire and forget)
+        if (process.env.HARNESS_TRIGGER_URL) {
+          triggerHarnessBuild({
+            item_id: itemId,
+            work_type: updatedItem.work_type || 'feature',
+            github_issue_number: githubIssue.issueNumber,
+            github_issue_url: githubIssue.issueUrl,
+            spec: {
+              title: updatedItem.title,
+              description: updatedItem.description,
+              problem_statement: updatedItem.problem_statement,
+              acceptance_criteria: updatedItem.acceptance_criteria,
+              target_module: updatedItem.target_module,
+              test_scenarios: updatedItem.test_scenarios,
+              effort_estimate: updatedItem.effort_estimate,
+              priority: updatedItem.priority,
+            },
+          }).catch((err) => {
+            log.warn(`Harness trigger failed (non-blocking): ${err}`, 'WishlistMove');
+          });
+        }
       } else {
         log.warn(
           `Failed to create GitHub issue for item ${itemId} - MVP pipeline not triggered`,
