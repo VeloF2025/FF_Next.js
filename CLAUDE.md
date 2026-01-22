@@ -709,11 +709,18 @@ ssh louis@100.96.203.105
 | **Local** | localhost:3004 | 3004 | Local machine | manual (`PORT=3004 npm start`) |
 
 ### Deployment Workflow
-1. **Local:** Develop on feature branch
-2. **Staging:** Push to master → Deploy to vf.fibreflow.app (test)
-3. **Production:** After staging verified → Deploy to app.fibreflow.app
+1. **Local:** Develop on feature branch (localhost:3004)
+2. **Dev:** Deploy to dev.fibreflow.app for initial testing
+3. **Staging:** After dev verified → Deploy to vf.fibreflow.app for UAT
+4. **Production:** After staging approved → Deploy to app.fibreflow.app (go live)
 
 ### Deployment Commands (Updated Jan 2026)
+
+**Deploy to DEV (dev.fibreflow.app):**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "cd /home/hein/apps/fibreflow-dev && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+```
 
 **Deploy to STAGING (vf.fibreflow.app):**
 ```bash
