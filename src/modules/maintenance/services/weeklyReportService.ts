@@ -135,7 +135,17 @@ export async function createWeeklyReport(
         status,
         imported_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *`,
+      RETURNING
+        id, report_uid, week_number, year, report_date,
+        original_filename, file_path, status,
+        total_rows, imported_count, skipped_count, error_count,
+        imported_by, started_at, created_at, updated_at,
+        completed_at as imported_at,
+        CASE
+          WHEN error_message IS NOT NULL AND error_message != ''
+          THEN error_message::jsonb
+          ELSE '[]'::jsonb
+        END as errors`,
       [
         reportUID,
         payload.week_number,
@@ -182,7 +192,18 @@ export async function getWeeklyReportById(
   }
 
   const report = await queryOne<WeeklyReport>(
-    `SELECT * FROM maintenance_weekly_reports WHERE id = $1`,
+    `SELECT
+       id, report_uid, week_number, year, report_date,
+       original_filename, file_path, status,
+       total_rows, imported_count, skipped_count, error_count,
+       imported_by, started_at, created_at, updated_at,
+       completed_at as imported_at,
+       CASE
+         WHEN error_message IS NOT NULL AND error_message != ''
+         THEN error_message::jsonb
+         ELSE '[]'::jsonb
+       END as errors
+     FROM maintenance_weekly_reports WHERE id = $1`,
     [reportId]
   );
 
@@ -258,7 +279,17 @@ export async function updateWeeklyReport(
     `UPDATE maintenance_weekly_reports
      SET ${updates.join(', ')}
      WHERE id = $${paramIndex}
-     RETURNING *`,
+     RETURNING
+       id, report_uid, week_number, year, report_date,
+       original_filename, file_path, status,
+       total_rows, imported_count, skipped_count, error_count,
+       imported_by, started_at, created_at, updated_at,
+       completed_at as imported_at,
+       CASE
+         WHEN error_message IS NOT NULL AND error_message != ''
+         THEN error_message::jsonb
+         ELSE '[]'::jsonb
+       END as errors`,
     values
   );
 
@@ -705,7 +736,18 @@ export async function listWeeklyReports(
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const reports = await query<WeeklyReport>(
-    `SELECT * FROM maintenance_weekly_reports
+    `SELECT
+       id, report_uid, week_number, year, report_date,
+       original_filename, file_path, status,
+       total_rows, imported_count, skipped_count, error_count,
+       imported_by, started_at, created_at, updated_at,
+       completed_at as imported_at,
+       CASE
+         WHEN error_message IS NOT NULL AND error_message != ''
+         THEN error_message::jsonb
+         ELSE '[]'::jsonb
+       END as errors
+     FROM maintenance_weekly_reports
      ${whereClause}
      ORDER BY created_at DESC`,
     values
