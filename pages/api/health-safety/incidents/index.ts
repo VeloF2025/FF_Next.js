@@ -40,23 +40,22 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     project_id,
     contractor_id,
     severity,
-    incident_type,
     status,
     dol_reportable,
     limit = '50',
     offset = '0',
   } = req.query;
 
-  // Check if tickets table exists (maintenance module dependency)
+  // Check if maintenance_tickets table exists
   const ticketsTableExists = await sql`
     SELECT EXISTS (
       SELECT 1 FROM information_schema.tables
-      WHERE table_name = 'tickets'
+      WHERE table_name = 'maintenance_tickets'
     ) as exists
   `;
 
   if (!ticketsTableExists[0]?.exists) {
-    // Return empty results if tickets table doesn't exist
+    // Return empty results if maintenance_tickets table doesn't exist
     return apiResponse.success(res, {
       incidents: [],
       total: 0,
@@ -77,53 +76,43 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const incidents = await sql`
     SELECT
       t.id,
+      t.ticket_uid,
       t.title,
+      t.description,
       t.status,
       t.priority,
-      t.ticket_type,
+      t.source_type,
       t.created_at,
       t.updated_at,
-      t.due_date,
-      hd.incident_type,
+      t.project_id,
       hd.severity,
-      hd.incident_date,
-      hd.incident_time,
-      hd.location,
       hd.dol_reportable,
       hd.dol_reported,
       hd.corrective_action_required,
-      hd.investigation_started_at,
-      hd.investigation_completed_at,
-      p.project_name,
-      c.company_name as contractor_name,
-      s.full_name as assigned_to_name,
-      (SELECT COUNT(*) FROM jsonb_array_elements(hd.injured_persons))::int as injured_count
-    FROM tickets t
+      hd.root_cause,
+      p.project_name
+    FROM maintenance_tickets t
     JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    LEFT JOIN projects p ON p.id = t.project_id
-    LEFT JOIN contractors c ON c.id = t.contractor_id
-    LEFT JOIN staff s ON s.id = t.assigned_to
-    WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+    LEFT JOIN projects p ON p.id::text = t.project_id
+    WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
     ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
     ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
     ${severity ? sql`AND hd.severity = ${severity}` : sql``}
-    ${incident_type ? sql`AND hd.incident_type = ${incident_type}` : sql``}
     ${status ? sql`AND t.status = ${status}` : sql``}
     ${dol_reportable === 'true' ? sql`AND hd.dol_reportable = true` : sql``}
-    ORDER BY hd.incident_date DESC, t.created_at DESC
+    ORDER BY t.created_at DESC
     LIMIT ${parseInt(limit as string)}
     OFFSET ${parseInt(offset as string)}
   `;
 
   const [{ count }] = await sql`
     SELECT COUNT(*)::int as count
-    FROM tickets t
+    FROM maintenance_tickets t
     JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+    WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
     ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
     ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
     ${severity ? sql`AND hd.severity = ${severity}` : sql``}
-    ${incident_type ? sql`AND hd.incident_type = ${incident_type}` : sql``}
     ${status ? sql`AND t.status = ${status}` : sql``}
     ${dol_reportable === 'true' ? sql`AND hd.dol_reportable = true` : sql``}
   `;
@@ -138,9 +127,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
       COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
       COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
-    FROM tickets t
+    FROM maintenance_tickets t
     JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+    WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
     ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
     ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
   `;
@@ -155,11 +144,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  // Check if tickets table exists first
+  // Check if maintenance_tickets table exists first
   const ticketsTableExists = await sql`
     SELECT EXISTS (
       SELECT 1 FROM information_schema.tables
-      WHERE table_name = 'tickets'
+      WHERE table_name = 'maintenance_tickets'
     ) as exists
   `;
 
@@ -218,22 +207,28 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const autoTitle =
     title || `${incidentConfig?.label || incident_type} - ${location || 'Unknown location'}`;
 
+  // Generate ticket UID
+  const ticketUid = `HS-${Date.now().toString(36).toUpperCase()}`;
+
   // Create maintenance ticket
   const [ticket] = await sql`
-    INSERT INTO tickets (
-      title, description, ticket_type, source, priority, status,
-      project_id, contractor_id, assigned_to, due_date
+    INSERT INTO maintenance_tickets (
+      ticket_uid, title, description, type, source, source_type, priority, status,
+      project_id, contractor_id, assigned_to, due_date, created_by
     ) VALUES (
+      ${ticketUid},
       ${autoTitle},
       ${description || null},
+      'incident',
+      'internal',
       ${ticketType},
-      'hse_report',
       ${priority},
       'open',
       ${project_id || null},
       ${contractor_id || null},
       ${assigned_to || null},
-      ${dueDate.toISOString()}
+      ${dueDate.toISOString()},
+      (SELECT id FROM users LIMIT 1)
     )
     RETURNING *
   `;
@@ -287,10 +282,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       hd.corrective_action_required,
       p.project_name,
       c.company_name as contractor_name
-    FROM tickets t
+    FROM maintenance_tickets t
     JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    LEFT JOIN projects p ON p.id = t.project_id
-    LEFT JOIN contractors c ON c.id = t.contractor_id
+    LEFT JOIN projects p ON p.id::text = t.project_id
+    LEFT JOIN contractors c ON c.id::text = t.contractor_id
     WHERE t.id = ${ticket.id}
   `;
 
