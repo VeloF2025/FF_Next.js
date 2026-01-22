@@ -511,6 +511,66 @@ Use this checklist when reviewing components for compliance:
 
 ---
 
+## FOUC Prevention (Flash of Unstyled Content)
+
+### The Problem
+When navigating between pages, users may see a brief flash of light-themed content before dark mode is applied. This occurs because React's `useEffect` runs **after** the initial paint.
+
+### The Solution
+Both `pages/_document.tsx` (Pages Router) and `app/layout.tsx` (App Router) contain inline blocking scripts that apply the theme **before** React hydrates.
+
+### Critical Implementation
+
+#### 1. Server-Side Rendering
+```tsx
+// Both layouts render with dark class by default
+<html lang="en" className="dark">
+  <body style={{ backgroundColor: '#1a1d23' }}>
+```
+
+#### 2. Blocking Theme Script
+```javascript
+// Runs BEFORE React hydration
+(function() {
+  var DARK_BG = '#1a1d23';
+  var LIGHT_BG = '#ffffff';
+  try {
+    var stored = localStorage.getItem('fibreflow-theme-preference');
+    var theme = 'dark'; // Default
+    if (stored) {
+      var pref = JSON.parse(stored);
+      if (pref.theme === 'light' || pref.theme === 'dark') {
+        theme = pref.theme;
+      }
+    }
+    var isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    document.body.style.backgroundColor = isDark ? DARK_BG : LIGHT_BG;
+  } catch (e) {
+    document.documentElement.classList.add('dark');
+  }
+})();
+```
+
+### Key Points
+| Requirement | Implementation |
+|-------------|----------------|
+| Script placement | Inside `<body>`, before content |
+| Script type | Blocking (NO `async` or `defer`) |
+| Default theme | Dark (`#1a1d23`) |
+| Storage key | `fibreflow-theme-preference` |
+| CSS property | `color-scheme: dark` for native form controls |
+
+### Files to Maintain
+- `pages/_document.tsx` - Pages Router layout
+- `app/layout.tsx` - App Router layout
+- `src/contexts/ThemeContext.tsx` - Runtime theme management
+
+**WARNING:** Do NOT remove the inline scripts from either layout file. They are critical for preventing theme flash.
+
+---
+
 ## Migration Notes
 
 ### Issues to Fix (from Audit)
@@ -525,4 +585,5 @@ Use this checklist when reviewing components for compliance:
 
 ---
 
+*Last Updated: January 2026*
 *This specification is the single source of truth for FibreFlow UI/UX standards.*
