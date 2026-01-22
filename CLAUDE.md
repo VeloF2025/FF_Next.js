@@ -792,6 +792,7 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 | **Cloudflared 502** | 502 via Cloudflare but nginx/app work locally | `sudo systemctl restart cloudflared-tunnel.service` |
 | **Cloudflared QUIC/Perm** | 502s persist, "accept stream listener failure" or "Connection terminated" | Use HTTP/2 + run as root (see below) |
 | **Port 3006 In Use** | 500 errors, service keeps restarting | `sudo fuser -k 3006/tcp && sudo systemctl restart fibreflow.service` |
+| **Missing DATABASE_URL** | 500 on API routes, "NEON_DATABASE_URL is not defined" | Add `DATABASE_URL=...` to `.env.production` (see below) |
 
 **Cloudflared 502 Diagnostic Path:**
 1. Test via Cloudflare: `curl https://vf.fibreflow.app/api/activate/health-check` → 502
@@ -829,8 +830,14 @@ sudo systemctl restart nginx fibreflow.service cloudflared-tunnel.service
 
 **Required Environment Variables (.env.production):**
 ```bash
+DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
 VLM_API_URL=http://localhost:8100          # Must use localhost, not Tailscale IP
 NEXT_PUBLIC_APP_URL=http://localhost:3006  # For internal photo fetching (must match port)
+```
+
+**Check for missing DATABASE_URL:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production || echo 'MISSING!'"
 ```
 
 **Quick Recovery:**

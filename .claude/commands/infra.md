@@ -121,6 +121,16 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S fuser -
 sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/apps/fibreflow && sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' .env.production"
 ```
 
+**Check DATABASE_URL exists:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production || echo 'MISSING DATABASE_URL!'"
+```
+
+**Fix missing DATABASE_URL:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' >> /home/louis/apps/fibreflow/.env.production && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+```
+
 ## Cloudflared Tunnel Management
 
 **Check status:**
@@ -221,6 +231,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemc
 | **Cloudflared certs** | 502, "Cannot determine origin certificate" | root can't find certs | Set `Environment=HOME=/home/louis` |
 | **Port conflict** | 500, EADDRINUSE | Stale process | `fuser -k [port]/tcp` |
 | **DB auth** | 500, "password authentication failed" | Wrong password in .env | Fix password: `npg_MIUZXrg1tEY0` |
+| **Missing DATABASE_URL** | 500, "NEON_DATABASE_URL is not defined" | DATABASE_URL not in .env.production | Add `DATABASE_URL=...` to .env.production |
 | **Old build** | Missing features | Stale .next cache | `rm -rf .next && npm run build` |
 | **Git perms** | "Permission denied" on git | Wrong ownership | `chown -R louis:louis .git` |
 
