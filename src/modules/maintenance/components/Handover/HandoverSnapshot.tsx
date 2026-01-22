@@ -174,7 +174,7 @@ export function HandoverSnapshot({
             <Calendar className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
             <span className="text-[var(--ff-text-secondary)]">Handover At:</span>
             <span className="text-[var(--ff-text-primary)]">
-              {new Date(snapshot.handover_at).toLocaleString()}
+              {new Date(snapshot.handover_at).toISOString().split('T')[0]} {new Date(snapshot.handover_at).toTimeString().slice(0, 5)}
             </span>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -313,7 +313,7 @@ export function HandoverSnapshot({
                     <div>
                       <p className="text-sm font-medium text-[var(--ff-text-primary)]">{evidence.filename}</p>
                       <p className="text-xs text-[var(--ff-text-secondary)]">
-                        Uploaded {new Date(evidence.uploaded_at).toLocaleDateString()}
+                        Uploaded {new Date(evidence.uploaded_at).toISOString().split('T')[0]}
                       </p>
                     </div>
                   </div>
@@ -365,7 +365,7 @@ export function HandoverSnapshot({
                       {decision.decision_type.replace(/_/g, ' ')}
                     </span>
                     <span className="text-xs text-[var(--ff-text-secondary)]">
-                      {new Date(decision.decision_at).toLocaleString()}
+                      {new Date(decision.decision_at).toISOString().split('T')[0]} {new Date(decision.decision_at).toTimeString().slice(0, 5)}
                     </span>
                   </div>
                   {decision.notes && (

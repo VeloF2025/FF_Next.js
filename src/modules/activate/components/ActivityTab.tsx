@@ -151,11 +151,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
     try {
-      return new Date(dateStr).toLocaleDateString('en-ZA', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
+      // Standard YYYY-MM-DD format
+      return new Date(dateStr).toISOString().split('T')[0];
     } catch {
       return dateStr;
     }

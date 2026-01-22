@@ -663,7 +663,7 @@ export async function extractOdometerWithCalibration(
     // Build few-shot prompt with calibration context
     const prompt = buildFewShotOdometerPrompt(
       calibration.baselineOdometer,
-      new Date(calibration.calibratedAt).toLocaleDateString()
+      new Date(calibration.calibratedAt).toISOString().split('T')[0]
     );
 
     // First pass with calibration-aware prompt

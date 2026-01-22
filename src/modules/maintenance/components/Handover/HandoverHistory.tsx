@@ -77,7 +77,8 @@ function formatRelativeTime(date: Date): string {
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
-  return new Date(date).toLocaleDateString();
+  // Standard YYYY-MM-DD format
+  return new Date(date).toISOString().split('T')[0];
 }
 
 /**
@@ -174,7 +175,7 @@ function HandoverTimelineEntry({
               <div className="flex flex-wrap gap-4 text-xs text-[var(--ff-text-secondary)]">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>{new Date(handover.handover_at).toLocaleString()}</span>
+                  <span>{new Date(handover.handover_at).toISOString().split('T')[0]} {new Date(handover.handover_at).toTimeString().slice(0, 5)}</span>
                   <span className="text-[var(--ff-text-tertiary)]">
                     ({formatRelativeTime(handover.handover_at)})
                   </span>

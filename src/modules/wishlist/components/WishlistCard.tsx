@@ -149,7 +149,7 @@ export function WishlistCard({ item, onVote, onDelete, onEdit, onAttachments, is
             <span>{item.created_by_name}</span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {new Date(item.created_at).toLocaleDateString()}
+              {new Date(item.created_at).toISOString().split('T')[0]}
             </span>
           </div>
         </div>

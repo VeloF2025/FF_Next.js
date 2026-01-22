@@ -95,7 +95,7 @@ function DriverRow({
             </p>
             {driver.licenseExpiry && (
               <p className="text-xs text-[var(--ff-text-tertiary)]">
-                Expires: {new Date(driver.licenseExpiry).toLocaleDateString()}
+                Expires: {new Date(driver.licenseExpiry).toISOString().split('T')[0]}
               </p>
             )}
           </div>

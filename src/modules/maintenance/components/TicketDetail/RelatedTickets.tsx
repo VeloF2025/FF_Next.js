@@ -25,16 +25,12 @@ interface RelatedTicketsProps {
 }
 
 /**
- * Format date to readable string
+ * Format date to YYYY-MM-DD standard
  */
 function formatDate(dateString: string): string {
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-ZA', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return date.toISOString().split('T')[0];
   } catch {
     return dateString;
   }

@@ -240,7 +240,7 @@ export function CheckInForm({
                     {lastOdometer.value.toLocaleString()} km
                   </span>
                   <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">
-                    ({new Date(lastOdometer.recordedAt).toLocaleDateString()})
+                    ({new Date(lastOdometer.recordedAt).toISOString().split('T')[0]})
                   </span>
                 </div>
               )}
@@ -251,7 +251,7 @@ export function CheckInForm({
                     {lastFuel.value}%
                   </span>
                   <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">
-                    ({new Date(lastFuel.recordedAt).toLocaleDateString()})
+                    ({new Date(lastFuel.recordedAt).toISOString().split('T')[0]})
                   </span>
                 </div>
               )}

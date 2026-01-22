@@ -274,7 +274,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
                       )}
                       {picking.scheduledDate && (
                         <span>
-                          {new Date(picking.scheduledDate).toLocaleDateString()}
+                          {new Date(picking.scheduledDate).toISOString().split('T')[0]}
                         </span>
                       )}
                     </div>

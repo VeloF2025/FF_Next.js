@@ -179,7 +179,7 @@ export function ContractorAccountabilityList({
                     </div>
                     {contractor.lastReconciliationDate && (
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Last reconciled: {new Date(contractor.lastReconciliationDate).toLocaleDateString()}
+                        Last reconciled: {new Date(contractor.lastReconciliationDate).toISOString().split('T')[0]}
                       </div>
                     )}
                   </td>

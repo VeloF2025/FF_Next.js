@@ -138,14 +138,10 @@ function formatStatusLabel(status: EscalationStatus): string {
 }
 
 /**
- * 🟢 WORKING: Format date
+ * 🟢 WORKING: Format date (YYYY-MM-DD standard)
  */
 function formatDate(date: Date): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return new Date(date).toISOString().split('T')[0];
 }
 
 /**

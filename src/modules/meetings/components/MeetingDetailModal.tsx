@@ -31,7 +31,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               <div className="space-y-2 text-sm text-[var(--ff-text-secondary)]">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                  <span>{meeting.date.toLocaleDateString()}</span>
+                  <span>{meeting.date.toISOString().split('T')[0]}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
@@ -96,7 +96,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                       <div>
                         <p className="text-sm font-medium text-[var(--ff-text-primary)]">{item.task}</p>
                         <p className="text-xs text-[var(--ff-text-secondary)]">
-                          Assigned to {item.assignee} • Due {item.dueDate.toLocaleDateString()}
+                          Assigned to {item.assignee} • Due {item.dueDate.toISOString().split('T')[0]}
                         </p>
                       </div>
                     </div>

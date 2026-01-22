@@ -186,7 +186,7 @@ export class WorkflowTemplateService {
 
       if (existingTemplates.templates.some(t => t.name === templateData.template.name)) {
         warnings.push('Template name already exists, will be imported with suffix');
-        templateData.template.name += ` (Imported ${new Date().toLocaleDateString()})`;
+        templateData.template.name += ` (Imported ${new Date().toISOString().split('T')[0]})`;
       }
 
       // Start import process

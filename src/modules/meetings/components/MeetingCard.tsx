@@ -72,7 +72,7 @@ export function MeetingCard({ meeting, onEdit, onDelete, onJoin }: MeetingCardPr
       <div className="space-y-2 text-sm text-[var(--ff-text-secondary)] mb-3">
         <div className="flex items-center">
           <Calendar className="w-4 h-4 mr-2" />
-          <span>{meeting.date.toLocaleDateString()}</span>
+          <span>{meeting.date.toISOString().split('T')[0]}</span>
         </div>
         
         <div className="flex items-center">

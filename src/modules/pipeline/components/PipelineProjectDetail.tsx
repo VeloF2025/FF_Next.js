@@ -207,11 +207,8 @@ export function PipelineProjectDetail() {
 
   const formatDate = (date: string | null) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    // Standard YYYY-MM-DD format
+    return new Date(date).toISOString().split('T')[0];
   };
 
   const getDaysUntilExpiry = (expiryDate: string | null) => {

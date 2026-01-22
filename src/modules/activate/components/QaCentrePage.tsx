@@ -769,11 +769,11 @@ function QaCentrePageContent() {
               {/* Table Rows */}
               <div className="grid gap-1">
                 {filteredDrops.map((drop) => {
-                  // Format dates
+                  // Format dates (YYYY-MM-DD standard)
                   const formatDate = (dateStr: string | null) => {
                     if (!dateStr) return '-';
                     const date = new Date(dateStr);
-                    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                    return date.toISOString().split('T')[0];
                   };
 
                   // Format time (HH:MM)

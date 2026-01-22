@@ -271,9 +271,9 @@ export function PropertiesPanel() {
         <div>
           <FormField label="Order Index" value={data.orderIndex} path="orderIndex" type="number" readonly />
           <div className="text-xs text-[var(--ff-text-tertiary)]">
-            Created: {new Date(data.createdAt).toLocaleDateString()}
+            Created: {new Date(data.createdAt).toISOString().split('T')[0]}
             <br />
-            Updated: {new Date(data.updatedAt).toLocaleDateString()}
+            Updated: {new Date(data.updatedAt).toISOString().split('T')[0]}
           </div>
         </div>
       )}

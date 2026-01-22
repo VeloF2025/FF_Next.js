@@ -220,10 +220,7 @@ export function WorkflowTimeline({
                 <div className={`text-xs font-medium ${
                   header.isToday ? 'text-red-600 dark:text-red-400' : 'text-[var(--ff-text-secondary)]'
                 }`}>
-                  {header.date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                  })}
+                  {header.date.toISOString().split('T')[0]}
                 </div>
               </div>
             ))}

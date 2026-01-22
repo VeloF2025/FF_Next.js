@@ -36,11 +36,8 @@ function formatDate(dateStr: string | null): string {
   if (!dateStr) return '-';
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    // Standard YYYY-MM-DD format
+    return date.toISOString().split('T')[0];
   } catch {
     return dateStr;
   }

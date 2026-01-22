@@ -360,13 +360,7 @@ export function FeedbackPhase({
             </div>
           </div>
           <div className="text-right text-sm text-gray-500">
-            {new Date().toLocaleDateString('en-ZA', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {new Date().toISOString().split('T')[0]} {new Date().toTimeString().slice(0, 5)}
           </div>
         </div>
       </div>
@@ -528,13 +522,7 @@ export function FeedbackPhase({
                 WhatsApp feedback was sent for this DR on{' '}
                 <strong>
                   {feedbackSentAt
-                    ? new Date(feedbackSentAt).toLocaleDateString('en-ZA', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
+                    ? `${new Date(feedbackSentAt).toISOString().split('T')[0]} ${new Date(feedbackSentAt).toTimeString().slice(0, 5)}`
                     : 'unknown date'}
                 </strong>
               </p>

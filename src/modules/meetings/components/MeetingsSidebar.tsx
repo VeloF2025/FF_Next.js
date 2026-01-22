@@ -56,7 +56,7 @@ export function MeetingsSidebar({ upcomingMeetings, meetings }: MeetingsSidebarP
                     <User className="w-3 h-3 text-[var(--ff-text-tertiary)]" />
                     <span className="text-xs text-[var(--ff-text-secondary)]">{item.assignee}</span>
                     <span className="text-xs text-[var(--ff-text-tertiary)]">•</span>
-                    <span className="text-xs text-[var(--ff-text-secondary)]">Due {item.dueDate.toLocaleDateString()}</span>
+                    <span className="text-xs text-[var(--ff-text-secondary)]">Due {item.dueDate.toISOString().split('T')[0]}</span>
                   </div>
                 </div>
               ))}

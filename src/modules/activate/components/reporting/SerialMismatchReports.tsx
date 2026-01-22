@@ -516,7 +516,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                     )}
                     {record.status === 'resolved' && record.resolved_at && (
                       <span className="text-xs text-gray-500">
-                        {new Date(record.resolved_at).toLocaleDateString()}
+                        {new Date(record.resolved_at).toISOString().split('T')[0]}
                       </span>
                     )}
                   </td>

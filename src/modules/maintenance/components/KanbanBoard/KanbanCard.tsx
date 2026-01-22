@@ -74,7 +74,8 @@ export function KanbanCard({ ticket, isDragging, onDragStart, onDragEnd }: Kanba
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    return new Date(date).toLocaleDateString();
+    // Standard YYYY-MM-DD format
+    return new Date(date).toISOString().split('T')[0];
   };
 
   return (

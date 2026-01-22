@@ -44,11 +44,8 @@ const DOCUMENT_TYPES: { value: ApprovalDocumentType; label: string }[] = [
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  // Standard YYYY-MM-DD format
+  return new Date(date).toISOString().split('T')[0];
 }
 
 function formatFileSize(bytes: number | null | undefined): string {

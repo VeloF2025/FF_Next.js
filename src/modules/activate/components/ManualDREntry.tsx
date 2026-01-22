@@ -310,7 +310,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
                       </span>
                     )}
                     <span className="ml-2">
-                      ({new Date(result.previousSubmission.snapshot_at).toLocaleDateString()})
+                      ({new Date(result.previousSubmission.snapshot_at).toISOString().split('T')[0]})
                     </span>
                   </div>
                 )}

@@ -148,7 +148,7 @@ export function ReturnList({ returns, loading, onInspect, onAccept, onView }: Re
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                       {ret.returnDate
-                        ? new Date(ret.returnDate).toLocaleDateString()
+                        ? new Date(ret.returnDate).toISOString().split('T')[0]
                         : '-'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">

@@ -362,7 +362,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                     )}
                     {record.swap_status === 'corrected_in_1map' && record.corrected_at && (
                       <span className="text-xs text-gray-500">
-                        {new Date(record.corrected_at).toLocaleDateString()}
+                        {new Date(record.corrected_at).toISOString().split('T')[0]}
                       </span>
                     )}
                   </td>

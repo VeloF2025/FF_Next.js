@@ -106,7 +106,7 @@ export function CheckInSummary({
         <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
           <Calendar className="w-5 h-5" />
           <span>
-            {new Date(record.checkDate).toLocaleDateString()} at{' '}
+            {new Date(record.checkDate).toISOString().split('T')[0]} at{' '}
             {record.checkTime.substring(0, 5)}
           </span>
         </div>

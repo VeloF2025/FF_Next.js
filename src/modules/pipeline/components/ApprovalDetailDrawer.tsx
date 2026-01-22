@@ -69,11 +69,8 @@ const INTERNAL_STATUS_CONFIG: Record<
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  // Standard YYYY-MM-DD format
+  return new Date(date).toISOString().split('T')[0];
 }
 
 function formatCurrency(value: number | null | undefined): string {

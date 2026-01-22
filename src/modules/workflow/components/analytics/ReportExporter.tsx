@@ -164,7 +164,7 @@ export function ReportExporter({ analytics, dateRange, variant = 'compact' }: Re
 ## ${data.metadata.subtitle}
 
 **Report Period:** ${data.metadata.dateRange}
-**Generated:** ${new Date().toLocaleDateString()}
+**Generated:** ${new Date().toISOString().split('T')[0]}
 
 ## Executive Summary
 - Total Projects: ${data.overview.totalProjects}
@@ -214,7 +214,7 @@ ${data.insights.map((insight: any) => `
       // Overview sheet data
       ['Workflow Analytics Report'],
       ['Report Period', data.metadata.dateRange],
-      ['Generated', new Date().toLocaleDateString()],
+      ['Generated', new Date().toISOString().split('T')[0]],
       [''],
       ['Executive Summary'],
       ['Metric', 'Value'],

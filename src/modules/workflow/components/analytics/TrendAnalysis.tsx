@@ -80,7 +80,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
       const seasonalFactor = 1 + 0.1 * Math.sin((date.getMonth() / 12) * 2 * Math.PI);
       
       periods.push({
-        period: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        period: date.toISOString().slice(0, 7), // YYYY-MM format for chart periods
         date,
         completionRate: Math.round(baseCompletion * seasonalFactor),
         avgDuration: Math.round(baseDuration / seasonalFactor),
@@ -91,7 +91,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
 
     // Add current period with actual data
     const currentPeriod: TrendDataPoint = {
-      period: now.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      period: now.toISOString().slice(0, 7), // YYYY-MM format for chart periods
       date: now,
       completionRate: Math.round(analytics.performanceMetrics.onTimeCompletion),
       avgDuration: Math.round(analytics.performanceMetrics.averageProjectDuration),
@@ -110,7 +110,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
       
       const lastPeriod = periods[periods.length - 1];
       periods.push({
-        period: futureDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        period: futureDate.toISOString().slice(0, 7), // YYYY-MM format for chart periods
         date: futureDate,
         completionRate: Math.max(0, Math.min(100, lastPeriod.completionRate + trend.completion * i)),
         avgDuration: Math.max(1, lastPeriod.avgDuration + trend.duration * i),

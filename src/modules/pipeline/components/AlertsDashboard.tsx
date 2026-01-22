@@ -87,11 +87,8 @@ const FOLLOWUP_CONFIG: Record<
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
-  return new Date(date).toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  // Standard YYYY-MM-DD format
+  return new Date(date).toISOString().split('T')[0];
 }
 
 export function AlertsDashboard({ className = '', compact = false }: AlertsDashboardProps) {

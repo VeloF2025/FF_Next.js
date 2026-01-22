@@ -530,7 +530,7 @@ function PendingAgingSection({
                   {record.project}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                  {new Date(record.wa_submitted).toLocaleDateString()}
+                  {new Date(record.wa_submitted).toISOString().split('T')[0]}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <span
