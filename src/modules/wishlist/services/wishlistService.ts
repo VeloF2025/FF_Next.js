@@ -212,7 +212,7 @@ class WishlistService {
   }>): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/columns`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
