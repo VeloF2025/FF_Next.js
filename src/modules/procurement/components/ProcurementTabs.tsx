@@ -184,8 +184,12 @@ export function ProcurementTabs({
     // Call the tab change callback (for context-based usage)
     onTabChange(tab.id);
 
-    // Navigate to the tab's path if it exists and differs from current path
-    if (tab.path && router.pathname !== tab.path) {
+    // Navigate to the tab's path if:
+    // 1. Path exists and differs from current path
+    // 2. We're NOT on the main /procurement page (which has inline tab content)
+    // This prevents "abort fetching" errors when showing inline content
+    const isOnMainProcurementPage = router.pathname === '/procurement';
+    if (tab.path && router.pathname !== tab.path && !isOnMainProcurementPage) {
       router.push(tab.path);
     }
   };
