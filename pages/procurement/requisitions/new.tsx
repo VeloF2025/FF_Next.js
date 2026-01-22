@@ -290,7 +290,7 @@ export default function NewRequisitionPage() {
                     <option value="">Select a project</option>
                     {projects.map((project) => (
                       <option key={project.id} value={project.id}>
-                        {project.name} ({project.project_code})
+                        {project.name}
                       </option>
                     ))}
                   </select>
