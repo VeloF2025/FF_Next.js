@@ -16,8 +16,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-// Service URLs (will be fetched from config in production)
-const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://192.168.1.150:8081';
+// Service URLs - use Tailscale IP for consistency across environments
+const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://100.96.203.105:8081';
 
 export default async function handler(
   req: NextApiRequest,
