@@ -30,11 +30,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fromDate = date_from || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
     const toDate = date_to || new Date().toISOString();
 
-    // Check if tickets table exists (maintenance module dependency)
+    // Check if maintenance_tickets table exists
     const ticketsTableExists = await sql`
       SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
-        WHERE table_name = 'tickets'
+        WHERE table_name = 'maintenance_tickets'
       ) as exists
     `;
     const hasTickets = ticketsTableExists[0]?.exists;
@@ -62,14 +62,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
           COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
           COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
-          COUNT(*) FILTER (WHERE t.ticket_type = 'hse_near_miss')::int as near_misses,
+          COUNT(*) FILTER (WHERE t.source_type = 'hse_near_miss')::int as near_misses,
           COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
           COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
           COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
           COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
-        FROM tickets t
+        FROM maintenance_tickets t
         JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-        WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
         AND t.created_at >= ${fromDate}
         AND t.created_at <= ${toDate}
         ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
@@ -83,9 +83,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           DATE_TRUNC('month', t.created_at) as month,
           COUNT(*)::int as total,
           COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
-        FROM tickets t
+        FROM maintenance_tickets t
         JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-        WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
         AND t.created_at >= ${fromDate}
         AND t.created_at <= ${toDate}
         ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
@@ -103,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         COUNT(*)::int as count
       FROM hs_contractor_compliance cc
       JOIN contractors c ON c.id = cc.contractor_id
-      WHERE c.status = 'active'
+      WHERE c.status IN ('approved', 'active', 'pending')
       ${contractor_id ? sql`AND cc.contractor_id = ${contractor_id}` : sql``}
       GROUP BY cc.rag_status
     `;
@@ -118,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cc.next_audit_due
       FROM hs_contractor_compliance cc
       JOIN contractors c ON c.id = cc.contractor_id
-      WHERE c.status = 'active'
+      WHERE c.status IN ('approved', 'active', 'pending')
       AND cc.rag_status IN ('red', 'amber')
       ${contractor_id ? sql`AND cc.contractor_id = ${contractor_id}` : sql``}
       ORDER BY cc.overall_score ASC
@@ -197,16 +197,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       LIMIT 20
     `;
 
-    // Calculate overall safety score
+    // Calculate overall safety score based on latest audit per project
+    const latestAuditPerProject = await sql`
+      SELECT DISTINCT ON (project_id) project_id, rag_status
+      FROM hs_project_audits
+      WHERE status IN ('completed', 'requires_action')
+      AND rag_status IS NOT NULL
+      ORDER BY project_id, audit_date DESC
+    `;
+
     const totalProjects = (await sql`SELECT COUNT(*)::int as count FROM hs_project_config`)[0].count;
-    const greenProjects = projectRagStats.find((p: any) => p.rag_status === 'green')?.count || 0;
-    const amberProjects = projectRagStats.find((p: any) => p.rag_status === 'amber')?.count || 0;
-    const redProjects = projectRagStats.find((p: any) => p.rag_status === 'red')?.count || 0;
+    const greenProjects = latestAuditPerProject.filter((p: any) => p.rag_status === 'green').length;
+    const amberProjects = latestAuditPerProject.filter((p: any) => p.rag_status === 'amber').length;
+    const redProjects = latestAuditPerProject.filter((p: any) => p.rag_status === 'red').length;
+    const auditedProjects = greenProjects + amberProjects + redProjects;
 
     // Weighted score: green=100, amber=60, red=20
     const overallScore =
-      totalProjects > 0
-        ? Math.round((greenProjects * 100 + amberProjects * 60 + redProjects * 20) / totalProjects)
+      auditedProjects > 0
+        ? Math.round((greenProjects * 100 + amberProjects * 60 + redProjects * 20) / auditedProjects)
         : 100;
 
     const overallRag = overallScore < 50 ? 'red' : overallScore < 80 ? 'amber' : 'green';
