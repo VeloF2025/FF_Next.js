@@ -206,53 +206,63 @@ export default function ProcurementPage({
     <AppLayout>
       <ProcurementPortalProvider value={contextValue}>
         <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="py-8">
-              {/* Page Header */}
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">Procurement Portal</h1>
-                <p className="mt-2 text-[var(--ff-text-secondary)]">
-                  Manage procurement across all projects
-                </p>
+          {/* Page Header */}
+          <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+            <div className="px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <ShoppingCart className="h-6 w-6 text-purple-500" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement</h1>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    Manage procurement across all projects
+                  </p>
+                </div>
               </div>
+            </div>
 
-              {/* Filters */}
-              <div className="mb-6">
-                <ProcurementFilters
-                  selectedProject={selectedProject}
-                  onProjectChange={handleProjectChange}
-                  isLoading={isLoading}
-                />
-              </div>
+            {/* Tab Navigation */}
+            <div className="px-6 border-t border-[var(--ff-border-default)]">
+              <ProcurementTabs />
+            </div>
+          </div>
 
-              {/* Error State */}
-              {error && (
-                <div className="mb-6 bg-red-500/20 border border-red-500/30 rounded-lg p-4">
-                  <div className="flex">
-                    <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 mr-3" />
-                    <div>
-                      <h3 className="text-sm font-medium text-red-400">Error</h3>
-                      <div className="mt-1 text-sm text-red-400">{error}</div>
-                    </div>
+          {/* Content */}
+          <div className="p-6">
+            {/* Filters */}
+            <div className="mb-6">
+              <ProcurementFilters
+                selectedProject={selectedProject}
+                onProjectChange={handleProjectChange}
+                isLoading={isLoading}
+              />
+            </div>
+
+            {/* Error State */}
+            {error && (
+              <div className="mb-6 bg-red-500/20 border border-red-500/30 rounded-lg p-4">
+                <div className="flex">
+                  <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 mr-3" />
+                  <div>
+                    <h3 className="text-sm font-medium text-red-400">Error</h3>
+                    <div className="mt-1 text-sm text-red-400">{error}</div>
                   </div>
                 </div>
-              )}
-
-              {/* Tab Navigation */}
-              <ProcurementTabs />
-
-              {/* Tab Content */}
-              <div className="mt-6">
-                {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
-                {activeTab === 'boq' && <PlaceholderTab title="Bill of Quantities" icon={FileText} description="Manage project BOQ items" />}
-                {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
-                {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
-                {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
-                {activeTab === 'stock' && <PlaceholderTab title="Stock Movement" icon={Package} description="Track inventory movements" />}
-                {activeTab === 'field-stock' && <FieldStockTabContent />}
-                {activeTab === 'suppliers' && <SuppliersTabContent />}
-                {activeTab === 'reports' && <PlaceholderTab title="Procurement Reports" icon={ClipboardList} description="Generate and view reports" />}
               </div>
+            )}
+
+            {/* Tab Content */}
+            <div className="mt-6">
+              {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
+              {activeTab === 'boq' && <PlaceholderTab title="Bill of Quantities" icon={FileText} description="Manage project BOQ items" />}
+              {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
+              {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
+              {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
+              {activeTab === 'stock' && <PlaceholderTab title="Stock Movement" icon={Package} description="Track inventory movements" />}
+              {activeTab === 'field-stock' && <FieldStockTabContent />}
+              {activeTab === 'suppliers' && <SuppliersTabContent />}
+              {activeTab === 'reports' && <PlaceholderTab title="Procurement Reports" icon={ClipboardList} description="Generate and view reports" />}
             </div>
           </div>
         </div>
