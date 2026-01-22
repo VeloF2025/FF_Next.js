@@ -189,7 +189,7 @@ export function BundleItemsModal({
 
   // Calculate bundle total
   const bundleTotal = items.reduce((sum, item) => {
-    const cost = item.effective_cost || item.item_cost || 0;
+    const cost = Number(item.effective_cost || item.item_cost || 0);
     return sum + cost * item.quantity;
   }, 0);
 
@@ -273,7 +273,7 @@ export function BundleItemsModal({
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-[var(--ff-text-primary)]">
-                                R {(item.standardCost || 0).toFixed(2)}
+                                R {Number(item.standardCost || 0).toFixed(2)}
                               </p>
                               <p className="text-xs text-[var(--ff-text-tertiary)]">
                                 {item.qtyAvailable} {item.uom}
@@ -368,10 +368,10 @@ export function BundleItemsModal({
                           {/* Cost */}
                           <div className="text-right w-24">
                             <p className="font-medium text-[var(--ff-text-primary)]">
-                              R {((item.effective_cost || item.item_cost || 0) * item.quantity).toFixed(2)}
+                              R {(Number(item.effective_cost || item.item_cost || 0) * item.quantity).toFixed(2)}
                             </p>
                             <p className="text-xs text-[var(--ff-text-tertiary)]">
-                              @ R {(item.effective_cost || item.item_cost || 0).toFixed(2)}
+                              @ R {Number(item.effective_cost || item.item_cost || 0).toFixed(2)}
                             </p>
                           </div>
 
