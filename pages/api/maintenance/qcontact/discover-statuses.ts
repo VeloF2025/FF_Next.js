@@ -1,9 +1,11 @@
 /**
  * QContact Status Discovery Endpoint
- * 🟢 WORKING: Fetches all QContact tickets to discover unique status values
+ * 🟢 WORKING: Fetches QContact tickets and their details to discover unique status values
  *
  * Used to understand what statuses QContact uses before creating a mapping
  * to FibreFlow's 11-status workflow.
+ *
+ * Note: The list view doesn't include status, so we fetch case details.
  *
  * @endpoint GET /api/maintenance/qcontact/discover-statuses
  */
@@ -13,7 +15,6 @@ import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import {
   createFiberTimeQContactClient,
-  FiberTimeCase,
 } from '@/modules/maintenance/services/fibertimeQContactClient';
 
 const logger = createLogger('qcontact-discover-statuses');
@@ -27,8 +28,8 @@ interface DiscoveryResult {
   samples: Record<string, { id: string; label: string; created_at: string }[]>;
   /** Total tickets scanned */
   totalScanned: number;
-  /** Number of pages fetched */
-  pagesFetched: number;
+  /** Details fetched count */
+  detailsFetched: number;
   /** Timestamp of discovery */
   discoveredAt: string;
 }
@@ -55,14 +56,15 @@ export default async function handler(
 
     const statusCounts: Record<string, number> = {};
     const statusSamples: Record<string, { id: string; label: string; created_at: string }[]> = {};
-    let totalScanned = 0;
+    const allCaseIds: { id: number; label: string; created_at: string }[] = [];
+
+    // First, fetch all case IDs from list view
     let page = 1;
     const pageSize = 50;
     let hasMore = true;
 
-    // Fetch all pages
     while (hasMore) {
-      logger.debug(`Fetching page ${page}`);
+      logger.debug(`Fetching list page ${page}`);
 
       const response = await client.listCases({
         page,
@@ -70,39 +72,69 @@ export default async function handler(
       });
 
       const cases = response.results || [];
-      totalScanned += cases.length;
 
-      // Process each case
       for (const ftCase of cases) {
-        // Get status from both fields (raw and display)
-        const status = ftCase.status || ftCase.__status || 'unknown';
-
-        // Count occurrences
-        statusCounts[status] = (statusCounts[status] || 0) + 1;
-
-        // Keep first 3 samples per status
-        if (!statusSamples[status]) {
-          statusSamples[status] = [];
-        }
-        if (statusSamples[status].length < 3) {
-          statusSamples[status].push({
-            id: String(ftCase.id),
-            label: ftCase.label,
-            created_at: ftCase.created_at,
-          });
-        }
+        allCaseIds.push({
+          id: ftCase.id,
+          label: ftCase.label,
+          created_at: ftCase.created_at,
+        });
       }
 
-      // Check if more pages exist
       if (cases.length < pageSize) {
         hasMore = false;
       } else {
         page++;
-        // Safety limit to prevent infinite loops
         if (page > 100) {
           logger.warn('Reached page limit of 100');
           hasMore = false;
         }
+      }
+    }
+
+    logger.info(`Found ${allCaseIds.length} cases, fetching details for status discovery`);
+
+    // Fetch details for all cases (in batches to avoid overwhelming API)
+    const batchSize = 10;
+    let detailsFetched = 0;
+
+    for (let i = 0; i < allCaseIds.length; i += batchSize) {
+      const batch = allCaseIds.slice(i, i + batchSize);
+
+      // Fetch batch in parallel
+      const results = await Promise.allSettled(
+        batch.map(async (caseInfo) => {
+          const detail = await client.getCase(caseInfo.id);
+          return { caseInfo, detail };
+        })
+      );
+
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.detail) {
+          const { caseInfo, detail } = result.value;
+          // Get status from fields.status (the actual status field)
+          const status = detail.fields?.status as string || 'unknown';
+
+          statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+          if (!statusSamples[status]) {
+            statusSamples[status] = [];
+          }
+          if (statusSamples[status].length < 3) {
+            statusSamples[status].push({
+              id: String(caseInfo.id),
+              label: caseInfo.label,
+              created_at: caseInfo.created_at,
+            });
+          }
+
+          detailsFetched++;
+        }
+      }
+
+      // Small delay between batches to avoid rate limiting
+      if (i + batchSize < allCaseIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
@@ -113,15 +145,15 @@ export default async function handler(
       statuses: sortedStatuses,
       counts: statusCounts,
       samples: statusSamples,
-      totalScanned,
-      pagesFetched: page,
+      totalScanned: allCaseIds.length,
+      detailsFetched,
       discoveredAt: new Date().toISOString(),
     };
 
     logger.info('QContact status discovery complete', {
       uniqueStatuses: sortedStatuses.length,
-      totalScanned,
-      pagesFetched: page,
+      totalScanned: allCaseIds.length,
+      detailsFetched,
     });
 
     return apiResponse.success(res, result);
