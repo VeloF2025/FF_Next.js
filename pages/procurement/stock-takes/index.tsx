@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import type { StockTake } from '@/types/procurement/stockTake.types';
 import { STOCK_TAKE_TYPES, STOCK_TAKE_STATUSES } from '@/types/procurement/stockTake.types';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 export default function StockTakesPage() {
   const router = useRouter();
@@ -56,11 +56,11 @@ export default function StockTakesPage() {
       if (data.success) {
         setStockTakes(data.data);
       } else {
-        toast.error(data.error || 'Failed to load stock takes');
+        notificationService.error(data.error || 'Failed to load stock takes');
       }
     } catch (error) {
       console.error('Error fetching stock takes:', error);
-      toast.error('Failed to load stock takes');
+      notificationService.error('Failed to load stock takes');
     } finally {
       setIsLoading(false);
     }
@@ -80,16 +80,16 @@ export default function StockTakesPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Stock take created');
+        notificationService.success('Stock take created');
         setShowCreateModal(false);
         // Navigate to the detail page
         router.push(`/procurement/stock-takes/${data.data.id}`);
       } else {
-        toast.error(data.error || 'Failed to create stock take');
+        notificationService.error(data.error || 'Failed to create stock take');
       }
     } catch (error) {
       console.error('Error creating stock take:', error);
-      toast.error('Failed to create stock take');
+      notificationService.error('Failed to create stock take');
     }
   };
 
@@ -336,7 +336,7 @@ function CreateStockTakeModal({ onClose, onCreate }: CreateModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      toast.error('Name is required');
+      notificationService.error('Name is required');
       return;
     }
     onCreate(formData);

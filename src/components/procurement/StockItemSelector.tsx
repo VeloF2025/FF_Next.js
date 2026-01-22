@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, Plus, Package, Loader2, X } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface StockItem {
@@ -104,7 +104,7 @@ export function StockItemSelector({
 
   const handleCreateNew = async () => {
     if (!newItemDescription.trim()) {
-      toast.error('Please enter a description');
+      notificationService.error('Please enter a description');
       return;
     }
 
@@ -130,7 +130,7 @@ export function StockItemSelector({
         const data = await response.json();
         const newItem = data.data || data;
 
-        toast.success('Stock item created');
+        notificationService.operationSuccess('created', 'Stock item');
         onSelect({
           stockItemId: newItem.id,
           description: newItemDescription,
@@ -144,7 +144,7 @@ export function StockItemSelector({
       }
     } catch (error) {
       log.error('Failed to create stock item', { data: error }, 'StockItemSelector');
-      toast.error(error instanceof Error ? error.message : 'Failed to create stock item');
+      notificationService.operationError('create', error as Error, 'stock item');
 
       // Still allow using the item without linking to stock
       if (onCreateNew) {

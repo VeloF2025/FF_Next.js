@@ -14,7 +14,7 @@ import {
   Save,
   AlertCircle,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import type { StockBundleItem } from '@/types/procurement/bundle.types';
 
@@ -65,11 +65,11 @@ export function BundleItemsModal({
       if (data.success) {
         setItems(data.data || []);
       } else {
-        toast.error(data.error?.message || 'Failed to load bundle items');
+        notificationService.error(data.error?.message || 'Failed to load bundle items');
       }
     } catch (err) {
       log.error('Failed to fetch bundle items', err);
-      toast.error('Failed to load bundle items');
+      notificationService.operationError('load', err as Error, 'bundle items');
     } finally {
       setIsLoading(false);
     }
@@ -126,17 +126,17 @@ export function BundleItemsModal({
       const data = await res.json();
 
       if (data.success) {
-        toast.success(`Added ${stockItem.name}`);
+        notificationService.success(`Added ${stockItem.name}`);
         setSearchTerm('');
         setSearchResults([]);
         setShowSearch(false);
         fetchItems();
       } else {
-        toast.error(data.error?.message || 'Failed to add item');
+        notificationService.error(data.error?.message || 'Failed to add item');
       }
     } catch (err) {
       log.error('Failed to add item to bundle', err);
-      toast.error('Failed to add item');
+      notificationService.operationError('add', err as Error, 'item');
     }
   };
 
@@ -157,11 +157,11 @@ export function BundleItemsModal({
           prev.map(i => (i.id === item.id ? { ...i, quantity: newQty } : i))
         );
       } else {
-        toast.error(data.error?.message || 'Failed to update quantity');
+        notificationService.error(data.error?.message || 'Failed to update quantity');
       }
     } catch (err) {
       log.error('Failed to update item quantity', err);
-      toast.error('Failed to update quantity');
+      notificationService.operationError('update', err as Error, 'quantity');
     }
   };
 
@@ -176,14 +176,14 @@ export function BundleItemsModal({
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Item removed');
+        notificationService.operationSuccess('removed', 'Item');
         setItems(prev => prev.filter(i => i.id !== item.id));
       } else {
-        toast.error(data.error?.message || 'Failed to remove item');
+        notificationService.error(data.error?.message || 'Failed to remove item');
       }
     } catch (err) {
       log.error('Failed to remove item from bundle', err);
-      toast.error('Failed to remove item');
+      notificationService.operationError('remove', err as Error, 'item');
     }
   };
 

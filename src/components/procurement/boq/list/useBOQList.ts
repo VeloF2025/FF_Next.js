@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { BOQ } from '@/types/procurement/boq.types';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import {
   FilterState,
@@ -60,7 +60,7 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
       setBOQs(transformed);
     } catch (error) {
       log.error('Failed to load BOQs:', { data: error }, 'useBOQList');
-      toast.error('Failed to load BOQs');
+      notificationService.operationError('load', error as Error, 'BOQs');
     } finally {
       setIsLoading(false);
     }
@@ -190,10 +190,10 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('BOQ downloaded successfully');
+      notificationService.operationSuccess('downloaded', 'BOQ');
     } catch (error) {
       log.error('Failed to download BOQ:', { data: error }, 'useBOQList');
-      toast.error('Failed to download BOQ');
+      notificationService.operationError('download', error as Error, 'BOQ');
     }
     setActionMenuOpen(null);
   };
@@ -202,10 +202,10 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
     try {
       // await procurementApiService.updateBOQStatus(context!, boq.id, 'archived');
       setBOQs(prev => prev.map(b => b.id === boq.id ? { ...b, status: 'archived' } : b));
-      toast.success('BOQ archived successfully');
+      notificationService.operationSuccess('archived', 'BOQ');
     } catch (error) {
       log.error('Failed to archive BOQ:', { data: error }, 'useBOQList');
-      toast.error('Failed to archive BOQ');
+      notificationService.operationError('archive', error as Error, 'BOQ');
     }
     setActionMenuOpen(null);
   };
@@ -224,10 +224,10 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
         throw new Error('Failed to delete BOQ');
       }
       setBOQs(prev => prev.filter(b => b.id !== boq.id));
-      toast.success('BOQ deleted successfully');
+      notificationService.operationSuccess('deleted', 'BOQ');
     } catch (error) {
       log.error('Failed to delete BOQ:', { data: error }, 'useBOQList');
-      toast.error('Failed to delete BOQ');
+      notificationService.operationError('delete', error as Error, 'BOQ');
     }
     setActionMenuOpen(null);
   };

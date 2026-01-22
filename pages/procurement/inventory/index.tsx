@@ -35,7 +35,7 @@ import {
   Filter,
   Download,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 // Import bundle modal
@@ -180,7 +180,7 @@ function CategoriesTabContent() {
 
   const handleSave = async () => {
     if (!formData.code.trim() || !formData.name.trim()) {
-      toast.error('Code and name are required');
+      notificationService.error('Code and name are required');
       return;
     }
 
@@ -199,14 +199,14 @@ function CategoriesTabContent() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(editingCategory ? 'Category updated' : 'Category created');
+        notificationService.success(editingCategory ? 'Category updated' : 'Category created');
         closeModal();
         fetchCategories();
       } else {
-        toast.error(data.error?.message || 'Failed to save category');
+        notificationService.error(data.error?.message || 'Failed to save category');
       }
     } catch (err) {
-      toast.error('Failed to save category');
+      notificationService.error('Failed to save category');
       log.error('Failed to save category', err);
     } finally {
       setIsSaving(false);
@@ -221,13 +221,13 @@ function CategoriesTabContent() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Category deleted');
+        notificationService.success('Category deleted');
         fetchCategories();
       } else {
-        toast.error(data.error?.message || 'Failed to delete category');
+        notificationService.error(data.error?.message || 'Failed to delete category');
       }
     } catch (err) {
-      toast.error('Failed to delete category');
+      notificationService.error('Failed to delete category');
       log.error('Failed to delete category', err);
     }
   };
@@ -449,7 +449,7 @@ function BundlesTabContent() {
       if (data.success) {
         setBundles(data.data || []);
       } else {
-        toast.error(data.error?.message || 'Failed to load bundles');
+        notificationService.error(data.error?.message || 'Failed to load bundles');
       }
     } catch (err) {
       log.error('Failed to fetch bundles', err);
@@ -483,7 +483,7 @@ function BundlesTabContent() {
 
   const handleSave = async () => {
     if (!formData.bundle_code.trim() || !formData.name.trim()) {
-      toast.error('Code and name are required');
+      notificationService.error('Code and name are required');
       return;
     }
 
@@ -502,14 +502,14 @@ function BundlesTabContent() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(editingBundle ? 'Bundle updated' : 'Bundle created');
+        notificationService.success(editingBundle ? 'Bundle updated' : 'Bundle created');
         closeModal();
         fetchBundles();
       } else {
-        toast.error(data.error?.message || 'Failed to save bundle');
+        notificationService.error(data.error?.message || 'Failed to save bundle');
       }
     } catch (err) {
-      toast.error('Failed to save bundle');
+      notificationService.error('Failed to save bundle');
       log.error('Failed to save bundle', err);
     } finally {
       setIsSaving(false);
@@ -524,13 +524,13 @@ function BundlesTabContent() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Bundle deleted');
+        notificationService.success('Bundle deleted');
         fetchBundles();
       } else {
-        toast.error(data.error?.message || 'Failed to delete bundle');
+        notificationService.error(data.error?.message || 'Failed to delete bundle');
       }
     } catch (err) {
-      toast.error('Failed to delete bundle');
+      notificationService.error('Failed to delete bundle');
       log.error('Failed to delete bundle', err);
     }
   };
@@ -794,14 +794,14 @@ function StockTakesTabContent() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Stock take created');
+        notificationService.success('Stock take created');
         closeModal();
         fetchStockTakes();
       } else {
-        toast.error(data.error?.message || 'Failed to create stock take');
+        notificationService.error(data.error?.message || 'Failed to create stock take');
       }
     } catch (err) {
-      toast.error('Failed to create stock take');
+      notificationService.error('Failed to create stock take');
       log.error('Failed to create stock take', err);
     } finally {
       setIsSaving(false);
@@ -810,7 +810,7 @@ function StockTakesTabContent() {
 
   const handleDelete = async (take: StockTake) => {
     if (take.status !== 'draft') {
-      toast.error('Only draft stock takes can be deleted');
+      notificationService.error('Only draft stock takes can be deleted');
       return;
     }
     if (!confirm(`Delete stock take "${take.reference_number}"? This cannot be undone.`)) return;
@@ -820,13 +820,13 @@ function StockTakesTabContent() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Stock take deleted');
+        notificationService.success('Stock take deleted');
         fetchStockTakes();
       } else {
-        toast.error(data.error?.message || 'Failed to delete stock take');
+        notificationService.error(data.error?.message || 'Failed to delete stock take');
       }
     } catch (err) {
-      toast.error('Failed to delete stock take');
+      notificationService.error('Failed to delete stock take');
       log.error('Failed to delete stock take', err);
     }
   };
@@ -1038,12 +1038,12 @@ function BundleReportsTabContent() {
       if (data.success) {
         setReportData(data.data);
       } else {
-        toast.error(data.error?.message || 'Failed to load report');
+        notificationService.error(data.error?.message || 'Failed to load report');
         setReportData(null);
       }
     } catch (err) {
       log.error('Failed to fetch report', err);
-      toast.error('Failed to load report');
+      notificationService.error('Failed to load report');
       setReportData(null);
     } finally {
       setIsLoading(false);
@@ -1063,7 +1063,7 @@ function BundleReportsTabContent() {
 
   const exportReport = () => {
     if (!reportData?.data?.length) {
-      toast.error('No data to export');
+      notificationService.error('No data to export');
       return;
     }
 
@@ -1086,7 +1086,7 @@ function BundleReportsTabContent() {
     link.download = `bundle-${reportType}-${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    toast.success('Report exported');
+    notificationService.success('Report exported');
   };
 
   return (

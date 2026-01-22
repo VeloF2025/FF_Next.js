@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { BOQItem, BOQWithItems } from '@/types/procurement/boq.types';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
 import { procurementApiService } from '@/services/procurement/boqApiExtensions';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import {
   FilterState,
@@ -52,7 +52,7 @@ export const useBOQViewer = (
       setBOQData(data);
     } catch (error) {
       log.error('Failed to load BOQ data:', { data: error }, 'useBOQViewer');
-      toast.error('Failed to load BOQ data');
+      notificationService.operationError('load', error as Error, 'BOQ data');
     } finally {
       setIsLoading(false);
     }
@@ -213,11 +213,11 @@ export const useBOQViewer = (
       // Clear editing state
       cancelEditing(itemId);
       
-      toast.success('Item updated successfully');
+      notificationService.operationSuccess('updated', 'Item');
       onItemUpdate?.(updatedItem);
     } catch (error) {
       log.error('Failed to save item:', { data: error }, 'useBOQViewer');
-      toast.error('Failed to save item');
+      notificationService.operationError('save', error as Error, 'item');
     } finally {
       setIsSaving(false);
     }

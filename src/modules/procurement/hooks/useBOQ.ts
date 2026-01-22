@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boqService } from '@/services/procurement/boqService';
 import { BOQFormData, BOQStatus } from '@/types/procurement.types';
-import { toast } from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 // Get all BOQs
 export function useBOQs(filter?: { projectId?: string; clientId?: string; status?: BOQStatus }) {
@@ -38,10 +38,10 @@ export function useCreateBOQ() {
     mutationFn: (data: BOQFormData) => boqService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
-      toast.success('BOQ created successfully');
+      notificationService.operationSuccess('created', 'BOQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create BOQ: ${error.message}`);
+      notificationService.operationError('create', error, 'BOQ');
     },
   });
 }
@@ -56,10 +56,10 @@ export function useUpdateBOQ() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       queryClient.invalidateQueries({ queryKey: ['boqs', variables.id] });
-      toast.success('BOQ updated successfully');
+      notificationService.operationSuccess('updated', 'BOQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update BOQ: ${error.message}`);
+      notificationService.operationError('update', error, 'BOQ');
     },
   });
 }
@@ -72,10 +72,10 @@ export function useDeleteBOQ() {
     mutationFn: (id: string) => boqService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
-      toast.success('BOQ deleted successfully');
+      notificationService.operationSuccess('deleted', 'BOQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete BOQ: ${error.message}`);
+      notificationService.operationError('delete', error, 'BOQ');
     },
   });
 }
@@ -90,10 +90,10 @@ export function useUpdateBOQStatus() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       queryClient.invalidateQueries({ queryKey: ['boqs', variables.id] });
-      toast.success('BOQ status updated successfully');
+      notificationService.operationSuccess('updated', 'BOQ status');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update BOQ status: ${error.message}`);
+      notificationService.operationError('update', error, 'BOQ status');
     },
   });
 }
@@ -107,10 +107,10 @@ export function useCloneBOQ() {
       boqService.clone(boqId, newTitle, projectId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
-      toast.success('BOQ cloned successfully');
+      notificationService.operationSuccess('cloned', 'BOQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to clone BOQ: ${error.message}`);
+      notificationService.operationError('clone', error, 'BOQ');
     },
   });
 }
@@ -125,10 +125,10 @@ export function useCreateBOQTemplate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['boqs'] });
       queryClient.invalidateQueries({ queryKey: ['boq-templates'] });
-      toast.success('BOQ template created successfully');
+      notificationService.operationSuccess('created', 'BOQ template');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create BOQ template: ${error.message}`);
+      notificationService.operationError('create', error, 'BOQ template');
     },
   });
 }
@@ -149,10 +149,10 @@ export function useExportBOQ() {
       document.body.removeChild(a);
     },
     onSuccess: () => {
-      toast.success('BOQ exported successfully');
+      notificationService.operationSuccess('exported', 'BOQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to export BOQ: ${error.message}`);
+      notificationService.operationError('export', error, 'BOQ');
     },
   });
 }

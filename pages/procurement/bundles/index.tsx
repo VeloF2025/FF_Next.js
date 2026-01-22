@@ -31,7 +31,7 @@ import type {
 } from '@/types/procurement/bundle.types';
 import { BUNDLE_TYPES, PRICE_TYPES } from '@/types/procurement/bundle.types';
 import type { StockCategory } from '@/types/procurement/category.types';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 interface StockItem {
   id: string;
@@ -75,11 +75,11 @@ export default function BundlesPage() {
       if (data.success) {
         setBundles(data.data);
       } else {
-        toast.error(data.error || 'Failed to load bundles');
+        notificationService.error(data.error || 'Failed to load bundles');
       }
     } catch (error) {
       console.error('Error fetching bundles:', error);
-      toast.error('Failed to load bundles');
+      notificationService.error('Failed to load bundles');
     } finally {
       setIsLoading(false);
     }
@@ -119,11 +119,11 @@ export default function BundlesPage() {
         setViewingBundle(data.data);
         setShowDetailModal(true);
       } else {
-        toast.error(data.error || 'Failed to load bundle details');
+        notificationService.error(data.error || 'Failed to load bundle details');
       }
     } catch (error) {
       console.error('Error fetching bundle:', error);
-      toast.error('Failed to load bundle details');
+      notificationService.error('Failed to load bundle details');
     }
   };
 
@@ -134,7 +134,7 @@ export default function BundlesPage() {
 
   const handleDelete = async (bundle: StockBundle) => {
     if (bundle.usage_count > 0) {
-      toast.error(`Bundle has been used ${bundle.usage_count} times. Consider deactivating instead.`);
+      notificationService.error(`Bundle has been used ${bundle.usage_count} times. Consider deactivating instead.`);
       return;
     }
 
@@ -147,14 +147,14 @@ export default function BundlesPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Bundle deleted');
+        notificationService.success('Bundle deleted');
         fetchBundles();
       } else {
-        toast.error(data.error || 'Failed to delete bundle');
+        notificationService.error(data.error || 'Failed to delete bundle');
       }
     } catch (error) {
       console.error('Error deleting bundle:', error);
-      toast.error('Failed to delete bundle');
+      notificationService.error('Failed to delete bundle');
     }
   };
 
@@ -174,7 +174,7 @@ export default function BundlesPage() {
       const bundleData = await bundleRes.json();
 
       if (!bundleData.success) {
-        toast.error(bundleData.error || 'Failed to save bundle');
+        notificationService.error(bundleData.error || 'Failed to save bundle');
         return;
       }
 
@@ -190,18 +190,18 @@ export default function BundlesPage() {
         const itemsData = await itemsRes.json();
 
         if (!itemsData.success) {
-          toast.error(itemsData.error || 'Failed to save bundle items');
+          notificationService.error(itemsData.error || 'Failed to save bundle items');
           return;
         }
       }
 
-      toast.success(isEdit ? 'Bundle updated' : 'Bundle created');
+      notificationService.success(isEdit ? 'Bundle updated' : 'Bundle created');
       setShowModal(false);
       setEditingBundle(null);
       fetchBundles();
     } catch (error) {
       console.error('Error saving bundle:', error);
-      toast.error('Failed to save bundle');
+      notificationService.error('Failed to save bundle');
     }
   };
 
@@ -522,7 +522,7 @@ function BundleModal({ bundle, categories, stockItems, onSave, onClose }: Bundle
 
   const handleAddItem = (itemId: string) => {
     if (bundleItems.some(i => i.stock_item_id === itemId)) {
-      toast.error('Item already in bundle');
+      notificationService.error('Item already in bundle');
       return;
     }
     setBundleItems(prev => [...prev, {

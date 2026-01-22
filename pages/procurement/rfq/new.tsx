@@ -9,7 +9,7 @@ import { AppLayout } from '@/components/layout';
 import { ArrowLeft, Plus, Trash2, Loader2, Users, Calendar, FileText, Package } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { StockItemSelector } from '@/components/procurement/StockItemSelector';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface Project {
@@ -143,9 +143,9 @@ export default function NewRFQPage() {
           if (!title && boq.title) {
             setTitle(`RFQ from BOQ: ${boq.title}`);
           }
-          toast.success(`Imported ${boqItems.length} items from BOQ`);
+          notificationService.success(`Imported ${boqItems.length} items from BOQ`);
         } else {
-          toast('No items found in selected BOQ');
+          notificationService.info('No items found in selected BOQ');
         }
       } else {
         // Fallback to project BOQ list if specific BOQ not found
@@ -164,15 +164,15 @@ export default function NewRFQPage() {
               estimatedUnitPrice: item.unitPrice || 0,
               boqItemId: item.id
             })));
-            toast.success(`Imported ${firstBoq.items.length} items from BOQ`);
+            notificationService.success(`Imported ${firstBoq.items.length} items from BOQ`);
           } else {
-            toast('No BOQ items found for this project');
+            notificationService.info('No BOQ items found for this project');
           }
         }
       }
     } catch (error) {
       log.error('Failed to import from BOQ:', { data: error }, 'NewRFQPage');
-      toast.error('Failed to import items from BOQ');
+      notificationService.error('Failed to import items from BOQ');
     } finally {
       setImportingFromBOQ(false);
     }
@@ -234,19 +234,19 @@ export default function NewRFQPage() {
 
   const handleSubmit = async (status: 'draft' | 'open') => {
     if (!title.trim()) {
-      toast.error('Please enter an RFQ title');
+      notificationService.error('Please enter an RFQ title');
       return;
     }
     if (!selectedProjectId) {
-      toast.error('Please select a project');
+      notificationService.error('Please select a project');
       return;
     }
     if (items.length === 0) {
-      toast.error('Please add at least one item');
+      notificationService.error('Please add at least one item');
       return;
     }
     if (status === 'open' && selectedSuppliers.length === 0) {
-      toast.error('Please select at least one supplier to issue the RFQ');
+      notificationService.error('Please select at least one supplier to issue the RFQ');
       return;
     }
 
@@ -283,11 +283,11 @@ export default function NewRFQPage() {
       }
 
       const statusMessage = status === 'draft' ? 'saved as draft' : 'issued successfully';
-      toast.success(`RFQ ${statusMessage}!`);
+      notificationService.success(`RFQ ${statusMessage}!`);
       router.push('/procurement/rfq');
     } catch (error) {
       log.error('Failed to create RFQ:', { data: error }, 'NewRFQPage');
-      toast.error(error instanceof Error ? error.message : 'Failed to create RFQ');
+      notificationService.error(error instanceof Error ? error.message : 'Failed to create RFQ');
     } finally {
       setIsSubmitting(false);
     }

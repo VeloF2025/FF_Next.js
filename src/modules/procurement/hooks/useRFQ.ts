@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfqService } from '@/services/procurement/rfqService';
 import { RFQFormData, RFQStatus, Quote } from '@/types/procurement.types';
-import { toast } from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 // Get all RFQs
 export function useRFQs(filter?: { projectId?: string; status?: RFQStatus; supplierId?: string }) {
@@ -47,10 +47,10 @@ export function useCreateRFQ() {
     mutationFn: (data: RFQFormData) => rfqService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
-      toast.success('RFQ created successfully');
+      notificationService.operationSuccess('created', 'RFQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create RFQ: ${error.message}`);
+      notificationService.operationError('create', error, 'RFQ');
     },
   });
 }
@@ -65,10 +65,10 @@ export function useUpdateRFQ() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
       queryClient.invalidateQueries({ queryKey: ['rfqs', variables.id] });
-      toast.success('RFQ updated successfully');
+      notificationService.operationSuccess('updated', 'RFQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update RFQ: ${error.message}`);
+      notificationService.operationError('update', error, 'RFQ');
     },
   });
 }
@@ -81,10 +81,10 @@ export function useDeleteRFQ() {
     mutationFn: (id: string) => rfqService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
-      toast.success('RFQ deleted successfully');
+      notificationService.operationSuccess('deleted', 'RFQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete RFQ: ${error.message}`);
+      notificationService.operationError('delete', error, 'RFQ');
     },
   });
 }
@@ -99,10 +99,10 @@ export function useUpdateRFQStatus() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
       queryClient.invalidateQueries({ queryKey: ['rfqs', variables.id] });
-      toast.success('RFQ status updated successfully');
+      notificationService.operationSuccess('updated', 'RFQ status');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update RFQ status: ${error.message}`);
+      notificationService.operationError('update', error, 'RFQ status');
     },
   });
 }
@@ -116,10 +116,10 @@ export function useSendRFQ() {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
       queryClient.invalidateQueries({ queryKey: ['rfqs', id] });
-      toast.success('RFQ sent to suppliers successfully');
+      notificationService.operationSuccess('sent', 'RFQ');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to send RFQ: ${error.message}`);
+      notificationService.operationError('send', error, 'RFQ');
     },
   });
 }
@@ -135,10 +135,10 @@ export function useSubmitRFQResponse() {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
       queryClient.invalidateQueries({ queryKey: ['rfqs', variables.rfqId] });
       queryClient.invalidateQueries({ queryKey: ['rfq-responses', variables.rfqId] });
-      toast.success('Response submitted successfully');
+      notificationService.operationSuccess('submitted', 'Response');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to submit response: ${error.message}`);
+      notificationService.operationError('submit', error, 'Response');
     },
   });
 }
@@ -154,10 +154,10 @@ export function useSelectRFQResponse() {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
       queryClient.invalidateQueries({ queryKey: ['rfqs', variables.rfqId] });
       queryClient.invalidateQueries({ queryKey: ['rfq-responses', variables.rfqId] });
-      toast.success('Supplier selected successfully');
+      notificationService.operationSuccess('selected', 'Supplier');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to select supplier: ${error.message}`);
+      notificationService.operationError('select', error, 'Supplier');
     },
   });
 }

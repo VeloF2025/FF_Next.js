@@ -31,7 +31,7 @@ import {
   TRACKING_TYPES,
   UNITS_OF_MEASURE,
 } from '@/types/procurement/category.types';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 export default function StockCategoriesPage() {
   const [categories, setCategories] = useState<StockCategory[]>([]);
@@ -66,11 +66,11 @@ export default function StockCategoriesPage() {
           .map((c: StockCategory) => c.id);
         setExpandedIds(new Set(roots));
       } else {
-        toast.error(data.error || 'Failed to load categories');
+        notificationService.error(data.error || 'Failed to load categories');
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories');
+      notificationService.error('Failed to load categories');
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +99,7 @@ export default function StockCategoriesPage() {
 
   const handleDelete = async (category: StockCategory) => {
     if (category.is_system) {
-      toast.error('Cannot delete system category');
+      notificationService.error('Cannot delete system category');
       return;
     }
 
@@ -112,14 +112,14 @@ export default function StockCategoriesPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Category deleted');
+        notificationService.success('Category deleted');
         fetchCategories();
       } else {
-        toast.error(data.error || 'Failed to delete category');
+        notificationService.error(data.error || 'Failed to delete category');
       }
     } catch (error) {
       console.error('Error deleting category:', error);
-      toast.error('Failed to delete category');
+      notificationService.error('Failed to delete category');
     }
   };
 
@@ -138,16 +138,16 @@ export default function StockCategoriesPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(isEdit ? 'Category updated' : 'Category created');
+        notificationService.success(isEdit ? 'Category updated' : 'Category created');
         setShowModal(false);
         setEditingCategory(null);
         fetchCategories();
       } else {
-        toast.error(data.error || 'Failed to save category');
+        notificationService.error(data.error || 'Failed to save category');
       }
     } catch (error) {
       console.error('Error saving category:', error);
-      toast.error('Failed to save category');
+      notificationService.error('Failed to save category');
     }
   };
 

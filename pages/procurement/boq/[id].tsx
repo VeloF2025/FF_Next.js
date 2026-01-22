@@ -21,7 +21,7 @@ import {
   User,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface BOQItem {
@@ -132,13 +132,13 @@ export default function BOQDetailPage() {
       const data = await response.json();
 
       if (data.success !== false) {
-        toast.success('BOQ deleted successfully');
+        notificationService.success('BOQ deleted successfully');
         router.push('/procurement/boq');
       } else {
-        toast.error(data.error?.message || 'Failed to delete BOQ');
+        notificationService.error(data.error?.message || 'Failed to delete BOQ');
       }
     } catch (err) {
-      toast.error('Failed to delete BOQ');
+      notificationService.error('Failed to delete BOQ');
     }
   };
 
@@ -153,7 +153,7 @@ export default function BOQDetailPage() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('BOQ downloaded');
+    notificationService.success('BOQ downloaded');
   };
 
   if (isLoading) {

@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import {
   BOQVersion,
@@ -39,7 +39,7 @@ export const useBOQHistory = (
       setVersions(versions); // Empty array until real BOQ history service is connected
     } catch (error) {
       log.error('Failed to load version history:', { data: error }, 'useBOQHistory');
-      toast.error('Failed to load version history');
+      notificationService.operationError('load', error as Error, 'version history');
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +144,7 @@ export const useBOQHistory = (
       setShowComparison(true);
     } catch (error) {
       log.error('Failed to compare versions:', { data: error }, 'useBOQHistory');
-      toast.error('Failed to compare versions');
+      notificationService.operationError('compare', error as Error, 'versions');
     } finally {
       setIsComparing(false);
     }
@@ -156,12 +156,12 @@ export const useBOQHistory = (
 
     try {
       // This would call an actual API endpoint
-      toast.success(`Version ${version.version} restored successfully`);
+      notificationService.success(`Version ${version.version} restored successfully`);
       onRestore?.(version);
       loadVersionHistory();
     } catch (error) {
       log.error('Failed to restore version:', { data: error }, 'useBOQHistory');
-      toast.error('Failed to restore version');
+      notificationService.operationError('restore', error as Error, 'version');
     }
   };
 
@@ -181,10 +181,10 @@ export const useBOQHistory = (
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Version exported successfully');
+      notificationService.operationSuccess('exported', 'Version');
     } catch (error) {
       log.error('Failed to export version:', { data: error }, 'useBOQHistory');
-      toast.error('Failed to export version');
+      notificationService.operationError('export', error as Error, 'version');
     }
   };
 

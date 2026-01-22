@@ -24,7 +24,7 @@ import {
   X
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface StockItem {
@@ -125,7 +125,7 @@ export default function StockPage() {
       setStats(data.stats || null);
     } catch (error) {
       log.error('Error loading stock data:', { data: error }, 'StockPage');
-      toast.error('Failed to load stock data');
+      notificationService.error('Failed to load stock data');
     } finally {
       setIsLoading(false);
     }
@@ -162,11 +162,11 @@ export default function StockPage() {
   // Handle movement creation
   const handleCreateMovement = async () => {
     if (!movementForm.itemId) {
-      toast.error('Please select an item');
+      notificationService.error('Please select an item');
       return;
     }
     if (movementForm.quantity <= 0) {
-      toast.error('Quantity must be greater than 0');
+      notificationService.error('Quantity must be greater than 0');
       return;
     }
 
@@ -216,7 +216,7 @@ export default function StockPage() {
           : item
       ));
 
-      toast.success(`${movementForm.type.charAt(0).toUpperCase() + movementForm.type.slice(1)} recorded successfully`);
+      notificationService.success(`${movementForm.type.charAt(0).toUpperCase() + movementForm.type.slice(1)} recorded successfully`);
       setShowMovementModal(false);
       setMovementForm({
         type: 'receipt',
@@ -229,7 +229,7 @@ export default function StockPage() {
       });
     } catch (error) {
       log.error('Failed to create movement:', { data: error }, 'StockPage');
-      toast.error('Failed to record movement');
+      notificationService.error('Failed to record movement');
     } finally {
       setIsSubmitting(false);
     }

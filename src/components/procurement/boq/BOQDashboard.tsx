@@ -8,7 +8,7 @@ import { FileText, AlertTriangle, Clock, Loader2 } from 'lucide-react';
 import { BOQ, BOQStats } from '@/types/procurement/boq.types';
 import { ImportJob, ImportStats } from '@/services/procurement/boqImportService';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 // Import split components
 import BOQUpload from './BOQUpload';
@@ -54,7 +54,7 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
       setActiveJobs(data.activeJobs);
     } catch (error) {
       // log.error('Failed to load dashboard data:', { data: error }, 'BOQDashboard');
-      toast.error('Failed to load dashboard data');
+      notificationService.operationError('load', error as Error, 'dashboard data');
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +93,7 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
 
   // Handle upload completion
   const handleUploadComplete = (result: { boqId: string; itemsCreated: number; exceptionsCreated: number }) => {
-    toast.success(`BOQ imported successfully! ${result.itemsCreated} items created`);
+    notificationService.success(`BOQ imported successfully! ${result.itemsCreated} items created`);
     loadDashboardData(); // Refresh data
     
     // Navigate to mapping review if there are exceptions
@@ -111,7 +111,7 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
         return (
           <BOQUpload
             onUploadComplete={handleUploadComplete}
-            onUploadError={(error) => toast.error(error)}
+            onUploadError={(error) => notificationService.error(error)}
           />
         );
       
@@ -162,7 +162,7 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
           <BOQHistory
             boqId={selectedBOQ.id}
             onVersionSelect={(version) => {
-              toast(`Viewing version ${version.version}`);
+              notificationService.info(`Viewing version ${version.version}`);
             }}
             onRestore={() => loadDashboardData()}
           />

@@ -9,7 +9,7 @@ import { AppLayout } from '@/components/layout';
 import { ArrowLeft, Upload, FileSpreadsheet, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import BOQUpload from '@/components/procurement/boq/BOQUpload';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface Project {
@@ -87,15 +87,15 @@ export default function NewBOQPage() {
 
   const handleManualSubmit = async () => {
     if (!title.trim()) {
-      toast.error('Please enter a BOQ title');
+      notificationService.error('Please enter a BOQ title');
       return;
     }
     if (!selectedProjectId) {
-      toast.error('Please select a project');
+      notificationService.error('Please select a project');
       return;
     }
     if (items.length === 0) {
-      toast.error('Please add at least one item');
+      notificationService.error('Please add at least one item');
       return;
     }
 
@@ -122,18 +122,18 @@ export default function NewBOQPage() {
         throw new Error(error.message || 'Failed to create BOQ');
       }
 
-      toast.success('BOQ created successfully!');
+      notificationService.success('BOQ created successfully!');
       router.push('/procurement/boq');
     } catch (error) {
       log.error('Failed to create BOQ:', { data: error }, 'NewBOQPage');
-      toast.error(error instanceof Error ? error.message : 'Failed to create BOQ');
+      notificationService.error(error instanceof Error ? error.message : 'Failed to create BOQ');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleUploadComplete = (result: { boqId: string; itemsCreated: number }) => {
-    toast.success(`BOQ imported with ${result.itemsCreated} items!`);
+    notificationService.success(`BOQ imported with ${result.itemsCreated} items!`);
     router.push('/procurement/boq');
   };
 
@@ -253,7 +253,7 @@ export default function NewBOQPage() {
               ) : (
                 <BOQUpload
                   onUploadComplete={handleUploadComplete}
-                  onUploadError={(error) => toast.error(error)}
+                  onUploadError={(error) => notificationService.error(error)}
                   enableEnhancedImport={true}
                   createBudgetItems={true}
                   createMaterials={true}

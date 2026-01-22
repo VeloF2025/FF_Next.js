@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { ConvertToPOModal } from '@/components/procurement/rfq/ConvertToPOModal';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface RFQItem {
@@ -152,13 +152,13 @@ export default function RFQDetailPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success('RFQ deleted successfully');
+        notificationService.success('RFQ deleted successfully');
         router.push('/procurement/rfq');
       } else {
-        toast.error(data.error?.message || 'Failed to delete RFQ');
+        notificationService.error(data.error?.message || 'Failed to delete RFQ');
       }
     } catch (err) {
-      toast.error('Failed to delete RFQ');
+      notificationService.error('Failed to delete RFQ');
     }
   };
 
@@ -175,13 +175,13 @@ export default function RFQDetailPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success('RFQ issued successfully');
+        notificationService.success('RFQ issued successfully');
         setRfq({ ...rfq, status: 'open' });
       } else {
-        toast.error(data.error?.message || 'Failed to issue RFQ');
+        notificationService.error(data.error?.message || 'Failed to issue RFQ');
       }
     } catch (err) {
-      toast.error('Failed to issue RFQ');
+      notificationService.error('Failed to issue RFQ');
     }
   };
 
@@ -198,18 +198,18 @@ export default function RFQDetailPage() {
       const data = await response.json();
 
       if (data.success) {
-        toast.success('RFQ closed for evaluation');
+        notificationService.success('RFQ closed for evaluation');
         setRfq({ ...rfq, status: 'evaluating' });
       } else {
-        toast.error(data.error?.message || 'Failed to close RFQ');
+        notificationService.error(data.error?.message || 'Failed to close RFQ');
       }
     } catch (err) {
-      toast.error('Failed to close RFQ');
+      notificationService.error('Failed to close RFQ');
     }
   };
 
   const handlePOCreated = (poId: string, poNumber: string) => {
-    toast.success(`Purchase Order ${poNumber} created!`);
+    notificationService.success(`Purchase Order ${poNumber} created!`);
     // Update RFQ status to awarded
     if (rfq) {
       setRfq({ ...rfq, status: 'awarded' });

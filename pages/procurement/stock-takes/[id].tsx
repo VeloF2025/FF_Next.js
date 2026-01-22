@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import type { StockTake, StockTakeLine } from '@/types/procurement/stockTake.types';
 import { STOCK_TAKE_STATUSES, LINE_STATUSES } from '@/types/procurement/stockTake.types';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 export default function StockTakeDetailPage() {
   const router = useRouter();
@@ -52,12 +52,12 @@ export default function StockTakeDetailPage() {
         setStockTake(data.data);
         setLines(data.data.lines || []);
       } else {
-        toast.error(data.error || 'Failed to load stock take');
+        notificationService.error(data.error || 'Failed to load stock take');
         router.push('/procurement/stock-takes');
       }
     } catch (error) {
       console.error('Error fetching stock take:', error);
-      toast.error('Failed to load stock take');
+      notificationService.error('Failed to load stock take');
     } finally {
       setIsLoading(false);
     }
@@ -80,14 +80,14 @@ export default function StockTakeDetailPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(data.message || `Stock take ${action}ed`);
+        notificationService.success(data.message || `Stock take ${action}ed`);
         fetchStockTake();
       } else {
-        toast.error(data.error || `Failed to ${action} stock take`);
+        notificationService.error(data.error || `Failed to ${action} stock take`);
       }
     } catch (error) {
       console.error(`Error ${action}ing stock take:`, error);
-      toast.error(`Failed to ${action} stock take`);
+      notificationService.error(`Failed to ${action} stock take`);
     } finally {
       setIsActionLoading(false);
     }
@@ -104,14 +104,14 @@ export default function StockTakeDetailPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success(data.message || 'Items initialized');
+        notificationService.success(data.message || 'Items initialized');
         fetchStockTake();
       } else {
-        toast.error(data.error || 'Failed to initialize items');
+        notificationService.error(data.error || 'Failed to initialize items');
       }
     } catch (error) {
       console.error('Error initializing items:', error);
-      toast.error('Failed to initialize items');
+      notificationService.error('Failed to initialize items');
     } finally {
       setIsActionLoading(false);
     }
@@ -132,16 +132,16 @@ export default function StockTakeDetailPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Count recorded');
+        notificationService.success('Count recorded');
         setEditingLineId(null);
         setCountValue('');
         fetchStockTake();
       } else {
-        toast.error(data.error || 'Failed to record count');
+        notificationService.error(data.error || 'Failed to record count');
       }
     } catch (error) {
       console.error('Error recording count:', error);
-      toast.error('Failed to record count');
+      notificationService.error('Failed to record count');
     }
   };
 

@@ -17,7 +17,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
 interface Supplier {
@@ -140,17 +140,17 @@ export function ConvertToPOModal({
       const data = await response.json();
 
       if (data.success) {
-        toast.success('Purchase Order created successfully');
+        notificationService.operationSuccess('created', 'Purchase Order');
         onSuccess(data.data.purchaseOrder.id, data.data.purchaseOrder.poNumber);
         onClose();
       } else {
         setError(data.error?.message || 'Failed to create Purchase Order');
-        toast.error(data.error?.message || 'Failed to create Purchase Order');
+        notificationService.error(data.error?.message || 'Failed to create Purchase Order');
       }
     } catch (err) {
       log.error('Failed to convert RFQ to PO', err);
       setError('An unexpected error occurred');
-      toast.error('Failed to create Purchase Order');
+      notificationService.operationError('create', err as Error, 'Purchase Order');
     } finally {
       setIsConverting(false);
     }

@@ -7,7 +7,7 @@ import { useState, useCallback, useRef } from 'react';
 import { validateFile } from '@/lib/utils/excelParser';
 import { BOQImportService, ImportJob, ImportConfig } from '@/services/procurement/boqImportService';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
-import toast from 'react-hot-toast';
+import { notificationService } from '@/services/core/NotificationService';
 
 // Import split components
 import { BOQUploadDropzone } from './upload/BOQUploadDropzone';
@@ -82,7 +82,7 @@ export default function BOQUpload({
     const validation = validateFile(file);
 
     if (!validation.valid) {
-      toast.error(validation.error || 'Invalid file');
+      notificationService.error(validation.error || 'Invalid file');
       onUploadError?.(validation.error || 'Invalid file');
       return;
     }
@@ -99,7 +99,7 @@ export default function BOQUpload({
 
   const startUpload = async () => {
     if (!state.file || !context) {
-      toast.error('Please select a file and ensure project context is available');
+      notificationService.error('Please select a file and ensure project context is available');
       return;
     }
 
@@ -146,7 +146,7 @@ export default function BOQUpload({
             clearInterval(pollJob);
             setTimeout(() => {
               const result = currentJob.result!;
-              toast.success(`BOQ imported successfully! ${result.itemsCreated || result.stats.validRows} items created`);
+              notificationService.success(`BOQ imported successfully! ${result.itemsCreated || result.stats.validRows} items created`);
               onUploadComplete?.({
                 boqId: result.boqId || boqId,
                 itemsCreated: result.itemsCreated || result.stats.validRows,
@@ -156,7 +156,7 @@ export default function BOQUpload({
             }, 500);
           } else if (currentJob.status === 'failed') {
             clearInterval(pollJob);
-            toast.error(`Import failed: ${currentJob.error}`);
+            notificationService.error(`Import failed: ${currentJob.error}`);
             onUploadError?.(currentJob.error || 'Import failed');
             setState(prev => ({ ...prev, isUploading: false }));
           }
@@ -164,7 +164,7 @@ export default function BOQUpload({
       }, 1000);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
-      toast.error(errorMessage);
+      notificationService.error(errorMessage);
       onUploadError?.(errorMessage);
       setState(prev => ({ ...prev, isUploading: false }));
     }
@@ -175,7 +175,7 @@ export default function BOQUpload({
    */
   const startEnhancedUpload = async () => {
     if (!state.file || !context?.projectId) {
-      toast.error('Please select a file and ensure project context is available');
+      notificationService.error('Please select a file and ensure project context is available');
       setState(prev => ({ ...prev, isUploading: false }));
       return;
     }
@@ -207,7 +207,7 @@ export default function BOQUpload({
       if (result.materialsCreated > 0) details.push(`${result.materialsCreated} materials added`);
       if (result.budgetItemsCreated > 0) details.push(`${result.budgetItemsCreated} budget items`);
 
-      toast.success(
+      notificationService.success(
         `BOQ imported! ${result.itemsProcessed} items processed${details.length ? ` (${details.join(', ')})` : ''}`
       );
 
@@ -224,7 +224,7 @@ export default function BOQUpload({
       setState(INITIAL_STATE);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Enhanced import failed';
-      toast.error(errorMessage);
+      notificationService.error(errorMessage);
       onUploadError?.(errorMessage);
       setState(prev => ({ ...prev, isUploading: false }));
     }
@@ -233,7 +233,7 @@ export default function BOQUpload({
   const cancelUpload = () => {
     if (state.job?.id) {
       boqImportService.cancelJob(state.job.id);
-      toast('Import cancelled');
+      notificationService.info('Import cancelled');
     }
     setState(INITIAL_STATE);
   };
