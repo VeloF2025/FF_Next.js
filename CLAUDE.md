@@ -620,13 +620,14 @@ echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
 
 ### Available Projects
 
-| Project | UUID | Notes |
-|---------|------|-------|
-| **FibreFlow_OES_Automations** | `067b51c8-6e96-4e0c-9462-d4890763758b` | **Current default** - Dedicated sync project |
-| Test_Project__Automations | `e849b878-f8a8-4f84-a3f1-9fbd051686c0` | Has .qgs conflicts - DO NOT USE |
-| OES_Project_Progress | `ad3b1035-ddb3-42a3-8077-175f9400b38a` | Reference project (working example) |
+| Project | UUID | UPLOAD_QGS | Notes |
+|---------|------|------------|-------|
+| **OES_Project_Progress** | `ad3b1035-ddb3-42a3-8077-175f9400b38a` | `false` | **PRODUCTION** - Has existing .qgs |
+| FibreFlow_OES_Automations | `067b51c8-6e96-4e0c-9462-d4890763758b` | `true` | Test project |
+| Test_Project__Automations | `e849b878-f8a8-4f84-a3f1-9fbd051686c0` | N/A | Has .qgs conflicts - DO NOT USE |
 
-**Collaborators (FibreFlow_OES_Automations):** Jaun (owner), Adminuser, Hein
+**Collaborators (OES_Project_Progress):** Hein
+**Note:** Projects with existing `.qgs` must use `UPLOAD_QGS=false` in systemd service
 
 ### How It Works
 1. **OES Import** at `/activate` → OES Import tab
