@@ -6,7 +6,8 @@ import {
   CheckCircle,
   BarChart3,
   LayoutDashboard,
-  GitBranch
+  GitBranch,
+  Shield
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -27,6 +28,13 @@ export const projectSection: NavSection = {
       icon: GitBranch,
       label: 'Pipeline',
       shortLabel: 'Pipe',
+      permissions: [],
+    },
+    {
+      to: '/health-safety',
+      icon: Shield,
+      label: 'Health & Safety',
+      shortLabel: 'H&S',
       permissions: [],
     },
     {
