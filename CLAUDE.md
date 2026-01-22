@@ -695,17 +695,18 @@ ssh louis@100.96.203.105
 - **OS:** Ubuntu Server
 - **Tailnet:** velof2025.github
 
-### Three Environment Setup
+### Four Environment Setup
 
 > **Full infrastructure details:** `docs/INFRASTRUCTURE.md`
 
-**IMPORTANT:** All three environments share the **same production database** (Neon PostgreSQL).
+**IMPORTANT:** All environments share the **same production database** (Neon PostgreSQL).
 
 | Environment | URL | Port | Directory | Service |
 |-------------|-----|------|-----------|---------|
 | **Production** | app.fibreflow.app | 3000 | `/home/velo/fibreflow-production` | `fibreflow-production.service` |
 | **Staging** | vf.fibreflow.app | 3006 | `/home/louis/apps/fibreflow` | `fibreflow.service` |
-| **Dev** | localhost:3005 | 3005 | `/home/velo/fibreflow` | manual |
+| **Dev** | dev.fibreflow.app | 3005 | `/home/hein/apps/fibreflow-dev` | `fibreflow-dev.service` |
+| **Local** | localhost:3004 | 3004 | Local machine | manual (`PORT=3004 npm start`) |
 
 ### Deployment Workflow
 1. **Local:** Develop on feature branch

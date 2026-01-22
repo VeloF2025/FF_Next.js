@@ -21,7 +21,8 @@ Manage and troubleshoot all FibreFlow environments (dev, staging, production).
 |-------------|-----|------|---------|-----------|
 | **Production** | app.fibreflow.app | 3000 | `fibreflow-production.service` | `/home/velo/fibreflow-production` |
 | **Staging** | vf.fibreflow.app | 3006 | `fibreflow.service` | `/home/louis/apps/fibreflow` |
-| **Dev** | localhost:3005 | 3005 | manual | `/home/velo/fibreflow` |
+| **Dev** | dev.fibreflow.app | 3005 | `fibreflow-dev.service` | `/home/hein/apps/fibreflow-dev` |
+| **Local** | localhost:3004 | 3004 | manual | Local machine |
 
 **Server:** 100.96.203.105 (Velocity via Tailscale)
 **SSH:** `velo@100.96.203.105` (password: velo2026)
@@ -36,8 +37,11 @@ curl -s -o /dev/null -w 'PROD: %{http_code}\n' https://app.fibreflow.app/api/hea
 # Staging
 curl -s -o /dev/null -w 'STAGING: %{http_code}\n' https://vf.fibreflow.app/api/health
 
-# Dev (if running)
-curl -s -o /dev/null -w 'DEV: %{http_code}\n' http://localhost:3005/api/health 2>/dev/null || echo "DEV: not running"
+# Dev
+curl -s -o /dev/null -w 'DEV: %{http_code}\n' https://dev.fibreflow.app/api/health
+
+# Local (if running)
+curl -s -o /dev/null -w 'LOCAL: %{http_code}\n' http://localhost:3004/api/health 2>/dev/null || echo "LOCAL: not running"
 ```
 
 ### Step 2: Test Localhost on Server
@@ -45,6 +49,7 @@ curl -s -o /dev/null -w 'DEV: %{http_code}\n' http://localhost:3005/api/health 2
 sshpass -p 'velo2026' ssh velo@100.96.203.105 "
   echo 'PROD (3000):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
   echo 'STAGING (3006):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
+  echo 'DEV (3005):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
 "
 ```
 
@@ -129,6 +134,28 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep DATABASE_URL /home/louis/app
 **Fix missing DATABASE_URL:**
 ```bash
 sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' >> /home/louis/apps/fibreflow/.env.production && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+```
+
+### Dev (dev.fibreflow.app)
+
+**Restart app:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+```
+
+**View logs:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-dev.service -n 50 --no-pager"
+```
+
+**Deploy:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+```
+
+**Fix port conflict:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S fuser -k 3005/tcp && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 ## Cloudflared Tunnel Management
