@@ -14,11 +14,11 @@ interface ColumnUpdate {
 }
 
 /**
- * PUT /api/wishlist/columns
+ * POST /api/wishlist/columns
  * Update column settings (create, update, delete columns)
  * Admin only
  */
-export async function PUT(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
