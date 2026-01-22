@@ -29,9 +29,17 @@ import {
   DollarSign,
   Box,
   X,
+  Settings,
+  BarChart3,
+  Calendar,
+  Filter,
+  Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
+
+// Import bundle modal
+import { BundleItemsModal } from '@/components/procurement/bundles';
 
 // Import existing components
 import { StockItemsPage } from '@/modules/stock-items';
@@ -54,6 +62,7 @@ const TABS = [
   { id: 'bundles', label: 'Bundles', icon: PackagePlus },
   { id: 'takes', label: 'Takes', icon: ClipboardCheck },
   { id: 'field', label: 'Field', icon: Package },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -242,19 +251,19 @@ function CategoriesTabContent() {
           label="Total Categories"
           value={totalCategories}
           icon={FolderTree}
-          colorType="blue"
+          colorType="info"
         />
         <StatCard
           label="Active"
           value={activeCategories}
           icon={FolderTree}
-          colorType="green"
+          colorType="success"
         />
         <StatCard
           label="Total Items"
           value={totalItems}
           icon={Box}
-          colorType="purple"
+          colorType="value"
         />
       </StatCardGrid>
 
@@ -404,6 +413,8 @@ function BundlesTabContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showItemsModal, setShowItemsModal] = useState(false);
+  const [selectedBundle, setSelectedBundle] = useState<StockBundle | null>(null);
   const [editingBundle, setEditingBundle] = useState<StockBundle | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -413,6 +424,18 @@ function BundlesTabContent() {
     bundle_type: 'installation',
     is_active: true,
   });
+
+  const openItemsModal = (bundle: StockBundle, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedBundle(bundle);
+    setShowItemsModal(true);
+  };
+
+  const closeItemsModal = () => {
+    setShowItemsModal(false);
+    setSelectedBundle(null);
+    fetchBundles(); // Refresh to get updated item counts
+  };
 
   useEffect(() => {
     fetchBundles();
@@ -531,19 +554,19 @@ function BundlesTabContent() {
           label="Total Bundles"
           value={totalBundles}
           icon={PackagePlus}
-          colorType="blue"
+          colorType="info"
         />
         <StatCard
           label="Active"
           value={activeBundles}
           icon={PackagePlus}
-          colorType="green"
+          colorType="success"
         />
         <StatCard
           label="Total Value"
           value={`R ${totalValue.toLocaleString()}`}
           icon={DollarSign}
-          colorType="purple"
+          colorType="value"
         />
       </StatCardGrid>
 
@@ -588,6 +611,13 @@ function BundlesTabContent() {
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{bundle.item_count || 0} items</span>
                 <span className="font-medium text-[var(--ff-text-primary)]">R {(bundle.calculated_price || 0).toLocaleString()}</span>
+                <button
+                  onClick={(e) => openItemsModal(bundle, e)}
+                  className="p-1 text-[var(--ff-text-tertiary)] hover:text-indigo-400 transition-colors"
+                  title="Manage Items"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(bundle); }}
                   className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
@@ -699,6 +729,16 @@ function BundlesTabContent() {
           </div>
         </div>
       )}
+
+      {/* Bundle Items Modal */}
+      {showItemsModal && selectedBundle && (
+        <BundleItemsModal
+          bundle={selectedBundle}
+          isOpen={showItemsModal}
+          onClose={closeItemsModal}
+          onSave={fetchBundles}
+        />
+      )}
     </div>
   );
 }
@@ -808,19 +848,19 @@ function StockTakesTabContent() {
           label="Total Takes"
           value={totalTakes}
           icon={ClipboardCheck}
-          colorType="blue"
+          colorType="info"
         />
         <StatCard
           label="In Progress"
           value={inProgress}
           icon={ClipboardCheck}
-          colorType="yellow"
+          colorType="pending"
         />
         <StatCard
           label="Total Variance"
           value={`R ${totalVariance.toLocaleString()}`}
           icon={AlertTriangle}
-          colorType="red"
+          colorType="error"
         />
       </StatCardGrid>
 
@@ -945,6 +985,278 @@ function StockTakesTabContent() {
   );
 }
 
+// Bundle Reports Tab Content
+interface ReportData {
+  summary: Record<string, number>;
+  data: any[];
+  byType?: Record<string, any>;
+  byProject?: Record<string, any>;
+  byCategory?: Record<string, any>;
+}
+
+type ReportType = 'usage' | 'cost-analysis' | 'consumption' | 'inventory-value';
+
+function BundleReportsTabContent() {
+  const [reportType, setReportType] = useState<ReportType>('usage');
+  const [isLoading, setIsLoading] = useState(false);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [projectId, setProjectId] = useState('');
+  const [bundleType, setBundleType] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [projects, setProjects] = useState<{ id: string; project_name: string }[]>([]);
+
+  // Fetch projects for filter dropdown
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch('/api/projects');
+        const data = await res.json();
+        if (data.success) {
+          setProjects(data.data || []);
+        }
+      } catch (err) {
+        log.error('Failed to fetch projects', err);
+      }
+    };
+    fetchProjects();
+  }, []);
+
+  const fetchReport = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (projectId) params.append('projectId', projectId);
+      if (bundleType) params.append('bundleType', bundleType);
+      if (dateFrom) params.append('dateFrom', dateFrom);
+      if (dateTo) params.append('dateTo', dateTo);
+
+      const url = `/api/procurement/bundles/reports/${reportType}?${params.toString()}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success) {
+        setReportData(data.data);
+      } else {
+        toast.error(data.error?.message || 'Failed to load report');
+        setReportData(null);
+      }
+    } catch (err) {
+      log.error('Failed to fetch report', err);
+      toast.error('Failed to load report');
+      setReportData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [reportType, projectId, bundleType, dateFrom, dateTo]);
+
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  const reportTabs = [
+    { id: 'usage' as const, label: 'Bundle Usage', icon: TrendingUp },
+    { id: 'cost-analysis' as const, label: 'Cost Analysis', icon: DollarSign },
+    { id: 'consumption' as const, label: 'Item Consumption', icon: Boxes },
+    { id: 'inventory-value' as const, label: 'Inventory Value', icon: Warehouse },
+  ];
+
+  const exportReport = () => {
+    if (!reportData?.data?.length) {
+      toast.error('No data to export');
+      return;
+    }
+
+    // Convert to CSV
+    const headers = Object.keys(reportData.data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...reportData.data.map(row =>
+        headers.map(h => {
+          const val = row[h];
+          return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+        }).join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bundle-${reportType}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Report exported');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Report Type Tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {reportTabs.map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setReportType(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                reportType === tab.id
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-secondary)]'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-4 p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-default)]">
+        <div>
+          <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Project</label>
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+          >
+            <option value="">All Projects</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.project_name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Bundle Type</label>
+          <select
+            value={bundleType}
+            onChange={(e) => setBundleType(e.target.value)}
+            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+          >
+            <option value="">All Types</option>
+            <option value="installation">Installation</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="repair">Repair</option>
+            <option value="project">Project</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">From Date</label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">To Date</label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={fetchReport}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+        >
+          <Filter className="h-4 w-4" />
+          Apply Filters
+        </button>
+
+        <button
+          onClick={exportReport}
+          disabled={!reportData?.data?.length}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </button>
+      </div>
+
+      {/* Summary Stats */}
+      {reportData?.summary && (
+        <StatCardGrid columns={4}>
+          {Object.entries(reportData.summary).map(([key, value]) => (
+            <StatCard
+              key={key}
+              label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+              value={typeof value === 'number' && key.toLowerCase().includes('value')
+                ? `R ${value.toLocaleString()}`
+                : value.toLocaleString()
+              }
+              icon={BarChart3}
+              colorType="info"
+            />
+          ))}
+        </StatCardGrid>
+      )}
+
+      {/* Report Data */}
+      {isLoading ? (
+        <LoadingState message="Loading report..." />
+      ) : reportData?.data?.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-[var(--ff-bg-tertiary)]">
+              <tr>
+                {Object.keys(reportData.data[0]).map(key => (
+                  <th
+                    key={key}
+                    className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider"
+                  >
+                    {key.replace(/_/g, ' ')}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--ff-border-default)]">
+              {reportData.data.map((row, idx) => (
+                <tr key={idx} className="hover:bg-[var(--ff-bg-secondary)]">
+                  {Object.entries(row).map(([key, value], cidx) => (
+                    <td key={cidx} className="px-4 py-3 text-[var(--ff-text-primary)]">
+                      {typeof value === 'number'
+                        ? key.toLowerCase().includes('cost') || key.toLowerCase().includes('value') || key.toLowerCase().includes('price') || key.toLowerCase().includes('revenue')
+                          ? `R ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : value.toLocaleString()
+                        : value instanceof Date
+                          ? value.toISOString().split('T')[0]
+                          : String(value || '-')
+                      }
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="text-center py-12 text-[var(--ff-text-secondary)]">
+          <BarChart3 className="h-12 w-12 mx-auto mb-3 text-[var(--ff-text-tertiary)]" />
+          <p>No data available for the selected filters</p>
+          <p className="text-sm text-[var(--ff-text-tertiary)] mt-1">
+            Try adjusting your filters or check if bundles have been used
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InventoryPage({ projectId }: InventoryPageProps) {
   const { activeTab, changeTab, isInitialized } = useTabPersistence({
     pageKey: 'inventory',
@@ -1014,6 +1326,7 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
               {activeTab === 'bundles' && <BundlesTabContent />}
               {activeTab === 'takes' && <StockTakesTabContent />}
               {activeTab === 'field' && <FieldStockDashboard />}
+              {activeTab === 'reports' && <BundleReportsTabContent />}
             </>
           )}
         </div>
