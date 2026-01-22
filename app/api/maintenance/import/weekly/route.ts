@@ -281,11 +281,13 @@ export async function POST(req: NextRequest) {
       });
 
     // Return report immediately with PENDING status
+    // Note: Frontend expects 'id' field (WeeklyReport type), not 'report_id'
     return NextResponse.json(
       {
         success: true,
         data: {
-          report_id: report.id,
+          id: report.id,
+          report_id: report.id, // Keep for backwards compatibility
           report_uid: report.report_uid,
           status: report.status,
           total_rows: parseResult.rows.length,
