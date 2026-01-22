@@ -222,6 +222,15 @@ export interface WaServicePhoneConfig {
 }
 
 // ============================================
+// Send Message
+// ============================================
+export interface WaSendMessageInput {
+  group_id: string;
+  message: string;
+  mention_phone?: string;
+}
+
+// ============================================
 // Tab Types for UI
 // ============================================
-export type WaAdminTab = 'services' | 'groups' | 'templates' | 'logs' | 'settings';
+export type WaAdminTab = 'services' | 'send' | 'groups' | 'templates' | 'logs' | 'settings';

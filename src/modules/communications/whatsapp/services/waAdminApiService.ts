@@ -18,6 +18,7 @@ import type {
   WaTestMessageResult,
   WaPhoneNumber,
   WaPhoneNumberInput,
+  WaSendMessageInput,
 } from '../types/wa-admin.types';
 
 const API_BASE = '/api/communications/whatsapp';
@@ -236,6 +237,17 @@ export const logsApi = {
 };
 
 // ============================================
+// Messages API (Send Custom Messages)
+// ============================================
+export const messagesApi = {
+  send: (input: WaSendMessageInput) =>
+    fetchApi<WaTestMessageResult>('/send-message', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+};
+
+// ============================================
 // Phones API (Multi-service Support)
 // ============================================
 export const phonesApi = {
@@ -279,6 +291,7 @@ export const waAdminApi = {
   config: configApi,
   services: servicesApi,
   logs: logsApi,
+  messages: messagesApi,
   phones: phonesApi,
 };
 
