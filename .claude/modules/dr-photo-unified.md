@@ -121,9 +121,10 @@ retryFailed(drNumbers?: string[])
 
 ## WhatsApp Integration
 
-### Sender Service
-- URL: http://100.96.203.105:8081
-- Health check: `curl http://100.96.203.105:8081/health`
+### Sender Service (VPS - Jan 2026)
+- URL: http://72.61.197.178:8081 (VPS)
+- Proxy: http://100.96.203.105:8092 (wa-feedback on Velocity)
+- Health check: `curl http://72.61.197.178:8081/health`
 
 ### Group Mapping
 | Project | Group ID |
@@ -164,8 +165,11 @@ docker logs vllm-qwen3
 
 ### WhatsApp Feedback Not Sending
 ```bash
-ssh louis@100.96.203.105
-sudo systemctl restart whatsapp-sender
+# Check VPS sender
+ssh root@72.61.197.178 "systemctl restart whatsapp-sender"
+
+# Check wa-feedback proxy on Velocity
+ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart wa-feedback"
 ```
 
 ## Related Modules

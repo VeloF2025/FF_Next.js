@@ -151,15 +151,17 @@ The portal integrates with the existing WhatsApp infrastructure:
 ```
 WhatsApp Admin Portal (FibreFlow UI)
     │
-    ├─→ whatsapp-sender.service (Port 8081)
-    │       └─→ Status checks, restart commands
-    │       └─→ Test message sending
+    ├─→ wa-feedback (Velocity 100.96.203.105:8092)
+    │       └─→ Proxies to VPS sender
     │
-    └─→ whatsapp-bridge.service (Port 8083)
-            └─→ Status checks, restart commands
-            └─→ Message log aggregation
+    ├─→ whatsapp-sender (VPS 72.61.197.178:8081)
+    │       └─→ Status checks, test messages
+    │
+    └─→ whatsapp-bridge (VPS 72.61.197.178:8083)
+            └─→ Message receiving, DB writes
 
-Server: 100.96.203.105 (Velocity Server)
+Primary Server: VPS 72.61.197.178 (Hostinger - WhatsApp services)
+Proxy Server: 100.96.203.105 (Velocity - wa-feedback only)
 ```
 
 ## Common Tasks
@@ -198,9 +200,9 @@ Navigate to Services tab - shows real-time status with auto-refresh.
 ## Troubleshooting
 
 ### Service Shows Disconnected
-1. Check server connectivity: `curl http://100.96.203.105:8081/health`
-2. SSH to server and check service: `systemctl status whatsapp-sender.service`
-3. Use restart button in UI or restart manually
+1. Check VPS sender connectivity: `curl http://72.61.197.178:8081/health`
+2. SSH to VPS and check service: `ssh root@72.61.197.178 "systemctl status whatsapp-sender"`
+3. Use restart button in UI or restart manually on VPS
 
 ### Test Message Not Sending
 1. Verify group JID is correct format (`XXXXX@g.us`)

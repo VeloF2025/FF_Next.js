@@ -22,9 +22,10 @@ This module is **fully isolated** and operates independently from the main Fibre
 
 **If feedback sending fails:**
 - See **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** for common issues and fixes
-- Check wa-feedback health: `curl http://100.96.203.105:8092/health`
-- Check sender-2 health: `curl http://100.96.203.105:8081/health`
-- Restart services: `echo 'velo2026' | sudo -S systemctl restart wa-feedback whatsapp-sender-2`
+- Check VPS sender health: `curl http://72.61.197.178:8081/health`
+- Check wa-feedback proxy: `curl http://100.96.203.105:8092/health`
+- Restart VPS services: `ssh root@72.61.197.178 "systemctl restart whatsapp-sender whatsapp-bridge"`
+- Restart wa-feedback: `ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart wa-feedback"`
 
 ## Overview
 
@@ -306,9 +307,13 @@ Send feedback to WhatsApp group
 - Shows warning if locked by another user
 - Released on "Save" or "Cancel"
 
-## WA Monitor Agent (VPS)
+## WA Monitor Agent (Velocity Server)
 
-**Location**: `/opt/wa-monitor/prod/` on VPS (72.60.17.245)
+**Location**: `/opt/wa-monitor/prod/` on Velocity (100.96.203.105)
+
+**WhatsApp Services (VPS - Jan 2026)**: `ssh root@72.61.197.178`
+- Sender: `/opt/whatsapp-sender/` (port 8081)
+- Bridge: `/opt/whatsapp-bridge/` (port 8083)
 
 ### Does NOT Need Updating
 
@@ -337,7 +342,7 @@ The VPS Python agent **does NOT require changes** for the incorrect photo markin
 
 **Important**: Always use safe restart script:
 ```bash
-ssh root@72.60.17.245
+ssh velo@100.96.203.105
 /opt/wa-monitor/prod/restart-monitor.sh  # Clears Python bytecode cache
 ```
 
@@ -362,19 +367,17 @@ PORT=3005 npm start
 # Visit: http://localhost:3005/wa-monitor
 ```
 
-### Deploy to Dev
+### Deploy to Staging
 ```bash
-ssh root@72.60.17.245
-cd /var/www/fibreflow-dev
-git pull && rm -rf .next && npm run build && pm2 restart fibreflow-dev
-# Visit: https://dev.fibreflow.app/wa-monitor
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "echo 'velo2026' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
+# Visit: https://vf.fibreflow.app/wa-monitor
 ```
 
 ### Deploy to Production
 ```bash
-ssh root@72.60.17.245
-cd /var/www/fibreflow
-git pull && npm ci && npm run build && pm2 restart fibreflow-prod
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 # Visit: https://app.fibreflow.app/wa-monitor
 ```
 
@@ -402,9 +405,11 @@ pm2 restart fibreflow-[prod|dev]
 
 ### WA Monitor agent not capturing messages?
 ```bash
-ssh root@72.60.17.245
-/opt/wa-monitor/prod/restart-monitor.sh  # Use safe restart!
-tail -f /opt/wa-monitor/prod/logs/wa-monitor-prod.log
+# Check VPS bridge logs
+ssh root@72.61.197.178 "tail -f /opt/whatsapp-bridge/bridge.log"
+
+# Restart VPS services
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge whatsapp-sender"
 ```
 
 ## Related Documentation

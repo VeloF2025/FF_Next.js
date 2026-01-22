@@ -193,36 +193,54 @@ fetch(`${WA_FEEDBACK_URL}/send-feedback`, {
 });
 ```
 
-**Service URLs:**
-- Sender-2: `http://100.96.203.105:8081` (for direct sends with @mentions)
-- Bridge-2: `http://100.96.203.105:8083` (for receiving/groups list)
-- WA Feedback: `http://100.96.203.105:8092` (FibreFlow proxy - preferred)
+**Service URLs (Jan 2026 - VPS Migration):**
+- Sender: `http://72.61.197.178:8081` (VPS - for sending)
+- Bridge: `http://72.61.197.178:8083` (VPS - for receiving)
+- WA Feedback: `http://100.96.203.105:8092` (Velocity proxy → VPS sender)
 
 ### Files Involved
 
+**VPS (72.61.197.178):**
+- **Sender Service:** `/etc/systemd/system/whatsapp-sender.service`
+- **Bridge Service:** `/etc/systemd/system/whatsapp-bridge.service`
+- **Sender Logs:** `/opt/whatsapp-sender/sender.log`
+- **Bridge Logs:** `/opt/whatsapp-bridge/bridge.log`
+
+**Velocity (100.96.203.105):**
 - **wa-feedback Service:** `/etc/systemd/system/wa-feedback.service`
 - **wa-feedback Code:** `/home/louis/wa-feedback-service/wa-feedback-service.js`
-- **Sender-2 Service:** `/etc/systemd/system/whatsapp-sender-2.service`
-- **Bridge-2 Service:** `/etc/systemd/system/whatsapp-bridge-2.service`
-- **Bridge-2 Logs:** `/home/louis/whatsapp-bridge-2/bridge.log`
+
+**FibreFlow:**
 - **API Endpoint:** `/pages/api/wa-monitor-send-feedback.ts`
 - **Activate API:** `/pages/api/activate/send-feedback.ts`
 
-### Velocity Server Connection
+### Server Connections
 
 ```bash
-# Primary access (use velo user)
-ssh velo@100.96.203.105     # via Tailscale (recommended)
-# Password: velo2026
+# VPS (WhatsApp services)
+ssh root@72.61.197.178
 
-# Check service health
-curl http://100.96.203.105:8092/health  # wa-feedback
-curl http://100.96.203.105:8081/health  # sender-2
+# Check VPS service health
+curl http://72.61.197.178:8081/health  # sender
 
-# Restart services
+# Restart VPS services
+systemctl restart whatsapp-sender
+systemctl restart whatsapp-bridge
+
+# View logs
+tail -f /opt/whatsapp-sender/sender.log
+tail -f /opt/whatsapp-bridge/bridge.log
+```
+
+```bash
+# Velocity (wa-feedback proxy only)
+ssh velo@100.96.203.105  # Password: velo2026
+
+# Check wa-feedback health
+curl http://100.96.203.105:8092/health
+
+# Restart wa-feedback
 echo 'velo2026' | sudo -S systemctl restart wa-feedback
-echo 'velo2026' | sudo -S systemctl restart whatsapp-sender-2
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge-2
 ```
 
 ### Monitoring

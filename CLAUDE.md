@@ -406,51 +406,60 @@ getTechnicianIssues(data)      // Returns actionable issues for technicians
 
 ### WhatsApp Integration
 
-**WhatsApp Services (Updated Jan 2026):**
+**WhatsApp Services (Updated Jan 2026 - VPS Migration):**
 
-| Service | Port | Number | Purpose |
-|---------|------|--------|---------|
-| `whatsapp-sender-2` | 8081 | 063 841 2276 | **SENDING** - REST API `/send-message` |
-| `whatsapp-bridge-2` | 8083 | 063 841 2276 | **RECEIVING** - Incoming messages |
-| `wa-feedback` | 8092 | - | FibreFlow proxy → sender-2 |
+| Service | Server | Port | Purpose |
+|---------|--------|------|---------|
+| `whatsapp-sender` | **VPS** (72.61.197.178) | 8081 | **SENDING** - REST API `/send-message` |
+| `whatsapp-bridge` | **VPS** (72.61.197.178) | 8083 | **RECEIVING** - Incoming messages → DB |
+| `wa-feedback` | Velocity (100.96.203.105) | 8092 | FibreFlow proxy → VPS sender |
 
-**Architecture (Jan 2026):**
+**Architecture (Jan 2026 - VPS Redundancy):**
 ```
-FibreFlow APIs → wa-feedback (8092) → sender-2 (8081) → WhatsApp (063 841 2276)
-                                            ↓
-                 bridge-2 (8083) ← WhatsApp incoming messages
+FibreFlow APIs → wa-feedback (Velocity:8092) → VPS sender (8081) → WhatsApp
+                                                                      ↓
+                              Neon DB ← VPS bridge (8083) ← WhatsApp incoming
 ```
 
-**All services use Tailscale IP for consistency across dev/staging/prod:**
-- Sender-2: `http://100.96.203.105:8081`
-- Bridge-2: `http://100.96.203.105:8083`
-- WA Feedback: `http://100.96.203.105:8092`
+**Why VPS?** WhatsApp services now run on Hostinger VPS for redundancy. If Velocity goes down, DR submissions still get captured.
 
-**Sender-2 (for SENDING):** `/home/louis/whatsapp-sender-2/`
+**VPS WhatsApp Services:** `ssh root@72.61.197.178`
 ```bash
-curl http://100.96.203.105:8081/health  # Check connection status
-# Send with @mention:
-curl -X POST http://100.96.203.105:8081/send-message -H "Content-Type: application/json" \
-  -d '{"group_jid": "120363418298130331@g.us", "recipient_jid": "27123456789@s.whatsapp.net", "message": "Test"}'
-# Send without @mention (use dummy recipient):
-curl -X POST http://100.96.203.105:8081/send-message -H "Content-Type: application/json" \
-  -d '{"group_jid": "120363418298130331@g.us", "recipient_jid": "0@s.whatsapp.net", "message": "Test"}'
+# Health checks
+curl http://72.61.197.178:8081/health  # Sender
+curl http://72.61.197.178:8083/health  # Bridge (no endpoint, check logs)
+
+# Logs
+tail -f /opt/whatsapp-sender/sender.log
+tail -f /opt/whatsapp-bridge/bridge.log
+
+# Restart services
+systemctl restart whatsapp-sender
+systemctl restart whatsapp-bridge
+
+# Service locations
+/opt/whatsapp-sender/   # Sender binary + store/whatsapp.db
+/opt/whatsapp-bridge/   # Bridge binary + store/whatsapp.db
 ```
 
-**Bridge-2 (for RECEIVING):** `/home/louis/whatsapp-bridge-2/`
+**Send test message via VPS:**
 ```bash
-tail -f /home/louis/whatsapp-bridge-2/bridge.log
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge-2.service
+curl -X POST http://72.61.197.178:8081/send-message -H "Content-Type: application/json" \
+  -d '{"group_jid": "120363421664266245@g.us", "recipient_jid": "0@s.whatsapp.net", "message": "Test"}'
 ```
 
-**WA Feedback Service (FibreFlow proxy):** Port 8092
+**WA Feedback Service (Velocity proxy to VPS):** Port 8092
 ```bash
 curl http://100.96.203.105:8092/health
 echo 'velo2026' | sudo -S systemctl restart wa-feedback
 # Config: /etc/systemd/system/wa-feedback.service
 # Code: /home/louis/wa-feedback-service/wa-feedback-service.js
-# Proxies to sender-2 (8081) with /send-message endpoint
+# Routes to VPS sender (72.61.197.178:8081)
 ```
+
+**Legacy Velocity Services (STOPPED - kept for reference):**
+- `/home/louis/whatsapp-sender-2/` - Old sender (stopped)
+- `/home/louis/whatsapp-bridge-2/` - Old bridge (stopped)
 
 **Group Mapping:**
 - Lawley: `120363418298130331@g.us`
