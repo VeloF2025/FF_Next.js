@@ -83,12 +83,12 @@ interface StockCategory {
 interface StockBundle {
   id: string;
   name: string;
-  code: string;
+  bundle_code: string;
   description?: string;
   bundle_type: string;
   is_active: boolean;
   item_count?: number;
-  total_cost?: number;
+  calculated_price?: number;
 }
 
 // Types for Stock Takes
@@ -194,7 +194,7 @@ function CategoriesTabContent() {
         closeModal();
         fetchCategories();
       } else {
-        toast.error(data.error || 'Failed to save category');
+        toast.error(data.error?.message || 'Failed to save category');
       }
     } catch (err) {
       toast.error('Failed to save category');
@@ -215,7 +215,7 @@ function CategoriesTabContent() {
         toast.success('Category deleted');
         fetchCategories();
       } else {
-        toast.error(data.error || 'Failed to delete category');
+        toast.error(data.error?.message || 'Failed to delete category');
       }
     } catch (err) {
       toast.error('Failed to delete category');
@@ -407,7 +407,7 @@ function BundlesTabContent() {
   const [editingBundle, setEditingBundle] = useState<StockBundle | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
-    code: '',
+    bundle_code: '',
     name: '',
     description: '',
     bundle_type: 'installation',
@@ -425,6 +425,8 @@ function BundlesTabContent() {
       const data = await res.json();
       if (data.success) {
         setBundles(data.data || []);
+      } else {
+        toast.error(data.error?.message || 'Failed to load bundles');
       }
     } catch (err) {
       log.error('Failed to fetch bundles', err);
@@ -435,14 +437,14 @@ function BundlesTabContent() {
 
   const openNewModal = () => {
     setEditingBundle(null);
-    setFormData({ code: '', name: '', description: '', bundle_type: 'installation', is_active: true });
+    setFormData({ bundle_code: '', name: '', description: '', bundle_type: 'installation', is_active: true });
     setShowModal(true);
   };
 
   const openEditModal = (bundle: StockBundle) => {
     setEditingBundle(bundle);
     setFormData({
-      code: bundle.code,
+      bundle_code: bundle.bundle_code,
       name: bundle.name,
       description: bundle.description || '',
       bundle_type: bundle.bundle_type,
@@ -457,7 +459,7 @@ function BundlesTabContent() {
   };
 
   const handleSave = async () => {
-    if (!formData.code.trim() || !formData.name.trim()) {
+    if (!formData.bundle_code.trim() || !formData.name.trim()) {
       toast.error('Code and name are required');
       return;
     }
@@ -481,7 +483,7 @@ function BundlesTabContent() {
         closeModal();
         fetchBundles();
       } else {
-        toast.error(data.error || 'Failed to save bundle');
+        toast.error(data.error?.message || 'Failed to save bundle');
       }
     } catch (err) {
       toast.error('Failed to save bundle');
@@ -502,7 +504,7 @@ function BundlesTabContent() {
         toast.success('Bundle deleted');
         fetchBundles();
       } else {
-        toast.error(data.error || 'Failed to delete bundle');
+        toast.error(data.error?.message || 'Failed to delete bundle');
       }
     } catch (err) {
       toast.error('Failed to delete bundle');
@@ -513,12 +515,12 @@ function BundlesTabContent() {
   const filtered = bundles.filter(
     (b) =>
       b.name.toLowerCase().includes(search.toLowerCase()) ||
-      b.code.toLowerCase().includes(search.toLowerCase())
+      b.bundle_code.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalBundles = bundles.length;
   const activeBundles = bundles.filter(b => b.is_active).length;
-  const totalValue = bundles.reduce((sum, b) => sum + (b.total_cost || 0), 0);
+  const totalValue = bundles.reduce((sum, b) => sum + (b.calculated_price || 0), 0);
 
   if (isLoading) return <LoadingState message="Loading bundles..." />;
 
@@ -577,7 +579,7 @@ function BundlesTabContent() {
                 <PackagePlus className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
                 <div>
                   <p className="font-medium text-[var(--ff-text-primary)]">{bundle.name}</p>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">{bundle.code} • {bundle.bundle_type}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{bundle.bundle_code} • {bundle.bundle_type}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -585,7 +587,7 @@ function BundlesTabContent() {
                   {bundle.is_active ? 'Active' : 'Inactive'}
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{bundle.item_count || 0} items</span>
-                <span className="font-medium text-[var(--ff-text-primary)]">R {(bundle.total_cost || 0).toLocaleString()}</span>
+                <span className="font-medium text-[var(--ff-text-primary)]">R {(bundle.calculated_price || 0).toLocaleString()}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(bundle); }}
                   className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
@@ -623,8 +625,8 @@ function BundlesTabContent() {
                 <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Code *</label>
                 <input
                   type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  value={formData.bundle_code}
+                  onChange={(e) => setFormData({ ...formData, bundle_code: e.target.value.toUpperCase() })}
                   placeholder="e.g., INST-FTTH"
                   className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                 />
@@ -756,7 +758,7 @@ function StockTakesTabContent() {
         closeModal();
         fetchStockTakes();
       } else {
-        toast.error(data.error || 'Failed to create stock take');
+        toast.error(data.error?.message || 'Failed to create stock take');
       }
     } catch (err) {
       toast.error('Failed to create stock take');
@@ -781,7 +783,7 @@ function StockTakesTabContent() {
         toast.success('Stock take deleted');
         fetchStockTakes();
       } else {
-        toast.error(data.error || 'Failed to delete stock take');
+        toast.error(data.error?.message || 'Failed to delete stock take');
       }
     } catch (err) {
       toast.error('Failed to delete stock take');
