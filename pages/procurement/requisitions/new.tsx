@@ -53,7 +53,7 @@ interface FormItem {
 
 interface Project {
   id: string;
-  project_name: string;
+  name: string;
   project_code: string;
 }
 
@@ -290,7 +290,7 @@ export default function NewRequisitionPage() {
                     <option value="">Select a project</option>
                     {projects.map((project) => (
                       <option key={project.id} value={project.id}>
-                        {project.project_name} ({project.project_code})
+                        {project.name} ({project.project_code})
                       </option>
                     ))}
                   </select>
