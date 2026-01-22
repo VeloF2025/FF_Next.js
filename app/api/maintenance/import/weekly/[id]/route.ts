@@ -33,10 +33,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Validate UUID format
     if (!UUID_REGEX.test(id)) {
@@ -118,7 +118,6 @@ export async function GET(
   } catch (error) {
     logger.error('Error fetching weekly import status', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      reportId: params.id,
     });
 
     return NextResponse.json(
