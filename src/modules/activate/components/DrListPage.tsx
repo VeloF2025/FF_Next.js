@@ -772,34 +772,18 @@ function DashboardPageContent() {
                                                         {dr.qa_status === 'rework' && <span className="text-yellow-500 text-xs">↻</span>}
                                                       </div>
                                                     </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">-</td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                      {dr.is_installed ? (
-                                                        <span className="text-blue-400">✓</span>
-                                                      ) : (
-                                                        <span className="text-gray-500">-</span>
-                                                      )}
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">1</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-300 dark:text-blue-400">
+                                                      {dr.is_installed ? 1 : 0}
                                                     </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                      {dr.is_activated ? (
-                                                        <span className="text-purple-400">✓</span>
-                                                      ) : (
-                                                        <span className="text-gray-500">-</span>
-                                                      )}
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-300 dark:text-purple-400">
+                                                      {dr.is_activated ? 1 : 0}
                                                     </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                      {!dr.is_reviewed ? (
-                                                        <span className="text-yellow-400">●</span>
-                                                      ) : (
-                                                        <span className="text-gray-500">-</span>
-                                                      )}
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-300 dark:text-yellow-400">
+                                                      {dr.is_reviewed ? 0 : 1}
                                                     </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                      {dr.is_reviewed ? (
-                                                        <span className="text-green-400">✓</span>
-                                                      ) : (
-                                                        <span className="text-gray-500">-</span>
-                                                      )}
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-green-300 dark:text-green-400">
+                                                      {dr.is_reviewed ? 1 : 0}
                                                     </td>
                                                   </tr>
                                                 ))}
