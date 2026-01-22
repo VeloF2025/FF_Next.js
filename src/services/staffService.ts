@@ -93,15 +93,21 @@ export const staffService: StaffService = {
   },
 
   // Extended operations
+  // TODO: Wire up to /api/staff/[staffId]/projects GET endpoint
   getProjectAssignments: async () => {
+    // STUB: Returns empty array - project assignments not yet wired up
     return Promise.resolve([]);
   },
 
+  // TODO: Wire up to /api/staff/[staffId]/projects POST endpoint
   assignToProject: async () => {
+    // STUB: Returns success without action - project assignments not yet wired up
     return Promise.resolve({ success: true });
   },
 
+  // TODO: Implement via API or direct Neon query
   updateStaffProjectCount: async () => {
+    // STUB: Returns success without action - counts not recalculated
     return Promise.resolve({ success: true });
   },
 

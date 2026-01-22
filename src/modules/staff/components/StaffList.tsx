@@ -51,7 +51,7 @@ export function StaffList() {
     
     try {
       await staffService.delete(id);
-      refetch();
+      await refetch();
     } catch (error) {
       log.error('Failed to delete staff member:', { data: error }, 'StaffList');
     }
@@ -111,9 +111,9 @@ export function StaffList() {
             Back to List
           </button>
         </div>
-        <StaffImport onComplete={() => {
+        <StaffImport onComplete={async () => {
           setShowImport(false);
-          refetch();
+          await refetch();
         }} />
       </div>
     );

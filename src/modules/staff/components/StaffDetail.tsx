@@ -134,7 +134,7 @@ export function StaffDetail() {
       throw new Error(data.error || 'Failed to upload CV');
     }
 
-    refetch();
+    await refetch();
   };
 
   const handleCvDelete = async () => {
@@ -148,7 +148,7 @@ export function StaffDetail() {
       throw new Error('Failed to delete CV');
     }
 
-    refetch();
+    await refetch();
   };
 
   // Profile Photo handlers
@@ -166,7 +166,7 @@ export function StaffDetail() {
       throw new Error(data.error || 'Failed to upload profile photo');
     }
 
-    refetch();
+    await refetch();
   };
 
   const handleProfilePhotoDelete = async () => {
@@ -180,7 +180,7 @@ export function StaffDetail() {
       throw new Error('Failed to delete profile photo');
     }
 
-    refetch();
+    await refetch();
   };
 
   const handleComparePhotos = async () => {
@@ -196,7 +196,7 @@ export function StaffDetail() {
     }
 
     notificationService.success('Photos compared successfully');
-    refetch();
+    await refetch();
   };
 
   // Disciplinary handlers
