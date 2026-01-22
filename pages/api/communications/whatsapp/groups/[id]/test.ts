@@ -147,6 +147,7 @@ async function sendTestMessage(
       },
       body: JSON.stringify({
         group_jid: groupJid,
+        recipient_jid: '0@s.whatsapp.net', // Dummy JID for no @mention
         message: message,
       }),
       signal: AbortSignal.timeout(30000), // 30 second timeout
