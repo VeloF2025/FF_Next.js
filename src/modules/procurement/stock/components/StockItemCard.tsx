@@ -2,6 +2,7 @@ import React from 'react';
 import { Eye, Tag, MapPin, Truck, Calendar, ArrowRight, Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { StatusBadge } from './StatusBadge';
+import { formatDate } from '@/utils/dateFormat';
 import type { StockItemData } from '../types/stock.types';
 
 interface StockItemCardProps {

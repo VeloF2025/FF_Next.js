@@ -10,13 +10,12 @@ export class DateFormatter {
   private defaultLocale = 'en-US';
 
   // Date and time formatting
+  // Standard format: YYYY-MM-DD
   date(
     date: Date | string,
     options: DateFormatOptions = {}
   ): string {
     const {
-      locale = this.defaultLocale,
-      dateStyle = 'medium',
       timeStyle,
       timeZone,
     } = options;
@@ -28,22 +27,25 @@ export class DateFormatter {
     }
 
     try {
-      const formatOptions: Intl.DateTimeFormatOptions = {
-        dateStyle,
-      };
+      // Standard YYYY-MM-DD format
+      const datePart = dateObj.toISOString().split('T')[0];
 
+      // If time is requested, append it
       if (timeStyle) {
-        formatOptions.timeStyle = timeStyle;
+        const timeOptions: Intl.DateTimeFormatOptions = {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        };
+        if (timeZone) timeOptions.timeZone = timeZone;
+        const timePart = dateObj.toLocaleTimeString('en-GB', timeOptions);
+        return `${datePart} ${timePart}`;
       }
 
-      if (timeZone) {
-        formatOptions.timeZone = timeZone;
-      }
-
-      return new Intl.DateTimeFormat(locale, formatOptions).format(dateObj);
+      return datePart;
     } catch (error) {
       log.warn('Date formatting failed:', { data: error }, 'dateFormatter');
-      return dateObj.toLocaleDateString();
+      return dateObj.toISOString().split('T')[0];
     }
   }
 

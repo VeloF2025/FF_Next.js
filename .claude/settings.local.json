@@ -422,7 +422,8 @@
       "Bash(\"echo ''velo2026'' | sudo -S bash -c ''cd /home/louis/apps/fibreflow && rm -rf .next && chown -R louis:louis .git && su louis -c \"\"git pull origin master && npm run build\"\"'' && sudo systemctl restart fibreflow.service\")",
       "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/communications/whatsapp)",
       "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/)",
-      "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/api/health)"
+      "Bash(do curl -s -o /dev/null -w '%{http_code} ' https://vf.fibreflow.app/api/health)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline --all --grep=\"procurement\")"
     ],
     "deny": [],
     "ask": [],

@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Calendar, Truck, Package, ArrowRight, ArrowLeft, FileText } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { formatDate } from '@/utils/dateFormat';
 import type { StockMovementData } from '../types/stock.types';
 
 interface MovementsTabProps {

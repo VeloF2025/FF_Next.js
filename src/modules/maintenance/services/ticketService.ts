@@ -16,7 +16,11 @@
  * - Soft delete (never hard delete tickets)
  * - Pagination support
  * - Multi-criteria filtering
- * - Automatic ticket UID generation (FT + 6 digits)
+ * - Automatic ticket UID generation (VF-YYYYMMDD-NNN format)
+ *   - VF = Velocity Fibre
+ *   - YYYYMMDD = Date
+ *   - NNN = Daily sequence (001, 002, etc.)
+ *   - Uses atomic database sequence for collision-free generation
  */
 
 import { query, queryOne } from '../utils/db';
@@ -48,10 +52,50 @@ function isValidUUID(id: string): boolean {
 }
 
 /**
- * Generate unique ticket UID (FF + 6 random digits)
- * Format: FF406824 (FF = FibreFlow)
+ * Generate unique ticket UID using atomic database sequence
+ * Format: VF-YYYYMMDD-NNN (e.g., VF-20260122-001)
+ *
+ * - VF = Velocity Fibre
+ * - YYYYMMDD = Date of creation
+ * - NNN = Daily sequence number (resets each day)
+ *
+ * Uses INSERT...ON CONFLICT for atomic, collision-free generation.
+ *
+ * @param forDate - Optional date to generate UID for (used during migration)
+ * @returns Promise<string> The generated VF ticket UID
  */
-function generateTicketUID(): string {
+async function generateTicketUID(forDate?: Date): Promise<string> {
+  const targetDate = forDate || new Date();
+  const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD for SQL
+  const formattedDate = dateStr.replace(/-/g, ''); // YYYYMMDD for UID
+
+  // Atomic sequence generation using INSERT...ON CONFLICT
+  const result = await queryOne<{ last_sequence: number }>(
+    `INSERT INTO maintenance_ticket_sequences (sequence_date, last_sequence)
+     VALUES ($1::date, 1)
+     ON CONFLICT (sequence_date)
+     DO UPDATE SET
+       last_sequence = maintenance_ticket_sequences.last_sequence + 1,
+       updated_at = NOW()
+     RETURNING last_sequence`,
+    [dateStr]
+  );
+
+  if (!result) {
+    throw new Error('Failed to generate VF ticket UID - sequence query returned no result');
+  }
+
+  const seqNum = result.last_sequence;
+  const paddedSeq = String(seqNum).padStart(3, '0');
+
+  return `VF-${formattedDate}-${paddedSeq}`;
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use generateTicketUID() instead
+ */
+function generateLegacyTicketUID(): string {
   const randomDigits = Math.floor(100000 + Math.random() * 900000);
   return `FF${randomDigits}`;
 }
@@ -103,7 +147,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
   // 🟢 WORKING: Set defaults
   const priority = payload.priority || TicketPriority.NORMAL;
   const status = TicketStatus.OPEN;
-  const ticketUID = generateTicketUID();
+  const ticketUID = await generateTicketUID();
 
   logger.info('Creating ticket', {
     title: payload.title,
@@ -543,3 +587,8 @@ export async function listTickets(
     throw error;
   }
 }
+
+/**
+ * Export generateTicketUID for use in migration scripts
+ */
+export { generateTicketUID };

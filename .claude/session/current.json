@@ -1,21 +1,22 @@
 {
   "session_id": "2026-01-22-weekly-import-fix",
   "started_at": "2026-01-22T05:30:00Z",
-  "last_updated": "2026-01-22T08:10:23.291Z",
+  "last_updated": "2026-01-22T12:16:00.070Z",
   "working_on": {
-    "task": "Cloudflared QUIC buffer fix + production port fix",
+    "task": "Weekly Import polling fix - UI stuck on completion",
     "status": "completed",
     "progress": [
-      "Fixed 502 errors on staging - QUIC buffer size issue",
-      "Increased UDP buffers: rmem_max/wmem_max to 7340032",
-      "Persisted in /etc/sysctl.conf",
-      "Fixed production port: 3008 → 3000 in systemd service",
-      "Updated CLAUDE.md with QUIC troubleshooting docs"
+      "Fixed Next.js caching on /[id] and /[id]/progress endpoints",
+      "Added Cache-Control: no-store headers to responses",
+      "Fixed frontend polling: now checks status='completed' in addition to progress>=100",
+      "Verified fix via API: import 09b3f915 completed with status='completed' but progress=0%",
+      "Deployed to staging (commit c5b6d1b8)"
     ],
-    "last_action": "KB scan via /kb - 100% coverage maintained"
+    "last_action": "Verified polling fix deployed and working via API test"
   },
   "commits": {
-    "1356312a": "docs: add cloudflared QUIC buffer fix to troubleshooting"
+    "b01bcbba": "fix(maintenance): disable caching on weekly import status endpoint",
+    "c5b6d1b8": "fix(maintenance): fix weekly import polling stuck on completion"
   },
   "context": {
     "project": "FibreFlow",
@@ -26,12 +27,11 @@
     "staging": "vf.fibreflow.app:3006",
     "production": "app.fibreflow.app:3000"
   },
-  "kb_scan_results": {
-    "timestamp": "2026-01-22T09:10:00Z",
-    "total_modules": 42,
-    "modules_with_claude_md": 42,
-    "coverage": "100%",
-    "learnings_pending": 1,
-    "learnings_note": "activate module has fresh learning from today (port conflict)"
+  "fixes_summary": {
+    "root_cause_1": "Next.js caching API route responses",
+    "fix_1": "Added dynamic='force-dynamic' and Cache-Control headers",
+    "root_cause_2": "Frontend only checked progress_percentage, not status",
+    "fix_2": "Added check for status='completed' or 'failed' in polling logic",
+    "verified": "API test confirmed fix works (status=completed with progress=0%)"
   }
 }

@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle, GitCompare } from 'lucide-react';
+import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle, GitCompare, FileSpreadsheet } from 'lucide-react';
 
 // QContact Sync components
 import { SyncDashboard } from '@/modules/maintenance/components/QContact/SyncDashboard';
@@ -17,6 +17,9 @@ import { SyncTrigger } from '@/modules/maintenance/components/QContact/SyncTrigg
 import { SyncAuditLog } from '@/modules/maintenance/components/QContact/SyncAuditLog';
 import { AlignmentReport } from '@/modules/maintenance/components/QContact/AlignmentReport';
 import { useTriggerManualSync } from '@/modules/maintenance/hooks/useQContactSync';
+
+// Three-Way Alignment component
+import { ThreeWayAlignmentReport } from '@/modules/maintenance/components/ThreeWayAlignmentReport';
 
 // Weekly Import component
 import { WeeklyImportWizard } from '@/modules/maintenance/components/WeeklyImport/WeeklyImportWizard';
@@ -272,7 +275,7 @@ function ImportHistory() {
   );
 }
 
-type TabId = 'qcontact' | 'alignment' | 'weekly';
+type TabId = 'qcontact' | 'alignment' | 'three-way' | 'weekly';
 
 interface Tab {
   id: TabId;
@@ -282,7 +285,8 @@ interface Tab {
 
 const tabs: Tab[] = [
   { id: 'qcontact', label: 'QContact Sync', icon: RefreshCw },
-  { id: 'alignment', label: 'Alignment', icon: GitCompare },
+  { id: 'alignment', label: 'QC Alignment', icon: GitCompare },
+  { id: 'three-way', label: '3-Way Alignment', icon: FileSpreadsheet },
   { id: 'weekly', label: 'Weekly Import', icon: FileUp },
 ];
 
@@ -366,6 +370,12 @@ export default function DataSyncPageClient() {
       {activeTab === 'alignment' && (
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 border border-[var(--ff-border-light)]">
           <AlignmentReport />
+        </div>
+      )}
+
+      {activeTab === 'three-way' && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 border border-[var(--ff-border-light)]">
+          <ThreeWayAlignmentReport />
         </div>
       )}
 

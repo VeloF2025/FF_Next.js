@@ -129,9 +129,6 @@ export function formatPercentage(value: number): string {
 }
 
 export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  }).format(date);
+  // Standard YYYY-MM-DD format
+  return date.toISOString().split('T')[0];
 }

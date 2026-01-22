@@ -103,16 +103,14 @@ export function safeToDate(date: any): Date {
 
 /**
  * Format date safely with fallback
+ * Standard format: YYYY-MM-DD
  */
 export function safeFormatDate(date: any, fallback: string = 'N/A'): string {
   try {
     const dateObj = safeToDate(date);
     if (!isNaN(dateObj.getTime())) {
-      return dateObj.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
+      // Standard YYYY-MM-DD format
+      return dateObj.toISOString().split('T')[0];
     }
     return fallback;
   } catch (error) {
