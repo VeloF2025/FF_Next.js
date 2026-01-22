@@ -77,8 +77,8 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
     };
   }, []);
 
-  // 🟢 WORKING: Handle file selection
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  // 🟢 WORKING: Handle file selection - auto-parse on select
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -98,36 +98,27 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
 
     setError(null);
     setSelectedFile(file);
-  }, []);
 
-  // 🟢 WORKING: Parse uploaded file
-  const handleParseFile = useCallback(async () => {
-    if (!selectedFile || !currentUser?.id) {
+    // Auto-parse immediately after selection
+    if (!currentUser?.id) {
+      setError('User not authenticated');
       return;
     }
 
     setIsParsing(true);
-    setError(null);
 
     try {
-      // Read file as array buffer
-      const buffer = await readFileAsArrayBuffer(selectedFile);
+      // Use FormData for efficient file upload
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Send to API for parsing
       const response = await fetch('/api/maintenance/import/weekly/parse', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: selectedFile.name,
-          data: Array.from(new Uint8Array(buffer)),
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        // Handle nested error structure: {error: {code, message, details}}
         const errorMsg = typeof errorData.error === 'object'
           ? errorData.error?.message || JSON.stringify(errorData.error)
           : errorData.error || 'Failed to parse file';
@@ -147,7 +138,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
     } finally {
       setIsParsing(false);
     }
-  }, [selectedFile, currentUser]);
+  }, [currentUser]);
 
   // 🟢 WORKING: Start import process
   const handleStartImport = useCallback(async () => {
@@ -160,20 +151,15 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
     setCurrentStep('importing');
 
     try {
-      // Read file as array buffer
-      const buffer = await readFileAsArrayBuffer(selectedFile);
+      // Use FormData for efficient file upload
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('user_id', currentUser.id);
 
       // Create weekly report and start import
       const response = await fetch('/api/maintenance/import/weekly', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: selectedFile.name,
-          data: Array.from(new Uint8Array(buffer)),
-          user_id: currentUser.id,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -352,7 +338,6 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
           <FileUploadStep
             selectedFile={selectedFile}
             onFileChange={handleFileChange}
-            onParse={handleParseFile}
             isParsing={isParsing}
           />
         )}
@@ -411,16 +396,15 @@ function StepIndicator({
 
 /**
  * 🟢 WORKING: File upload step component
+ * Auto-parses on file selection for streamlined workflow
  */
 function FileUploadStep({
   selectedFile,
   onFileChange,
-  onParse,
   isParsing,
 }: {
   selectedFile: File | null;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onParse: () => void;
   isParsing: boolean;
 }) {
   return (
@@ -432,7 +416,7 @@ function FileUploadStep({
       <div className="text-center space-y-2">
         <h3 className="text-lg font-medium text-[var(--ff-text-primary)]">Upload Weekly Report</h3>
         <p className="text-sm text-[var(--ff-text-secondary)] max-w-md">
-          Select an Excel file (.xlsx or .xls) containing weekly ticket data to upload and import
+          Select an Excel file (.xlsx or .xls) containing weekly ticket data - it will be parsed automatically
         </p>
       </div>
 
@@ -440,14 +424,29 @@ function FileUploadStep({
       <div className="w-full max-w-md">
         <label
           htmlFor="file-upload"
-          className="flex flex-col items-center gap-4 p-8 border-2 border-dashed border-[var(--ff-border-light)] rounded-lg cursor-pointer hover:border-blue-500/50 hover:bg-[var(--ff-bg-tertiary)] transition-all"
+          className={cn(
+            "flex flex-col items-center gap-4 p-8 border-2 border-dashed rounded-lg cursor-pointer transition-all",
+            isParsing
+              ? "border-blue-500/50 bg-blue-500/5"
+              : "border-[var(--ff-border-light)] hover:border-blue-500/50 hover:bg-[var(--ff-bg-tertiary)]"
+          )}
         >
-          <Upload className="w-8 h-8 text-[var(--ff-text-tertiary)]" />
+          {isParsing ? (
+            <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+          ) : (
+            <Upload className="w-8 h-8 text-[var(--ff-text-tertiary)]" />
+          )}
           <div className="text-center">
             <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-              {selectedFile ? selectedFile.name : 'Choose file or drag and drop'}
+              {isParsing
+                ? `Parsing ${selectedFile?.name}...`
+                : selectedFile
+                  ? selectedFile.name
+                  : 'Choose file or drag and drop'}
             </p>
-            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Excel files only (.xlsx, .xls)</p>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+              {isParsing ? 'Please wait...' : 'Excel files only (.xlsx, .xls)'}
+            </p>
           </div>
           <input
             id="file-upload"
@@ -456,33 +455,10 @@ function FileUploadStep({
             onChange={onFileChange}
             className="hidden"
             aria-label="Choose file"
+            disabled={isParsing}
           />
         </label>
       </div>
-
-      {/* Parse Button */}
-      {selectedFile && (
-        <button
-          type="button"
-          onClick={onParse}
-          disabled={isParsing}
-          className={cn(
-            'px-6 py-2.5 rounded-lg text-sm font-medium transition-all',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500/50',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            'bg-blue-600 hover:bg-blue-700 text-white'
-          )}
-        >
-          {isParsing ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Parsing File...</span>
-            </span>
-          ) : (
-            'Parse File'
-          )}
-        </button>
-      )}
     </div>
   );
 }

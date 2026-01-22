@@ -108,6 +108,8 @@ export default async function handler(
 
 /**
  * Check the health of a WhatsApp service
+ * Bridge uses TCP connectivity check (no HTTP health endpoint)
+ * Sender uses HTTP /health endpoint
  */
 async function checkServiceHealth(
   name: 'bridge' | 'sender',
@@ -133,6 +135,30 @@ async function checkServiceHealth(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+    // Bridge doesn't have /health endpoint - check if port responds
+    if (name === 'bridge') {
+      // Try any HTTP request to check port is open
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal,
+      }).catch(() => null);
+
+      clearTimeout(timeoutId);
+
+      // If we get any response (even 404), the service is running
+      if (response) {
+        baseStatus.status = 'connected';
+        baseStatus.session_valid = true;
+        // Bridge is a Go binary that receives messages - it's "connected" if responding
+        return baseStatus;
+      } else {
+        baseStatus.status = 'disconnected';
+        baseStatus.error_message = 'Service not responding';
+        return baseStatus;
+      }
+    }
+
+    // Sender has /health endpoint
     const response = await fetch(`${url}/health`, {
       method: 'GET',
       signal: controller.signal,
@@ -153,6 +179,11 @@ async function checkServiceHealth(
     baseStatus.session_valid = data.connected === true || data.session_valid === true;
     baseStatus.needs_auth = data.needs_auth === true || data.authenticated === false;
     baseStatus.uptime = data.uptime || null;
+
+    // Get phone number from health response if available
+    if (data.phone_number) {
+      baseStatus.phone_number = data.phone_number;
+    }
 
     if (data.error) {
       baseStatus.error_message = data.error;

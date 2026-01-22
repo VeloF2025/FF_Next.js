@@ -3,12 +3,11 @@
  *
  * POST /api/maintenance/import/weekly/parse - Parse Excel file and return preview
  *
- * Accepts JSON body with:
- * - filename: string - Original filename
- * - data: number[] - File data as byte array
- * - sheetName?: string - Optional sheet name to use
+ * Accepts:
+ * - FormData with 'file' field (preferred - more efficient)
+ * - JSON body with { filename, data: number[] } (legacy)
  *
- * Auto-detects the best sheet with ticket data if not specified.
+ * Auto-detects the best sheet with ticket data.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -37,29 +36,51 @@ const VALID_FILE_EXTENSIONS = ['.xlsx', '.xls'];
 
 export async function POST(req: NextRequest) {
   try {
-    // Parse JSON body
-    const body = await req.json();
-    const { filename, data } = body;
+    let filename: string;
+    let buffer: Buffer;
+    let sheetNameParam: string | undefined;
 
-    // Validate required fields
-    if (!filename || typeof filename !== 'string') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Filename is required',
-        },
-        { status: 400 }
-      );
+    const contentType = req.headers.get('content-type') || '';
+
+    // Handle FormData (preferred - more efficient)
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return NextResponse.json(
+          { success: false, error: 'File is required' },
+          { status: 400 }
+        );
+      }
+
+      filename = file.name;
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      sheetNameParam = formData.get('sheetName') as string | undefined;
     }
+    // Handle JSON body (legacy)
+    else {
+      const body = await req.json();
+      const { filename: jsonFilename, data } = body;
 
-    if (!data || !Array.isArray(data)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'File data is required',
-        },
-        { status: 400 }
-      );
+      if (!jsonFilename || typeof jsonFilename !== 'string') {
+        return NextResponse.json(
+          { success: false, error: 'Filename is required' },
+          { status: 400 }
+        );
+      }
+
+      if (!data || !Array.isArray(data)) {
+        return NextResponse.json(
+          { success: false, error: 'File data is required' },
+          { status: 400 }
+        );
+      }
+
+      filename = jsonFilename;
+      buffer = Buffer.from(data);
+      sheetNameParam = body.sheetName;
     }
 
     // Validate file extension
@@ -78,7 +99,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check file size
-    if (data.length > MAX_FILE_SIZE_BYTES) {
+    if (buffer.length > MAX_FILE_SIZE_BYTES) {
       return NextResponse.json(
         {
           success: false,
@@ -90,14 +111,11 @@ export async function POST(req: NextRequest) {
 
     logger.info('Parsing Excel file for preview', {
       filename,
-      dataLength: data.length,
+      size: buffer.length,
     });
 
-    // Convert byte array to Buffer
-    const buffer = Buffer.from(data);
-
     // Auto-detect the best sheet if not specified
-    let sheetName = body.sheetName;
+    let sheetName = sheetNameParam;
     let availableSheets: { name: string; rows: number; hasTicketColumns: boolean }[] = [];
 
     if (!sheetName) {
