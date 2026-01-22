@@ -295,8 +295,12 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
         setIsImporting(false);
         setImportPhase(null);
 
-        // Show success toast with import stats
+        // Calculate duplicates (total - imported - errors)
+        const duplicateCount = Math.max(0, finalResult.total_rows - finalResult.imported_count - finalResult.error_count);
+        const allDuplicates = finalResult.imported_count === 0 && duplicateCount > 0;
         const hasErrors = finalResult.error_count > 0;
+
+        // Show success toast with import stats
         toast.custom(
           (t) => (
             <div
@@ -318,15 +322,23 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
                       {hasErrors ? 'Import Complete with Warnings' : 'Weekly Import Complete'}
                     </p>
                     <div className="mt-2 space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                        <Database className="h-4 w-4 text-blue-500" />
-                        <span>{finalResult.imported_count} tickets imported</span>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      </div>
-                      {finalResult.skipped_count > 0 && (
+                      {finalResult.imported_count > 0 && (
                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                          <FileCheck className="h-4 w-4 text-gray-400" />
-                          <span>{finalResult.skipped_count} skipped (duplicates)</span>
+                          <Database className="h-4 w-4 text-green-500" />
+                          <span>{finalResult.imported_count} new tickets created</span>
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        </div>
+                      )}
+                      {duplicateCount > 0 && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                          <FileCheck className="h-4 w-4 text-blue-400" />
+                          <span>{duplicateCount} duplicates updated</span>
+                        </div>
+                      )}
+                      {allDuplicates && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                          <CheckCircle className="h-4 w-4 text-blue-500" />
+                          <span>All tickets already exist</span>
                         </div>
                       )}
                       {finalResult.error_count > 0 && (

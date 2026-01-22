@@ -30,6 +30,22 @@ export function ImportResults({ result }: ImportResultsProps) {
   const isSuccess = result.status === 'completed';
   const hasErrors = result.error_count > 0;
 
+  // Calculate duplicates: total - imported - errors
+  // UPSERT updates existing records but doesn't count them as "imported"
+  const duplicateCount = Math.max(0, result.total_rows - result.imported_count - result.error_count);
+  const allDuplicates = result.imported_count === 0 && duplicateCount > 0;
+
+  // Build descriptive message
+  const getSuccessMessage = () => {
+    if (allDuplicates) {
+      return `All ${result.total_rows} tickets already exist in the system (updated)`;
+    }
+    if (duplicateCount > 0 && result.imported_count > 0) {
+      return `${result.imported_count} new tickets imported, ${duplicateCount} duplicates updated`;
+    }
+    return `Successfully imported ${result.imported_count} of ${result.total_rows} tickets`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Success/Failure Header */}
@@ -57,7 +73,7 @@ export function ImportResults({ result }: ImportResultsProps) {
             </h3>
             <p className={cn('text-sm mt-1', isSuccess ? 'text-green-300/80' : 'text-red-300/80')}>
               {isSuccess
-                ? `Successfully imported ${result.imported_count} of ${result.total_rows} tickets`
+                ? getSuccessMessage()
                 : `Failed to import tickets. Please check the errors below.`}
             </p>
           </div>
@@ -73,16 +89,17 @@ export function ImportResults({ result }: ImportResultsProps) {
           color="blue"
         />
         <StatCard
-          label="Imported"
+          label="New Tickets"
           value={result.imported_count}
           icon={<CheckCircle2 className="w-5 h-5" />}
           color="green"
         />
         <StatCard
-          label="Skipped"
-          value={result.skipped_count}
+          label="Duplicates"
+          value={duplicateCount}
           icon={<AlertTriangle className="w-5 h-5" />}
           color="yellow"
+          tooltip="Existing tickets that were updated"
         />
         <StatCard
           label="Errors"
@@ -127,30 +144,57 @@ export function ImportResults({ result }: ImportResultsProps) {
         </div>
       )}
 
-      {/* Success Message for Perfect Import */}
-      {isSuccess && !hasErrors && (
+      {/* Success Message for Perfect Import (all new) */}
+      {isSuccess && !hasErrors && result.imported_count > 0 && duplicateCount === 0 && (
         <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-400" />
             <p className="text-sm text-green-200">
-              All tickets were imported successfully without any errors!
+              All {result.imported_count} tickets were imported successfully!
             </p>
           </div>
         </div>
       )}
 
-      {/* Partial Success Message */}
+      {/* Success Message for All Duplicates */}
+      {isSuccess && !hasErrors && allDuplicates && (
+        <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-blue-400" />
+            <p className="text-sm text-blue-200">
+              All {duplicateCount} tickets already existed and were updated with the latest data.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message for Mixed (new + duplicates) */}
+      {isSuccess && !hasErrors && result.imported_count > 0 && duplicateCount > 0 && (
+        <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <p className="text-sm text-green-200">
+              {result.imported_count} new tickets created, {duplicateCount} existing tickets updated.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Success Message (has errors) */}
       {isSuccess && hasErrors && (
         <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-yellow-200">
-                Partial Import Completed
+                Import Completed with Errors
               </p>
               <p className="text-xs text-yellow-300/80 mt-1">
-                {result.imported_count} tickets imported successfully, but {result.error_count} rows had errors.
-                Review the errors above to understand what went wrong.
+                {result.imported_count > 0 ? `${result.imported_count} new tickets created` : ''}
+                {result.imported_count > 0 && duplicateCount > 0 ? ', ' : ''}
+                {duplicateCount > 0 ? `${duplicateCount} duplicates updated` : ''}
+                {(result.imported_count > 0 || duplicateCount > 0) ? ', but ' : ''}
+                {result.error_count} rows had errors. Review the errors above.
               </p>
             </div>
           </div>
@@ -168,11 +212,13 @@ function StatCard({
   value,
   icon,
   color,
+  tooltip,
 }: {
   label: string;
   value: number;
   icon: React.ReactNode;
   color: 'blue' | 'green' | 'yellow' | 'red';
+  tooltip?: string;
 }) {
   const colorClasses = {
     blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
@@ -182,7 +228,7 @@ function StatCard({
   };
 
   return (
-    <div className={cn('p-4 border rounded-lg', colorClasses[color])}>
+    <div className={cn('p-4 border rounded-lg', colorClasses[color])} title={tooltip}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--ff-text-secondary)]">{label}</p>
