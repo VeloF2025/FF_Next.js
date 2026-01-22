@@ -1,12 +1,12 @@
 /**
- * People & Management section configuration
+ * Human Resources section configuration
  */
 
 import { Users } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const peopleSection: NavSection = {
-  section: 'PEOPLE',
+  section: 'HUMAN RESOURCES',
   sectionId: 'people',
   isCollapsible: true,
   items: [
