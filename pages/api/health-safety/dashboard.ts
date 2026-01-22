@@ -1,0 +1,233 @@
+/**
+ * H&S Dashboard API
+ *
+ * GET /api/health-safety/dashboard - Get aggregated H&S metrics
+ *
+ * Returns:
+ * - Overall safety score
+ * - Incident statistics
+ * - Contractor compliance overview
+ * - Project audit status
+ * - Upcoming audits
+ * - Recent activity
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { neon } from '@neondatabase/serverless';
+import { apiResponse } from '@/lib/apiResponse';
+
+const sql = neon(process.env.DATABASE_URL!);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+  }
+
+  try {
+    const { project_id, contractor_id, date_from, date_to } = req.query;
+
+    // Default date range: last 12 months
+    const fromDate = date_from || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    const toDate = date_to || new Date().toISOString();
+
+    // Get incident statistics
+    const [incidentStats] = await sql`
+      SELECT
+        COUNT(*)::int as total_incidents,
+        COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+        COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+        COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
+        COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
+        COUNT(*) FILTER (WHERE t.ticket_type = 'hse_near_miss')::int as near_misses,
+        COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+        COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+      FROM tickets t
+      JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+      AND t.created_at >= ${fromDate}
+      AND t.created_at <= ${toDate}
+      ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
+      ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
+    `;
+
+    // Get incident trend (by month)
+    const incidentTrend = await sql`
+      SELECT
+        DATE_TRUNC('month', t.created_at) as month,
+        COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
+      FROM tickets t
+      JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+      AND t.created_at >= ${fromDate}
+      AND t.created_at <= ${toDate}
+      ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
+      ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
+      GROUP BY DATE_TRUNC('month', t.created_at)
+      ORDER BY month DESC
+      LIMIT 12
+    `;
+
+    // Get contractor compliance overview
+    const contractorStats = await sql`
+      SELECT
+        cc.rag_status,
+        COUNT(*)::int as count
+      FROM hs_contractor_compliance cc
+      JOIN contractors c ON c.id = cc.contractor_id
+      WHERE c.status = 'active'
+      ${contractor_id ? sql`AND cc.contractor_id = ${contractor_id}` : sql``}
+      GROUP BY cc.rag_status
+    `;
+
+    // Get contractors at risk (red/amber)
+    const contractorsAtRisk = await sql`
+      SELECT
+        c.id,
+        c.company_name,
+        cc.overall_score,
+        cc.rag_status,
+        cc.next_audit_due
+      FROM hs_contractor_compliance cc
+      JOIN contractors c ON c.id = cc.contractor_id
+      WHERE c.status = 'active'
+      AND cc.rag_status IN ('red', 'amber')
+      ${contractor_id ? sql`AND cc.contractor_id = ${contractor_id}` : sql``}
+      ORDER BY cc.overall_score ASC
+      LIMIT 10
+    `;
+
+    // Get project audit statistics
+    const [auditStats] = await sql`
+      SELECT
+        COUNT(*)::int as total_audits,
+        COUNT(*) FILTER (WHERE status = 'completed')::int as completed,
+        COUNT(*) FILTER (WHERE status = 'requires_action')::int as requires_action,
+        COUNT(*) FILTER (WHERE status = 'in_progress')::int as in_progress,
+        AVG(overall_score)::int as average_score
+      FROM hs_project_audits
+      WHERE audit_date >= ${fromDate}
+      AND audit_date <= ${toDate}
+      ${project_id ? sql`AND project_id = ${project_id}` : sql``}
+    `;
+
+    // Get projects by RAG status
+    const projectRagStats = await sql`
+      SELECT
+        rag_status,
+        COUNT(*)::int as count
+      FROM hs_project_audits
+      WHERE status IN ('completed', 'requires_action')
+      AND audit_date >= ${fromDate}
+      AND audit_date <= ${toDate}
+      ${project_id ? sql`AND project_id = ${project_id}` : sql``}
+      GROUP BY rag_status
+    `;
+
+    // Get upcoming audits
+    const upcomingAudits = await sql`
+      SELECT
+        pc.project_id,
+        p.project_name,
+        pc.next_audit_due,
+        pc.audit_frequency,
+        (
+          SELECT overall_score
+          FROM hs_project_audits
+          WHERE project_id = pc.project_id
+          ORDER BY audit_date DESC
+          LIMIT 1
+        ) as last_score
+      FROM hs_project_config pc
+      JOIN projects p ON p.id = pc.project_id
+      WHERE pc.next_audit_due IS NOT NULL
+      AND pc.next_audit_due <= NOW() + INTERVAL '14 days'
+      ${project_id ? sql`AND pc.project_id = ${project_id}` : sql``}
+      ORDER BY pc.next_audit_due ASC
+      LIMIT 10
+    `;
+
+    // Get overdue audits
+    const overdueAudits = await sql`
+      SELECT
+        pc.project_id,
+        p.project_name,
+        pc.next_audit_due,
+        pc.audit_frequency
+      FROM hs_project_config pc
+      JOIN projects p ON p.id = pc.project_id
+      WHERE pc.next_audit_due < NOW()
+      ${project_id ? sql`AND pc.project_id = ${project_id}` : sql``}
+      ORDER BY pc.next_audit_due ASC
+    `;
+
+    // Get recent activity
+    const recentActivity = await sql`
+      SELECT *
+      FROM hs_activity_log
+      ORDER BY created_at DESC
+      LIMIT 20
+    `;
+
+    // Calculate overall safety score
+    const totalProjects = (await sql`SELECT COUNT(*)::int as count FROM hs_project_config`)[0].count;
+    const greenProjects = projectRagStats.find((p: any) => p.rag_status === 'green')?.count || 0;
+    const amberProjects = projectRagStats.find((p: any) => p.rag_status === 'amber')?.count || 0;
+    const redProjects = projectRagStats.find((p: any) => p.rag_status === 'red')?.count || 0;
+
+    // Weighted score: green=100, amber=60, red=20
+    const overallScore =
+      totalProjects > 0
+        ? Math.round((greenProjects * 100 + amberProjects * 60 + redProjects * 20) / totalProjects)
+        : 100;
+
+    const overallRag = overallScore < 50 ? 'red' : overallScore < 80 ? 'amber' : 'green';
+
+    return apiResponse.success(res, {
+      overall: {
+        score: overallScore,
+        rag_status: overallRag,
+        total_projects_configured: totalProjects,
+      },
+      incidents: {
+        stats: incidentStats,
+        trend: incidentTrend,
+        alerts: {
+          critical_open: incidentStats?.critical || 0,
+          dol_pending: incidentStats?.dol_pending || 0,
+          ca_pending: incidentStats?.ca_pending || 0,
+        },
+      },
+      contractors: {
+        stats: contractorStats,
+        at_risk: contractorsAtRisk,
+        by_rag: {
+          green: contractorStats.find((c: any) => c.rag_status === 'green')?.count || 0,
+          amber: contractorStats.find((c: any) => c.rag_status === 'amber')?.count || 0,
+          red: contractorStats.find((c: any) => c.rag_status === 'red')?.count || 0,
+        },
+      },
+      audits: {
+        stats: auditStats,
+        by_rag: {
+          green: projectRagStats.find((p: any) => p.rag_status === 'green')?.count || 0,
+          amber: projectRagStats.find((p: any) => p.rag_status === 'amber')?.count || 0,
+          red: projectRagStats.find((p: any) => p.rag_status === 'red')?.count || 0,
+        },
+        upcoming: upcomingAudits,
+        overdue: overdueAudits,
+        overdue_count: overdueAudits.length,
+      },
+      recent_activity: recentActivity,
+      date_range: {
+        from: fromDate,
+        to: toDate,
+      },
+    });
+  } catch (error) {
+    console.error('[H&S Dashboard API] Error:', error);
+    return apiResponse.internalError(res, error);
+  }
+}
