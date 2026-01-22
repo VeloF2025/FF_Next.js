@@ -174,7 +174,7 @@ export default function NewIncidentPage() {
   };
 
   return (
-    <>
+    <AppLayout>
       <Head>
         <title>Report Incident | H&S | FibreFlow</title>
       </Head>
@@ -184,16 +184,16 @@ export default function NewIncidentPage() {
         <div className="flex items-center gap-4 mb-6">
           <Link
             href="/health-safety/incidents"
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-500" />
+            <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] flex items-center gap-3">
               <AlertTriangle className="w-7 h-7 text-red-500" />
               Report H&S Incident
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-[var(--ff-text-secondary)] mt-1">
               Document health & safety incidents for investigation and compliance
             </p>
           </div>
@@ -624,8 +624,6 @@ export default function NewIncidentPage() {
           </div>
         </form>
       </div>
-    </>
+    </AppLayout>
   );
 }
-
-NewIncidentPage.getLayout = (page: React.ReactElement) => <AppLayout>{page}</AppLayout>;

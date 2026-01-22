@@ -94,7 +94,7 @@ export default function ChecklistsPage() {
   };
 
   return (
-    <>
+    <AppLayout>
       <Head>
         <title>H&S Checklists | FibreFlow</title>
       </Head>
@@ -105,12 +105,12 @@ export default function ChecklistsPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/health-safety"
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
             >
-              <ChevronLeft className="w-5 h-5 text-gray-500" />
+              <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] flex items-center gap-3">
                 <ClipboardCheck className="w-7 h-7 text-green-500" />
                 H&S Checklists
               </h1>
@@ -183,7 +183,7 @@ export default function ChecklistsPage() {
       {showCreateModal && (
         <CreateTemplateModal onClose={() => setShowCreateModal(false)} />
       )}
-    </>
+    </AppLayout>
   );
 }
 
@@ -603,4 +603,3 @@ function EmptyState({
   );
 }
 
-ChecklistsPage.getLayout = (page: React.ReactElement) => <AppLayout>{page}</AppLayout>;

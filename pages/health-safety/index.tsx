@@ -37,7 +37,7 @@ export default function HealthSafetyDashboard() {
   const dashboard = data?.data;
 
   return (
-    <>
+    <AppLayout>
       <Head>
         <title>Health & Safety | FibreFlow</title>
       </Head>
@@ -154,7 +154,7 @@ export default function HealthSafetyDashboard() {
           </>
         )}
       </div>
-    </>
+    </AppLayout>
   );
 }
 
@@ -584,4 +584,3 @@ function RecentActivity({ activity }: { activity?: any[] }) {
   );
 }
 
-HealthSafetyDashboard.getLayout = (page: React.ReactElement) => <AppLayout>{page}</AppLayout>;

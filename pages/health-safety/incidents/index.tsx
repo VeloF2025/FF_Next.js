@@ -113,7 +113,7 @@ export default function IncidentsListPage() {
   );
 
   return (
-    <>
+    <AppLayout>
       <Head>
         <title>H&S Incidents | FibreFlow</title>
       </Head>
@@ -124,9 +124,9 @@ export default function IncidentsListPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/health-safety"
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
             >
-              <ChevronLeft className="w-5 h-5 text-gray-500" />
+              <ChevronLeft className="w-5 h-5 text-[var(--ff-text-secondary)]" />
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
@@ -270,7 +270,7 @@ export default function IncidentsListPage() {
           </div>
         )}
       </div>
-    </>
+    </AppLayout>
   );
 }
 
@@ -467,4 +467,3 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
   );
 }
 
-IncidentsListPage.getLayout = (page: React.ReactElement) => <AppLayout>{page}</AppLayout>;
