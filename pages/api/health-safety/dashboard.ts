@@ -30,45 +30,71 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fromDate = date_from || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
     const toDate = date_to || new Date().toISOString();
 
-    // Get incident statistics
-    const [incidentStats] = await sql`
-      SELECT
-        COUNT(*)::int as total_incidents,
-        COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
-        COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
-        COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
-        COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
-        COUNT(*) FILTER (WHERE t.ticket_type = 'hse_near_miss')::int as near_misses,
-        COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
-        COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
-        COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
-        COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
-      FROM tickets t
-      JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-      WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
-      AND t.created_at >= ${fromDate}
-      AND t.created_at <= ${toDate}
-      ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-      ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
+    // Check if tickets table exists (maintenance module dependency)
+    const ticketsTableExists = await sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_name = 'tickets'
+      ) as exists
     `;
+    const hasTickets = ticketsTableExists[0]?.exists;
 
-    // Get incident trend (by month)
-    const incidentTrend = await sql`
-      SELECT
-        DATE_TRUNC('month', t.created_at) as month,
-        COUNT(*)::int as total,
-        COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
-      FROM tickets t
-      JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-      WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
-      AND t.created_at >= ${fromDate}
-      AND t.created_at <= ${toDate}
-      ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-      ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
-      GROUP BY DATE_TRUNC('month', t.created_at)
-      ORDER BY month DESC
-      LIMIT 12
-    `;
+    // Get incident statistics (only if tickets table exists)
+    let incidentStats = {
+      total_incidents: 0,
+      critical: 0,
+      major: 0,
+      moderate: 0,
+      minor: 0,
+      near_misses: 0,
+      open_incidents: 0,
+      dol_reportable: 0,
+      dol_pending: 0,
+      ca_pending: 0,
+    };
+    let incidentTrend: any[] = [];
+
+    if (hasTickets) {
+      const [stats] = await sql`
+        SELECT
+          COUNT(*)::int as total_incidents,
+          COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+          COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+          COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
+          COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
+          COUNT(*) FILTER (WHERE t.ticket_type = 'hse_near_miss')::int as near_misses,
+          COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
+          COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+          COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+          COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+        FROM tickets t
+        JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+        AND t.created_at >= ${fromDate}
+        AND t.created_at <= ${toDate}
+        ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
+        ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
+      `;
+      incidentStats = stats || incidentStats;
+
+      // Get incident trend (by month)
+      incidentTrend = await sql`
+        SELECT
+          DATE_TRUNC('month', t.created_at) as month,
+          COUNT(*)::int as total,
+          COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
+        FROM tickets t
+        JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+        AND t.created_at >= ${fromDate}
+        AND t.created_at <= ${toDate}
+        ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
+        ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
+        GROUP BY DATE_TRUNC('month', t.created_at)
+        ORDER BY month DESC
+        LIMIT 12
+      `;
+    }
 
     // Get contractor compliance overview
     const contractorStats = await sql`
