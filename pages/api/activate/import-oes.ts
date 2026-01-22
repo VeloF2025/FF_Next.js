@@ -466,12 +466,14 @@ export default async function handler(
 
                     // If last_sync is after our sync started, it's done
                     if (lastSyncTime >= syncStartTime - 5000) {
+                      // Check last_error (null = success) and last_count (not last_status/last_record_count)
+                      const syncSuccess = status.last_error === null && !status.is_running;
                       qfieldSyncStatus = {
-                        success: status.last_status === 'success',
-                        message: status.last_status === 'success'
-                          ? `Synced ${status.last_record_count || 0} records to QFieldCloud`
+                        success: syncSuccess,
+                        message: syncSuccess
+                          ? `Synced ${status.last_count || 0} records to QFieldCloud`
                           : status.last_error || 'Sync completed with issues',
-                        recordCount: status.last_record_count
+                        recordCount: status.last_count
                       };
                       log.info('OESImport', 'QField sync confirmed complete', qfieldSyncStatus);
                       break;
