@@ -11,12 +11,14 @@ import {
   Settings,
   Radio,
   MessageCircle,
+  MessageSquare,
   Send,
 } from 'lucide-react';
 import type { WaAdminTab } from './types/wa-admin.types';
 
 // Tab components
 import ServicesTab from './components/ServicesTab';
+import ChatTab from './components/ChatTab';
 import SendTab from './components/SendTab';
 import GroupsTab from './components/GroupsTab';
 import TemplatesTab from './components/TemplatesTab';
@@ -32,6 +34,7 @@ interface TabConfig {
 
 const tabs: TabConfig[] = [
   { id: 'services', label: 'Services', icon: Radio, component: ServicesTab },
+  { id: 'chat', label: 'Chat', icon: MessageSquare, component: ChatTab },
   { id: 'send', label: 'Send', icon: Send, component: SendTab },
   { id: 'groups', label: 'Groups', icon: Users, component: GroupsTab },
   { id: 'templates', label: 'Templates', icon: FileText, component: TemplatesTab },

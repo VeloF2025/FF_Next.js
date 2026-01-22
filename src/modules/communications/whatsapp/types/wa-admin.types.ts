@@ -233,4 +233,4 @@ export interface WaSendMessageInput {
 // ============================================
 // Tab Types for UI
 // ============================================
-export type WaAdminTab = 'services' | 'send' | 'groups' | 'templates' | 'logs' | 'settings';
+export type WaAdminTab = 'services' | 'chat' | 'send' | 'groups' | 'templates' | 'logs' | 'settings';
