@@ -215,7 +215,7 @@ export default function BOQDetailPage() {
                 <div className="flex items-center gap-4 text-sm text-[var(--ff-text-secondary)]">
                   <span>Version: {boq.version}</span>
                   <span>|</span>
-                  <span>{boq.itemCount} items</span>
+                  <span>{items.length} items</span>
                 </div>
               </div>
 
@@ -250,7 +250,7 @@ export default function BOQDetailPage() {
                     <span className="text-xs">Items</span>
                   </div>
                   <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    {boq.itemCount}
+                    {items.length}
                   </p>
                 </div>
                 <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
@@ -259,7 +259,7 @@ export default function BOQDetailPage() {
                     <span className="text-xs">Total Value</span>
                   </div>
                   <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    {formatCurrency(boq.totalEstimatedValue || 0)}
+                    {formatCurrency(items.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0))}
                   </p>
                 </div>
                 <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
