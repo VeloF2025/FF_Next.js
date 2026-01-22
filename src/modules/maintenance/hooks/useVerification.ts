@@ -47,9 +47,10 @@ export const verificationKeys = {
 
 /**
  * 🟢 WORKING: Fetch verification steps from API
+ * Uses flat route /api/maintenance/verification?ticketId= to avoid Vercel nested route issues
  */
 async function fetchVerificationSteps(ticketId: string): Promise<VerificationStep[]> {
-  const response = await fetch(`/api/maintenance/tickets/${ticketId}/verification`, {
+  const response = await fetch(`/api/maintenance/verification?ticketId=${ticketId}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -67,9 +68,10 @@ async function fetchVerificationSteps(ticketId: string): Promise<VerificationSte
 
 /**
  * 🟢 WORKING: Fetch verification progress from API
+ * Uses flat route /api/maintenance/verification?ticketId= to avoid Vercel nested route issues
  */
 async function fetchVerificationProgress(ticketId: string): Promise<VerificationProgress> {
-  const response = await fetch(`/api/maintenance/tickets/${ticketId}/verification/complete`, {
+  const response = await fetch(`/api/maintenance/verification?ticketId=${ticketId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -87,13 +89,14 @@ async function fetchVerificationProgress(ticketId: string): Promise<Verification
 
 /**
  * 🟢 WORKING: Update a verification step via API
+ * Uses flat route /api/maintenance/verification-step to avoid Vercel nested route issues
  */
 async function updateVerificationStepAPI(
   ticketId: string,
   stepNumber: VerificationStepNumber,
   payload: UpdateVerificationStepPayload
 ): Promise<VerificationStep> {
-  const response = await fetch(`/api/maintenance/tickets/${ticketId}/verification/${stepNumber}`, {
+  const response = await fetch(`/api/maintenance/verification-step?ticketId=${ticketId}&stepNumber=${stepNumber}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
