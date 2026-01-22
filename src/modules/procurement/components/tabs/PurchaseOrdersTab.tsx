@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, ShoppingCart, Search, Filter, Clock, CheckCircle, AlertTriangle, FileText } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { formatDate } from '@/utils/dateFormat';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 
 export function PurchaseOrdersTab() {
@@ -291,11 +292,11 @@ function PurchaseOrderItem({
           </div>
           
           <div className="flex items-center gap-6 text-sm text-gray-600">
-            <span>Created: {new Date(dateCreated).toLocaleDateString()}</span>
-            <span>Expected: {new Date(expectedDelivery).toLocaleDateString()}</span>
+            <span>Created: {formatDate(dateCreated)}</span>
+            <span>Expected: {formatDate(expectedDelivery)}</span>
             {actualDelivery && (
               <span className="text-green-700">
-                Delivered: {new Date(actualDelivery).toLocaleDateString()}
+                Delivered: {formatDate(actualDelivery)}
               </span>
             )}
             <span className="font-medium">R{amount.toLocaleString()}</span>

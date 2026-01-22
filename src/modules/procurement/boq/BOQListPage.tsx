@@ -4,6 +4,7 @@ import { useBOQs } from '../hooks/useBOQ';
 import { BOQStatus } from '@/types/procurement.types';
 import { BOQCard } from '../components/BOQCard';
 import { useNavigate } from 'react-router-dom';
+import { formatDate } from '@/utils/dateFormat';
 import {
   StandardModuleHeader,
   StandardSummaryCards,
@@ -110,7 +111,7 @@ export function BOQListPage() {
     { 
       key: 'createdAt', 
       header: 'Created',
-      render: (boq: any) => new Date(boq.createdAt).toLocaleDateString()
+      render: (boq: any) => formatDate(boq.createdAt)
     }
   ];
 

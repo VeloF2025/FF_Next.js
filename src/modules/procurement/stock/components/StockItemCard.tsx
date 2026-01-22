@@ -107,13 +107,13 @@ export const StockItemCard: React.FC<StockItemCardProps> = ({
           {item.lastReceived && (
             <span className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              Last received: {item.lastReceived.toLocaleDateString()}
+              Last received: {formatDate(item.lastReceived)}
             </span>
           )}
           {item.lastIssued && (
             <span className="flex items-center gap-1">
               <ArrowRight className="h-4 w-4" />
-              Last issued: {item.lastIssued.toLocaleDateString()}
+              Last issued: {formatDate(item.lastIssued)}
             </span>
           )}
         </div>

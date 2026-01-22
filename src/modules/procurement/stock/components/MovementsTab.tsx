@@ -87,7 +87,7 @@ export const MovementsTab: React.FC<MovementsTabProps> = ({ movements, onViewAll
                   </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    {movement.createdDate.toLocaleDateString()}
+                    {formatDate(movement.createdDate)}
                   </span>
                 </div>
                 <Button variant="outline" size="sm">

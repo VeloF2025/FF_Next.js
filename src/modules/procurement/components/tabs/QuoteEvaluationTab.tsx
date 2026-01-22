@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Quote, Search, Filter, Award, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import { formatDate } from '@/utils/dateFormat';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 
 export function QuoteEvaluationTab() {
@@ -220,7 +221,7 @@ function QuoteEvaluationItem({
           <div className="flex items-center gap-6 text-sm text-gray-600">
             <span>Ref: {rfqRef}</span>
             <span>Quotes: {quotesReceived}</span>
-            <span>Due: {new Date(dueDate).toLocaleDateString()}</span>
+            <span>Due: {formatDate(dueDate)}</span>
             <span>Value: R{totalValue.toLocaleString()}</span>
           </div>
           

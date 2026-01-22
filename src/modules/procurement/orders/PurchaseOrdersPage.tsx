@@ -74,7 +74,8 @@ const PurchaseOrdersPage: React.FC = () => {
   
   const formatDate = (date: Date | undefined) => {
     if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-ZA');
+    // Standard YYYY-MM-DD format
+    return new Date(date).toISOString().split('T')[0];
   };
   
   // Table columns configuration
