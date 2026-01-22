@@ -438,6 +438,9 @@ export async function importTicketsFromReport(
  * @param userId - User ID performing the import
  * @returns Batch processing result
  */
+// System user for imports when no valid user ID provided
+const SYSTEM_IMPORT_USER_ID = '81abd560-48ae-414e-ad31-9d82f1a9ed49';
+
 export async function processImportBatch(
   rows: ImportRow[],
   batchSize: number,
@@ -451,6 +454,9 @@ export async function processImportBatch(
   tickets_created: string[];
   tickets_updated: string[];
 }> {
+  // Use system user if provided userId isn't a valid UUID
+  const effectiveUserId = isValidUUID(userId) ? userId : SYSTEM_IMPORT_USER_ID;
+
   const errors: ImportError[] = [];
   const ticketsCreated: string[] = [];
   const ticketsUpdated: string[] = [];
@@ -567,9 +573,8 @@ export async function processImportBatch(
           pon_number: row.pon_number,
           address: row.address,
           fault_cause: row.fault_cause as any,
-          // Note: Set to null for imports since userId may not exist in users table
-          // The source: WEEKLY_REPORT identifies these as imported tickets
-          created_by: null
+          // Use the userId from the import request - required by maintenance_tickets.created_by NOT NULL constraint
+          created_by: effectiveUserId
         };
 
         const ticket = await createTicket(ticketPayload);
