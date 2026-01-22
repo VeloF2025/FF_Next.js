@@ -172,16 +172,16 @@ export default function StockManagement({ projectId, projectName, stockItems = [
 
       {/* Critical Alerts */}
       {(metrics.lowStockItems > 0 || metrics.outOfStockItems > 0) && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-medium text-red-900">Stock Level Alerts</h3>
-              <p className="text-sm text-red-700 mt-1">
-                {metrics.outOfStockItems > 0 && 
+              <h3 className="font-medium text-red-400">Stock Level Alerts</h3>
+              <p className="text-sm text-red-300 mt-1">
+                {metrics.outOfStockItems > 0 &&
                   `${metrics.outOfStockItems} item${metrics.outOfStockItems !== 1 ? 's' : ''} out of stock. `
                 }
-                {metrics.lowStockItems > 0 && 
+                {metrics.lowStockItems > 0 &&
                   `${metrics.lowStockItems} item${metrics.lowStockItems !== 1 ? 's' : ''} below minimum level. `
                 }
                 Immediate action required to prevent project delays.
@@ -200,54 +200,54 @@ export default function StockManagement({ projectId, projectName, stockItems = [
 
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Package className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <Package className="h-5 w-5 text-blue-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-gray-500">Total Items</p>
-              <p className="text-xl font-bold text-gray-900">{metrics.totalItems.toLocaleString()}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total Items</p>
+              <p className="text-xl font-bold text-[var(--ff-text-primary)]">{metrics.totalItems.toLocaleString()}</p>
             </div>
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
           <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-green-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-gray-500">Total Value</p>
-              <p className="text-xl font-bold text-green-600">
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total Value</p>
+              <p className="text-xl font-bold text-green-400">
                 R {(metrics.totalValue / 1000).toFixed(0)}k
               </p>
             </div>
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
           <div className="flex items-center">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-gray-500">Critical Stock</p>
-              <p className="text-xl font-bold text-red-600">
+              <p className="text-sm text-[var(--ff-text-secondary)]">Critical Stock</p>
+              <p className="text-xl font-bold text-red-400">
                 {metrics.lowStockItems + metrics.outOfStockItems}
               </p>
             </div>
           </div>
         </div>
-        
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
           <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Truck className="h-5 w-5 text-orange-600" />
+            <div className="p-2 bg-orange-500/20 rounded-lg">
+              <Truck className="h-5 w-5 text-orange-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-gray-500">Pending</p>
-              <p className="text-xl font-bold text-orange-600">
+              <p className="text-sm text-[var(--ff-text-secondary)]">Pending</p>
+              <p className="text-xl font-bold text-orange-400">
                 {metrics.pendingReceipts + metrics.pendingIssues}
               </p>
             </div>
@@ -256,15 +256,15 @@ export default function StockManagement({ projectId, projectName, stockItems = [
       </div>
 
       {/* Main Content - TODO: Implement Stock Management components */}
-      <div className="bg-white rounded-lg border p-6">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
         <div className="text-center py-12">
-          <Package className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">Stock Management</h3>
-          <p className="mt-2 text-gray-500">
-            This module is under development. Stock management features including inventory dashboard, 
+          <Package className="mx-auto h-12 w-12 text-[var(--ff-text-tertiary)]" />
+          <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">Stock Management</h3>
+          <p className="mt-2 text-[var(--ff-text-secondary)]">
+            This module is under development. Stock management features including inventory dashboard,
             goods receipts, stock operations, warehouse management, and reporting will be available here.
           </p>
-          <div className="mt-6 text-sm text-gray-400">
+          <div className="mt-6 text-sm text-[var(--ff-text-tertiary)]">
             Current tab: {activeTab}
           </div>
         </div>
