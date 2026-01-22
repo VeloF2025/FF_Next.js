@@ -9,12 +9,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
+import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle, GitCompare } from 'lucide-react';
 
 // QContact Sync components
 import { SyncDashboard } from '@/modules/maintenance/components/QContact/SyncDashboard';
 import { SyncTrigger } from '@/modules/maintenance/components/QContact/SyncTrigger';
 import { SyncAuditLog } from '@/modules/maintenance/components/QContact/SyncAuditLog';
+import { AlignmentReport } from '@/modules/maintenance/components/QContact/AlignmentReport';
 import { useTriggerManualSync } from '@/modules/maintenance/hooks/useQContactSync';
 
 // Weekly Import component
@@ -271,7 +272,7 @@ function ImportHistory() {
   );
 }
 
-type TabId = 'qcontact' | 'weekly';
+type TabId = 'qcontact' | 'alignment' | 'weekly';
 
 interface Tab {
   id: TabId;
@@ -281,6 +282,7 @@ interface Tab {
 
 const tabs: Tab[] = [
   { id: 'qcontact', label: 'QContact Sync', icon: RefreshCw },
+  { id: 'alignment', label: 'Alignment', icon: GitCompare },
   { id: 'weekly', label: 'Weekly Import', icon: FileUp },
 ];
 
@@ -358,6 +360,12 @@ export default function DataSyncPageClient() {
               <SyncAuditLog />
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'alignment' && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 border border-[var(--ff-border-light)]">
+          <AlignmentReport />
         </div>
       )}
 

@@ -5,3 +5,4 @@ export { SyncDashboard } from './SyncDashboard';
 export { SyncTrigger } from './SyncTrigger';
 export { SyncAuditLog } from './SyncAuditLog';
 export type { AuditLogFilters } from './SyncAuditLog';
+export { AlignmentReport } from './AlignmentReport';
