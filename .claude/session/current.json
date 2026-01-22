@@ -1,49 +1,48 @@
 {
-  "session_id": "2026-01-22-pipeline-docs-and-fixes",
+  "session_id": "2026-01-22-procurement-menu-restructure",
   "started_at": "2026-01-22T00:00:00Z",
-  "last_updated": "2026-01-21T22:12:10.272Z",
+  "last_updated": "2026-01-22T01:32:44.954Z",
   "working_on": {
-    "task": "Pipeline document management and UI fixes",
+    "task": "Procurement menu restructure",
     "status": "completed",
     "progress": [
-      "Completed Smartsheet document sync (3,979 docs)",
-      "Added project-level document management API",
-      "Created ProjectDocumentManager component",
-      "Added document proxy API for secure file viewing",
-      "Fixed Projects page layout flash with skeleton loading",
-      "Added Pipeline to sidebar under Project Management",
-      "Deployed to staging (vf.fibreflow.app) and dev (dev.fibreflow.app)"
+      "Restructured procurement from 17 nested items to 6 flat menu items",
+      "Created Sourcing page with 3 tabs (Suppliers, BOQ, RFQ)",
+      "Created Purchasing page with 4 tabs (Quotes, Requisitions, PO, GRN)",
+      "Created Inventory page with 6 tabs (Stock, Items, Categories, Bundles, Takes, Field)",
+      "Created Financial page with 2 tabs (Budget, Cost Centers)",
+      "Created useTabPersistence hook for URL + localStorage sync",
+      "Added 15 redirects for backward compatibility",
+      "Deployed to staging (vf.fibreflow.app)"
     ],
-    "last_action": "KB update with learnings"
+    "last_action": "KB update via /kb"
   },
-  "pipeline_docs": {
-    "total_synced": 3979,
-    "storage_path": "/srv/data/fibreflow-storage/pipeline/{projectId}/",
-    "proxy_endpoint": "/api/pipeline/documents/[...path]",
-    "project_docs_endpoint": "/api/pipeline/projects/[id]/documents"
+  "procurement_restructure": {
+    "menu_items": [
+      "Dashboard",
+      "Sourcing",
+      "Purchasing",
+      "Inventory",
+      "Financial",
+      "Approvals"
+    ],
+    "hook": "useTabPersistence",
+    "redirects_added": 15,
+    "pages_created": [
+      "pages/procurement/sourcing/index.tsx",
+      "pages/procurement/purchasing/index.tsx",
+      "pages/procurement/inventory/index.tsx",
+      "pages/procurement/financial/index.tsx"
+    ]
   },
-  "fixes_applied": [
-    {
-      "issue": "Projects page layout flash",
-      "cause": "Conditional rendering of WA stats card caused layout shift",
-      "solution": "Always render container, use skeleton placeholder while loading",
-      "file": "app/(main)/projects/page.tsx"
-    },
-    {
-      "issue": "Document URLs not accessible from browser",
-      "cause": "Direct storage API URLs blocked by CORS/mixed content",
-      "solution": "Created proxy endpoint that fetches server-side and streams to client",
-      "file": "pages/api/pipeline/documents/[...path].ts"
-    }
-  ],
   "kb_scan_results": {
-    "timestamp": "2026-01-22T00:15:00Z",
+    "timestamp": "2026-01-22T00:12:00Z",
     "total_modules": 42,
     "modules_with_claude_md": 42,
     "coverage": "100%",
-    "learnings_consolidated": 2,
+    "learnings_consolidated": 0,
     "updated_modules": [
-      "pipeline"
+      "procurement"
     ]
   },
   "context": {
