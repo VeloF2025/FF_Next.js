@@ -170,15 +170,15 @@ async function handlePost(
       mentionJIDs.push(staffJid);
     }
 
-    // Build reply params for threading (only used for group messages)
-    const replyParams: WhatsAppReplyParams | undefined = review.wa_message_id
-      ? {
-          replyToId: review.wa_message_id,
-          replyToSender: review.wa_sender_jid,
-          quotedContent: review.wa_original_text || `${dropNumber}`,
-          mentionJIDs: mentionJIDs.length > 0 ? mentionJIDs : undefined,
-        }
-      : undefined;
+    // Build reply params for threading and logging
+    const replyParams: WhatsAppReplyParams = {
+      replyToId: review.wa_message_id || undefined,
+      replyToSender: review.wa_sender_jid || undefined,
+      quotedContent: review.wa_original_text || `${dropNumber}`,
+      mentionJIDs: mentionJIDs.length > 0 ? mentionJIDs : undefined,
+      dropNumber: dropNumber,
+      project: review.project,
+    };
 
     // Build message with @mentions for group messages
     let groupMessage = feedbackMessage;
@@ -208,7 +208,10 @@ async function handlePost(
         technicianJid: review.wa_sender_jid,
       });
       // Private message - no @mentions needed (it's a direct message)
-      sendResults.technicianPrivate = await sendToWhatsApp(review.wa_sender_jid, feedbackMessage);
+      sendResults.technicianPrivate = await sendToWhatsApp(review.wa_sender_jid, feedbackMessage, {
+        dropNumber,
+        project: review.project,
+      });
       if (!sendResults.technicianPrivate.success) {
         log.error('Failed to send private to technician', { dropNumber });
       }
@@ -217,7 +220,10 @@ async function handlePost(
     // Send PRIVATE copy to staff if requested and staffJid available
     if (sendStaffPrivate && staffJid) {
       log.info(`Sending private copy to staff for ${dropNumber}`, { staffJid });
-      sendResults.staffPrivate = await sendToWhatsApp(staffJid, feedbackMessage);
+      sendResults.staffPrivate = await sendToWhatsApp(staffJid, feedbackMessage, {
+        dropNumber,
+        project: review.project,
+      });
       if (!sendResults.staffPrivate.success) {
         log.error('Failed to send private to staff', { dropNumber, staffJid });
       }
@@ -566,6 +572,8 @@ interface WhatsAppReplyParams {
   replyToSender?: string | null;
   quotedContent?: string | null;
   mentionJIDs?: string[];
+  dropNumber?: string;
+  project?: string;
 }
 
 interface SendResult {
@@ -629,6 +637,21 @@ async function sendToWhatsApp(
       messageId: data.messageId,
     });
 
+    // Log to wa_message_logs for WhatsApp Portal visibility
+    const isGroup = recipient.includes('@g.us');
+    await logWhatsAppMessage({
+      direction: 'outbound',
+      service: 'sender',
+      messageType: 'feedback',
+      groupJid: isGroup ? recipient : null,
+      recipientJid: isGroup ? null : recipient,
+      messageContent: message,
+      status: data.success !== false ? 'sent' : 'failed',
+      dropNumber: replyParams?.dropNumber || null,
+      project: replyParams?.project || null,
+      templateKey: 'feedback_pass', // Could be enhanced to detect actual template
+    });
+
     return { success: data.success !== false, messageId: data.messageId };
   } catch (error) {
     log.error('Failed to send message via WhatsApp', { error });
@@ -670,6 +693,54 @@ async function updateFeedbackStatus(
   } catch (error) {
     log.error('Failed to update feedback status', { dropNumber, error });
     throw error;
+  }
+}
+
+/**
+ * Log WhatsApp message to wa_message_logs for portal visibility
+ */
+interface WaMessageLogParams {
+  direction: 'inbound' | 'outbound';
+  service: 'bridge' | 'sender';
+  messageType: string;
+  groupJid: string | null;
+  recipientJid: string | null;
+  messageContent: string;
+  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'read';
+  dropNumber: string | null;
+  project: string | null;
+  templateKey: string | null;
+}
+
+async function logWhatsAppMessage(params: WaMessageLogParams): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO wa_message_logs (
+        direction, service, message_type, group_jid, recipient_jid,
+        message_content, status, drop_number, project, template_key, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+      [
+        params.direction,
+        params.service,
+        params.messageType,
+        params.groupJid,
+        params.recipientJid,
+        params.messageContent,
+        params.status,
+        params.dropNumber,
+        params.project,
+        params.templateKey,
+      ]
+    );
+    log.info('Logged WhatsApp message', {
+      direction: params.direction,
+      messageType: params.messageType,
+      status: params.status,
+      dropNumber: params.dropNumber,
+    });
+  } catch (error) {
+    // Don't fail the main operation if logging fails
+    log.error('Failed to log WhatsApp message', { error, params });
   }
 }
 
