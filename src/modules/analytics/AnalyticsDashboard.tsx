@@ -8,10 +8,8 @@
 import React, { useState, lazy, useCallback } from 'react';
 import { Calendar, Filter, Download, RefreshCw } from 'lucide-react';
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';
-import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { useAnalyticsData } from './hooks/useAnalyticsData';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { getAnalyticsDashboardCards } from '../../config/dashboards/dashboardConfigs';
 import { TimeRange } from './types/analytics.types';
 
 // Lazy load heavy components
@@ -36,29 +34,8 @@ const AnalyticsDashboard: React.FC = () => {
     loadAnalyticsData
   } = useAnalyticsData(timeRange);
 
-  // 🟢 WORKING: Enhanced dashboard data for comprehensive metrics
-  const { 
-    stats: enhancedStats, 
-    trends, 
-    formatNumber: formatNum, 
-    formatCurrency, 
-    formatPercentage,
-    loadDashboardData
-  } = useDashboardData();
-
-  // 🟢 WORKING: Get analytics dashboard cards
-  const analyticsCards = getAnalyticsDashboardCards(
-    {
-      ...stats,
-      polesInstalled: enhancedStats.polesInstalled,
-      dropsCompleted: enhancedStats.dropsCompleted,
-      fiberInstalled: enhancedStats.fiberInstalled,
-      totalRevenue: enhancedStats.totalRevenue,
-      teamMembers: enhancedStats.teamMembers,
-    },
-    trends,
-    { formatNumber: formatNum, formatCurrency, formatPercentage }
-  );
+  // Dashboard data for refresh functionality
+  const { loadDashboardData } = useDashboardData();
 
   // Memoize expensive operations
   const handleExport = useCallback(() => {
@@ -130,14 +107,7 @@ const AnalyticsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Enhanced Stats Cards */}
-      <StatsGrid 
-        cards={analyticsCards}
-        columns={5}
-        className="mb-6"
-      />
-
-      {/* Original Stats Cards for comparison */}
+      {/* Stats Cards - Standard layout per THEME_SPECIFICATION.md */}
       <div className="mb-6">
         <AnalyticsStatsCards stats={stats} formatNumber={formatNumber} />
       </div>
