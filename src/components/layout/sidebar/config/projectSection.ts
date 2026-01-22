@@ -5,12 +5,7 @@
 import {
   CheckCircle,
   BarChart3,
-  Camera,
-  Cable,
-  Droplets,
-  FileSignature,
   LayoutDashboard,
-  ArrowDownUp,
   GitBranch
 } from 'lucide-react';
 import type { NavSection } from './types';
@@ -32,41 +27,6 @@ export const projectSection: NavSection = {
       icon: GitBranch,
       label: 'Pipeline',
       shortLabel: 'Pipe',
-      permissions: [],
-    },
-    {
-      to: '/pole-capture',
-      icon: Camera,
-      label: 'Pole Capture',
-      shortLabel: 'Poles',
-      permissions: [],
-    },
-    {
-      to: '/fiber-stringing',
-      icon: Cable,
-      label: 'Fiber Stringing',
-      shortLabel: 'Fiber',
-      permissions: [],
-    },
-    {
-      to: '/qfield-sync',
-      icon: ArrowDownUp,
-      label: 'QField Sync',
-      shortLabel: 'Sync',
-      permissions: [],
-    },
-    {
-      to: '/drops',
-      icon: Droplets,
-      label: 'Drops Management',
-      shortLabel: 'Drops',
-      permissions: [],
-    },
-    {
-      to: '/sow-management',
-      icon: FileSignature,
-      label: 'SOW Management',
-      shortLabel: 'SOW',
       permissions: [],
     },
     {
