@@ -789,6 +789,7 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow.service
 | **Git Permission** | "Permission denied" on git ops | `chown -R louis:louis .git` |
 | **VLM Extraction Failed** | "fetch failed" in Data Validation | Check `VLM_API_URL` and `NEXT_PUBLIC_APP_URL` in .env.production |
 | **Cloudflared 502** | 502 via Cloudflare but nginx/app work locally | `sudo systemctl restart cloudflared-tunnel.service` |
+| **Port 3006 In Use** | 500 errors, service keeps restarting | `sudo fuser -k 3006/tcp && sudo systemctl restart fibreflow.service` |
 
 **Cloudflared 502 Diagnostic Path:**
 1. Test via Cloudflare: `curl https://vf.fibreflow.app/api/activate/health-check` → 502

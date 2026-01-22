@@ -1,11 +1,13 @@
 /**
  * Pole Photos Delete API
  * DELETE /api/pole-photos-delete
- * Handles pole photo deletion from local storage
+ * Handles pole photo deletion from VF Storage
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
@@ -54,14 +56,18 @@ export default async function handler(
       });
     }
 
-    // Delete file from local storage if URL provided
+    // Delete file from VF Storage if URL provided
     if (photoUrl) {
       try {
-        // Extract storage path from URL (remove /uploads/ prefix)
-        const storagePath = photoUrl.replace(/^\/uploads\//, '');
-        await localFileStorage.deleteFile(storagePath);
+        // Extract path from VF Storage URL
+        // URL format: http://100.96.203.105:8091/poles/{projectId}/{poleId}/{filename}
+        const urlMatch = photoUrl.match(/\/poles\/([^/]+)\/([^/]+)\/([^/]+)$/);
+        if (urlMatch) {
+          const [, projectIdFromUrl, poleIdFromUrl, filename] = urlMatch;
+          await vfStorage.deleteFile('poles', `${projectIdFromUrl}/${poleIdFromUrl}`, filename);
+        }
       } catch (error) {
-        log.warn('Failed to delete photo file:', { data: error }, 'pole-photos-delete');
+        log.warn('Failed to delete photo file from VF Storage:', { data: error }, 'pole-photos-delete');
         // Continue even if file deletion fails
       }
     }

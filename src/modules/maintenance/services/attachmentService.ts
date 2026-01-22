@@ -1,12 +1,14 @@
 /**
  * Attachment Service
- * 🟢 WORKING: Production-ready attachment service with local file storage
+ * 🟢 WORKING: Production-ready attachment service with VF Storage API
  *
- * Handles file uploads to local storage and attachment record management.
+ * Handles file uploads to VF Storage (Velo server port 8091) and attachment record management.
  * Supports photo evidence for verification steps and general document uploads.
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for unified storage architecture
  */
 
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { query, queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
 import {
@@ -120,7 +122,7 @@ function sanitizeFileName(fileName: string): string {
 }
 
 /**
- * Upload file to Firebase Storage and create attachment record
+ * Upload file to Velo server storage and create attachment record
  * 🟢 WORKING: Complete upload workflow with validation
  */
 export async function uploadAttachment(
@@ -142,35 +144,36 @@ export async function uploadAttachment(
     // Sanitize filename
     const sanitizedFileName = sanitizeFileName(request.filename);
 
-    // Create storage path for maintenance attachments
-    const uploadPath = localFileStorage.getMaintenanceAttachmentPath(request.ticket_id);
+    // Generate unique filename with timestamp to avoid collisions
+    const timestamp = Date.now();
+    const uniqueFilename = `${timestamp}_${sanitizedFileName}`;
 
     // Get file buffer from File object
     const file = request.file as File;
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to local storage
+    // Upload to VF Storage API (Velo server port 8091)
+    // Path convention: maintenance/attachments/{ticketId}/{filename}
     let uploadResult;
     try {
-      uploadResult = await localFileStorage.uploadFile(
+      uploadResult = await vfStorage.uploadFile(
         buffer,
-        uploadPath,
-        request.filename,
-        file.type
+        'maintenance',
+        `attachments/${request.ticket_id}`,
+        uniqueFilename
       );
     } catch (error) {
-      logger.error('Local storage upload failed', {
+      logger.error('VF Storage upload failed', {
         error,
         ticket_id: request.ticket_id,
         filename: request.filename
       });
-      throw new Error('Failed to upload file to storage');
+      throw new Error('Failed to upload file to VF Storage');
     }
 
-    // Generate file URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const downloadURL = `${baseUrl}/api/uploads/${uploadResult.path}`;
+    // Use URL from VF Storage response
+    const downloadURL = uploadResult.url;
     const storagePath = uploadResult.path;
 
     // Determine file type
@@ -435,7 +438,7 @@ export async function listAttachmentsForTicket(
 }
 
 /**
- * Delete attachment from both Firebase Storage and database
+ * Delete attachment from both local storage and database
  * 🟢 WORKING: Cascade delete with cleanup
  */
 export async function deleteAttachment(attachmentId: string): Promise<void> {
@@ -454,15 +457,26 @@ export async function deleteAttachment(attachmentId: string): Promise<void> {
       throw new Error('Attachment not found');
     }
 
-    // Delete from local storage
+    // Delete from VF Storage API
+    // Parse storage_path: maintenance/attachments/{ticketId}/{filename}
     try {
-      await localFileStorage.deleteFile(attachment.storage_path);
-      logger.debug('Deleted file from local storage', {
-        storage_path: attachment.storage_path
-      });
+      const pathParts = attachment.storage_path.split('/');
+      if (pathParts.length >= 4) {
+        const type = pathParts[0]; // 'maintenance'
+        const category = pathParts.slice(1, -1).join('/'); // 'attachments/{ticketId}'
+        const filename = pathParts[pathParts.length - 1];
+        await vfStorage.deleteFile(type, category, filename);
+        logger.debug('Deleted file from VF Storage', {
+          storage_path: attachment.storage_path
+        });
+      } else {
+        logger.warn('Invalid storage path format, skipping VF Storage deletion', {
+          storage_path: attachment.storage_path
+        });
+      }
     } catch (error) {
       // Log warning but continue - file might already be deleted
-      logger.warn('Failed to delete file from storage (continuing with DB deletion)', {
+      logger.warn('Failed to delete file from VF Storage (continuing with DB deletion)', {
         error,
         storage_path: attachment.storage_path
       });

@@ -1,14 +1,15 @@
 /**
  * File Serving API - Catch-all route
  * GET /api/uploads/[...path]
- * Serves files from local storage
+ * Proxies files from VF Storage
  *
- * In production, nginx should serve /uploads directly for better performance.
- * This API serves as a fallback for development and authenticated file access.
+ * This API proxies requests to VF Storage API for file serving.
+ * VF Storage handles actual file storage at 100.96.203.105:8091.
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { localFileStorage } from '@/services/localFileStorage';
 import path from 'path';
 
 // MIME type mapping for common file types
@@ -26,6 +27,8 @@ const MIME_TYPES: Record<string, string> = {
   '.txt': 'text/plain',
   '.csv': 'text/csv',
 };
+
+const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -48,21 +51,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Invalid file path' });
     }
 
-    // Check if file exists
-    const exists = await localFileStorage.fileExists(filePath);
-    if (!exists) {
-      return res.status(404).json({ error: 'File not found' });
+    // Proxy request to VF Storage
+    const vfUrl = `${VF_STORAGE_URL}/${filePath}`;
+    const response = await fetch(vfUrl);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      throw new Error(`VF Storage returned ${response.status}`);
     }
 
-    // Get the file
-    const fileBuffer = await localFileStorage.getFile(filePath);
-    if (!fileBuffer) {
-      return res.status(404).json({ error: 'File not found' });
-    }
+    // Get the file buffer
+    const fileBuffer = Buffer.from(await response.arrayBuffer());
 
-    // Determine content type from extension
+    // Determine content type from extension or response header
     const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const contentType = response.headers.get('content-type') || MIME_TYPES[ext] || 'application/octet-stream';
 
     // Set response headers
     res.setHeader('Content-Type', contentType);

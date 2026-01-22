@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 const sql = neon(process.env.DATABASE_URL!);
 
 // Storage API URL (VF Server)
-const STORAGE_API_URL = process.env.STORAGE_API_URL || 'http://100.96.203.105:8091';
+const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 interface RouteParams {
   params: { id: string };
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
 
-      const uploadResponse = await fetch(`${STORAGE_API_URL}/upload/wishlist/${itemId}`, {
+      const uploadResponse = await fetch(`${VF_STORAGE_URL}/upload/wishlist/${itemId}`, {
         method: 'POST',
         body: uploadFormData,
       });

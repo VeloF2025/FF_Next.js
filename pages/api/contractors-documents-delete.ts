@@ -1,12 +1,14 @@
 /**
  * Contractors Documents Delete API - Flat Endpoint
  * POST /api/contractors-documents-delete
- * Deletes document from local storage AND database
+ * Deletes document from VF Storage AND database
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -32,13 +34,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    // Delete from local storage
+    // Delete from VF Storage
     try {
       if (document.file_path) {
-        await localFileStorage.deleteFile(document.file_path);
+        // Parse storage path: contractors/documents/{filename}
+        const pathParts = document.file_path.split('/');
+        if (pathParts.length >= 3) {
+          const filename = pathParts[pathParts.length - 1];
+          await vfStorage.deleteFile('contractors', 'documents', filename);
+        }
       }
     } catch (storageError) {
-      console.error('Local storage delete error:', storageError);
+      console.error('VF Storage delete error:', storageError);
       // Continue even if file delete fails (file might already be gone)
     }
 

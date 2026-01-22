@@ -18,7 +18,7 @@ export * from './verificationService';
 // Risk Acceptance Service (subtask 2.4)
 export * from './riskAcceptanceService';
 
-// Attachment Service - Firebase Storage Integration (subtask 2.8)
+// Attachment Service - Velo Server Storage Integration (subtask 2.8)
 export * from './attachmentService';
 
 // Escalation Service - Repeat Fault Escalation Management (subtask 3.2)

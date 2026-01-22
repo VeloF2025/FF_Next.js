@@ -2,10 +2,12 @@
  * Unified Storage List API
  * GET /api/storage/list?type=X&category=Y
  * Lists files in a directory
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
 interface ListResponse {
@@ -38,13 +40,12 @@ export default async function handler(
     const typeStr = Array.isArray(type) ? type[0] : type;
     const categoryStr = Array.isArray(category) ? category[0] : category;
 
-    // List files from local storage
-    const dirPath = `${typeStr}/${categoryStr}`;
-    const fileNames = await localFileStorage.listFiles(dirPath);
+    // List files from VF Storage
+    const fileNames = await vfStorage.listFiles(typeStr, categoryStr);
 
     const files = fileNames.map(name => ({
       name,
-      url: localFileStorage.getFileUrl(`${dirPath}/${name}`),
+      url: vfStorage.getFileUrl(typeStr, categoryStr, name),
     }));
 
     return res.status(200).json({

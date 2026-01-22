@@ -15,7 +15,7 @@ import FormData from 'form-data';
 const sql = neon(process.env.DATABASE_URL!);
 
 // VF Storage Service configuration
-const STORAGE_SERVICE_URL = process.env.STORAGE_SERVICE_URL || 'http://100.96.203.105:8091';
+const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 const STORAGE_PUBLIC_URL = process.env.STORAGE_PUBLIC_URL || '/storage';
 
 interface CalibrationStatus {
@@ -67,7 +67,7 @@ async function uploadCalibrationPhoto(
     contentType: `image/${matches[1]}`,
   });
 
-  const uploadUrl = `${STORAGE_SERVICE_URL}/upload/fleet/calibration`;
+  const uploadUrl = `${VF_STORAGE_URL}/upload/fleet/calibration`;
   log.info('Uploading calibration photo to storage', { uploadUrl, filename });
 
   const response = await fetch(uploadUrl, {

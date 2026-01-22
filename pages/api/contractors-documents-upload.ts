@@ -1,19 +1,21 @@
 /**
  * Contractors Documents Upload API - Flat Endpoint
  * POST /api/contractors-documents-upload
- * Handles file upload to local storage + metadata to Neon
+ * Handles file upload to VF Storage API + metadata to Neon
  *
  * Protected by Arcjet:
  * - Bot detection
  * - Rate limiting (30 req/min)
  * - Attack protection
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import formidable from 'formidable';
 import fs from 'fs';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -95,22 +97,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Read file buffer
     const fileBuffer = await fs.promises.readFile(file.filepath);
 
-    // Upload to local storage
+    // Upload to VF Storage API
+    // Path convention: contractors/documents/{contractorId}_{timestamp}_{filename}
     const sanitizedFileName = sanitizeFileName(file.originalFilename || 'document');
-    const uploadPath = localFileStorage.getContractorDocumentPath(contractorId);
-    const uploadResult = await localFileStorage.uploadFile(
+    const uniqueFilename = `${contractorId}_${Date.now()}_${sanitizedFileName}`;
+    const uploadResult = await vfStorage.uploadFile(
       fileBuffer,
-      uploadPath,
-      file.originalFilename || 'document',
-      file.mimetype || 'application/octet-stream'
+      'contractors',
+      'documents',
+      uniqueFilename
     );
 
     uploadedToStorage = true;
     storagePath = uploadResult.path;
 
-    // Generate file URL (use API endpoint for serving files)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-    const fileUrl = `${baseUrl}/api/uploads/${uploadResult.path}`;
+    // Use URL from VF Storage response
+    const fileUrl = uploadResult.url;
 
     // Save metadata to Neon
     const [document] = await sql`
@@ -166,13 +168,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Document upload error:', errorMessage);
 
-    // Cleanup: Remove uploaded file from local storage if DB insert failed
+    // Cleanup: Remove uploaded file from VF Storage if DB insert failed
     if (uploadedToStorage && storagePath) {
       try {
-        await localFileStorage.deleteFile(storagePath);
-        console.log('Cleaned up local file after error:', storagePath);
+        // Parse storage path: contractors/documents/{filename}
+        const pathParts = storagePath.split('/');
+        if (pathParts.length >= 3) {
+          const filename = pathParts[pathParts.length - 1];
+          await vfStorage.deleteFile('contractors', 'documents', filename);
+          console.log('Cleaned up VF Storage file after error:', storagePath);
+        }
       } catch (cleanupError) {
-        console.error('Failed to cleanup local file:', cleanupError);
+        console.error('Failed to cleanup VF Storage file:', cleanupError);
       }
     }
 

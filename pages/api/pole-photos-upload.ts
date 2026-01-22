@@ -1,13 +1,15 @@
 /**
  * Pole Photos Upload API
  * POST /api/pole-photos-upload
- * Handles pole photo uploads to local storage
+ * Handles pole photo uploads to VF Storage
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm, File as FormidableFile } from 'formidable';
 import fs from 'fs';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
@@ -106,18 +108,15 @@ export default async function handler(
     // Read file buffer
     const buffer = await fs.promises.readFile(file.filepath);
 
-    // Generate storage path
-    const storagePath = localFileStorage.getPolePhotoPath(
-      projectId || 'unknown',
-      poleId
-    );
-
-    // Upload to local storage
-    const result = await localFileStorage.uploadFile(
+    // Upload to VF Storage
+    // Path convention: poles/{projectId}/{poleId}/{photoType}_{filename}
+    const category = `${projectId || 'unknown'}/${poleId}`;
+    const filename = `${photoType}_${Date.now()}_${file.originalFilename || 'photo.jpg'}`;
+    const result = await vfStorage.uploadFile(
       buffer,
-      storagePath,
-      `${photoType}_${file.originalFilename || 'photo.jpg'}`,
-      file.mimetype || 'image/jpeg'
+      'poles',
+      category,
+      filename
     );
 
     // Update database with photo URL

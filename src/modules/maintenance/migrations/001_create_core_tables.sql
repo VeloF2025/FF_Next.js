@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS ticket_attachments (
   file_size INTEGER,
 
   -- Storage
-  storage_path TEXT NOT NULL, -- Firebase Storage path
+  storage_path TEXT NOT NULL, -- Velo server storage path
   storage_url TEXT, -- Public URL
 
   -- Metadata
@@ -269,7 +269,7 @@ CREATE TABLE IF NOT EXISTS ticket_attachments (
 );
 
 COMMENT ON TABLE ticket_attachments IS 'File attachments (photos, documents) linked to tickets';
-COMMENT ON COLUMN ticket_attachments.storage_path IS 'Firebase Storage path to the file';
+COMMENT ON COLUMN ticket_attachments.storage_path IS 'Velo server storage path to the file';
 COMMENT ON COLUMN ticket_attachments.verification_step_id IS 'Links photo to specific verification step if used as evidence';
 COMMENT ON COLUMN ticket_attachments.is_evidence IS 'Indicates if attachment is used as verification evidence';
 

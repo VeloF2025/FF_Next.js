@@ -3,7 +3,7 @@
  * 🟢 WORKING: Type definitions match database schema from migrations
  *
  * Defines TypeScript types for ticket attachments, photo evidence,
- * and document management via Firebase Storage.
+ * and document management via Velo Server storage.
  */
 
 /**
@@ -18,7 +18,7 @@ export enum FileType {
 
 /**
  * Ticket Attachment Interface
- * Tracks files attached to tickets (stored in Firebase Storage)
+ * Tracks files attached to tickets (stored on VF Storage API at 100.96.203.105:8091)
  */
 export interface TicketAttachment {
   // Primary identification
@@ -32,7 +32,7 @@ export interface TicketAttachment {
   file_size: number | null; // Bytes
 
   // Storage location
-  storage_path: string; // Firebase Storage path
+  storage_path: string; // Velo server storage path
   storage_url: string | null; // Public URL
 
   // Metadata

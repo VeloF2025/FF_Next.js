@@ -1,11 +1,13 @@
 /**
  * Unified Storage Delete API
  * DELETE /api/storage/delete
- * Handles file deletion from local storage
+ * Handles file deletion from VF Storage
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
 interface DeleteResponse {
@@ -31,11 +33,8 @@ export default async function handler(
       });
     }
 
-    // Construct storage path
-    const storagePath = `${type}/${category}/${fileName}`;
-
-    // Delete from local storage
-    await localFileStorage.deleteFile(storagePath);
+    // Delete from VF Storage
+    await vfStorage.deleteFile(type, category, fileName);
 
     log.info(`File deleted: ${storagePath}`, {}, 'storage-delete');
 

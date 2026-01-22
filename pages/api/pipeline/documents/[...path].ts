@@ -10,7 +10,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const STORAGE_API_URL = process.env.STORAGE_API_URL || 'http://100.96.203.105:8091';
+const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Build the storage API URL
     // Expected format: /api/pipeline/documents/pipeline/{projectId}/{filename}
     const storagePath = pathSegments.join('/');
-    const storageUrl = `${STORAGE_API_URL}/${storagePath}`;
+    const storageUrl = `${VF_STORAGE_URL}/${storagePath}`;
 
     console.log(`[Document Proxy] Fetching: ${storageUrl}`);
 

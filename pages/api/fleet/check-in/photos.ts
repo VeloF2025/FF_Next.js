@@ -24,7 +24,7 @@ import { log } from '@/lib/logger';
 const sql = neon(process.env.DATABASE_URL!);
 
 // VF Storage Service configuration
-const STORAGE_SERVICE_URL = process.env.STORAGE_SERVICE_URL || 'http://100.96.203.105:8091';
+const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 const STORAGE_PUBLIC_URL = process.env.STORAGE_PUBLIC_URL || '/storage';
 
 export const config = {
@@ -63,7 +63,7 @@ async function uploadToStorage(
     contentType: 'image/jpeg',
   });
 
-  const uploadUrl = `${STORAGE_SERVICE_URL}/upload/fleet/${category}`;
+  const uploadUrl = `${VF_STORAGE_URL}/upload/fleet/${category}`;
   log.info('Uploading to VF Storage', { uploadUrl, filename });
 
   const response = await fetch(uploadUrl, {

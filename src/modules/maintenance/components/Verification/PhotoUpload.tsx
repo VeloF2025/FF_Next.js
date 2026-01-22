@@ -95,12 +95,11 @@ export function PhotoUpload({
       setUploadProgress(0);
 
       try {
-        // 🔵 MOCK: Simulate upload progress
-        // In production, this would upload to Firebase Storage
+        // 🟢 WORKING: Upload to Velo server via API
         const formData = new FormData();
         formData.append('file', file);
 
-        // Simulate progress
+        // Start progress indicator
         const progressInterval = setInterval(() => {
           setUploadProgress(prev => {
             if (prev >= 90) {
@@ -111,19 +110,25 @@ export function PhotoUpload({
           });
         }, 100);
 
-        // TODO: Replace with actual Firebase Storage upload
-        // const uploadedUrl = await uploadToFirebaseStorage(file);
-
-        // 🔵 MOCK: Simulate upload delay and return mock URL
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const mockUrl = URL.createObjectURL(file);
+        // Upload to maintenance attachments API
+        const response = await fetch('/api/maintenance/attachments/upload', {
+          method: 'POST',
+          body: formData,
+        });
 
         clearInterval(progressInterval);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Upload failed: ${response.status}`);
+        }
+
+        const result = await response.json();
         setUploadProgress(100);
 
-        // Notify parent component
+        // Notify parent component with the storage URL
         if (onPhotoUploaded) {
-          onPhotoUploaded(mockUrl);
+          onPhotoUploaded(result.storage_url || result.url);
         }
 
         setIsUploading(false);

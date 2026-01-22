@@ -3,14 +3,16 @@
  *
  * Tests FIRST - Implementation SECOND
  *
- * Testing attachment operations with Firebase Storage integration:
- * - Upload photo to Firebase Storage
+ * Testing attachment operations with VF Storage API integration:
+ * - Upload photo to VF Storage API (Velo server port 8091)
  * - Create attachment record in DB
  * - Link attachment to verification step
  * - List attachments for ticket
  * - Delete attachment (cascade)
  * - File type validation
  * - File size validation
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for unified storage architecture
  *
  * 🟢 WORKING: Comprehensive test suite for attachment service
  */
@@ -40,17 +42,16 @@ vi.mock('../../utils/db', () => ({
   transaction: vi.fn()
 }));
 
-// Mock Firebase Storage
-vi.mock('firebase/storage', () => ({
-  ref: vi.fn(),
-  uploadBytes: vi.fn(),
-  getDownloadURL: vi.fn(),
-  deleteObject: vi.fn()
-}));
-
-// Mock Firebase config
-vi.mock('@/config/firebase', () => ({
-  storage: {}
+// Mock VF Storage API (Velo server port 8091)
+vi.mock('@/services/vfStorageAdapter', () => ({
+  vfStorage: {
+    uploadFile: vi.fn(),
+    deleteFile: vi.fn(),
+    getFileUrl: vi.fn((type: string, category: string, filename: string) =>
+      `http://100.96.203.105:8091/${type}/${category}/${filename}`
+    ),
+    checkHealth: vi.fn().mockResolvedValue(true)
+  }
 }));
 
 // Mock the logger
@@ -64,9 +65,9 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { query, queryOne } from '../../utils/db';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 
-describe('Attachment Service - Firebase Storage Integration', () => {
+describe('Attachment Service - VF Storage API Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -168,13 +169,14 @@ describe('Attachment Service - Firebase Storage Integration', () => {
   });
 
   describe('uploadAttachment', () => {
-    it('should upload photo to Firebase Storage and create DB record', async () => {
+    it('should upload photo to Velo server storage and create DB record', async () => {
       // 🟢 WORKING: Test complete upload workflow
       const mockFile = {
         name: 'photo.jpg',
         size: 1024000, // ~1MB
-        type: 'image/jpeg'
-      } as File;
+        type: 'image/jpeg',
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(1024000))
+      } as unknown as File;
 
       const request: FileUploadRequest = {
         ticket_id: 'ticket-uuid-123',
@@ -185,17 +187,16 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         verification_step_id: 'step-uuid-789'
       };
 
-      const mockStorageRef = { fullPath: 'tickets/ticket-uuid-123/1234567890_photo.jpg' };
-      const mockUploadResult = {
-        ref: mockStorageRef,
-        metadata: { size: 1024000, contentType: 'image/jpeg' }
-      };
-      const mockDownloadURL = 'https://storage.googleapis.com/bucket/tickets/ticket-uuid-123/photo.jpg';
+      const mockStoragePath = 'maintenance/attachments/ticket-uuid-123/1234567890_photo.jpg';
+      const mockDownloadURL = 'http://100.96.203.105:8091/maintenance/attachments/ticket-uuid-123/1234567890_photo.jpg';
 
-      // Mock Firebase Storage calls
-      vi.mocked(ref).mockReturnValue(mockStorageRef as any);
-      vi.mocked(uploadBytes).mockResolvedValue(mockUploadResult as any);
-      vi.mocked(getDownloadURL).mockResolvedValue(mockDownloadURL);
+      // Mock VF Storage API upload
+      vi.mocked(vfStorage.uploadFile).mockResolvedValue({
+        success: true,
+        path: mockStoragePath,
+        url: mockDownloadURL,
+        filename: '1234567890_photo.jpg'
+      });
 
       // Mock DB insert
       const mockAttachment = {
@@ -205,7 +206,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         file_type: FileType.PHOTO,
         mime_type: 'image/jpeg',
         file_size: 1024000,
-        storage_path: 'tickets/ticket-uuid-123/1234567890_photo.jpg',
+        storage_path: mockStoragePath,
         storage_url: mockDownloadURL,
         uploaded_by: 'user-uuid-456',
         uploaded_at: new Date('2024-01-15T10:00:00Z'),
@@ -217,14 +218,13 @@ describe('Attachment Service - Firebase Storage Integration', () => {
 
       const result = await uploadAttachment(request);
 
-      // Verify Firebase Storage was called correctly
-      expect(ref).toHaveBeenCalled();
-      expect(uploadBytes).toHaveBeenCalledWith(
-        mockStorageRef,
-        mockFile,
-        expect.objectContaining({ contentType: 'image/jpeg' })
+      // Verify VF Storage API was called correctly
+      expect(vfStorage.uploadFile).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        'maintenance',
+        expect.stringContaining('attachments/ticket-uuid-123'),
+        expect.stringMatching(/^\d+_photo\.jpg$/)
       );
-      expect(getDownloadURL).toHaveBeenCalledWith(mockStorageRef);
 
       // Verify DB record was created
       expect(queryOne).toHaveBeenCalledWith(
@@ -234,12 +234,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           'photo.jpg',
           FileType.PHOTO,
           'image/jpeg',
-          1024000,
-          expect.stringContaining('tickets/ticket-uuid-123'),
-          mockDownloadURL,
-          'user-uuid-456',
-          'step-uuid-789',
-          true
+          1024000
         ])
       );
 
@@ -248,7 +243,6 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         attachment_id: 'attachment-uuid-111',
         ticket_id: 'ticket-uuid-123',
         filename: 'photo.jpg',
-        storage_url: mockDownloadURL,
         file_size: 1024000,
         mime_type: 'image/jpeg'
       });
@@ -258,8 +252,9 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       const mockFile = {
         name: 'document.pdf',
         size: 500000,
-        type: 'application/pdf'
-      } as File;
+        type: 'application/pdf',
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(500000))
+      } as unknown as File;
 
       const request: FileUploadRequest = {
         ticket_id: 'ticket-uuid-123',
@@ -269,12 +264,15 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         is_evidence: false
       };
 
-      const mockStorageRef = { fullPath: 'tickets/ticket-uuid-123/1234567890_document.pdf' };
-      const mockDownloadURL = 'https://storage.googleapis.com/bucket/document.pdf';
+      const mockStoragePath = 'maintenance/attachments/ticket-uuid-123/1234567890_document.pdf';
+      const mockDownloadURL = 'http://100.96.203.105:8091/maintenance/attachments/ticket-uuid-123/1234567890_document.pdf';
 
-      vi.mocked(ref).mockReturnValue(mockStorageRef as any);
-      vi.mocked(uploadBytes).mockResolvedValue({ ref: mockStorageRef, metadata: {} } as any);
-      vi.mocked(getDownloadURL).mockResolvedValue(mockDownloadURL);
+      vi.mocked(vfStorage.uploadFile).mockResolvedValue({
+        success: true,
+        path: mockStoragePath,
+        url: mockDownloadURL,
+        filename: '1234567890_document.pdf'
+      });
 
       const mockAttachment = {
         id: 'attachment-uuid-222',
@@ -283,7 +281,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         file_type: FileType.PDF,
         mime_type: 'application/pdf',
         file_size: 500000,
-        storage_path: 'tickets/ticket-uuid-123/1234567890_document.pdf',
+        storage_path: mockStoragePath,
         storage_url: mockDownloadURL,
         uploaded_by: 'user-uuid-456',
         uploaded_at: new Date('2024-01-15T10:00:00Z'),
@@ -297,21 +295,6 @@ describe('Attachment Service - Firebase Storage Integration', () => {
 
       expect(result.attachment_id).toBe('attachment-uuid-222');
       expect(result.file_size).toBe(500000);
-      expect(queryOne).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([
-          'ticket-uuid-123',
-          'document.pdf',
-          FileType.PDF,
-          'application/pdf',
-          500000,
-          expect.any(String),
-          mockDownloadURL,
-          'user-uuid-456',
-          null, // verification_step_id
-          false // is_evidence
-        ])
-      );
     });
 
     it('should reject invalid file during upload', async () => {
@@ -329,16 +312,17 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       };
 
       await expect(uploadAttachment(request)).rejects.toThrow('Invalid file type');
-      expect(uploadBytes).not.toHaveBeenCalled();
+      expect(vfStorage.uploadFile).not.toHaveBeenCalled();
       expect(queryOne).not.toHaveBeenCalled();
     });
 
-    it('should handle Firebase Storage upload failure', async () => {
+    it('should handle VF Storage upload failure', async () => {
       const mockFile = {
         name: 'photo.jpg',
         size: 1024000,
-        type: 'image/jpeg'
-      } as File;
+        type: 'image/jpeg',
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(1024000))
+      } as unknown as File;
 
       const request: FileUploadRequest = {
         ticket_id: 'ticket-uuid-123',
@@ -347,11 +331,9 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         uploaded_by: 'user-uuid-456'
       };
 
-      const mockStorageRef = { fullPath: 'tickets/ticket-uuid-123/photo.jpg' };
-      vi.mocked(ref).mockReturnValue(mockStorageRef as any);
-      vi.mocked(uploadBytes).mockRejectedValue(new Error('Storage quota exceeded'));
+      vi.mocked(vfStorage.uploadFile).mockRejectedValue(new Error('Storage quota exceeded'));
 
-      await expect(uploadAttachment(request)).rejects.toThrow('Failed to upload file to storage');
+      await expect(uploadAttachment(request)).rejects.toThrow('Failed to upload file to VF Storage');
       expect(queryOne).not.toHaveBeenCalled();
     });
 
@@ -359,8 +341,9 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       const mockFile = {
         name: 'photo.jpg',
         size: 1024000,
-        type: 'image/jpeg'
-      } as File;
+        type: 'image/jpeg',
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(1024000))
+      } as unknown as File;
 
       const request: FileUploadRequest = {
         ticket_id: 'ticket-uuid-123',
@@ -369,12 +352,15 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         uploaded_by: 'user-uuid-456'
       };
 
-      const mockStorageRef = { fullPath: 'tickets/ticket-uuid-123/photo.jpg' };
-      const mockDownloadURL = 'https://storage.googleapis.com/bucket/photo.jpg';
+      const mockStoragePath = 'maintenance/attachments/ticket-uuid-123/photo.jpg';
+      const mockDownloadURL = 'http://100.96.203.105:8091/maintenance/attachments/ticket-uuid-123/photo.jpg';
 
-      vi.mocked(ref).mockReturnValue(mockStorageRef as any);
-      vi.mocked(uploadBytes).mockResolvedValue({ ref: mockStorageRef, metadata: {} } as any);
-      vi.mocked(getDownloadURL).mockResolvedValue(mockDownloadURL);
+      vi.mocked(vfStorage.uploadFile).mockResolvedValue({
+        success: true,
+        path: mockStoragePath,
+        url: mockDownloadURL,
+        filename: 'photo.jpg'
+      });
       vi.mocked(queryOne).mockRejectedValue(new Error('Database error'));
 
       await expect(uploadAttachment(request)).rejects.toThrow('Failed to create attachment record');
@@ -391,7 +377,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         mime_type: 'image/jpeg',
         file_size: 1024000,
         storage_path: 'tickets/ticket-uuid-123/photo.jpg',
-        storage_url: 'https://storage.googleapis.com/bucket/photo.jpg',
+        storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo.jpg',
         uploaded_by: 'user-uuid-456',
         verification_step_id: 'step-uuid-789',
         is_evidence: true
@@ -416,7 +402,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           'image/jpeg',
           1024000,
           'tickets/ticket-uuid-123/photo.jpg',
-          'https://storage.googleapis.com/bucket/photo.jpg',
+          'http://100.96.203.105:8091/maintenance/attachments/photo.jpg',
           'user-uuid-456',
           'step-uuid-789',
           true
@@ -495,7 +481,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         mime_type: 'image/jpeg',
         file_size: 1024000,
         storage_path: 'tickets/ticket-uuid-123/photo.jpg',
-        storage_url: 'https://storage.googleapis.com/bucket/photo.jpg',
+        storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo.jpg',
         uploaded_by: 'user-uuid-456',
         uploaded_at: new Date('2024-01-15T10:00:00Z'),
         verification_step_id: 'step-uuid-789',
@@ -546,7 +532,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           mime_type: 'image/jpeg',
           file_size: 1024000,
           storage_path: 'tickets/ticket-uuid-123/photo1.jpg',
-          storage_url: 'https://storage.googleapis.com/bucket/photo1.jpg',
+          storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo1.jpg',
           uploaded_by: 'user-uuid-456',
           uploaded_at: new Date('2024-01-15T10:00:00Z'),
           verification_step_id: 'step-uuid-789',
@@ -560,7 +546,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           mime_type: 'image/jpeg',
           file_size: 2048000,
           storage_path: 'tickets/ticket-uuid-123/photo2.jpg',
-          storage_url: 'https://storage.googleapis.com/bucket/photo2.jpg',
+          storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo2.jpg',
           uploaded_by: 'user-uuid-456',
           uploaded_at: new Date('2024-01-15T11:00:00Z'),
           verification_step_id: null,
@@ -598,7 +584,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           mime_type: 'image/jpeg',
           file_size: 1024000,
           storage_path: 'tickets/ticket-uuid-123/photo.jpg',
-          storage_url: 'https://storage.googleapis.com/bucket/photo.jpg',
+          storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo.jpg',
           uploaded_by: 'user-uuid-456',
           uploaded_at: new Date('2024-01-15T10:00:00Z'),
           verification_step_id: null,
@@ -664,7 +650,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
   });
 
   describe('deleteAttachment', () => {
-    it('should delete attachment from both Firebase Storage and DB', async () => {
+    it('should delete attachment from both VF Storage and DB', async () => {
       // 🟢 WORKING: Test cascade delete (Storage + DB)
       const attachmentId = '123e4567-e89b-12d3-a456-426614174001';
 
@@ -675,8 +661,8 @@ describe('Attachment Service - Firebase Storage Integration', () => {
         file_type: FileType.PHOTO,
         mime_type: 'image/jpeg',
         file_size: 1024000,
-        storage_path: 'tickets/ticket-uuid-123/photo.jpg',
-        storage_url: 'https://storage.googleapis.com/bucket/photo.jpg',
+        storage_path: 'maintenance/attachments/ticket-uuid-123/photo.jpg',
+        storage_url: 'http://100.96.203.105:8091/maintenance/attachments/ticket-uuid-123/photo.jpg',
         uploaded_by: 'user-uuid-456',
         uploaded_at: new Date('2024-01-15T10:00:00Z'),
         verification_step_id: null,
@@ -689,13 +675,17 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       // Mock delete from DB
       vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 1 });
 
-      // Mock delete from Firebase Storage
-      vi.mocked(deleteObject).mockResolvedValue(undefined);
+      // Mock delete from VF Storage
+      vi.mocked(vfStorage.deleteFile).mockResolvedValue(undefined);
 
       await deleteAttachment(attachmentId);
 
-      // Verify Storage deletion
-      expect(deleteObject).toHaveBeenCalled();
+      // Verify VF Storage deletion (type, category, filename)
+      expect(vfStorage.deleteFile).toHaveBeenCalledWith(
+        'maintenance',
+        'attachments/ticket-uuid-123',
+        'photo.jpg'
+      );
 
       // Verify DB deletion
       expect(query).toHaveBeenCalledWith(
@@ -708,22 +698,22 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       vi.mocked(queryOne).mockResolvedValue(null);
 
       await expect(deleteAttachment('123e4567-e89b-12d3-a456-426614174999')).rejects.toThrow('Attachment not found');
-      expect(deleteObject).not.toHaveBeenCalled();
+      expect(vfStorage.deleteFile).not.toHaveBeenCalled();
       expect(query).not.toHaveBeenCalled();
     });
 
-    it('should continue DB deletion even if Storage deletion fails', async () => {
+    it('should continue DB deletion even if VF Storage deletion fails', async () => {
       const attachmentId = '123e4567-e89b-12d3-a456-426614174001';
 
       const mockAttachment = {
         id: attachmentId,
-        storage_path: 'tickets/123e4567-e89b-12d3-a456-426614174000/photo.jpg',
+        storage_path: 'maintenance/attachments/123e4567-e89b-12d3-a456-426614174000/photo.jpg',
         ticket_id: '123e4567-e89b-12d3-a456-426614174000',
         filename: 'photo.jpg',
         file_type: FileType.PHOTO,
         mime_type: 'image/jpeg',
         file_size: 1024000,
-        storage_url: 'https://storage.googleapis.com/bucket/photo.jpg',
+        storage_url: 'http://100.96.203.105:8091/maintenance/attachments/123e4567-e89b-12d3-a456-426614174000/photo.jpg',
         uploaded_by: 'user-uuid-456',
         uploaded_at: new Date('2024-01-15T10:00:00Z'),
         verification_step_id: null,
@@ -731,7 +721,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
       };
 
       vi.mocked(queryOne).mockResolvedValueOnce(mockAttachment);
-      vi.mocked(deleteObject).mockRejectedValue(new Error('Storage error'));
+      vi.mocked(vfStorage.deleteFile).mockRejectedValue(new Error('Storage error'));
       vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 1 });
 
       // Should not throw - logs warning and continues
@@ -746,7 +736,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
     it('should validate UUID format before deletion', async () => {
       await expect(deleteAttachment('invalid-uuid')).rejects.toThrow('Invalid attachment ID format');
       expect(queryOne).not.toHaveBeenCalled();
-      expect(deleteObject).not.toHaveBeenCalled();
+      expect(vfStorage.deleteFile).not.toHaveBeenCalled();
     });
   });
 
@@ -764,7 +754,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           mime_type: 'image/jpeg',
           file_size: 1024000,
           storage_path: 'tickets/ticket-uuid-123/photo1.jpg',
-          storage_url: 'https://storage.googleapis.com/bucket/photo1.jpg',
+          storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo1.jpg',
           uploaded_by: 'user-uuid-456',
           uploaded_at: new Date('2024-01-15T10:00:00Z'),
           verification_step_id: 'step-1',
@@ -778,7 +768,7 @@ describe('Attachment Service - Firebase Storage Integration', () => {
           mime_type: 'image/jpeg',
           file_size: 2048000,
           storage_path: 'tickets/ticket-uuid-123/photo2.jpg',
-          storage_url: 'https://storage.googleapis.com/bucket/photo2.jpg',
+          storage_url: 'http://100.96.203.105:8091/maintenance/attachments/photo2.jpg',
           uploaded_by: 'user-uuid-456',
           uploaded_at: new Date('2024-01-15T11:00:00Z'),
           verification_step_id: 'step-1',

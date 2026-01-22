@@ -11,7 +11,7 @@ import FormData from 'form-data';
 // ============================================================================
 
 const SMARTSHEET_API_BASE = 'https://api.smartsheet.com/2.0';
-const STORAGE_API_BASE = process.env.STORAGE_API_URL || 'http://100.96.203.105:8091';
+const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 const SHEET_ID = '8735086443712388';
 
 // Stakeholder name patterns for parsing filenames
@@ -195,7 +195,7 @@ async function uploadToStorage(
   const body = Buffer.concat([header, fileBuffer, footer]);
 
   const response = await fetch(
-    `${STORAGE_API_BASE}/upload/pipeline/${projectId}`,
+    `${VF_STORAGE_URL}/upload/pipeline/${projectId}`,
     {
       method: 'POST',
       body: body,

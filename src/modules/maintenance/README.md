@@ -282,7 +282,7 @@ npm run test:coverage
 
 - **Database:** Neon PostgreSQL (serverless)
 - **Auth:** Clerk
-- **Storage:** Firebase Storage
+- **Storage:** VF Storage API (100.96.203.105:8091) via vfStorageAdapter
 - **External APIs:** QContact, WAHA (WhatsApp)
 - **Excel Parsing:** xlsx library
 

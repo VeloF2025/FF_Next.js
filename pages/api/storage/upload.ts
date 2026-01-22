@@ -1,13 +1,15 @@
 /**
  * Unified Storage Upload API
  * POST /api/storage/upload
- * Handles file uploads to local storage with unified interface
+ * Handles file uploads to VF Storage with unified interface
+ *
+ * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm, File as FormidableFile } from 'formidable';
 import fs from 'fs';
-import { localFileStorage } from '@/services/localFileStorage';
+import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
 export const config = {
@@ -74,15 +76,13 @@ export default async function handler(
     // Read file buffer
     const buffer = await fs.promises.readFile(file.filepath);
 
-    // Generate storage path
-    const storagePath = `${type}/${category}`;
-
-    // Upload to local storage
-    const result = await localFileStorage.uploadFile(
+    // Upload to VF Storage
+    const filename = file.originalFilename || `file_${Date.now()}`;
+    const result = await vfStorage.uploadFile(
       buffer,
-      storagePath,
-      file.originalFilename || `file_${Date.now()}`,
-      file.mimetype || 'application/octet-stream'
+      type,
+      category,
+      filename
     );
 
     // Clean up temp file
@@ -94,8 +94,7 @@ export default async function handler(
       success: true,
       url: result.url,
       path: result.path,
-      fileName: result.fileName,
-      size: result.size,
+      fileName: result.filename,
     });
   } catch (error) {
     log.error('Storage upload error:', { data: error }, 'storage-upload');

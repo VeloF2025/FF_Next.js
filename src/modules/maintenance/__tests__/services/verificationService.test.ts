@@ -328,7 +328,7 @@ describe('VerificationService - TDD', () => {
   describe('updateVerificationStep - Add Photo URL', () => {
     it('should add photo URL to step', async () => {
       // Arrange
-      const photoUrl = 'https://storage.firebase.com/photos/test.jpg';
+      const photoUrl = '/api/uploads/maintenance-attachments/test.jpg';
       const existingStep = createMockStep(1);
       const updatedStep = createMockStep(1, { photo_url: photoUrl });
 
@@ -404,7 +404,7 @@ describe('VerificationService - TDD', () => {
   describe('updateVerificationStep - Multiple Fields', () => {
     it('should update multiple fields at once', async () => {
       // Arrange
-      const photoUrl = 'https://storage.firebase.com/photos/complete.jpg';
+      const photoUrl = '/api/uploads/maintenance-attachments/complete.jpg';
       const notes = 'All requirements met';
       const existingStep = createMockStep(1);
       const updatedStep = createMockStep(1, {
@@ -440,7 +440,7 @@ describe('VerificationService - TDD', () => {
 
     it('should preserve existing data when partially updating step', async () => {
       // Arrange
-      const photoUrl = 'https://storage.firebase.com/photos/original.jpg';
+      const photoUrl = '/api/uploads/maintenance-attachments/original.jpg';
       const existingStep = createMockStep(1, {
         is_complete: true,
         completed_by: mockUserId,
@@ -746,7 +746,7 @@ describe('VerificationService - TDD', () => {
 
     it('should track photo verification status separately from completion', async () => {
       // Arrange
-      const photoUrl = 'https://storage.firebase.com/photos/test.jpg';
+      const photoUrl = '/api/uploads/maintenance-attachments/test.jpg';
       const existingStep = createMockStep(1, {
         photo_url: photoUrl,
         is_complete: true,

@@ -1,46 +1,39 @@
 {
-  "session_id": "2026-01-22-dark-mode-fouc-fix",
-  "started_at": "2026-01-22T00:00:00Z",
-  "last_updated": "2026-01-22T02:45:09.929Z",
+  "session_id": "2026-01-22-confirmation-rule",
+  "started_at": "2026-01-22T05:30:00Z",
+  "last_updated": "2026-01-22T03:37:17.564Z",
   "working_on": {
-    "task": "Dark mode FOUC fix",
+    "task": "System-wide confirmation rule for toast notifications",
     "status": "completed",
     "progress": [
-      "Fixed dark mode flash on App Router pages",
-      "Added inline blocking script to app/layout.tsx",
-      "Script reads localStorage and applies theme before hydration",
-      "Set inline background-color on body for immediate dark paint",
-      "Updated layout .claude.md with FOUC fix documentation",
-      "Created src/config/.claude.md for theme system docs",
-      "Updated UI_UX_STANDARD.md with dark mode guidelines",
-      "Deployed to staging (vf.fibreflow.app)"
+      "Added confirmation-before-success rule to CLAUDE.md",
+      "Updated import-oes.ts to poll QField sync status (60s timeout)",
+      "Updated OESImportTab.tsx to show conditional checkmarks",
+      "Committed changes (20ecd466)",
+      "Deployed to staging (vf.fibreflow.app)",
+      "Verified staging health - all 6 services healthy",
+      "Ran /kb - all 42 modules have .claude.md"
     ],
-    "last_action": "KB and theme spec update"
-  },
-  "dark_mode_fix": {
-    "files_modified": [
-      "app/layout.tsx",
-      "src/components/layout/.claude.md",
-      "src/config/.claude.md",
-      "docs/standards/UI_UX_STANDARD.md"
-    ],
-    "key_learnings": [
-      "FOUC caused by useEffect applying theme after initial paint",
-      "Fix: inline blocking script before React hydration",
-      "Both App Router and Pages Router need the fix",
-      "Default to dark theme (matches DEFAULT_THEME constant)"
-    ]
+    "last_action": "KB scan complete - 100% coverage"
   },
   "kb_scan_results": {
-    "timestamp": "2026-01-22T04:30:00Z",
-    "total_modules": 43,
-    "modules_with_claude_md": 43,
+    "timestamp": "2026-01-22T05:40:00Z",
+    "total_modules": 42,
+    "modules_with_claude_md": 42,
     "coverage": "100%",
-    "learnings_consolidated": 1,
-    "updated_modules": [
-      "layout",
-      "config"
-    ]
+    "learnings_pending": 1,
+    "learnings_note": "activate module has 1 entry from today (port conflict fix) - not yet 7 days old"
+  },
+  "system_rules_added": {
+    "confirmation_before_success": {
+      "added": "2026-01-22",
+      "location": "CLAUDE.md > Coding Standards",
+      "principle": "Toast notifications must wait for actual confirmation before showing approval checkmarks",
+      "examples": [
+        "import-oes.ts: Polls QField sync status before returning",
+        "OESImportTab.tsx: Conditional checkmarks based on confirmed status"
+      ]
+    }
   },
   "context": {
     "project": "FibreFlow",
@@ -48,11 +41,7 @@
   },
   "infrastructure": {
     "server": "100.96.203.105 (Velocity)",
-    "vlm": "Qwen3-VL-8B on port 8100",
-    "qfield_webhook": "port 8095",
-    "database": "Neon PostgreSQL (production branch)",
     "staging": "vf.fibreflow.app:3006",
-    "dev": "dev.fibreflow.app",
     "production": "app.fibreflow.app:3000"
   }
 }
