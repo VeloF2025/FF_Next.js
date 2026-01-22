@@ -18,6 +18,7 @@ import {
   UserMinus,
   Users
 } from 'lucide-react';
+import { StaffAlertsPanel } from '@/components/staff/StaffAlertsPanel';
 
 type StaffStatusType = 'active' | 'inactive' | 'on_leave' | 'suspended' | 'terminated' | 'resigned' | 'retired';
 
@@ -252,6 +253,9 @@ export default function StaffPage() {
             </Button>
           </div>
         </div>
+
+        {/* Staff Alerts Panel */}
+        <StaffAlertsPanel defaultExpanded={false} />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

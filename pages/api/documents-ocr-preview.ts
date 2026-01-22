@@ -31,6 +31,99 @@ import { validateDocument, type ValidationResult } from '@/services/staff/docume
 const MAX_IMAGE_WIDTH = 1280;
 const MAX_IMAGE_HEIGHT = 960;
 
+/**
+ * Cross-validate SA ID number against DOB
+ * SA ID format: YYMMDD SSSS C A Z
+ * - First 6 digits = Date of Birth (YYMMDD)
+ * - If DOB is extracted separately, we can cross-check and correct OCR errors
+ */
+interface IdCrossValidationResult {
+  mismatch: boolean;
+  corrected: boolean;
+  correctedId?: string;
+  reason: string;
+}
+
+function crossValidateSaIdWithDob(idNumber: string, dateOfBirth: string): IdCrossValidationResult {
+  // Clean the ID number (remove spaces/dashes)
+  const cleanId = (idNumber || '').replace(/[\s\-]/g, '');
+
+  // Parse DOB (expected format: YYYY-MM-DD)
+  const dobMatch = (dateOfBirth || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!dobMatch) {
+    return { mismatch: false, corrected: false, reason: 'DOB format not recognized' };
+  }
+
+  const [, year, month, day] = dobMatch;
+  const yy = year.slice(-2); // Last 2 digits of year
+  const expectedDobPrefix = `${yy}${month}${day}`; // YYMMDD
+
+  // Check if ID number has at least 13 digits
+  if (cleanId.length !== 13) {
+    return { mismatch: false, corrected: false, reason: `ID number length is ${cleanId.length}, expected 13` };
+  }
+
+  const idDobPrefix = cleanId.substring(0, 6);
+
+  // If prefixes match, no correction needed
+  if (idDobPrefix === expectedDobPrefix) {
+    return { mismatch: false, corrected: false, reason: 'ID and DOB match correctly' };
+  }
+
+  // Mismatch detected - try to correct the ID based on DOB
+  // The DOB from separate field extraction is often more reliable than ID number OCR
+  // because DOB is typically printed in larger, clearer text
+
+  // Calculate what the corrected ID would be
+  const correctedId = expectedDobPrefix + cleanId.substring(6);
+
+  // Validate the corrected ID passes Luhn check (SA ID checksum)
+  if (isValidSaIdChecksum(correctedId)) {
+    return {
+      mismatch: true,
+      corrected: true,
+      correctedId,
+      reason: `ID DOB prefix "${idDobPrefix}" corrected to "${expectedDobPrefix}" based on extracted DOB (${dateOfBirth}). Checksum valid.`,
+    };
+  }
+
+  // If corrected ID fails checksum, don't auto-correct but flag the mismatch
+  return {
+    mismatch: true,
+    corrected: false,
+    reason: `ID DOB prefix "${idDobPrefix}" doesn't match extracted DOB "${expectedDobPrefix}" (${dateOfBirth}). Auto-correction failed checksum validation.`,
+  };
+}
+
+/**
+ * Validate SA ID number using Luhn algorithm (mod 10 checksum)
+ * The last digit of SA ID is a check digit
+ */
+function isValidSaIdChecksum(idNumber: string): boolean {
+  if (idNumber.length !== 13 || !/^\d+$/.test(idNumber)) {
+    return false;
+  }
+
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    let digit = parseInt(idNumber[i], 10);
+
+    // Double every second digit (from right, so odd positions from left in 0-indexed)
+    if (i % 2 === 1) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+
+    sum += digit;
+  }
+
+  // Check digit should make total divisible by 10
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(idNumber[12], 10);
+}
+
 // VLLM endpoint for Qwen3-VL
 const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
 
@@ -653,6 +746,50 @@ export default async function handler(
             value,
             confidence: 0.95, // VLM typically has high confidence
             validated: true,
+          };
+        }
+      }
+
+      // Cross-validate SA ID number against DOB for SA ID documents
+      if ((documentType === 'sa_id' || documentType === 'id_document') && extractedFields.documentNumber && extractedFields.dateOfBirth) {
+        const crossValidation = crossValidateSaIdWithDob(
+          extractedFields.documentNumber.value,
+          extractedFields.dateOfBirth.value
+        );
+
+        if (crossValidation.corrected) {
+          log.info('SA ID cross-validation applied correction', {
+            original: extractedFields.documentNumber.value,
+            corrected: crossValidation.correctedId,
+            dob: extractedFields.dateOfBirth.value,
+            reason: crossValidation.reason,
+          });
+
+          // Update the ID number with corrected value
+          extractedFields.documentNumber = {
+            value: crossValidation.correctedId,
+            confidence: 0.90, // Slightly lower confidence for corrected values
+            validated: true,
+          };
+
+          // Add a note about the correction
+          extractedFields._idCorrectionNote = {
+            value: crossValidation.reason,
+            confidence: 1.0,
+            validated: true,
+          };
+        } else if (crossValidation.mismatch) {
+          log.warn('SA ID / DOB mismatch detected but could not auto-correct', {
+            id: extractedFields.documentNumber.value,
+            dob: extractedFields.dateOfBirth.value,
+            reason: crossValidation.reason,
+          });
+
+          // Flag the mismatch for manual review
+          extractedFields._idValidationWarning = {
+            value: crossValidation.reason,
+            confidence: 1.0,
+            validated: false,
           };
         }
       }
