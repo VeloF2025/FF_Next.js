@@ -393,5 +393,52 @@ This standard is MANDATORY and will be:
 
 ---
 
-*Last Updated: 2025-08-23*
+## 🌙 DARK MODE STANDARD (Jan 2026)
+
+### Theme Variables (MANDATORY)
+Always use CSS custom properties for theme-aware colors:
+
+```tsx
+// ✅ CORRECT - Uses theme variables
+className="bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]"
+className="border-[var(--ff-border-light)]"
+
+// ❌ WRONG - Hardcoded colors
+className="bg-gray-900 text-white"
+className="border-gray-700"
+```
+
+### Common Theme Variables
+| Variable | Purpose | Dark Value |
+|----------|---------|------------|
+| `--ff-bg-primary` | Main background | `#1a1d23` |
+| `--ff-bg-secondary` | Card/panel bg | `#21242c` |
+| `--ff-bg-tertiary` | Input/elevated bg | `#2a2e38` |
+| `--ff-text-primary` | Main text | `#f3f4f6` |
+| `--ff-text-secondary` | Muted text | `#9ca3af` |
+| `--ff-border-light` | Subtle borders | `#374151` |
+
+### FOUC Prevention
+**Critical for App Router pages:** Both `pages/_document.tsx` and `app/layout.tsx` contain inline blocking scripts that apply the theme before React hydrates. DO NOT remove these scripts.
+
+### Dark Mode Best Practices
+1. **Always use CSS variables** - Never hardcode colors
+2. **Test both themes** - Verify light mode still works
+3. **Check form controls** - `color-scheme: dark` makes native inputs dark
+4. **Status badges** - Use opacity variants (`bg-green-500/20 text-green-400`)
+
+### Status Badge Colors (Dark Mode)
+```tsx
+const darkModeStatusColors = {
+  active: 'bg-green-500/20 text-green-400',
+  inactive: 'bg-gray-500/20 text-gray-400',
+  pending: 'bg-yellow-500/20 text-yellow-400',
+  completed: 'bg-blue-500/20 text-blue-400',
+  cancelled: 'bg-red-500/20 text-red-400',
+};
+```
+
+---
+
+*Last Updated: 2026-01-22*
 *Status: ACTIVE - All new development must follow these standards*

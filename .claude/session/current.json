@@ -1,48 +1,45 @@
 {
-  "session_id": "2026-01-22-procurement-menu-restructure",
+  "session_id": "2026-01-22-dark-mode-fouc-fix",
   "started_at": "2026-01-22T00:00:00Z",
-  "last_updated": "2026-01-22T02:00:05.153Z",
+  "last_updated": "2026-01-22T02:45:09.929Z",
   "working_on": {
-    "task": "Procurement menu restructure",
+    "task": "Dark mode FOUC fix",
     "status": "completed",
     "progress": [
-      "Restructured procurement from 17 nested items to 6 flat menu items",
-      "Created Sourcing page with 3 tabs (Suppliers, BOQ, RFQ)",
-      "Created Purchasing page with 4 tabs (Quotes, Requisitions, PO, GRN)",
-      "Created Inventory page with 6 tabs (Stock, Items, Categories, Bundles, Takes, Field)",
-      "Created Financial page with 2 tabs (Budget, Cost Centers)",
-      "Created useTabPersistence hook for URL + localStorage sync",
-      "Added 15 redirects for backward compatibility",
+      "Fixed dark mode flash on App Router pages",
+      "Added inline blocking script to app/layout.tsx",
+      "Script reads localStorage and applies theme before hydration",
+      "Set inline background-color on body for immediate dark paint",
+      "Updated layout .claude.md with FOUC fix documentation",
+      "Created src/config/.claude.md for theme system docs",
+      "Updated UI_UX_STANDARD.md with dark mode guidelines",
       "Deployed to staging (vf.fibreflow.app)"
     ],
-    "last_action": "KB update via /kb"
+    "last_action": "KB and theme spec update"
   },
-  "procurement_restructure": {
-    "menu_items": [
-      "Dashboard",
-      "Sourcing",
-      "Purchasing",
-      "Inventory",
-      "Financial",
-      "Approvals"
+  "dark_mode_fix": {
+    "files_modified": [
+      "app/layout.tsx",
+      "src/components/layout/.claude.md",
+      "src/config/.claude.md",
+      "docs/standards/UI_UX_STANDARD.md"
     ],
-    "hook": "useTabPersistence",
-    "redirects_added": 15,
-    "pages_created": [
-      "pages/procurement/sourcing/index.tsx",
-      "pages/procurement/purchasing/index.tsx",
-      "pages/procurement/inventory/index.tsx",
-      "pages/procurement/financial/index.tsx"
+    "key_learnings": [
+      "FOUC caused by useEffect applying theme after initial paint",
+      "Fix: inline blocking script before React hydration",
+      "Both App Router and Pages Router need the fix",
+      "Default to dark theme (matches DEFAULT_THEME constant)"
     ]
   },
   "kb_scan_results": {
-    "timestamp": "2026-01-22T00:12:00Z",
-    "total_modules": 42,
-    "modules_with_claude_md": 42,
+    "timestamp": "2026-01-22T04:30:00Z",
+    "total_modules": 43,
+    "modules_with_claude_md": 43,
     "coverage": "100%",
-    "learnings_consolidated": 0,
+    "learnings_consolidated": 1,
     "updated_modules": [
-      "procurement"
+      "layout",
+      "config"
     ]
   },
   "context": {
