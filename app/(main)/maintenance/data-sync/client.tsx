@@ -48,6 +48,7 @@ interface WeeklyReport {
 function ImportHistory() {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
@@ -66,22 +67,32 @@ function ImportHistory() {
     setExpandedRowId(expandedRowId === reportId ? null : reportId);
   };
 
-  useEffect(() => {
-    async function fetchHistory() {
-      try {
-        const response = await fetch('/api/maintenance/import/weekly/history');
-        const data = await response.json();
-        if (data.success) {
-          setReports(data.data.reports || []);
-        } else {
-          setError(data.error?.message || 'Failed to fetch history');
-        }
-      } catch (err) {
-        setError('Failed to fetch import history');
-      } finally {
-        setLoading(false);
+  // Fetch history function (reusable for refresh)
+  const fetchHistory = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const response = await fetch('/api/maintenance/import/weekly/history');
+      const data = await response.json();
+      if (data.success) {
+        setReports(data.data.reports || []);
+        setError(null);
+      } else {
+        setError(data.error?.message || 'Failed to fetch history');
       }
+    } catch (err) {
+      setError('Failed to fetch import history');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  // Refresh handler
+  const handleRefresh = () => {
+    fetchHistory(true);
+  };
+
+  useEffect(() => {
     fetchHistory();
   }, []);
 
@@ -133,24 +144,40 @@ function ImportHistory() {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-[var(--ff-border-light)]">
-            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Report</th>
-            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">File</th>
-            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
-            <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Rows</th>
-            <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Imported</th>
-            <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Errors</th>
-            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Date</th>
-          </tr>
-        </thead>
+    <div className="space-y-4">
+      {/* Refresh Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--ff-text-primary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)] transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--ff-border-light)]">
+              <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Report</th>
+              <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">File</th>
+              <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
+              <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Rows</th>
+              <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">New</th>
+              <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium" title="Existing tickets updated">Duplicates</th>
+              <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Errors</th>
+              <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Date</th>
+            </tr>
+          </thead>
         <tbody>
           {reports.map((report) => {
             const errors = parseErrors(report.error_message);
             const isExpanded = expandedRowId === report.id;
             const hasErrors = report.error_count > 0;
+            // Calculate duplicates: total - new - errors
+            const duplicateCount = Math.max(0, report.total_rows - report.imported_count - report.error_count);
 
             return (
               <React.Fragment key={report.id}>
@@ -167,6 +194,7 @@ function ImportHistory() {
                   </td>
                   <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">{report.total_rows}</td>
                   <td className="py-3 px-4 text-right text-green-500">{report.imported_count}</td>
+                  <td className="py-3 px-4 text-right text-blue-400">{duplicateCount}</td>
                   <td className="py-3 px-4 text-right">
                     {hasErrors ? (
                       <button
@@ -188,7 +216,7 @@ function ImportHistory() {
                 {/* Expandable Error Details */}
                 {isExpanded && hasErrors && (
                   <tr>
-                    <td colSpan={7} className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
+                    <td colSpan={8} className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
                       <div className="p-4">
                         <h4 className="text-sm font-semibold text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -238,6 +266,7 @@ function ImportHistory() {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
