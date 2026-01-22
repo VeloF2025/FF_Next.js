@@ -184,7 +184,11 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
 
       setImportResult(result);
 
-      // Show success toast with database sync confirmations
+      // Show success toast with CONFIRMED sync statuses only
+      // IMPORTANT: Only show checkmarks when we have actual confirmation
+      const dbConfirmed = result.dbSyncConfirmed === true;
+      const qfieldConfirmed = result.qfieldSyncStatus?.success === true;
+
       toast.custom(
         (t) => (
           <div
@@ -195,26 +199,51 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0 pt-0.5">
-                  <CheckCircle className="h-10 w-10 text-green-500" />
+                  {dbConfirmed && qfieldConfirmed ? (
+                    <CheckCircle className="h-10 w-10 text-green-500" />
+                  ) : dbConfirmed ? (
+                    <AlertCircle className="h-10 w-10 text-yellow-500" />
+                  ) : (
+                    <XCircle className="h-10 w-10 text-red-500" />
+                  )}
                 </div>
                 <div className="ml-3 flex-1">
                   <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    OES Import Complete
+                    {dbConfirmed && qfieldConfirmed
+                      ? 'OES Import Complete'
+                      : dbConfirmed
+                      ? 'OES Import Partial'
+                      : 'OES Import Failed'}
                   </p>
                   <div className="mt-2 space-y-1">
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                       <Database className="h-4 w-4 text-blue-500" />
                       <span>Uploaded to FibreFlow Database</span>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      {dbConfirmed ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                       <CloudCog className="h-4 w-4 text-purple-500" />
-                      <span>Synced to QField Database</span>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>
+                        {qfieldConfirmed
+                          ? 'Synced to QField Database'
+                          : result.qfieldSyncStatus?.message || 'QField sync failed'}
+                      </span>
+                      {qfieldConfirmed ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
                     </div>
                   </div>
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     {result.totalRows.toLocaleString()} records processed
+                    {qfieldConfirmed && result.qfieldSyncStatus?.recordCount && (
+                      <span> • {result.qfieldSyncStatus.recordCount.toLocaleString()} synced to QField</span>
+                    )}
                   </p>
                 </div>
               </div>

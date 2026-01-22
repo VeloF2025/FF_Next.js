@@ -410,7 +410,13 @@ export default async function handler(
 
       log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, errors: errors.length });
 
-      // Trigger QField sync (fire-and-forget) - Added Jan 2026
+      // Trigger QField sync and WAIT for confirmation - Updated Jan 2026
+      // IMPORTANT: Only show success confirmation after actual confirmation received
+      let qfieldSyncStatus: { success: boolean; message: string; recordCount?: number } = {
+        success: false,
+        message: 'QField sync not attempted'
+      };
+
       try {
         const syncPayload = {
           batchId,
@@ -420,27 +426,99 @@ export default async function handler(
           timestamp: new Date().toISOString()
         };
 
-        log.info('OESImport', 'Triggering QField sync webhook', syncPayload);
+        log.info('OESImport', 'Triggering QField sync webhook (awaiting confirmation)', syncPayload);
 
-        fetch('http://100.96.203.105:8095/sync/oes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(syncPayload)
-        })
-        .then(async (response) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
+        try {
+          const response = await fetch('http://100.96.203.105:8095/sync/oes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(syncPayload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
           if (response.ok) {
             const result = await response.json();
-            log.info('OESImport', 'QField sync triggered successfully', result);
+            log.info('OESImport', 'QField sync webhook responded', result);
+
+            // The webhook triggers sync in background, so we need to poll for completion
+            // Poll the status endpoint for up to 60 seconds
+            const maxWaitMs = 60000;
+            const pollIntervalMs = 3000;
+            const startTime = Date.now();
+
+            while (Date.now() - startTime < maxWaitMs) {
+              await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+
+              try {
+                const statusResponse = await fetch('http://100.96.203.105:8095/status');
+                if (statusResponse.ok) {
+                  const status = await statusResponse.json();
+                  log.info('OESImport', 'QField sync status poll', status);
+
+                  // Check if sync completed (last_sync updated recently)
+                  if (status.last_sync) {
+                    const lastSyncTime = new Date(status.last_sync).getTime();
+                    const syncStartTime = new Date(syncPayload.timestamp).getTime();
+
+                    // If last_sync is after our sync started, it's done
+                    if (lastSyncTime >= syncStartTime - 5000) {
+                      qfieldSyncStatus = {
+                        success: status.last_status === 'success',
+                        message: status.last_status === 'success'
+                          ? `Synced ${status.last_record_count || 0} records to QFieldCloud`
+                          : status.last_error || 'Sync completed with issues',
+                        recordCount: status.last_record_count
+                      };
+                      log.info('OESImport', 'QField sync confirmed complete', qfieldSyncStatus);
+                      break;
+                    }
+                  }
+                }
+              } catch (pollError) {
+                log.warn('OESImport', 'QField status poll failed', pollError);
+              }
+            }
+
+            // If we timed out waiting, still mark as triggered
+            if (!qfieldSyncStatus.success && qfieldSyncStatus.message === 'QField sync not attempted') {
+              qfieldSyncStatus = {
+                success: false,
+                message: 'QField sync triggered but confirmation timed out - check QField app'
+              };
+            }
           } else {
-            log.warn('OESImport', `QField sync webhook returned ${response.status}`);
+            qfieldSyncStatus = {
+              success: false,
+              message: `QField sync webhook returned ${response.status}`
+            };
+            log.warn('OESImport', qfieldSyncStatus.message);
           }
-        })
-        .catch((error) => {
-          log.warn('OESImport', 'QField sync webhook failed (non-blocking)', error.message);
-        });
+        } catch (fetchError: unknown) {
+          clearTimeout(timeoutId);
+          const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+          if (errorMessage.includes('aborted')) {
+            qfieldSyncStatus = {
+              success: false,
+              message: 'QField sync timed out after 2 minutes'
+            };
+          } else {
+            qfieldSyncStatus = {
+              success: false,
+              message: `QField sync failed: ${errorMessage}`
+            };
+          }
+          log.warn('OESImport', 'QField sync webhook failed', errorMessage);
+        }
       } catch (error) {
-        // Non-blocking - don't fail import if webhook fails
         log.error('OESImport', 'Failed to call QField sync webhook', error);
+        qfieldSyncStatus = {
+          success: false,
+          message: 'QField sync failed unexpectedly'
+        };
       }
 
       // === SHAREPOINT FOLDER VERIFICATION (Fire-and-forget) ===
@@ -496,6 +574,9 @@ export default async function handler(
         oesOnlyCreated: oesOnlyDRs.length,
         errors,
         batchId,
+        // Confirmation statuses - only true when actually confirmed
+        dbSyncConfirmed: true, // DB insert/update completed if we got here
+        qfieldSyncStatus,
       });
     }
 

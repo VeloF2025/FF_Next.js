@@ -138,6 +138,36 @@ node scripts/sow-import/verify-fibre-louissep15.cjs
 - Type organization by module
 - Domain-focused services
 
+### 🚨 CRITICAL: Confirmation Before Success Display
+**System-wide rule (Jan 2026):** Toast notifications and any success confirmations must WAIT for actual confirmation before showing approval checkmarks.
+
+**Principle:** Never show success (checkmarks, green indicators) until the operation is actually confirmed complete.
+
+**Pattern:**
+```typescript
+// ❌ WRONG - Fire and forget, shows success immediately
+await triggerSync();
+toast.success("Sync complete ✓");  // Lies! We don't know if it worked
+
+// ✅ CORRECT - Wait for confirmation, then show status
+const result = await triggerSyncWithConfirmation();
+if (result.confirmed) {
+  toast.success("Sync complete ✓");
+} else {
+  toast.error("Sync failed: " + result.error);
+}
+```
+
+**Applies to:**
+- Database inserts/updates - wait for DB confirmation
+- External API syncs (QField, WhatsApp, etc.) - poll for status if async
+- File uploads - wait for storage confirmation
+- Any async operation shown to user
+
+**Implementation Examples:**
+- `import-oes.ts`: Polls QField sync status for up to 60s before returning
+- `OESImportTab.tsx`: Shows conditional checkmarks based on `dbSyncConfirmed` and `qfieldSyncStatus.success`
+
 ### API Route Naming
 **Consistent dynamic parameters required:**
 ```bash
