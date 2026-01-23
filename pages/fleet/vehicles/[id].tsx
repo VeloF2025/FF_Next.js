@@ -41,6 +41,8 @@ import {
   Pencil,
   Receipt,
   ImageIcon,
+  Search,
+  Upload,
 } from 'lucide-react';
 import type {
   VehicleDocument,
@@ -214,6 +216,7 @@ interface StaffOption {
   name: string;
   email: string | null;
   hasValidLicense: boolean;
+  licenseExpiry: string | null;
   hasVehicle: boolean;
 }
 
@@ -2632,6 +2635,9 @@ export default function VehicleDetailPage() {
   const [assigning, setAssigning] = useState(false);
   const [unassigning, setUnassigning] = useState(false);
   const [showLicenseUpload, setShowLicenseUpload] = useState(false);
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [uploadForStaffId, setUploadForStaffId] = useState<string | null>(null);
+  const [uploadForStaffName, setUploadForStaffName] = useState<string | null>(null);
 
   // Set initial tab from URL
   useEffect(() => {
@@ -3547,8 +3553,12 @@ export default function VehicleDetailPage() {
       {/* Driver License Upload Modal */}
       {showLicenseUpload && (
         <DriverLicenseUploadModal
+          staffId={uploadForStaffId || undefined}
+          staffName={uploadForStaffName || undefined}
           onSuccess={async () => {
             setShowLicenseUpload(false);
+            setUploadForStaffId(null);
+            setUploadForStaffName(null);
             // Refresh available staff list
             const res = await fetch('/api/fleet/available-drivers');
             if (res.ok) {
@@ -3557,15 +3567,19 @@ export default function VehicleDetailPage() {
             }
             toast.success("Driver's license uploaded successfully");
           }}
-          onClose={() => setShowLicenseUpload(false)}
+          onClose={() => {
+            setShowLicenseUpload(false);
+            setUploadForStaffId(null);
+            setUploadForStaffName(null);
+          }}
         />
       )}
 
-      {/* Assign Driver Modal */}
+      {/* Assign Driver Modal - Improved UX with searchable list */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-6 border-b border-[var(--ff-border-light)]">
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+            <div className="p-4 border-b border-[var(--ff-border-light)] shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                   Assign Driver to {vehicle.registration}
@@ -3574,6 +3588,7 @@ export default function VehicleDetailPage() {
                   onClick={() => {
                     setShowAssignModal(false);
                     setSelectedStaffId('');
+                    setStaffSearchQuery('');
                   }}
                   className="p-1 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
                 >
@@ -3581,81 +3596,161 @@ export default function VehicleDetailPage() {
                 </button>
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-4 flex-1 overflow-hidden flex flex-col">
               {loadingStaff ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-8 h-8 text-[var(--ff-text-tertiary)] animate-spin" />
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
-                      Select Staff Member
-                    </label>
-                    <select
-                      value={selectedStaffId}
-                      onChange={(e) => setSelectedStaffId(e.target.value)}
-                      className="w-full px-3 py-2 bg-[#1a1d23] text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 hover:border-gray-500"
-                    >
-                      <option value="">Choose a staff member...</option>
-                      {availableStaff
-                        .filter(s => s.hasValidLicense)
-                        .map((staff) => (
-                          <option key={staff.id} value={staff.id}>
-                            {staff.name} {staff.hasVehicle ? '(has vehicle)' : ''}
-                          </option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
-                      Only staff with valid driver&apos;s license are shown
+                <>
+                  {/* Search box */}
+                  <div className="mb-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                      <input
+                        type="text"
+                        value={staffSearchQuery}
+                        onChange={(e) => setStaffSearchQuery(e.target.value)}
+                        placeholder="Search employees..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-[var(--ff-primary)] focus:border-[var(--ff-primary)]"
+                      />
+                    </div>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1.5">
+                      Select a driver with valid license, or upload license for employees without one
                     </p>
                   </div>
-                  {availableStaff.filter(s => !s.hasValidLicense).length > 0 && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-yellow-800">
-                          <AlertTriangle className="w-4 h-4 inline mr-1" />
-                          {availableStaff.filter(s => !s.hasValidLicense).length} staff member(s) hidden due to missing/invalid license
-                        </p>
-                        <button
-                          onClick={() => setShowLicenseUpload(true)}
-                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+
+                  {/* Staff list */}
+                  <div className="flex-1 overflow-y-auto space-y-2">
+                    {availableStaff
+                      .filter(staff =>
+                        staff.name.toLowerCase().includes(staffSearchQuery.toLowerCase())
+                      )
+                      .sort((a, b) => {
+                        // Sort: with license first, then alphabetically
+                        if (a.hasValidLicense && !b.hasValidLicense) return -1;
+                        if (!a.hasValidLicense && b.hasValidLicense) return 1;
+                        return a.name.localeCompare(b.name);
+                      })
+                      .map((staff) => (
+                        <div
+                          key={staff.id}
+                          className={`p-3 rounded-lg border transition-all ${
+                            selectedStaffId === staff.id
+                              ? 'border-[var(--ff-primary)] bg-[var(--ff-primary)]/10'
+                              : staff.hasValidLicense
+                              ? 'border-[var(--ff-border-light)] hover:border-[var(--ff-primary)] hover:bg-[var(--ff-bg-tertiary)] cursor-pointer'
+                              : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]'
+                          }`}
+                          onClick={() => {
+                            if (staff.hasValidLicense) {
+                              setSelectedStaffId(staff.id);
+                            }
+                          }}
                         >
-                          Upload License
-                        </button>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                                staff.hasValidLicense
+                                  ? 'bg-green-500/10'
+                                  : 'bg-amber-500/10'
+                              }`}>
+                                <User className={`w-4 h-4 ${
+                                  staff.hasValidLicense
+                                    ? 'text-green-500'
+                                    : 'text-amber-500'
+                                }`} />
+                              </div>
+                              <div>
+                                <p className="font-medium text-[var(--ff-text-primary)]">
+                                  {staff.name}
+                                </p>
+                                <p className="text-xs text-[var(--ff-text-secondary)]">
+                                  {staff.hasVehicle && (
+                                    <span className="text-amber-500 mr-2">
+                                      <Car className="w-3 h-3 inline mr-0.5" />
+                                      Has vehicle
+                                    </span>
+                                  )}
+                                  {staff.licenseExpiry && (
+                                    <span>Expires: {new Date(staff.licenseExpiry).toLocaleDateString()}</span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {staff.hasValidLicense ? (
+                                <>
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-500 rounded text-xs font-medium">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Licensed
+                                  </span>
+                                  {selectedStaffId === staff.id && (
+                                    <CheckCircle className="w-5 h-5 text-[var(--ff-primary)]" />
+                                  )}
+                                </>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setUploadForStaffId(staff.id);
+                                    setUploadForStaffName(staff.name);
+                                    setShowLicenseUpload(true);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 rounded text-xs font-medium transition-colors"
+                                >
+                                  <Upload className="w-3 h-3" />
+                                  Upload License
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    {availableStaff.filter(staff =>
+                      staff.name.toLowerCase().includes(staffSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-center py-8 text-[var(--ff-text-secondary)]">
+                        No employees found matching &ldquo;{staffSearchQuery}&rdquo;
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
-            <div className="p-6 border-t border-[var(--ff-border-light)] flex items-center justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowAssignModal(false);
-                  setSelectedStaffId('');
-                }}
-                className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAssignDriver}
-                disabled={!selectedStaffId || assigning}
-                className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {assigning ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Assigning...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Assign Driver
-                  </>
-                )}
-              </button>
+            <div className="p-4 border-t border-[var(--ff-border-light)] flex items-center justify-between shrink-0">
+              <p className="text-xs text-[var(--ff-text-secondary)]">
+                {availableStaff.filter(s => s.hasValidLicense).length} licensed / {availableStaff.length} total
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setSelectedStaffId('');
+                    setStaffSearchQuery('');
+                  }}
+                  className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors text-[var(--ff-text-primary)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssignDriver}
+                  disabled={!selectedStaffId || assigning}
+                  className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {assigning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Assigning...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Assign Driver
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
