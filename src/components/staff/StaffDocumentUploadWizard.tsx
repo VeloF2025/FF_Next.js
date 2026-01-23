@@ -119,19 +119,22 @@ interface StaffDocumentUploadWizardProps {
   staffId: string;
   onSuccess: () => void;
   onCancel: () => void;
+  /** Pre-select a document type and skip type selection step */
+  preSelectedType?: DocumentType;
 }
 
 export function StaffDocumentUploadWizard({
   staffId,
   onSuccess,
   onCancel,
+  preSelectedType,
 }: StaffDocumentUploadWizardProps) {
-  // Wizard state
+  // Wizard state - if preSelectedType provided, skip to file_upload
   const [state, setState] = useState<WizardState>({
-    currentStep: 'select_type',
+    currentStep: preSelectedType ? 'file_upload' : 'select_type',
     file: null,
     ocrResult: null,
-    selectedDocumentType: null,
+    selectedDocumentType: preSelectedType || null,
     documentName: '',
     extractedFields: {},
     fieldOverrides: {},

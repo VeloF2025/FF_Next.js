@@ -25,7 +25,7 @@ const VALID_ITEM_IDS = [
 ];
 
 const DEFAULT_ITEMS = ['meetings', 'action-items'];
-const MAX_ITEMS = 4; // Dashboard is always pinned, plus 4 custom items
+const MAX_ITEMS = 5; // Dashboard is always pinned, plus 5 custom items
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // TODO: Replace with proper Clerk auth when ready for production

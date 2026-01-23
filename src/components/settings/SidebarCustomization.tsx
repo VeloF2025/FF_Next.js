@@ -49,7 +49,7 @@ const AVAILABLE_ITEMS: CustomizableItem[] = [
 ];
 
 const DEFAULT_ITEMS = ['meetings', 'action-items'];
-const MAX_ITEMS = 4;
+const MAX_ITEMS = 5;
 
 export function SidebarCustomization() {
   const [selectedItems, setSelectedItems] = useState<string[]>(DEFAULT_ITEMS);

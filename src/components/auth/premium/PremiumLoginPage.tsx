@@ -1,12 +1,13 @@
 /**
  * PremiumLoginPage - High-tech login page with fiber background, glass card, and quotes
  * Features: FiberBackground, GlassCard aurora variant, VelocityInput/Button, motivational quotes
+ * Supports: Multi-step flow for first-time users and returning users
  */
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, ArrowLeft, Check, User } from 'lucide-react';
 import { FiberBackground } from './FiberBackground';
 import { QuoteDisplay } from './QuoteDisplay';
 import { BrandHeader } from './BrandHeader';
@@ -15,12 +16,27 @@ import { VelocityInput } from '@/components/ui/VelocityInput';
 import { VelocityButton } from '@/components/ui/VelocityButton';
 import { getRandomQuote, MotivationalQuote } from '@/data/motivational-quotes';
 
+type AuthStep = 'email' | 'password' | 'setup-password';
+type EmailStatus = 'STAFF_NOT_FOUND' | 'FIRST_TIME_USER' | 'PASSWORD_REQUIRED' | 'PASSWORD_SETUP_REQUIRED' | 'USER_DISABLED';
+
+interface StaffInfo {
+  id: string;
+  firstName: string;
+  lastName: string;
+  position?: string;
+  department?: string;
+}
+
 export function PremiumLoginPage() {
   const router = useRouter();
+  const [step, setStep] = useState<AuthStep>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState<string>('');
   const [quote, setQuote] = useState<MotivationalQuote | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -30,7 +46,54 @@ export function PremiumLoginPage() {
     setQuote(getRandomQuote());
   }, []);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleEmailSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setError(data.error?.message || 'An error occurred');
+        return;
+      }
+
+      const status: EmailStatus = data.data.status;
+      setWelcomeMessage(data.data.message);
+      setStaffInfo(data.data.staff || null);
+
+      switch (status) {
+        case 'STAFF_NOT_FOUND':
+          setError('This email is not registered in the system. Please contact your administrator.');
+          break;
+        case 'USER_DISABLED':
+          setError('Your account has been disabled. Please contact your administrator.');
+          break;
+        case 'FIRST_TIME_USER':
+        case 'PASSWORD_SETUP_REQUIRED':
+          setStep('setup-password');
+          break;
+        case 'PASSWORD_REQUIRED':
+          setStep('password');
+          break;
+        default:
+          setError('Unknown status. Please try again.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -46,7 +109,7 @@ export function PremiumLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || 'Login failed');
+        setError(data.error?.message || 'Login failed');
         return;
       }
 
@@ -60,10 +123,265 @@ export function PremiumLoginPage() {
     }
   };
 
+  const handleSetupPasswordSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/setup-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, confirmPassword }),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error?.message || 'Password setup failed');
+        return;
+      }
+
+      // Redirect to dashboard on success (auto-logged in)
+      const returnUrl = (router.query.returnUrl as string) || '/';
+      router.push(returnUrl);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBack = () => {
+    setStep('email');
+    setPassword('');
+    setConfirmPassword('');
+    setError(null);
+    setStaffInfo(null);
+    setWelcomeMessage('');
+  };
+
+  const renderStepIndicator = () => {
+    if (step === 'email') return null;
+
+    return (
+      <button
+        type="button"
+        onClick={handleBack}
+        className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span className="text-sm">Back to email</span>
+      </button>
+    );
+  };
+
+  const renderWelcomeBanner = () => {
+    if (!staffInfo || step === 'email') return null;
+
+    return (
+      <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+            <User className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-emerald-200 font-medium">
+              {staffInfo.firstName} {staffInfo.lastName}
+            </p>
+            {staffInfo.position && (
+              <p className="text-sm text-slate-400">
+                {staffInfo.position}
+                {staffInfo.department && ` • ${staffInfo.department}`}
+              </p>
+            )}
+          </div>
+        </div>
+        {welcomeMessage && (
+          <p className="mt-3 text-sm text-slate-300">{welcomeMessage}</p>
+        )}
+      </div>
+    );
+  };
+
+  const renderEmailStep = () => (
+    <form onSubmit={handleEmailSubmit} className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Email Address
+        </label>
+        <VelocityInput
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          variant="neon-green"
+          icon={<Mail className="w-5 h-5" />}
+          iconPosition="left"
+          placeholder="you@company.com"
+          autoComplete="email"
+          disabled={loading}
+          disableFloating
+        />
+      </div>
+
+      <VelocityButton
+        type="submit"
+        variant="aurora"
+        size="lg"
+        fullWidth
+        loading={loading}
+        loadingText="Checking..."
+        className="mt-8"
+      >
+        Continue
+      </VelocityButton>
+    </form>
+  );
+
+  const renderPasswordStep = () => (
+    <form onSubmit={handlePasswordSubmit} className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Password
+        </label>
+        <VelocityInput
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          variant="neon-green"
+          icon={<Lock className="w-5 h-5" />}
+          iconPosition="left"
+          showPasswordReveal
+          placeholder="Enter your password"
+          autoComplete="current-password"
+          disabled={loading}
+          disableFloating
+        />
+      </div>
+
+      <VelocityButton
+        type="submit"
+        variant="aurora"
+        size="lg"
+        fullWidth
+        loading={loading}
+        loadingText="Signing in..."
+        className="mt-8"
+      >
+        Sign In
+      </VelocityButton>
+    </form>
+  );
+
+  const renderSetupPasswordStep = () => (
+    <form onSubmit={handleSetupPasswordSubmit} className="space-y-5">
+      <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+        <p className="text-sm text-blue-200">
+          {step === 'setup-password' && (
+            <>
+              <Check className="w-4 h-4 inline mr-1" />
+              Set up your password to access FibreFlow
+            </>
+          )}
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Create Password
+        </label>
+        <VelocityInput
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          variant="neon-green"
+          icon={<Lock className="w-5 h-5" />}
+          iconPosition="left"
+          showPasswordReveal
+          placeholder="Create a strong password"
+          autoComplete="new-password"
+          disabled={loading}
+          disableFloating
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Min 8 characters with uppercase, lowercase, number, and special character
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          Confirm Password
+        </label>
+        <VelocityInput
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          variant="neon-green"
+          icon={<Lock className="w-5 h-5" />}
+          iconPosition="left"
+          showPasswordReveal
+          placeholder="Confirm your password"
+          autoComplete="new-password"
+          disabled={loading}
+          disableFloating
+        />
+      </div>
+
+      <VelocityButton
+        type="submit"
+        variant="aurora"
+        size="lg"
+        fullWidth
+        loading={loading}
+        loadingText="Setting up..."
+        className="mt-8"
+      >
+        Set Password & Sign In
+      </VelocityButton>
+    </form>
+  );
+
+  const renderCurrentStep = () => {
+    switch (step) {
+      case 'email':
+        return renderEmailStep();
+      case 'password':
+        return renderPasswordStep();
+      case 'setup-password':
+        return renderSetupPasswordStep();
+      default:
+        return renderEmailStep();
+    }
+  };
+
+  const getStepTitle = () => {
+    switch (step) {
+      case 'email':
+        return 'Sign In';
+      case 'password':
+        return 'Welcome Back';
+      case 'setup-password':
+        return 'Get Started';
+      default:
+        return 'Sign In';
+    }
+  };
+
   return (
     <>
       <Head>
-        <title>Sign In | FibreFlow</title>
+        <title>{getStepTitle()} | FibreFlow</title>
         <meta name="description" content="Sign in to your FibreFlow account" />
       </Head>
 
@@ -91,10 +409,16 @@ export function PremiumLoginPage() {
                 padding="xl"
                 className="relative"
               >
+                {/* Back button for non-email steps */}
+                {renderStepIndicator()}
+
                 {/* Brand header */}
                 <div className="mb-8">
-                  <BrandHeader />
+                  <BrandHeader subtitle={getStepTitle()} />
                 </div>
+
+                {/* Welcome banner for known users */}
+                {renderWelcomeBanner()}
 
                 {/* Error message */}
                 {error && (
@@ -103,59 +427,8 @@ export function PremiumLoginPage() {
                   </div>
                 )}
 
-                {/* Login form */}
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Email Address
-                    </label>
-                    <VelocityInput
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      variant="neon-green"
-                      icon={<Mail className="w-5 h-5" />}
-                      iconPosition="left"
-                      placeholder="you@company.com"
-                      autoComplete="email"
-                      disabled={loading}
-                      disableFloating
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Password
-                    </label>
-                    <VelocityInput
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      variant="neon-green"
-                      icon={<Lock className="w-5 h-5" />}
-                      iconPosition="left"
-                      showPasswordReveal
-                      placeholder="Enter your password"
-                      autoComplete="current-password"
-                      disabled={loading}
-                      disableFloating
-                    />
-                  </div>
-
-                  <VelocityButton
-                    type="submit"
-                    variant="aurora"
-                    size="lg"
-                    fullWidth
-                    loading={loading}
-                    loadingText="Signing in..."
-                    className="mt-8"
-                  >
-                    Sign In
-                  </VelocityButton>
-                </form>
+                {/* Current step form */}
+                {renderCurrentStep()}
 
                 {/* Footer hint */}
                 <div className="mt-8 text-center">
@@ -185,7 +458,7 @@ export function PremiumLoginPage() {
               {/* Dev hint - can be removed in production */}
               <div className="mt-4 text-center">
                 <p className="text-xs text-slate-500">
-                  Demo: admin@fibreflow.com
+                  Use your staff email to sign in
                 </p>
               </div>
             </div>

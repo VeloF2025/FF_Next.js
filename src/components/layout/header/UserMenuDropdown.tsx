@@ -80,23 +80,23 @@ export function UserMenuDropdown({
           {/* Menu items */}
           <div className="py-1">
             <button
-              onClick={() => handleMenuItemClick('/app/profile')}
+              onClick={() => handleMenuItemClick('/profile')}
               className="flex items-center px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-surface-secondary)] w-full text-left"
             >
               <User className="h-4 w-4 mr-3" />
               My Profile
             </button>
-            
+
             <button
-              onClick={() => handleMenuItemClick('/app/settings')}
+              onClick={() => handleMenuItemClick('/admin/settings')}
               className="flex items-center px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-surface-secondary)] w-full text-left"
             >
               <Settings className="h-4 w-4 mr-3" />
               Settings
             </button>
-            
+
             <button
-              onClick={() => handleMenuItemClick('/app/help')}
+              onClick={() => handleMenuItemClick('/help')}
               className="flex items-center px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-surface-secondary)] w-full text-left"
             >
               <HelpCircle className="h-4 w-4 mr-3" />

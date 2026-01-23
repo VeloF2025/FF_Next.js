@@ -8,11 +8,13 @@ import { useState, useEffect } from 'react';
 interface BrandHeaderProps {
   companyName?: string;
   tagline?: string;
+  subtitle?: string;
 }
 
 export function BrandHeader({
   companyName = 'FibreFlow',
-  tagline = 'Fiber Network Management'
+  tagline = 'Fiber Network Management',
+  subtitle,
 }: BrandHeaderProps) {
   const [logoSrc, setLogoSrc] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -75,7 +77,7 @@ export function BrandHeader({
           {companyName}
         </h1>
         <p className="text-sm lg:text-base text-slate-400 mt-1">
-          {tagline}
+          {subtitle || tagline}
         </p>
       </div>
     </div>
