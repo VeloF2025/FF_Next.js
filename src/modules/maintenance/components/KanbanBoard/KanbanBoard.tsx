@@ -1,13 +1,15 @@
 'use client';
 
 /**
- * KanbanBoard Component
+ * KanbanBoard Component (Enhanced)
  *
  * Main Kanban board for ticket workflow management.
- * Displays tickets grouped by status in draggable columns.
+ * Uses @hello-pangea/dnd for drag-and-drop with framer-motion animations.
+ * Features: WIP limits, accessibility, touch support.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
+import { DragDropContext, Droppable, type DropResult } from '@hello-pangea/dnd';
 import type { Ticket, TicketFilters } from '../../types/ticket';
 import { useTickets } from '../../hooks/useTickets';
 import { useUpdateTicket } from '../../hooks/useTicket';
@@ -20,19 +22,23 @@ interface KanbanBoardProps {
 // Database status values (from tickets_status_check constraint)
 export type DatabaseStatus = 'new' | 'triaged' | 'assigned' | 'in_progress' | 'blocked' | 'resolved' | 'closed' | 'cancelled' | 'pending_approval';
 
-// Define visible columns and their order (matching actual database values)
-const VISIBLE_STATUSES: DatabaseStatus[] = [
-  'new',
-  'triaged',
-  'assigned',
-  'in_progress',
-  'blocked',
-  'resolved',
-  'closed',
+// Define visible columns, their order, and WIP limits
+interface ColumnConfig {
+  status: DatabaseStatus;
+  wipLimit?: number;
+}
+
+const COLUMN_CONFIG: ColumnConfig[] = [
+  { status: 'new', wipLimit: 20 },
+  { status: 'triaged', wipLimit: 15 },
+  { status: 'assigned', wipLimit: 10 },
+  { status: 'in_progress', wipLimit: 8 },
+  { status: 'blocked', wipLimit: 5 },
+  { status: 'resolved' },
+  { status: 'closed' },
 ];
 
 export function KanbanBoard({ filters }: KanbanBoardProps) {
-  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Fetch all tickets (no status filter for Kanban view)
@@ -48,7 +54,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     const grouped: Record<DatabaseStatus, Ticket[]> = {} as Record<DatabaseStatus, Ticket[]>;
 
     // Initialize all statuses with empty arrays
-    VISIBLE_STATUSES.forEach((status) => {
+    COLUMN_CONFIG.forEach(({ status }) => {
       grouped[status] = [];
     });
 
@@ -74,31 +80,43 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     return grouped;
   }, [tickets]);
 
-  // Handle ticket drop (status change)
-  const handleDrop = async (ticketId: string, newStatus: DatabaseStatus) => {
-    // Find the ticket to check current status
-    const ticket = tickets.find((t) => t.id === ticketId);
+  // Handle drag end (status change)
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    const { draggableId, destination, source } = result;
+
+    // No destination or dropped in same place
+    if (!destination || destination.droppableId === source.droppableId) {
+      return;
+    }
+
+    const newStatus = destination.droppableId as DatabaseStatus;
+    const ticket = tickets.find((t) => t.id === draggableId);
+
     if (!ticket) return;
 
-    // Don't update if status hasn't changed
-    if ((ticket.status as unknown as DatabaseStatus) === newStatus) return;
+    // Check WIP limit
+    const columnConfig = COLUMN_CONFIG.find(c => c.status === newStatus);
+    if (columnConfig?.wipLimit) {
+      const currentCount = ticketsByStatus[newStatus].length;
+      if (currentCount >= columnConfig.wipLimit) {
+        setErrorMessage(`Cannot move: ${newStatus.replace('_', ' ')} column is at WIP limit (${columnConfig.wipLimit})`);
+        setTimeout(() => setErrorMessage(null), 3000);
+        return;
+      }
+    }
 
-    setUpdatingTicketId(ticketId);
     setErrorMessage(null);
 
     try {
       await updateTicket.mutateAsync({
-        id: ticketId,
-        payload: { status: newStatus as any }, // Cast to match API expectation
+        id: draggableId,
+        payload: { status: newStatus as any },
       });
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to update ticket status');
-      // Refetch to reset the UI
       refetch();
-    } finally {
-      setUpdatingTicketId(null);
     }
-  };
+  }, [tickets, ticketsByStatus, updateTicket, refetch]);
 
   if (isLoading) {
     return (
@@ -139,16 +157,16 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     <div className="flex flex-col h-full">
       {/* Error Toast */}
       {errorMessage && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-sm text-red-700">{errorMessage}</span>
+            <span className="text-sm text-red-400">{errorMessage}</span>
           </div>
           <button
             onClick={() => setErrorMessage(null)}
-            className="text-red-500 hover:text-red-700"
+            className="text-red-400 hover:text-red-300"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -166,22 +184,41 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
         <span className="text-[var(--ff-text-secondary)]">
           Drag cards to change status
         </span>
+        {updateTicket.isPending && (
+          <span className="flex items-center gap-2 text-blue-400">
+            <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div>
+            Updating...
+          </span>
+        )}
       </div>
 
-      {/* Kanban Columns */}
-      <div className="flex-1 overflow-x-auto pb-4">
-        <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
-          {VISIBLE_STATUSES.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              tickets={ticketsByStatus[status]}
-              onDrop={handleDrop}
-              isUpdating={updateTicket.isPending && ticketsByStatus[status].some(t => t.id === updatingTicketId)}
-            />
-          ))}
+      {/* Kanban Columns with DragDropContext */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex-1 overflow-x-auto pb-4">
+          <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
+            {COLUMN_CONFIG.map(({ status, wipLimit }) => (
+              <Droppable key={status} droppableId={status}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="h-full"
+                  >
+                    <KanbanColumn
+                      status={status}
+                      tickets={ticketsByStatus[status]}
+                      wipLimit={wipLimit}
+                      isDraggingOver={snapshot.isDraggingOver}
+                      isUpdating={updateTicket.isPending}
+                    />
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            ))}
+          </div>
         </div>
-      </div>
+      </DragDropContext>
     </div>
   );
 }
