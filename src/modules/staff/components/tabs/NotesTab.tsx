@@ -139,7 +139,8 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
         throw new Error('Failed to fetch notes');
       }
       const data = await response.json();
-      setNotes(data.notes || []);
+      // API returns { success, data: { notes } } or legacy { notes }
+      setNotes(data.data?.notes || data.notes || []);
     } catch (err) {
       log.error('Failed to fetch staff notes', { staffId, error: err });
       setError('Failed to load notes');
