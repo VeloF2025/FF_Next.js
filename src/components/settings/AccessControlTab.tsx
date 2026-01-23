@@ -6,8 +6,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Users, Shield, Key, Search, ChevronRight, ChevronDown,
-  Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus
+  Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus, Settings
 } from 'lucide-react';
+import { UserPermissionsModal } from './UserPermissionsModal';
 
 // Types
 interface UserWithRole {
@@ -74,6 +75,10 @@ export function AccessControlTab() {
   // Permissions state
   const [permissionTree, setPermissionTree] = useState<PermissionNode[]>([]);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+
+  // Modal state
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserWithRole | null>(null);
+  const [savingRolePermission, setSavingRolePermission] = useState<string | null>(null);
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -166,6 +171,44 @@ export function AccessControlTab() {
       }
     } catch (err) {
       setError('Failed to update user status');
+    }
+  };
+
+  // Update role permission template
+  const updateRolePermission = async (
+    role: string,
+    permissionKey: string,
+    action: 'view' | 'create' | 'edit' | 'delete',
+    currentValue: boolean
+  ) => {
+    try {
+      setSavingRolePermission(`${role}:${permissionKey}:${action}`);
+      setError(null);
+
+      // Get current actions for this permission
+      const currentRole = roles.find(r => r.name === role);
+      const currentPerm = currentRole?.permissions.find(p => p.key === permissionKey);
+      const currentActions = currentPerm?.actions || { view: false, create: false, edit: false, delete: false };
+
+      // Toggle the action
+      const newActions = { ...currentActions, [action]: !currentValue };
+
+      const res = await fetch(`/api/admin/roles/${role}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissionKey, actions: newActions }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchRoles();
+      } else {
+        setError(data.error?.message || 'Failed to update role permission');
+      }
+    } catch (err) {
+      setError('Failed to update role permission');
+    } finally {
+      setSavingRolePermission(null);
     }
   };
 
@@ -297,7 +340,15 @@ export function AccessControlTab() {
                     : 'Never'
                   }
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  <button
+                    onClick={() => setSelectedUserForPermissions(user)}
+                    className="text-sm px-3 py-1 rounded text-blue-400 hover:bg-blue-500/20"
+                    title="Edit user permissions"
+                  >
+                    <Settings className="w-4 h-4 inline mr-1" />
+                    Permissions
+                  </button>
                   <button
                     onClick={() => toggleUserStatus(user.id, user.isActive)}
                     className={`text-sm px-3 py-1 rounded ${
@@ -358,7 +409,12 @@ export function AccessControlTab() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{currentRole.displayName}</h3>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">{currentRole.permissions.length} permissions assigned</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    {currentRole.permissions.length} permissions assigned
+                    {selectedRole === 'super_admin' && (
+                      <span className="ml-2 text-yellow-400">(Super Admin has all permissions - not editable)</span>
+                    )}
+                  </p>
                 </div>
               </div>
 
@@ -370,35 +426,73 @@ export function AccessControlTab() {
                   <div className="text-center">Edit</div>
                 </div>
 
-                {currentRole.permissions.slice(0, 20).map((perm) => (
-                  <div key={perm.key} className="grid grid-cols-5 gap-2 items-center py-2 border-b border-[var(--ff-border-light)]">
-                    <div className="col-span-2">
-                      <div className="font-medium text-sm text-[var(--ff-text-primary)]">{perm.label}</div>
-                      <div className="text-xs text-[var(--ff-text-tertiary)]">{perm.key}</div>
+                {currentRole.permissions.slice(0, 20).map((perm) => {
+                  const isSuperAdmin = selectedRole === 'super_admin';
+                  const isSaving = (action: string) => savingRolePermission === `${selectedRole}:${perm.key}:${action}`;
+
+                  return (
+                    <div key={perm.key} className="grid grid-cols-5 gap-2 items-center py-2 border-b border-[var(--ff-border-light)]">
+                      <div className="col-span-2">
+                        <div className="font-medium text-sm text-[var(--ff-text-primary)]">{perm.label}</div>
+                        <div className="text-xs text-[var(--ff-text-tertiary)]">{perm.key}</div>
+                      </div>
+                      <div className="flex justify-center">
+                        <button
+                          onClick={() => !isSuperAdmin && updateRolePermission(selectedRole!, perm.key, 'view', perm.actions.view)}
+                          disabled={isSuperAdmin || isSaving('view')}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                            perm.actions.view
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
+                          } ${isSuperAdmin ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'}`}
+                          title={isSuperAdmin ? 'Cannot edit super_admin permissions' : `Toggle view permission`}
+                        >
+                          {isSaving('view') ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-white" />
+                          ) : perm.actions.view ? (
+                            <Check className="w-3 h-3 text-white" />
+                          ) : null}
+                        </button>
+                      </div>
+                      <div className="flex justify-center">
+                        <button
+                          onClick={() => !isSuperAdmin && updateRolePermission(selectedRole!, perm.key, 'create', perm.actions.create)}
+                          disabled={isSuperAdmin || isSaving('create')}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                            perm.actions.create
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
+                          } ${isSuperAdmin ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'}`}
+                          title={isSuperAdmin ? 'Cannot edit super_admin permissions' : `Toggle create permission`}
+                        >
+                          {isSaving('create') ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-white" />
+                          ) : perm.actions.create ? (
+                            <Check className="w-3 h-3 text-white" />
+                          ) : null}
+                        </button>
+                      </div>
+                      <div className="flex justify-center">
+                        <button
+                          onClick={() => !isSuperAdmin && updateRolePermission(selectedRole!, perm.key, 'edit', perm.actions.edit)}
+                          disabled={isSuperAdmin || isSaving('edit')}
+                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                            perm.actions.edit
+                              ? 'bg-green-500 border-green-500'
+                              : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
+                          } ${isSuperAdmin ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'}`}
+                          title={isSuperAdmin ? 'Cannot edit super_admin permissions' : `Toggle edit permission`}
+                        >
+                          {isSaving('edit') ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-white" />
+                          ) : perm.actions.edit ? (
+                            <Check className="w-3 h-3 text-white" />
+                          ) : null}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex justify-center">
-                      {perm.actions.view ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <X className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                      )}
-                    </div>
-                    <div className="flex justify-center">
-                      {perm.actions.create ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <X className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                      )}
-                    </div>
-                    <div className="flex justify-center">
-                      {perm.actions.edit ? (
-                        <Check className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <X className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {currentRole.permissions.length > 20 && (
                   <div className="text-center text-sm text-[var(--ff-text-secondary)] py-2">
@@ -601,6 +695,25 @@ export function AccessControlTab() {
       {subTab === 'users' && renderUsersTab()}
       {subTab === 'roles' && renderRolesTab()}
       {subTab === 'permissions' && renderPermissionsTab()}
+
+      {/* User Permissions Modal */}
+      {selectedUserForPermissions && (
+        <UserPermissionsModal
+          isOpen={true}
+          onClose={() => setSelectedUserForPermissions(null)}
+          user={{
+            id: selectedUserForPermissions.id,
+            email: selectedUserForPermissions.email,
+            fullName: selectedUserForPermissions.fullName,
+            role: selectedUserForPermissions.role,
+            roleDisplayName: selectedUserForPermissions.roleDisplayName,
+          }}
+          onPermissionsUpdated={() => {
+            fetchUsers();
+            fetchRoles();
+          }}
+        />
+      )}
     </div>
   );
 }
