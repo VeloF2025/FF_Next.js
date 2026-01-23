@@ -14,7 +14,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import {
   getMessagesForDR,
   getMaintenanceFlag,
@@ -22,7 +22,7 @@ import {
   getFlaggedDRs,
 } from '@/modules/maintenance/services/waMaintenanceProcessor';
 
-const logger = log.child({ module: 'api:maintenance:wa-messages' });
+const logger = createLogger('api:maintenance:wa-messages');
 
 function getDb() {
   const databaseUrl = process.env.DATABASE_URL;

@@ -11,7 +11,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 
 // ============================================================================
 // Types
@@ -265,7 +265,7 @@ export async function storePhotoMetadata(
 export async function processMaintenanceMessage(
   message: IncomingWAMessage
 ): Promise<ProcessedMessage> {
-  const logger = log.child({ module: 'waMaintenanceProcessor' });
+  const logger = createLogger('waMaintenanceProcessor');
 
   // Validate group
   if (message.group_jid !== MAINTENANCE_GROUP_JID) {

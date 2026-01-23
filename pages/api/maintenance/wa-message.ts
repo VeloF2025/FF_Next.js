@@ -10,14 +10,14 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import {
   processMaintenanceMessage,
   type IncomingWAMessage,
   type ProcessedMessage,
 } from '@/modules/maintenance/services/waMaintenanceProcessor';
 
-const logger = log.child({ module: 'api:maintenance:wa-message' });
+const logger = createLogger('api:maintenance:wa-message');
 
 // Expected group JID for validation
 const EXPECTED_GROUP_JID =
