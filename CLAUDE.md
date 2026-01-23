@@ -713,18 +713,42 @@ ssh louis@100.96.203.105
 - **OS:** Ubuntu Server
 - **Tailnet:** velof2025.github
 
-### Four Environment Setup
+### Five Environment Setup
 
 > **Full infrastructure details:** `docs/INFRASTRUCTURE.md`
 
 **IMPORTANT:** All environments share the **same production database** (Neon PostgreSQL).
 
-| Environment | URL | Port | Directory | Service |
-|-------------|-----|------|-----------|---------|
-| **Production** | app.fibreflow.app | 3000 | `/home/velo/fibreflow-production` | `fibreflow-production.service` |
-| **Staging** | vf.fibreflow.app | 3006 | `/home/louis/apps/fibreflow` | `fibreflow.service` |
-| **Dev** | dev.fibreflow.app | 3005 | `/home/hein/apps/fibreflow-dev` | `fibreflow-dev.service` |
-| **Local** | localhost:3004 | 3004 | Local machine | manual (`PORT=3004 npm start`) |
+| Environment | URL | Port | Server | Service |
+|-------------|-----|------|--------|---------|
+| **Production** | app.fibreflow.app | 3000 | Velocity | `fibreflow-production.service` |
+| **Staging** | vf.fibreflow.app | 3006 | Velocity | `fibreflow.service` |
+| **Dev** | dev.fibreflow.app | 3005 | Velocity | `fibreflow-dev.service` |
+| **VPS Backup** | backup.fibreflow.app | 3005 | VPS | `fibreflow-backup.service` |
+| **Local** | localhost:3004 | 3004 | Local | manual (`PORT=3004 npm start`) |
+
+### 🌐 Hostinger VPS (Backup Infrastructure)
+**Server:** 72.61.197.178 (SSH: `ssh root@72.61.197.178`)
+
+| Service | Port | Purpose | Auto-Recovery |
+|---------|------|---------|---------------|
+| FibreFlow Backup | 3005 | Redundant app instance | Hourly auto-update from master |
+| WhatsApp Sender | 8081 | Message sending (+27638412276) | Health check every 5 min |
+| WhatsApp Bridge | 8083 | Message receiving | Health check every 5 min |
+| nginx | 80/443 | Reverse proxy + SSL | - |
+
+**Auto-Update Cron Jobs:**
+```bash
+# FibreFlow - hourly pull & rebuild if changes
+0 * * * * /opt/fibreflow/auto-update.sh >> /var/log/fibreflow-autoupdate.log 2>&1
+
+# WhatsApp - health check every 5 min, auto-restart if down
+*/5 * * * * /opt/wa-healthcheck.sh >> /var/log/wa-healthcheck.log 2>&1
+```
+
+**VPS Logs:**
+- `/var/log/fibreflow-autoupdate.log` - App update history
+- `/var/log/wa-healthcheck.log` - WA service health
 
 ### Deployment Workflow
 1. **Local:** Develop on feature branch (localhost:3004)
@@ -767,14 +791,23 @@ echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service
 echo 'velo2026' | sudo -S journalctl -u fibreflow-production.service -f
 ```
 
-### Additional Services
+### Additional Services (Velocity)
 | Service | Port | URL |
 |---------|------|-----|
 | **PDFCraft** | 3007 | https://vf.fibreflow.app/pdf-tools/ |
+| **wa-feedback** | 8092 | Proxies to VPS WhatsApp Sender |
+| **VLM (Qwen3)** | 8100 | http://100.96.203.105:8100 |
 | **Portainer** | 9443 | https://100.96.203.105:9443 |
 | **Grafana** | 3000 | http://100.96.203.105:3000 |
 | **Ollama** | 11434 | http://100.96.203.105:11434 |
 | **Qdrant** | 6333 | http://100.96.203.105:6333 |
+
+### Additional Services (VPS - 72.61.197.178)
+| Service | Port | URL |
+|---------|------|-----|
+| **FibreFlow Backup** | 3005 | https://backup.fibreflow.app (pending DNS) |
+| **WhatsApp Sender** | 8081 | http://72.61.197.178:8081 |
+| **WhatsApp Bridge** | 8083 | http://72.61.197.178:8083 |
 
 ### PDFCraft (PDF Tools)
 **URL:** `https://vf.fibreflow.app/pdf-tools/`

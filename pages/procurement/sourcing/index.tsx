@@ -120,22 +120,10 @@ export default function SourcingPage({ projectId, projectName }: SourcingPagePro
               )}
 
               {activeTab === 'boq' && (
-                <div className="space-y-6">
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">
-                      Bill of Quantities
-                    </h2>
-                    {projectName && (
-                      <p className="text-sm text-[var(--ff-text-secondary)]">
-                        Project: {projectName}
-                      </p>
-                    )}
-                  </div>
-                  <BOQList
-                    onCreateBOQ={handleCreateBOQ}
-                    projectId={projectId}
-                  />
-                </div>
+                <BOQList
+                  onCreateBOQ={handleCreateBOQ}
+                  projectId={projectId}
+                />
               )}
 
               {activeTab === 'rfq' && (

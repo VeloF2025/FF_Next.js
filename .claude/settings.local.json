@@ -439,7 +439,13 @@
       "Bash(src/components/procurement/bundles/BundleItemsModal.tsx )",
       "Bash(src/modules/procurement/hooks/useBOQ.ts )",
       "Bash(src/modules/procurement/hooks/useRFQ.ts)",
-      "Bash(if curl -s http://localhost:3004/api/health)"
+      "Bash(if curl -s http://localhost:3004/api/health)",
+      "Skill(audit)",
+      "Bash(PORT=3004 npm start)",
+      "Bash(do curl -s http://localhost:3004/api/activate/health-check)",
+      "Bash(sudo -S systemctl restart:*)",
+      "Bash(sort:*)",
+      "Bash(__NEW_LINE__ git commit -m \"$\\(cat <<''EOF''\nfix: resolve 3 UI display bugs from production audit\n\n- H&S Incidents: Fix \"Invalid Date\" by falling back to created_at when incident_date is null\n- Project Detail: Fix UUID showing instead of manager name by adding staff/users JOIN\n- Purchase Orders: Fix \"Unknown Supplier\" by using s.name instead of s.company_name\n\nFiles changed:\n- pages/health-safety/incidents/index.tsx\n- pages/api/projects/[projectId].ts\n- src/services/projects/utils/projectDataMapper.ts\n- pages/api/procurement/purchase-orders/index.ts\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": [],
