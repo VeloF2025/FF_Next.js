@@ -178,10 +178,10 @@ export function WATrackingDashboard() {
         <div>
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-orange-600" />
-            WhatsApp Maintenance Tracking
+            Offline Tracking
           </h2>
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-            Monitor DRs flagged from the Mohadin QA WhatsApp group
+            Monitor DRs flagged from WhatsApp QA groups
           </p>
         </div>
         <button

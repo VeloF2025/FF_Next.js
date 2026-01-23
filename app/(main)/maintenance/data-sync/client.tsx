@@ -291,7 +291,7 @@ const tabs: Tab[] = [
   { id: 'alignment', label: 'QC Alignment', icon: GitCompare },
   { id: 'three-way', label: '3-Way Alignment', icon: FileSpreadsheet },
   { id: 'weekly', label: 'Weekly Import', icon: FileUp },
-  { id: 'wa-tracking', label: 'WA Tracking', icon: MessageSquare },
+  { id: 'wa-tracking', label: 'Offline Tracking', icon: MessageSquare },
 ];
 
 export default function DataSyncPageClient() {
