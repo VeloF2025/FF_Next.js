@@ -1445,3 +1445,21 @@ Use these prefixes for consistency:
 - **Bugs Fixed**: 3
 - **Last Deployment**: 2025-10-22
 - **Deployment Method**: Git push + Deploy hook (tested)
+
+## 2026-01-23 - OES Import Project Mapping Fix
+
+**Issue:** DRs imported via OES were showing with null project in QA Centre, making them invisible in project-filtered views.
+
+**Root Cause:** `import-oes.ts` was inserting records into `dr_photo_unified_reviews` without looking up the project from the `drops` table.
+
+**Fix:** Updated `import-oes.ts` to:
+1. Query `drops` table (joined with `projects`) to get project mapping for each DR
+2. Include project in the INSERT statement
+3. DRs not found in `drops` table will have null project (expected for unknown DRs)
+
+**Source of Truth:** `drops` table → `projects.project_name`
+
+**Commit:** `19e3d621` - fix(activate): lookup project from drops table during OES import
+
+**Files Changed:**
+- `pages/api/activate/import-oes.ts` (lines 332-378)

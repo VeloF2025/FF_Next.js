@@ -268,6 +268,20 @@ interface TrendAnalysisResponse {
 
 ## Database Tables
 
+### Project Mapping (Source of Truth)
+
+The `project` field in `dr_photo_unified_reviews` is determined by looking up the DR in the **`drops` table** (from SOW imports) joined with `projects`:
+
+```sql
+SELECT p.project_name FROM drops d
+JOIN projects p ON d.project_id = p.id
+WHERE d.drop_number = $1
+```
+
+- **WA submissions:** `process-new-dr.ts` validates and sets project from drops table
+- **OES imports:** `import-oes.ts` looks up project before inserting (Jan 2026 fix)
+- **Unknown DRs:** DRs not in drops table will have `project = null`
+
 ### `dr_photo_unified_reviews` (Main Table)
 
 **Core Fields:**
