@@ -7,7 +7,10 @@ import {
   BarChart3,
   LayoutDashboard,
   GitBranch,
-  Shield
+  Shield,
+  Building2,
+  Briefcase,
+  Activity,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -49,6 +52,27 @@ export const projectSection: NavSection = {
       icon: BarChart3,
       label: 'Daily Progress',
       shortLabel: 'Daily',
+      permissions: [],
+    },
+    {
+      to: '/clients',
+      icon: Building2,
+      label: 'Clients',
+      shortLabel: 'Clients',
+      permissions: [],
+    },
+    {
+      to: '/contractors',
+      icon: Briefcase,
+      label: 'Contractors',
+      shortLabel: 'Contract',
+      permissions: [],
+    },
+    {
+      to: '/contractors/rag-dashboard',
+      icon: Activity,
+      label: 'RAG Dashboard',
+      shortLabel: 'RAG',
       permissions: [],
     },
   ]

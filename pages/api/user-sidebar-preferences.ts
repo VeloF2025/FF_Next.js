@@ -16,6 +16,12 @@ const VALID_ITEM_IDS = [
   'contractors',
   'wa-monitor',
   'daily-progress',
+  // Added Jan 2026 - all main modules now available as shortcuts
+  'clients',
+  'procurement',
+  'assets',
+  'communications',
+  'activate',
 ];
 
 const DEFAULT_ITEMS = ['meetings', 'action-items'];

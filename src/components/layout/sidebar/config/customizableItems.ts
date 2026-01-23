@@ -13,6 +13,9 @@ import {
   UserCircle,
   HardHat,
   MessageSquare,
+  ShoppingCart,
+  Package,
+  Camera,
 } from 'lucide-react';
 import type { NavItem } from '../types';
 
@@ -103,6 +106,41 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     icon: BarChart3,
     label: 'Daily Progress',
     shortLabel: 'Daily',
+    permissions: [],
+  },
+  'clients': {
+    to: '/clients',
+    icon: Users,
+    label: 'Clients',
+    shortLabel: 'Clients',
+    permissions: [],
+  },
+  'procurement': {
+    to: '/procurement',
+    icon: ShoppingCart,
+    label: 'Procurement',
+    shortLabel: 'Procure',
+    permissions: [],
+  },
+  'assets': {
+    to: '/assets',
+    icon: Package,
+    label: 'Assets',
+    shortLabel: 'Assets',
+    permissions: [],
+  },
+  'communications': {
+    to: '/communications',
+    icon: MessageSquare,
+    label: 'Communications',
+    shortLabel: 'Comms',
+    permissions: [],
+  },
+  'activate': {
+    to: '/activate',
+    icon: Camera,
+    label: 'Activate',
+    shortLabel: 'Activate',
     permissions: [],
   },
 };
