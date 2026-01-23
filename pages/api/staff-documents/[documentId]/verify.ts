@@ -402,6 +402,11 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
         break;
     }
 
+    // If any fields were synced, also append to staff's notes field for audit trail
+    if (syncedFields.length > 0) {
+      await appendToStaffNotes(staffId, documentType, syncedFields);
+    }
+
     // Return synced fields for auto-generated notes
     return syncedFields;
   } catch (error) {
@@ -413,6 +418,70 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
     });
     return [];
   }
+}
+
+/**
+ * Append document verification summary to staff's notes field
+ * Creates an audit trail of verified documents on the staff record
+ */
+async function appendToStaffNotes(
+  staffId: string,
+  documentType: string,
+  syncedFields: string[]
+): Promise<void> {
+  try {
+    const timestamp = new Date().toISOString().split('T')[0];
+    const docTypeLabel = formatDocumentType(documentType);
+
+    // Build the note entry
+    const noteEntry = `[${timestamp}] ✅ ${docTypeLabel} verified:\n  • ${syncedFields.join('\n  • ')}`;
+
+    // Get existing notes and append
+    const [staff] = await sql`
+      SELECT notes FROM staff WHERE id = ${staffId}
+    `;
+
+    const existingNotes = (staff?.notes as string) || '';
+    const newNotes = existingNotes
+      ? `${existingNotes}\n\n${noteEntry}`
+      : noteEntry;
+
+    await sql`
+      UPDATE staff
+      SET notes = ${newNotes}, updated_at = NOW()
+      WHERE id = ${staffId}
+    `;
+
+    logger.info('Appended OCR verification to staff notes', {
+      staffId,
+      documentType,
+      fieldsCount: syncedFields.length,
+    });
+  } catch (error) {
+    // Don't fail verification if notes update fails
+    logger.warn('Failed to append to staff notes', {
+      staffId,
+      documentType,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Format document type for display in notes
+ */
+function formatDocumentType(documentType: string): string {
+  const labels: Record<string, string> = {
+    sa_id: 'SA ID Document',
+    passport: 'Passport',
+    drivers_license: "Driver's License",
+    bank_details: 'Bank Details',
+    bank_statement: 'Bank Statement',
+    employment_contract: 'Employment Contract',
+    medical_certificate: 'Medical Certificate',
+    police_clearance: 'Police Clearance',
+  };
+  return labels[documentType] || documentType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 /**
