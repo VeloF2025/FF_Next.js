@@ -20,6 +20,8 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
@@ -34,6 +36,7 @@ interface StaffNote {
   title?: string;
   content: string;
   createdBy?: string;
+  createdByName?: string;
   createdAt: string;
   updatedAt?: string;
   metadata?: Record<string, any>;
@@ -123,6 +126,37 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [contractMetadata, setContractMetadata] = useState<Record<string, any> | null>(null);
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+
+  // Toggle note expansion
+  const toggleNoteExpanded = (noteId: string) => {
+    setExpandedNotes(prev => {
+      const next = new Set(prev);
+      if (next.has(noteId)) {
+        next.delete(noteId);
+      } else {
+        next.add(noteId);
+      }
+      return next;
+    });
+  };
+
+  // Parse note content - handles JSON format for document notes
+  const parseNoteContent = (content: string): { summary: string; details?: string[]; isJson: boolean } => {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.summary && parsed.fields) {
+        return {
+          summary: parsed.summary,
+          details: parsed.fields,
+          isJson: true,
+        };
+      }
+    } catch {
+      // Not JSON, return as plain text
+    }
+    return { summary: content, isJson: false };
+  };
 
   // Fetch notes for this staff member
   const fetchNotes = useCallback(async () => {
@@ -451,42 +485,72 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {notes.map((note) => {
             const typeInfo = getNoteTypeInfo(note.noteType);
             const TypeIcon = typeInfo.icon;
+            const isExpanded = expandedNotes.has(note.id);
+            const parsed = parseNoteContent(note.content);
+            const createdByDisplay = note.createdByName || note.createdBy;
 
             return (
               <div
                 key={note.id}
                 className="bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden"
               >
-                {/* Note Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)]">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-1.5 rounded ${typeInfo.bg}`}>
-                      <TypeIcon className={`w-4 h-4 ${typeInfo.color}`} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-[var(--ff-text-primary)]">
-                        {note.title || typeInfo.label}
-                      </p>
-                      <p className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-2">
-                        <Clock className="w-3 h-3" />
-                        {formatDate(note.createdAt)}
-                        {note.createdBy && (
+                {/* Note Header - Clickable for expand/collapse */}
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--ff-bg-hover)] transition-colors"
+                  onClick={() => toggleNoteExpanded(note.id)}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Expand/collapse indicator */}
+                    {parsed.isJson ? (
+                      isExpanded ? (
+                        <ChevronDown className="w-4 h-4 text-[var(--ff-text-secondary)] flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-[var(--ff-text-secondary)] flex-shrink-0" />
+                      )
+                    ) : (
+                      <div className={`p-1.5 rounded ${typeInfo.bg} flex-shrink-0`}>
+                        <TypeIcon className={`w-4 h-4 ${typeInfo.color}`} />
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {parsed.isJson && (
+                          <div className={`p-1 rounded ${typeInfo.bg} flex-shrink-0`}>
+                            <TypeIcon className={`w-3 h-3 ${typeInfo.color}`} />
+                          </div>
+                        )}
+                        <p className="font-medium text-[var(--ff-text-primary)] truncate">
+                          {note.title || typeInfo.label}
+                        </p>
+                      </div>
+                      <p className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-2 mt-0.5">
+                        <Clock className="w-3 h-3 flex-shrink-0" />
+                        <span>{formatDate(note.createdAt)}</span>
+                        {createdByDisplay && (
                           <>
                             <span className="text-[var(--ff-text-muted)]">•</span>
-                            <User className="w-3 h-3" />
-                            {note.createdBy}
+                            <User className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{createdByDisplay}</span>
+                          </>
+                        )}
+                        {parsed.isJson && parsed.details && (
+                          <>
+                            <span className="text-[var(--ff-text-muted)]">•</span>
+                            <span className="text-green-400">{parsed.details.length} fields synced</span>
                           </>
                         )}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => handleCopyNote(note.content)}
+                      onClick={() => handleCopyNote(parsed.isJson ? parsed.details?.join('\n') || note.content : note.content)}
                       className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] rounded"
                       title="Copy to clipboard"
                     >
@@ -502,12 +566,25 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
                   </div>
                 </div>
 
-                {/* Note Content */}
-                <div className="p-4">
-                  <pre className="text-sm text-[var(--ff-text-primary)] whitespace-pre-wrap font-sans">
-                    {note.content}
-                  </pre>
-                </div>
+                {/* Note Content - Expandable for JSON notes, always shown for plain text */}
+                {(isExpanded || !parsed.isJson) && (
+                  <div className="px-4 pb-4 pt-0 border-t border-[var(--ff-border-light)]">
+                    {parsed.isJson && parsed.details ? (
+                      <div className="mt-3 space-y-1">
+                        {parsed.details.map((field, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm">
+                            <span className="text-green-400">•</span>
+                            <span className="text-[var(--ff-text-primary)]">{field}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <pre className="mt-3 text-sm text-[var(--ff-text-primary)] whitespace-pre-wrap font-sans">
+                        {note.content}
+                      </pre>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

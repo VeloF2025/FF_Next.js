@@ -427,24 +427,45 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
 async function appendToStaffNotes(
   staffId: string,
   documentType: string,
-  syncedFields: string[]
+  syncedFields: string[],
+  verifierName?: string
 ): Promise<void> {
   try {
     const docTypeLabel = formatDocumentType(documentType);
+    const noteTitle = `${docTypeLabel} Verified`;
 
-    // Build the note content
-    const noteContent = `✅ Document verified and data synced:\n\n• ${syncedFields.join('\n• ')}`;
+    // Prevent duplicates - check if same note was created in last 30 seconds
+    const [existing] = await sql`
+      SELECT id FROM staff_notes
+      WHERE staff_id = ${staffId}::uuid
+        AND title = ${noteTitle}
+        AND created_at > NOW() - INTERVAL '30 seconds'
+      LIMIT 1
+    `;
+
+    if (existing) {
+      logger.info('Skipping duplicate note creation', { staffId, documentType });
+      return;
+    }
+
+    // Build the note content with summary and details
+    const noteContent = JSON.stringify({
+      summary: `${docTypeLabel} verified and ${syncedFields.length} fields synced`,
+      verifiedBy: verifierName || 'System',
+      fields: syncedFields,
+    });
 
     // Insert into staff_notes table (matches NotesTab component)
     await sql`
-      INSERT INTO staff_notes (id, staff_id, note_type, title, content, created_by_name, created_at, updated_at)
+      INSERT INTO staff_notes (id, staff_id, note_type, title, content, created_by_name, metadata, created_at, updated_at)
       VALUES (
         gen_random_uuid(),
         ${staffId}::uuid,
         'document_note',
-        ${`${docTypeLabel} Verified`},
+        ${noteTitle},
         ${noteContent},
-        'System (OCR)',
+        ${verifierName || 'System (OCR)'},
+        ${JSON.stringify({ documentType, fieldCount: syncedFields.length })}::jsonb,
         NOW(),
         NOW()
       )
