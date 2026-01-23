@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle, GitCompare, FileSpreadsheet } from 'lucide-react';
+import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle, GitCompare, FileSpreadsheet, MessageSquare } from 'lucide-react';
 
 // QContact Sync components
 import { SyncDashboard } from '@/modules/maintenance/components/QContact/SyncDashboard';
@@ -23,6 +23,9 @@ import { ThreeWayAlignmentReport } from '@/modules/maintenance/components/ThreeW
 
 // Weekly Import component
 import { WeeklyImportWizard } from '@/modules/maintenance/components/WeeklyImport/WeeklyImportWizard';
+
+// WA Tracking component
+import { WATrackingDashboard } from '@/modules/maintenance/components/WATrackingDashboard';
 
 // Import History types
 interface ImportError {
@@ -275,7 +278,7 @@ function ImportHistory() {
   );
 }
 
-type TabId = 'qcontact' | 'alignment' | 'three-way' | 'weekly';
+type TabId = 'qcontact' | 'alignment' | 'three-way' | 'weekly' | 'wa-tracking';
 
 interface Tab {
   id: TabId;
@@ -288,6 +291,7 @@ const tabs: Tab[] = [
   { id: 'alignment', label: 'QC Alignment', icon: GitCompare },
   { id: 'three-way', label: '3-Way Alignment', icon: FileSpreadsheet },
   { id: 'weekly', label: 'Weekly Import', icon: FileUp },
+  { id: 'wa-tracking', label: 'WA Tracking', icon: MessageSquare },
 ];
 
 export default function DataSyncPageClient() {
@@ -400,6 +404,12 @@ export default function DataSyncPageClient() {
           ) : (
             <WeeklyImportWizard />
           )}
+        </div>
+      )}
+
+      {activeTab === 'wa-tracking' && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 border border-[var(--ff-border-light)]">
+          <WATrackingDashboard />
         </div>
       )}
     </div>
