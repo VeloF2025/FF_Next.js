@@ -25,10 +25,10 @@ export async function GET(
       SELECT
         wi.*,
         CASE WHEN wv.user_id IS NOT NULL THEN true ELSE false END as has_voted,
-        (SELECT COUNT(*) FROM devQueue_comments WHERE item_id = wi.id) as comments_count,
-        (SELECT COUNT(*) FROM devQueue_attachments WHERE item_id = wi.id) as attachments_count
-      FROM devQueue_items wi
-      LEFT JOIN devQueue_votes wv ON wi.id = wv.item_id AND wv.user_id = ${userId}
+        (SELECT COUNT(*) FROM wishlist_comments WHERE item_id = wi.id) as comments_count,
+        (SELECT COUNT(*) FROM wishlist_attachments WHERE item_id = wi.id) as attachments_count
+      FROM wishlist_items wi
+      LEFT JOIN wishlist_votes wv ON wi.id = wv.item_id AND wv.user_id = ${userId}
       WHERE wi.id = ${id}
     `;
 
@@ -38,7 +38,7 @@ export async function GET(
 
     // Fetch comments
     const comments = await sql`
-      SELECT * FROM devQueue_comments
+      SELECT * FROM wishlist_comments
       WHERE item_id = ${id}
       ORDER BY created_at DESC
     `;
@@ -75,7 +75,7 @@ export async function PUT(
 
     // Check if item exists and user has permission
     const [existingItem] = await sql`
-      SELECT * FROM devQueue_items WHERE id = ${id}
+      SELECT * FROM wishlist_items WHERE id = ${id}
     `;
 
     if (!existingItem) {
@@ -162,7 +162,7 @@ export async function PUT(
 
     // Update the item
     const [updatedItem] = await sql`
-      UPDATE devQueue_items
+      UPDATE wishlist_items
       SET
         title = COALESCE(${title}, title),
         description = COALESCE(${description}, description),
@@ -209,7 +209,7 @@ export async function DELETE(
 
     // Check if item exists and user has permission
     const [existingItem] = await sql`
-      SELECT * FROM devQueue_items WHERE id = ${id}
+      SELECT * FROM wishlist_items WHERE id = ${id}
     `;
 
     if (!existingItem) {
@@ -225,12 +225,12 @@ export async function DELETE(
     }
 
     // Delete related data first (cascading delete)
-    await sql`DELETE FROM devQueue_votes WHERE item_id = ${id}`;
-    await sql`DELETE FROM devQueue_comments WHERE item_id = ${id}`;
-    await sql`DELETE FROM devQueue_attachments WHERE item_id = ${id}`;
+    await sql`DELETE FROM wishlist_votes WHERE item_id = ${id}`;
+    await sql`DELETE FROM wishlist_comments WHERE item_id = ${id}`;
+    await sql`DELETE FROM wishlist_attachments WHERE item_id = ${id}`;
 
     // Delete the item
-    await sql`DELETE FROM devQueue_items WHERE id = ${id}`;
+    await sql`DELETE FROM wishlist_items WHERE id = ${id}`;
 
     return NextResponse.json({ success: true, message: 'Item deleted' });
   } catch (error: any) {

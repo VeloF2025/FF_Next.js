@@ -1,13 +1,13 @@
-# Wishlist Feature Test Specification
+# Dev Queue Feature Test Specification
 
 ## Feature Overview
-The wishlist feature allows users to submit, vote on, and track feature requests through a Kanban board interface.
+The dev-queue feature allows users to submit, vote on, and track feature requests through a Kanban board interface.
 
 ## Test Categories
 
 ### 1. Authentication Tests
 - [ ] Unauthenticated users redirected to login
-- [ ] Authenticated users can access wishlist
+- [ ] Authenticated users can access dev-queue
 - [ ] User permissions respected
 
 ### 2. Board Display Tests
@@ -35,8 +35,8 @@ The wishlist feature allows users to submit, vote on, and track feature requests
 - [ ] Vote persists on refresh
 
 ### 6. API Tests
-- [ ] GET /api/wishlist returns board
-- [ ] POST /api/wishlist creates item
-- [ ] PUT /api/wishlist/[id] updates item
-- [ ] POST /api/wishlist/move changes position
-- [ ] POST /api/wishlist/vote toggles vote
+- [ ] GET /api/dev-queue returns board
+- [ ] POST /api/dev-queue creates item
+- [ ] PUT /api/dev-queue/[id] updates item
+- [ ] POST /api/dev-queue/move changes position
+- [ ] POST /api/dev-queue/vote toggles vote

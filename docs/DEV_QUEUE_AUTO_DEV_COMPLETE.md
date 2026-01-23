@@ -1,12 +1,12 @@
-# Wishlist Auto Dev Feature - Complete
+# Dev Queue Auto Dev Feature - Complete
 
 **Status**: ✅ Production Ready (Hybrid Mode)
 **Date**: 2026-01-22
-**Staging URL**: https://vf.fibreflow.app/wishlist
+**Staging URL**: https://vf.fibreflow.app/dev-queue
 
 ## Overview
 
-The Wishlist page now has a complete automation pipeline that connects user feature requests to the agent harness for automated development.
+The Dev Queue page now has a complete automation pipeline that connects user feature requests to the agent harness for automated development.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ The Wishlist page now has a complete automation pipeline that connects user feat
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │               HARNESS TRIGGER SERVICE (VF Server:8096)               │
-│  1. Generate spec file from wishlist item details                   │
+│  1. Generate spec file from dev-queue item details                   │
 │  2. Queue build (in-memory)                                          │
 │  3. Send email notification to ai@velocityfibre.co.za               │
 │  4. [FUTURE] Auto-run harness with ANTHROPIC_API_KEY                │
@@ -45,7 +45,7 @@ The Wishlist page now has a complete automation pipeline that connects user feat
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    PROGRESS WEBHOOK                                  │
-│  POST /api/wishlist/{id}/progress                                   │
+│  POST /api/dev-queue/{id}/progress                                   │
 │  Updates: build_status, build_progress, github_pr_url               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -62,24 +62,24 @@ The Wishlist page now has a complete automation pipeline that connects user feat
 ## Components Built
 
 ### 1. Database
-- **Migration**: `scripts/migrations/add-wishlist-work-type.sql`
+- **Migration**: `scripts/migrations/add-dev-queue-work-type.sql`
 - **New column**: `work_type VARCHAR(20)` with CHECK constraint
 
 ### 2. TypeScript Types
-- **File**: `src/modules/wishlist/types/wishlist.ts`
-- **Added**: `WishlistWorkType = 'feature' | 'fix' | 'amendment' | 'refactor'`
+- **File**: `src/modules/dev-queue/types/dev-queue.ts`
+- **Added**: `Dev QueueWorkType = 'feature' | 'fix' | 'amendment' | 'refactor'`
 
 ### 3. UI Components
-- **File**: `src/modules/wishlist/components/AddWishlistItemModal.tsx`
+- **File**: `src/modules/dev-queue/components/AddDev QueueItemModal.tsx`
 - **Added**: Work type dropdown selector
 
 ### 4. API Endpoints
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/wishlist` | POST | Create item (includes work_type) |
-| `/api/wishlist/move` | POST | Move item, triggers MVP pipeline |
-| `/api/wishlist/[id]/progress` | POST | Receive build progress updates |
+| `/api/dev-queue` | POST | Create item (includes work_type) |
+| `/api/dev-queue/move` | POST | Move item, triggers MVP pipeline |
+| `/api/dev-queue/[id]/progress` | POST | Receive build progress updates |
 
 ### 5. Harness Trigger Service (VF Server)
 - **Location**: `/opt/harness-trigger/`
@@ -91,7 +91,7 @@ The Wishlist page now has a complete automation pipeline that connects user feat
   - `GET /builds` - View all builds
 
 ### 6. Harness Trigger Client
-- **File**: `src/modules/wishlist/services/harnessTrigger.ts`
+- **File**: `src/modules/dev-queue/services/harnessTrigger.ts`
 - **Function**: `triggerHarnessBuild()`
 
 ### 7. Spec Generator
@@ -103,14 +103,14 @@ The Wishlist page now has a complete automation pipeline that connects user feat
 ### FibreFlow Staging (.env.production)
 ```bash
 HARNESS_TRIGGER_URL=http://100.96.203.105:8096
-HARNESS_TRIGGER_SECRET=wishlist-harness-secret-2026
+HARNESS_TRIGGER_SECRET=dev-queue-harness-secret-2026
 ```
 
 ### Harness Trigger Service (/opt/harness-trigger/.env)
 ```bash
 HARNESS_PATH=/home/louisdup/Agents/claude/VF/harness
-FIBREFLOW_WEBHOOK_URL=https://vf.fibreflow.app/api/wishlist
-HARNESS_TRIGGER_SECRET=wishlist-harness-secret-2026
+FIBREFLOW_WEBHOOK_URL=https://vf.fibreflow.app/api/dev-queue
+HARNESS_TRIGGER_SECRET=dev-queue-harness-secret-2026
 ANTHROPIC_API_KEY=                    # Empty = hybrid mode
 RESEND_API_KEY=re_YQYSYwyD_...
 NOTIFY_EMAIL=ai@velocityfibre.co.za
@@ -183,7 +183,7 @@ With API key configured:
 
 ## Testing Checklist
 
-- [x] Create wishlist item with work_type
+- [x] Create dev-queue item with work_type
 - [x] Move to Approved triggers GitHub issue
 - [x] Harness trigger service receives request
 - [x] Email notification sent
@@ -223,13 +223,13 @@ claude "Build fix_807faa3b_20260122_130734"
 ## Files Modified/Created
 
 ### FibreFlow App
-- `scripts/migrations/add-wishlist-work-type.sql` (new)
-- `src/modules/wishlist/types/wishlist.ts` (modified)
-- `src/modules/wishlist/components/AddWishlistItemModal.tsx` (modified)
-- `src/modules/wishlist/services/harnessTrigger.ts` (new)
-- `app/api/wishlist/route.ts` (modified)
-- `app/api/wishlist/move/route.ts` (modified)
-- `app/api/wishlist/[id]/progress/route.ts` (new)
+- `scripts/migrations/add-dev-queue-work-type.sql` (new)
+- `src/modules/dev-queue/types/dev-queue.ts` (modified)
+- `src/modules/dev-queue/components/AddDev QueueItemModal.tsx` (modified)
+- `src/modules/dev-queue/services/harnessTrigger.ts` (new)
+- `app/api/dev-queue/route.ts` (modified)
+- `app/api/dev-queue/move/route.ts` (modified)
+- `app/api/dev-queue/[id]/progress/route.ts` (new)
 - `.claude/commands/build.md` (new)
 
 ### VF Server

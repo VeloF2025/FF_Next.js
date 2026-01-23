@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user already voted
     const [existingVote] = await sql`
-      SELECT id FROM devQueue_votes
+      SELECT id FROM wishlist_votes
       WHERE item_id = ${itemId} AND user_id = ${userId}
     `;
 
@@ -31,13 +31,13 @@ export async function POST(req: NextRequest) {
     if (existingVote) {
       // Remove vote
       await sql`
-        DELETE FROM devQueue_votes
+        DELETE FROM wishlist_votes
         WHERE item_id = ${itemId} AND user_id = ${userId}
       `;
 
       // Decrement vote count
       await sql`
-        UPDATE devQueue_items
+        UPDATE wishlist_items
         SET votes = GREATEST(0, COALESCE(votes, 0) - 1)
         WHERE id = ${itemId}
       `;
@@ -46,13 +46,13 @@ export async function POST(req: NextRequest) {
     } else {
       // Add vote
       await sql`
-        INSERT INTO devQueue_votes (item_id, user_id)
+        INSERT INTO wishlist_votes (item_id, user_id)
         VALUES (${itemId}, ${userId})
       `;
 
       // Increment vote count
       await sql`
-        UPDATE devQueue_items
+        UPDATE wishlist_items
         SET votes = COALESCE(votes, 0) + 1
         WHERE id = ${itemId}
       `;
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     // Get updated vote count
     const [item] = await sql`
-      SELECT votes FROM devQueue_items WHERE id = ${itemId}
+      SELECT votes FROM wishlist_items WHERE id = ${itemId}
     `;
 
     votes = item?.votes || 0;

@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     // Get existing columns to compare
     const existingColumns = await sql`
-      SELECT id, name FROM devQueue_columns
+      SELECT id, name FROM wishlist_columns
     `;
     const existingIds = new Set(existingColumns.map((c: any) => c.id));
     const newIds = new Set(columns.map((c) => c.id));
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
       for (const name of columnNames) {
         const itemsInColumn = await sql`
-          SELECT COUNT(*) as count FROM devQueue_items WHERE status = ${name}
+          SELECT COUNT(*) as count FROM wishlist_items WHERE status = ${name}
         `;
         if (parseInt(itemsInColumn[0].count, 10) > 0) {
           return NextResponse.json(
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     // Process updates in a transaction-like manner
     // Delete removed columns
     for (const id of idsToDelete) {
-      await sql`DELETE FROM devQueue_columns WHERE id = ${id}`;
+      await sql`DELETE FROM wishlist_columns WHERE id = ${id}`;
     }
 
     // Update or create columns
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       if (column.isNew || column.id.startsWith('new-')) {
         // Create new column
         await sql`
-          INSERT INTO devQueue_columns (name, color, wip_limit, position)
+          INSERT INTO wishlist_columns (name, color, wip_limit, position)
           VALUES (${column.name}, ${column.color}, ${column.wip_limit}, ${column.position})
         `;
       } else if (existingIds.has(column.id)) {
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
         // Update existing column
         await sql`
-          UPDATE devQueue_columns
+          UPDATE wishlist_columns
           SET
             name = ${column.name},
             color = ${column.color},
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         // If column name changed, update items in that column
         if (oldColumn && oldColumn.name !== column.name) {
           await sql`
-            UPDATE devQueue_items
+            UPDATE wishlist_items
             SET status = ${column.name}
             WHERE status = ${oldColumn.name}
           `;
@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
     }
 
     const columns = await sql`
-      SELECT * FROM devQueue_columns
+      SELECT * FROM wishlist_columns
       ORDER BY position
     `;
 

@@ -51,10 +51,10 @@ export const communicationsSection: NavSection = {
       permissions: [],
     },
     {
-      to: '/communications/wishlist',
+      to: '/communications/dev-queue',
       icon: ListTodo,
-      label: 'Wishlist',
-      shortLabel: 'Wishlist',
+      label: 'Dev Queue',
+      shortLabel: 'DevQ',
       permissions: [],
     },
   ]

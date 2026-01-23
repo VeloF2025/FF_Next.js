@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Update the item's status (column) and position
     const [updatedItem] = await sql`
-      UPDATE devQueue_items
+      UPDATE wishlist_items
       SET
         status = ${targetColumn},
         column_position = ${position ?? 0},
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       if (githubIssue) {
         // Update devQueue item with GitHub issue URL and POC status
         await sql`
-          UPDATE devQueue_items
+          UPDATE wishlist_items
           SET
             github_issue_url = ${githubIssue.issueUrl},
             poc_status = 'pending',
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 
       // Update build status
       await sql`
-        UPDATE devQueue_items
+        UPDATE wishlist_items
         SET
           build_status = 'building',
           build_progress = 0

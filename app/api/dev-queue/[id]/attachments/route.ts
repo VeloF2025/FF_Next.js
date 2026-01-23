@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const itemId = params.id;
 
     const attachments = await sql`
-      SELECT * FROM devQueue_attachments
+      SELECT * FROM wishlist_attachments
       WHERE item_id = ${itemId}
       ORDER BY created_at DESC
     `;
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       }
 
       const [attachment] = await sql`
-        INSERT INTO devQueue_attachments (item_id, type, url, uploaded_by, uploaded_by_name)
+        INSERT INTO wishlist_attachments (item_id, type, url, uploaded_by, uploaded_by_name)
         VALUES (${itemId}, ${type}, ${url}, ${userId}, ${userName})
         RETURNING *
       `;
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       }
 
       const [attachment] = await sql`
-        INSERT INTO devQueue_attachments (
+        INSERT INTO wishlist_attachments (
           item_id, type, url, filename, file_size, mime_type, uploaded_by, uploaded_by_name
         )
         VALUES (
@@ -145,7 +145,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     }
 
     await sql`
-      DELETE FROM devQueue_attachments
+      DELETE FROM wishlist_attachments
       WHERE id = ${attachmentId} AND item_id = ${params.id}
     `;
 

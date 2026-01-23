@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch all columns
     const columns = await sql`
-      SELECT * FROM devQueue_columns
+      SELECT * FROM wishlist_columns
       ORDER BY position
     `;
 
@@ -24,10 +24,10 @@ export async function GET(req: NextRequest) {
       SELECT
         wi.*,
         CASE WHEN wv.user_id IS NOT NULL THEN true ELSE false END as has_voted,
-        (SELECT COUNT(*) FROM devQueue_comments WHERE item_id = wi.id) as comments_count,
-        (SELECT COUNT(*) FROM devQueue_attachments WHERE item_id = wi.id) as attachments_count
-      FROM devQueue_items wi
-      LEFT JOIN devQueue_votes wv ON wi.id = wv.item_id AND wv.user_id = ${userId}
+        (SELECT COUNT(*) FROM wishlist_comments WHERE item_id = wi.id) as comments_count,
+        (SELECT COUNT(*) FROM wishlist_attachments WHERE item_id = wi.id) as attachments_count
+      FROM wishlist_items wi
+      LEFT JOIN wishlist_votes wv ON wi.id = wv.item_id AND wv.user_id = ${userId}
       ORDER BY wi.column_position, wi.created_at DESC
     `;
 
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const userName = auth.user?.name || 'User';
 
     const [newItem] = await sql`
-      INSERT INTO devQueue_items (
+      INSERT INTO wishlist_items (
         title, description, status, priority,
         effort_estimate, work_type, business_value,
         problem_statement, acceptance_criteria, target_module, test_scenarios,

@@ -63,7 +63,7 @@ export async function POST(
 
     // Update devQueue item
     const [updatedItem] = await sql`
-      UPDATE devQueue_items
+      UPDATE wishlist_items
       SET
         build_status = ${updates.build_status},
         build_progress = ${updates.build_progress},
@@ -83,8 +83,8 @@ export async function POST(
     // Log to mvp_builds table if harness_run_id provided
     if (harness_run_id) {
       await sql`
-        INSERT INTO devQueue_mvp_builds (
-          devQueue_item_id,
+        INSERT INTO wishlist_mvp_builds (
+          wishlist_item_id,
           github_issue_number,
           status,
           progress,
@@ -147,7 +147,7 @@ export async function GET(
         id, title, build_status, build_progress,
         build_started_at, build_completed_at, build_error,
         github_issue_url, github_pr_url
-      FROM devQueue_items
+      FROM wishlist_items
       WHERE id = ${itemId}
     `;
 

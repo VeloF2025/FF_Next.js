@@ -76,14 +76,14 @@ Update `.claude/session/current.json`:
 ║                    KB UPDATE COMPLETE                        ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Modules scanned:        40                                   ║
-║ New modules found:      2 (fleet, wishlist)                  ║
+║ New modules found:      2 (fleet, dev-queue)                  ║
 ║ Missing .claude.md:     5                                    ║
 ║ Learnings consolidated: 12                                   ║
 ║ Session state:          Updated                              ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ NEW .claude.md FILES CREATED:                                ║
 ║   - src/modules/fleet/.claude.md                             ║
-║   - src/modules/wishlist/.claude.md                          ║
+║   - src/modules/dev-queue/.claude.md                          ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ MODULES STILL MISSING .claude.md:                            ║
 ║   - src/modules/field-stock/                                 ║
