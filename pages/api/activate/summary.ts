@@ -15,13 +15,23 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
+
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { DRSummary, DRState, QADecision } from '@/modules/activate/types/summary.types';
 
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
+// Configure Neon transport based on NEON_USE_HTTP env var
+const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
+
+if (!useHttpTransport) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ws = require('ws');
+    neonConfig.webSocketConstructor = ws;
+  } catch {
+    // ws not available, will use HTTP
+  }
+}
 
 // BOSS API (dr-photo-api) - Single source for all 1Map data
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';

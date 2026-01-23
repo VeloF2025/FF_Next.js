@@ -13,14 +13,24 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
+
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
 
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
+// Configure Neon transport based on NEON_USE_HTTP env var
+const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
+
+if (!useHttpTransport) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ws = require('ws');
+    neonConfig.webSocketConstructor = ws;
+  } catch {
+    // ws not available, will use HTTP
+  }
+}
 
 // CRITICAL: Use correct Neon endpoint (ep-dry-night-a9qyh4sj)
 const pool = new Pool({

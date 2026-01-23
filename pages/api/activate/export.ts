@@ -15,12 +15,22 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
+
 import * as XLSX from 'xlsx';
 import { log } from '@/lib/logger';
 
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
+// Configure Neon transport based on NEON_USE_HTTP env var
+const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
+
+if (!useHttpTransport) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ws = require('ws');
+    neonConfig.webSocketConstructor = ws;
+  } catch {
+    // ws not available, will use HTTP
+  }
+}
 
 const pool = new Pool({
   connectionString:
