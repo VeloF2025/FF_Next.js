@@ -329,6 +329,21 @@ export default async function handler(
       if (oesOnlyDRs.length > 0) {
         log.info('OESImport', `Creating ${oesOnlyDRs.length} unified records for OES-only DRs`);
 
+        // Lookup project for each DR from drops table (source of truth)
+        const oesOnlyDropNumbers = oesOnlyDRs.map(r => r.drop_number);
+        const projectLookupResult = await pool.query(
+          `SELECT d.drop_number, p.project_name
+           FROM drops d
+           JOIN projects p ON d.project_id = p.id
+           WHERE d.drop_number = ANY($1)`,
+          [oesOnlyDropNumbers]
+        );
+        const drToProject = new Map<string, string>();
+        projectLookupResult.rows.forEach(r => {
+          drToProject.set(r.drop_number, r.project_name);
+        });
+        log.info('OESImport', `Found project mapping for ${drToProject.size}/${oesOnlyDRs.length} DRs`);
+
         // Batch insert OES-only DRs into unified table
         // Photos will be fetched via ensure-data when user opens for QA review
         // NOTE: submitted_date is NOT set - these DRs were not "submitted" via WhatsApp
@@ -342,19 +357,21 @@ export default async function handler(
           const placeholders: string[] = [];
 
           chunk.forEach((row, idx) => {
-            const offset = idx * 2;
+            const offset = idx * 3;
             // is_oes_only is always TRUE for these records
-            placeholders.push(`($${offset + 1}, $${offset + 2}, TRUE)`);
+            // project is looked up from drops table (source of truth)
+            placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, TRUE)`);
             values.push(
               row.drop_number,
-              'OES Import' // Mark source as OES import
+              'OES Import', // Mark source as OES import
+              drToProject.get(row.drop_number) || null // Project from drops table
               // NOTE: submitted_date is NOT set - these are OES-only activations
             );
           });
 
           try {
             await pool.query(
-              `INSERT INTO dr_photo_unified_reviews (drop_number, photo_source, is_oes_only)
+              `INSERT INTO dr_photo_unified_reviews (drop_number, photo_source, project, is_oes_only)
                VALUES ${placeholders.join(', ')}
                ON CONFLICT (drop_number) DO NOTHING`,
               values
