@@ -10,9 +10,20 @@ import { getAuth } from '@/lib/auth-mock';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
+import { logDocumentVerified, logDocumentRejected } from '@/services/staff/staffAuditService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentVerifyAPI');
+
+// Helper to get verifier name
+async function getVerifierName(verifierId: string): Promise<string> {
+  try {
+    const [verifier] = await sql`SELECT name FROM staff WHERE id = ${verifierId}`;
+    return (verifier?.name as string) || 'Unknown';
+  } catch {
+    return 'Unknown';
+  }
+}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -136,6 +147,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           syncedFieldCount: syncedFields.length,
         });
       }
+
+      // Log to audit trail
+      const staffId = (updated as Record<string, unknown>).staff_id as string;
+      const verifierName = verifierId ? await getVerifierName(verifierId) : 'System';
+      await logDocumentVerified(
+        staffId,
+        documentType,
+        syncedFields,
+        verifierName,
+        req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
+      );
+    } else if (status === 'rejected') {
+      // Log rejection to audit trail
+      const staffId = (updated as Record<string, unknown>).staff_id as string;
+      const verifierName = verifierId ? await getVerifierName(verifierId) : 'System';
+      await logDocumentRejected(
+        staffId,
+        documentType,
+        notes || 'No reason provided',
+        verifierName,
+        req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
+      );
     }
 
     // Get full document with joins

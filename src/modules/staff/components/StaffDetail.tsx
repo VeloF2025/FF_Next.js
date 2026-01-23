@@ -13,6 +13,7 @@ import {
   Car,
   AlertTriangle,
   MessageSquare,
+  Activity,
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { log } from '@/lib/logger';
@@ -25,11 +26,12 @@ import { ComplianceTab } from './tabs/ComplianceTab';
 import { VehiclesTab } from './tabs/VehiclesTab';
 import { DisciplinaryTab } from './tabs/DisciplinaryTab';
 import { NotesTab } from './tabs/NotesTab';
+import { ActivityTab } from './tabs/ActivityTab';
 import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 
-type TabType = 'overview' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes';
+type TabType = 'overview' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
 
 const TABS: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Overview', icon: User },
@@ -40,6 +42,7 @@ const TABS: { id: TabType; label: string; icon: React.ComponentType<{ className?
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'notes', label: 'Notes', icon: MessageSquare },
+  { id: 'activity', label: 'Activity', icon: Activity },
 ];
 
 export function StaffDetail() {
@@ -422,6 +425,10 @@ export function StaffDetail() {
 
           {activeTab === 'notes' && (
             <NotesTab staff={staff} staffId={id} />
+          )}
+
+          {activeTab === 'activity' && (
+            <ActivityTab staffId={id} />
           )}
         </div>
       </div>

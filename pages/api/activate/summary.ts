@@ -10,6 +10,7 @@
  * - oes_activations (activation date, team, optical metrics)
  * - drops (installation date, installer)
  * - qa_photo_reviews (submitter info)
+ * - onemap_properties (installer name from 1Map - Jan 2026)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
