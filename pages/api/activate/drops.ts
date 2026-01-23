@@ -738,15 +738,19 @@ async function getProjectStats(filters?: {
  * Auto-sync missing DRs from qa_photo_reviews to dr_photo_unified_reviews
  * This ensures DRs always appear in the list, even if the webhook failed.
  *
+ * IMPORTANT: Only syncs DRs that are ALSO in oes_activations (OES report).
+ * Business rule: DRs only appear in /activate after OES import.
+ *
  * Called on each request but runs efficiently:
- * - Only syncs DRs from the last 7 days (recent submissions)
+ * - Only syncs DRs from the last 30 days (recent submissions)
+ * - Only syncs DRs that exist in oes_activations
  * - Uses INSERT ... ON CONFLICT DO NOTHING to avoid duplicates
- * - Runs in background, doesn't block the response
  */
 async function syncMissingFromQaPhotoReviews(): Promise<number> {
   try {
-    // Find DRs in qa_photo_reviews that are missing from dr_photo_unified_reviews
-    // Only look at last 7 days to keep it fast
+    // Find DRs in qa_photo_reviews that:
+    // 1. Are missing from dr_photo_unified_reviews
+    // 2. Exist in oes_activations (have been OES imported)
     const result = await pool.query(`
       INSERT INTO dr_photo_unified_reviews (
         drop_number, project, submission_count, submitted_date, sender_phone,
@@ -762,10 +766,14 @@ async function syncMissingFromQaPhotoReviews(): Promise<number> {
         NOW(),
         FALSE
       FROM qa_photo_reviews qa
-      WHERE qa.created_at > NOW() - INTERVAL '7 days'
+      WHERE qa.created_at > NOW() - INTERVAL '30 days'
         AND NOT EXISTS (
           SELECT 1 FROM dr_photo_unified_reviews u
           WHERE u.drop_number = qa.drop_number
+        )
+        AND EXISTS (
+          SELECT 1 FROM oes_activations oes
+          WHERE oes.drop_number = qa.drop_number
         )
       ON CONFLICT (drop_number) DO NOTHING
       RETURNING drop_number
