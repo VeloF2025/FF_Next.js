@@ -216,6 +216,7 @@ export function DriverLicenseUploadModal({
               <DocumentUploadWizard
                 staffId={selectedStaff.id}
                 context="fleet"
+                preSelectedType="drivers_license"
                 onSuccess={handleUploadSuccess}
                 onCancel={handleCancel}
               />

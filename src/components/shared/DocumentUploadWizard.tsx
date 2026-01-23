@@ -19,7 +19,7 @@ export interface DocumentUploadWizardProps {
   onCancel: () => void;
   /** Context for audit logging - defaults to 'staff' */
   context?: 'staff' | 'fleet';
-  /** Pre-selected document type (optional) */
+  /** Pre-selected document type - skips type selection step */
   preSelectedType?: DocumentType;
 }
 
@@ -31,14 +31,14 @@ export function DocumentUploadWizard({
   staffId,
   onSuccess,
   onCancel,
+  preSelectedType,
 }: DocumentUploadWizardProps) {
-  // For now, directly use StaffDocumentUploadWizard
-  // Context tracking will be added to audit logs in future if needed
   return (
     <StaffDocumentUploadWizard
       staffId={staffId}
       onSuccess={onSuccess}
       onCancel={onCancel}
+      preSelectedType={preSelectedType}
     />
   );
 }
