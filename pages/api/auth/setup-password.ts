@@ -140,11 +140,16 @@ export default async function handler(
     // Step 3: Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Step 4: Determine auth role
-    // Super admins (explicit list)
-    const SUPER_ADMIN_EMAILS = [
-      'hein@velocityfibre.co.za',
-    ];
+    // Step 4: Determine auth role using database-driven RBAC
+    // Super admin emails can be configured via environment variable
+    // Format: comma-separated list e.g. "admin@example.com,ceo@example.com"
+    const BOOTSTRAP_SUPER_ADMIN_EMAILS = process.env.SUPER_ADMIN_EMAILS
+      ? process.env.SUPER_ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
+      : [];
+
+    // Check if this is the first user (bootstrap super admin)
+    const userCountResult = await sql`SELECT COUNT(*) as count FROM users`;
+    const isFirstUser = parseInt(String(userCountResult[0]?.count || '0')) === 0;
 
     const mapPositionToAuthRole = (position: string | null): AuthRole => {
       if (!position) return 'viewer';
@@ -166,8 +171,11 @@ export default async function handler(
       return 'viewer';
     };
 
-    // Check for super admin first, then fall back to position mapping
-    const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
+    // Determine if this user should be super_admin:
+    // 1. First user in the system becomes super_admin automatically
+    // 2. Email is in the SUPER_ADMIN_EMAILS env variable
+    // 3. Otherwise, use position-based role mapping
+    const isSuperAdmin = isFirstUser || BOOTSTRAP_SUPER_ADMIN_EMAILS.includes(normalizedEmail);
     const authRole = isSuperAdmin
       ? 'super_admin' as AuthRole
       : mapPositionToAuthRole(staffMember.position as string | null);

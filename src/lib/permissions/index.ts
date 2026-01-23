@@ -1,0 +1,485 @@
+/**
+ * Permission Service
+ * Database-driven RBAC with module/page/tab/action hierarchy
+ */
+
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL!);
+
+// Types
+export type PermissionType = 'module' | 'page' | 'tab' | 'action';
+
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+
+export interface Permission {
+  id: string;
+  type: PermissionType;
+  key: string;
+  parentKey: string | null;
+  label: string;
+  description: string | null;
+  route: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface PermissionActions {
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+}
+
+export interface RolePermission {
+  role: string;
+  permissionKey: string;
+  actions: PermissionActions;
+}
+
+export interface UserPermissionOverride {
+  userId: string;
+  permissionKey: string;
+  overrideType: 'grant' | 'revoke';
+  actions: PermissionActions;
+  grantedBy: string | null;
+  grantedAt: Date;
+  expiresAt: Date | null;
+  reason: string | null;
+}
+
+export interface EffectivePermission {
+  permissionKey: string;
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}
+
+// =====================================================
+// Permission Queries
+// =====================================================
+
+/**
+ * Get all permissions (optionally filtered by type)
+ */
+export async function getPermissions(type?: PermissionType): Promise<Permission[]> {
+  const result = type
+    ? await sql`
+        SELECT id, type, key, parent_key, label, description, route, sort_order, is_active
+        FROM access_permissions
+        WHERE is_active = true AND type = ${type}
+        ORDER BY sort_order
+      `
+    : await sql`
+        SELECT id, type, key, parent_key, label, description, route, sort_order, is_active
+        FROM access_permissions
+        WHERE is_active = true
+        ORDER BY
+          CASE type
+            WHEN 'module' THEN 1
+            WHEN 'page' THEN 2
+            WHEN 'tab' THEN 3
+            WHEN 'action' THEN 4
+          END,
+          sort_order
+      `;
+
+  return result.map(row => ({
+    id: row.id,
+    type: row.type as PermissionType,
+    key: row.key,
+    parentKey: row.parent_key,
+    label: row.label,
+    description: row.description,
+    route: row.route,
+    sortOrder: row.sort_order,
+    isActive: row.is_active,
+  }));
+}
+
+/**
+ * Get permission tree (hierarchical structure)
+ */
+export async function getPermissionTree(): Promise<Permission[]> {
+  return getPermissions();
+}
+
+/**
+ * Get permissions for a specific module (and its children)
+ */
+export async function getModulePermissions(moduleKey: string): Promise<Permission[]> {
+  const result = await sql`
+    SELECT id, type, key, parent_key, label, description, route, sort_order, is_active
+    FROM access_permissions
+    WHERE is_active = true
+      AND (key = ${moduleKey} OR key LIKE ${moduleKey + '.%'})
+    ORDER BY
+      CASE type
+        WHEN 'module' THEN 1
+        WHEN 'page' THEN 2
+        WHEN 'tab' THEN 3
+        WHEN 'action' THEN 4
+      END,
+      sort_order
+  `;
+
+  return result.map(row => ({
+    id: row.id,
+    type: row.type as PermissionType,
+    key: row.key,
+    parentKey: row.parent_key,
+    label: row.label,
+    description: row.description,
+    route: row.route,
+    sortOrder: row.sort_order,
+    isActive: row.is_active,
+  }));
+}
+
+// =====================================================
+// Role Queries
+// =====================================================
+
+/**
+ * Get all unique roles
+ */
+export async function getRoles(): Promise<string[]> {
+  const result = await sql`
+    SELECT DISTINCT role FROM role_permissions ORDER BY role
+  `;
+  return result.map(row => row.role);
+}
+
+/**
+ * Get permissions for a specific role
+ */
+export async function getRolePermissions(role: string): Promise<RolePermission[]> {
+  const result = await sql`
+    SELECT role, permission_key, actions
+    FROM role_permissions
+    WHERE role = ${role}
+  `;
+
+  return result.map(row => ({
+    role: row.role,
+    permissionKey: row.permission_key,
+    actions: row.actions as PermissionActions,
+  }));
+}
+
+/**
+ * Update role permission
+ */
+export async function updateRolePermission(
+  role: string,
+  permissionKey: string,
+  actions: Partial<PermissionActions>
+): Promise<void> {
+  const currentActions = await sql`
+    SELECT actions FROM role_permissions
+    WHERE role = ${role} AND permission_key = ${permissionKey}
+  `;
+
+  const merged = {
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+    ...(currentActions[0]?.actions || {}),
+    ...actions,
+  };
+
+  await sql`
+    INSERT INTO role_permissions (role, permission_key, actions)
+    VALUES (${role}, ${permissionKey}, ${JSON.stringify(merged)}::jsonb)
+    ON CONFLICT (role, permission_key)
+    DO UPDATE SET actions = ${JSON.stringify(merged)}::jsonb, updated_at = NOW()
+  `;
+}
+
+// =====================================================
+// User Permission Queries
+// =====================================================
+
+/**
+ * Check if user has a specific permission action
+ */
+export async function userHasPermission(
+  userId: string,
+  permissionKey: string,
+  action: PermissionAction = 'view'
+): Promise<boolean> {
+  // Check for legacy 'all' permission (super admin)
+  const userResult = await sql`
+    SELECT role, permissions FROM users WHERE id = ${userId}
+  `;
+
+  if (userResult.length === 0) return false;
+
+  const user = userResult[0];
+
+  // Super admin with 'all' permission
+  if (user.permissions && Array.isArray(user.permissions) && user.permissions.includes('all')) {
+    return true;
+  }
+
+  // Get role-based permission
+  const rolePermResult = await sql`
+    SELECT actions FROM role_permissions
+    WHERE role = ${user.role} AND permission_key = ${permissionKey}
+  `;
+
+  let hasPermission = false;
+  if (rolePermResult.length > 0 && rolePermResult[0].actions) {
+    hasPermission = rolePermResult[0].actions[action] === true;
+  }
+
+  // Check for user override
+  const overrideResult = await sql`
+    SELECT override_type, actions FROM user_permission_overrides
+    WHERE user_id = ${userId}
+      AND permission_key = ${permissionKey}
+      AND (expires_at IS NULL OR expires_at > NOW())
+  `;
+
+  if (overrideResult.length > 0) {
+    const override = overrideResult[0];
+    if (override.override_type === 'grant' && override.actions[action]) {
+      return true;
+    }
+    if (override.override_type === 'revoke' && override.actions[action]) {
+      return false;
+    }
+  }
+
+  return hasPermission;
+}
+
+/**
+ * Get user's effective permissions
+ */
+export async function getUserEffectivePermissions(userId: string): Promise<EffectivePermission[]> {
+  // Check for super admin
+  const userResult = await sql`
+    SELECT role, permissions FROM users WHERE id = ${userId}
+  `;
+
+  if (userResult.length === 0) return [];
+
+  const user = userResult[0];
+  const isSuperAdmin = user.permissions && Array.isArray(user.permissions) && user.permissions.includes('all');
+
+  if (isSuperAdmin) {
+    // Super admin gets all permissions
+    const allPerms = await sql`
+      SELECT key FROM access_permissions WHERE is_active = true
+    `;
+    return allPerms.map(p => ({
+      permissionKey: p.key,
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      canDelete: true,
+    }));
+  }
+
+  // Get role permissions + overrides
+  const result = await sql`
+    SELECT
+      ap.key as permission_key,
+      COALESCE(
+        CASE
+          WHEN upo.override_type = 'grant' THEN (upo.actions->>'view')::boolean
+          WHEN upo.override_type = 'revoke' AND (upo.actions->>'view')::boolean THEN FALSE
+          ELSE (rp.actions->>'view')::boolean
+        END,
+        FALSE
+      ) as can_view,
+      COALESCE(
+        CASE
+          WHEN upo.override_type = 'grant' THEN (upo.actions->>'create')::boolean
+          WHEN upo.override_type = 'revoke' AND (upo.actions->>'create')::boolean THEN FALSE
+          ELSE (rp.actions->>'create')::boolean
+        END,
+        FALSE
+      ) as can_create,
+      COALESCE(
+        CASE
+          WHEN upo.override_type = 'grant' THEN (upo.actions->>'edit')::boolean
+          WHEN upo.override_type = 'revoke' AND (upo.actions->>'edit')::boolean THEN FALSE
+          ELSE (rp.actions->>'edit')::boolean
+        END,
+        FALSE
+      ) as can_edit,
+      COALESCE(
+        CASE
+          WHEN upo.override_type = 'grant' THEN (upo.actions->>'delete')::boolean
+          WHEN upo.override_type = 'revoke' AND (upo.actions->>'delete')::boolean THEN FALSE
+          ELSE (rp.actions->>'delete')::boolean
+        END,
+        FALSE
+      ) as can_delete
+    FROM access_permissions ap
+    LEFT JOIN role_permissions rp ON rp.permission_key = ap.key AND rp.role = ${user.role}
+    LEFT JOIN user_permission_overrides upo ON upo.permission_key = ap.key
+      AND upo.user_id = ${userId}
+      AND (upo.expires_at IS NULL OR upo.expires_at > NOW())
+    WHERE ap.is_active = true
+  `;
+
+  return result.map(row => ({
+    permissionKey: row.permission_key,
+    canView: row.can_view,
+    canCreate: row.can_create,
+    canEdit: row.can_edit,
+    canDelete: row.can_delete,
+  }));
+}
+
+/**
+ * Get user's permission overrides
+ */
+export async function getUserPermissionOverrides(userId: string): Promise<UserPermissionOverride[]> {
+  const result = await sql`
+    SELECT user_id, permission_key, override_type, actions, granted_by, granted_at, expires_at, reason
+    FROM user_permission_overrides
+    WHERE user_id = ${userId}
+      AND (expires_at IS NULL OR expires_at > NOW())
+  `;
+
+  return result.map(row => ({
+    userId: row.user_id,
+    permissionKey: row.permission_key,
+    overrideType: row.override_type as 'grant' | 'revoke',
+    actions: row.actions as PermissionActions,
+    grantedBy: row.granted_by,
+    grantedAt: row.granted_at,
+    expiresAt: row.expires_at,
+    reason: row.reason,
+  }));
+}
+
+/**
+ * Grant permission override to user
+ */
+export async function grantUserPermission(
+  userId: string,
+  permissionKey: string,
+  actions: Partial<PermissionActions>,
+  grantedBy: string,
+  reason?: string,
+  expiresAt?: Date
+): Promise<void> {
+  const fullActions = {
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+    ...actions,
+  };
+
+  await sql`
+    INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions, granted_by, reason, expires_at)
+    VALUES (${userId}, ${permissionKey}, 'grant', ${JSON.stringify(fullActions)}::jsonb, ${grantedBy}, ${reason || null}, ${expiresAt || null})
+    ON CONFLICT (user_id, permission_key)
+    DO UPDATE SET
+      override_type = 'grant',
+      actions = ${JSON.stringify(fullActions)}::jsonb,
+      granted_by = ${grantedBy},
+      granted_at = NOW(),
+      reason = ${reason || null},
+      expires_at = ${expiresAt || null}
+  `;
+}
+
+/**
+ * Revoke permission from user
+ */
+export async function revokeUserPermission(
+  userId: string,
+  permissionKey: string,
+  actions: Partial<PermissionActions>,
+  revokedBy: string,
+  reason?: string
+): Promise<void> {
+  const fullActions = {
+    view: false,
+    create: false,
+    edit: false,
+    delete: false,
+    ...actions,
+  };
+
+  await sql`
+    INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions, granted_by, reason)
+    VALUES (${userId}, ${permissionKey}, 'revoke', ${JSON.stringify(fullActions)}::jsonb, ${revokedBy}, ${reason || null})
+    ON CONFLICT (user_id, permission_key)
+    DO UPDATE SET
+      override_type = 'revoke',
+      actions = ${JSON.stringify(fullActions)}::jsonb,
+      granted_by = ${revokedBy},
+      granted_at = NOW(),
+      reason = ${reason || null}
+  `;
+}
+
+/**
+ * Remove permission override from user (revert to role-based)
+ */
+export async function removeUserPermissionOverride(
+  userId: string,
+  permissionKey: string
+): Promise<void> {
+  await sql`
+    DELETE FROM user_permission_overrides
+    WHERE user_id = ${userId} AND permission_key = ${permissionKey}
+  `;
+}
+
+// =====================================================
+// Helper functions for common checks
+// =====================================================
+
+/**
+ * Check if user can view a module
+ */
+export async function canViewModule(userId: string, moduleKey: string): Promise<boolean> {
+  return userHasPermission(userId, moduleKey, 'view');
+}
+
+/**
+ * Check if user can access a page
+ */
+export async function canAccessPage(userId: string, pageKey: string): Promise<boolean> {
+  return userHasPermission(userId, pageKey, 'view');
+}
+
+/**
+ * Get modules user can view
+ */
+export async function getAccessibleModules(userId: string): Promise<Permission[]> {
+  const allModules = await getPermissions('module');
+  const effectivePerms = await getUserEffectivePermissions(userId);
+
+  const viewableKeys = new Set(
+    effectivePerms.filter(p => p.canView).map(p => p.permissionKey)
+  );
+
+  return allModules.filter(m => viewableKeys.has(m.key));
+}
+
+/**
+ * Get pages user can view for a module
+ */
+export async function getAccessiblePages(userId: string, moduleKey: string): Promise<Permission[]> {
+  const modulePerms = await getModulePermissions(moduleKey);
+  const pages = modulePerms.filter(p => p.type === 'page');
+  const effectivePerms = await getUserEffectivePermissions(userId);
+
+  const viewableKeys = new Set(
+    effectivePerms.filter(p => p.canView).map(p => p.permissionKey)
+  );
+
+  return pages.filter(p => viewableKeys.has(p.key));
+}

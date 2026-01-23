@@ -6,9 +6,10 @@ import { VFLogoUpload } from '@/components/settings/VFLogoUpload';
 import { RemindersTab } from '@/components/settings/RemindersTab';
 import { SidebarCustomization } from '@/components/settings/SidebarCustomization';
 import { SageIntegrationTab } from '@/components/settings/SageIntegrationTab';
-import { Palette, Moon, Sun, Settings2, GitBranch, Bell, PanelLeft, Cloud } from 'lucide-react';
+import { AccessControlTab } from '@/components/settings/AccessControlTab';
+import { Palette, Moon, Sun, Settings2, GitBranch, Bell, PanelLeft, Cloud, Shield } from 'lucide-react';
 
-type SettingsTab = 'general' | 'sidebar' | 'workflow' | 'reminders' | 'integrations';
+type SettingsTab = 'general' | 'sidebar' | 'workflow' | 'reminders' | 'integrations' | 'access';
 
 export function Settings() {
   const { themeConfig, setTheme, availableThemes } = useTheme();
@@ -18,6 +19,7 @@ export function Settings() {
   const tabs = [
     { id: 'general', label: 'General', icon: Settings2 },
     { id: 'sidebar', label: 'Sidebar', icon: PanelLeft },
+    { id: 'access', label: 'Access Control', icon: Shield },
     { id: 'workflow', label: 'Workflow Management', icon: GitBranch },
     { id: 'integrations', label: 'Integrations', icon: Cloud },
     { id: 'reminders', label: 'Reminders', icon: Bell }
@@ -163,6 +165,9 @@ export function Settings() {
 
       case 'integrations':
         return <SageIntegrationTab />;
+
+      case 'access':
+        return <AccessControlTab />;
 
       default:
         return null;
