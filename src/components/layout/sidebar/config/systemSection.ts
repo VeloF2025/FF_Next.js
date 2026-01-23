@@ -20,7 +20,7 @@ export const systemSection: NavSection = {
       icon: HeartPulse,
       label: 'System Health',
       shortLabel: 'Health',
-      permissions: [Permission.SYSTEM_ADMIN],
+      permissions: [],
     },
     {
       to: XYOPS_URL,
