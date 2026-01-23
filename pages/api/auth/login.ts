@@ -95,17 +95,23 @@ export default async function handler(
       department: dbUser.department,
     };
 
-    // Sign JWT token
+    // Create session and sign JWT with session ID
     const expiresIn = rememberMe ? '30d' : '24h';
-    const token = await signToken(user, '', expiresIn); // Session ID will be added
-
-    // Create session in database
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
-    const session = await createSession(user.id, token, ipAddress, userAgent);
 
-    // Re-sign token with session ID
+    // Create session first to get session ID
+    const session = await createSession(user.id, '', ipAddress, userAgent);
+
+    // Sign final token with session ID
     const finalToken = await signToken(user, session.id, expiresIn);
+
+    // Update session with token hash
+    await sql`
+      UPDATE user_sessions
+      SET token_hash = encode(sha256(${finalToken}::bytea), 'hex')
+      WHERE id = ${session.id}
+    `;
 
     // Update last login
     await sql`
