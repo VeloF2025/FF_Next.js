@@ -51,6 +51,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function mapRole(role: string): UserRole {
   const roleMap: Record<string, UserRole> = {
     'system': UserRole.SUPER_ADMIN,
+    'super_admin': UserRole.SUPER_ADMIN,
     'admin': UserRole.ADMIN,
     'manager': UserRole.PROJECT_MANAGER,
     'technician': UserRole.FIELD_TECHNICIAN,
@@ -64,19 +65,27 @@ function mapApiUser(apiUser: {
   id: string;
   email: string;
   name?: string;
+  firstName?: string;
+  lastName?: string;
   role: string;
   permissions: string[];
+  profilePicture?: string | null;
 }): { user: User; authUser: AuthUser } {
   const role = mapRole(apiUser.role);
   const permissions = apiUser.permissions.includes('all')
     ? Object.values(Permission)
     : (apiUser.permissions as Permission[]);
 
+  // Build display name from firstName/lastName or fall back to name or email
+  const displayName = apiUser.firstName && apiUser.lastName
+    ? `${apiUser.firstName} ${apiUser.lastName}`
+    : apiUser.name || apiUser.email.split('@')[0];
+
   const user: User = {
     id: apiUser.id,
     email: apiUser.email,
-    displayName: apiUser.name || apiUser.email.split('@')[0],
-    photoURL: null,
+    displayName,
+    photoURL: apiUser.profilePicture || null,
     role,
     permissions,
     isEmailVerified: true,
@@ -87,8 +96,8 @@ function mapApiUser(apiUser: {
   const authUser: AuthUser = {
     uid: apiUser.id,
     email: apiUser.email,
-    displayName: apiUser.name || apiUser.email.split('@')[0],
-    photoURL: null,
+    displayName,
+    photoURL: apiUser.profilePicture || null,
     emailVerified: true,
   };
 
@@ -111,7 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (res.ok) {
         const data = await res.json();
-        const { user: mappedUser, authUser } = mapApiUser(data.user);
+        // API returns { success, data: { user } } structure
+        const userData = data.data?.user || data.user;
+        const { user: mappedUser, authUser } = mapApiUser(userData);
         setUser(authUser);
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);
@@ -149,10 +160,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
+        throw new Error(data.error?.message || data.message || 'Login failed');
       }
 
-      const { user: mappedUser, authUser } = mapApiUser(data.user);
+      // API returns { success, data: { user } } structure
+      const userData = data.data?.user || data.user;
+      const { user: mappedUser, authUser } = mapApiUser(userData);
       setUser(authUser);
       setCurrentUser(mappedUser);
       setIsAuthenticated(true);
