@@ -50,6 +50,11 @@ const VELOCITY_TRACKER_COLUMNS = {
   STAKEHOLDER_OUTSTANDING: 8658713715625860,
   WAYLEAVE_COMMENTS: 126626108755844,
   COMMENT_OTHER: 198770178084740,
+  // New columns added Jan 2026
+  WAYLEAVE_START: 3272064541347716,
+  WAYLEAVE_END: 7775664168718212,
+  CESSION_DATE: 2146164634505092,
+  CESSION_SIGNED: 6649764261875588,
 };
 
 // Status mapping: Smartsheet → Pipeline
@@ -469,6 +474,12 @@ export async function syncFromSmartsheet(
         const nearestBh = getCellValue(row, VELOCITY_TRACKER_COLUMNS.NEAREST_BH) as string;
         const commentOther = getCellValue(row, VELOCITY_TRACKER_COLUMNS.COMMENT_OTHER) as string;
 
+        // New fields (Jan 2026)
+        const wayleaveStart = getCellValue(row, VELOCITY_TRACKER_COLUMNS.WAYLEAVE_START) as string;
+        const wayleaveEnd = getCellValue(row, VELOCITY_TRACKER_COLUMNS.WAYLEAVE_END) as string;
+        const cessionDate = getCellValue(row, VELOCITY_TRACKER_COLUMNS.CESSION_DATE) as string;
+        const cessionSigned = getCellValue(row, VELOCITY_TRACKER_COLUMNS.CESSION_SIGNED) as string;
+
         // Wayleave data
         const wlAppDate = getCellValue(row, VELOCITY_TRACKER_COLUMNS.WAYLEAVE_APPLICATION_DATE) as string;
         const wlStatus = getCellValue(row, VELOCITY_TRACKER_COLUMNS.WAYLEAVE_STATUS) as string;
@@ -511,6 +522,10 @@ export async function syncFromSmartsheet(
                 mh_name: mhName,
                 nearest_bh: nearestBh,
                 customer: customer,
+                wayleave_start: wayleaveStart,
+                wayleave_end: wayleaveEnd,
+                cession_date: cessionDate,
+                cession_signed: cessionSigned,
               })},
               smartsheet_id = ${ssRowId},
               smartsheet_sheet_id = ${String(sheetId)},
