@@ -37,6 +37,12 @@ export interface RolePermission {
   actions: PermissionActions;
 }
 
+export interface RolePermissionWithLabel extends RolePermission {
+  key: string;
+  label: string;
+  type?: string;
+}
+
 export interface UserPermissionOverride {
   userId: string;
   permissionKey: string;
@@ -154,16 +160,21 @@ export async function getRoles(): Promise<string[]> {
 /**
  * Get permissions for a specific role
  */
-export async function getRolePermissions(role: string): Promise<RolePermission[]> {
+export async function getRolePermissions(role: string): Promise<RolePermissionWithLabel[]> {
   const result = await sql`
-    SELECT role, permission_key, actions
-    FROM role_permissions
-    WHERE role = ${role}
+    SELECT rp.role, rp.permission_key, rp.actions, ap.label, ap.type
+    FROM role_permissions rp
+    JOIN access_permissions ap ON rp.permission_key = ap.key
+    WHERE rp.role = ${role} AND ap.is_active = true
+    ORDER BY ap.sort_order
   `;
 
   return result.map(row => ({
     role: row.role,
     permissionKey: row.permission_key,
+    key: row.permission_key,
+    label: row.label || row.permission_key,
+    type: row.type,
     actions: row.actions as PermissionActions,
   }));
 }
