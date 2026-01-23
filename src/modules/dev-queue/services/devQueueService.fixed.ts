@@ -10,7 +10,7 @@ import type {
 } from '../types/devQueue';
 
 class DevQueueService {
-  private baseUrl = '/api/devQueue';
+  private baseUrl = '/api/dev-queue';
 
   async getBoard(): Promise<DevQueueBoard> {
     const response = await fetch(this.baseUrl, {

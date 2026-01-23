@@ -14,7 +14,7 @@ import type {
 } from '../types/devQueue';
 
 class DevQueueService {
-  private baseUrl = '/api/devQueue';
+  private baseUrl = '/api/dev-queue';
 
   /**
    * Get the complete devQueue board with columns and items

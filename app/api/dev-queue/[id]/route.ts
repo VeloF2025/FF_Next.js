@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
-import type { UpdateDevQueueItemInput } from '@/modules/devQueue/types/devQueue';
+import type { UpdateDevQueueItemInput } from '@/modules/dev-queue/types/devQueue';
 
 const sql = neon(process.env.DATABASE_URL!);
 

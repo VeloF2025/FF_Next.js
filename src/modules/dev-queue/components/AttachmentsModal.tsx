@@ -49,7 +49,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
   const fetchAttachments = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/devQueue/${itemId}/attachments`);
+      const response = await fetch(`/api/dev-queue/${itemId}/attachments`);
       if (response.ok) {
         const data = await response.json();
         setAttachments(data.data || []);
@@ -74,7 +74,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
       // Determine if it's an image URL
       const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(urlInput);
 
-      const response = await fetch(`/api/devQueue/${itemId}/attachments`, {
+      const response = await fetch(`/api/dev-queue/${itemId}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,7 +109,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`/api/devQueue/${itemId}/attachments`, {
+      const response = await fetch(`/api/dev-queue/${itemId}/attachments`, {
         method: 'POST',
         body: formData,
       });
@@ -135,7 +135,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
 
     try {
       const response = await fetch(
-        `/api/devQueue/${itemId}/attachments?attachmentId=${attachmentId}`,
+        `/api/dev-queue/${itemId}/attachments?attachmentId=${attachmentId}`,
         { method: 'DELETE' }
       );
 

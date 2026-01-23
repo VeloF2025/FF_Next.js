@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DevQueueDashboard } from '@/modules/devQueue/DevQueueDashboard';
+import { DevQueueDashboard } from '@/modules/dev-queue/DevQueueDashboard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Typography, CircularProgress, Box } from '@mui/material';
 import { getAuth } from '@/lib/auth-mock';

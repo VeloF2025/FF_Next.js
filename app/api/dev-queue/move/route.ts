@@ -5,11 +5,11 @@ import { log } from '@/lib/logger';
 import {
   isEligibleForMvp,
   createMvpIssue,
-} from '@/modules/devQueue/services/githubMvpSync';
+} from '@/modules/dev-queue/services/githubMvpSync';
 import {
   triggerPocValidation,
   triggerHarnessBuild,
-} from '@/modules/devQueue/services/harnessTrigger';
+} from '@/modules/dev-queue/services/harnessTrigger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
