@@ -76,13 +76,37 @@ async function triggerBuild(
       'HarnessTrigger'
     );
 
+    // Transform to format expected by mvp_pipeline.py
+    const serverPayload = {
+      issue_number: request.github_issue_number,
+      issue_title: `[${request.stage.toUpperCase()}] ${request.spec.title}`,
+      repo: 'VelocityFibre/mvp-builds',
+      issue_body: [
+        `## Problem Statement`,
+        request.spec.problem_statement || 'N/A',
+        '',
+        `## Acceptance Criteria`,
+        request.spec.acceptance_criteria || 'N/A',
+        '',
+        `## Target Module`,
+        request.spec.target_module || 'N/A',
+        '',
+        `## Metadata`,
+        `- Item ID: ${request.item_id}`,
+        `- Work Type: ${request.work_type}`,
+        `- Stage: ${request.stage}`,
+        `- Priority: ${request.spec.priority || 'medium'}`,
+        `- Effort: ${request.spec.effort_estimate || 'M'}`,
+      ].join('\n'),
+    };
+
     const response = await fetch(`${HARNESS_TRIGGER_URL}/api/mvp-pipeline/trigger`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-webhook-secret': HARNESS_TRIGGER_SECRET,
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(serverPayload),
     });
 
     if (!response.ok) {
