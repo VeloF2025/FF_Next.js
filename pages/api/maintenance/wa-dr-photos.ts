@@ -43,7 +43,7 @@ export default async function handler(
         p.original_filename,
         p.local_path,
         p.created_at,
-        m.sender
+        m.sender_name
       FROM maintenance_wa_photos p
       LEFT JOIN maintenance_wa_messages m ON p.message_id = m.id
       WHERE p.drop_number = ${dropNumber}
@@ -62,7 +62,7 @@ export default async function handler(
         filename: p.original_filename || filename,
         local_path: p.local_path,
         timestamp: p.created_at,
-        sender: p.sender || 'Unknown',
+        sender: p.sender_name || 'Unknown',
         url: `/api/maintenance/wa-photos/${groupJid}/${filename}`,
       };
     });
