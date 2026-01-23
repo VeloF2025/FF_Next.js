@@ -25,6 +25,8 @@ import type {
   Priority,
 } from '../types';
 import { AlertsDashboard } from './AlertsDashboard';
+import { SmartsheetSyncPanel } from './SmartsheetSyncPanel';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Status badge colors
 const STATUS_COLORS: Record<PipelineStatus, { bg: string; text: string; label: string }> = {
@@ -55,6 +57,10 @@ export function PipelineDashboard() {
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | ''>('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  // RBAC: Check if user is super_admin for Smartsheet sync access
+  const { currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   useEffect(() => {
     loadData();
@@ -114,6 +120,10 @@ export function PipelineDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Smartsheet Sync - Super Admin Only */}
+            {isSuperAdmin && (
+              <SmartsheetSyncPanel compact onSyncComplete={loadData} />
+            )}
             <button
               onClick={loadData}
               className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"

@@ -551,6 +551,10 @@ export async function syncFromSmartsheet(
                 mh_name: mhName,
                 nearest_bh: nearestBh,
                 customer: customer,
+                wayleave_start: wayleaveStart,
+                wayleave_end: wayleaveEnd,
+                cession_date: cessionDate,
+                cession_signed: cessionSigned,
               })},
               ${ssRowId}, ${String(sheetId)}, NOW(), 'synced'
             )

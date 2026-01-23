@@ -1,18 +1,21 @@
 /**
  * API: Sync documents from Smartsheet to FibreFlow storage
  * POST /api/pipeline/smartsheet/sync-documents
+ *
+ * Protected: super_admin role required
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { syncDocumentsFromSmartsheet } from '@/modules/pipeline/services';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
-export default async function handler(
-  req: NextApiRequest,
+async function handler(
+  req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
@@ -28,3 +31,6 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+// Protect endpoint: requires super_admin role
+export default withAuth(withRole('super_admin')(handler));
