@@ -6,7 +6,10 @@ import {
   isEligibleForMvp,
   createMvpIssue,
 } from '@/modules/wishlist/services/githubMvpSync';
-import { triggerHarnessBuild } from '@/modules/wishlist/services/harnessTrigger';
+import {
+  triggerPocValidation,
+  triggerHarnessBuild,
+} from '@/modules/wishlist/services/harnessTrigger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -43,17 +46,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 });
     }
 
-    // MVP Pipeline Trigger: When item moves to "Approved" with XS/S/M effort
-    let mvpTriggered = false;
+    // 2-Stage Pipeline Triggers
+    let pipelineTriggered = false;
+    let pipelineStage: 'poc' | 'harness' | null = null;
     let githubIssue: { issueNumber: number; issueUrl: string } | null = null;
 
+    // Stage 1: Move to "Approved" → Create GitHub Issue + Trigger POC
     if (targetColumn === 'Approved' && isEligibleForMvp(updatedItem.effort_estimate)) {
       log.info(
-        `Item ${itemId} approved with effort ${updatedItem.effort_estimate} - triggering MVP pipeline`,
+        `Item ${itemId} approved with effort ${updatedItem.effort_estimate} - triggering Stage 1 (POC)`,
         'WishlistMove'
       );
 
-      // Create GitHub Issue to trigger the MVP build
+      // Create GitHub Issue
       githubIssue = await createMvpIssue({
         id: updatedItem.id,
         title: updatedItem.title,
@@ -71,25 +76,27 @@ export async function POST(req: NextRequest) {
       });
 
       if (githubIssue) {
-        // Update wishlist item with GitHub issue URL and build status
+        // Update wishlist item with GitHub issue URL and POC status
         await sql`
           UPDATE wishlist_items
           SET
             github_issue_url = ${githubIssue.issueUrl},
+            poc_status = 'pending',
             build_status = 'pending',
             build_progress = 0
           WHERE id = ${itemId}
         `;
 
-        mvpTriggered = true;
+        pipelineTriggered = true;
+        pipelineStage = 'poc';
         log.info(
-          `MVP pipeline triggered for item ${itemId} - GitHub Issue #${githubIssue.issueNumber}`,
+          `Stage 1 (POC) triggered for item ${itemId} - GitHub Issue #${githubIssue.issueNumber}`,
           'WishlistMove'
         );
 
-        // Trigger harness build (async, fire and forget)
+        // Trigger POC validation (async, fire and forget)
         if (process.env.HARNESS_TRIGGER_URL) {
-          triggerHarnessBuild({
+          triggerPocValidation({
             item_id: itemId,
             work_type: updatedItem.work_type || 'feature',
             github_issue_number: githubIssue.issueNumber,
@@ -105,14 +112,60 @@ export async function POST(req: NextRequest) {
               priority: updatedItem.priority,
             },
           }).catch((err) => {
-            log.warn(`Harness trigger failed (non-blocking): ${err}`, 'WishlistMove');
+            log.warn(`POC trigger failed (non-blocking): ${err}`, 'WishlistMove');
           });
         }
       } else {
         log.warn(
-          `Failed to create GitHub issue for item ${itemId} - MVP pipeline not triggered`,
+          `Failed to create GitHub issue for item ${itemId} - pipeline not triggered`,
           'WishlistMove'
         );
+      }
+    }
+
+    // Stage 2: Move to "Building" → Trigger Full Harness
+    if (targetColumn === 'Building' && updatedItem.github_issue_url) {
+      log.info(
+        `Item ${itemId} moved to Building - triggering Stage 2 (Full Harness)`,
+        'WishlistMove'
+      );
+
+      // Extract issue number from URL
+      const issueMatch = updatedItem.github_issue_url.match(/\/issues\/(\d+)$/);
+      const issueNumber = issueMatch ? parseInt(issueMatch[1], 10) : 0;
+
+      // Update build status
+      await sql`
+        UPDATE wishlist_items
+        SET
+          build_status = 'building',
+          build_progress = 0
+        WHERE id = ${itemId}
+      `;
+
+      pipelineTriggered = true;
+      pipelineStage = 'harness';
+
+      // Trigger full harness build (async, fire and forget)
+      if (process.env.HARNESS_TRIGGER_URL) {
+        triggerHarnessBuild({
+          item_id: itemId,
+          work_type: updatedItem.work_type || 'feature',
+          github_issue_number: issueNumber,
+          github_issue_url: updatedItem.github_issue_url,
+          spec: {
+            title: updatedItem.title,
+            description: updatedItem.description,
+            problem_statement: updatedItem.problem_statement,
+            acceptance_criteria: updatedItem.acceptance_criteria,
+            target_module: updatedItem.target_module,
+            test_scenarios: updatedItem.test_scenarios,
+            effort_estimate: updatedItem.effort_estimate,
+            priority: updatedItem.priority,
+          },
+        }).catch((err) => {
+          log.warn(`Harness trigger failed (non-blocking): ${err}`, 'WishlistMove');
+        });
       }
     }
 
@@ -120,7 +173,8 @@ export async function POST(req: NextRequest) {
       success: true,
       data: {
         item: updatedItem,
-        mvpTriggered,
+        pipelineTriggered,
+        pipelineStage,
         githubIssue: githubIssue ? {
           number: githubIssue.issueNumber,
           url: githubIssue.issueUrl,

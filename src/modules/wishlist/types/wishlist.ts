@@ -4,8 +4,9 @@
 
 export type WishlistPriority = 'low' | 'medium' | 'high';
 export type WishlistEffort = 'XS' | 'S' | 'M' | 'L' | 'XL';
-export type WishlistStatus = 'Backlog' | 'Under Review' | 'Approved' | 'In Progress' | 'Testing' | 'Completed';
+export type WishlistStatus = 'Backlog' | 'Under Review' | 'Approved' | 'POC Validation' | 'Building' | 'Done';
 export type WishlistWorkType = 'feature' | 'fix' | 'amendment' | 'refactor';
+export type PocStatus = 'pending' | 'running' | 'passed' | 'failed';
 
 export interface WishlistColumn {
   id: string;
@@ -51,6 +52,11 @@ export interface WishlistItem {
   build_started_at?: string;
   build_completed_at?: string;
   build_error?: string;
+  // 2-Stage Pipeline fields
+  poc_status?: PocStatus;
+  poc_run_id?: string;
+  harness_run_id?: string;
+  pr_url?: string;
   // UI state
   has_voted?: boolean;
   comments_count?: number;

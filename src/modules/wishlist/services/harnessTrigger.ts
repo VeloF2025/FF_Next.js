@@ -1,15 +1,19 @@
 /**
- * Harness Trigger Service
+ * Harness Trigger Service - 2-Stage Pipeline
  *
- * Triggers the agent harness on VF Server to build features, fixes, amendments.
+ * Stage 1: POC Loop (quick validation, 1-5 hours)
+ * Stage 2: Full Harness (production-ready, 4-24 hours)
  */
 
 import { log } from '@/lib/logger';
 import type { WishlistWorkType } from '../types/wishlist';
 
+export type PipelineStage = 'poc' | 'harness';
+
 interface TriggerBuildRequest {
   item_id: string;
   work_type: WishlistWorkType;
+  stage: PipelineStage;
   github_issue_number: number;
   github_issue_url: string;
   spec: {
@@ -26,7 +30,8 @@ interface TriggerBuildRequest {
 
 interface TriggerBuildResponse {
   success: boolean;
-  harness_run_id?: string;
+  run_id?: string;
+  stage?: string;
   message?: string;
   error?: string;
 }
@@ -35,9 +40,27 @@ const HARNESS_TRIGGER_URL = process.env.HARNESS_TRIGGER_URL || 'http://100.96.20
 const HARNESS_TRIGGER_SECRET = process.env.HARNESS_TRIGGER_SECRET;
 
 /**
- * Trigger harness build for a wishlist item
+ * Trigger POC validation (Stage 1)
+ */
+export async function triggerPocValidation(
+  request: Omit<TriggerBuildRequest, 'stage'>
+): Promise<TriggerBuildResponse> {
+  return triggerBuild({ ...request, stage: 'poc' });
+}
+
+/**
+ * Trigger full harness build (Stage 2)
  */
 export async function triggerHarnessBuild(
+  request: Omit<TriggerBuildRequest, 'stage'>
+): Promise<TriggerBuildResponse> {
+  return triggerBuild({ ...request, stage: 'harness' });
+}
+
+/**
+ * Trigger build for a wishlist item (POC or Harness)
+ */
+async function triggerBuild(
   request: TriggerBuildRequest
 ): Promise<TriggerBuildResponse> {
   if (!HARNESS_TRIGGER_SECRET) {
@@ -45,9 +68,11 @@ export async function triggerHarnessBuild(
     return { success: false, error: 'Harness trigger not configured' };
   }
 
+  const stageLabel = request.stage === 'poc' ? 'POC validation' : 'harness build';
+
   try {
     log.info(
-      `Triggering harness build for item ${request.item_id} (${request.work_type})`,
+      `Triggering ${stageLabel} for item ${request.item_id} (${request.work_type})`,
       'HarnessTrigger'
     );
 
@@ -63,26 +88,26 @@ export async function triggerHarnessBuild(
     if (!response.ok) {
       const errorText = await response.text();
       log.error(
-        `Harness trigger failed: ${response.status} - ${errorText}`,
+        `${stageLabel} trigger failed: ${response.status} - ${errorText}`,
         null,
         'HarnessTrigger'
       );
       return {
         success: false,
-        error: `Harness trigger failed: ${response.status}`,
+        error: `${stageLabel} trigger failed: ${response.status}`,
       };
     }
 
     const result: TriggerBuildResponse = await response.json();
 
     log.info(
-      `Harness build triggered: ${result.harness_run_id || 'no run ID'}`,
+      `${stageLabel} triggered: ${result.run_id || 'no run ID'}`,
       'HarnessTrigger'
     );
 
     return result;
   } catch (error: any) {
-    log.error('Failed to trigger harness build:', error, 'HarnessTrigger');
+    log.error(`Failed to trigger ${stageLabel}:`, error, 'HarnessTrigger');
     return {
       success: false,
       error: error?.message || 'Unknown error',
@@ -91,19 +116,27 @@ export async function triggerHarnessBuild(
 }
 
 /**
- * Check status of a harness build
+ * Check status of a build (POC or Harness)
  */
-export async function checkBuildStatus(itemId: string): Promise<{
+export async function checkBuildStatus(
+  itemId: string,
+  stage: PipelineStage = 'poc'
+): Promise<{
   status: string;
   progress: number;
+  run_id?: string;
+  stage?: string;
   error?: string;
 } | null> {
   try {
-    const response = await fetch(`${HARNESS_TRIGGER_URL}/status/${itemId}`, {
-      headers: {
-        'x-webhook-secret': HARNESS_TRIGGER_SECRET || '',
-      },
-    });
+    const response = await fetch(
+      `${HARNESS_TRIGGER_URL}/status/${itemId}?stage=${stage}`,
+      {
+        headers: {
+          'x-webhook-secret': HARNESS_TRIGGER_SECRET || '',
+        },
+      }
+    );
 
     if (!response.ok) {
       return null;
@@ -129,18 +162,53 @@ export function getWorkTypeLabel(workType: WishlistWorkType): string {
 }
 
 /**
- * Get estimated complexity based on work type
+ * Get estimated complexity based on work type and stage
  */
-export function getWorkTypeComplexity(workType: WishlistWorkType): {
+export function getWorkTypeComplexity(
+  workType: WishlistWorkType,
+  stage: PipelineStage = 'harness'
+): {
   minFeatures: number;
   maxFeatures: number;
   estimatedHours: string;
 } {
-  const complexity: Record<WishlistWorkType, { minFeatures: number; maxFeatures: number; estimatedHours: string }> = {
+  // POC is always quick validation
+  if (stage === 'poc') {
+    return { minFeatures: 5, maxFeatures: 20, estimatedHours: '1-5' };
+  }
+
+  // Full harness depends on work type
+  const complexity: Record<
+    WishlistWorkType,
+    { minFeatures: number; maxFeatures: number; estimatedHours: string }
+  > = {
     feature: { minFeatures: 50, maxFeatures: 100, estimatedHours: '8-24' },
     fix: { minFeatures: 5, maxFeatures: 15, estimatedHours: '1-4' },
     amendment: { minFeatures: 10, maxFeatures: 30, estimatedHours: '2-8' },
     refactor: { minFeatures: 20, maxFeatures: 40, estimatedHours: '4-12' },
   };
   return complexity[workType] || complexity.feature;
+}
+
+/**
+ * Get pipeline stage info
+ */
+export function getPipelineStageInfo(stage: PipelineStage): {
+  label: string;
+  description: string;
+  icon: string;
+} {
+  const stages: Record<PipelineStage, { label: string; description: string; icon: string }> = {
+    poc: {
+      label: 'POC Validation',
+      description: 'Quick validation to ensure the approach works',
+      icon: '🧪',
+    },
+    harness: {
+      label: 'Full Harness Build',
+      description: 'Production-ready implementation with 100% test coverage',
+      icon: '🏗️',
+    },
+  };
+  return stages[stage];
 }
