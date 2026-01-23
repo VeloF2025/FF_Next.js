@@ -626,7 +626,7 @@ echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
 ## QField Sync (OES to QFieldCloud)
 
 **Status:** ✅ PRODUCTION - OES data syncs to QFieldCloud for mobile viewing
-**Last Updated:** Jan 2026 - Race condition fix applied
+**Last Updated:** Jan 23, 2026 - Labeling and renderer fixes applied
 
 ### Quick Reference
 - **Webhook:** `http://100.96.203.105:8095`
@@ -638,23 +638,34 @@ echo 'velo2026' | sudo -S journalctl -u vllm-qwen.service -n 50
 
 ### Available Projects
 
-| Project | UUID | UPLOAD_QGS | Notes |
-|---------|------|------------|-------|
-| **OES_Project_Progress** | `ad3b1035-ddb3-42a3-8077-175f9400b38a` | `false` | **PRODUCTION** - Has existing .qgs |
-| FibreFlow_OES_Automations | `067b51c8-6e96-4e0c-9462-d4890763758b` | `true` | Test project |
-| Test_Project__Automations | `e849b878-f8a8-4f84-a3f1-9fbd051686c0` | N/A | Has .qgs conflicts - DO NOT USE |
+| Project | UUID | Role | Notes |
+|---------|------|------|-------|
+| **OES_Project_Progress** | `af058301-32d1-4bca-84f9-83b899fcbb34` | reader | **PRODUCTION** - Jaun's manual uploads |
+| **Test_Project__Automations** | `e849b878-f8a8-4f84-a3f1-9fbd051686c0` | admin | **AUTOMATED** - Sync target |
 
-**Collaborators (OES_Project_Progress):** Hein
-**Note:** Projects with existing `.qgs` must use `UPLOAD_QGS=false` in systemd service
+**Active Sync Target:** `Test_Project__Automations` (automated OES sync)
+**Note:** Production project owned by Jaun, we sync to Test project
 
 ### How It Works
 1. **OES Import** at `/activate` → OES Import tab
-2. **import-oes.ts** inserts data + calls webhook (fire-and-forget)
+2. **import-oes.ts** inserts data to `oes_activations` + calls webhook
 3. **Webhook** runs sync script on Velocity server
-4. **Script** queries Neon DB → creates GeoPackage → uploads via SDK
-5. **CRITICAL:** 10-second waits between uploads to avoid race conditions
-6. **QFieldCloud** triggers `process_projectfile` + `package` jobs
-7. **QField app** syncs to see data on mobile
+4. **Script** queries Neon DB → creates GeoPackage with `Pole Nr` column (DR numbers)
+5. **Script** updates .qgs with:
+   - Simple blue circle renderer (not status categories)
+   - `Pole Nr` labeling for DR numbers
+6. **CRITICAL:** 10-second waits between uploads to avoid race conditions
+7. **QFieldCloud** triggers `process_projectfile` + `package` jobs
+8. **QField app** syncs to see DR numbers on mobile
+
+### GeoPackage Format
+| Column | Purpose |
+|--------|---------|
+| `fid` | Feature ID |
+| `geom` | Point geometry |
+| `Pole Nr` | **DR number** (displayed as label) |
+| `Vlook` | Same as Pole Nr |
+| `lat`, `lon` | Coordinates |
 
 ### Commands
 ```bash
@@ -678,7 +689,14 @@ ssh velo@100.96.203.105 "nano /opt/qfield-sync/sync_oes_db_to_qfield.py"
 - **Package not updating:** Check `data_last_packaged_at` via API
 - **Layer `is_valid: False`:** Race condition - ensure 10s waits between uploads
 - **Data not visible:** Verify gpkg filename matches QGIS project layer reference
+- **DR numbers not showing:** Check labeling uses `Pole Nr` field (fixed Jan 23, 2026)
+- **Showing planned/wip/live/issue:** Renderer using categories - should be `singleSymbol` (fixed Jan 23, 2026)
 - **Full guide:** Run `/Qfield` skill for detailed troubleshooting
+
+### Script Functions (Jan 2026)
+The sync script includes these key functions:
+- `add_pole_nr_labeling(maplayer)` - Adds DR number labels using `Pole Nr` field
+- `set_simple_renderer(maplayer)` - Sets blue circle renderer (removes status categories)
 
 ## Arcjet Security
 
