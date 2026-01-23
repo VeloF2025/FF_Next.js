@@ -125,3 +125,19 @@ dashboardData, currentJob, syncHistory, isLoading, error
 - **WebSocket Partial**: WebSocket support mentioned but not fully implemented
 - **Polling Interval**: Default 5 minutes
 - **Large Batches**: fiber_cables can be 1000+
+
+## OES Sync (Jan 2026)
+
+### Server-Side Sync Script
+Location: `/opt/qfield-sync/sync_oes_db_to_qfield.py`
+
+**Key Functions:**
+- `add_pole_nr_labeling(maplayer)` - Adds DR number labels using `Pole Nr` field
+- `set_simple_renderer(maplayer)` - Sets blue circle renderer (removes status categories)
+
+**Sync Target:** `Test_Project__Automations` (`e849b878-f8a8-4f84-a3f1-9fbd051686c0`)
+
+### Troubleshooting
+- **DR numbers not showing:** Check labeling uses `Pole Nr` field
+- **Showing planned/wip/live/issue:** Renderer using categories - should be `singleSymbol`
+- **Run `/Qfield` skill** for full management commands
