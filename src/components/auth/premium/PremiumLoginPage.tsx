@@ -104,35 +104,45 @@ export function PremiumLoginPage() {
                 )}
 
                 {/* Login form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <VelocityInput
-                    label="Email Address"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    variant="neon-green"
-                    icon={<Mail className="w-5 h-5" />}
-                    iconPosition="left"
-                    placeholder="you@company.com"
-                    autoComplete="email"
-                    disabled={loading}
-                  />
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Email Address
+                    </label>
+                    <VelocityInput
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      variant="neon-green"
+                      icon={<Mail className="w-5 h-5" />}
+                      iconPosition="left"
+                      placeholder="you@company.com"
+                      autoComplete="email"
+                      disabled={loading}
+                      disableFloating
+                    />
+                  </div>
 
-                  <VelocityInput
-                    label="Password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    variant="neon-green"
-                    icon={<Lock className="w-5 h-5" />}
-                    iconPosition="left"
-                    showPasswordReveal
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    disabled={loading}
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Password
+                    </label>
+                    <VelocityInput
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      variant="neon-green"
+                      icon={<Lock className="w-5 h-5" />}
+                      iconPosition="left"
+                      showPasswordReveal
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      disabled={loading}
+                      disableFloating
+                    />
+                  </div>
 
                   <VelocityButton
                     type="submit"

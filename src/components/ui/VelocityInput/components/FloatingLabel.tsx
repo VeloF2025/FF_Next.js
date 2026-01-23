@@ -15,6 +15,7 @@ interface FloatingLabelProps {
   isFloating?: boolean;
   focused?: boolean;
   htmlFor?: string;
+  hasLeftIcon?: boolean;
 }
 
 export const FloatingLabel: React.FC<FloatingLabelProps> = ({
@@ -25,6 +26,7 @@ export const FloatingLabel: React.FC<FloatingLabelProps> = ({
   isFloating,
   focused,
   htmlFor,
+  hasLeftIcon,
 }) => {
   if (!label) return null;
 
@@ -37,7 +39,9 @@ export const FloatingLabel: React.FC<FloatingLabelProps> = ({
           state: currentState,
           floating: isFloating
         }),
-        variant?.includes('neon') && focused && 'drop-shadow-[0_0_4px_currentColor]'
+        variant?.includes('neon') && focused && 'drop-shadow-[0_0_4px_currentColor]',
+        // Shift label right when there's a left icon (and not floating)
+        hasLeftIcon && !isFloating && 'left-10'
       )}
       htmlFor={htmlFor}
     >

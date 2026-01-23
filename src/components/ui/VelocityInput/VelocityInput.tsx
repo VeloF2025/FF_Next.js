@@ -141,6 +141,7 @@ const VelocityInput = React.forwardRef<HTMLInputElement, VelocityInputProps>(
         isFloating={isFloating}
         focused={focused}
         htmlFor={props.id}
+        hasLeftIcon={!!icon && iconPosition === 'left'}
       />
         </div>
 
