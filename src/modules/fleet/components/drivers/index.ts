@@ -7,3 +7,4 @@ export { DashboardTab } from './DashboardTab';
 export { DriversListTab } from './DriversListTab';
 export { LeaderboardTab } from './LeaderboardTab';
 export { ScorecardTab } from './ScorecardTab';
+export { DriversDocumentsTab } from './DriversDocumentsTab';

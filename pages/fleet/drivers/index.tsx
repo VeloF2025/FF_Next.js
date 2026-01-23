@@ -12,20 +12,23 @@ import {
   Users,
   Trophy,
   ClipboardList,
+  FileText,
 } from 'lucide-react';
 import {
   DashboardTab,
   DriversListTab,
   LeaderboardTab,
   ScorecardTab,
+  DriversDocumentsTab,
 } from '@/modules/fleet/components/drivers';
 import type { FleetDriver, DriverDashboardStats } from '@/modules/fleet/types/driver.types';
 
-type TabId = 'dashboard' | 'drivers' | 'leaderboard' | 'scorecards';
+type TabId = 'dashboard' | 'drivers' | 'leaderboard' | 'scorecards' | 'documents';
 
 const tabs: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'drivers', label: 'Drivers', icon: Users },
+  { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
   { id: 'scorecards', label: 'Scorecards', icon: ClipboardList },
 ];
@@ -207,6 +210,10 @@ export default function FleetDriversPage() {
                 drivers={drivers}
                 onSelectDriver={handleSelectDriver}
               />
+            )}
+
+            {activeTab === 'documents' && (
+              <DriversDocumentsTab />
             )}
           </>
         )}

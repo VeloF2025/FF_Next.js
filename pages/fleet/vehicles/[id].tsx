@@ -49,6 +49,7 @@ import type {
   VehicleLease,
   VehicleInsurance,
 } from '@/modules/fleet/types';
+import { DriverLicenseUploadModal } from '@/modules/fleet/components/DriverLicenseUploadModal';
 
 // ============================================================================
 // Types
@@ -2630,6 +2631,7 @@ export default function VehicleDetailPage() {
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [assigning, setAssigning] = useState(false);
   const [unassigning, setUnassigning] = useState(false);
+  const [showLicenseUpload, setShowLicenseUpload] = useState(false);
 
   // Set initial tab from URL
   useEffect(() => {
@@ -3542,6 +3544,23 @@ export default function VehicleDetailPage() {
         </div>
       </div>
 
+      {/* Driver License Upload Modal */}
+      {showLicenseUpload && (
+        <DriverLicenseUploadModal
+          onSuccess={async () => {
+            setShowLicenseUpload(false);
+            // Refresh available staff list
+            const res = await fetch('/api/fleet/available-drivers');
+            if (res.ok) {
+              const data = await res.json();
+              setAvailableStaff(data.data.drivers);
+            }
+            toast.success("Driver's license uploaded successfully");
+          }}
+          onClose={() => setShowLicenseUpload(false)}
+        />
+      )}
+
       {/* Assign Driver Modal */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -3593,10 +3612,18 @@ export default function VehicleDetailPage() {
                   </div>
                   {availableStaff.filter(s => !s.hasValidLicense).length > 0 && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <p className="text-sm text-yellow-800">
-                        <AlertTriangle className="w-4 h-4 inline mr-1" />
-                        {availableStaff.filter(s => !s.hasValidLicense).length} staff member(s) hidden due to missing/invalid license
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-yellow-800">
+                          <AlertTriangle className="w-4 h-4 inline mr-1" />
+                          {availableStaff.filter(s => !s.hasValidLicense).length} staff member(s) hidden due to missing/invalid license
+                        </p>
+                        <button
+                          onClick={() => setShowLicenseUpload(true)}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Upload License
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

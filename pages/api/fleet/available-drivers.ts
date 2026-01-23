@@ -70,19 +70,24 @@ export default async function handler(
       ORDER BY s.first_name, s.last_name
     `;
 
-    const drivers: AvailableDriver[] = rows.map((row) => ({
-      id: row.id as string,
-      name: row.name as string,
-      email: row.email as string | null,
-      phone: row.phone as string | null,
-      department: row.department as string | null,
-      hasValidLicense: row.has_valid_license as boolean,
-      licenseExpiry: row.license_expiry
-        ? new Date(row.license_expiry as string).toISOString().split('T')[0]
-        : null,
-      hasVehicle: row.has_company_vehicle as boolean,
-      currentVehicleReg: row.current_vehicle_reg as string | null,
-    }));
+    const drivers: AvailableDriver[] = rows.map((row) => {
+      let licenseExpiry: string | null = null;
+      if (row.license_expiry) {
+        // ISO string is always YYYY-MM-DDTHH:MM:SS.sssZ format
+        licenseExpiry = new Date(row.license_expiry as string).toISOString().substring(0, 10);
+      }
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        email: row.email as string | null,
+        phone: row.phone as string | null,
+        department: row.department as string | null,
+        hasValidLicense: row.has_valid_license as boolean,
+        licenseExpiry,
+        hasVehicle: row.has_company_vehicle as boolean,
+        currentVehicleReg: row.current_vehicle_reg as string | null,
+      };
+    });
 
     const withLicense = drivers.filter((d) => d.hasValidLicense);
     const withoutLicense = drivers.filter((d) => !d.hasValidLicense);
