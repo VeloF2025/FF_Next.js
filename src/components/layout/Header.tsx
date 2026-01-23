@@ -6,6 +6,7 @@ import { BreadcrumbNavigation } from './header/BreadcrumbNavigation';
 import { SearchBar } from './header/SearchBar';
 import { NotificationsDropdown } from './header/NotificationsDropdown';
 import { UserMenuDropdown } from './header/UserMenuDropdown';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Header({ 
   title = 'Dashboard', 
@@ -26,6 +27,7 @@ export function Header({
   
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const { signOut } = useAuth();
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -43,20 +45,12 @@ export function Header({
   }, []);
 
   const handleLogout = async () => {
-    // DEVELOPMENT MODE: Disable logout functionality
-    // TODO: Restore logout when implementing RBAC
-    // DEBUG: Logout disabled in development mode
-    return;
-    
-    // Original logout logic (commented out for development)
-    /*
     try {
       await signOut();
-      navigate('/login');
+      // signOut redirects to /sign-in automatically
     } catch (error) {
-      log.error('Logout failed:', { data: error }, 'Header');
+      console.error('Logout failed:', error);
     }
-    */
   };
 
   return (
