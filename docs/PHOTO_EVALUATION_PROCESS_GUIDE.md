@@ -553,14 +553,14 @@ pm2 restart fibreflow-prod
 - No evaluation results after 5 minutes
 
 **Causes**:
-- DR Photo API service down (`http://192.168.1.150:8003`)
+- DR Photo API service down (`http://100.96.203.105:8003`)
 - Gemini API key invalid/expired
 - 1Map credentials invalid
 
 **Solutions**:
 ```bash
 # 1. Check DR Photo API status
-curl http://192.168.1.150:8003/health
+curl http://100.96.203.105:8003/health
 
 # 2. Check Gemini API key
 # Verify in DR Photo API .env file
@@ -754,8 +754,8 @@ interface FeedbackResponse {
 #### DR Photo API: Download Photos from 1Map
 
 ```bash
-# POST http://192.168.1.150:8003/api/download/{dr_number}
-curl -X POST http://192.168.1.150:8003/api/download/DR123456
+# POST http://100.96.203.105:8003/api/download/{dr_number}
+curl -X POST http://100.96.203.105:8003/api/download/DR123456
 
 # Response format:
 {
@@ -780,8 +780,8 @@ curl -X POST http://192.168.1.150:8003/api/download/DR123456
 #### DR Photo API: Run AI Evaluation
 
 ```bash
-# POST http://192.168.1.150:8003/api/evaluate/{dr_number}
-curl -X POST http://192.168.1.150:8003/api/evaluate/DR123456
+# POST http://100.96.203.105:8003/api/evaluate/{dr_number}
+curl -X POST http://100.96.203.105:8003/api/evaluate/DR123456
 
 # Response format: Same as EvaluationResult above
 ```

@@ -252,9 +252,9 @@ INSERT INTO dr_photo_unified_reviews (
   'onemap',
   3,
   '[
-    {"filename": "DR_MIGRATION_TEST_ph_prop_001.jpg", "step": 1, "url": "http://192.168.1.150:8003/api/photo/DR_MIGRATION_TEST/DR_MIGRATION_TEST_ph_prop_001.jpg"},
-    {"filename": "DR_MIGRATION_TEST_ph_pole_001.jpg", "step": 2, "url": "http://192.168.1.150:8003/api/photo/DR_MIGRATION_TEST/DR_MIGRATION_TEST_ph_pole_001.jpg"},
-    {"filename": "DR_MIGRATION_TEST_ph_powm_001.jpg", "step": 7, "url": "http://192.168.1.150:8003/api/photo/DR_MIGRATION_TEST/DR_MIGRATION_TEST_ph_powm_001.jpg"}
+    {"filename": "DR_MIGRATION_TEST_ph_prop_001.jpg", "step": 1, "url": "http://100.96.203.105:8003/api/photo/DR_MIGRATION_TEST/DR_MIGRATION_TEST_ph_prop_001.jpg"},
+    {"filename": "DR_MIGRATION_TEST_ph_pole_001.jpg", "step": 2, "url": "http://100.96.203.105:8003/api/photo/DR_MIGRATION_TEST/DR_MIGRATION_TEST_ph_pole_001.jpg"},
+    {"filename": "DR_MIGRATION_TEST_ph_powm_001.jpg", "step": 7, "url": "http://100.96.203.105:8003/api/photo/DR_MIGRATION_TEST/DR_MIGRATION_TEST_ph_powm_001.jpg"}
   ]'::jsonb,
   true
 ) ON CONFLICT (drop_number) DO NOTHING;

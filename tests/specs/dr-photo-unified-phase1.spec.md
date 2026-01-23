@@ -169,7 +169,7 @@ expect(photoTypes).toContain(photoType); // ✅ Consistency verified
     {
       filename: 'DR1730550_ph_prop_001.jpg',
       step: 1,
-      url: 'http://192.168.1.150:8003/api/photo/DR1730550/DR1730550_ph_prop_001.jpg',
+      url: 'http://100.96.203.105:8003/api/photo/DR1730550/DR1730550_ph_prop_001.jpg',
       size: 123456,
       modified: 1736819847.0
     },

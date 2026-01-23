@@ -45,14 +45,14 @@ describe('unifiedPhotoService', () => {
         {
           filename: 'DR1730550_ph_prop_001.jpg',
           step: 1,
-          url: 'http://192.168.1.150:8003/api/photo/DR1730550/DR1730550_ph_prop_001.jpg',
+          url: 'http://100.96.203.105:8003/api/photo/DR1730550/DR1730550_ph_prop_001.jpg',
           size: 123456,
           modified: 1736819847.0,
         },
         {
           filename: 'DR1730550_ph_powm_001.jpg',
           step: 7,
-          url: 'http://192.168.1.150:8003/api/photo/DR1730550/DR1730550_ph_powm_001.jpg',
+          url: 'http://100.96.203.105:8003/api/photo/DR1730550/DR1730550_ph_powm_001.jpg',
           size: 234567,
           modified: 1736819848.0,
         },
@@ -104,7 +104,7 @@ describe('unifiedPhotoService', () => {
         {
           filename: 'DR1730550_ph_prop_001.jpg',
           step: 1,
-          url: 'http://192.168.1.150:8003/api/photo/DR1730550/DR1730550_ph_prop_001.jpg',
+          url: 'http://100.96.203.105:8003/api/photo/DR1730550/DR1730550_ph_prop_001.jpg',
           size: 123456,
           modified: 1736819847.0,
         },
@@ -135,7 +135,7 @@ describe('unifiedPhotoService', () => {
       const mockPhotos: Photo[] = Array(16).fill(null).map((_, i) => ({
         filename: `DR1730550_ph_prop_${String(i + 1).padStart(3, '0')}.jpg`,
         step: 1,
-        url: `http://192.168.1.150:8003/api/photo/DR1730550/DR1730550_ph_prop_${String(i + 1).padStart(3, '0')}.jpg`,
+        url: `http://100.96.203.105:8003/api/photo/DR1730550/DR1730550_ph_prop_${String(i + 1).padStart(3, '0')}.jpg`,
       }));
 
       const mockResponse: PhotoSource = {

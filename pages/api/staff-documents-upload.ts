@@ -17,6 +17,7 @@ import { uploadStaffDocument, isVFStorageAvailable, deleteStaffDocument } from '
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import type { DocumentType } from '@/types/staff-document.types';
+import { logDocumentUploaded } from '@/services/staff/staffAuditService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentsUploadAPI');
@@ -510,6 +511,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     logger.info('Staff document uploaded', { staffId, documentType, documentId: document.id, ocrConfirmed, isMultiFile });
+
+    // Log to audit trail
+    await logDocumentUploaded(
+      staffId,
+      documentType,
+      primaryFileName,
+      'System', // TODO: Get uploader name from session
+      req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
+    );
 
     // Sync document data to staff table based on document type
     // This ensures OCR/manual data appears in employee details

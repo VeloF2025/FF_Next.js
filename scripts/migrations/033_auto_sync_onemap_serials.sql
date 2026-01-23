@@ -10,7 +10,7 @@
 CREATE OR REPLACE FUNCTION auto_sync_onemap_serials()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_api_url TEXT := 'http://192.168.1.150:8003'; -- dr-photo-api URL
+  v_api_url TEXT := 'http://100.96.203.105:8003'; -- dr-photo-api URL
   v_response TEXT;
   v_ont_barcode TEXT;
   v_ups_serial TEXT;

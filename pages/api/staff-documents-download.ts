@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
+import { logDocumentDownloaded } from '@/services/staff/staffAuditService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentDownloadAPI');
@@ -74,6 +75,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get file content
     const fileBuffer = await response.arrayBuffer();
+
+    // Log to audit trail (only for actual downloads, not inline views)
+    if (inline !== 'true') {
+      const staffId = document.staff_id as string;
+      const documentType = document.document_type as string;
+      await logDocumentDownloaded(
+        staffId,
+        documentType,
+        fileName,
+        'System', // TODO: Get downloader name from session
+        req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
+      );
+    }
 
     // Set response headers
     const disposition = inline === 'true' ? 'inline' : 'attachment';

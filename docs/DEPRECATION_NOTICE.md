@@ -15,7 +15,7 @@ The unified DR photo review system is now **fully rolled out** to all projects a
 
 ### 1. Port 8003 HTML App (OneMap GIS Photo Downloader)
 - **Status:** ⚠️ DEPRECATED
-- **Location:** http://192.168.1.150:8003/
+- **Location:** http://100.96.203.105:8003/
 - **Docker Container:** `dr-photo-api`
 - **Shutdown Date:** January 28, 2026 (2 weeks from full rollout)
 - **Reason:** Functionality integrated into unified photo service with multi-source fallback

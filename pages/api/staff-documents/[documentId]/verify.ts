@@ -286,14 +286,17 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
 
       case 'passport':
         // Sync passport details to staff table
-        const passportNumber = ocrMetadata.passportNumber;
-        const passportExpiry = ocrMetadata.passportExpiry || ocrMetadata.dateOfExpiry;
+        // Check both original VLM field names AND mapped field names
+        const passportNumber = ocrMetadata.passportNumber || ocrMetadata.documentNumber;
+        const passportExpiry = ocrMetadata.passportExpiry || ocrMetadata.dateOfExpiry || ocrMetadata.expiryDate;
         const passportCountry = ocrMetadata.passportCountry || ocrMetadata.issuingAuthority;
         const passportDob = ocrMetadata.dateOfBirth;
         const passportGender = ocrMetadata.gender;
         const passportNationality = ocrMetadata.nationality;
+        const passportPlaceOfBirth = ocrMetadata.placeOfBirth;
+        const passportIssueDate = ocrMetadata.dateOfIssue || ocrMetadata.issuedDate;
 
-        if (passportNumber || passportExpiry || passportCountry || passportDob) {
+        if (passportNumber || passportExpiry || passportCountry || passportDob || passportNationality) {
           await sql`
             UPDATE staff
             SET
@@ -303,47 +306,67 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
               date_of_birth = COALESCE(${passportDob ? new Date(passportDob) : null}, date_of_birth),
               gender = COALESCE(${passportGender || null}, gender),
               nationality = COALESCE(${passportNationality || null}, nationality),
+              country_of_birth = COALESCE(${passportPlaceOfBirth || null}, country_of_birth),
               updated_at = NOW()
             WHERE id = ${staffId}
           `;
 
           if (passportNumber) syncedFields.push(`Passport: ${passportNumber}`);
           if (passportExpiry) syncedFields.push(`Passport Expiry: ${passportExpiry}`);
+          if (passportIssueDate) syncedFields.push(`Issue Date: ${passportIssueDate}`);
           if (passportCountry) syncedFields.push(`Issuing Country: ${passportCountry}`);
           if (passportDob) syncedFields.push(`DOB: ${passportDob}`);
+          if (passportGender) syncedFields.push(`Gender: ${passportGender}`);
+          if (passportNationality) syncedFields.push(`Nationality: ${passportNationality}`);
+          if (passportPlaceOfBirth) syncedFields.push(`Place of Birth: ${passportPlaceOfBirth}`);
 
-          logger.info('Synced passport from verified document', { staffId, passportNumber, passportExpiry });
+          logger.info('Synced passport from verified document', {
+            staffId,
+            passportNumber,
+            passportExpiry,
+            fieldsUpdated: syncedFields.length,
+          });
         }
         break;
 
       case 'drivers_license':
         // Sync driver's license details to staff table
+        // Check both original VLM field names AND mapped field names
         const dlNumber = ocrMetadata.driversLicenseNumber || ocrMetadata.licenseNumber;
-        const dlExpiry = ocrMetadata.driversLicenseExpiry || ocrMetadata.validTo;
+        const dlIdNumber = ocrMetadata.idNumber || ocrMetadata.documentNumber;
+        const dlExpiry = ocrMetadata.driversLicenseExpiry || ocrMetadata.validTo || ocrMetadata.expiryDate;
+        const dlValidFrom = ocrMetadata.validFrom;
         const dlCodes = ocrMetadata.driversLicenseCodes || ocrMetadata.licenseCodes;
         const dlDob = ocrMetadata.dateOfBirth;
+        const dlFullName = ocrMetadata.fullName;
+        const dlRestrictions = ocrMetadata.restrictions;
 
-        if (dlNumber || dlExpiry || dlCodes || dlDob) {
+        if (dlNumber || dlExpiry || dlCodes || dlDob || dlIdNumber) {
           await sql`
             UPDATE staff
             SET
               drivers_license_number = COALESCE(${dlNumber || null}, drivers_license_number),
               drivers_license_expiry = COALESCE(${dlExpiry ? new Date(dlExpiry) : null}, drivers_license_expiry),
+              sa_id_number = COALESCE(${dlIdNumber || null}, sa_id_number),
               date_of_birth = COALESCE(${dlDob ? new Date(dlDob) : null}, date_of_birth),
               updated_at = NOW()
             WHERE id = ${staffId}
           `;
 
           if (dlNumber) syncedFields.push(`License: ${dlNumber}`);
+          if (dlIdNumber) syncedFields.push(`SA ID (from DL): ${dlIdNumber}`);
           if (dlExpiry) syncedFields.push(`License Expiry: ${dlExpiry}`);
+          if (dlValidFrom) syncedFields.push(`Valid From: ${dlValidFrom}`);
           if (dlCodes) syncedFields.push(`License Codes: ${dlCodes}`);
           if (dlDob) syncedFields.push(`DOB: ${dlDob}`);
+          if (dlRestrictions) syncedFields.push(`Restrictions: ${dlRestrictions}`);
 
           logger.info('Synced drivers license from verified document', {
             staffId,
             licenseNumber: dlNumber,
             licenseCodes: dlCodes,
             expiry: dlExpiry,
+            fieldsUpdated: syncedFields.length,
           });
         }
         break;
