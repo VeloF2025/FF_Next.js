@@ -41,9 +41,28 @@ export interface AuditLogEntry {
 
 /**
  * Record an audit log entry for a staff action
+ * Includes duplicate prevention - skips if same action logged in last 10 seconds
  */
 export async function recordAuditLog(entry: AuditLogEntry): Promise<void> {
   try {
+    // Prevent duplicates - check if same action was logged in last 10 seconds
+    const [existing] = await sql`
+      SELECT id FROM staff_audit_log
+      WHERE staff_id = ${entry.staffId}::uuid
+        AND action_type = ${entry.actionType}
+        AND action_description = ${entry.actionDescription}
+        AND created_at > NOW() - INTERVAL '10 seconds'
+      LIMIT 1
+    `;
+
+    if (existing) {
+      log.debug('Skipping duplicate audit log', {
+        staffId: entry.staffId,
+        action: entry.actionType,
+      });
+      return;
+    }
+
     await sql`
       INSERT INTO staff_audit_log (
         staff_id, action_type, action_description, details,
