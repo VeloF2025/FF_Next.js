@@ -65,6 +65,7 @@ interface WizardState {
   documentName: string;
   extractedFields: Record<string, unknown>;
   fieldOverrides: Record<string, unknown>;
+  criticalMismatchAcknowledged: boolean;
 }
 
 // Validation mismatch interface
@@ -134,6 +135,7 @@ export function StaffDocumentUploadWizard({
     documentName: '',
     extractedFields: {},
     fieldOverrides: {},
+    criticalMismatchAcknowledged: false,
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -352,7 +354,21 @@ export function StaffDocumentUploadWizard({
   // =========================================================================
 
   const handleAcceptOcrFields = () => {
+    // Check for critical mismatches before proceeding
+    const criticalMismatches = state.ocrResult?.validation?.mismatches.filter(
+      m => m.severity === 'critical'
+    ) || [];
+
+    if (criticalMismatches.length > 0 && !state.criticalMismatchAcknowledged) {
+      // Don't proceed - user must acknowledge the warning first
+      return;
+    }
+
     setState((prev) => ({ ...prev, currentStep: 'confirmation' }));
+  };
+
+  const handleAcknowledgeCriticalMismatch = () => {
+    setState((prev) => ({ ...prev, criticalMismatchAcknowledged: true }));
   };
 
   const handleEditOcrFields = () => {
@@ -748,21 +764,22 @@ export function StaffDocumentUploadWizard({
           <div className="space-y-3">
             {/* Critical Mismatches - Red Alert */}
             {criticalMismatches.length > 0 && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="h-5 w-5 text-red-400" />
-                  <span className="text-sm font-semibold text-red-400">
-                    ❌ Critical Mismatch - Review Required
+              <div className="p-4 bg-red-500/20 border-2 border-red-500/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertCircle className="h-6 w-6 text-red-400" />
+                  <span className="text-base font-bold text-red-400">
+                    🚨 CRITICAL: Document Belongs to Wrong Person
                   </span>
                 </div>
                 {criticalMismatches.map((m, i) => (
-                  <div key={i} className="ml-7 text-sm text-red-300 mb-1">
-                    <strong>{m.label}:</strong> Document has "{m.documentValue || 'N/A'}" but staff record shows "{m.recordValue || 'N/A'}"
+                  <div key={i} className="mb-2 p-3 bg-red-500/10 rounded border border-red-500/30">
+                    <p className="text-sm text-red-300 font-medium">{m.message}</p>
+                    <div className="mt-1 text-xs text-red-400/80 flex gap-4">
+                      <span>📄 Document: <strong>{m.documentValue || 'N/A'}</strong></span>
+                      <span>👤 Staff Record: <strong>{m.recordValue || 'N/A'}</strong></span>
+                    </div>
                   </div>
                 ))}
-                <p className="ml-7 text-xs text-red-400/80 mt-2">
-                  This document may belong to a different person. Please verify before proceeding.
-                </p>
               </div>
             )}
 
@@ -864,22 +881,58 @@ export function StaffDocumentUploadWizard({
           ))}
         </div>
 
-        <div className="flex items-center gap-3 pt-4">
-          <button
-            onClick={handleEditOcrFields}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]"
-          >
-            <Edit3 className="h-4 w-4" />
-            Edit More Fields
-          </button>
-          <button
-            onClick={handleAcceptOcrFields}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Accept & Continue
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
+        {/* Critical Mismatch Acknowledgment Required */}
+        {criticalMismatches.length > 0 && !state.criticalMismatchAcknowledged && (
+          <div className="p-4 bg-red-500/20 border-2 border-red-500/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="h-6 w-6 text-red-400" />
+              <span className="text-base font-bold text-red-400">
+                🚨 DOCUMENT MISMATCH DETECTED
+              </span>
+            </div>
+            <p className="text-sm text-red-300 mb-4">
+              This document appears to belong to a different person. Are you sure you want to upload it to this staff member&apos;s record?
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onCancel}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Cancel Upload
+              </button>
+              <button
+                onClick={handleAcknowledgeCriticalMismatch}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                ⚠️ Upload Anyway (I Understand)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Normal Buttons - shown when no critical mismatch or already acknowledged */}
+        {(criticalMismatches.length === 0 || state.criticalMismatchAcknowledged) && (
+          <div className="flex items-center gap-3 pt-4">
+            <button
+              onClick={handleEditOcrFields}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]"
+            >
+              <Edit3 className="h-4 w-4" />
+              Edit More Fields
+            </button>
+            <button
+              onClick={handleAcceptOcrFields}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${
+                state.criticalMismatchAcknowledged
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {state.criticalMismatchAcknowledged ? 'Continue Despite Warning' : 'Accept & Continue'}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
     );
   };

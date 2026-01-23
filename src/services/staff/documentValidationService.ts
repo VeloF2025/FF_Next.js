@@ -387,6 +387,125 @@ export async function validateSaIdDocument(
 }
 
 /**
+ * Validate bank confirmation/statement against staff record
+ * CRITICAL: Account holder name must match staff name to prevent uploading wrong person's document
+ */
+export async function validateBankDocument(
+  staffId: string,
+  ocrData: Record<string, any>
+): Promise<ValidationResult> {
+  const mismatches: ValidationMismatch[] = [];
+  const matches: string[] = [];
+
+  const staffRecord = await fetchStaffRecord(staffId);
+
+  if (!staffRecord) {
+    return {
+      isValid: true,
+      matchScore: 100,
+      mismatches: [],
+      matches: [],
+      staffRecord: null,
+    };
+  }
+
+  // CRITICAL: Compare Account Holder Name against staff name
+  // This is the primary check to prevent uploading wrong person's bank details
+  const accountHolder = ocrData.accountHolder || ocrData.accountHolderName;
+  if (accountHolder && staffRecord.name) {
+    if (areNamesSimilar(accountHolder, staffRecord.name)) {
+      matches.push('Account Holder Name');
+    } else {
+      mismatches.push({
+        field: 'accountHolder',
+        label: 'Account Holder',
+        documentValue: accountHolder,
+        recordValue: staffRecord.name,
+        severity: 'critical',
+        message: `⚠️ WRONG PERSON: Bank account belongs to "${accountHolder}" but staff record is for "${staffRecord.name}". This document appears to belong to someone else.`,
+      });
+    }
+  } else if (!accountHolder) {
+    // No account holder extracted - warn user to verify manually
+    mismatches.push({
+      field: 'accountHolder',
+      label: 'Account Holder',
+      documentValue: null,
+      recordValue: staffRecord.name,
+      severity: 'warning',
+      message: `Account holder name could not be extracted. Please verify the document belongs to "${staffRecord.name}".`,
+    });
+  }
+
+  // Bank name validation (info only - bank can change)
+  const bankName = ocrData.bankName;
+  if (bankName) {
+    matches.push('Bank Name');
+  }
+
+  // Account number validation (format check)
+  const accountNumber = ocrData.accountNumber;
+  if (accountNumber) {
+    const cleanAccount = accountNumber.replace(/[\s-]/g, '');
+    if (/^\d{9,12}$/.test(cleanAccount)) {
+      matches.push('Account Number (valid format)');
+    } else {
+      mismatches.push({
+        field: 'accountNumber',
+        label: 'Account Number',
+        documentValue: accountNumber,
+        recordValue: null,
+        severity: 'warning',
+        message: `Account number "${accountNumber}" may be invalid (expected 9-12 digits)`,
+      });
+    }
+  }
+
+  // Branch code validation (format check)
+  const branchCode = ocrData.branchCode;
+  if (branchCode) {
+    const cleanBranch = branchCode.replace(/[\s-]/g, '');
+    if (/^\d{6}$/.test(cleanBranch)) {
+      matches.push('Branch Code (valid format)');
+    } else {
+      mismatches.push({
+        field: 'branchCode',
+        label: 'Branch Code',
+        documentValue: branchCode,
+        recordValue: null,
+        severity: 'info',
+        message: `Branch code "${branchCode}" may be invalid (expected 6 digits)`,
+      });
+    }
+  }
+
+  const totalFields = matches.length + mismatches.length;
+  const criticalMismatches = mismatches.filter(m => m.severity === 'critical').length;
+  const warningMismatches = mismatches.filter(m => m.severity === 'warning').length;
+
+  let matchScore = 100;
+  if (totalFields > 0) {
+    matchScore = Math.max(0, Math.round(
+      ((matches.length * 100) - (criticalMismatches * 50) - (warningMismatches * 20)) / totalFields
+    ));
+  }
+
+  return {
+    isValid: criticalMismatches === 0,
+    matchScore,
+    mismatches,
+    matches,
+    staffRecord: {
+      name: staffRecord.name,
+      saIdNumber: staffRecord.saIdNumber,
+      position: staffRecord.position,
+      department: staffRecord.department,
+      startDate: null,
+    },
+  };
+}
+
+/**
  * Validate any document type against staff record
  */
 export async function validateDocument(
@@ -400,7 +519,10 @@ export async function validateDocument(
     case 'sa_id':
     case 'id_document':
       return validateSaIdDocument(staffId, ocrData);
-    // Add more document types as needed
+    case 'bank_details':
+    case 'bank_statement':
+    case 'bank_confirmation':
+      return validateBankDocument(staffId, ocrData);
     default:
       // For other document types, return basic validation
       return {
