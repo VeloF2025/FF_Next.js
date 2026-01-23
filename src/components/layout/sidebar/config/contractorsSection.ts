@@ -16,6 +16,7 @@ export const contractorsSection: NavSection = {
       label: 'Contractors Portal',
       shortLabel: 'Contract',
       permissions: [],
+      rbacKey: 'contractors.list',
     },
     {
       to: '/contractors/rag-dashboard',
@@ -23,6 +24,7 @@ export const contractorsSection: NavSection = {
       label: 'RAG Dashboard',
       shortLabel: 'RAG',
       permissions: [],
+      rbacKey: 'contractors',
     },
   ]
 };

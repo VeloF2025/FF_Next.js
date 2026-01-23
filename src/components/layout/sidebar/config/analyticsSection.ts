@@ -16,6 +16,7 @@ export const analyticsSection: NavSection = {
       label: 'Analytics Dashboard',
       shortLabel: 'Analytics',
       permissions: [],
+      rbacKey: 'analytics.main',
     },
     {
       to: '/enhanced-kpis',
@@ -23,6 +24,7 @@ export const analyticsSection: NavSection = {
       label: 'Enhanced KPIs',
       shortLabel: 'KPIs',
       permissions: [],
+      rbacKey: 'analytics',
     },
     {
       to: '/kpi-dashboard',
@@ -30,6 +32,7 @@ export const analyticsSection: NavSection = {
       label: 'KPI Dashboard',
       shortLabel: 'KPI Dash',
       permissions: [],
+      rbacKey: 'analytics',
     },
     {
       to: '/reports',
@@ -37,6 +40,7 @@ export const analyticsSection: NavSection = {
       label: 'Reports',
       shortLabel: 'Reports',
       permissions: [],
+      rbacKey: 'analytics.reports',
     },
   ]
 };

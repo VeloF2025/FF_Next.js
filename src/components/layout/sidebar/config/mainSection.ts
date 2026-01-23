@@ -17,6 +17,7 @@ export const mainSection: NavSection = {
       label: 'Dashboard',
       shortLabel: 'Dash',
       permissions: [], // Available to all
+      rbacKey: 'dashboard.main',
     },
     {
       to: '/meetings',
@@ -24,6 +25,7 @@ export const mainSection: NavSection = {
       label: 'Meetings',
       shortLabel: 'Meet',
       permissions: [],
+      rbacKey: 'people.meetings',
     },
     {
       to: '/action-items',
@@ -31,6 +33,7 @@ export const mainSection: NavSection = {
       label: 'Action Items',
       shortLabel: 'Actions',
       permissions: [],
+      rbacKey: 'dashboard.action-items',
     },
   ]
 };

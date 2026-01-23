@@ -31,7 +31,8 @@ export const procurementSection: NavSection = {
       icon: LayoutDashboard,
       label: 'Dashboard',
       shortLabel: 'Dash',
-      permissions: []
+      permissions: [],
+      rbacKey: 'procurement.main',
     },
 
     // Sourcing - Pre-purchase activities (tabs: Suppliers, BOQ, RFQ)
@@ -40,7 +41,8 @@ export const procurementSection: NavSection = {
       icon: ShoppingCart,
       label: 'Sourcing',
       shortLabel: 'Source',
-      permissions: []
+      permissions: [],
+      rbacKey: 'procurement.sourcing',
     },
 
     // Purchasing - Transaction workflow (tabs: Quotes, Requisitions, PO, GRN)
@@ -49,7 +51,8 @@ export const procurementSection: NavSection = {
       icon: FileText,
       label: 'Purchasing',
       shortLabel: 'Purchase',
-      permissions: []
+      permissions: [],
+      rbacKey: 'procurement.purchasing',
     },
 
     // Inventory - Stock management (tabs: Stock, Items, Categories, Bundles, Takes, Field)
@@ -58,7 +61,8 @@ export const procurementSection: NavSection = {
       icon: Warehouse,
       label: 'Inventory',
       shortLabel: 'Stock',
-      permissions: []
+      permissions: [],
+      rbacKey: 'procurement.inventory',
     },
 
     // Financial - Budget and cost tracking (tabs: Budget, Cost Centers)
@@ -67,7 +71,8 @@ export const procurementSection: NavSection = {
       icon: DollarSign,
       label: 'Financial',
       shortLabel: 'Finance',
-      permissions: []
+      permissions: [],
+      rbacKey: 'procurement', // Module-level for now
     },
 
     // Approvals - Cross-cutting workflow gate
@@ -76,7 +81,8 @@ export const procurementSection: NavSection = {
       icon: CheckCircle,
       label: 'Approvals',
       shortLabel: 'Approve',
-      permissions: []
+      permissions: [],
+      rbacKey: 'procurement.approvals',
     },
   ]
 };

@@ -25,6 +25,7 @@ export const projectSection: NavSection = {
       label: 'Projects',
       shortLabel: 'Proj',
       permissions: [],
+      rbacKey: 'projects.list',
     },
     {
       to: '/pipeline',
@@ -32,6 +33,7 @@ export const projectSection: NavSection = {
       label: 'Pipeline',
       shortLabel: 'Pipe',
       permissions: [],
+      rbacKey: 'projects.pipeline',
     },
     {
       to: '/health-safety',
@@ -39,6 +41,7 @@ export const projectSection: NavSection = {
       label: 'Health & Safety',
       shortLabel: 'H&S',
       permissions: [],
+      rbacKey: 'people.health-safety',
     },
     {
       to: '/tasks',
@@ -46,6 +49,7 @@ export const projectSection: NavSection = {
       label: 'Task Management',
       shortLabel: 'Tasks',
       permissions: [],
+      rbacKey: 'projects', // Module-level
     },
     {
       to: '/daily-progress',
@@ -53,6 +57,7 @@ export const projectSection: NavSection = {
       label: 'Daily Progress',
       shortLabel: 'Daily',
       permissions: [],
+      rbacKey: 'dashboard.daily-progress',
     },
     {
       to: '/clients',
@@ -60,6 +65,7 @@ export const projectSection: NavSection = {
       label: 'Clients',
       shortLabel: 'Clients',
       permissions: [],
+      rbacKey: 'clients.list',
     },
     {
       to: '/contractors',
@@ -67,6 +73,7 @@ export const projectSection: NavSection = {
       label: 'Contractors',
       shortLabel: 'Contract',
       permissions: [],
+      rbacKey: 'contractors.list',
     },
     {
       to: '/contractors/rag-dashboard',
@@ -74,6 +81,7 @@ export const projectSection: NavSection = {
       label: 'RAG Dashboard',
       shortLabel: 'RAG',
       permissions: [],
+      rbacKey: 'contractors', // Module-level
     },
   ]
 };

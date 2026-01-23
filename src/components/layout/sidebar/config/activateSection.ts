@@ -17,6 +17,7 @@ export const activateSection: NavSection = {
       label: 'Dashboard',
       shortLabel: 'Dash',
       permissions: [],
+      rbacKey: 'activate.main',
     },
     {
       to: '/activate/qa-centre',
@@ -24,6 +25,7 @@ export const activateSection: NavSection = {
       label: 'QA Centre',
       shortLabel: 'QA',
       permissions: [],
+      rbacKey: 'activate.qa-centre',
     },
   ],
 };

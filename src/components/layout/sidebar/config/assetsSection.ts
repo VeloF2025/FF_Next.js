@@ -24,6 +24,7 @@ export const assetsSection: NavSection = {
       label: 'Asset Dashboard',
       shortLabel: 'Dashboard',
       permissions: [],
+      rbacKey: 'assets',
     },
     {
       to: '/assets/list',
@@ -31,6 +32,7 @@ export const assetsSection: NavSection = {
       label: 'All Assets',
       shortLabel: 'Assets',
       permissions: [],
+      rbacKey: 'assets.list',
     },
     {
       to: '/assets/categories',
@@ -38,6 +40,7 @@ export const assetsSection: NavSection = {
       label: 'Categories',
       shortLabel: 'Categories',
       permissions: [],
+      rbacKey: 'assets.categories',
     },
     {
       to: '/assets/checkout',
@@ -45,6 +48,7 @@ export const assetsSection: NavSection = {
       label: 'Check Out / In',
       shortLabel: 'Checkout',
       permissions: [],
+      rbacKey: 'assets',
     },
     {
       to: '/assets/maintenance',
@@ -52,6 +56,7 @@ export const assetsSection: NavSection = {
       label: 'Maintenance',
       shortLabel: 'Maint',
       permissions: [],
+      rbacKey: 'assets.maintenance',
     },
     {
       to: '/assets/calibration',
@@ -59,6 +64,7 @@ export const assetsSection: NavSection = {
       label: 'Calibration',
       shortLabel: 'Calib',
       permissions: [],
+      rbacKey: 'assets',
     },
   ]
 };

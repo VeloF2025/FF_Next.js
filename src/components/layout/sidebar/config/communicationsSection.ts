@@ -20,6 +20,7 @@ export const communicationsSection: NavSection = {
       label: 'Communications Portal',
       shortLabel: 'Comms',
       permissions: [],
+      rbacKey: 'communications.main',
     },
     {
       to: '/communications/whatsapp',
@@ -27,6 +28,7 @@ export const communicationsSection: NavSection = {
       label: 'WhatsApp Portal',
       shortLabel: 'WhatsApp',
       permissions: [Permission.SYSTEM_ADMIN], // Admin only
+      rbacKey: 'communications.whatsapp',
     },
     {
       to: PDFCRAFT_URL,
@@ -34,6 +36,7 @@ export const communicationsSection: NavSection = {
       label: 'PDF Tools',
       shortLabel: 'PDF',
       permissions: [],
+      rbacKey: 'communications',
       external: true,
     },
     {
@@ -42,6 +45,7 @@ export const communicationsSection: NavSection = {
       label: 'Meetings',
       shortLabel: 'Meet',
       permissions: [],
+      rbacKey: 'people.meetings',
     },
     {
       to: '/action-items',
@@ -49,6 +53,7 @@ export const communicationsSection: NavSection = {
       label: 'Action Items',
       shortLabel: 'Actions',
       permissions: [],
+      rbacKey: 'dashboard.action-items',
     },
     {
       to: '/communications/dev-queue',
@@ -56,6 +61,7 @@ export const communicationsSection: NavSection = {
       label: 'Dev Queue',
       shortLabel: 'DevQ',
       permissions: [],
+      rbacKey: 'communications',
     },
   ]
 };

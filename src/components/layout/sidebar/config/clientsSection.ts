@@ -16,6 +16,7 @@ export const clientsSection: NavSection = {
       label: 'Clients',
       shortLabel: 'Clients',
       permissions: [],
+      rbacKey: 'clients.list',
     },
   ]
 };

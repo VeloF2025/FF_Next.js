@@ -24,6 +24,7 @@ export const maintenanceSection: NavSection = {
       label: 'Dashboard',
       shortLabel: 'Dash',
       permissions: [],
+      rbacKey: 'maintenance.main',
     },
     {
       to: '/maintenance/tickets',
@@ -31,6 +32,7 @@ export const maintenanceSection: NavSection = {
       label: 'Work Orders',
       shortLabel: 'Orders',
       permissions: [],
+      rbacKey: 'maintenance.tickets',
     },
     {
       to: '/maintenance/teams',
@@ -38,6 +40,7 @@ export const maintenanceSection: NavSection = {
       label: 'Teams',
       shortLabel: 'Teams',
       permissions: [],
+      rbacKey: 'maintenance',
     },
     {
       to: '/maintenance/data-sync',
@@ -45,6 +48,7 @@ export const maintenanceSection: NavSection = {
       label: 'Data Sync',
       shortLabel: 'Sync',
       permissions: [],
+      rbacKey: 'maintenance',
     },
     {
       to: '/maintenance/escalations',
@@ -52,6 +56,7 @@ export const maintenanceSection: NavSection = {
       label: 'Escalations',
       shortLabel: 'Escal',
       permissions: [],
+      rbacKey: 'maintenance.escalations',
     },
     {
       to: '/maintenance/handover',
@@ -59,6 +64,7 @@ export const maintenanceSection: NavSection = {
       label: 'Handover Center',
       shortLabel: 'Handover',
       permissions: [],
+      rbacKey: 'maintenance',
     },
     {
       to: '/maintenance/risks',
@@ -66,6 +72,7 @@ export const maintenanceSection: NavSection = {
       label: 'Risk Acceptance',
       shortLabel: 'Risks',
       permissions: [],
+      rbacKey: 'maintenance',
     },
   ]
 };

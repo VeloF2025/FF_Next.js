@@ -26,6 +26,7 @@ export const DASHBOARD_ITEM: NavItem = {
   label: 'Dashboard',
   shortLabel: 'Dash',
   permissions: [],
+  rbacKey: 'dashboard.main',
 };
 
 // Map of item IDs to their NavItem definitions
@@ -37,6 +38,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Meetings',
     shortLabel: 'Meet',
     permissions: [],
+    rbacKey: 'people.meetings',
   },
   'action-items': {
     to: '/action-items',
@@ -44,6 +46,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Action Items',
     shortLabel: 'Actions',
     permissions: [],
+    rbacKey: 'dashboard.action-items',
   },
   'tasks': {
     to: '/tasks',
@@ -51,6 +54,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Task Management',
     shortLabel: 'Tasks',
     permissions: [],
+    rbacKey: 'projects',
   },
   'projects': {
     to: '/projects',
@@ -58,6 +62,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Projects',
     shortLabel: 'Proj',
     permissions: [],
+    rbacKey: 'projects.list',
   },
   'maintenance': {
     to: '/maintenance',
@@ -65,6 +70,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Maintenance',
     shortLabel: 'Maint',
     permissions: [],
+    rbacKey: 'maintenance.main',
   },
   'analytics': {
     to: '/analytics',
@@ -72,6 +78,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Analytics',
     shortLabel: 'Analytics',
     permissions: [],
+    rbacKey: 'analytics.main',
   },
   'fleet': {
     to: '/fleet',
@@ -79,6 +86,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Fleet Dashboard',
     shortLabel: 'Fleet',
     permissions: [],
+    rbacKey: 'fleet.main',
   },
   'staff': {
     to: '/staff',
@@ -86,6 +94,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Staff',
     shortLabel: 'Staff',
     permissions: [],
+    rbacKey: 'people.staff',
   },
   'contractors': {
     to: '/contractors',
@@ -93,6 +102,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Contractors',
     shortLabel: 'Contract',
     permissions: [],
+    rbacKey: 'contractors.list',
   },
   'wa-monitor': {
     to: '/wa-monitor',
@@ -100,6 +110,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'WA Monitor',
     shortLabel: 'WA',
     permissions: [],
+    rbacKey: 'field',
   },
   'daily-progress': {
     to: '/daily-progress',
@@ -107,6 +118,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Daily Progress',
     shortLabel: 'Daily',
     permissions: [],
+    rbacKey: 'dashboard.daily-progress',
   },
   'clients': {
     to: '/clients',
@@ -114,6 +126,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Clients',
     shortLabel: 'Clients',
     permissions: [],
+    rbacKey: 'clients.list',
   },
   'procurement': {
     to: '/procurement',
@@ -121,6 +134,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Procurement',
     shortLabel: 'Procure',
     permissions: [],
+    rbacKey: 'procurement.main',
   },
   'assets': {
     to: '/assets',
@@ -128,6 +142,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Assets',
     shortLabel: 'Assets',
     permissions: [],
+    rbacKey: 'assets',
   },
   'communications': {
     to: '/communications',
@@ -135,6 +150,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Communications',
     shortLabel: 'Comms',
     permissions: [],
+    rbacKey: 'communications.main',
   },
   'activate': {
     to: '/activate',
@@ -142,6 +158,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     label: 'Activate',
     shortLabel: 'Activate',
     permissions: [],
+    rbacKey: 'activate.main',
   },
 };
 

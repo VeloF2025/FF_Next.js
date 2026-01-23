@@ -21,6 +21,7 @@ export const systemSection: NavSection = {
       label: 'System Health',
       shortLabel: 'Health',
       permissions: [],
+      rbacKey: 'activate.monitoring',
     },
     {
       to: '/system/infrastructure',
@@ -28,6 +29,7 @@ export const systemSection: NavSection = {
       label: 'Infrastructure',
       shortLabel: 'Infra',
       permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'system', // Admin-only via RBAC
     },
     {
       to: XYOPS_URL,
@@ -35,6 +37,7 @@ export const systemSection: NavSection = {
       label: 'xyOps Monitor',
       shortLabel: 'xyOps',
       permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'system', // Admin-only via RBAC
       external: true,
     },
     {
@@ -43,6 +46,7 @@ export const systemSection: NavSection = {
       label: 'Grafana',
       shortLabel: 'Grafana',
       permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'system', // Admin-only via RBAC
       external: true,
     },
     {
@@ -51,6 +55,7 @@ export const systemSection: NavSection = {
       label: 'QField',
       shortLabel: 'QField',
       permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'system', // Admin-only via RBAC
     },
     {
       to: '/downloads',
@@ -58,6 +63,7 @@ export const systemSection: NavSection = {
       label: 'Downloads',
       shortLabel: 'Downloads',
       permissions: [],
+      rbacKey: 'system.downloads',
     },
     {
       to: '/imports',
@@ -65,6 +71,7 @@ export const systemSection: NavSection = {
       label: 'Imports',
       shortLabel: 'Imports',
       permissions: [],
+      rbacKey: 'projects.imports',
     },
     {
       to: '/settings',
@@ -72,6 +79,7 @@ export const systemSection: NavSection = {
       label: 'Settings',
       shortLabel: 'Settings',
       permissions: [],
+      rbacKey: 'system.settings',
     },
   ]
 };

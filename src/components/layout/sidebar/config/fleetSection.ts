@@ -30,6 +30,7 @@ export const fleetSection: NavSection = {
       label: 'Fleet Dashboard',
       shortLabel: 'Dashboard',
       permissions: [],
+      rbacKey: 'fleet.main',
     },
     {
       to: '/fleet/analytics',
@@ -37,6 +38,7 @@ export const fleetSection: NavSection = {
       label: 'Fleet Analytics',
       shortLabel: 'Analytics',
       permissions: [],
+      rbacKey: 'fleet',
     },
     {
       to: '/fleet/drivers',
@@ -44,6 +46,7 @@ export const fleetSection: NavSection = {
       label: 'Fleet Drivers',
       shortLabel: 'Drivers',
       permissions: [],
+      rbacKey: 'fleet.drivers',
     },
     {
       to: '/fleet/fuel',
@@ -51,6 +54,7 @@ export const fleetSection: NavSection = {
       label: 'Fuel Analytics',
       shortLabel: 'Fuel',
       permissions: [],
+      rbacKey: 'fleet.fuel',
     },
     {
       to: '/fleet/maintenance',
@@ -58,6 +62,7 @@ export const fleetSection: NavSection = {
       label: 'Maintenance',
       shortLabel: 'Maint.',
       permissions: [],
+      rbacKey: 'fleet.maintenance',
     },
     {
       to: '/fleet/vehicles',
@@ -65,6 +70,7 @@ export const fleetSection: NavSection = {
       label: 'All Vehicles',
       shortLabel: 'Vehicles',
       permissions: [],
+      rbacKey: 'fleet.vehicles',
     },
     {
       to: '/fleet/investigation',
@@ -72,6 +78,7 @@ export const fleetSection: NavSection = {
       label: 'GPS Investigation',
       shortLabel: 'GPS',
       permissions: [],
+      rbacKey: 'fleet',
     },
     {
       to: '/fleet/locations',
@@ -79,6 +86,7 @@ export const fleetSection: NavSection = {
       label: 'Authorized Locations',
       shortLabel: 'Locations',
       permissions: [],
+      rbacKey: 'fleet',
     },
     {
       to: '/fleet/portal',
@@ -86,6 +94,7 @@ export const fleetSection: NavSection = {
       label: 'Vehicle Portal',
       shortLabel: 'Portal',
       permissions: [],
+      rbacKey: 'fleet',
     },
     {
       to: '/fleet/check-in/audit',
@@ -93,6 +102,7 @@ export const fleetSection: NavSection = {
       label: 'Check-In Audit',
       shortLabel: 'Audit',
       permissions: [],
+      rbacKey: 'fleet',
     },
   ],
 };

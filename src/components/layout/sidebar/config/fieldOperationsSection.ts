@@ -16,6 +16,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'Field App Portal',
       shortLabel: 'Field',
       permissions: [],
+      rbacKey: 'field',
     },
     {
       to: '/onemap',
@@ -23,6 +24,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'OneMap Data Grid',
       shortLabel: 'OneMap',
       permissions: [],
+      rbacKey: 'projects.onemap',
     },
     {
       to: '/nokia-equipment',
@@ -30,6 +32,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'Nokia Equipment',
       shortLabel: 'Nokia',
       permissions: [],
+      rbacKey: 'field',
     },
     {
       to: '/wa-monitor',
@@ -37,6 +40,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'WA Monitor',
       shortLabel: 'WA',
       permissions: [],
+      rbacKey: 'field',
     },
     {
       to: '/wa-monitor/dr-validation',
@@ -44,6 +48,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'DR Validation',
       shortLabel: 'DR Valid',
       permissions: [],
+      rbacKey: 'field',
     },
     {
       to: '/marketing-activations',
@@ -51,6 +56,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'Marketing Activations',
       shortLabel: 'Marketing',
       permissions: [],
+      rbacKey: 'field',
     },
     {
       to: '/photo-review',
@@ -58,6 +64,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'Photo Review',
       shortLabel: 'Photos',
       permissions: [],
+      rbacKey: 'activate',
     },
   ]
 };

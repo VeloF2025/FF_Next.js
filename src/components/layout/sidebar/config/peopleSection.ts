@@ -16,6 +16,7 @@ export const peopleSection: NavSection = {
       label: 'Staff',
       shortLabel: 'Staff',
       permissions: [],
+      rbacKey: 'people.staff',
     },
   ]
 };

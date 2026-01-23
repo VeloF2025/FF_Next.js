@@ -6,7 +6,8 @@ export interface NavItem {
   icon: LucideIcon;
   label: string;
   shortLabel: string;
-  permissions: Permission[];
+  permissions: Permission[];  // Legacy permission enum (deprecated, use rbacKey)
+  rbacKey?: string;           // RBAC permission key like 'dashboard', 'projects', 'procurement.sourcing'
   subItems?: NavItem[];
   external?: boolean; // Opens in new tab
   isGroup?: boolean; // If true, this is a collapsible group header (not navigable)

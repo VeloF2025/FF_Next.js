@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { usePermission } from '@/hooks/usePermission';
 import { navItems } from './sidebar/navigationConfig';
-import { filterNavigationItems, getSidebarStyles } from './sidebar/sidebarUtils';
+import { filterNavigationItemsRBAC, getSidebarStyles } from './sidebar/sidebarUtils';
 import { SidebarHeader } from './sidebar/SidebarHeader';
 import { NavigationMenu } from './sidebar/NavigationMenu';
 import { CollapseToggle } from './sidebar/CollapseToggle';
@@ -11,8 +12,9 @@ import { buildMainSectionItems } from './sidebar/config/customizableItems';
 import type { SidebarProps, NavSection } from './sidebar/types';
 
 export function Sidebar({ isOpen, isCollapsed, onCollapse }: SidebarProps) {
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser } = useAuth();
   const { themeConfig } = useTheme();
+  const { can } = usePermission();
   const { mainSectionItems } = useSidebarPreferences();
 
   // Build nav items with customized MAIN section
@@ -32,7 +34,8 @@ export function Sidebar({ isOpen, isCollapsed, onCollapse }: SidebarProps) {
     );
   }, [mainSectionItems]);
 
-  const visibleNavItems = filterNavigationItems(customizedNavItems, hasPermission);
+  // Use RBAC-based filtering with permission keys from database
+  const visibleNavItems = filterNavigationItemsRBAC(customizedNavItems, can);
   const sidebarStyles = getSidebarStyles(themeConfig);
   
   return (
