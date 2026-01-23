@@ -19,6 +19,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { ServiceStatusCard } from './ServiceStatusCard';
+import { HealthTrendChart } from './HealthTrendChart';
 import type { SystemHealthResponse, OverallStatus } from '../types/infrastructure.types';
 
 const overallStatusConfig: Record<OverallStatus, {
@@ -285,6 +286,11 @@ export function InfrastructureHealthDashboard() {
               <ServiceStatusCard name="Grafana" status={health.infrastructure.grafana} />
               <ServiceStatusCard name="Portainer" status={health.infrastructure.portainer} />
             </div>
+          </section>
+
+          {/* Health Trend Chart */}
+          <section>
+            <HealthTrendChart hours={24} limit={48} />
           </section>
 
           {/* Recent Recovery Actions */}
