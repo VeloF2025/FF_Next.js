@@ -501,7 +501,12 @@
       "Bash(for item in clients procurement assets communications activate)",
       "Bash(do echo -n \"Testing $item: \" curl -s -X PUT https://dev.fibreflow.app/api/user-sidebar-preferences -H \"Content-Type: application/json\" -d \"{\"\"main_section_items\"\": [\"\"$item\"\"]}\")",
       "Bash(__NEW_LINE__ echo \"=== Production \\(app.fibreflow.app\\) ===\")",
-      "Bash(__NEW_LINE__ echo \"=== Dev \\(dev.fibreflow.app\\) ===\")"
+      "Bash(__NEW_LINE__ echo \"=== Dev \\(dev.fibreflow.app\\) ===\")",
+      "Bash(TOKEN=\"wxZ3VYaXO7NZcPQ9NWzkAN5KKkARDv7rtRqJeKVoRa2oQS3YemnswsXikDS02W9Gs59ocg37bR5ZC22PhS0PFegekZ6k9oKaj1GN\" PROJECT_ID=\"067b51c8-6e96-4e0c-9462-d4890763758b\")",
+      "Bash(TOKEN=\"wxZ3VYaXO7NZcPQ9NWzkAN5KKkARDv7rtRqJeKVoRa2oQS3YemnswsXikDS02W9Gs59ocg37bR5ZC22PhS0PFegekZ6k9oKaj1GN\")",
+      "Bash(PROJECT_ID=\"067b51c8-6e96-4e0c-9462-d4890763758b\")",
+      "Bash(__NEW_LINE__ echo \"=== QFieldCloud Project Files ===\")",
+      "Bash(do basename \"$dir\")"
     ],
     "deny": [],
     "ask": [],
