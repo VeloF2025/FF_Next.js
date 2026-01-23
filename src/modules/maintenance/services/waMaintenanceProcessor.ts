@@ -64,7 +64,8 @@ const MAINTENANCE_GROUP_JID =
   process.env.MAINTENANCE_WA_GROUP_JID || '120363424360693693@g.us';
 
 // DR number regex pattern (DR followed by 6-8 digits)
-const DR_PATTERN = /\bDR(\d{6,8})\b/gi;
+// Allow optional space/dash between DR and number (e.g., "DR1856394", "DR 1856394", "DR-1856394")
+const DR_PATTERN = /\bDR[\s\-]?(\d{6,8})\b/gi;
 
 // ============================================================================
 // Database Connection
@@ -91,8 +92,8 @@ export function extractDRNumbers(text: string | null | undefined): string[] {
   const matches = text.match(DR_PATTERN);
   if (!matches) return [];
 
-  // Normalize to uppercase and deduplicate
-  const normalized = matches.map((m) => m.toUpperCase());
+  // Normalize: uppercase, remove spaces/dashes, deduplicate
+  const normalized = matches.map((m) => m.toUpperCase().replace(/[\s\-]/g, ''));
   return [...new Set(normalized)];
 }
 
