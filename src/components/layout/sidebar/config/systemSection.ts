@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, Download, FileDown, Activity, BarChart3, MapPin } from 'lucide-react';
+import { Settings, Download, FileDown, Activity, BarChart3, MapPin, HeartPulse } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -15,6 +15,13 @@ export const systemSection: NavSection = {
   sectionId: 'system',
   isCollapsible: true,
   items: [
+    {
+      to: '/activate/monitoring',
+      icon: HeartPulse,
+      label: 'System Health',
+      shortLabel: 'Health',
+      permissions: [Permission.SYSTEM_ADMIN],
+    },
     {
       to: XYOPS_URL,
       icon: Activity,

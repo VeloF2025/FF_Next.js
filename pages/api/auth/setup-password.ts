@@ -167,9 +167,13 @@ export default async function handler(
     };
 
     // Check for super admin first, then fall back to position mapping
-    const authRole = SUPER_ADMIN_EMAILS.includes(normalizedEmail)
+    const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(normalizedEmail);
+    const authRole = isSuperAdmin
       ? 'super_admin' as AuthRole
       : mapPositionToAuthRole(staffMember.position as string | null);
+
+    // Super admins get the 'all' permission for full system access
+    const userPermissions = isSuperAdmin ? ['all'] : [];
 
     // Step 5: Create or update user
     if (isNewUser) {
@@ -181,6 +185,7 @@ export default async function handler(
           first_name,
           last_name,
           role,
+          permissions,
           department,
           is_active,
           created_at,
@@ -192,6 +197,7 @@ export default async function handler(
           ${staffMember.first_name},
           ${staffMember.last_name},
           ${authRole},
+          ${JSON.stringify(userPermissions)}::jsonb,
           ${staffMember.department},
           true,
           NOW(),
@@ -203,6 +209,8 @@ export default async function handler(
         userId,
         email: normalizedEmail,
         staffId: staffMember.id,
+        role: authRole,
+        isSuperAdmin,
       });
     } else {
       await sql`
@@ -212,6 +220,7 @@ export default async function handler(
           first_name = ${staffMember.first_name},
           last_name = ${staffMember.last_name},
           role = ${authRole},
+          permissions = ${JSON.stringify(userPermissions)}::jsonb,
           department = ${staffMember.department},
           updated_at = NOW()
         WHERE id = ${userId}
@@ -220,6 +229,8 @@ export default async function handler(
       logger.info('setup-password: Updated existing user with password', {
         userId,
         email: normalizedEmail,
+        role: authRole,
+        isSuperAdmin,
       });
     }
 
@@ -237,7 +248,7 @@ export default async function handler(
       firstName: (staffMember.first_name as string) || '',
       lastName: (staffMember.last_name as string) || '',
       role: authRole,
-      permissions: [],
+      permissions: userPermissions,
       isActive: true,
       department: staffMember.department as string | undefined,
     };
