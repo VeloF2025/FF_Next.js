@@ -421,8 +421,8 @@ async function syncOcrMetadataToStaff(document: Record<string, unknown>): Promis
 }
 
 /**
- * Append document verification summary to staff's notes field
- * Creates an audit trail of verified documents on the staff record
+ * Create document verification note in staff_notes table
+ * Creates an audit trail of verified documents that shows in the Notes tab
  */
 async function appendToStaffNotes(
   staffId: string,
@@ -430,36 +430,34 @@ async function appendToStaffNotes(
   syncedFields: string[]
 ): Promise<void> {
   try {
-    const timestamp = new Date().toISOString().split('T')[0];
     const docTypeLabel = formatDocumentType(documentType);
 
-    // Build the note entry
-    const noteEntry = `[${timestamp}] ✅ ${docTypeLabel} verified:\n  • ${syncedFields.join('\n  • ')}`;
+    // Build the note content
+    const noteContent = `✅ Document verified and data synced:\n\n• ${syncedFields.join('\n• ')}`;
 
-    // Get existing notes and append
-    const [staff] = await sql`
-      SELECT notes FROM staff WHERE id = ${staffId}
-    `;
-
-    const existingNotes = (staff?.notes as string) || '';
-    const newNotes = existingNotes
-      ? `${existingNotes}\n\n${noteEntry}`
-      : noteEntry;
-
+    // Insert into staff_notes table (matches NotesTab component)
     await sql`
-      UPDATE staff
-      SET notes = ${newNotes}, updated_at = NOW()
-      WHERE id = ${staffId}
+      INSERT INTO staff_notes (id, staff_id, note_type, title, content, created_by_name, created_at, updated_at)
+      VALUES (
+        gen_random_uuid(),
+        ${staffId}::uuid,
+        'document_note',
+        ${`${docTypeLabel} Verified`},
+        ${noteContent},
+        'System (OCR)',
+        NOW(),
+        NOW()
+      )
     `;
 
-    logger.info('Appended OCR verification to staff notes', {
+    logger.info('Created OCR verification note', {
       staffId,
       documentType,
       fieldsCount: syncedFields.length,
     });
   } catch (error) {
-    // Don't fail verification if notes update fails
-    logger.warn('Failed to append to staff notes', {
+    // Don't fail verification if notes creation fails
+    logger.warn('Failed to create staff note', {
       staffId,
       documentType,
       error: error instanceof Error ? error.message : 'Unknown error',
