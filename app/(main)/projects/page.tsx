@@ -288,7 +288,9 @@ export default function ProjectsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
-                      {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '-'}
+                      {(project.created_at || project.createdAt)
+                        ? new Date(project.created_at || project.createdAt).toLocaleDateString()
+                        : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
