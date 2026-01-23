@@ -133,8 +133,9 @@ export function KanbanColumn({ status, tickets, wipLimit, isDraggingOver, isUpda
 
       {/* Cards Container */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        <AnimatePresence mode="popLayout">
-          {tickets.length === 0 ? (
+        {/* Empty state with AnimatePresence */}
+        <AnimatePresence>
+          {tickets.length === 0 && (
             <motion.div
               key="empty-state"
               initial={{ opacity: 0 }}
@@ -168,46 +169,42 @@ export function KanbanColumn({ status, tickets, wipLimit, isDraggingOver, isUpda
                 {isDraggingOver ? 'Drop here!' : 'No tickets'}
               </span>
             </motion.div>
-          ) : (
-            tickets.map((ticket, index) => (
-              <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    className={snapshot.isDragging ? 'z-50' : ''}
-                  >
-                    <KanbanCard
-                      ticket={ticket}
-                      isDragging={snapshot.isDragging}
-                    />
-                  </div>
-                )}
-              </Draggable>
-            ))
           )}
         </AnimatePresence>
 
-        {/* Drop Preview Indicator */}
-        <AnimatePresence>
-          {isDraggingOver && tickets.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 60 }}
-              exit={{ opacity: 0, height: 0 }}
-              className={`
-                flex items-center justify-center
-                border-2 border-dashed rounded-lg
-                ${config.borderColor} ${config.bgColor}
-              `}
-            >
-              <svg className={`w-5 h-5 ${config.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Draggable cards - no AnimatePresence wrapper to avoid ref conflicts */}
+        {tickets.map((ticket, index) => (
+          <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                {...provided.dragHandleProps}
+                className={snapshot.isDragging ? 'z-50' : ''}
+              >
+                <KanbanCard
+                  ticket={ticket}
+                  isDragging={snapshot.isDragging}
+                />
+              </div>
+            )}
+          </Draggable>
+        ))}
+
+        {/* Drop Preview Indicator - static, no AnimatePresence needed */}
+        {isDraggingOver && tickets.length > 0 && (
+          <div
+            className={`
+              flex items-center justify-center h-[60px]
+              border-2 border-dashed rounded-lg transition-all duration-200
+              ${config.borderColor} ${config.bgColor}
+            `}
+          >
+            <svg className={`w-5 h-5 ${config.color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </div>
+        )}
       </div>
     </motion.div>
   );
