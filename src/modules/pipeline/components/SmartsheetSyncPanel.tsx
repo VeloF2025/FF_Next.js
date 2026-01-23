@@ -6,7 +6,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock, Settings, ChevronDown, ChevronUp, FileDown } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock, Settings, ChevronDown, ChevronUp, FileDown, Database, ArrowUpDown } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface SyncResult {
   success: boolean;
@@ -123,8 +124,68 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
       setLastResult(data);
       fetchConfigs(); // Refresh configs and history
       onSyncComplete?.();
+
+      // Show FibreFlow-style toast notification
+      const syncResult = data as SyncResult;
+      toast.custom(
+        (t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  {syncResult.success ? (
+                    <CheckCircle className="h-10 w-10 text-green-500" />
+                  ) : syncResult.stats.errored > 0 ? (
+                    <AlertTriangle className="h-10 w-10 text-yellow-500" />
+                  ) : (
+                    <XCircle className="h-10 w-10 text-red-500" />
+                  )}
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    Smartsheet Sync Complete
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <Database className="h-4 w-4 text-blue-500" />
+                      <span>{syncResult.stats.processed.toLocaleString()} projects synced</span>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <ArrowUpDown className="h-4 w-4 text-purple-500" />
+                      <span className="text-green-600">+{syncResult.stats.created} new</span>
+                      <span className="text-blue-600">~{syncResult.stats.updated} updated</span>
+                      {syncResult.stats.errored > 0 && (
+                        <span className="text-red-600">!{syncResult.stats.errored} errors</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Duration: {(syncResult.duration_ms / 1000).toFixed(1)}s
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 6000 }
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sync failed');
+      const errorMsg = e instanceof Error ? e.message : 'Sync failed';
+      setError(errorMsg);
+      toast.error(`Smartsheet sync failed: ${errorMsg}`);
     } finally {
       setIsSyncing(false);
     }
@@ -151,8 +212,64 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
 
       setDocSyncResult(data.data);
       onSyncComplete?.();
+
+      // Show toast for document sync
+      const docResult = data.data as DocSyncResult;
+      toast.custom(
+        (t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  {docResult.success ? (
+                    <CheckCircle className="h-10 w-10 text-green-500" />
+                  ) : (
+                    <AlertTriangle className="h-10 w-10 text-yellow-500" />
+                  )}
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    Document Sync Complete
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <FileDown className="h-4 w-4 text-blue-500" />
+                      <span>{docResult.totalAttachments.toLocaleString()} documents processed</span>
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <ArrowUpDown className="h-4 w-4 text-purple-500" />
+                      <span className="text-blue-600">{docResult.downloaded} downloaded</span>
+                      <span className="text-green-600">{docResult.uploaded} uploaded</span>
+                      <span className="text-purple-600">{docResult.linked} linked</span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Duration: {(docResult.duration_ms / 1000).toFixed(1)}s
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: 6000 }
+      );
     } catch (e) {
-      setDocSyncError(e instanceof Error ? e.message : 'Document sync failed');
+      const errorMsg = e instanceof Error ? e.message : 'Document sync failed';
+      setDocSyncError(errorMsg);
+      toast.error(`Document sync failed: ${errorMsg}`);
     } finally {
       setIsDocSyncing(false);
     }
