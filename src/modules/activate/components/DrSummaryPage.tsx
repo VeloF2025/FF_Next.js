@@ -143,6 +143,7 @@ export function DrSummaryPage({
               icon="📅"
               label="Installed"
               date={formatDate(summary.timeline.installationDate)}
+              highlight={!!summary.timeline.installationDate}
             />
             <TimelineItem
               icon="✅"
