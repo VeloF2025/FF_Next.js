@@ -76,7 +76,7 @@ async function triggerBuild(
       'HarnessTrigger'
     );
 
-    const response = await fetch(`${HARNESS_TRIGGER_URL}/trigger`, {
+    const response = await fetch(`${HARNESS_TRIGGER_URL}/api/mvp-pipeline/trigger`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -130,7 +130,7 @@ export async function checkBuildStatus(
 } | null> {
   try {
     const response = await fetch(
-      `${HARNESS_TRIGGER_URL}/status/${itemId}?stage=${stage}`,
+      `${HARNESS_TRIGGER_URL}/api/mvp-pipeline/status/${itemId}?stage=${stage}`,
       {
         headers: {
           'x-webhook-secret': HARNESS_TRIGGER_SECRET || '',
