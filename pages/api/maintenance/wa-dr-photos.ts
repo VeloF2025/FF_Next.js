@@ -13,8 +13,7 @@ const logger = createLogger('maintenance:wa-dr-photos');
 interface Photo {
   id: string;
   filename: string;
-  vps_path: string;
-  group_jid: string;
+  local_path: string;
   timestamp: string;
   sender: string;
   url: string;
@@ -41,27 +40,32 @@ export default async function handler(
     const photos = await sql`
       SELECT
         p.id,
-        p.filename,
-        p.vps_path,
-        p.group_jid,
-        p.timestamp,
+        p.original_filename,
+        p.local_path,
+        p.created_at,
         m.sender
       FROM maintenance_wa_photos p
       LEFT JOIN maintenance_wa_messages m ON p.message_id = m.id
       WHERE p.drop_number = ${dropNumber}
-      ORDER BY p.timestamp DESC
+      ORDER BY p.created_at DESC
     `;
 
     // Build URLs for each photo
-    const photosWithUrls: Photo[] = photos.map((p) => ({
-      id: p.id,
-      filename: p.filename,
-      vps_path: p.vps_path,
-      group_jid: p.group_jid,
-      timestamp: p.timestamp,
-      sender: p.sender || 'Unknown',
-      url: `/api/maintenance/wa-photos/${p.group_jid}/${p.filename}`,
-    }));
+    // local_path format: /opt/whatsapp-bridge/store/{group_jid}/{filename}
+    const photosWithUrls: Photo[] = photos.map((p) => {
+      const pathParts = (p.local_path || '').split('/');
+      const groupJid = pathParts[pathParts.length - 2] || '';
+      const filename = pathParts[pathParts.length - 1] || p.original_filename;
+
+      return {
+        id: p.id,
+        filename: p.original_filename || filename,
+        local_path: p.local_path,
+        timestamp: p.created_at,
+        sender: p.sender || 'Unknown',
+        url: `/api/maintenance/wa-photos/${groupJid}/${filename}`,
+      };
+    });
 
     logger.info({ dropNumber, count: photosWithUrls.length }, 'Fetched photos for DR');
 
