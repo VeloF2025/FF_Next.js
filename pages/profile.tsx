@@ -24,7 +24,7 @@ import {
   Edit2,
   Users,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import toast from 'react-hot-toast';
 
 interface UserProfile {
   id: string;
@@ -278,11 +278,11 @@ export default function ProfilePage() {
           </div>
 
           {/* Profile Header Card */}
-          <GlassCard variant="default" padding="lg">
+          <GlassCard variant="medium" padding="lg">
             <div className="flex items-center gap-6">
               {/* Avatar */}
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                {(profile.firstName?.[0] || profile.email[0]).toUpperCase()}
+                {(profile.firstName?.[0] || profile.email?.[0] || 'U').toUpperCase()}
                 {(profile.lastName?.[0] || '').toUpperCase()}
               </div>
 
@@ -328,7 +328,7 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Personal Information */}
-            <GlassCard variant="default" padding="lg">
+            <GlassCard variant="medium" padding="lg">
               <div className="flex items-center gap-2 mb-4">
                 <User className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-lg font-semibold text-white">Personal Information</h3>
@@ -376,7 +376,7 @@ export default function ProfilePage() {
             </GlassCard>
 
             {/* Address */}
-            <GlassCard variant="default" padding="lg">
+            <GlassCard variant="medium" padding="lg">
               <div className="flex items-center gap-2 mb-4">
                 <MapPin className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-lg font-semibold text-white">Address</h3>
@@ -422,7 +422,7 @@ export default function ProfilePage() {
             </GlassCard>
 
             {/* Employment Details */}
-            <GlassCard variant="default" padding="lg">
+            <GlassCard variant="medium" padding="lg">
               <div className="flex items-center gap-2 mb-4">
                 <Briefcase className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-lg font-semibold text-white">Employment</h3>
@@ -438,7 +438,7 @@ export default function ProfilePage() {
             </GlassCard>
 
             {/* Emergency Contact */}
-            <GlassCard variant="default" padding="lg">
+            <GlassCard variant="medium" padding="lg">
               <div className="flex items-center gap-2 mb-4">
                 <Users className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-lg font-semibold text-white">Emergency Contact</h3>
@@ -477,7 +477,7 @@ export default function ProfilePage() {
 
           {/* Skills & Certifications (Read-only) */}
           {(profile.skills?.length || profile.certifications?.length) && (
-            <GlassCard variant="default" padding="lg">
+            <GlassCard variant="medium" padding="lg">
               <h3 className="text-lg font-semibold text-white mb-4">Skills & Certifications</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -519,7 +519,7 @@ export default function ProfilePage() {
           )}
 
           {/* Account Info */}
-          <GlassCard variant="default" padding="lg">
+          <GlassCard variant="medium" padding="lg">
             <h3 className="text-lg font-semibold text-white mb-4">Account Information</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>

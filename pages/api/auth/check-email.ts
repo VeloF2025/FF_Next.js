@@ -11,7 +11,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { log } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -85,11 +85,10 @@ export default async function handler(
       FROM staff
       WHERE email = ${normalizedEmail}
       AND is_active = true
-      AND deleted_at IS NULL
     `;
 
     if (staffResult.length === 0) {
-      log('auth', 'info', 'check-email: Email not found in staff table', { email: normalizedEmail });
+      logger.info('check-email: Email not found in staff table', { email: normalizedEmail });
       return res.status(200).json({
         success: true,
         data: {
@@ -99,13 +98,13 @@ export default async function handler(
       });
     }
 
-    const staffMember = staffResult[0];
+    const staffMember = staffResult[0]!;
     const staffInfo: StaffInfo = {
-      id: staffMember.id,
-      firstName: staffMember.first_name,
-      lastName: staffMember.last_name,
-      position: staffMember.position,
-      department: staffMember.department,
+      id: String(staffMember.id),
+      firstName: String(staffMember.first_name || ''),
+      lastName: String(staffMember.last_name || ''),
+      position: staffMember.position ? String(staffMember.position) : undefined,
+      department: staffMember.department ? String(staffMember.department) : undefined,
     };
 
     // Step 2: Check if user account exists (via user_id or direct email lookup)
@@ -130,7 +129,7 @@ export default async function handler(
     // Step 3: Determine status based on user existence and password
     if (userResult.length === 0) {
       // No user account exists - first time user
-      log('auth', 'info', 'check-email: First time user detected', { email: normalizedEmail, staffId: staffMember.id });
+      logger.info('check-email: First time user detected', { email: normalizedEmail, staffId: staffMember.id });
       return res.status(200).json({
         success: true,
         data: {
@@ -141,7 +140,7 @@ export default async function handler(
       });
     }
 
-    const user = userResult[0];
+    const user = userResult[0]!;
 
     // Check if user is active
     if (!user.is_active) {
@@ -156,7 +155,7 @@ export default async function handler(
 
     // Check if password is set
     if (!user.password) {
-      log('auth', 'info', 'check-email: User exists but no password', { email: normalizedEmail });
+      logger.info('check-email: User exists but no password', { email: normalizedEmail });
       return res.status(200).json({
         success: true,
         data: {
@@ -178,7 +177,7 @@ export default async function handler(
     });
 
   } catch (error) {
-    log('auth', 'error', 'check-email: Error checking email', { error });
+    logger.error('check-email: Error checking email', { error });
     return res.status(500).json({
       success: false,
       error: { code: 'CHECK_EMAIL_ERROR', message: 'An error occurred. Please try again.' },

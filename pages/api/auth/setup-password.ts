@@ -12,14 +12,14 @@ import { serialize } from 'cookie';
 import { v4 as uuidv4 } from 'uuid';
 import {
   hashPassword,
-  validatePasswordStrength,
+  checkPasswordStrength,
   signToken,
   createSession,
   AUTH_COOKIE_NAME,
   type AuthUser,
   type AuthRole,
 } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -59,13 +59,13 @@ export default async function handler(
     }
 
     // Validate password strength
-    const strengthResult = validatePasswordStrength(password);
+    const strengthResult = checkPasswordStrength(password);
     if (!strengthResult.isValid) {
       return res.status(400).json({
         success: false,
         error: {
           code: 'WEAK_PASSWORD',
-          message: strengthResult.errors.join('. '),
+          message: strengthResult.issues.join('. '),
         },
       });
     }
@@ -81,13 +81,11 @@ export default async function handler(
         email,
         position,
         department,
-        role,
         user_id,
         is_active
       FROM staff
       WHERE email = ${normalizedEmail}
       AND is_active = true
-      AND deleted_at IS NULL
     `;
 
     if (staffResult.length === 0) {
@@ -97,7 +95,7 @@ export default async function handler(
       });
     }
 
-    const staffMember = staffResult[0];
+    const staffMember = staffResult[0]!;
 
     // Step 2: Check for existing user
     let userId: string;
@@ -109,14 +107,14 @@ export default async function handler(
         SELECT id, password FROM users WHERE id = ${staffMember.user_id}
       `;
 
-      if (existingUser.length > 0 && existingUser[0].password) {
+      if (existingUser.length > 0 && existingUser[0]!.password) {
         return res.status(400).json({
           success: false,
           error: { code: 'PASSWORD_ALREADY_SET', message: 'Password is already set. Please use login.' },
         });
       }
 
-      userId = staffMember.user_id;
+      userId = String(staffMember.user_id);
     } else {
       // Check if user exists by email (not linked to staff yet)
       const existingUser = await sql`
@@ -124,13 +122,14 @@ export default async function handler(
       `;
 
       if (existingUser.length > 0) {
-        if (existingUser[0].password) {
+        const existing = existingUser[0]!;
+        if (existing.password) {
           return res.status(400).json({
             success: false,
             error: { code: 'PASSWORD_ALREADY_SET', message: 'Password is already set. Please use login.' },
           });
         }
-        userId = existingUser[0].id;
+        userId = String(existing.id);
       } else {
         // Create new user
         userId = uuidv4();
@@ -141,23 +140,28 @@ export default async function handler(
     // Step 3: Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Step 4: Map staff role to auth role
-    const mapStaffRoleToAuthRole = (staffRole: string | null): AuthRole => {
-      if (!staffRole) return 'viewer';
-      const roleMap: Record<string, AuthRole> = {
-        'admin': 'admin',
-        'administrator': 'admin',
-        'manager': 'manager',
-        'supervisor': 'manager',
-        'technician': 'technician',
-        'installer': 'technician',
-        'viewer': 'viewer',
-        'staff': 'viewer',
-      };
-      return roleMap[staffRole.toLowerCase()] || 'viewer';
+    // Step 4: Map staff position to auth role
+    const mapPositionToAuthRole = (position: string | null): AuthRole => {
+      if (!position) return 'viewer';
+      const positionLower = position.toLowerCase();
+
+      // Admin positions
+      if (positionLower.includes('admin') || positionLower.includes('director') || positionLower.includes('ceo') || positionLower.includes('cso')) {
+        return 'admin';
+      }
+      // Manager positions
+      if (positionLower.includes('manager') || positionLower.includes('supervisor') || positionLower.includes('head') || positionLower.includes('lead')) {
+        return 'manager';
+      }
+      // Technician positions
+      if (positionLower.includes('technician') || positionLower.includes('installer') || positionLower.includes('engineer')) {
+        return 'technician';
+      }
+      // Default to viewer
+      return 'viewer';
     };
 
-    const authRole = mapStaffRoleToAuthRole(staffMember.role);
+    const authRole = mapPositionToAuthRole(staffMember.position as string | null);
 
     // Step 5: Create or update user
     if (isNewUser) {
@@ -187,7 +191,7 @@ export default async function handler(
         )
       `;
 
-      log('auth', 'info', 'setup-password: Created new user account', {
+      logger.info('setup-password: Created new user account', {
         userId,
         email: normalizedEmail,
         staffId: staffMember.id,
@@ -205,7 +209,7 @@ export default async function handler(
         WHERE id = ${userId}
       `;
 
-      log('auth', 'info', 'setup-password: Updated existing user with password', {
+      logger.info('setup-password: Updated existing user with password', {
         userId,
         email: normalizedEmail,
       });
@@ -222,12 +226,12 @@ export default async function handler(
     const user: AuthUser = {
       id: userId,
       email: normalizedEmail,
-      firstName: staffMember.first_name || '',
-      lastName: staffMember.last_name || '',
+      firstName: (staffMember.first_name as string) || '',
+      lastName: (staffMember.last_name as string) || '',
       role: authRole,
       permissions: [],
       isActive: true,
-      department: staffMember.department,
+      department: staffMember.department as string | undefined,
     };
 
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress;
@@ -254,7 +258,7 @@ export default async function handler(
 
     res.setHeader('Set-Cookie', cookie);
 
-    log('auth', 'info', 'setup-password: Password setup complete, user logged in', {
+    logger.info('setup-password: Password setup complete, user logged in', {
       userId,
       email: normalizedEmail,
       isNewUser,
@@ -277,7 +281,7 @@ export default async function handler(
     });
 
   } catch (error) {
-    log('auth', 'error', 'setup-password: Error setting up password', { error });
+    logger.error('setup-password: Error setting up password', { error });
     return res.status(500).json({
       success: false,
       error: { code: 'SETUP_ERROR', message: 'An error occurred. Please try again.' },

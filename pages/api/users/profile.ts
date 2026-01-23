@@ -6,8 +6,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { withAuth, type AuthenticatedRequest } from '@/lib/auth/middleware';
-import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth/middleware';
+import { AuthenticatedRequest } from '@/lib/auth/types';
+import logger from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -98,13 +99,13 @@ async function getProfile(userId: string, res: NextApiResponse) {
         s.city,
         s.country,
         s.postal_code,
-        s.hire_date,
-        s.birth_date,
+        s.join_date as hire_date,
+        s.date_of_birth as birth_date,
         s.emergency_contact,
         s.skills,
         s.certifications,
         s.contract_type,
-        s.availability_status
+        s.status as availability_status
       FROM users u
       LEFT JOIN staff s ON s.user_id = u.id
       WHERE u.id = ${userId}
@@ -117,33 +118,33 @@ async function getProfile(userId: string, res: NextApiResponse) {
       });
     }
 
-    const row = result[0];
+    const row = result[0]!;
     const profile: UserProfile = {
-      id: row.id,
-      email: row.email,
-      firstName: row.first_name || '',
-      lastName: row.last_name || '',
-      role: row.role,
-      department: row.department,
-      profilePicture: row.profile_picture,
-      lastLogin: row.last_login,
-      createdAt: row.created_at,
-      staffId: row.staff_id,
-      employeeId: row.employee_id,
-      position: row.position,
-      phone: row.phone,
-      alternatePhone: row.alternate_phone,
-      address: row.address,
-      city: row.city,
-      country: row.country,
-      postalCode: row.postal_code,
-      hireDate: row.hire_date,
-      birthDate: row.birth_date,
-      emergencyContact: row.emergency_contact,
-      skills: row.skills,
-      certifications: row.certifications,
-      contractType: row.contract_type,
-      availabilityStatus: row.availability_status,
+      id: String(row.id),
+      email: String(row.email),
+      firstName: String(row.first_name || ''),
+      lastName: String(row.last_name || ''),
+      role: String(row.role),
+      department: row.department ? String(row.department) : undefined,
+      profilePicture: row.profile_picture ? String(row.profile_picture) : undefined,
+      lastLogin: row.last_login ? String(row.last_login) : undefined,
+      createdAt: String(row.created_at),
+      staffId: row.staff_id ? String(row.staff_id) : undefined,
+      employeeId: row.employee_id ? String(row.employee_id) : undefined,
+      position: row.position ? String(row.position) : undefined,
+      phone: row.phone ? String(row.phone) : undefined,
+      alternatePhone: row.alternate_phone ? String(row.alternate_phone) : undefined,
+      address: row.address ? String(row.address) : undefined,
+      city: row.city ? String(row.city) : undefined,
+      country: row.country ? String(row.country) : undefined,
+      postalCode: row.postal_code ? String(row.postal_code) : undefined,
+      hireDate: row.hire_date ? String(row.hire_date) : undefined,
+      birthDate: row.birth_date ? String(row.birth_date) : undefined,
+      emergencyContact: row.emergency_contact as UserProfile['emergencyContact'],
+      skills: row.skills as string[] | undefined,
+      certifications: row.certifications as UserProfile['certifications'],
+      contractType: row.contract_type ? String(row.contract_type) : undefined,
+      availabilityStatus: row.availability_status ? String(row.availability_status) : undefined,
     };
 
     return res.status(200).json({
@@ -152,7 +153,7 @@ async function getProfile(userId: string, res: NextApiResponse) {
     });
 
   } catch (error) {
-    log('users', 'error', 'Error fetching profile', { userId, error });
+    logger.error('Error fetching profile', { userId, error });
     return res.status(500).json({
       success: false,
       error: { code: 'FETCH_ERROR', message: 'Failed to fetch profile' },
@@ -192,8 +193,8 @@ async function updateProfile(
       await sql`
         UPDATE users
         SET
-          first_name = COALESCE(${data.firstName}, first_name),
-          last_name = COALESCE(${data.lastName}, last_name),
+          first_name = COALESCE(${data.firstName ?? null}, first_name),
+          last_name = COALESCE(${data.lastName ?? null}, last_name),
           updated_at = NOW()
         WHERE id = ${userId}
       `;
@@ -201,31 +202,33 @@ async function updateProfile(
 
     // Update staff table if linked
     if (staffResult.length > 0) {
-      const staffId = staffResult[0].id;
+      const staffId = staffResult[0]!.id;
+      const emergencyContactJson = data.emergencyContact ? JSON.stringify(data.emergencyContact) : null;
+
       await sql`
         UPDATE staff
         SET
-          first_name = COALESCE(${data.firstName}, first_name),
-          last_name = COALESCE(${data.lastName}, last_name),
-          phone = COALESCE(${data.phone}, phone),
-          alternate_phone = COALESCE(${data.alternatePhone}, alternate_phone),
-          address = COALESCE(${data.address}, address),
-          city = COALESCE(${data.city}, city),
-          country = COALESCE(${data.country}, country),
-          postal_code = COALESCE(${data.postalCode}, postal_code),
-          emergency_contact = COALESCE(${data.emergencyContact ? JSON.stringify(data.emergencyContact) : null}::jsonb, emergency_contact),
+          first_name = COALESCE(${data.firstName ?? null}, first_name),
+          last_name = COALESCE(${data.lastName ?? null}, last_name),
+          phone = COALESCE(${data.phone ?? null}, phone),
+          alternate_phone = COALESCE(${data.alternatePhone ?? null}, alternate_phone),
+          address = COALESCE(${data.address ?? null}, address),
+          city = COALESCE(${data.city ?? null}, city),
+          country = COALESCE(${data.country ?? null}, country),
+          postal_code = COALESCE(${data.postalCode ?? null}, postal_code),
+          emergency_contact = COALESCE(${emergencyContactJson}::jsonb, emergency_contact),
           updated_at = NOW()
         WHERE id = ${staffId}
       `;
     }
 
-    log('users', 'info', 'Profile updated', { userId });
+    logger.info('Profile updated', { userId });
 
     // Return updated profile
     return getProfile(userId, res);
 
   } catch (error) {
-    log('users', 'error', 'Error updating profile', { userId, error });
+    logger.error('Error updating profile', { userId, error });
     return res.status(500).json({
       success: false,
       error: { code: 'UPDATE_ERROR', message: 'Failed to update profile' },
