@@ -107,12 +107,15 @@ export async function getSenderContext(
 ): Promise<SenderContext | null> {
   const sql = getDb();
 
+  // Calculate the cutoff timestamp in JavaScript
+  const cutoffTime = new Date(Date.now() - CONTEXT_WINDOW_MINUTES * 60 * 1000);
+
   const result = await sql`
     SELECT sender_jid, last_drop_number, last_drop_timestamp
     FROM maintenance_wa_sender_context
     WHERE wa_group_jid = ${groupJid}
       AND sender_jid = ${senderJid}
-      AND last_drop_timestamp > NOW() - INTERVAL '${CONTEXT_WINDOW_MINUTES} minutes'
+      AND last_drop_timestamp > ${cutoffTime}
   `;
 
   if (result.length === 0) return null;
