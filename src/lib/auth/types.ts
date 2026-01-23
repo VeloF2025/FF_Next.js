@@ -15,7 +15,7 @@ export interface AuthUser {
   department?: string;
 }
 
-export type AuthRole = 'admin' | 'manager' | 'technician' | 'viewer' | 'system';
+export type AuthRole = 'super_admin' | 'admin' | 'manager' | 'technician' | 'viewer' | 'system';
 
 export interface JWTPayload {
   sub: string; // user id
@@ -55,6 +55,7 @@ export interface AuthenticatedRequest {
 
 // Role hierarchy for permission checks
 export const ROLE_HIERARCHY: Record<AuthRole, number> = {
+  super_admin: 6,
   system: 5,
   admin: 4,
   manager: 3,

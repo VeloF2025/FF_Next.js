@@ -140,7 +140,12 @@ export default async function handler(
     // Step 3: Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Step 4: Map staff position to auth role
+    // Step 4: Determine auth role
+    // Super admins (explicit list)
+    const SUPER_ADMIN_EMAILS = [
+      'hein@velocityfibre.co.za',
+    ];
+
     const mapPositionToAuthRole = (position: string | null): AuthRole => {
       if (!position) return 'viewer';
       const positionLower = position.toLowerCase();
@@ -161,7 +166,10 @@ export default async function handler(
       return 'viewer';
     };
 
-    const authRole = mapPositionToAuthRole(staffMember.position as string | null);
+    // Check for super admin first, then fall back to position mapping
+    const authRole = SUPER_ADMIN_EMAILS.includes(normalizedEmail)
+      ? 'super_admin' as AuthRole
+      : mapPositionToAuthRole(staffMember.position as string | null);
 
     // Step 5: Create or update user
     if (isNewUser) {
