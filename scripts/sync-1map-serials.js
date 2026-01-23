@@ -14,7 +14,7 @@
 const { neon } = require('@neondatabase/serverless');
 
 // Configuration
-const ONEMAP_BASE_URL = 'http://192.168.1.150:8003/api/record';
+const ONEMAP_BASE_URL = 'http://100.96.203.105:8003/api/record';
 const BATCH_SIZE = 100;        // Drops per batch
 const CONCURRENCY = 10;        // Parallel requests to 1Map
 const DELAY_BETWEEN_BATCHES = 1000; // ms between batches

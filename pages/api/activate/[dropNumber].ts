@@ -18,7 +18,7 @@ import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/activate/types/unified.types';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial, fuzzySerialMatch } from '@/modules/activate/services/qaAutoFailService';
 
-const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;

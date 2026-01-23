@@ -555,7 +555,7 @@ Event logging for full DR lifecycle tracking.
 5-service health check at `/api/activate/health-check`:
 
 1. **Database** - Neon PostgreSQL connectivity
-2. **OneMap** - Photo storage API (192.168.1.150:8003)
+2. **OneMap** - Photo storage API (100.96.203.105:8003)
 3. **VLM** - Qwen3 server (100.96.203.105:8100)
 4. **WA Bridge** - Inferred from recent DR activity
 5. **WA Feedback** - Sender service (100.96.203.105:8090)

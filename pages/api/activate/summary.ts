@@ -6,11 +6,11 @@
  * Query: dropNumber (required)
  *
  * Consolidates data from:
+ * - BOSS API (1Map data: installer_name, signup_agent, photos, serials)
  * - dr_photo_unified_reviews (main review data)
  * - oes_activations (activation date, team, optical metrics)
- * - drops (installation date, installer)
+ * - drops (installation date - fallback)
  * - qa_photo_reviews (submitter info)
- * - onemap_properties (installer name from 1Map - Jan 2026)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -22,6 +22,9 @@ import type { DRSummary, DRState, QADecision } from '@/modules/activate/types/su
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
+
+// BOSS API (dr-photo-api) - Single source for all 1Map data
+const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 
 const pool = new Pool({
   connectionString:
@@ -49,6 +52,41 @@ function determineState(
 /**
  * Extract step coverage from VLM categorization results (preferred) or photos metadata
  */
+/**
+ * Fetch DR data from BOSS API (1Map data)
+ * Returns installer_name, signup_agent, and other 1Map data
+ */
+async function fetchBossApiData(dropNumber: string): Promise<{
+  installer_name: string | null;
+  signup_agent: string | null;
+  ont_barcode: string | null;
+  ups_serial: string | null;
+} | null> {
+  try {
+    const response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000), // 5s timeout
+    });
+
+    if (!response.ok) {
+      log.warn('DRSummary', `BOSS API returned ${response.status} for ${dropNumber}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      installer_name: data.installer_name || null,
+      signup_agent: data.signup_agent || null,
+      ont_barcode: data.ont_barcode || null,
+      ups_serial: data.ups_serial || null,
+    };
+  } catch (error) {
+    log.warn('DRSummary', `BOSS API fetch failed for ${dropNumber}`, error);
+    return null;
+  }
+}
+
 function calculateStepsCovered(vlmCategorization: any[], photosMetadata: any[]): number {
   const stepsSet = new Set<number>();
 
@@ -92,8 +130,10 @@ export default async function handler(
   try {
     log.info('DRSummary', `Fetching summary for ${dropNumber}`);
 
-    // Query all relevant tables in parallel
-    const [unifiedResult, oesResult, dropsResult, qaResult] = await Promise.all([
+    // Query BOSS API (1Map) and database tables in parallel
+    const [bossData, unifiedResult, oesResult, dropsResult, qaResult] = await Promise.all([
+      // BOSS API: installer_name, signup_agent, serials from 1Map
+      fetchBossApiData(dropNumber),
       // Main unified review data (including resubmission fields)
       pool.query(
         `SELECT
@@ -226,9 +266,12 @@ export default async function handler(
           phone: qa?.sender_phone || null,
         },
         installer: {
-          name: drop?.installed_by_name || null,
+          // Prefer BOSS API (1Map) data, fallback to drops table
+          name: bossData?.installer_name || drop?.installed_by_name || null,
           id: drop?.installed_by_id || null,
         },
+        // Signup agent from 1Map (fieldnme2)
+        signupAgent: bossData?.signup_agent || null,
         oesTeam: oes?.team || null,
         reviewer: unified?.reviewed_by || null,
       },

@@ -20,7 +20,7 @@ FibreFlow currently operates three separate DR (Drop Record) photo review servic
 
 **Three Fragmented Services:**
 
-1. **Port 8003 HTML App** (http://192.168.1.150:8003/)
+1. **Port 8003 HTML App** (http://100.96.203.105:8003/)
    - FastAPI Python service for photo downloads from OneMap GIS API
    - Manual DR entry and photo download trigger
    - 11-step filename-based photo organization

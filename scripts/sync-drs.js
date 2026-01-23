@@ -6,7 +6,7 @@ const pool = new Pool({
   connectionString: 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
 });
 
-const ONEMAP_HOST = 'http://192.168.1.150:8003';
+const ONEMAP_HOST = 'http://100.96.203.105:8003';
 
 async function main() {
   console.log('Fetching last 250 DRs...');

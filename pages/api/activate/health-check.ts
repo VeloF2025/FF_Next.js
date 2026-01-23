@@ -34,7 +34,7 @@ const pool = new Pool({
 });
 
 // Service endpoints
-const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 // WA Feedback service (port 8092) - proxies to bridge-2 (8083) for all outgoing messages
 // Phone number: 063 841 2276 (bridge-2)

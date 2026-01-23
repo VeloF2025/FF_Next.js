@@ -22,7 +22,7 @@ import type { PhotoSourceResponse, Photo } from '../types/unified.types';
 /**
  * OneMap API Configuration
  */
-const ONEMAP_API_URL = 'http://192.168.1.150:8003';
+const ONEMAP_API_URL = 'http://100.96.203.105:8003';
 
 /**
  * OneMap API Response (port 8003)

@@ -16,7 +16,7 @@ const ws = require('ws');
 
 neonConfig.webSocketConstructor = ws;
 
-const ONEMAP_API = 'http://192.168.1.150:8003';
+const ONEMAP_API = 'http://100.96.203.105:8003';
 const LIMIT = parseInt(process.argv[2] || '100', 10);
 
 // Serial pattern detection

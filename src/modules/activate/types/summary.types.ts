@@ -28,9 +28,10 @@ export interface DRSummary {
       phone: string | null;
     };
     installer: {
-      name: string | null;
+      name: string | null; // from 1Map fieldnme3 via BOSS API
       id: string | null;
     };
+    signupAgent: string | null; // from 1Map fieldnme2 via BOSS API
     oesTeam: string | null;
     reviewer: string | null;
   };
@@ -53,6 +54,12 @@ export interface DRSummary {
     step: number;
     filename: string;
   }>;
+
+  // Resubmission tracking (Jan 2026)
+  submission_count: number;
+  is_resubmission: boolean;
+  previous_photo_count: number | null;
+  feedback_message: string | null;
 }
 
 export interface DRSummaryResponse {

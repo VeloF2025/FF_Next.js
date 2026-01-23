@@ -197,7 +197,7 @@ async function fetchFromSpecificSource(
   }
 }
 
-const ONEMAP_HOST = 'http://192.168.1.150:8003';
+const ONEMAP_HOST = 'http://100.96.203.105:8003';
 
 /**
  * Fetch from OneMap GIS API (via port 8003)

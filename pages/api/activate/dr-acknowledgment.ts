@@ -24,7 +24,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 
 interface ExistingSubmission {
   submission_count: number;

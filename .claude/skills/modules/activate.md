@@ -402,7 +402,7 @@ SELECT 1 as health;
 
 ### 2. 1M (OneMap API)
 ```bash
-curl http://192.168.1.150:8003/health
+curl http://100.96.203.105:8003/health
 ```
 
 ### 3. VLM Server (Qwen3)

@@ -22,7 +22,7 @@ The FibreFlow Photo Review system is a **three-service architecture** for instal
    - **Purpose**: WhatsApp QA tracking with 12-step installation checklist + barcode scanning
    - **Database**: Neon PostgreSQL (`qa_photo_reviews` table)
 
-3. **DR Photo API Service** (`http://192.168.1.150:8003`)
+3. **DR Photo API Service** (`http://100.96.203.105:8003`)
    - **Technology**: FastAPI (Python) + Gemini Vision AI
    - **Purpose**: Download photos from 1Map GIS, AI evaluation, GPS validation
    - **Database**: Neon PostgreSQL (`dr_photo_downloads` table)
@@ -331,7 +331,7 @@ POST /api/wa-monitor-scan-serial
 ## 3. DR Photo API Service
 
 ### Overview
-- **URL**: `http://192.168.1.150:8003`
+- **URL**: `http://100.96.203.105:8003`
 - **Technology**: FastAPI (Python) + Gemini Vision AI
 - **Purpose**: Download photos from 1Map GIS, AI-powered evaluation, GPS validation
 
@@ -541,7 +541,7 @@ Photo Review UI ("Evaluate" button click)
   ↓ (user triggers evaluation)
 POST /api/foto/evaluate (Next.js API)
   ↓ (forward request)
-POST http://192.168.1.150:8003/api/evaluate/{dr_number} (DR Photo API)
+POST http://100.96.203.105:8003/api/evaluate/{dr_number} (DR Photo API)
   ↓ (AI processing with Gemini Vision)
 DR Photo API:
   1. Downloads photos from 1Map
@@ -670,7 +670,7 @@ DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-po
 ### Photo Review (Next.js)
 ```env
 BOSS_VPS_API_URL=http://100.96.203.105:8001
-DR_PHOTO_API_URL=http://192.168.1.150:8003
+DR_PHOTO_API_URL=http://100.96.203.105:8003
 ```
 
 ### DR Photo API (FastAPI)

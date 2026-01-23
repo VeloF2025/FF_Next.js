@@ -4,7 +4,7 @@
  * Purpose: Proxy photos from internal dr-photo-api to external clients
  * Method: GET
  *
- * This solves the issue where the browser can't access http://192.168.1.150:8003
+ * This solves the issue where the browser can't access http://100.96.203.105:8003
  * from https://vf.fibreflow.app (LAN IP + mixed content blocking)
  */
 

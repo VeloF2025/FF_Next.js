@@ -19,7 +19,7 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-const ONEMAP_BASE_URL = 'http://192.168.1.150:8003/api/record';
+const ONEMAP_BASE_URL = 'http://100.96.203.105:8003/api/record';
 
 interface OneMapResponse {
   dr_number: string;

@@ -24,7 +24,7 @@ import { neon } from '@neondatabase/serverless';
 const sql = neon(process.env.DATABASE_URL!);
 
 // dr-photo-api endpoint (running on VF Server)
-const DR_PHOTO_API_URL = process.env.DR_PHOTO_API_URL || 'http://192.168.1.150:8003';
+const DR_PHOTO_API_URL = process.env.DR_PHOTO_API_URL || 'http://100.96.203.105:8003';
 
 // Response from dr-photo-api /api/record/{dr_number}
 interface DrPhotoApiRecord {

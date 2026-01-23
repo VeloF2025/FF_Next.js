@@ -175,7 +175,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const step9Photos = photos.filter((p) => p.step === 9);
 
     // Use full OneMap URLs for extraction (relative URLs don't work in server context)
-    const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://192.168.1.150:8003';
+    const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
     const makeOneMapUrl = (filename: string) => `${ONEMAP_HOST}/api/photo/${dropNumber}/${filename}`;
 
     log.info('ExtractData', `Found photos: Step6=${step6Photos.length}, Step7=${step7Photos.length}, Step9=${step9Photos.length}`);

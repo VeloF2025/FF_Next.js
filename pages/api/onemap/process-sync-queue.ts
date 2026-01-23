@@ -19,7 +19,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
-const DR_PHOTO_API_URL = process.env.DR_PHOTO_API_URL || 'http://192.168.1.150:8003';
+const DR_PHOTO_API_URL = process.env.DR_PHOTO_API_URL || 'http://100.96.203.105:8003';
 
 interface DrPhotoApiRecord {
   dr_number: string;
