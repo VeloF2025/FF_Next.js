@@ -44,7 +44,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (search) {
-      whereConditions.push(`(po.po_number ILIKE $${paramIndex} OR s.company_name ILIKE $${paramIndex})`);
+      whereConditions.push(`(po.po_number ILIKE $${paramIndex} OR s.name ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
       paramIndex++;
     }
@@ -73,7 +73,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         po.po_number,
         po.status,
         po.supplier_id,
-        s.company_name as supplier_name,
+        s.name as supplier_name,
         p.project_name as project_name,
         po.expected_delivery_date as delivery_date,
         po.subtotal,

@@ -329,7 +329,11 @@ function IncidentCard({ incident }: { incident: Incident }) {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
-                  {new Date(incident.incident_date).toLocaleDateString()}
+                  {incident.incident_date
+                    ? new Date(incident.incident_date).toLocaleDateString()
+                    : incident.created_at
+                      ? new Date(incident.created_at).toLocaleDateString()
+                      : 'N/A'}
                 </span>
                 {incident.location && (
                   <span className="flex items-center gap-1">

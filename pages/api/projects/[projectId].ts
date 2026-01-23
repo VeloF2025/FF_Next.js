@@ -52,12 +52,15 @@ export default async function handler(
               p.budget,
               p.actual_cost,
               p.project_manager,
+              COALESCE(s.first_name || ' ' || s.last_name, u.name, p.project_manager) as project_manager_name,
               p.progress,
               p.created_at,
               p.updated_at,
               c.company_name as client_name
             FROM projects p
             LEFT JOIN clients c ON p.client_id = c.id
+            LEFT JOIN staff s ON p.project_manager::text = s.id::text
+            LEFT JOIN users u ON p.project_manager::text = u.id::text
             WHERE p.id = ${id}
           `,
           { logError: true }

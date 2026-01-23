@@ -34,7 +34,7 @@ export class ProjectDataMapper {
       updatedAt: project.updated_at,
       // Additional fields
       location: project.location,
-      projectManager: project.manager,
+      projectManager: project.project_manager_name || project.manager || project.project_manager,
       risks: project.risks || [],
       milestones: project.milestones || []
     };
