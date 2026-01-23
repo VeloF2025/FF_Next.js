@@ -8,6 +8,7 @@ import { SupplierStatus, ProductCategory } from '@/types/supplier.types';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { useRouter } from 'next/router';
+import { PermissionGate } from '@/components/PermissionGate';
 
 export function SuppliersPage() {
   const router = useRouter();
@@ -68,13 +69,15 @@ export function SuppliersPage() {
             Manage suppliers, products, and performance tracking
           </p>
         </div>
-        <Button
-          onClick={handleCreate}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Supplier
-        </Button>
+        <PermissionGate permission="procurement.sourcing" action="create">
+          <Button
+            onClick={handleCreate}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Supplier
+          </Button>
+        </PermissionGate>
       </div>
 
       {/* Filters */}
@@ -213,9 +216,11 @@ export function SuppliersPage() {
         <div className="bg-[var(--ff-bg-secondary)] p-12 rounded-lg border border-[var(--ff-border-light)] text-center">
           <Building2 className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
           <p className="text-[var(--ff-text-secondary)] mb-4">No suppliers found</p>
-          <Button onClick={handleCreate}>
-            Add First Supplier
-          </Button>
+          <PermissionGate permission="procurement.sourcing" action="create">
+            <Button onClick={handleCreate}>
+              Add First Supplier
+            </Button>
+          </PermissionGate>
         </div>
       )}
 

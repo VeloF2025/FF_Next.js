@@ -49,6 +49,7 @@ export enum TicketSource {
   OFFLINE_REPORT = 'offline_report', // From Offline Devices (ARCH) report
   QA_REVIEW = 'qa_review', // From QA Centre review process
   HSE_REPORT = 'hse_report', // From Health & Safety module
+  WA_MAINTENANCE = 'wa_maintenance', // From WhatsApp maintenance tracking group
 }
 
 /**

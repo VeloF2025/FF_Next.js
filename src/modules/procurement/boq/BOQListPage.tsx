@@ -137,6 +137,8 @@ export function BOQListPage() {
         onExport={handleExportAll}
         addButtonText="Create BOQ"
         exportDisabled={!boqs || boqs.length === 0}
+        addPermission="procurement.sourcing.boq"
+        importPermission="procurement.sourcing.boq"
       />
       
       {/* Additional Actions */}

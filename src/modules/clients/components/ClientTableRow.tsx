@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import type { Client } from '@/types/client.types';
 import { getStatusColor, getPriorityColor, getCategoryIcon, formatCurrency } from '../utils/clientUtils';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface ClientTableRowProps {
   client: Client;
@@ -100,20 +101,24 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
           >
             <Eye className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => router.push(`/app/clients/${client.id}/edit`)}
-            className="p-1 text-indigo-400 hover:text-indigo-300"
-            title="Edit"
-          >
-            <Edit className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => onDelete(client.id!)}
-            className="p-1 text-red-400 hover:text-red-300"
-            title="Delete"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          <PermissionGate permission="clients.list" action="edit">
+            <button
+              onClick={() => router.push(`/app/clients/${client.id}/edit`)}
+              className="p-1 text-indigo-400 hover:text-indigo-300"
+              title="Edit"
+            >
+              <Edit className="h-4 w-4" />
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="clients.list" action="delete">
+            <button
+              onClick={() => onDelete(client.id!)}
+              className="p-1 text-red-400 hover:text-red-300"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </PermissionGate>
         </div>
       </td>
     </tr>

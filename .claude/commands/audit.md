@@ -405,7 +405,85 @@ Warning: Expected server HTML to contain
 
 ---
 
-## 7. QUICK CHECKS
+## 7. RBAC AUDIT (Quick)
+
+Quick checks for Role-Based Access Control system. For comprehensive RBAC audit, run `/audit-rbac`.
+
+### 7.1 Database Tables Exist
+
+```bash
+DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+const { neon } = require('@neondatabase/serverless');
+const sql = neon(process.env.DATABASE_URL);
+(async () => {
+  const tables = await sql\`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('access_permissions', 'role_permissions', 'user_permission_overrides')\`;
+  console.log('RBAC Tables:', tables.length === 3 ? '✅ All 3 exist' : '❌ Missing tables');
+})();
+"
+```
+
+### 7.2 Permission Data Seeded
+
+```bash
+DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+const { neon } = require('@neondatabase/serverless');
+const sql = neon(process.env.DATABASE_URL);
+(async () => {
+  const perms = await sql\`SELECT type, COUNT(*) as c FROM access_permissions WHERE is_active = true GROUP BY type ORDER BY type\`;
+  const roles = await sql\`SELECT DISTINCT role FROM role_permissions\`;
+  console.log('Permissions:', perms.map(p => p.type + ':' + p.c).join(', '));
+  console.log('Roles:', roles.map(r => r.role).join(', '));
+})();
+"
+```
+
+**Expected:**
+- Modules: 14, Pages: 50+, Tabs: 15+
+- Roles: admin, contractor, manager, super_admin, technician, viewer
+
+### 7.3 Super Admin Has 'all' Permission
+
+```bash
+DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+const { neon } = require('@neondatabase/serverless');
+const sql = neon(process.env.DATABASE_URL);
+(async () => {
+  const admins = await sql\`SELECT email, permissions FROM users WHERE role = 'super_admin'\`;
+  admins.forEach(a => {
+    const hasAll = a.permissions && a.permissions.includes('all');
+    console.log(a.email + ':', hasAll ? '✅ has [all]' : '❌ missing [all]');
+  });
+})();
+"
+```
+
+### 7.4 API Endpoints Respond
+
+```bash
+# Test with auth (requires valid session)
+for endpoint in /api/admin/permissions /api/admin/roles /api/admin/users; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:3005$endpoint")
+  echo "$endpoint: $code"
+done
+```
+
+**Expected:** 200 (with auth) or 401 (without auth)
+
+### 7.5 Access Control UI
+
+Navigate to: **Settings > Access Control**
+
+Check:
+- [ ] Users tab loads with user list
+- [ ] Roles tab shows 6 roles with permission matrix
+- [ ] Permissions tab shows hierarchical tree (14 modules)
+- [ ] No console errors
+
+**For full RBAC audit:** Run `/audit-rbac`
+
+---
+
+## 8. QUICK CHECKS
 
 ### One-Command Infrastructure Check
 ```bash
@@ -497,6 +575,15 @@ grep -rn ": any" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | wc -l
 | /procurement | 0 | 0 |
 | ... | ... | ... |
 
+## 7. RBAC
+| Check | Status |
+|-------|--------|
+| Tables exist (3) | ✅/❌ |
+| Permissions seeded | ✅ 14 modules, 50+ pages |
+| Roles configured (6) | ✅/❌ |
+| Super admin has 'all' | ✅/❌ |
+| Access Control UI | ✅/❌ |
+
 ---
 
 ## Issues Found
@@ -530,6 +617,7 @@ For detailed module testing protocols, see:
 
 | Command | Purpose |
 |---------|---------|
+| `/audit-rbac` | Deep RBAC system audit |
 | `/infra` | Infrastructure management |
 | `/deploy` | Deploy to environments |
 | `/status` | Quick project status |
@@ -541,6 +629,7 @@ For detailed module testing protocols, see:
 
 | Date | Scope | Issues | Fixed | Status |
 |------|-------|--------|-------|--------|
+| 2026-01-23 | RBAC | System configured | ✅ | PASS |
 | 2026-01-22 | Procurement | BOQ stale counts | ✅ | PASS |
 | 2026-01-22 | Global UI | Dark theme verified | ✅ | PASS |
 | 2026-01-19 | Full System | Sidebar dead links | ✅ | PASS |

@@ -25,12 +25,14 @@ export interface IncomingWAMessage {
   text?: string;
   timestamp: string;
   has_media: boolean;
-  media?: {
-    type: string;
-    mime_type: string;
-    data: string; // Base64
-    filename?: string;
-  }[];
+  media?: MediaItem[];
+}
+
+export interface MediaItem {
+  type: string;
+  mime_type: string;
+  data: string; // Base64
+  filename?: string;
 }
 
 export interface ProcessedMessage {
@@ -120,10 +122,16 @@ export async function getSenderContext(
 
   if (result.length === 0) return null;
 
+  const row = result[0] as {
+    sender_jid: string;
+    last_drop_number: string | null;
+    last_drop_timestamp: Date | null;
+  };
+
   return {
-    sender_jid: result[0].sender_jid,
-    last_drop_number: result[0].last_drop_number,
-    last_drop_timestamp: result[0].last_drop_timestamp,
+    sender_jid: row.sender_jid,
+    last_drop_number: row.last_drop_number,
+    last_drop_timestamp: row.last_drop_timestamp,
   };
 }
 
@@ -199,7 +207,7 @@ export async function storeMessage(
     RETURNING id
   `;
 
-  return result[0].id;
+  return (result[0] as { id: string }).id;
 }
 
 // ============================================================================
@@ -212,7 +220,7 @@ export async function storeMessage(
 export async function storePhotoMetadata(
   messageId: string,
   dropNumber: string,
-  photo: IncomingWAMessage['media'][0],
+  photo: MediaItem,
   index: number,
   project: string = 'Mohadin'
 ): Promise<string> {
@@ -243,7 +251,7 @@ export async function storePhotoMetadata(
     RETURNING id
   `;
 
-  return result[0].id;
+  return (result[0] as { id: string }).id;
 }
 
 // ============================================================================
@@ -285,7 +293,7 @@ export async function processMaintenanceMessage(
   // Step 2: Determine which DR to associate with this message
   let dropNumber: string | null = null;
 
-  if (drMentionedDirectly) {
+  if (drMentionedDirectly && extractedDRs[0]) {
     // Use the first DR mentioned (could be enhanced to handle multiple)
     dropNumber = extractedDRs[0];
 
@@ -340,6 +348,7 @@ export async function processMaintenanceMessage(
   if (message.has_media && message.media && dropNumber) {
     for (let i = 0; i < message.media.length; i++) {
       const photo = message.media[i];
+      if (!photo) continue;
       if (photo.type === 'image' || photo.mime_type?.startsWith('image/')) {
         await storePhotoMetadata(messageId, dropNumber, photo, i);
         photosCount++;

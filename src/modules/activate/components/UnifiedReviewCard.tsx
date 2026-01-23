@@ -1,14 +1,15 @@
 /**
  * UnifiedReviewCard Component
  *
- * Main component for unified DR photo review with 7 tabs:
+ * Main component for unified DR photo review with 8 tabs:
  * 1. Summary - DR overview with timeline, team, and status (landing tab)
  * 2. QA Wizard - 5-phase guided workflow (Prerequisites → Photo Review → Data Validation → Final Decision → Feedback)
  * 3. Photos - Photo gallery with step grouping
  * 4. AI Categorization - VLM photo categorization results
  * 5. Activity - Review history, comments, and activity timeline
- * 6. Feedback - Generate and send WhatsApp feedback
- * 7. Manual QA - Legacy 10-step checklist (for reference)
+ * 6. Maintenance - WhatsApp maintenance messages and photos (if any)
+ * 7. Feedback - Generate and send WhatsApp feedback
+ * 8. Manual QA - Legacy 10-step checklist (for reference)
  *
  * NOTE: ONT Barcode and UPS Serial are NOT photo steps - they are scanned
  * barcodes stored directly in ont_serial_scanned and ups_serial_scanned fields.
@@ -28,13 +29,14 @@ import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
 import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
+import { MaintenanceTab } from '@/modules/maintenance/components/MaintenanceTab';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
   onBackToList?: () => void;
 }
 
-type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'qa' | 'categorization';
+type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maintenance' | 'qa' | 'categorization';
 
 export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCardProps) {
   const router = useRouter();
@@ -90,6 +92,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
     { key: 'photos' as const, label: `Photos (${review.photo_count})`, icon: '📸' },
     { key: 'categorization' as const, label: 'AI Categorization', icon: '🏷️' },
     { key: 'activity' as const, label: 'Activity', icon: '📜' },
+    { key: 'maintenance' as const, label: 'Maintenance', icon: '🔧' },
     { key: 'feedback' as const, label: 'Feedback', icon: '💬' },
     { key: 'qa' as const, label: 'Manual QA', icon: '✅' },
   ];
@@ -179,6 +182,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
         {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
         {activeTab === 'feedback' && <FeedbackTab review={review} generateFeedback={generateFeedback} sendFeedback={sendFeedback} />}
         {activeTab === 'activity' && <ActivityTab dropNumber={dropNumber} feedbackSentAt={review.feedback_sent_at} />}
+        {activeTab === 'maintenance' && <MaintenanceTab dropNumber={dropNumber} />}
         {activeTab === 'qa' && <ManualQATab review={review} updateStep={updateStep} markIncorrect={markIncorrect} />}
         {activeTab === 'categorization' && (
           <AICategorizationTab

@@ -4,6 +4,7 @@
 
 import { Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import type { StaffMember } from '@/types/staff.types';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface StaffTableProps {
   staff: StaffMember[];
@@ -140,20 +141,24 @@ export function StaffTable({ staff, onView, onEdit, onDelete }: StaffTableProps)
                     >
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={(e) => handleActionClick(e, () => onEdit(member))}
-                      className="text-indigo-400 hover:text-indigo-300"
-                      title="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={(e) => handleActionClick(e, () => member.id && onDelete(member.id))}
-                      className="text-red-400 hover:text-red-300"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <PermissionGate permission="people.staff" action="edit">
+                      <button
+                        onClick={(e) => handleActionClick(e, () => onEdit(member))}
+                        className="text-indigo-400 hover:text-indigo-300"
+                        title="Edit"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    </PermissionGate>
+                    <PermissionGate permission="people.staff" action="delete">
+                      <button
+                        onClick={(e) => handleActionClick(e, () => member.id && onDelete(member.id))}
+                        className="text-red-400 hover:text-red-300"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </PermissionGate>
                   </div>
                 </td>
               </tr>

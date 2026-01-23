@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { Plus, Upload, Download } from 'lucide-react';
+import { PermissionGate } from '@/components/PermissionGate';
+import type { PermissionAction } from '@/hooks/usePermission';
 
 interface StandardModuleHeaderProps {
   title: string;
@@ -16,6 +18,12 @@ interface StandardModuleHeaderProps {
   showExport?: boolean;
   showAdd?: boolean;
   exportDisabled?: boolean;
+  /** Permission key for add/create button (e.g., 'procurement.sourcing.boq') */
+  addPermission?: string;
+  /** Permission action for add button (default: 'create') */
+  addPermissionAction?: PermissionAction;
+  /** Permission key for import button */
+  importPermission?: string;
 }
 
 export function StandardModuleHeader({
@@ -30,7 +38,10 @@ export function StandardModuleHeader({
   showImport = true,
   showExport = true,
   showAdd = true,
-  exportDisabled = false
+  exportDisabled = false,
+  addPermission,
+  addPermissionAction = 'create',
+  importPermission
 }: StandardModuleHeaderProps) {
   const router = useRouter();
 
@@ -50,13 +61,25 @@ export function StandardModuleHeader({
       </div>
       <div className="flex gap-3">
         {showImport && onImport && (
-          <button
-            onClick={onImport}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </button>
+          importPermission ? (
+            <PermissionGate permission={importPermission} action="create">
+              <button
+                onClick={onImport}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </button>
+            </PermissionGate>
+          ) : (
+            <button
+              onClick={onImport}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </button>
+          )
         )}
         {showExport && onExport && (
           <button
@@ -69,13 +92,25 @@ export function StandardModuleHeader({
           </button>
         )}
         {showAdd && (
-          <button
-            onClick={handleAdd}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {addButtonText}
-          </button>
+          addPermission ? (
+            <PermissionGate permission={addPermission} action={addPermissionAction}>
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {addButtonText}
+              </button>
+            </PermissionGate>
+          ) : (
+            <button
+              onClick={handleAdd}
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {addButtonText}
+            </button>
+          )
         )}
       </div>
     </div>

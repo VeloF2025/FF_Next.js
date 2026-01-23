@@ -3,6 +3,7 @@
  */
 
 import { Users, Plus, Upload, Settings, Filter, Download } from 'lucide-react';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface StaffListHeaderProps {
   totalStaff: number;
@@ -57,27 +58,33 @@ export function StaffListHeader({
               <Download className="h-4 w-4 mr-2" />
               Export
             </button>
-            <button
-              onClick={onImport}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
-            </button>
-            <button
-              onClick={onSettings}
-              className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
-              title="Staff Settings"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-            <button
-              onClick={onAddStaff}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Staff
-            </button>
+            <PermissionGate permission="people.staff" action="create">
+              <button
+                onClick={onImport}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </button>
+            </PermissionGate>
+            <PermissionGate permission="people.staff" action="edit">
+              <button
+                onClick={onSettings}
+                className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+                title="Staff Settings"
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+            </PermissionGate>
+            <PermissionGate permission="people.staff" action="create">
+              <button
+                onClick={onAddStaff}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Staff
+              </button>
+            </PermissionGate>
           </div>
         </div>
       </div>

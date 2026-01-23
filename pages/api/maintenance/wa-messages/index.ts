@@ -106,7 +106,7 @@ export default async function handler(
       `;
     }
 
-    const total = parseInt(countResult[0].total, 10);
+    const total = parseInt((countResult[0] as { total: string })?.total ?? '0', 10);
 
     return res.status(200).json({
       success: true,

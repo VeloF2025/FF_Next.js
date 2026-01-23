@@ -2,6 +2,7 @@
 
 import { Plus, Download, Upload } from 'lucide-react';
 import { useRouter } from 'next/router';
+import { PermissionGate } from '@/components/PermissionGate';
 
 interface ProjectListHeaderProps {
   onImport?: () => void;
@@ -23,15 +24,17 @@ export function ProjectListHeader({ onImport, onExport, projectCount = 0 }: Proj
         </div>
 
         <div className="flex items-center gap-3">
-          {onImport && (
-            <button
-              onClick={onImport}
-              className="flex items-center gap-2 px-4 py-2 text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
-            >
-              <Upload className="h-4 w-4" />
-              Import
-            </button>
-          )}
+          <PermissionGate permission="projects.imports" action="create">
+            {onImport && (
+              <button
+                onClick={onImport}
+                className="flex items-center gap-2 px-4 py-2 text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Import
+              </button>
+            )}
+          </PermissionGate>
 
           {onExport && projectCount > 0 && (
             <button
@@ -43,13 +46,15 @@ export function ProjectListHeader({ onImport, onExport, projectCount = 0 }: Proj
             </button>
           )}
 
-          <button
-            onClick={() => router.push('/projects/new')}
-            className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Project
-          </button>
+          <PermissionGate permission="projects.list" action="create">
+            <button
+              onClick={() => router.push('/projects/new')}
+              className="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Project
+            </button>
+          </PermissionGate>
         </div>
       </div>
     </div>

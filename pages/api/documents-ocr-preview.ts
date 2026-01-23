@@ -13,7 +13,7 @@
  *
  * Uses Qwen3-VL vision model for high-quality OCR on all document types
  *
- * Timeout: 60 seconds max (VLM inference)
+ * Timeout: 120 seconds max (PDF conversion + orientation detection + VLM inference)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -622,9 +622,9 @@ export default async function handler(
       return fileUrl;
     };
 
-    // Process OCR with timeout (60s for VLM inference)
+    // Process OCR with timeout (120s total: PDF conversion + orientation + OCR)
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
     try {
       // Convert PDF to image if necessary
@@ -874,8 +874,8 @@ export default async function handler(
       }
 
       if (ocrError.name === 'AbortError' || ocrError.message?.includes('timeout')) {
-        log.error('OCR timeout after 60 seconds', ocrError, 'OcrPreviewAPI');
-        return res.status(504).json({ error: 'OCR processing timed out. Please try manual entry.' });
+        log.error('OCR timeout after 120 seconds', ocrError, 'OcrPreviewAPI');
+        return res.status(504).json({ error: 'OCR processing timed out after 120 seconds. Please try manual entry.' });
       }
 
       throw ocrError;

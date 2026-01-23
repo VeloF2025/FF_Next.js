@@ -57,6 +57,7 @@ export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: 
           itemCount={projects.length}
           onAdd={() => navigate('/app/projects/new')}
           addButtonText="New Project"
+          addPermission="projects.list"
         />
         <div className="flex gap-2">
           <button

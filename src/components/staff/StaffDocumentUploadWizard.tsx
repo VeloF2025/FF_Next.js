@@ -278,10 +278,11 @@ export function StaffDocumentUploadWizard({
     setState((prev) => ({ ...prev, currentStep: 'ocr_processing' }));
     setError(null);
 
-    // Create abort controller with 30s timeout
+    // Create abort controller with 90s timeout
+    // Large PDFs need: conversion (~10s) + upload (~5s) + orientation detection (~15s) + rotation (~5s) + OCR (~30s)
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 90000);
 
     try {
       // Prepare form data
@@ -341,7 +342,7 @@ export function StaffDocumentUploadWizard({
       clearTimeout(timeout);
 
       if (err instanceof Error && err.name === 'AbortError') {
-        setError('OCR processing timed out after 30 seconds. Please try manual entry.');
+        setError('OCR processing timed out after 90 seconds. Please try manual entry.');
         setState((prev) => ({ ...prev, currentStep: 'manual_entry' }));
       } else {
         const errorMessage = err instanceof Error ? err.message : 'OCR processing failed';
