@@ -423,7 +423,8 @@ export default async function handler(
           totalRows: oesRows.length,
           imported: inserted + updated,
           matched: matched,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          reportDate: reportDate || new Date().toISOString().split('T')[0] // Pass user-selected date for layer naming
         };
 
         log.info('OESImport', 'Triggering QField sync webhook (awaiting confirmation)', syncPayload);
