@@ -192,24 +192,26 @@ const VLM_PROMPTS: Record<string, string> = {
 Return ONLY valid JSON, no other text.`,
 
   id_document: `Extract all fields from this South African ID document (Smart ID card or green ID book). Return JSON with:
-- idNumber: The 13-digit SA ID number
+- idNumber: The SA ID number - MUST be EXACTLY 13 digits. Count carefully: YYMMDD SSSS C A Z format. If you see only 11-12 digits, look again for missing digits.
 - surname: Surname/Last name
 - firstName: First names
-- dateOfBirth: Date of birth (YYYY-MM-DD format)
+- dateOfBirth: Date of birth (YYYY-MM-DD format) - first 6 digits of ID = YYMMDD
 - gender: Gender (Male/Female)
 - citizenship: Citizenship status
 - countryOfBirth: Country of birth
+CRITICAL: SA ID numbers are always exactly 13 digits. Verify your extracted idNumber has 13 digits before returning.
 Return ONLY valid JSON, no other text.`,
 
   // Alias for sa_id document type (used in UI)
   sa_id: `Extract all fields from this South African ID document (Smart ID card or green ID book). Return JSON with:
-- idNumber: The 13-digit SA ID number
+- idNumber: The SA ID number - MUST be EXACTLY 13 digits. Count carefully: YYMMDD SSSS C A Z format. If you see only 11-12 digits, look again for missing digits.
 - surname: Surname/Last name
 - firstName: First names
-- dateOfBirth: Date of birth (YYYY-MM-DD format)
+- dateOfBirth: Date of birth (YYYY-MM-DD format) - first 6 digits of ID = YYMMDD
 - gender: Gender (Male/Female)
 - citizenship: Citizenship status
 - countryOfBirth: Country of birth
+CRITICAL: SA ID numbers are always exactly 13 digits. Verify your extracted idNumber has 13 digits before returning.
 Return ONLY valid JSON, no other text.`,
 
   passport: `Extract all fields from this passport. Return JSON with:
@@ -489,18 +491,23 @@ async function resizeImageForVlm(imagePath: string, rotationDegrees: number = 0)
 
 /**
  * Convert PDF to PNG image using pdftoppm (from poppler-utils)
- * Uses adaptive DPI based on file size for faster processing
+ * Uses adaptive DPI based on file size AND document type
+ * ID documents need higher DPI for accurate digit recognition
  * Returns the path to the converted image file
  */
-async function convertPdfToImage(pdfPath: string): Promise<string> {
+async function convertPdfToImage(pdfPath: string, documentType?: string): Promise<string> {
   const tempDir = os.tmpdir();
   const outputBase = path.join(tempDir, `pdf-convert-${Date.now()}`);
 
-  // Get file size to determine optimal DPI
+  // Get file size to determine base DPI
   const fileSizeBytes = fs.statSync(pdfPath).size;
   const fileSizeMB = fileSizeBytes / (1024 * 1024);
 
-  // Adaptive DPI: lower for large files (OCR works fine at 100-150 DPI)
+  // Document types that require higher DPI for accurate digit/text recognition
+  const highPrecisionDocTypes = ['sa_id', 'id_document', 'drivers_license', 'passport'];
+  const needsHighPrecision = documentType && highPrecisionDocTypes.includes(documentType);
+
+  // Adaptive DPI based on file size
   let dpi: number;
   if (fileSizeMB > 3) {
     dpi = 100; // Fast for large files
@@ -510,7 +517,24 @@ async function convertPdfToImage(pdfPath: string): Promise<string> {
     dpi = 200; // High quality for small files
   }
 
-  log.info('Converting PDF with adaptive DPI', { fileSizeMB: fileSizeMB.toFixed(2), dpi });
+  // Override: ID documents need minimum 150 DPI for accurate digit recognition
+  // SA ID numbers have 13 small digits that get blurry at 100 DPI
+  if (needsHighPrecision && dpi < 150) {
+    log.info('Boosting DPI for ID document precision', { originalDpi: dpi, boostedDpi: 150, documentType });
+    dpi = 150;
+  }
+
+  // Adaptive timeout: larger files need more time for conversion
+  // Base 30s + 10s per MB over 2MB
+  const conversionTimeout = Math.max(30000, 30000 + Math.floor((fileSizeMB - 2) * 10000));
+
+  log.info('Converting PDF with adaptive DPI', {
+    fileSizeMB: fileSizeMB.toFixed(2),
+    dpi,
+    documentType,
+    needsHighPrecision,
+    timeoutMs: conversionTimeout
+  });
 
   try {
     // Use pdftoppm to convert first page of PDF to PNG
@@ -518,7 +542,7 @@ async function convertPdfToImage(pdfPath: string): Promise<string> {
     // -f 1 -l 1: only first page
     // -r {dpi}: adaptive DPI based on file size
     execSync(`pdftoppm -png -f 1 -l 1 -r ${dpi} "${pdfPath}" "${outputBase}"`, {
-      timeout: 30000,
+      timeout: conversionTimeout,
       stdio: 'pipe',
     });
 
@@ -647,8 +671,8 @@ export default async function handler(
       // Convert PDF to image if necessary
       let filePathForOcr = uploadedFile.filepath;
       if (isPdf) {
-        log.info('Converting PDF to image for OCR', { filename: uploadedFile.originalFilename });
-        filePathForOcr = await convertPdfToImage(uploadedFile.filepath);
+        log.info('Converting PDF to image for OCR', { filename: uploadedFile.originalFilename, documentType });
+        filePathForOcr = await convertPdfToImage(uploadedFile.filepath, documentType);
         tempFilePaths.push(uploadedFile.filepath); // Add original PDF for cleanup
       }
 
@@ -764,6 +788,32 @@ export default async function handler(
             confidence: 0.95, // VLM typically has high confidence
             validated: true,
           };
+        }
+      }
+
+      // Validate SA ID number length (must be exactly 13 digits)
+      if ((documentType === 'sa_id' || documentType === 'id_document') && extractedFields.documentNumber) {
+        const idValue = String(extractedFields.documentNumber.value || '').replace(/[\s\-]/g, '');
+        if (idValue.length !== 13) {
+          log.warn('SA ID extraction returned wrong digit count', {
+            extracted: idValue,
+            digitCount: idValue.length,
+            expected: 13,
+            documentType,
+          });
+
+          // Add validation warning for incorrect length
+          extractedFields._idLengthWarning = {
+            value: `Extracted ID "${idValue}" has ${idValue.length} digits instead of 13. Please verify manually.`,
+            confidence: 1.0,
+            validated: false,
+          };
+
+          // Lower confidence since we know it's incorrect
+          extractedFields.documentNumber.confidence = 0.5;
+          extractedFields.documentNumber.validated = false;
+        } else {
+          log.info('SA ID extraction validated', { idValue, digitCount: 13 });
         }
       }
 
