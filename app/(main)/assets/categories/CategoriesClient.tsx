@@ -19,6 +19,9 @@ import {
   Wrench,
   Laptop,
   PenTool,
+  Truck,
+  HardHat,
+  Package,
 } from 'lucide-react';
 import type { AssetCategory } from '@/modules/assets/types';
 
@@ -31,6 +34,9 @@ const typeIcons: Record<string, any> = {
   splice_equipment: Wrench,
   computing_device: Laptop,
   tools: PenTool,
+  vehicle: Truck,
+  safety_equipment: HardHat,
+  other: Package,
 };
 
 const typeLabels: Record<string, string> = {
@@ -38,6 +44,9 @@ const typeLabels: Record<string, string> = {
   splice_equipment: 'Splice Equipment',
   computing_device: 'Computing Device',
   tools: 'Tools',
+  vehicle: 'Vehicle',
+  safety_equipment: 'Safety Equipment',
+  other: 'Other',
 };
 
 export function CategoriesClient({ initialCategories }: CategoriesClientProps) {
