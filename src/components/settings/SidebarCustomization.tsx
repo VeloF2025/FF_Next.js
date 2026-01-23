@@ -13,7 +13,11 @@ import {
   RotateCcw,
   Save,
   Loader2,
-  X
+  X,
+  ShoppingCart,
+  Package,
+  Camera,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -37,6 +41,11 @@ const AVAILABLE_ITEMS: CustomizableItem[] = [
   { id: 'contractors', label: 'Contractors', icon: HardHat, description: 'Contractor portal' },
   { id: 'wa-monitor', label: 'WA Monitor', icon: MessageSquare, description: 'WhatsApp monitoring' },
   { id: 'daily-progress', label: 'Daily Progress', icon: BarChart3, description: 'Daily status updates' },
+  { id: 'clients', label: 'Clients', icon: Building2, description: 'Client management' },
+  { id: 'procurement', label: 'Procurement', icon: ShoppingCart, description: 'Purchasing and inventory' },
+  { id: 'assets', label: 'Assets', icon: Package, description: 'Asset management' },
+  { id: 'communications', label: 'Communications', icon: MessageSquare, description: 'Communications portal' },
+  { id: 'activate', label: 'Activate', icon: Camera, description: 'DR photo QA review' },
 ];
 
 const DEFAULT_ITEMS = ['meetings', 'action-items'];
