@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-// import { authService, AuthUser } from '@/services/authService'; // Commented out for development mode
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { AuthUser } from '@/services/authService';
 import {
   User,
@@ -9,6 +8,7 @@ import {
   RegisterCredentials,
   PasswordResetRequest,
   ChangePasswordRequest,
+  ROLE_PERMISSIONS,
 } from '@/types/auth.types';
 
 interface AuthContextType {
@@ -21,7 +21,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  
+
   // Enhanced properties with RBAC
   currentUser: User | null;
   isAuthenticated: boolean;
@@ -32,14 +32,14 @@ interface AuthContextType {
   changePassword: (request: ChangePasswordRequest) => Promise<void>;
   sendEmailVerification: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
-  
+
   // Permission checking methods
   hasPermission: (permission: Permission) => boolean;
   hasAnyPermission: (permissions: Permission[]) => boolean;
   hasAllPermissions: (permissions: Permission[]) => boolean;
   hasRole: (role: UserRole) => boolean;
   hasAnyRole: (roles: UserRole[]) => boolean;
-  
+
   // Utility methods
   clearError: () => void;
   refreshUser: () => Promise<void>;
@@ -47,189 +47,222 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  // DEVELOPMENT MODE: Mock user data for easier testing
-  // TODO: Remove this mock data when implementing RBAC
-  // Use Hein van Vuuren's staff ID from database to satisfy foreign key constraints
-  // NOTE: Using static dates to prevent SSR/CSR hydration mismatch (React error #418/#423)
-  const mockUser: User = {
-    id: 'ac59fe41-b52b-43f6-8b8e-a8d53c8d56f2',
-    email: 'hein@velocityfibre.co.za',
-    displayName: 'Hein van Vuuren',
+// Map API role to UserRole enum
+function mapRole(role: string): UserRole {
+  const roleMap: Record<string, UserRole> = {
+    'system': UserRole.SUPER_ADMIN,
+    'admin': UserRole.ADMIN,
+    'manager': UserRole.PROJECT_MANAGER,
+    'technician': UserRole.FIELD_TECHNICIAN,
+    'viewer': UserRole.VIEWER,
+  };
+  return roleMap[role] || UserRole.VIEWER;
+}
+
+// Map API user to internal User type
+function mapApiUser(apiUser: {
+  id: string;
+  email: string;
+  name?: string;
+  role: string;
+  permissions: string[];
+}): { user: User; authUser: AuthUser } {
+  const role = mapRole(apiUser.role);
+  const permissions = apiUser.permissions.includes('all')
+    ? Object.values(Permission)
+    : (apiUser.permissions as Permission[]);
+
+  const user: User = {
+    id: apiUser.id,
+    email: apiUser.email,
+    displayName: apiUser.name || apiUser.email.split('@')[0],
     photoURL: null,
-    role: UserRole.SUPER_ADMIN,
-    permissions: [
-      Permission.PROJECTS_READ,
-      Permission.PROJECTS_CREATE,
-      Permission.STAFF_READ,
-      Permission.STAFF_CREATE,
-      Permission.SYSTEM_ADMIN,
-    ],
+    role,
+    permissions,
     isEmailVerified: true,
-    lastLoginAt: new Date('2025-01-01T00:00:00.000Z'),
-    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    lastLoginAt: new Date(),
+    createdAt: new Date(),
   };
 
-  const mockAuthUser: AuthUser = {
-    uid: 'ac59fe41-b52b-43f6-8b8e-a8d53c8d56f2',
-    email: 'hein@velocityfibre.co.za',
-    displayName: 'Hein van Vuuren',
+  const authUser: AuthUser = {
+    uid: apiUser.id,
+    email: apiUser.email,
+    displayName: apiUser.name || apiUser.email.split('@')[0],
     photoURL: null,
     emailVerified: true,
   };
 
-  // Legacy state for backward compatibility
-  const [user] = useState<AuthUser | null>(mockAuthUser);
-  const [loading] = useState(false); // No loading in dev mode
+  return { user, authUser };
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Enhanced state with RBAC
-  const [currentUser] = useState<User | null>(mockUser);
-  const [isAuthenticated] = useState(true); // Always authenticated in dev mode
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  useEffect(() => {
-    // DEVELOPMENT MODE: Skip Firebase auth listeners
-    // TODO: Restore auth listeners when implementing RBAC
-    /* 
-    // Set up enhanced auth state listener
-    const unsubscribeEnhanced = authService.onAuthStateChangedEnhanced((user) => {
-      setCurrentUser(user);
-      setIsAuthenticated(!!user);
+  // Check auth status on mount
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const { user: mappedUser, authUser } = mapApiUser(data.user);
+        setUser(authUser);
+        setCurrentUser(mappedUser);
+        setIsAuthenticated(true);
+      } else {
+        setUser(null);
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      }
+    } catch {
+      setUser(null);
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+    } finally {
       setLoading(false);
-    });
-
-    // Set up legacy auth state listener for backward compatibility
-    const unsubscribeLegacy = authService.onAuthStateChanged((user) => {
-      setUser(user);
-    });
-
-    return () => {
-      unsubscribeEnhanced();
-      unsubscribeLegacy();
-    };
-    */
+    }
   }, []);
 
-  // DEVELOPMENT MODE: Mock auth methods
-  // TODO: Restore real auth methods when implementing RBAC
-  
-  // Legacy methods for backward compatibility
-  const signInWithEmail = async (_email: string, _password: string) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement real authentication
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Legacy sign in method
+  const signInWithEmail = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      const { user: mappedUser, authUser } = mapApiUser(data.user);
+      setUser(authUser);
+      setCurrentUser(mappedUser);
+      setIsAuthenticated(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signInWithGoogle = async () => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement Google authentication
+    setError('Google sign-in is not available. Please use email/password.');
+    throw new Error('Google sign-in not implemented');
   };
 
   const signUp = async (_email: string, _password: string, _displayName?: string) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement user registration
+    setError('Registration is not available. Please contact an administrator.');
+    throw new Error('Registration not implemented');
   };
 
   const resetPassword = async (_email: string) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement password reset
+    setError('Password reset is not available. Please contact an administrator.');
+    throw new Error('Password reset not implemented');
   };
 
   // Enhanced methods with RBAC
-  const signInWithEmailEnhanced = async (_credentials: LoginCredentials) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement enhanced email authentication
+  const signInWithEmailEnhanced = async (credentials: LoginCredentials) => {
+    await signInWithEmail(credentials.email, credentials.password);
   };
 
   const signInWithGoogleEnhanced = async (_rememberMe = false) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement enhanced Google authentication
+    await signInWithGoogle();
   };
 
   const registerWithEmail = async (_credentials: RegisterCredentials) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement enhanced email registration
+    setError('Registration is not available. Please contact an administrator.');
+    throw new Error('Registration not implemented');
   };
 
   const signOut = async () => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement sign out functionality
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      setUser(null);
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      // Redirect to sign-in page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/sign-in';
+      }
+    }
   };
 
   const resetPasswordEnhanced = async (_request: PasswordResetRequest) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement enhanced password reset
+    await resetPassword(_request.email);
   };
 
   const changePassword = async (_request: ChangePasswordRequest) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement password change functionality
+    setError('Password change is not available yet.');
+    throw new Error('Password change not implemented');
   };
 
   const sendEmailVerification = async () => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement email verification
+    setError('Email verification is not available.');
+    throw new Error('Email verification not implemented');
   };
 
   const updateProfile = async (_updates: Partial<User>) => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement profile update functionality
+    setError('Profile update is not available yet.');
+    throw new Error('Profile update not implemented');
   };
 
   // Permission checking methods
-  const hasPermission = (_permission: Permission): boolean => {
-    // DEVELOPMENT MODE: Always return true for easier testing
-    // TODO: Restore proper permission checking when implementing RBAC
-    return true;
-    
-    // Original logic (commented out for development)
-    /*
+  const hasPermission = (permission: Permission): boolean => {
     if (!currentUser) return false;
-    return authService.hasPermission(permission);
-    */
+
+    // Check if user has 'all' permission (super admin)
+    if (currentUser.permissions.includes(Permission.SYSTEM_ADMIN)) return true;
+
+    // Check role-based permissions
+    const rolePermissions = ROLE_PERMISSIONS[currentUser.role] || [];
+    if (rolePermissions.includes(permission)) return true;
+
+    // Check direct permissions
+    return currentUser.permissions.includes(permission);
   };
 
-  const hasAnyPermission = (_permissions: Permission[]): boolean => {
-    // DEVELOPMENT MODE: Always return true for easier testing
-    return true;
-    
-    // Original logic (commented out for development)
-    /*
+  const hasAnyPermission = (permissions: Permission[]): boolean => {
     if (!currentUser) return false;
-    return authService.hasAnyPermission(permissions);
-    */
+    return permissions.some(p => hasPermission(p));
   };
 
-  const hasAllPermissions = (_permissions: Permission[]): boolean => {
-    // DEVELOPMENT MODE: Always return true for easier testing
-    return true;
-    
-    // Original logic (commented out for development)
-    /*
+  const hasAllPermissions = (permissions: Permission[]): boolean => {
     if (!currentUser) return false;
-    return authService.hasAllPermissions(permissions);
-    */
+    return permissions.every(p => hasPermission(p));
   };
 
-  const hasRole = (_role: UserRole): boolean => {
-    // DEVELOPMENT MODE: Always return true for easier testing
-    return true;
-    
-    // Original logic (commented out for development)
-    /*
+  const hasRole = (role: UserRole): boolean => {
     if (!currentUser) return false;
-    return authService.hasRole(role);
-    */
+    return currentUser.role === role;
   };
 
-  const hasAnyRole = (_roles: UserRole[]): boolean => {
-    // DEVELOPMENT MODE: Always return true for easier testing
-    return true;
-    
-    // Original logic (commented out for development)
-    /*
+  const hasAnyRole = (roles: UserRole[]): boolean => {
     if (!currentUser) return false;
-    return currentUser?.role ? roles.includes(currentUser.role as UserRole) : false;
-    */
+    return roles.includes(currentUser.role);
   };
 
   // Utility methods
@@ -238,8 +271,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshUser = async () => {
-    // Mock implementation - silent in development mode
-    // TODO: Implement user refresh functionality
+    await checkAuth();
   };
 
   const value: AuthContextType = {
@@ -252,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
     resetPassword,
-    
+
     // Enhanced properties with RBAC
     currentUser,
     isAuthenticated,
@@ -263,14 +295,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     changePassword,
     sendEmailVerification,
     updateProfile,
-    
+
     // Permission checking methods
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
     hasRole,
     hasAnyRole,
-    
+
     // Utility methods
     clearError,
     refreshUser,
