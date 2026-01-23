@@ -686,7 +686,7 @@ export function StaffDocumentUploadWizard({
                 Extracting information from your document
               </p>
               <p className="text-xs text-[var(--ff-text-secondary)] mt-1 opacity-70">
-                This may take up to 30 seconds
+                Large PDFs may take up to 90 seconds
               </p>
             </div>
           </div>

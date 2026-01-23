@@ -735,6 +735,56 @@ async function getProjectStats(filters?: {
 }
 
 /**
+ * Auto-sync missing DRs from qa_photo_reviews to dr_photo_unified_reviews
+ * This ensures DRs always appear in the list, even if the webhook failed.
+ *
+ * Called on each request but runs efficiently:
+ * - Only syncs DRs from the last 7 days (recent submissions)
+ * - Uses INSERT ... ON CONFLICT DO NOTHING to avoid duplicates
+ * - Runs in background, doesn't block the response
+ */
+async function syncMissingFromQaPhotoReviews(): Promise<number> {
+  try {
+    // Find DRs in qa_photo_reviews that are missing from dr_photo_unified_reviews
+    // Only look at last 7 days to keep it fast
+    const result = await pool.query(`
+      INSERT INTO dr_photo_unified_reviews (
+        drop_number, project, submission_count, submitted_date, sender_phone,
+        created_at, updated_at, is_oes_only
+      )
+      SELECT
+        qa.drop_number,
+        qa.project,
+        1,
+        COALESCE(qa.whatsapp_message_date::DATE, qa.created_at::DATE),
+        qa.sender_phone,
+        qa.created_at,
+        NOW(),
+        FALSE
+      FROM qa_photo_reviews qa
+      WHERE qa.created_at > NOW() - INTERVAL '7 days'
+        AND NOT EXISTS (
+          SELECT 1 FROM dr_photo_unified_reviews u
+          WHERE u.drop_number = qa.drop_number
+        )
+      ON CONFLICT (drop_number) DO NOTHING
+      RETURNING drop_number
+    `);
+
+    if (result.rowCount && result.rowCount > 0) {
+      log.info('DropsAPI', `Auto-synced ${result.rowCount} missing DRs from qa_photo_reviews`, {
+        dropNumbers: result.rows.map((r: any) => r.drop_number),
+      });
+    }
+
+    return result.rowCount || 0;
+  } catch (error) {
+    log.error('DropsAPI', 'Error auto-syncing from qa_photo_reviews', error);
+    return 0;
+  }
+}
+
+/**
  * Get all active projects for the filter dropdown
  * Returns projects that have WhatsApp group mappings (active projects)
  */
@@ -815,6 +865,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     const searchTerm = search && typeof search === 'string' ? search : undefined;
+
+    // Auto-sync missing DRs from qa_photo_reviews BEFORE querying
+    // This ensures DRs appear even if the webhook failed
+    // Must complete before queries so newly synced DRs are included in results
+    const syncedCount = await syncMissingFromQaPhotoReviews();
 
     // Run all queries in parallel for faster response
     const [result, summary, projectStats, activeProjects] = await Promise.all([

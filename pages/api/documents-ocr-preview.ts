@@ -489,18 +489,35 @@ async function resizeImageForVlm(imagePath: string, rotationDegrees: number = 0)
 
 /**
  * Convert PDF to PNG image using pdftoppm (from poppler-utils)
+ * Uses adaptive DPI based on file size for faster processing
  * Returns the path to the converted image file
  */
 async function convertPdfToImage(pdfPath: string): Promise<string> {
   const tempDir = os.tmpdir();
   const outputBase = path.join(tempDir, `pdf-convert-${Date.now()}`);
 
+  // Get file size to determine optimal DPI
+  const fileSizeBytes = fs.statSync(pdfPath).size;
+  const fileSizeMB = fileSizeBytes / (1024 * 1024);
+
+  // Adaptive DPI: lower for large files (OCR works fine at 100-150 DPI)
+  let dpi: number;
+  if (fileSizeMB > 3) {
+    dpi = 100; // Fast for large files
+  } else if (fileSizeMB > 1) {
+    dpi = 150; // Balanced
+  } else {
+    dpi = 200; // High quality for small files
+  }
+
+  log.info('Converting PDF with adaptive DPI', { fileSizeMB: fileSizeMB.toFixed(2), dpi });
+
   try {
     // Use pdftoppm to convert first page of PDF to PNG
     // -png: output PNG format
     // -f 1 -l 1: only first page
-    // -r 200: 200 DPI for good quality
-    execSync(`pdftoppm -png -f 1 -l 1 -r 200 "${pdfPath}" "${outputBase}"`, {
+    // -r {dpi}: adaptive DPI based on file size
+    execSync(`pdftoppm -png -f 1 -l 1 -r ${dpi} "${pdfPath}" "${outputBase}"`, {
       timeout: 30000,
       stdio: 'pipe',
     });
