@@ -1,0 +1,30 @@
+
+Lawley:
+  Total DRs: 4172
+  Match (YES): 4121
+  Mismatch (NO): 0
+  Empty/Unknown: 51
+
+Mamelodi:
+  Total DRs: 391
+  Match (YES): 370
+  Mismatch (NO): 0
+  Empty/Unknown: 21
+
+Mohadin:
+  Total DRs: 2574
+  Match (YES): 2510
+  Mismatch (NO): 0
+  Empty/Unknown: 64
+
+════════════════════════════════════════════════════════════════
+OLT REPORT MISMATCHES ("Drop & ONT SN on 1Map matches to OLT?" = NO)
+════════════════════════════════════════════════════════════════
+Total: 0 mismatches across all projects
+
+DR Number       | Project   | OLT Serial     | Field App Serial
+----------------|-----------|----------------|------------------
+
+
+DR Numbers only (for cross-reference):
+
