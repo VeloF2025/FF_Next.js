@@ -21,8 +21,8 @@ import { sql } from '@/lib/db';
 import { extractSerialsFromWaPhoto } from '@/modules/activate/services/vlmExtractionService';
 import { logWaPhotoVlmProcessed, logSerialChange } from '@/modules/activate/services/activityLogService';
 
-// VPS photo base URL
-const VPS_PHOTO_BASE = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8084';
+// VPS photo server (same as step photos - port 8866)
+const VPS_PHOTO_BASE = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
 
 interface ProcessResult {
   photoId: string;
@@ -90,7 +90,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Process each photo
     for (const photo of photos) {
-      const photoUrl = `${VPS_PHOTO_BASE}${photo.local_path}`;
+      // Transform local_path to URL path
+      // From: /var/lib/docker/volumes/boss-vps_dr_photos/_data/DR470096/wa_filename.jpg
+      // To:   /photos/DR470096/wa_filename.jpg
+      const urlPath = photo.local_path.replace(
+        '/var/lib/docker/volumes/boss-vps_dr_photos/_data/',
+        '/photos/'
+      );
+      const photoUrl = `${VPS_PHOTO_BASE}${urlPath}`;
 
       log.debug('ProcessWaPhotoVlm', `Processing photo: ${photo.original_filename}`, { photoUrl });
 
