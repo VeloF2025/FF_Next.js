@@ -1,0 +1,601 @@
+/**
+ * Self-Healing Dashboard Component
+ *
+ * Displays daemon controls, pending approvals, classification suggestions,
+ * and recovery action history with approve/reject functionality.
+ */
+
+import React, { useState, useEffect } from 'react';
+import {
+  Play,
+  Pause,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  Shield,
+  Zap,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronDown,
+  ChevronRight,
+  Lightbulb,
+  History,
+} from 'lucide-react';
+import type {
+  DaemonStatus,
+  ApprovalQueueItem,
+  ClassificationSuggestion,
+  RiskLevel,
+} from '../types/self-healing.types';
+
+interface DashboardData {
+  daemon: DaemonStatus;
+  pendingApprovals: ApprovalQueueItem[];
+  suggestions: ClassificationSuggestion[];
+  stats: {
+    successRate: number | null;
+    mttrSeconds: number | null;
+    incidentCount: number;
+  };
+}
+
+export default function SelfHealingDashboard() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [expandedApproval, setExpandedApproval] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/system/self-healing');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const result = await response.json();
+      setData(result.data);
+    } catch (err) {
+      console.error('Failed to load self-healing data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDaemonAction = async (action: 'start-daemon' | 'stop-daemon' | 'trigger-check') => {
+    try {
+      setActionLoading(action);
+      const response = await fetch('/api/system/self-healing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+
+      if (!response.ok) throw new Error('Action failed');
+
+      await fetchData();
+    } catch (err) {
+      console.error('Daemon action failed:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApproval = async (id: string, approve: boolean) => {
+    try {
+      setActionLoading(id);
+      const response = await fetch('/api/system/approve-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          queueId: id,
+          approved: approve,
+          decidedBy: 'current-user', // Will be replaced by actual user
+        }),
+      });
+
+      if (!response.ok) throw new Error('Approval failed');
+
+      await fetchData();
+    } catch (err) {
+      console.error('Approval action failed:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
+        <p className="text-red-400">Failed to load self-healing data</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Daemon Control Panel */}
+      <DaemonControlPanel
+        daemon={data.daemon}
+        onAction={handleDaemonAction}
+        actionLoading={actionLoading}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pending Approvals */}
+        <div className="bg-gray-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-yellow-400" />
+              <h3 className="text-lg font-medium text-white">Pending Approvals</h3>
+            </div>
+            <span className="text-sm text-gray-500">
+              {data.pendingApprovals.length} pending
+            </span>
+          </div>
+
+          {data.pendingApprovals.length === 0 ? (
+            <p className="text-gray-500 text-sm py-4 text-center">
+              No pending approvals
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {data.pendingApprovals.map((item) => (
+                <ApprovalCard
+                  key={item.id}
+                  item={item}
+                  isExpanded={expandedApproval === item.id}
+                  onToggle={() =>
+                    setExpandedApproval(expandedApproval === item.id ? null : item.id)
+                  }
+                  onApprove={() => handleApproval(item.id, true)}
+                  onReject={() => handleApproval(item.id, false)}
+                  isLoading={actionLoading === item.id}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Classification Suggestions */}
+        <div className="bg-gray-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-purple-400" />
+              <h3 className="text-lg font-medium text-white">AI Suggestions</h3>
+            </div>
+            <span className="text-sm text-gray-500">
+              {data.suggestions.length} pending
+            </span>
+          </div>
+
+          {data.suggestions.length === 0 ? (
+            <p className="text-gray-500 text-sm py-4 text-center">
+              No suggestions at this time
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {data.suggestions.slice(0, 5).map((suggestion) => (
+                <SuggestionCard key={suggestion.id} suggestion={suggestion} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recovery Statistics */}
+      <RecoveryStats stats={data.stats} />
+
+      {/* History Toggle */}
+      <button
+        onClick={() => setShowHistory(!showHistory)}
+        className="flex items-center gap-2 text-gray-400 hover:text-gray-300 transition-colors"
+      >
+        <History className="w-4 h-4" />
+        <span className="text-sm">{showHistory ? 'Hide' : 'Show'} Recovery History</span>
+        {showHistory ? (
+          <ChevronDown className="w-4 h-4" />
+        ) : (
+          <ChevronRight className="w-4 h-4" />
+        )}
+      </button>
+
+      {showHistory && <RecoveryHistory />}
+    </div>
+  );
+}
+
+// Sub-components
+
+function DaemonControlPanel({
+  daemon,
+  onAction,
+  actionLoading,
+}: {
+  daemon: DaemonStatus;
+  onAction: (action: 'start-daemon' | 'stop-daemon' | 'trigger-check') => void;
+  actionLoading: string | null;
+}) {
+  const isRunning = daemon.isRunning;
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div
+            className={`w-3 h-3 rounded-full ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}
+          />
+          <div>
+            <h3 className="text-lg font-medium text-white">Self-Healing Daemon</h3>
+            <p className="text-sm text-gray-400">
+              {isRunning ? (
+                <>
+                  Running • Last check:{' '}
+                  {daemon.lastCheck
+                    ? formatRelativeTime(new Date(daemon.lastCheck))
+                    : 'Never'}
+                </>
+              ) : (
+                'Stopped'
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isRunning ? (
+            <>
+              <button
+                onClick={() => onAction('trigger-check')}
+                disabled={actionLoading === 'trigger-check'}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700
+                           text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${actionLoading === 'trigger-check' ? 'animate-spin' : ''}`}
+                />
+                Check Now
+              </button>
+              <button
+                onClick={() => onAction('stop-daemon')}
+                disabled={actionLoading === 'stop-daemon'}
+                className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700
+                           text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Pause className="w-4 h-4" />
+                Stop
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => onAction('start-daemon')}
+              disabled={actionLoading === 'start-daemon'}
+              className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700
+                         text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Play className="w-4 h-4" />
+              Start Daemon
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Daemon Stats */}
+      {isRunning && (
+        <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-700">
+          <div>
+            <span className="text-sm text-gray-500">Interval</span>
+            <p className="text-white">{(daemon.intervalMs / 1000).toFixed(0)}s</p>
+          </div>
+          <div>
+            <span className="text-sm text-gray-500">Cycles</span>
+            <p className="text-white">{daemon.cycleCount}</p>
+          </div>
+          <div>
+            <span className="text-sm text-gray-500">Errors</span>
+            <p className={daemon.errorCount > 0 ? 'text-red-400' : 'text-white'}>
+              {daemon.errorCount}
+            </p>
+          </div>
+          <div>
+            <span className="text-sm text-gray-500">Started</span>
+            <p className="text-white">
+              {daemon.startedAt ? formatRelativeTime(new Date(daemon.startedAt)) : 'N/A'}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ApprovalCard({
+  item,
+  isExpanded,
+  onToggle,
+  onApprove,
+  onReject,
+  isLoading,
+}: {
+  item: ApprovalQueueItem;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+  isLoading: boolean;
+}) {
+  const riskConfig: Record<RiskLevel, { color: string; bg: string }> = {
+    safe: { color: 'text-green-400', bg: 'bg-green-900' },
+    moderate: { color: 'text-yellow-400', bg: 'bg-yellow-900' },
+    dangerous: { color: 'text-red-400', bg: 'bg-red-900' },
+  };
+
+  const risk = riskConfig[item.riskLevel] || riskConfig.moderate;
+
+  return (
+    <div className="bg-gray-700/50 rounded-lg overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-3 hover:bg-gray-700/70 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className={`text-xs px-2 py-0.5 rounded ${risk.bg} ${risk.color}`}>
+            {item.riskLevel}
+          </span>
+          <span className="text-white">{item.actionName}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-gray-500" />
+          <span className="text-sm text-gray-500">
+            {formatRelativeTime(new Date(item.requestedAt))}
+          </span>
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          )}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="px-3 pb-3 space-y-3">
+          <div className="text-sm">
+            <span className="text-gray-500">Service: </span>
+            <span className="text-gray-300">{item.serviceName}</span>
+          </div>
+          {item.reason && (
+            <div className="text-sm">
+              <span className="text-gray-500">Reason: </span>
+              <span className="text-gray-300">{item.reason}</span>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onApprove}
+              disabled={isLoading}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2
+                         bg-green-600 hover:bg-green-700 text-white rounded-lg
+                         transition-colors disabled:opacity-50"
+            >
+              <ThumbsUp className="w-4 h-4" />
+              Approve
+            </button>
+            <button
+              onClick={onReject}
+              disabled={isLoading}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2
+                         bg-red-600 hover:bg-red-700 text-white rounded-lg
+                         transition-colors disabled:opacity-50"
+            >
+              <ThumbsDown className="w-4 h-4" />
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SuggestionCard({ suggestion }: { suggestion: ClassificationSuggestion }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-gray-700/50 rounded-lg p-3">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-sm text-gray-300">{suggestion.serviceName}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Suggest: {suggestion.currentRiskLevel} → {suggestion.suggestedRiskLevel}
+          </p>
+        </div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-gray-400 hover:text-gray-300"
+        >
+          {expanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-2 pt-2 border-t border-gray-600">
+          <p className="text-xs text-gray-400">{suggestion.rationale}</p>
+          <div className="flex gap-2 mt-2">
+            <button className="text-xs text-green-400 hover:text-green-300">Apply</button>
+            <button className="text-xs text-gray-400 hover:text-gray-300">Dismiss</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecoveryStats({
+  stats,
+}: {
+  stats: { successRate: number | null; mttrSeconds: number | null; incidentCount: number };
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <CheckCircle className="w-4 h-4 text-green-400" />
+          <span className="text-sm text-gray-400">Success Rate</span>
+        </div>
+        <p
+          className={`text-2xl font-semibold ${
+            stats.successRate === null
+              ? 'text-gray-400'
+              : stats.successRate >= 90
+                ? 'text-green-400'
+                : stats.successRate >= 70
+                  ? 'text-yellow-400'
+                  : 'text-red-400'
+          }`}
+        >
+          {stats.successRate !== null ? `${stats.successRate}%` : 'N/A'}
+        </p>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Clock className="w-4 h-4 text-blue-400" />
+          <span className="text-sm text-gray-400">Avg Resolution</span>
+        </div>
+        <p className="text-2xl font-semibold text-blue-400">
+          {stats.mttrSeconds !== null ? formatDuration(stats.mttrSeconds) : 'N/A'}
+        </p>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Zap className="w-4 h-4 text-purple-400" />
+          <span className="text-sm text-gray-400">Total Incidents</span>
+        </div>
+        <p className="text-2xl font-semibold text-purple-400">{stats.incidentCount}</p>
+      </div>
+    </div>
+  );
+}
+
+function RecoveryHistory() {
+  const [history, setHistory] = useState<
+    Array<{
+      id: string;
+      actionName: string;
+      serviceName: string;
+      executedAt: Date;
+      success: boolean;
+      duration: number;
+    }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch('/api/system/stats');
+        if (!response.ok) throw new Error('Failed to fetch');
+        // For now, show empty - would need dedicated history endpoint
+        setHistory([]);
+      } catch (err) {
+        console.error('Failed to load history:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <RefreshCw className="w-5 h-5 text-gray-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="bg-gray-800 rounded-lg p-4 text-center">
+        <p className="text-gray-500 text-sm">No recovery actions in history</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <table className="w-full">
+        <thead className="bg-gray-700">
+          <tr>
+            <th className="px-4 py-2 text-left text-sm text-gray-400">Action</th>
+            <th className="px-4 py-2 text-left text-sm text-gray-400">Service</th>
+            <th className="px-4 py-2 text-left text-sm text-gray-400">Time</th>
+            <th className="px-4 py-2 text-left text-sm text-gray-400">Duration</th>
+            <th className="px-4 py-2 text-left text-sm text-gray-400">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.map((item) => (
+            <tr key={item.id} className="border-t border-gray-700">
+              <td className="px-4 py-2 text-gray-300">{item.actionName}</td>
+              <td className="px-4 py-2 text-gray-300">{item.serviceName}</td>
+              <td className="px-4 py-2 text-gray-500">
+                {formatRelativeTime(new Date(item.executedAt))}
+              </td>
+              <td className="px-4 py-2 text-gray-500">{item.duration}ms</td>
+              <td className="px-4 py-2">
+                {item.success ? (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-400" />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Helpers
+
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}m ${secs}s`;
+}

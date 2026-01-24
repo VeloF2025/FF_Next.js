@@ -780,9 +780,9 @@ export async function updateIncidentIndex(incident: Incident): Promise<{
 
   const newEntry: KBIndexEntry = {
     id: incident.id,
-    date: incident.createdAt.toISOString().split('T')[0],
+    date: incident.createdAt.toISOString().split('T')[0] || new Date().toISOString().split('T')[0] || '',
     service: serviceName,
-    issueType: incident.issueType,
+    issueType: incident.issueType || 'unknown',
     file: getIncidentFilename(incident),
   };
 

@@ -251,8 +251,8 @@ export async function checkServiceHealth(service: ServiceDefinition): Promise<He
       return checkSystemdHealth(service, '100.96.203.105', 'velo');
     case 'tcp':
       // Parse host:port from health endpoint
-      const [host, port] = (service.healthEndpoint || 'localhost:5432').split(':');
-      return checkTcpHealth(service, host, parseInt(port, 10));
+      const [tcpHost, tcpPort] = (service.healthEndpoint || 'localhost:5432').split(':');
+      return checkTcpHealth(service, tcpHost || 'localhost', parseInt(tcpPort || '5432', 10));
     case 'custom':
       // For database, use custom check
       if (service.category === 'database') {
@@ -645,6 +645,7 @@ export function stopDaemon(): void {
 export function getDaemonStatus(): DaemonStatus {
   return {
     running: isRunning,
+    isRunning,
     lastCheck: lastCheck || undefined,
     nextCheck: isRunning && lastCheck
       ? new Date(lastCheck.getTime() + DEFAULT_CONFIG.intervalMs)
@@ -652,6 +653,10 @@ export function getDaemonStatus(): DaemonStatus {
     checksPerformed,
     issuesDetected,
     autoFixesExecuted,
+    intervalMs: DEFAULT_CONFIG.intervalMs,
+    cycleCount: checksPerformed,
+    errorCount: issuesDetected,
+    startedAt: isRunning && lastCheck ? lastCheck : undefined,
   };
 }
 

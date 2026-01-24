@@ -10,8 +10,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/apiErrorHandler';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { serviceRegistry } from '@/modules/system/services/serviceRegistry';
+import type { ServiceCategory } from '@/modules/system/types/self-healing.types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -24,8 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case 'DELETE':
       return deleteService(req, res);
     default:
-      res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
-      return apiResponse.error(res, 'Method not allowed', 405);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   }
 }
 
@@ -35,7 +35,7 @@ async function getServices(req: NextApiRequest, res: NextApiResponse) {
   let services;
 
   if (category) {
-    services = await serviceRegistry.getServicesByCategory(category as string);
+    services = await serviceRegistry.getServicesByCategory(category as ServiceCategory);
   } else if (critical === 'true') {
     services = await serviceRegistry.getCriticalServices();
   } else if (enabled === 'true') {
@@ -75,7 +75,7 @@ async function createService(req: NextApiRequest, res: NextApiResponse) {
   } = req.body;
 
   if (!name || !category) {
-    return apiResponse.error(res, 'Name and category are required', 400);
+    return apiResponse.badRequest(res, 'Name and category are required');
   }
 
   const service = await serviceRegistry.createService({
@@ -92,14 +92,14 @@ async function createService(req: NextApiRequest, res: NextApiResponse) {
     cooldownMinutes: cooldownMinutes || 5,
   });
 
-  return apiResponse.success(res, service, 201);
+  return apiResponse.success(res, service, undefined, 201);
 }
 
 async function updateService(req: NextApiRequest, res: NextApiResponse) {
   const { id, ...updates } = req.body;
 
   if (!id) {
-    return apiResponse.error(res, 'Service ID is required', 400);
+    return apiResponse.badRequest(res, 'Service ID is required');
   }
 
   const service = await serviceRegistry.updateService(id, updates);
@@ -115,7 +115,7 @@ async function deleteService(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
-    return apiResponse.error(res, 'Service ID is required', 400);
+    return apiResponse.badRequest(res, 'Service ID is required');
   }
 
   const deleted = await serviceRegistry.deleteService(id);

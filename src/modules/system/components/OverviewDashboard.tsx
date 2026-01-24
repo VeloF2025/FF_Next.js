@@ -62,7 +62,7 @@ export default function OverviewDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div data-testid="loading-skeleton" className="flex items-center justify-center py-12">
         <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     );
@@ -71,7 +71,7 @@ export default function OverviewDashboard() {
   if (error || !data) {
     return (
       <div className="bg-red-900/20 border border-red-500 rounded-lg p-4">
-        <p className="text-red-400">{error || 'No data available'}</p>
+        <p className="text-red-400">Error loading data: {error || 'No data available'}</p>
       </div>
     );
   }
@@ -210,7 +210,9 @@ function OverallStatusBanner({
   return (
     <div className={`${config.bg} border ${config.border} rounded-lg p-4 flex items-center gap-3`}>
       <Icon className={`w-8 h-8 ${config.iconColor}`} />
-      <span className={`text-lg font-medium ${config.textColor}`}>{config.text}</span>
+      <span data-testid="overall-status" className={`text-lg font-medium ${config.textColor}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)} - {config.text}
+      </span>
     </div>
   );
 }

@@ -198,9 +198,10 @@ export interface ApprovalQueueItem {
   id: string;
   incidentId: string;
   actionId: string;
-  actionName?: string;
-  serviceName?: string;
-  riskLevel?: RiskLevel;
+  actionName: string;
+  serviceName: string;
+  riskLevel: RiskLevel;
+  reason?: string;
 
   // Request details
   requestedAt: Date;
@@ -277,10 +278,14 @@ export interface ClassificationSuggestion {
   id: string;
   actionId: string;
   actionName?: string;
+  serviceName?: string;
   currentLevel: RiskLevel;
   suggestedLevel: RiskLevel;
+  currentRiskLevel: RiskLevel; // Alias for UI
+  suggestedRiskLevel: RiskLevel; // Alias for UI
   suggestionType: SuggestionType;
   reason: string;
+  rationale: string; // Alias for UI
   overrideCount: number;
   status: SuggestionStatus;
   decidedBy?: string;
@@ -470,11 +475,18 @@ export interface MonitoringLoopConfig {
 
 export interface DaemonStatus {
   running: boolean;
+  isRunning: boolean;
   lastCheck?: Date;
   nextCheck?: Date;
   checksPerformed: number;
   issuesDetected: number;
   autoFixesExecuted: number;
+
+  // Extended properties
+  intervalMs: number;
+  cycleCount: number;
+  errorCount: number;
+  startedAt?: Date;
 }
 
 // ============================================

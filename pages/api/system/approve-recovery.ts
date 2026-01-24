@@ -7,8 +7,8 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole, getSession } from '@/lib/auth';
-import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/apiErrorHandler';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { recoveryService } from '@/modules/system/services/recoveryService';
 import { escalationService } from '@/modules/system/services/escalationService';
 
@@ -19,8 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case 'POST':
       return processDecision(req, res);
     default:
-      res.setHeader('Allow', ['GET', 'POST']);
-      return apiResponse.error(res, 'Method not allowed', 405);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
@@ -51,11 +50,11 @@ async function processDecision(req: NextApiRequest, res: NextApiResponse) {
   const session = await getSession(req, res);
 
   if (!pendingId) {
-    return apiResponse.error(res, 'Pending ID is required', 400);
+    return apiResponse.badRequest(res, 'Pending ID is required');
   }
 
   if (!action || !['approve', 'reject'].includes(action)) {
-    return apiResponse.error(res, 'Action must be "approve" or "reject"', 400);
+    return apiResponse.badRequest(res, 'Action must be "approve" or "reject"');
   }
 
   const decidedBy = session?.user?.id || 'unknown';

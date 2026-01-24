@@ -7,7 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/apiErrorHandler';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { incidentLearningService } from '@/modules/system/services/incidentLearning';
 import { escalationService } from '@/modules/system/services/escalationService';
 import { healthDaemon } from '@/modules/system/services/healthDaemon';
@@ -15,8 +15,7 @@ import { db } from '@/lib/db';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return apiResponse.error(res, 'Method not allowed', 405);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   const { period } = req.query;

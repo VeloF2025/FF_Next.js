@@ -11,8 +11,9 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import AppLayout from '@/components/layout/AppLayout';
-import { useAuth } from '@/context/AuthContext';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { useAuth } from '@/contexts/AuthContext';
+import { Permission } from '@/types/auth.types';
 import OverviewDashboard from '@/modules/system/components/OverviewDashboard';
 import InfrastructureDashboard from '@/modules/system/components/InfrastructureDashboard';
 import SelfHealingDashboard from '@/modules/system/components/SelfHealingDashboard';
@@ -37,7 +38,7 @@ export default function SystemHealthHub() {
   const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Check permissions
-  const hasAccess = hasPermission('system.health') || user?.role === 'super_admin';
+  const hasAccess = hasPermission(Permission.SYSTEM_ADMIN) || user?.role === 'super_admin';
 
   // Handle URL tab parameter
   useEffect(() => {

@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/apiErrorHandler';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { healthDaemon } from '@/modules/system/services/healthDaemon';
 import { recoveryService } from '@/modules/system/services/recoveryService';
 import { escalationService } from '@/modules/system/services/escalationService';
@@ -22,8 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case 'POST':
       return handleAction(req, res);
     default:
-      res.setHeader('Allow', ['GET', 'POST']);
-      return apiResponse.error(res, 'Method not allowed', 405);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
@@ -95,7 +94,7 @@ async function handleAction(req: NextApiRequest, res: NextApiResponse) {
 
     case 'trigger-recovery':
       if (!serviceId || !incidentId) {
-        return apiResponse.error(res, 'serviceId and incidentId required', 400);
+        return apiResponse.badRequest(res, 'serviceId and incidentId required');
       }
       const result = await recoveryService.triggerRecovery(serviceId, incidentId);
       return apiResponse.success(res, result);
@@ -108,7 +107,7 @@ async function handleAction(req: NextApiRequest, res: NextApiResponse) {
       });
 
     default:
-      return apiResponse.error(res, 'Invalid action', 400);
+      return apiResponse.badRequest(res, 'Invalid action');
   }
 }
 
