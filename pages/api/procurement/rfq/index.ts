@@ -3,6 +3,7 @@ import type { RFQStatusType } from '../../../../src/types/procurement/rfq.types'
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse, ErrorCode } from '../../../../src/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
 // API response interface for RFQ (different from database schema type)
 interface RFQApiResponse {
@@ -37,7 +38,7 @@ interface RFQApiResponse {
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -386,4 +387,4 @@ export default withErrorHandler(async (
   } else {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
-})
+}))

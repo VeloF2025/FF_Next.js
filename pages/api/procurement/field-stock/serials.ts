@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import {
   getSerials,
   registerSerial,
@@ -15,7 +16,7 @@ import {
 } from '@/modules/procurement/field-stock/services/serialService';
 import type { RegisterSerialInput, SerialFilters, SerialStatus } from '@/modules/procurement/field-stock/types';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
       // Special case: get available serials for an item
@@ -71,3 +72,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

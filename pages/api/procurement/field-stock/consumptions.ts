@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import {
   getConsumptions,
   recordConsumption,
@@ -16,7 +17,7 @@ import {
 } from '@/modules/procurement/field-stock/services/consumptionService';
 import type { RecordConsumptionInput, ConsumptionFilters, JobType } from '@/modules/procurement/field-stock/types';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
       // Special case: get consumptions for a drop
@@ -90,3 +91,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

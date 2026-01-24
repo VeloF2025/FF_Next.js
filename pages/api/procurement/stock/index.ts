@@ -3,6 +3,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 // API response interface for stock items
 interface StockItemResponse {
@@ -30,7 +31,7 @@ interface StockItemResponse {
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -184,4 +185,4 @@ export default withErrorHandler(async (
   } else {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
-})
+}))

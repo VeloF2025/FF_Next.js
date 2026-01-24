@@ -9,10 +9,11 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { StockCategory, StockCategoryFormData } from '@/types/procurement/category.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -179,3 +180,5 @@ function buildCategoryTree(categories: StockCategory[]) {
 
   return roots;
 }
+
+export default withAuth(handler);

@@ -3,13 +3,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
@@ -287,3 +288,5 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: strin
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

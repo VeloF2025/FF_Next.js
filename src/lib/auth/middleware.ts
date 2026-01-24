@@ -21,10 +21,11 @@ export interface AuthenticatedNextApiRequest extends NextApiRequest {
   sessionId: string;
 }
 
-type AuthenticatedHandler = (
-  req: AuthenticatedNextApiRequest,
-  res: NextApiResponse
-) => Promise<void> | void;
+// Handler type that accepts both NextApiRequest and AuthenticatedNextApiRequest
+// This allows handlers wrapped in withErrorHandler (which use NextApiRequest) to work with withAuth
+// Using 'any' return type for flexibility with different response patterns
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AuthenticatedHandler = (req: NextApiRequest, res: NextApiResponse<any>) => any;
 
 /**
  * Extract token from request (cookie or Authorization header)
@@ -58,11 +59,15 @@ async function getUserById(userId: string): Promise<AuthUser | null> {
   if (result.length === 0) return null;
 
   const row = result[0];
+  const firstName = row.first_name || '';
+  const lastName = row.last_name || '';
   return {
     id: row.id,
+    userId: row.id, // Alias for backwards compatibility
     email: row.email,
-    firstName: row.first_name || '',
-    lastName: row.last_name || '',
+    firstName,
+    lastName,
+    name: `${firstName} ${lastName}`.trim() || row.email, // Full name or email as fallback
     role: row.role as AuthRole,
     permissions: row.permissions || [],
     isActive: row.is_active,

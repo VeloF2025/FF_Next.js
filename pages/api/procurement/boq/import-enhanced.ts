@@ -11,6 +11,7 @@ import fs from 'fs';
 import { apiResponse } from '@/lib/apiResponse';
 import { createBOQImportEnhanced, ImportOptions } from '@/services/procurement/import';
 import type { BOQImportResult } from '@/types/procurement/material-catalog.types';
+import { withAuth } from '@/lib/auth';
 
 // Disable body parser for file upload
 export const config = {
@@ -21,7 +22,7 @@ export const config = {
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -119,3 +120,5 @@ function parseForm(
     });
   });
 }
+
+export default withAuth(handler);

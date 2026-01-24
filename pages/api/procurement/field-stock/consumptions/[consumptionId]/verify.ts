@@ -7,8 +7,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { verifyConsumption } from '@/modules/procurement/field-stock/services/consumptionService';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { consumptionId } = req.query;
 
   if (!consumptionId || typeof consumptionId !== 'string') {
@@ -33,3 +34,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

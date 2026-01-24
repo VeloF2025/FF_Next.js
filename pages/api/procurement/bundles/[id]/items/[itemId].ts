@@ -10,10 +10,11 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { StockBundleItemFormData } from '@/types/procurement/bundle.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -99,3 +100,5 @@ async function handleDelete(bundleId: string, itemId: string, res: NextApiRespon
 
   return apiResponse.success(res, { message: 'Item removed from bundle' });
 }
+
+export default withAuth(handler);

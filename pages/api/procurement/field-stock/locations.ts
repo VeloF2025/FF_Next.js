@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import {
   getLocations,
   createLocation,
@@ -14,7 +15,7 @@ import {
 } from '@/modules/procurement/field-stock/services/locationService';
 import type { CreateLocationInput, LocationFilters, LocationType } from '@/modules/procurement/field-stock/types';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
       // Parse query parameters for filters
@@ -64,3 +65,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

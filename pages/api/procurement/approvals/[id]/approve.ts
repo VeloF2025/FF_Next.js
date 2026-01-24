@@ -4,10 +4,11 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -76,7 +77,7 @@ export default withErrorHandler(async (
   } catch (error) {
     return apiResponse.databaseError(res, error, 'Failed to approve request');
   }
-});
+}));
 
 async function updateDocumentStatus(
   documentType: string,

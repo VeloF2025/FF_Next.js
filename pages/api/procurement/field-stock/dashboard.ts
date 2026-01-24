@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -36,7 +37,7 @@ interface DashboardSummary {
   };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== 'GET') {
       return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
@@ -156,3 +157,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

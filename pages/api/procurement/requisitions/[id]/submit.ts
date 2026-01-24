@@ -3,10 +3,11 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logUpdate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
+import { withAuth } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -120,4 +121,4 @@ export default withErrorHandler(async (
   } catch (error) {
     return apiResponse.databaseError(res, error, 'Failed to submit requisition');
   }
-});
+}));

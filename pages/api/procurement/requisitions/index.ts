@@ -7,15 +7,16 @@ import type {
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
-  const { userId } = getAuth(req);
+  // Get user ID from authenticated request (withAuth attaches user to req)
+  const userId = (req as AuthenticatedNextApiRequest).user?.id || 'system';
 
   if (req.method === 'GET') {
     try {
@@ -199,4 +200,4 @@ export default withErrorHandler(async (
   } else {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
-});
+}));

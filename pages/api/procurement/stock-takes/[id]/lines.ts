@@ -8,10 +8,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -81,3 +82,5 @@ async function handleInitialize(stockTakeId: string, status: string, res: NextAp
     items_added: itemsAdded
   });
 }
+
+export default withAuth(handler);

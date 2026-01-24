@@ -6,6 +6,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -18,7 +19,7 @@ interface ConvertToPORequest {
   itemIds?: string[]; // Optional: specific items to include, default all
 }
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -266,4 +267,4 @@ export default withErrorHandler(async (
     log.error('Failed to convert requisition to PO', error);
     return apiResponse.databaseError(res, error, 'Failed to convert requisition to PO');
   }
-});
+}));

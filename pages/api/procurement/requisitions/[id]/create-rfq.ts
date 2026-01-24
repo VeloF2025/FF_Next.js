@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -9,7 +10,7 @@ const sql = createLoggedSql(process.env.DATABASE_URL!);
  * POST /api/procurement/requisitions/[id]/create-rfq
  * Creates an RFQ from a requisition, copying over the items
  */
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -159,4 +160,4 @@ export default withErrorHandler(async (
   } catch (error: any) {
     return apiResponse.databaseError(res, error, 'Failed to create RFQ from requisition');
   }
-});
+}));

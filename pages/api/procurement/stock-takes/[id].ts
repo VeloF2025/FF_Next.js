@@ -10,10 +10,11 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { StockTakeFormData } from '@/types/procurement/stockTake.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -115,3 +116,5 @@ async function handleDelete(id: string, res: NextApiResponse) {
 
   return apiResponse.success(res, { message: 'Stock take deleted successfully' });
 }
+
+export default withAuth(handler);

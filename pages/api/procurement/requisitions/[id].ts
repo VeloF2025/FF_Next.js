@@ -4,10 +4,11 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { neon } from '@neondatabase/serverless';
 import { logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -150,4 +151,4 @@ export default withErrorHandler(async (
   } else {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
   }
-});
+}));

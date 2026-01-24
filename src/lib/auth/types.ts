@@ -5,9 +5,13 @@
 
 export interface AuthUser {
   id: string;
+  /** @deprecated Use `id` instead */
+  userId: string; // Alias for id for backwards compatibility
   email: string;
   firstName: string;
   lastName: string;
+  /** Full name (firstName + lastName) */
+  name: string;
   role: AuthRole;
   permissions: string[];
   isActive: boolean;

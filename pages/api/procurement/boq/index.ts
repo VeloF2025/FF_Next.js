@@ -3,11 +3,12 @@ import type { BOQItem } from '../../../../src/types/procurement/boq.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -238,4 +239,4 @@ export default withErrorHandler(async (
   } else {
     res.status(405).json({ error: 'Method not allowed' });
   }
-})
+}))
