@@ -173,10 +173,10 @@ async function fixSingleDR(
       const notFoundError = result.error?.toLowerCase().includes('not found');
 
       if (notFoundError) {
-        // Move to needs_investigation - DR doesn't exist in 1Map
+        // Move to not_found - DR doesn't exist in 1Map
         await client.query(
           `UPDATE olt_mismatch_records
-           SET fix_status = 'needs_investigation',
+           SET fix_status = 'not_found',
                fix_attempted_at = NOW(),
                fix_result = $1
            WHERE drop_number = $2
