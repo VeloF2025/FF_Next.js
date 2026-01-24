@@ -213,8 +213,11 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
       setDocSyncResult(data.data);
       onSyncComplete?.();
 
-      // Show toast for document sync
+      // Show FibreFlow-style toast for document sync with detailed stats
       const docResult = data.data as DocSyncResult;
+      const hasNewDocs = docResult.downloaded > 0;
+      const hasErrors = docResult.errors.length > 0;
+
       toast.custom(
         (t) => (
           <div
@@ -225,10 +228,12 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0 pt-0.5">
-                  {docResult.success ? (
+                  {docResult.success && !hasErrors ? (
                     <CheckCircle className="h-10 w-10 text-green-500" />
-                  ) : (
+                  ) : hasErrors ? (
                     <AlertTriangle className="h-10 w-10 text-yellow-500" />
+                  ) : (
+                    <CheckCircle className="h-10 w-10 text-green-500" />
                   )}
                 </div>
                 <div className="ml-3 flex-1">
@@ -236,17 +241,39 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                     Document Sync Complete
                   </p>
                   <div className="mt-2 space-y-1">
+                    {/* Total in Smartsheet */}
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
                       <FileDown className="h-4 w-4 text-blue-500" />
-                      <span>{docResult.totalAttachments.toLocaleString()} documents processed</span>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>{docResult.totalAttachments.toLocaleString()} total in Smartsheet</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                      <ArrowUpDown className="h-4 w-4 text-purple-500" />
-                      <span className="text-blue-600">{docResult.downloaded} downloaded</span>
-                      <span className="text-green-600">{docResult.uploaded} uploaded</span>
-                      <span className="text-purple-600">{docResult.linked} linked</span>
-                    </div>
+                    {/* New documents synced */}
+                    {hasNewDocs ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-green-600 font-medium">
+                          +{docResult.linked} new documents synced
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <CheckCircle className="h-4 w-4 text-gray-400" />
+                        <span>No new documents to sync</span>
+                      </div>
+                    )}
+                    {/* Already synced */}
+                    {docResult.skipped > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <Database className="h-4 w-4 text-gray-400" />
+                        <span>{docResult.skipped.toLocaleString()} already synced</span>
+                      </div>
+                    )}
+                    {/* Errors */}
+                    {hasErrors && (
+                      <div className="flex items-center gap-2 text-sm text-red-600">
+                        <XCircle className="h-4 w-4" />
+                        <span>{docResult.errors.length} failed</span>
+                      </div>
+                    )}
                   </div>
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     Duration: {(docResult.duration_ms / 1000).toFixed(1)}s
@@ -264,7 +291,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
             </div>
           </div>
         ),
-        { duration: 6000 }
+        { duration: 8000 }
       );
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Document sync failed';
