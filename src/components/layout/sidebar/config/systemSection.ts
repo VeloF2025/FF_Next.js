@@ -16,12 +16,12 @@ export const systemSection: NavSection = {
   isCollapsible: true,
   items: [
     {
-      to: '/activate/monitoring',
+      to: '/system/health',
       icon: HeartPulse,
-      label: 'System Health',
+      label: 'System Health Hub',
       shortLabel: 'Health',
-      permissions: [],
-      rbacKey: 'activate.monitoring',
+      permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'system.health',
     },
     {
       to: '/system/infrastructure',
