@@ -109,6 +109,21 @@ export default function OltReportPage() {
   const [bulkFixing, setBulkFixing] = useState(false);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
 
+  // Import detail state
+  const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
+  const [importDetail, setImportDetail] = useState<{
+    import: ImportRecord;
+    records: OltRecord[];
+    activityLog: Array<{
+      drop_number: string;
+      event_type: string;
+      event_data: Record<string, unknown>;
+      created_at: string;
+    }>;
+    stats: { total: number; fixed: number; pending: number; empty: number };
+  } | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
   // Fetch data based on active tab
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -288,6 +303,33 @@ export default function OltReportPage() {
       (r) => (r.fix_status === 'pending' || r.comparison_status === 'mismatch') && r.olt_serial
     );
     setSelectedRecords(new Set(pending.map((r) => r.id)));
+  };
+
+  // Fetch import detail for audit view
+  const fetchImportDetail = async (importId: string) => {
+    setLoadingDetail(true);
+    setSelectedImportId(importId);
+    try {
+      const res = await fetch(`/api/system/olt-report/${importId}`);
+      const data = await res.json();
+      if (data.success) {
+        setImportDetail(data.data);
+      } else {
+        alert('Failed to load import details');
+        setSelectedImportId(null);
+      }
+    } catch {
+      alert('Failed to load import details');
+      setSelectedImportId(null);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Close import detail modal
+  const closeImportDetail = () => {
+    setSelectedImportId(null);
+    setImportDetail(null);
   };
 
   // Render tabs
@@ -754,11 +796,17 @@ export default function OltReportPage() {
                   </tr>
                 ) : (
                   imports.map((imp) => (
-                    <tr key={imp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <tr
+                      key={imp.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                      onClick={() => fetchImportDetail(imp.id)}
+                    >
                       <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                         <span className="flex items-center gap-2">
                           <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                          {imp.filename}
+                          <span className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {imp.filename}
+                          </span>
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
@@ -791,6 +839,182 @@ export default function OltReportPage() {
           </div>
         )}
       </div>
+
+      {/* Import Detail Modal */}
+      {selectedImportId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Import Audit Trail
+                </h2>
+                {importDetail && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {importDetail.import.filename}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={closeImportDetail}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <XCircle className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-6">
+              {loadingDetail ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+                  <span className="ml-2 text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              ) : importDetail ? (
+                <div className="space-y-6">
+                  {/* Stats */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {importDetail.stats.total}
+                      </div>
+                      <div className="text-sm text-gray-500">Total Mismatches</div>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {importDetail.stats.fixed}
+                      </div>
+                      <div className="text-sm text-green-600 dark:text-green-400">Fixed</div>
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {importDetail.stats.pending}
+                      </div>
+                      <div className="text-sm text-red-600 dark:text-red-400">Pending</div>
+                    </div>
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                        {importDetail.stats.empty}
+                      </div>
+                      <div className="text-sm text-yellow-600 dark:text-yellow-400">Empty ONT</div>
+                    </div>
+                  </div>
+
+                  {/* Records Table */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+                      Mismatch Records ({importDetail.records.length})
+                    </h3>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">DR</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ONT (Correct)</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">1Map (Wrong)</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Old Value</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fixed At</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {importDetail.records.map((rec) => (
+                            <tr key={rec.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">
+                                {rec.drop_number}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-green-600 dark:text-green-400">
+                                {rec.olt_serial || '-'}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-red-600 dark:text-red-400">
+                                {rec.wrong_onemap_serial || '-'}
+                              </td>
+                              <td className="px-3 py-2">
+                                {rec.fix_status === 'fixed' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Fixed
+                                  </span>
+                                ) : rec.fix_status === 'empty_serial' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Empty
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                    <Clock className="h-3 w-3" />
+                                    Pending
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-gray-500">
+                                {rec.fix_old_value || '-'}
+                              </td>
+                              <td className="px-3 py-2 text-gray-500 text-xs">
+                                {rec.fix_status === 'fixed' && rec.onemap_fix_at
+                                  ? new Date(rec.onemap_fix_at).toLocaleString()
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Activity Log */}
+                  {importDetail.activityLog.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+                        Activity Log ({importDetail.activityLog.length})
+                      </h3>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">DR</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Event</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {importDetail.activityLog.map((log, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <td className="px-3 py-2 text-xs text-gray-500">
+                                  {new Date(log.created_at).toLocaleString()}
+                                </td>
+                                <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">
+                                  {log.drop_number}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
+                                    log.event_type === 'SERIAL_UPDATE'
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                  }`}>
+                                    {log.event_type}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                                  {(log.event_data as { details?: string; message?: string })?.details ||
+                                   (log.event_data as { message?: string })?.message ||
+                                   JSON.stringify(log.event_data)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
