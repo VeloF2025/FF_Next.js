@@ -105,9 +105,9 @@ export default function OverviewDashboard() {
         />
         <StatCard
           label="Pending Approvals"
-          value={pendingApprovals.length.toString()}
+          value={(pendingApprovals?.length || 0).toString()}
           icon={Bell}
-          color={pendingApprovals.length > 0 ? 'yellow' : 'gray'}
+          color={(pendingApprovals?.length || 0) > 0 ? 'yellow' : 'gray'}
         />
       </div>
 
@@ -116,13 +116,13 @@ export default function OverviewDashboard() {
         <div className="bg-gray-800 rounded-lg p-4">
           <h3 className="text-lg font-medium text-white mb-4">Service Status</h3>
           <div className="grid grid-cols-2 gap-2">
-            {health.services.slice(0, 10).map((service) => (
+            {(health.services || []).slice(0, 10).map((service) => (
               <ServiceStatusCard key={service.serviceId} service={service} />
             ))}
           </div>
-          {health.services.length > 10 && (
+          {(health.services?.length || 0) > 10 && (
             <p className="text-sm text-gray-500 mt-2">
-              +{health.services.length - 10} more services
+              +{(health.services?.length || 0) - 10} more services
             </p>
           )}
         </div>
@@ -131,10 +131,10 @@ export default function OverviewDashboard() {
         <div className="bg-gray-800 rounded-lg p-4">
           <h3 className="text-lg font-medium text-white mb-4">Recent Activity</h3>
           <div className="space-y-3">
-            {recentActivity.slice(0, 8).map((event) => (
+            {(recentActivity || []).slice(0, 8).map((event) => (
               <ActivityItem key={event.id} event={event} />
             ))}
-            {recentActivity.length === 0 && (
+            {(recentActivity?.length || 0) === 0 && (
               <p className="text-gray-500 text-sm">No recent activity</p>
             )}
           </div>
@@ -142,7 +142,7 @@ export default function OverviewDashboard() {
       </div>
 
       {/* Pending Approvals */}
-      {pendingApprovals.length > 0 && (
+      {(pendingApprovals?.length || 0) > 0 && (
         <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-5 h-5 text-yellow-400" />
@@ -151,7 +151,7 @@ export default function OverviewDashboard() {
             </h3>
           </div>
           <ul className="space-y-1">
-            {pendingApprovals.slice(0, 5).map((item) => (
+            {(pendingApprovals || []).slice(0, 5).map((item) => (
               <li key={item.id} className="text-gray-300 text-sm">
                 • {item.actionName}
               </li>

@@ -41,7 +41,12 @@ async function getDashboard(req: NextApiRequest, res: NextApiResponse) {
       total_services as services_checked,
       healthy_count,
       down_count,
-      created_at
+      created_at,
+      apps,
+      ai_services,
+      messaging,
+      databases,
+      infrastructure
     FROM system_health_logs
     ORDER BY created_at DESC
     LIMIT 1
@@ -50,6 +55,35 @@ async function getDashboard(req: NextApiRequest, res: NextApiResponse) {
   const latestLog = Array.isArray(daemonStatusResult)
     ? daemonStatusResult[0]
     : daemonStatusResult?.rows?.[0];
+
+  // Extract services from the health log JSON columns
+  const extractServices = (log: Record<string, unknown> | null) => {
+    if (!log) return [];
+    const services: Array<{
+      serviceId: string;
+      serviceName: string;
+      status: string;
+      responseTimeMs: number | null;
+    }> = [];
+
+    const categories = ['apps', 'ai_services', 'messaging', 'databases', 'infrastructure'];
+    for (const cat of categories) {
+      const items = log[cat] as Array<{ name: string; status: string; latency_ms?: number }> | null;
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          services.push({
+            serviceId: item.name?.replace(/\s+/g, '-').toLowerCase() || 'unknown',
+            serviceName: item.name || 'Unknown',
+            status: item.status || 'unknown',
+            responseTimeMs: item.latency_ms ?? null,
+          });
+        }
+      }
+    }
+    return services;
+  };
+
+  const services = extractServices(latestLog);
 
   // Determine if daemon is running (active if last check within 2 minutes)
   const isRunning = latestLog
@@ -181,6 +215,7 @@ async function getDashboard(req: NextApiRequest, res: NextApiResponse) {
       healthyCount: latestLog?.healthy_count || 0,
       unhealthyCount: latestLog?.down_count || 0,
       criticalDown: (latestLog?.down_count || 0) > 0,
+      services,
     },
     daemon: {
       isRunning,
