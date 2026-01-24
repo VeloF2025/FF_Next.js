@@ -10,7 +10,7 @@ import {
   ChangePasswordRequest,
   ROLE_PERMISSIONS,
 } from '@/types/auth.types';
-import { handleAuthError, resetAuthErrorHandler } from '@/lib/authErrorHandler';
+import { resetAuthErrorHandler } from '@/lib/authErrorHandler';
 
 interface AuthContextType {
   // Legacy properties for backward compatibility
@@ -146,28 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Reset the redirect handler when component mounts (in case of page reload after redirect)
     resetAuthErrorHandler();
-
-    // Set up global fetch interceptor for 401 handling
-    const originalFetch = window.fetch;
-    window.fetch = async function (...args) {
-      const response = await originalFetch.apply(this, args);
-
-      // Handle 401 responses globally (except for auth endpoints)
-      if (response.status === 401) {
-        const url = typeof args[0] === 'string' ? args[0] : args[0] instanceof Request ? args[0].url : '';
-        // Don't redirect for auth check endpoints (they're expected to return 401 when not logged in)
-        if (!url.includes('/api/auth/me') && !url.includes('/api/auth/check-email')) {
-          handleAuthError();
-        }
-      }
-
-      return response;
-    };
-
-    // Cleanup: restore original fetch on unmount
-    return () => {
-      window.fetch = originalFetch;
-    };
   }, [checkAuth]);
 
   // Legacy sign in method

@@ -2,12 +2,13 @@
  * Global Auth Error Handler
  *
  * Handles 401 errors by redirecting to sign-in page with return URL.
- * Can be used with fetch, axios, or any HTTP client.
+ * Sets up a global fetch interceptor when imported.
  */
 
 import toast from 'react-hot-toast';
 
 let isRedirecting = false;
+let interceptorInstalled = false;
 
 /**
  * Handle authentication error (401) by showing a message and redirecting to sign-in
@@ -82,4 +83,35 @@ export function checkAuthResponse(response: Response): boolean {
  */
 export function resetAuthErrorHandler() {
   isRedirecting = false;
+}
+
+/**
+ * Install the global fetch interceptor
+ * Safe to call multiple times - only installs once
+ */
+export function installAuthInterceptor() {
+  if (typeof window === 'undefined' || interceptorInstalled) return;
+
+  interceptorInstalled = true;
+  const originalFetch = window.fetch;
+
+  window.fetch = async function (...args) {
+    const response = await originalFetch.apply(this, args);
+
+    // Handle 401 responses globally (except for auth endpoints)
+    if (response.status === 401) {
+      const url = typeof args[0] === 'string' ? args[0] : args[0] instanceof Request ? args[0].url : '';
+      // Don't redirect for auth check endpoints (they're expected to return 401 when not logged in)
+      if (!url.includes('/api/auth/me') && !url.includes('/api/auth/check-email')) {
+        handleAuthError();
+      }
+    }
+
+    return response;
+  };
+}
+
+// Auto-install when this module is imported on the client side
+if (typeof window !== 'undefined') {
+  installAuthInterceptor();
 }

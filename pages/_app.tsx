@@ -10,6 +10,8 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { reportWebVitals } from '@/lib/performance';
 import { initErrorTracking } from '@/lib/errorTracking';
 import { VersionChecker } from '@/components/VersionChecker';
+// Install global 401 interceptor early - this import sets up the fetch interceptor
+import '@/lib/authErrorHandler';
 
 // Export for Next.js Web Vitals
 export { reportWebVitals };
