@@ -10,7 +10,7 @@
 
 ```
 Endpoint: POST https://www.1map.co.za/api/apps/app/attributes
-Layer ID: 5121 (Fibertime Installations)
+Layer ID: 5121 (Home Installation - Aerial)
 Field: ph_ont (ONT Barcode)
 ```
 
