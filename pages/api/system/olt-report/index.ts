@@ -79,13 +79,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let paramIndex = 1;
 
     if (view === 'pending') {
+      // Fixable: Has correct ONT serial from OLT report (column B)
+      // wrong_onemap_serial (column V) is optional - just for audit
       conditions.push(`m.fix_status = 'pending'`);
       conditions.push(`m.olt_serial IS NOT NULL`);
-      conditions.push(`m.wrong_onemap_serial IS NOT NULL`);
+      conditions.push(`m.olt_serial != ''`);
     } else if (view === 'needs_investigation') {
-      // Records that need manual investigation (no wrong serial)
+      // Records with no correct serial to upload - need manual investigation
       conditions.push(`m.fix_status = 'pending'`);
-      conditions.push(`(m.wrong_onemap_serial IS NULL OR m.olt_serial IS NULL)`);
+      conditions.push(`(m.olt_serial IS NULL OR m.olt_serial = '')`)
     } else if (view === 'fixed') {
       conditions.push(`m.fix_status = 'fixed'`);
     } else if (view === 'empty') {
@@ -139,10 +141,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const totalCount = Number(countResult.rows[0].count);
 
     // Get summary stats from olt_mismatch_records
+    // Fixable = has correct ONT serial (olt_serial from column B)
+    // Investigate = no correct serial to upload
     const statsResult = await client.query(`
       SELECT
-        COUNT(*) FILTER (WHERE fix_status = 'pending' AND olt_serial IS NOT NULL AND wrong_onemap_serial IS NOT NULL) as pending,
-        COUNT(*) FILTER (WHERE fix_status = 'pending' AND (wrong_onemap_serial IS NULL OR olt_serial IS NULL)) as needs_investigation,
+        COUNT(*) FILTER (WHERE fix_status = 'pending' AND olt_serial IS NOT NULL AND olt_serial != '') as pending,
+        COUNT(*) FILTER (WHERE fix_status = 'pending' AND (olt_serial IS NULL OR olt_serial = '')) as needs_investigation,
         COUNT(*) FILTER (WHERE fix_status = 'fixed') as fixed,
         COUNT(*) FILTER (WHERE fix_status = 'empty_serial') as empty,
         COUNT(*) as total
