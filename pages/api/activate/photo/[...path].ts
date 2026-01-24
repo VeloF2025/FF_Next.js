@@ -1,22 +1,24 @@
 /**
  * API Route: /api/activate/photo/[drNumber]/[filename]
  *
- * Purpose: Proxy photos from VPS photo viewer to external clients
+ * Purpose: Proxy photos from backend servers to external clients
  * Method: GET
  *
- * This solves the issue where the browser can't access http://72.61.197.178:8866
- * from https://dev.fibreflow.app (mixed content blocking / CORS)
+ * This solves mixed content blocking / CORS issues when browsers can't access
+ * internal photo servers directly from https://dev.fibreflow.app
  *
- * Photo storage: /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
- * VPS viewer URL: http://72.61.197.178:8866/photos/{DR}/{filename}
+ * Routing logic based on filename:
+ * - WA photos (wa_*) → VPS:8866 /photos/{DR}/{filename}
+ * - 1Map photos → Velocity:8003 /api/photo/{DR}/{filename}
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 
-// VPS photo viewer endpoint (serves photos from /var/lib/docker/volumes/boss-vps_dr_photos/_data/)
+// Photo server endpoints
 const VPS_PHOTO_API = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
+const VELOCITY_PHOTO_API = process.env.VELOCITY_PHOTO_URL || 'http://100.96.203.105:8003';
 
 async function handler(
   req: NextApiRequest,
@@ -46,9 +48,21 @@ async function handler(
       return res.status(400).json({ error: 'Invalid filename' });
     }
 
-    // Fetch from VPS photo viewer (serves /var/lib/docker/volumes/boss-vps_dr_photos/_data/)
-    const photoUrl = `${VPS_PHOTO_API}/photos/${drNumber}/${filename}`;
-    log.info(`[PhotoProxy] Fetching: ${photoUrl}`);
+    // Route based on filename pattern:
+    // - WA photos (wa_*) → VPS photo viewer
+    // - 1Map photos → Velocity photo server
+    const isWaPhoto = filename.toLowerCase().startsWith('wa_');
+
+    let photoUrl: string;
+    if (isWaPhoto) {
+      // WA photos stored on VPS: /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
+      photoUrl = `${VPS_PHOTO_API}/photos/${drNumber}/${filename}`;
+    } else {
+      // 1Map photos served by Velocity photo server
+      photoUrl = `${VELOCITY_PHOTO_API}/api/photo/${drNumber}/${filename}`;
+    }
+
+    log.info(`[PhotoProxy] Fetching ${isWaPhoto ? 'WA' : '1Map'} photo: ${photoUrl}`);
 
     const response = await fetch(photoUrl);
 
