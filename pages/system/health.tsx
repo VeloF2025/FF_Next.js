@@ -17,6 +17,7 @@ import { Permission } from '@/types/auth.types';
 import OverviewDashboard from '@/modules/system/components/OverviewDashboard';
 import InfrastructureDashboard from '@/modules/system/components/InfrastructureDashboard';
 import SelfHealingDashboard from '@/modules/system/components/SelfHealingDashboard';
+import { QFieldDashboard } from '@/modules/system/qfield/QFieldDashboard';
 import { Activity, Server, GitBranch, Bot, RefreshCw, AlertTriangle } from 'lucide-react';
 import type { DashboardTab } from '@/modules/system/types/self-healing.types';
 
@@ -163,7 +164,7 @@ export default function SystemHealthHub() {
         <div key={lastRefresh.getTime()}>
           {activeTab === 'overview' && <OverviewDashboard />}
           {activeTab === 'infrastructure' && <InfrastructureDashboard />}
-          {activeTab === 'qfield' && <QFieldPlaceholder />}
+          {activeTab === 'qfield' && <QFieldDashboard />}
           {activeTab === 'self-healing' && <SelfHealingDashboard />}
         </div>
       </div>
@@ -171,21 +172,3 @@ export default function SystemHealthHub() {
   );
 }
 
-// Placeholder for QField tab (existing functionality)
-function QFieldPlaceholder() {
-  return (
-    <div className="bg-gray-800 rounded-lg p-6 text-center">
-      <GitBranch className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-white mb-2">QField Sync Status</h3>
-      <p className="text-gray-400 mb-4">
-        QField synchronization monitoring coming soon.
-      </p>
-      <a
-        href="/admin/qfield-sync"
-        className="text-blue-400 hover:text-blue-300"
-      >
-        View existing QField admin →
-      </a>
-    </div>
-  );
-}
