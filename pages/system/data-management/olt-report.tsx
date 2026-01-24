@@ -108,6 +108,13 @@ export default function OltReportPage() {
   // Fix state
   const [fixing, setFixing] = useState<string | null>(null);
   const [bulkFixing, setBulkFixing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    current: number;
+    total: number;
+    success: number;
+    failed: number;
+    currentDR: string;
+  } | null>(null);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
 
   // Import detail state
@@ -236,7 +243,7 @@ export default function OltReportPage() {
     }
   };
 
-  // Handle bulk fix
+  // Handle bulk fix - processes one record at a time to avoid timeouts
   const handleBulkFix = async () => {
     const selected = records.filter(
       (r) => selectedRecords.has(r.id) && r.olt_serial
@@ -247,42 +254,80 @@ export default function OltReportPage() {
       return;
     }
 
-    if (!confirm(`Fix ${selected.length} records in 1Map?`)) {
+    if (!confirm(`Fix ${selected.length} records in 1Map?\n\nRecords will be processed one at a time.`)) {
       return;
     }
 
     setBulkFixing(true);
+    setBulkProgress({
+      current: 0,
+      total: selected.length,
+      success: 0,
+      failed: 0,
+      currentDR: '',
+    });
 
-    try {
-      const res = await fetch('/api/system/olt-report/fix-1map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bulk: true,
-          items: selected.map((r) => ({
-            drNumber: r.drop_number,
-            correctSerial: r.olt_serial,
-            wrongSerial: r.onemap_serial,
-          })),
-        }),
+    let successCount = 0;
+    let failCount = 0;
+    const failedDRs: string[] = [];
+
+    // Process one at a time to avoid timeout issues
+    for (let i = 0; i < selected.length; i++) {
+      const record = selected[i];
+
+      setBulkProgress({
+        current: i + 1,
+        total: selected.length,
+        success: successCount,
+        failed: failCount,
+        currentDR: record.drop_number,
       });
 
-      const data = await res.json();
-      const result = data.data || data;
+      try {
+        const res = await fetch('/api/system/olt-report/fix-1map', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            drNumber: record.drop_number,
+            correctSerial: record.olt_serial,
+            wrongSerial: record.wrong_onemap_serial || record.onemap_serial,
+          }),
+        });
 
-      alert(
-        `Bulk fix complete:\n` +
-          `Success: ${result.successCount}\n` +
-          `Failed: ${result.failCount}`
-      );
+        const data = await res.json();
+        const result = data.data || data;
 
-      setSelectedRecords(new Set());
-      fetchData();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Bulk fix failed');
-    } finally {
-      setBulkFixing(false);
+        if (result.success) {
+          successCount++;
+        } else {
+          failCount++;
+          failedDRs.push(`${record.drop_number}: ${result.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        failCount++;
+        failedDRs.push(`${record.drop_number}: ${err instanceof Error ? err.message : 'Request failed'}`);
+      }
+
+      // Small delay between requests to be nice to 1Map
+      if (i < selected.length - 1) {
+        await new Promise((r) => setTimeout(r, 500));
+      }
     }
+
+    setBulkProgress(null);
+    setBulkFixing(false);
+    setSelectedRecords(new Set());
+
+    // Show results
+    let message = `Bulk fix complete:\n✅ Success: ${successCount}\n❌ Failed: ${failCount}`;
+    if (failedDRs.length > 0 && failedDRs.length <= 10) {
+      message += `\n\nFailed records:\n${failedDRs.join('\n')}`;
+    } else if (failedDRs.length > 10) {
+      message += `\n\nFirst 10 failed records:\n${failedDRs.slice(0, 10).join('\n')}\n... and ${failedDRs.length - 10} more`;
+    }
+    alert(message);
+
+    fetchData();
   };
 
   // Toggle record selection
@@ -546,29 +591,52 @@ export default function OltReportPage() {
         {(activeTab === 'pending' || activeTab === 'needs_investigation') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             {/* Bulk Actions - only for fixable pending */}
-            {activeTab === 'pending' && selectedRecords.size > 0 && (
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-orange-50 dark:bg-orange-900/20 flex items-center gap-4">
-                <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
-                  {selectedRecords.size} selected
-                </span>
-                <button
-                  onClick={handleBulkFix}
-                  disabled={bulkFixing}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 disabled:opacity-50"
-                >
-                  {bulkFixing ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Wrench className="h-4 w-4" />
-                  )}
-                  Fix Selected in 1Map
-                </button>
-                <button
-                  onClick={() => setSelectedRecords(new Set())}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
-                >
-                  Clear
-                </button>
+            {activeTab === 'pending' && (selectedRecords.size > 0 || bulkProgress) && (
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-orange-50 dark:bg-orange-900/20">
+                {bulkProgress ? (
+                  // Progress indicator during bulk fix
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                        Processing {bulkProgress.current} of {bulkProgress.total}...
+                      </span>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        ✅ {bulkProgress.success} | ❌ {bulkProgress.failed}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>Fixing {bulkProgress.currentDR}...</span>
+                    </div>
+                  </div>
+                ) : (
+                  // Selection controls
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                      {selectedRecords.size} selected
+                    </span>
+                    <button
+                      onClick={handleBulkFix}
+                      disabled={bulkFixing}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      <Wrench className="h-4 w-4" />
+                      Fix Selected in 1Map
+                    </button>
+                    <button
+                      onClick={() => setSelectedRecords(new Set())}
+                      className="text-sm text-gray-600 dark:text-gray-400 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
