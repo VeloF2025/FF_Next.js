@@ -129,7 +129,7 @@ export function ReportsDashboard() {
   // The Dashboard tab still auto-refreshes via ActivateDataContext.
 
   // Quick filter handlers
-  type QuickFilterType = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'last7days' | 'last30days';
+  type QuickFilterType = 'today' | 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'last7days' | 'last30days' | 'all';
 
   const handleQuickFilter = (filter: QuickFilterType) => {
     const todayStr = getTodaySAST();
@@ -202,6 +202,15 @@ export function ReportsDashboard() {
         });
         break;
       }
+      case 'all': {
+        // Set to earliest possible date (2020-01-01) to today
+        setFilters({
+          ...filters,
+          dateFrom: '2020-01-01',
+          dateTo: todayStr,
+        });
+        break;
+      }
     }
   };
 
@@ -249,6 +258,7 @@ export function ReportsDashboard() {
     if (filters.dateFrom === thisMonthStr && filters.dateTo === todayStr) return 'thisMonth';
     if (filters.dateFrom === last7Str && filters.dateTo === todayStr) return 'last7days';
     if (filters.dateFrom === last30Str && filters.dateTo === todayStr) return 'last30days';
+    if (filters.dateFrom === '2020-01-01' && filters.dateTo === todayStr) return 'all';
 
     return null;
   };
@@ -314,6 +324,7 @@ export function ReportsDashboard() {
                 { key: 'thisMonth', label: 'This Month' },
                 { key: 'last7days', label: '7 Days' },
                 { key: 'last30days', label: '30 Days' },
+                { key: 'all', label: 'All' },
               ] as const
             ).map(({ key, label }) => (
               <button
