@@ -5,8 +5,13 @@
  * detects issues, classifies them, and triggers appropriate recovery actions.
  */
 
-import { db } from '@/lib/db';
 import { log } from '@/lib/logger';
+
+// Use dynamic import to avoid bundling issues
+async function getDb() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import type {
@@ -217,7 +222,8 @@ export async function checkDatabaseHealth(): Promise<HealthCheckResult> {
   const serviceId = '00000000-0000-0000-0000-000000000008'; // Neon DB service ID
 
   try {
-    const result = await db.query('SELECT 1 as health_check');
+    const db = await getDb();
+  const result = await db.query('SELECT 1 as health_check');
     const responseTimeMs = Date.now() - startTime;
 
     return {
@@ -363,6 +369,7 @@ export async function getAggregatedHealth(): Promise<AggregatedHealth> {
  * Store health check result in database
  */
 export async function storeHealthCheck(result: HealthCheckResult): Promise<void> {
+  const db = await getDb();
   await db.query(
     `
     INSERT INTO system_health_logs (
@@ -394,6 +401,7 @@ export async function getHealthHistory(
   serviceId: string,
   limit: number = 100
 ): Promise<HealthCheckResult[]> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -480,6 +488,7 @@ export async function detectIssue(
  * Create an incident from detected issue
  */
 export async function createIncident(input: IncidentInput): Promise<Incident> {
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO infrastructure_incidents (
@@ -524,6 +533,7 @@ export async function createIncident(input: IncidentInput): Promise<Incident> {
  * Get active (unresolved) incident for a service
  */
 export async function getActiveIncident(serviceId: string): Promise<Incident | null> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT

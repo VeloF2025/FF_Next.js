@@ -5,8 +5,13 @@
  * Manages service definitions, recovery actions, and provides query functions.
  */
 
-import { db } from '@/lib/db';
 import { log } from '@/lib/logger';
+
+// Use dynamic import to avoid bundling issues
+async function getDb() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 import type {
   ServiceDefinition,
   ServiceCategory,
@@ -23,6 +28,7 @@ import type {
  * Get all registered services
  */
 export async function getAllServices(): Promise<ServiceDefinition[]> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT
       id,
@@ -50,6 +56,7 @@ export async function getAllServices(): Promise<ServiceDefinition[]> {
  * Get enabled services only
  */
 export async function getEnabledServices(): Promise<ServiceDefinition[]> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT
       id,
@@ -78,6 +85,7 @@ export async function getEnabledServices(): Promise<ServiceDefinition[]> {
  * Get critical services only
  */
 export async function getCriticalServices(): Promise<ServiceDefinition[]> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT
       id,
@@ -106,6 +114,7 @@ export async function getCriticalServices(): Promise<ServiceDefinition[]> {
  * Get service by ID
  */
 export async function getServiceById(id: string): Promise<ServiceDefinition | null> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -136,6 +145,7 @@ export async function getServiceById(id: string): Promise<ServiceDefinition | nu
  * Get services by category
  */
 export async function getServicesByCategory(category: ServiceCategory): Promise<ServiceDefinition[]> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -175,6 +185,7 @@ export async function createService(service: Omit<ServiceDefinition, 'id' | 'cre
     throw new Error('Service category is required');
   }
 
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO infrastructure_services (
@@ -237,6 +248,7 @@ export async function updateService(
     return null;
   }
 
+  const db = await getDb();
   const result = await db.query(
     `
     UPDATE infrastructure_services SET
@@ -293,6 +305,7 @@ export async function updateService(
  * Delete a service
  */
 export async function deleteService(id: string): Promise<boolean> {
+  const db = await getDb();
   const result = await db.query(
     `DELETE FROM infrastructure_services WHERE id = $1 RETURNING id`,
     [id]
@@ -313,6 +326,7 @@ export async function deleteService(id: string): Promise<boolean> {
  * Get all recovery actions for a service
  */
 export async function getRecoveryActions(serviceId: string): Promise<RecoveryAction[]> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -354,6 +368,7 @@ export async function getRecoveryActions(serviceId: string): Promise<RecoveryAct
  * Get recovery action by ID
  */
 export async function getRecoveryActionById(id: string): Promise<RecoveryAction | null> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -394,6 +409,7 @@ export async function getRecoveryActionById(id: string): Promise<RecoveryAction 
  * Get safe recovery actions for a service (for auto-execution)
  */
 export async function getSafeRecoveryActions(serviceId: string): Promise<RecoveryAction[]> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -454,6 +470,7 @@ export async function createRecoveryAction(input: RecoveryActionInput): Promise<
   // Set requires_approval based on risk level if not specified
   const requiresApproval = input.requiresApproval ?? (input.riskLevel !== 'safe');
 
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO recovery_actions (
@@ -524,6 +541,7 @@ export async function updateRecoveryAction(
     return null;
   }
 
+  const db = await getDb();
   const result = await db.query(
     `
     UPDATE recovery_actions SET
@@ -586,6 +604,7 @@ export async function updateRecoveryAction(
  * Delete a recovery action
  */
 export async function deleteRecoveryAction(id: string): Promise<boolean> {
+  const db = await getDb();
   const result = await db.query(
     `DELETE FROM recovery_actions WHERE id = $1 RETURNING id`,
     [id]
@@ -602,6 +621,7 @@ export async function deleteRecoveryAction(id: string): Promise<boolean> {
  * Update action risk level
  */
 export async function updateActionRiskLevel(id: string, newLevel: RiskLevel): Promise<boolean> {
+  const db = await getDb();
   const result = await db.query(
     `
     UPDATE recovery_actions SET
@@ -629,6 +649,7 @@ export async function updateActionRiskLevel(id: string, newLevel: RiskLevel): Pr
  * Get service count by category
  */
 export async function getServiceCountByCategory(): Promise<Record<ServiceCategory, number>> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT category, COUNT(*) as count
     FROM infrastructure_services
@@ -655,6 +676,7 @@ export async function getServiceCountByCategory(): Promise<Record<ServiceCategor
  * Check if service has recovery enabled
  */
 export async function isRecoveryEnabled(serviceId: string): Promise<boolean> {
+  const db = await getDb();
   const result = await db.query(
     `SELECT recovery_enabled FROM infrastructure_services WHERE id = $1`,
     [serviceId]
@@ -674,6 +696,7 @@ export async function getNextRecoveryAction(
     ? `AND id NOT IN (${attemptedActionIds.map((_, i) => `$${i + 2}`).join(', ')})`
     : '';
 
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT

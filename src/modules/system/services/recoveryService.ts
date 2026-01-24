@@ -5,8 +5,13 @@
  * Safe actions auto-execute, moderate/dangerous require HITL approval.
  */
 
-import { db } from '@/lib/db';
 import { log } from '@/lib/logger';
+
+// Use dynamic import to avoid bundling issues
+async function getDb() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import type {
@@ -387,6 +392,7 @@ async function queueForApproval(
   const approvalToken = `approve-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const tokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO recovery_approval_queue (
@@ -417,6 +423,7 @@ async function queueForApproval(
  * Get pending approvals
  */
 export async function getPendingApprovals(): Promise<ApprovalQueueItem[]> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT
       q.id,
@@ -456,6 +463,7 @@ export async function approveAction(
   reason?: string
 ): Promise<ActionExecutionResult> {
   // Get the queue item
+  const db = await getDb();
   const queueResult = await db.query(
     `SELECT * FROM recovery_approval_queue WHERE id = $1 AND status = 'pending'`,
     [queueId]
@@ -538,6 +546,7 @@ export async function rejectAction(
   decidedBy: string,
   reason?: string
 ): Promise<boolean> {
+  const db = await getDb();
   const queueResult = await db.query(
     `SELECT * FROM recovery_approval_queue WHERE id = $1 AND status = 'pending'`,
     [queueId]
@@ -620,6 +629,7 @@ async function recordExecution(
   result: ActionExecutionResult
 ): Promise<void> {
   // Get attempt number
+  const db = await getDb();
   const countResult = await db.query(
     `SELECT COUNT(*) as count FROM incident_actions WHERE incident_id = $1`,
     [incidentId]

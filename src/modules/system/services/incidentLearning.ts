@@ -6,8 +6,13 @@
  * and exports learnings to knowledge base files.
  */
 
-import { db } from '@/lib/db';
 import { log } from '@/lib/logger';
+
+// Use dynamic import to avoid bundling issues
+async function getDb() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 import * as fs from 'fs';
 import * as path from 'path';
 import type {
@@ -49,6 +54,7 @@ const KB_BASE_PATH = '.claude/knowledge-base/incidents';
  * Track successful action execution
  */
 export async function trackSuccess(actionId: string, incidentId: string): Promise<void> {
+  const db = await getDb();
   await db.query(
     `
     UPDATE recovery_actions SET
@@ -72,6 +78,7 @@ export async function trackFailure(
   incidentId: string,
   errorMessage?: string
 ): Promise<void> {
+  const db = await getDb();
   await db.query(
     `
     UPDATE recovery_actions SET
@@ -91,6 +98,7 @@ export async function trackFailure(
  * Get success rate for an action
  */
 export async function getSuccessRate(actionId: string): Promise<number | null> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT success_count, failure_count
@@ -118,6 +126,7 @@ export async function trackResolutionTime(
   resolvedAt: Date
 ): Promise<void> {
   // Get incident creation time
+  const db = await getDb();
   const result = await db.query(
     `SELECT created_at FROM infrastructure_incidents WHERE id = $1`,
     [incidentId]
@@ -146,6 +155,7 @@ export async function trackResolutionTime(
  * Track attempt count for an incident
  */
 export async function trackAttempts(incidentId: string): Promise<{ attemptCount: number }> {
+  const db = await getDb();
   const result = await db.query(
     `SELECT COUNT(*) as count FROM incident_actions WHERE incident_id = $1`,
     [incidentId]
@@ -162,6 +172,7 @@ export async function getResolutionMethod(incidentId: string): Promise<{
   actionName: string;
   attemptNumber: number;
 } | null> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -188,6 +199,7 @@ export async function getResolutionMethod(incidentId: string): Promise<{
  * Get consecutive counts for an action
  */
 export async function getConsecutiveCounts(actionId: string): Promise<ConsecutiveCounts | null> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -313,6 +325,7 @@ export async function promoteRiskLevel(
   oldLevel: RiskLevel,
   newLevel: RiskLevel
 ): Promise<{ success: boolean; oldLevel: RiskLevel; newLevel: RiskLevel; eventLogged: boolean }> {
+  const db = await getDb();
   await db.query(
     `
     UPDATE recovery_actions SET
@@ -338,6 +351,7 @@ export async function demoteRiskLevel(
   oldLevel: RiskLevel,
   newLevel: RiskLevel
 ): Promise<{ success: boolean; oldLevel: RiskLevel; newLevel: RiskLevel; eventLogged: boolean }> {
+  const db = await getDb();
   await db.query(
     `
     UPDATE recovery_actions SET
@@ -358,6 +372,7 @@ export async function demoteRiskLevel(
  * Set auto-adjust enabled/disabled
  */
 export async function setAutoAdjustEnabled(actionId: string, enabled: boolean): Promise<void> {
+  const db = await getDb();
   await db.query(
     `UPDATE recovery_actions SET auto_adjust_enabled = $2 WHERE id = $1`,
     [actionId, enabled]
@@ -372,6 +387,7 @@ export async function setAutoAdjustEnabled(actionId: string, enabled: boolean): 
  * Record human override
  */
 export async function recordOverride(input: OverrideInput): Promise<RecoveryOverride> {
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO recovery_overrides (
@@ -411,6 +427,7 @@ export async function recordOverride(input: OverrideInput): Promise<RecoveryOver
  * Get override history for an action
  */
 export async function getOverrideHistory(actionId: string): Promise<OverrideHistory> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -439,7 +456,8 @@ async function checkForSuggestion(actionId: string): Promise<void> {
 
   // Check for demotion suggestion (many approvals)
   if (history.approvals >= DEFAULT_THRESHOLDS.approvalToDemote && action.riskLevel !== 'safe') {
-    const existingResult = await db.query(
+    const db = await getDb();
+  const existingResult = await db.query(
       `SELECT id FROM classification_suggestions WHERE action_id = $1 AND status = 'pending'`,
       [actionId]
     );
@@ -454,7 +472,8 @@ async function checkForSuggestion(actionId: string): Promise<void> {
 
   // Check for promotion suggestion (many rejections)
   if (history.rejections >= DEFAULT_THRESHOLDS.rejectionToPromote && action.riskLevel !== 'dangerous') {
-    const existingResult = await db.query(
+    const db = await getDb();
+  const existingResult = await db.query(
       `SELECT id FROM classification_suggestions WHERE action_id = $1 AND status = 'pending'`,
       [actionId]
     );
@@ -493,6 +512,7 @@ export async function createClassificationSuggestion(
     overrideCount = history.rejections;
   }
 
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO classification_suggestions (
@@ -533,6 +553,7 @@ export async function createClassificationSuggestion(
  * Get pending suggestions
  */
 export async function getSuggestions(status?: string): Promise<ClassificationSuggestion[]> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -567,6 +588,7 @@ export async function applySuggestion(
   suggestionId: string,
   appliedBy: string
 ): Promise<{ success: boolean; actionId: string; oldLevel: RiskLevel; newLevel: RiskLevel; appliedBy: string }> {
+  const db = await getDb();
   const suggestion = await db.query(
     `SELECT * FROM classification_suggestions WHERE id = $1 AND status = 'pending'`,
     [suggestionId]
@@ -612,6 +634,7 @@ export async function dismissSuggestion(
   dismissedBy: string,
   reason?: string
 ): Promise<{ success: boolean; suggestionId: string; dismissedBy: string; reason?: string; logged: boolean }> {
+  const db = await getDb();
   await db.query(
     `
     UPDATE classification_suggestions SET
@@ -664,7 +687,8 @@ export async function exportIncidentToKB(incident: Incident): Promise<KBExportRe
     }
 
     // Get actions attempted
-    const actionsResult = await db.query(
+    const db = await getDb();
+  const actionsResult = await db.query(
       `
       SELECT
         ra.action_name as name,
@@ -816,6 +840,7 @@ export async function updateIncidentIndex(incident: Incident): Promise<{
  * Get overall success rate
  */
 export async function getOverallSuccessRate(): Promise<SuccessRate> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT
       SUM(success_count) as total_success,
@@ -847,6 +872,7 @@ export async function getServiceSuccessRate(serviceId: string): Promise<{
 }> {
   const service = await serviceRegistry.getServiceById(serviceId);
 
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -874,6 +900,7 @@ export async function getServiceSuccessRate(serviceId: string): Promise<{
  * Get Mean Time To Resolution
  */
 export async function getMTTR(): Promise<MTTR> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT
       AVG(time_to_resolve_seconds) as avg_time,
@@ -901,6 +928,7 @@ export async function getMTTR(): Promise<MTTR> {
  * Get common failure types
  */
 export async function getCommonFailures(limit: number = 5): Promise<CommonFailure[]> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -929,6 +957,7 @@ export async function getCommonFailures(limit: number = 5): Promise<CommonFailur
  */
 export async function getImprovingActions(): Promise<ActionTrend[]> {
   // Compare last 7 days vs previous 7 days
+  const db = await getDb();
   const result = await db.query(`
     WITH recent AS (
       SELECT action_id, COUNT(*) as total, SUM(CASE WHEN success THEN 1 ELSE 0 END) as successes
@@ -968,6 +997,7 @@ export async function getImprovingActions(): Promise<ActionTrend[]> {
  * Get actions with declining success rates
  */
 export async function getDecliningActions(): Promise<ActionTrend[]> {
+  const db = await getDb();
   const result = await db.query(`
     WITH recent AS (
       SELECT action_id, COUNT(*) as total, SUM(CASE WHEN success THEN 1 ELSE 0 END) as successes
@@ -1007,6 +1037,7 @@ export async function getDecliningActions(): Promise<ActionTrend[]> {
  * Get stats by time range
  */
 export async function getStatsByTimeRange(from: Date, to: Date): Promise<TimeRangeStats> {
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT

@@ -5,8 +5,13 @@
  * Supports dashboard, WhatsApp, and email channels.
  */
 
-import { db } from '@/lib/db';
 import { log } from '@/lib/logger';
+
+// Use dynamic import to avoid bundling issues
+async function getDb() {
+  const { db } = await import('@/lib/db');
+  return db;
+}
 import type {
   EscalationLevel,
   EscalationChannel,
@@ -101,6 +106,7 @@ export async function isAlertSuppressed(serviceId: string): Promise<{
 }> {
   const now = new Date();
 
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT reason
@@ -133,6 +139,7 @@ export async function isDuplicateAlert(
 ): Promise<boolean> {
   const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
 
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT COUNT(*) as count
@@ -186,6 +193,7 @@ function recordAlertForRateLimit(serviceId: string): void {
  * Create alert suppression
  */
 export async function createSuppression(input: SuppressionInput): Promise<AlertSuppression> {
+  const db = await getDb();
   const result = await db.query(
     `
     INSERT INTO alert_suppressions (
@@ -223,6 +231,7 @@ export async function createSuppression(input: SuppressionInput): Promise<AlertS
 export async function getActiveSuppressions(): Promise<AlertSuppression[]> {
   const now = new Date();
 
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT
@@ -247,6 +256,7 @@ export async function getActiveSuppressions(): Promise<AlertSuppression[]> {
  * Delete suppression
  */
 export async function deleteSuppression(id: string): Promise<boolean> {
+  const db = await getDb();
   const result = await db.query(
     `DELETE FROM alert_suppressions WHERE id = $1 RETURNING id`,
     [id]
@@ -487,6 +497,7 @@ export async function getApprovalQueue(filters?: {
 
   query += ` ORDER BY q.escalation_level DESC, q.requested_at ASC`;
 
+  const db = await getDb();
   const result = await db.query(query, params);
 
   return result.rows.map((row) => ({
@@ -503,6 +514,7 @@ export async function getApprovalQueue(filters?: {
  * Get pending approval count
  */
 export async function getPendingCount(): Promise<number> {
+  const db = await getDb();
   const result = await db.query(`
     SELECT COUNT(*) as count
     FROM recovery_approval_queue
@@ -516,6 +528,7 @@ export async function getPendingCount(): Promise<number> {
  * Expire old pending approvals
  */
 export async function expireOldApprovals(): Promise<number> {
+  const db = await getDb();
   const result = await db.query(`
     UPDATE recovery_approval_queue SET
       status = 'auto_expired'
@@ -541,6 +554,7 @@ export async function processWhatsAppResponse(
   fromNumber: string
 ): Promise<{ success: boolean; error?: string }> {
   // Find pending item by token prefix
+  const db = await getDb();
   const result = await db.query(
     `
     SELECT id, token_expires_at
