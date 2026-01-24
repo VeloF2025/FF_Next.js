@@ -79,7 +79,6 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [ageFilter, setAgeFilter] = useState<string>('all');
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -90,19 +89,6 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
       if (filters.project) params.set('project', filters.project);
       params.set('page', page.toString());
       params.set('limit', '25');
-
-      // Age filter
-      if (ageFilter === 'under7') {
-        params.set('maxDays', '7');
-      } else if (ageFilter === '7to14') {
-        params.set('minDays', '7');
-        params.set('maxDays', '14');
-      } else if (ageFilter === '14to30') {
-        params.set('minDays', '14');
-        params.set('maxDays', '30');
-      } else if (ageFilter === 'over30') {
-        params.set('minDays', '30');
-      }
 
       const response = await fetch(`/api/activate/reporting/installation-gaps?${params}`);
       if (!response.ok) throw new Error('Failed to fetch installation gaps');
@@ -116,7 +102,7 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
     }
     // refreshKey is intentionally included to trigger refetch on parent refresh
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.project, page, ageFilter, refreshKey]);
+  }, [filters.project, page, refreshKey]);
 
   useEffect(() => {
     fetchData();
@@ -125,7 +111,7 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters.project, ageFilter]);
+  }, [filters.project]);
 
   if (isLoading) {
     return (
@@ -244,29 +230,6 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
           </div>
         </div>
       )}
-
-      {/* Age Filter */}
-      <div className="flex gap-2">
-        {[
-          { value: 'under7', label: '< 7 days' },
-          { value: '7to14', label: '7-14 days' },
-          { value: '14to30', label: '14-30 days' },
-          { value: 'over30', label: '30+ days' },
-          { value: 'all', label: 'All' },
-        ].map((option) => (
-          <button
-            key={option.value}
-            onClick={() => setAgeFilter(option.value)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              ageFilter === option.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
 
       {/* Data Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
