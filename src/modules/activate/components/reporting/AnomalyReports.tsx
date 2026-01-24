@@ -80,8 +80,10 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
 
         switch (activeSubReport) {
           case 'discrepancy': {
+            // Use same date for both WA and OES - compare same day submissions vs activations
+            // (Previously defaulted oesDate to waDate+1, which caused missing data when today's OES wasn't imported)
             const res = await fetch(
-              `/api/activate/reporting/discrepancy?waDate=${filters.dateFrom}${filters.project ? `&project=${filters.project}` : ''}`
+              `/api/activate/reporting/discrepancy?waDate=${filters.dateFrom}&oesDate=${filters.dateFrom}${filters.project ? `&project=${filters.project}` : ''}`
             );
             if (!res.ok) throw new Error('Failed to fetch discrepancy report');
             setDiscrepancyData(await res.json());
