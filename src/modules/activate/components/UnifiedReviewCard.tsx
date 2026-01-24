@@ -19,17 +19,19 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useUnifiedReview } from '../hooks/useUnifiedReview';
 import { STEP_LABELS } from '../types/unified.types';
 import type { UnifiedReview } from '../types/unified.types';
 import { PhotoGalleryUnified } from './PhotoGalleryUnified';
+import { WAPhotosGallery, type WAPhoto } from './WAPhotosGallery';
 import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
 import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
 import { MaintenanceTab } from '@/modules/maintenance/components/MaintenanceTab';
+import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench } from 'lucide-react';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
@@ -351,19 +353,45 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
 
 /**
  * Tab 2: Photos
- * Photo gallery with step grouping and fetch capability
+ * Unified photo gallery with three expandable sections:
+ * - Installation (OneMap photos)
+ * - Group (WA serial photos from activation groups)
+ * - Maintenance (WA photos from maintenance groups)
  */
 interface PhotosTabProps {
   review: UnifiedReview;
   onRefresh?: () => void;
 }
 
+interface MaintenancePhoto {
+  id: string;
+  original_filename: string | null;
+  mime_type: string;
+  sharepoint_url: string | null;
+  upload_status: string;
+  photo_index: number;
+  created_at: string;
+}
+
 function PhotosTab({ review, onRefresh }: PhotosTabProps) {
   const [isFetching, setIsFetching] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Expanded sections state - all expanded by default
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(['installation', 'group', 'maintenance'])
+  );
+
+  // WA Group photos state
+  const [waPhotos, setWaPhotos] = useState<WAPhoto[]>([]);
+  const [waPhotosLoading, setWaPhotosLoading] = useState(true);
+
+  // Maintenance photos state
+  const [maintenancePhotos, setMaintenancePhotos] = useState<MaintenancePhoto[]>([]);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+
   // Convert photos_metadata to Photo[] format for PhotoGalleryUnified
-  const photos = (review.photos_metadata || []).map((photo: any) => ({
+  const installationPhotos = (review.photos_metadata || []).map((photo: any) => ({
     filename: photo.filename,
     step: photo.step || 0,
     url: photo.url,
@@ -371,18 +399,69 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
     modified: photo.modified,
   }));
 
+  // Fetch WA Group photos
+  useEffect(() => {
+    async function fetchWAPhotos() {
+      setWaPhotosLoading(true);
+      try {
+        const response = await fetch(`/api/activate/wa-photos?dropNumber=${review.drop_number}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.photos) {
+            setWaPhotos(data.data.photos);
+          }
+        }
+      } catch {
+        // Silent fail - photos just won't show
+      } finally {
+        setWaPhotosLoading(false);
+      }
+    }
+    fetchWAPhotos();
+  }, [review.drop_number]);
+
+  // Fetch Maintenance photos
+  useEffect(() => {
+    async function fetchMaintenancePhotos() {
+      setMaintenanceLoading(true);
+      try {
+        const response = await fetch(`/api/maintenance/wa-messages?drop_number=${review.drop_number}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.photos) {
+            setMaintenancePhotos(data.data.photos);
+          }
+        }
+      } catch {
+        // Silent fail
+      } finally {
+        setMaintenanceLoading(false);
+      }
+    }
+    fetchMaintenancePhotos();
+  }, [review.drop_number]);
+
   // Check data completeness
-  const hasPhotos = photos.length > 0;
+  const hasPhotos = installationPhotos.length > 0;
   const hasOntSerial = !!review.ont_serial_scanned;
   const hasUpsSerial = !!review.ups_serial_scanned;
   const isDataIncomplete = !hasPhotos || (!hasOntSerial && !hasUpsSerial);
+
+  const toggleSection = (section: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(section)) {
+      newExpanded.delete(section);
+    } else {
+      newExpanded.add(section);
+    }
+    setExpandedSections(newExpanded);
+  };
 
   const handleFetchPhotos = async () => {
     setIsFetching(true);
     setFetchError(null);
 
     try {
-      // Use ensure-data endpoint for comprehensive refresh
       const response = await fetch('/api/activate/ensure-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -394,13 +473,66 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
         throw new Error(data.error?.message || 'Failed to fetch data');
       }
 
-      // Refresh the review to get updated data
       onRefresh?.();
     } catch (error) {
       setFetchError(error instanceof Error ? error.message : 'Failed to fetch data');
     } finally {
       setIsFetching(false);
     }
+  };
+
+  // Section configurations
+  type SectionColor = 'green' | 'blue' | 'orange';
+  const sections: Array<{
+    id: string;
+    label: string;
+    icon: typeof MapPin;
+    color: SectionColor;
+    count: number;
+    loading: boolean;
+  }> = [
+    {
+      id: 'installation',
+      label: 'Installation',
+      icon: MapPin,
+      color: 'green',
+      count: installationPhotos.length,
+      loading: false,
+    },
+    {
+      id: 'group',
+      label: 'Group',
+      icon: MessageCircle,
+      color: 'blue',
+      count: waPhotos.length,
+      loading: waPhotosLoading,
+    },
+    {
+      id: 'maintenance',
+      label: 'Maintenance',
+      icon: Wrench,
+      color: 'orange',
+      count: maintenancePhotos.length,
+      loading: maintenanceLoading,
+    },
+  ];
+
+  const colorClasses: Record<SectionColor, { bg: string; text: string; border: string }> = {
+    green: {
+      bg: 'bg-green-100 dark:bg-green-900/30',
+      text: 'text-green-800 dark:text-green-200',
+      border: 'border-green-200 dark:border-green-800',
+    },
+    blue: {
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-800 dark:text-blue-200',
+      border: 'border-blue-200 dark:border-blue-800',
+    },
+    orange: {
+      bg: 'bg-orange-100 dark:bg-orange-900/30',
+      text: 'text-orange-800 dark:text-orange-200',
+      border: 'border-orange-200 dark:border-orange-800',
+    },
   };
 
   return (
@@ -415,7 +547,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                 Data Incomplete
               </h4>
               <p className="text-sm text-amber-700 dark:text-amber-300 mb-3">
-                {!hasPhotos && 'No photos loaded. '}
+                {!hasPhotos && 'No installation photos loaded. '}
                 {!hasOntSerial && !hasUpsSerial && 'No serial numbers synced. '}
                 Data may still be syncing from OneMap.
               </p>
@@ -426,12 +558,12 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
               >
                 {isFetching ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
                     <span>Refreshing from OneMap...</span>
                   </>
                 ) : (
                   <>
-                    <span>🔄</span>
+                    <RefreshCw className="h-4 w-4" />
                     <span>Refresh Data from OneMap</span>
                   </>
                 )}
@@ -461,34 +593,6 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
         </div>
       </div>
 
-      {/* Fetch Photos Header */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {photos.length > 0
-            ? `${photos.length} photos loaded from ${review.photo_source || 'unknown source'}`
-            : 'No photos loaded yet'}
-        </div>
-        {!isDataIncomplete && (
-          <button
-            onClick={handleFetchPhotos}
-            disabled={isFetching}
-            className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-          >
-            {isFetching ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span>Refreshing...</span>
-              </>
-            ) : (
-              <>
-                <span>🔄</span>
-                <span>Refresh from OneMap</span>
-              </>
-            )}
-          </button>
-        )}
-      </div>
-
       {/* Error Message */}
       {fetchError && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
@@ -496,12 +600,162 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
         </div>
       )}
 
-      {/* Photo Gallery */}
-      <PhotoGalleryUnified
-        photos={photos}
-        source={review.photo_source as any}
-        groupByStep={true}
-      />
+      {/* Photo Sections */}
+      <div className="space-y-3">
+        {sections.map((section) => {
+          const isExpanded = expandedSections.has(section.id);
+          const colors = colorClasses[section.color];
+          const Icon = section.icon;
+
+          return (
+            <div
+              key={section.id}
+              className={`border rounded-lg bg-white dark:bg-gray-800 overflow-hidden ${colors.border}`}
+            >
+              {/* Section Header */}
+              <button
+                onClick={() => toggleSection(section.id)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`flex items-center justify-center w-8 h-8 rounded-full ${colors.bg}`}>
+                    <Icon className={`h-4 w-4 ${colors.text}`} />
+                  </span>
+                  <div className="text-left">
+                    <h4 className="font-medium text-gray-900 dark:text-white">
+                      {section.label} Photos
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {section.loading ? (
+                        'Loading...'
+                      ) : (
+                        `${section.count} photo${section.count !== 1 ? 's' : ''}`
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {section.count > 0 && (
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
+                      {section.count}
+                    </span>
+                  )}
+                  {isExpanded ? (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-gray-400" />
+                  )}
+                </div>
+              </button>
+
+              {/* Section Content */}
+              {isExpanded && (
+                <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                  {section.id === 'installation' && (
+                    <>
+                      {/* Refresh button for installation */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {installationPhotos.length > 0
+                            ? `Source: ${review.photo_source || 'OneMap'}`
+                            : 'No photos loaded yet'}
+                        </div>
+                        <button
+                          onClick={handleFetchPhotos}
+                          disabled={isFetching}
+                          className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+                          Refresh
+                        </button>
+                      </div>
+                      <PhotoGalleryUnified
+                        photos={installationPhotos}
+                        source={review.photo_source as any}
+                        groupByStep={true}
+                      />
+                    </>
+                  )}
+
+                  {section.id === 'group' && (
+                    <>
+                      {waPhotosLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="h-6 w-6 text-blue-500 animate-spin" />
+                        </div>
+                      ) : (
+                        <WAPhotosGallery
+                          photos={waPhotos}
+                          emptyMessage="No group photos received yet. Photos sent with DR submissions will appear here."
+                          showVlmInfo={true}
+                        />
+                      )}
+                    </>
+                  )}
+
+                  {section.id === 'maintenance' && (
+                    <>
+                      {maintenanceLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="h-6 w-6 text-orange-500 animate-spin" />
+                        </div>
+                      ) : maintenancePhotos.length === 0 ? (
+                        <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                          <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-600 dark:text-gray-400">
+                            No maintenance photos for this DR
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {maintenancePhotos.map((photo) => (
+                            <div
+                              key={photo.id}
+                              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                            >
+                              {photo.sharepoint_url ? (
+                                <a
+                                  href={photo.sharepoint_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block aspect-square bg-gray-100 dark:bg-gray-900 relative group"
+                                >
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <Wrench className="h-8 w-8 text-gray-400" />
+                                  </div>
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-sm">View in SharePoint</span>
+                                  </div>
+                                </a>
+                              ) : (
+                                <div className="aspect-square bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <Wrench className="h-8 w-8 text-gray-400 mx-auto mb-1" />
+                                    <span className="text-xs text-gray-500">
+                                      {photo.upload_status === 'pending' && 'Pending'}
+                                      {photo.upload_status === 'uploading' && 'Uploading...'}
+                                      {photo.upload_status === 'failed' && 'Failed'}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                                <div className="truncate">
+                                  {photo.original_filename || `Photo ${photo.photo_index}`}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
