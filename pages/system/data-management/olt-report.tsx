@@ -33,19 +33,27 @@ type TabId = 'import' | 'pending' | 'history';
 interface OltRecord {
   id: string;
   drop_number: string;
-  zone: string | null;
-  address: string | null;
+  zone?: string | null;
+  address?: string | null;
   olt_serial: string | null;
-  onemap_serial: string | null;
-  onemap_prop_id: string | null;
-  offline_serial: string | null;
-  oes_serial: string | null;
-  onemap_fix_attempted: boolean;
-  onemap_fix_result: string | null;
-  onemap_fix_old_value: string | null;
-  onemap_fix_at: string | null;
-  status: string;
-  comparison_status: string;
+  onemap_serial?: string | null;
+  wrong_onemap_serial?: string | null;
+  onemap_prop_id?: string | null;
+  offline_serial?: string | null;
+  oes_serial?: string | null;
+  onemap_fix_attempted?: boolean;
+  onemap_fix_result?: string | null;
+  onemap_fix_old_value?: string | null;
+  onemap_fix_at?: string | null;
+  fix_status?: string;
+  fix_result?: string | null;
+  fix_old_value?: string | null;
+  status?: string;
+  comparison_status?: string;
+  row_index?: number;
+  import_filename?: string;
+  import_date?: string;
+  project?: string;
 }
 
 interface ImportRecord {
@@ -605,7 +613,7 @@ export default function OltReportPage() {
                           <td className="px-3 py-3">
                             {record.olt_serial ? (
                               <span className="font-mono text-xs text-green-600 dark:text-green-400">
-                                ...{record.olt_serial.slice(-6)}
+                                {record.olt_serial}
                               </span>
                             ) : (
                               <span className="text-xs text-yellow-600 dark:text-yellow-400 italic">
@@ -614,7 +622,7 @@ export default function OltReportPage() {
                             )}
                           </td>
                           <td className="px-3 py-3">
-                            {record.onemap_serial ? (
+                            {(record.wrong_onemap_serial || record.onemap_serial) ? (
                               <span
                                 className={`font-mono text-xs ${
                                   isMismatch
@@ -622,7 +630,7 @@ export default function OltReportPage() {
                                     : 'text-green-600 dark:text-green-400'
                                 }`}
                               >
-                                ...{record.onemap_serial.slice(-6)}
+                                {record.wrong_onemap_serial || record.onemap_serial}
                               </span>
                             ) : (
                               <span className="text-xs text-gray-400 italic">none</span>
