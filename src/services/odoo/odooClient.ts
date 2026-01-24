@@ -139,7 +139,8 @@ export interface OdooStockPicking {
   date_done: string | false;
   state: string;
   origin: string | false;
-  move_ids_without_package: number[];
+  move_ids: number[];
+  move_line_ids: number[];
 }
 
 export interface OdooProduct {
@@ -158,6 +159,76 @@ export interface OdooWarehouse {
   id: number;
   name: string;
   code: string;
+  active: boolean;
+}
+
+// ============================================================================
+// Attachment Types (ir.attachment)
+// ============================================================================
+
+export interface OdooAttachment {
+  id: number;
+  name: string;
+  datas: string | false;           // Base64 encoded binary content
+  mimetype: string;
+  file_size: number;
+  res_model: string;               // Linked model (e.g., 'purchase.order')
+  res_id: number;                  // Linked record ID
+  res_name: string | false;        // Display name of linked record
+  type: 'binary' | 'url';          // Storage type
+  url: string | false;             // URL if type='url'
+  description: string | false;
+  create_date: string;
+  write_date: string;
+}
+
+// ============================================================================
+// Stock Move Types (stock.move)
+// ============================================================================
+
+export interface OdooStockMove {
+  id: number;
+  reference: string | false;                // Move reference (e.g., "Law/IN/00002")
+  picking_id: [number, string] | false;     // Linked stock.picking
+  product_id: [number, string] | false;
+  product_uom: [number, string] | false;    // Unit of measure
+  product_uom_qty: number;                  // Expected quantity
+  quantity: number;                         // Done quantity (Odoo 17+)
+  location_id: [number, string] | false;    // Source location
+  location_dest_id: [number, string] | false; // Destination location
+  state: string;                            // draft, waiting, confirmed, assigned, done, cancel
+  origin: string | false;                   // Source document reference
+  date: string;
+  lot_ids?: number[];                       // Linked lot/serial numbers
+}
+
+// ============================================================================
+// Stock Quant Types (stock.quant) - Real-time inventory
+// ============================================================================
+
+export interface OdooStockQuant {
+  id: number;
+  product_id: [number, string];
+  location_id: [number, string];
+  quantity: number;                         // On-hand quantity
+  reserved_quantity: number;                // Reserved for pickings
+  lot_id: [number, string] | false;        // Lot/serial tracking
+  package_id: [number, string] | false;
+  inventory_date: string | false;
+  in_date: string | false;                  // Date received
+}
+
+// ============================================================================
+// Stock Location Types (stock.location)
+// ============================================================================
+
+export interface OdooStockLocation {
+  id: number;
+  name: string;
+  complete_name: string;                    // Full path (e.g., "WH/Stock/Shelf A")
+  location_id: [number, string] | false;   // Parent location
+  usage: string;                            // internal, supplier, customer, transit, production, inventory
+  warehouse_id: [number, string] | false;
   active: boolean;
 }
 
@@ -501,7 +572,7 @@ export class OdooClient {
     const fields = options.fields || [
       'id', 'name', 'partner_id', 'picking_type_id', 'location_id',
       'location_dest_id', 'scheduled_date', 'date_done', 'state',
-      'origin', 'move_ids_without_package',
+      'origin', 'move_ids', 'move_line_ids',
     ];
 
     return this.searchRead<OdooStockPicking>('stock.picking', {
@@ -540,6 +611,277 @@ export class OdooClient {
   }
 
   // ==========================================================================
+  // Attachments (ir.attachment)
+  // ==========================================================================
+
+  /**
+   * Get attachments for a specific model and optional record
+   */
+  async getAttachments(options: {
+    resModel?: string;           // e.g., 'purchase.order', 'fleet.vehicle'
+    resId?: number;              // Specific record ID
+    withData?: boolean;          // Include base64 data (false by default - large!)
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<OdooAttachment[]> {
+    const { resModel, resId, withData = false, limit = 100, offset = 0 } = options;
+
+    const domain: unknown[] = [];
+    if (resModel) {
+      domain.push(['res_model', '=', resModel]);
+    }
+    if (resId) {
+      domain.push(['res_id', '=', resId]);
+    }
+
+    // Exclude binary data by default (it's large)
+    const fields = withData
+      ? ['id', 'name', 'datas', 'mimetype', 'file_size', 'res_model', 'res_id', 'res_name', 'type', 'url', 'description', 'create_date', 'write_date']
+      : ['id', 'name', 'mimetype', 'file_size', 'res_model', 'res_id', 'res_name', 'type', 'url', 'description', 'create_date', 'write_date'];
+
+    return this.searchRead<OdooAttachment>('ir.attachment', {
+      domain,
+      fields,
+      limit,
+      offset,
+      order: 'id ASC',
+    });
+  }
+
+  /**
+   * Get a single attachment with binary data
+   */
+  async getAttachment(id: number): Promise<OdooAttachment | null> {
+    const results = await this.read<OdooAttachment>('ir.attachment', [id], [
+      'id', 'name', 'datas', 'mimetype', 'file_size', 'res_model', 'res_id',
+      'res_name', 'type', 'url', 'description', 'create_date', 'write_date',
+    ]);
+    return results[0] || null;
+  }
+
+  /**
+   * Download attachment and return as Buffer
+   */
+  async downloadAttachment(id: number): Promise<{
+    buffer: Buffer;
+    filename: string;
+    mimetype: string;
+    fileSize: number;
+  } | null> {
+    const attachment = await this.getAttachment(id);
+
+    if (!attachment || !attachment.datas) {
+      logger.warn('Attachment has no data', { id, name: attachment?.name });
+      return null;
+    }
+
+    return {
+      buffer: Buffer.from(attachment.datas, 'base64'),
+      filename: attachment.name,
+      mimetype: attachment.mimetype,
+      fileSize: attachment.file_size,
+    };
+  }
+
+  /**
+   * Get attachments for multiple records of the same model
+   */
+  async getAttachmentsForRecords(
+    resModel: string,
+    resIds: number[]
+  ): Promise<Map<number, OdooAttachment[]>> {
+    if (resIds.length === 0) {
+      return new Map();
+    }
+
+    const attachments = await this.searchRead<OdooAttachment>('ir.attachment', {
+      domain: [
+        ['res_model', '=', resModel],
+        ['res_id', 'in', resIds],
+      ],
+      fields: ['id', 'name', 'mimetype', 'file_size', 'res_model', 'res_id', 'res_name', 'type', 'description', 'create_date'],
+      limit: 1000,
+    });
+
+    // Group by res_id
+    const result = new Map<number, OdooAttachment[]>();
+    for (const att of attachments) {
+      if (!result.has(att.res_id)) {
+        result.set(att.res_id, []);
+      }
+      result.get(att.res_id)!.push(att);
+    }
+
+    return result;
+  }
+
+  /**
+   * Count attachments by model
+   */
+  async countAttachments(resModel?: string): Promise<number> {
+    const domain = resModel ? [['res_model', '=', resModel]] : [];
+    return this.searchCount('ir.attachment', domain);
+  }
+
+  // ==========================================================================
+  // Stock Moves (stock.move) - Line items for pickings
+  // ==========================================================================
+
+  /**
+   * Get stock moves (picking line items)
+   */
+  async getStockMoves(options: SearchReadOptions = {}): Promise<OdooStockMove[]> {
+    const fields = options.fields || [
+      'id', 'reference', 'picking_id', 'product_id', 'product_uom',
+      'product_uom_qty', 'quantity', 'location_id', 'location_dest_id',
+      'state', 'origin', 'date',
+    ];
+
+    return this.searchRead<OdooStockMove>('stock.move', {
+      ...options,
+      fields,
+    });
+  }
+
+  /**
+   * Get stock moves for specific pickings
+   */
+  async getStockMovesForPickings(pickingIds: number[]): Promise<OdooStockMove[]> {
+    if (pickingIds.length === 0) return [];
+
+    return this.searchRead<OdooStockMove>('stock.move', {
+      domain: [['picking_id', 'in', pickingIds]],
+      fields: [
+        'id', 'reference', 'picking_id', 'product_id', 'product_uom',
+        'product_uom_qty', 'quantity', 'location_id', 'location_dest_id',
+        'state', 'origin', 'date',
+      ],
+      limit: 1000,
+    });
+  }
+
+  // ==========================================================================
+  // Stock Quants (stock.quant) - Real-time inventory levels
+  // ==========================================================================
+
+  /**
+   * Get stock quants (inventory levels)
+   */
+  async getStockQuants(options: SearchReadOptions = {}): Promise<OdooStockQuant[]> {
+    const fields = options.fields || [
+      'id', 'product_id', 'location_id', 'quantity', 'reserved_quantity',
+      'lot_id', 'package_id', 'inventory_date', 'in_date',
+    ];
+
+    return this.searchRead<OdooStockQuant>('stock.quant', {
+      ...options,
+      fields,
+    });
+  }
+
+  /**
+   * Get stock quants for internal locations only (exclude virtual locations)
+   */
+  async getInternalStockQuants(options: SearchReadOptions = {}): Promise<OdooStockQuant[]> {
+    // First get internal location IDs
+    const internalLocations = await this.getStockLocations({
+      domain: [['usage', '=', 'internal']],
+      fields: ['id'],
+      limit: 500,
+    });
+
+    const locationIds = internalLocations.map((l) => l.id);
+
+    if (locationIds.length === 0) {
+      return [];
+    }
+
+    return this.getStockQuants({
+      ...options,
+      domain: [
+        ...(options.domain || []),
+        ['location_id', 'in', locationIds],
+        ['quantity', '>', 0],
+      ],
+    });
+  }
+
+  // ==========================================================================
+  // Stock Locations (stock.location)
+  // ==========================================================================
+
+  /**
+   * Get stock locations
+   */
+  async getStockLocations(options: SearchReadOptions = {}): Promise<OdooStockLocation[]> {
+    const fields = options.fields || [
+      'id', 'name', 'complete_name', 'location_id', 'usage',
+      'warehouse_id', 'active',
+    ];
+
+    return this.searchRead<OdooStockLocation>('stock.location', {
+      ...options,
+      fields,
+    });
+  }
+
+  /**
+   * Get stock pickings by type (incoming, outgoing, internal)
+   */
+  async getStockPickingsByType(
+    pickingTypeCode: 'incoming' | 'outgoing' | 'internal',
+    options: SearchReadOptions = {}
+  ): Promise<OdooStockPicking[]> {
+    // Get picking types matching the code
+    const pickingTypes = await this.searchRead<{ id: number; code: string }>('stock.picking.type', {
+      domain: [['code', '=', pickingTypeCode]],
+      fields: ['id', 'code'],
+      limit: 50,
+    });
+
+    const typeIds = pickingTypes.map((pt) => pt.id);
+
+    if (typeIds.length === 0) {
+      logger.warn(`No picking types found for code: ${pickingTypeCode}`);
+      return [];
+    }
+
+    return this.getStockPickings({
+      ...options,
+      domain: [
+        ...(options.domain || []),
+        ['picking_type_id', 'in', typeIds],
+      ],
+    });
+  }
+
+  /**
+   * Get completed incoming pickings (receipts/GRN)
+   */
+  async getCompletedReceipts(options: SearchReadOptions = {}): Promise<OdooStockPicking[]> {
+    return this.getStockPickingsByType('incoming', {
+      ...options,
+      domain: [
+        ...(options.domain || []),
+        ['state', '=', 'done'],
+      ],
+    });
+  }
+
+  /**
+   * Get completed internal transfers
+   */
+  async getCompletedTransfers(options: SearchReadOptions = {}): Promise<OdooStockPicking[]> {
+    return this.getStockPickingsByType('internal', {
+      ...options,
+      domain: [
+        ...(options.domain || []),
+        ['state', '=', 'done'],
+      ],
+    });
+  }
+
+  // ==========================================================================
   // Utility Methods
   // ==========================================================================
 
@@ -574,24 +916,30 @@ export class OdooClient {
     suppliers: number;
     purchaseOrders: number;
     stockPickings: number;
+    stockQuants: number;
     fleetVehicles: number;
     products: number;
+    attachments: number;
   }> {
-    const [suppliers, purchaseOrders, stockPickings, fleetVehicles, products] =
+    const [suppliers, purchaseOrders, stockPickings, stockQuants, fleetVehicles, products, attachments] =
       await Promise.all([
         this.searchCount('res.partner', [['supplier_rank', '>', 0]]),
         this.searchCount('purchase.order'),
         this.searchCount('stock.picking'),
+        this.searchCount('stock.quant', [['quantity', '>', 0]]),
         this.searchCount('fleet.vehicle'),
         this.searchCount('product.product'),
+        this.searchCount('ir.attachment'),
       ]);
 
     return {
       suppliers,
       purchaseOrders,
       stockPickings,
+      stockQuants,
       fleetVehicles,
       products,
+      attachments,
     };
   }
 }
