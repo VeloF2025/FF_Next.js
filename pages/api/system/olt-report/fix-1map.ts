@@ -43,6 +43,7 @@ interface FixResult {
   oldValue: string | null;
   newValue: string;
   error?: string;
+  alreadyCorrect?: boolean;
 }
 
 async function fixSingleDR(
@@ -77,20 +78,25 @@ async function fixSingleDR(
     const result = await oneMapApi.fixDrOntSerial(drNumber, correctSerial, wrongSerial);
 
     if (result.success) {
+      // Check if already correct (no update was made)
+      const alreadyCorrect = result.error === 'Already correct';
+      const fixResult = alreadyCorrect ? 'already_correct' : 'success';
+      const resolution = alreadyCorrect ? 'already_correct' : 'data_corrected';
+
       // Update offline_devices tracking (if exists)
       await client.query(
         `UPDATE offline_devices
          SET onemap_fix_attempted = true,
-             onemap_fix_result = 'success',
-             onemap_fix_old_value = $1,
+             onemap_fix_result = $1,
+             onemap_fix_old_value = $2,
              onemap_fix_at = NOW(),
-             onemap_fix_by = $2,
+             onemap_fix_by = $3,
              mismatch_status = 'resolved',
-             mismatch_resolution = 'data_corrected',
+             mismatch_resolution = $4,
              mismatch_resolved_at = NOW(),
-             mismatch_resolved_by = $3
-         WHERE drop_number = $4`,
-        [result.oldValue, userId, userId, drNumber]
+             mismatch_resolved_by = $5
+         WHERE drop_number = $6`,
+        [fixResult, result.oldValue, userId, resolution, userId, drNumber]
       );
 
       // Update olt_mismatch_records (always)
@@ -98,35 +104,56 @@ async function fixSingleDR(
         `UPDATE olt_mismatch_records
          SET fix_status = 'fixed',
              fix_attempted_at = NOW(),
-             fix_result = 'success',
-             fix_old_value = $1,
-             fix_by = $2
-         WHERE drop_number = $3
+             fix_result = $1,
+             fix_old_value = $2,
+             fix_by = $3
+         WHERE drop_number = $4
            AND fix_status = 'pending'`,
-        [result.oldValue, userId, drNumber]
+        [fixResult, result.oldValue, userId, drNumber]
       );
 
-      // Log to activity log
-      await logActivity(
-        drNumber,
-        'SERIAL_UPDATE',
-        {
-          details: `1Map ONT serial updated: ${result.oldValue || 'EMPTY'} → ${correctSerial}`,
+      // Log to activity log with appropriate message
+      if (alreadyCorrect) {
+        await logActivity(
+          drNumber,
+          'SERIAL_VERIFIED',
+          {
+            details: `1Map already has correct ONT serial: ${correctSerial} - no update needed`,
+            propId: result.propId,
+            currentValue: correctSerial,
+            source: 'olt_report',
+            fix_type: 'already_correct',
+          },
+          userId || 'system'
+        );
+
+        log.info('FixOneMap', 'DR already correct - skipped update', {
+          drNumber,
+          propId: result.propId,
+          currentSerial: correctSerial,
+        });
+      } else {
+        await logActivity(
+          drNumber,
+          'SERIAL_UPDATE',
+          {
+            details: `1Map ONT serial updated: ${result.oldValue || 'EMPTY'} → ${correctSerial}`,
+            propId: result.propId,
+            oldValue: result.oldValue,
+            newValue: correctSerial,
+            source: 'olt_report',
+            fix_type: 'onemap_fix_success',
+          },
+          userId || 'system'
+        );
+
+        log.info('FixOneMap', 'Successfully fixed DR', {
+          drNumber,
           propId: result.propId,
           oldValue: result.oldValue,
           newValue: correctSerial,
-          source: 'olt_report',
-          fix_type: 'onemap_fix_success',
-        },
-        userId || 'system'
-      );
-
-      log.info('FixOneMap', 'Successfully fixed DR', {
-        drNumber,
-        propId: result.propId,
-        oldValue: result.oldValue,
-        newValue: correctSerial,
-      });
+        });
+      }
 
       return {
         drNumber,
@@ -134,6 +161,7 @@ async function fixSingleDR(
         propId: result.propId,
         oldValue: result.oldValue,
         newValue: correctSerial,
+        alreadyCorrect,
       };
     } else {
       // Record failure in offline_devices (if exists)
