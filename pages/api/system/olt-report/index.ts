@@ -73,20 +73,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Get OLT vs 1Map mismatches using the view
+    // Query from olt_mismatch_records (the authoritative source)
     let conditions: string[] = [];
     const params: (string | number)[] = [];
     let paramIndex = 1;
 
     if (view === 'pending') {
-      conditions.push(`(onemap_fix_attempted = false OR onemap_fix_attempted IS NULL)`);
-      conditions.push(`comparison_status = 'mismatch'`);
+      conditions.push(`m.fix_status = 'pending'`);
     } else if (view === 'fixed') {
-      conditions.push(`onemap_fix_result = 'success'`);
+      conditions.push(`m.fix_status = 'fixed'`);
+    } else if (view === 'empty') {
+      conditions.push(`m.fix_status = 'empty_serial'`);
     }
 
     if (importId) {
-      conditions.push(`olt_report_id = $${paramIndex}`);
+      conditions.push(`m.import_id = $${paramIndex}`);
       params.push(importId as string);
       paramIndex++;
     }
@@ -95,105 +96,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ? `WHERE ${conditions.join(' AND ')}`
       : '';
 
-    // Check if the view exists, fall back to direct query if not
-    let result;
-    try {
-      result = await client.query(`
-        SELECT
-          id,
-          drop_number,
-          zone,
-          address,
-          olt_serial,
-          onemap_serial,
-          onemap_prop_id,
-          offline_serial,
-          oes_serial,
-          onemap_fix_attempted,
-          onemap_fix_result,
-          onemap_fix_old_value,
-          onemap_fix_at,
-          status,
-          comparison_status,
-          import_filename,
-          import_date
-        FROM v_olt_onemap_mismatches
-        ${whereClause}
-        ORDER BY
-          CASE WHEN comparison_status = 'mismatch' THEN 0 ELSE 1 END,
-          import_date DESC NULLS LAST
-        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-      `, [...params, pageSizeNum, offset]);
-    } catch {
-      // View doesn't exist yet, use direct query
-      result = await client.query(`
-        SELECT
-          o.id,
-          o.drop_number,
-          o.zone,
-          o.address,
-          o.olt_serial,
-          r.ont_serial_scanned as onemap_serial,
-          r.prop_id as onemap_prop_id,
-          o.serial_number as offline_serial,
-          e.serial_number as oes_serial,
-          o.onemap_fix_attempted,
-          o.onemap_fix_result,
-          o.onemap_fix_old_value,
-          o.onemap_fix_at,
-          COALESCE(o.mismatch_status, 'pending_investigation') as status,
-          CASE
-            WHEN o.olt_serial IS NULL THEN 'empty_olt'
-            WHEN r.ont_serial_scanned IS NULL THEN 'no_onemap'
-            WHEN UPPER(o.olt_serial) = UPPER(r.ont_serial_scanned) THEN 'match'
-            ELSE 'mismatch'
-          END as comparison_status,
-          oi.filename as import_filename,
-          oi.imported_at as import_date
-        FROM offline_devices o
-        LEFT JOIN dr_photo_unified_reviews r ON o.drop_number = r.drop_number
-        LEFT JOIN oes_activations e ON o.drop_number = e.drop_number
-        LEFT JOIN olt_report_imports oi ON o.olt_report_id = oi.id
-        WHERE o.olt_serial IS NOT NULL
-        ORDER BY o.olt_imported_at DESC NULLS LAST
-        LIMIT $1 OFFSET $2
-      `, [pageSizeNum, offset]);
-    }
+    // Query from olt_mismatch_records with joined data
+    const result = await client.query(`
+      SELECT
+        m.id,
+        m.drop_number,
+        m.olt_serial,
+        m.wrong_onemap_serial,
+        m.row_index,
+        m.fix_status,
+        m.fix_attempted_at,
+        m.fix_result,
+        m.fix_old_value,
+        m.created_at,
+        i.filename as import_filename,
+        i.imported_at as import_date,
+        i.project
+      FROM olt_mismatch_records m
+      LEFT JOIN olt_report_imports i ON m.import_id = i.id
+      ${whereClause}
+      ORDER BY
+        CASE m.fix_status
+          WHEN 'pending' THEN 0
+          WHEN 'empty_serial' THEN 1
+          WHEN 'fixed' THEN 2
+          ELSE 3
+        END,
+        m.created_at DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, [...params, pageSizeNum, offset]);
 
     // Get count
-    let totalCount = 0;
-    try {
-      const countResult = await client.query(`
-        SELECT COUNT(*) FROM v_olt_onemap_mismatches ${whereClause}
-      `, params);
-      totalCount = Number(countResult.rows[0].count);
-    } catch {
-      const countResult = await client.query(`
-        SELECT COUNT(*) FROM offline_devices WHERE olt_serial IS NOT NULL
-      `);
-      totalCount = Number(countResult.rows[0].count);
-    }
+    const countResult = await client.query(`
+      SELECT COUNT(*) FROM olt_mismatch_records m ${whereClause}
+    `, params);
+    const totalCount = Number(countResult.rows[0].count);
 
-    // Get summary stats
-    let stats = { pending: 0, fixed: 0, empty: 0, match: 0 };
-    try {
-      const statsResult = await client.query(`
-        SELECT
-          COUNT(*) FILTER (WHERE comparison_status = 'mismatch' AND (onemap_fix_attempted = false OR onemap_fix_attempted IS NULL)) as pending,
-          COUNT(*) FILTER (WHERE onemap_fix_result = 'success') as fixed,
-          COUNT(*) FILTER (WHERE comparison_status = 'empty_olt') as empty,
-          COUNT(*) FILTER (WHERE comparison_status = 'match') as match
-        FROM v_olt_onemap_mismatches
-      `);
-      stats = {
-        pending: Number(statsResult.rows[0].pending) || 0,
-        fixed: Number(statsResult.rows[0].fixed) || 0,
-        empty: Number(statsResult.rows[0].empty) || 0,
-        match: Number(statsResult.rows[0].match) || 0,
-      };
-    } catch {
-      // View doesn't exist
-    }
+    // Get summary stats from olt_mismatch_records
+    const statsResult = await client.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE fix_status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE fix_status = 'fixed') as fixed,
+        COUNT(*) FILTER (WHERE fix_status = 'empty_serial') as empty,
+        COUNT(*) as total
+      FROM olt_mismatch_records
+    `);
+    const stats = {
+      pending: Number(statsResult.rows[0].pending) || 0,
+      fixed: Number(statsResult.rows[0].fixed) || 0,
+      empty: Number(statsResult.rows[0].empty) || 0,
+      total: Number(statsResult.rows[0].total) || 0,
+    };
 
     return apiResponse.success(res, {
       view,

@@ -77,7 +77,7 @@ async function fixSingleDR(
     const result = await oneMapApi.fixDrOntSerial(drNumber, correctSerial, wrongSerial);
 
     if (result.success) {
-      // Update offline_devices tracking
+      // Update offline_devices tracking (if exists)
       await client.query(
         `UPDATE offline_devices
          SET onemap_fix_attempted = true,
@@ -91,6 +91,19 @@ async function fixSingleDR(
              mismatch_resolved_by = $3
          WHERE drop_number = $4`,
         [result.oldValue, userId, userId, drNumber]
+      );
+
+      // Update olt_mismatch_records (always)
+      await client.query(
+        `UPDATE olt_mismatch_records
+         SET fix_status = 'fixed',
+             fix_attempted_at = NOW(),
+             fix_result = 'success',
+             fix_old_value = $1,
+             fix_by = $2
+         WHERE drop_number = $3
+           AND fix_status = 'pending'`,
+        [result.oldValue, userId, drNumber]
       );
 
       // Log to activity log
@@ -123,7 +136,7 @@ async function fixSingleDR(
         newValue: correctSerial,
       };
     } else {
-      // Record failure
+      // Record failure in offline_devices (if exists)
       await client.query(
         `UPDATE offline_devices
          SET onemap_fix_attempted = true,
@@ -131,6 +144,16 @@ async function fixSingleDR(
              onemap_fix_at = NOW()
          WHERE drop_number = $1`,
         [drNumber]
+      );
+
+      // Record failure in olt_mismatch_records
+      await client.query(
+        `UPDATE olt_mismatch_records
+         SET fix_attempted_at = NOW(),
+             fix_result = $1
+         WHERE drop_number = $2
+           AND fix_status = 'pending'`,
+        [result.error || 'Unknown error', drNumber]
       );
 
       // Log to activity log

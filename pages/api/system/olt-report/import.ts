@@ -154,18 +154,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
     const importId = importResult.rows[0].id;
 
-    // Process mismatches
+    // Process mismatches - insert ALL into olt_mismatch_records
     const results: ImportResult['mismatches'] = [];
     let emptySerialCount = 0;
     let notFoundCount = 0;
     let updatedCount = 0;
 
     for (const mismatch of mismatches) {
-      // Handle empty OLT serial - skip but log
+      // Determine initial status
+      let fixStatus = 'pending';
       if (!mismatch.oltSerial) {
+        fixStatus = 'empty_serial';
         emptySerialCount++;
+      }
 
-        // Log to activity log
+      // Insert into olt_mismatch_records (tracks ALL mismatches)
+      await client.query(
+        `INSERT INTO olt_mismatch_records
+          (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          importId,
+          mismatch.drNumber,
+          mismatch.oltSerial,
+          mismatch.wrongOneMapSerial,
+          mismatch.rowIndex,
+          fixStatus,
+        ]
+      );
+
+      // Handle empty OLT serial - log but don't try to update offline_devices
+      if (!mismatch.oltSerial) {
         await logActivity(
           mismatch.drNumber,
           'error',
@@ -185,7 +204,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         continue;
       }
 
-      // Update offline_devices with OLT serial AND wrong 1Map serial
+      // Try to update offline_devices if DR exists there
       const updateResult = await client.query(
         `UPDATE offline_devices
          SET olt_serial = $1,
@@ -198,7 +217,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
 
       if (updateResult.rowCount === 0) {
-        // DR not found in offline_devices - might be in a different table
+        // DR not in offline_devices - that's OK, it's tracked in olt_mismatch_records
         notFoundCount++;
         results.push({
           drNumber: mismatch.drNumber,
