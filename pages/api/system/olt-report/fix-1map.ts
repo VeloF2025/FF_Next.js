@@ -169,6 +169,44 @@ async function fixSingleDR(
         alreadyCorrect,
       };
     } else {
+      // Check if DR was not found in 1Map - move to investigate
+      const notFoundError = result.error?.toLowerCase().includes('not found');
+
+      if (notFoundError) {
+        // Move to needs_investigation - DR doesn't exist in 1Map
+        await client.query(
+          `UPDATE olt_mismatch_records
+           SET fix_status = 'needs_investigation',
+               fix_attempted_at = NOW(),
+               fix_result = $1
+           WHERE drop_number = $2
+             AND fix_status = 'pending'`,
+          ['DR not found in 1Map', drNumber]
+        );
+
+        await logActivity(
+          drNumber,
+          'INVESTIGATE',
+          {
+            details: `DR not found in 1Map layer 5121 - moved to investigate`,
+            source: 'olt_report',
+            fix_type: 'not_found',
+          },
+          userId || 'system'
+        );
+
+        log.info('FixOneMap', 'DR not found in 1Map - moved to investigate', { drNumber });
+
+        return {
+          drNumber,
+          success: false,
+          propId: null,
+          oldValue: null,
+          newValue: correctSerial,
+          error: 'Not found in 1Map - moved to investigate',
+        };
+      }
+
       // Record failure in offline_devices (if exists)
       await client.query(
         `UPDATE offline_devices
