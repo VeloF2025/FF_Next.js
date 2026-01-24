@@ -133,11 +133,42 @@ Location: `/opt/qfield-sync/sync_oes_db_to_qfield.py`
 
 **Key Functions:**
 - `add_pole_nr_labeling(maplayer)` - Adds DR number labels using `Pole Nr` field
-- `set_simple_renderer(maplayer)` - Sets blue circle renderer (removes status categories)
+- `set_renderer(maplayer, color)` - Sets single-symbol renderer with specified color
+- `is_valid_sa_coordinate(lat, lon)` - Filters coordinates outside South Africa bounds
+- `fetch_oes_data()` - Returns dict with 'actual' and 'planned' coordinate lists
+- `create_gpkg_with_two_tables()` - Creates GeoPackage with both actual and planned tables
 
 **Sync Target:** `Test_Project__Automations` (`e849b878-f8a8-4f84-a3f1-9fbd051686c0`)
+
+### Dual-Layer Feature (Jan 24, 2026)
+
+The sync now creates **two layers** for GPS discrepancy detection:
+
+| Layer | Color | Source | Purpose |
+|-------|-------|--------|---------|
+| `OES DD-MM-YY Actual` | 🔵 Blue | OES Excel GPS (`oes_latitude`, `oes_longitude`) | Where technician actually was |
+| `OES DD-MM-YY Planned` | 🟢 Green | Drops table (`planned_latitude`, `planned_longitude`) | Where drop was planned |
+
+**Visual Comparison:** Offset between blue and green dots indicates GPS discrepancy.
+
+### Database View
+
+The `v_qfield_oes_activations` view includes:
+- `oes_latitude`, `oes_longitude` - Actual GPS from OES Excel
+- `planned_latitude`, `planned_longitude` - Planned GPS from drops table
+- `distance_meters` - Calculated distance between actual and planned (approximate)
+
+### South Africa Bounds Filtering
+
+Coordinates outside these bounds are filtered out:
+- Latitude: -35.0 to -22.0
+- Longitude: 16.0 to 33.0
+
+This removes bad GPS data (e.g., coordinates in Iraq, Nepal, Indonesia).
 
 ### Troubleshooting
 - **DR numbers not showing:** Check labeling uses `Pole Nr` field
 - **Showing planned/wip/live/issue:** Renderer using categories - should be `singleSymbol`
+- **Blue dots outside project:** Check OES Excel GPS data quality
+- **Green dots missing:** Drop not matched or has no coordinates
 - **Run `/Qfield` skill** for full management commands

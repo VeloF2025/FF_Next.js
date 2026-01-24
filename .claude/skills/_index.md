@@ -10,6 +10,14 @@ Skills are automatically loaded when relevant keywords or contexts are detected.
 
 ## Knowledge Base Skills
 
+### `memory/SKILL.md`
+**Trigger:** /memory, memory audit, memory check, knowledge audit, context audit, slim claude
+- **Health Check:** CLAUDE.md size, module doc coverage, cross-references
+- **Route Knowledge:** Decision tree for where new knowledge belongs
+- **Slim CLAUDE.md:** Move bloated content to module docs
+- **Audit Report:** Full knowledge system status
+- Manages the progressive knowledge hierarchy
+
 ### `knowledge-base/SKILL.md`
 **Trigger:** kb, KB, /kb, update kb, refresh knowledge, scan modules, sync knowledge
 - Scan source modules for missing `.claude.md` files

@@ -542,7 +542,53 @@ Skill is successful when:
 | `src/modules/activate/components/DrListPage.tsx` | Main page with tabs |
 | `scripts/migrations/060_site_submission_tracking.sql` | Database schema |
 
+## QField Sync Integration (Jan 2026)
+
+After OES import, data automatically syncs to QFieldCloud for mobile viewing.
+
+### Automatic Trigger
+
+The import API (`/api/activate/import-oes`) triggers QField sync via webhook:
+```
+POST http://100.96.203.105:8095/sync/oes
+```
+
+### Dual-Layer Output
+
+The sync creates two layers in QField:
+
+| Layer | Color | Source |
+|-------|-------|--------|
+| `OES DD-MM-YY Actual` | 🔵 Blue | OES Excel GPS (where technician was) |
+| `OES DD-MM-YY Planned` | 🟢 Green | Drops table GPS (where drop was planned) |
+
+**Visual Comparison:** Offset between blue and green dots shows GPS discrepancy.
+
+### SA Bounds Filtering
+
+Bad GPS coordinates are filtered out:
+- Latitude: -35.0 to -22.0
+- Longitude: 16.0 to 33.0
+
+### Manual Sync Commands
+
+```bash
+# Check sync status
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s http://localhost:8095/status"
+
+# Trigger manual sync
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s -X POST http://localhost:8095/sync/oes -H 'Content-Type: application/json' -d '{\"batchId\": \"manual\"}'"
+
+# View sync logs
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "tail -30 /var/log/qfield-oes-sync.log"
+```
+
+### Sync Script Location
+
+Server: `/opt/qfield-sync/sync_oes_db_to_qfield.py`
+
 ## Related Skills
 
 - `/deploy` - Deploy code changes to staging
 - `/wa-monitor` - WhatsApp monitoring (sends feedback to groups)
+- `/Qfield` - Full QField management commands

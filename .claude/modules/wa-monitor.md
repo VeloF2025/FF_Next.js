@@ -9,26 +9,52 @@
 | **Category** | monitoring |
 | **Server** | Velocity Server 100.96.203.105 |
 
-## Infrastructure (Updated Jan 2026)
+## Infrastructure (Updated Jan 2026 - VPS Migration)
 
-### WhatsApp Services on Velocity Server
-
+### Architecture Overview
 ```
-Phone: +27 82 418 9511 (Unified for ALL messages)
-│
-├─→ whatsapp-sender.service (Port 8081)
-│       └─→ SENDS feedback with @mentions
-│       └─→ SENDS DR acknowledgments (via Bridge proxy)
-│       └─→ DELETE sent messages (within 1 hour)
-│       └─→ Location: /home/louis/whatsapp-sender/
-│
-└─→ whatsapp-bridge.service (Port 8083)
-        └─→ LISTENS to groups (receives DR submissions)
-        └─→ ROUTES acks through Sender API
-        └─→ Location: /home/louis/whatsapp-bridge-go/
+FibreFlow APIs → wa-feedback (Velocity:8092) → VPS sender (8081) → WhatsApp
+                                                                      ↓
+                              Neon DB ← VPS bridge (8083) ← WhatsApp incoming
+```
 
-Monitor Services (Python)
-    └─→ wa-monitor-prod (Port 8090)
+**Why VPS?** WhatsApp services run on Hostinger VPS for redundancy. If Velocity goes down, DR submissions still get captured.
+
+### WhatsApp Services on VPS (72.61.197.178)
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `whatsapp-sender` | 8081 | **SENDING** - REST API `/send-message` |
+| `whatsapp-bridge` | 8083 | **RECEIVING** - Incoming messages → DB |
+
+```bash
+ssh root@72.61.197.178
+
+# Health checks
+curl http://72.61.197.178:8081/health  # Sender
+curl http://72.61.197.178:8083/health  # Bridge
+
+# Logs
+tail -f /opt/whatsapp-sender/sender.log
+tail -f /opt/whatsapp-bridge/bridge.log
+
+# Restart services
+systemctl restart whatsapp-sender whatsapp-bridge
+```
+
+### WA Feedback Proxy (Velocity 100.96.203.105:8092)
+
+Routes FibreFlow API calls to VPS sender:
+```bash
+curl http://100.96.203.105:8092/health
+echo 'velo2026' | sudo -S systemctl restart wa-feedback
+# Config: /etc/systemd/system/wa-feedback.service
+# Code: /home/louis/wa-feedback-service/wa-feedback-service.js
+```
+
+### Monitor Service (Velocity)
+```
+wa-monitor-prod (Port 8090) - Python monitor for group monitoring
 ```
 
 ### Sender Service Endpoints (Port 8081)
@@ -163,6 +189,33 @@ curl http://localhost:8081/list-recent
 curl -X POST http://localhost:8081/delete-message \
   -H "Content-Type: application/json" \
   -d '{"message_id":"3EB0xxx","group_jid":"120363408849234743@g.us"}'
+```
+
+### Manual DR Acknowledgment (when bridge fails)
+If the bridge failed to send an acknowledgment (e.g., 401 auth errors):
+```bash
+# 1. Get the ack message from FibreFlow API
+ACK_DATA=$(curl -s -X POST "https://app.fibreflow.app/api/activate/dr-acknowledgment" \
+  -H "Content-Type: application/json" \
+  -d '{"dropNumber": "DR1234567"}')
+
+# 2. Extract and review message
+MESSAGE=$(echo "$ACK_DATA" | jq -r '.data.message')
+echo "$MESSAGE"
+
+# 3. Send to correct group (use JID from Monitored Groups above)
+curl -s -X POST http://72.61.197.178:8081/send-message \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"group_jid\": \"120363418298130331@g.us\",
+    \"recipient_jid\": \"0@s.whatsapp.net\",
+    \"message\": $(echo "$MESSAGE" | jq -Rs .)
+  }"
+```
+
+### Check Bridge Logs for Failed Acks
+```bash
+ssh root@72.61.197.178 "tail -100 /opt/whatsapp-bridge/bridge.log | grep -E '(401|FAILED|ERROR)'"
 ```
 
 ## WhatsApp Portal (Admin UI)

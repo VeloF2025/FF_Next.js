@@ -2,24 +2,22 @@
 """
 Sync OES activation data from FibreFlow (Neon) to QFieldCloud.
 
-This script uses the WORKING approach from Louis's import_excel.py:
-1. Query data from Neon PostgreSQL view
-2. Create GeoPackage with proper WKB geometry (GP header + WKB point)
-3. Create QGIS project file (.qgs) with relative paths
-4. Upload via qfieldcloud-sdk (NOT direct to MinIO)
-5. Trigger process_projectfile + package jobs
+Updated version with TWO layers:
+- OES Actual (blue) - where technician activated (from OES Excel GPS)
+- Planned (green) - where drop was planned (from drops table)
+
+This allows visual comparison of discrepancies between planned and actual locations.
+
+Features:
+- Filters out coordinates outside South Africa bounds
+- Creates date-based layers: OES DD-MM-YY Actual, OES DD-MM-YY Planned
+- Shows DR numbers as labels
 
 Usage:
-    python3 sync_oes_db_to_qfield.py [--full]
+    python3 sync_oes_db_to_qfield.py [--full] [--report-date YYYY-MM-DD]
 
-Environment:
-    NEON_DATABASE_URL - Neon PostgreSQL connection string
-    QFIELD_USERNAME - QFieldCloud username
-    QFIELD_PASSWORD - QFieldCloud password
-    QFIELD_PROJECT_ID - Target QFieldCloud project UUID
-
-Author: Hein/Claude Code (based on Louis's working import_excel.py)
-Date: 2026-01-21
+Author: Hein/Claude Code
+Date: 2026-01-24
 """
 
 import os
@@ -28,8 +26,12 @@ import sqlite3
 import struct
 import logging
 import time
+import argparse
+import uuid
+import copy
+import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 # Configure logging
 logging.basicConfig(
@@ -48,808 +50,559 @@ NEON_DATABASE_URL = os.environ.get(
     'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
 )
 
-QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME', 'Jaun')
-QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD', 'TestPass123')
-# Target: FibreFlow_OES_Automations (dedicated project for FibreFlow sync)
-QFIELD_PROJECT_ID = os.environ.get('QFIELD_PROJECT_ID', '067b51c8-6e96-4e0c-9462-d4890763758b')
+QFIELD_USERNAME = os.environ.get('QFIELD_USERNAME', 'admin')
+QFIELD_PASSWORD = os.environ.get('QFIELD_PASSWORD', '0203')
+QFIELD_PROJECT_ID = os.environ.get('QFIELD_PROJECT_ID', 'e849b878-f8a8-4f84-a3f1-9fbd051686c0')
 QFIELD_API_URL = os.environ.get('QFIELD_API_URL', 'https://qfield.fibreflow.app/api/v1/')
 
-# Whether to upload QGIS project file
-# Must be True for the layer to appear in QField (references the gpkg)
-UPLOAD_QGS = os.environ.get('UPLOAD_QGS', 'true').lower() == 'true'
-
 OUTPUT_DIR = '/tmp/qfield_oes_sync'
-# For Test_Project__Automations: uses "OES & Project Progress.gpkg"
-# We'll add our OES data as a new layer in a file with similar name
-GPKG_FILENAME = 'OES_Activations_Sync.gpkg'  # Our own file (won't conflict)
-LAYER_NAME = 'OES_Activations'  # Our layer name
-PROJECT_NAME = 'OES_Activations_Sync'
+
+# South Africa bounds for filtering bad GPS data
+SA_BOUNDS = {
+    'min_lat': -35.0,
+    'max_lat': -22.0,
+    'min_lon': 16.0,
+    'max_lon': 33.0
+}
+
+
+def is_valid_sa_coordinate(lat: float, lon: float) -> bool:
+    """Check if coordinates are within South Africa bounds."""
+    return (SA_BOUNDS['min_lat'] <= lat <= SA_BOUNDS['max_lat'] and
+            SA_BOUNDS['min_lon'] <= lon <= SA_BOUNDS['max_lon'])
+
+
+def parse_report_date(date_str: Optional[str]) -> datetime:
+    """Parse report date string (YYYY-MM-DD) or return today."""
+    if not date_str:
+        return datetime.now()
+
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        logger.warning(f"Invalid date format '{date_str}', using today")
+        return datetime.now()
 
 
 def create_gpkg_point(lon: float, lat: float) -> bytes:
-    """
-    Create GeoPackage point geometry (WKB with GPKG header).
+    """Create GeoPackage point geometry (WKB with GPKG header)."""
+    header = b'GP'
+    header += struct.pack('<B', 0)
+    header += struct.pack('<B', 1)
+    header += struct.pack('<i', 4326)
 
-    This is the CRITICAL part - must match Louis's working implementation:
-    - GP header: magic bytes, version, flags, SRID
-    - WKB Point: byte order, geometry type, X, Y
-    """
-    # GP header: magic, version, flags, srs_id
-    header = b'GP'  # magic bytes
-    header += struct.pack('<B', 0)  # version
-    header += struct.pack('<B', 1)  # flags (little endian, non-empty envelope)
-    header += struct.pack('<i', 4326)  # srs_id (WGS84)
-
-    # WKB Point
-    wkb = struct.pack('<B', 1)  # byte order (little endian)
-    wkb += struct.pack('<I', 1)  # geometry type (1 = Point)
-    wkb += struct.pack('<d', lon)  # X (longitude)
-    wkb += struct.pack('<d', lat)  # Y (latitude)
+    wkb = struct.pack('<B', 1)
+    wkb += struct.pack('<I', 1)
+    wkb += struct.pack('<d', lon)
+    wkb += struct.pack('<d', lat)
 
     return header + wkb
 
 
-def fetch_oes_data() -> Tuple[List[Dict], Tuple[float, float, float, float]]:
-    """
-    Fetch OES data from Neon PostgreSQL view.
+def add_pole_nr_labeling(maplayer):
+    """Add labeling configuration to show 'Pole Nr' field as labels."""
+    existing_labeling = maplayer.find("labeling")
+    if existing_labeling is not None:
+        maplayer.remove(existing_labeling)
 
-    Returns:
-        Tuple of (list of records, bounds tuple (min_lon, min_lat, max_lon, max_lat))
+    labeling = ET.SubElement(maplayer, "labeling")
+    labeling.set("type", "simple")
+
+    settings = ET.SubElement(labeling, "settings")
+    settings.set("calloutType", "simple")
+
+    text_style = ET.SubElement(settings, "text-style")
+    text_style.set("fieldName", "Pole Nr")
+    text_style.set("isExpression", "0")
+    text_style.set("fontSize", "8")
+    text_style.set("fontSizeUnit", "Point")
+    text_style.set("fontFamily", "Open Sans")
+    text_style.set("fontWeight", "50")
+    text_style.set("textColor", "50,50,50,255")
+    text_style.set("textOpacity", "1")
+    text_style.set("blendMode", "0")
+    text_style.set("multilineHeight", "1")
+
+    text_format = ET.SubElement(settings, "text-format")
+    text_format.set("wrapChar", "")
+    text_format.set("autoWrapLength", "0")
+    text_format.set("multilineAlign", "0")
+    text_format.set("addDirectionSymbol", "0")
+    text_format.set("formatNumbers", "0")
+
+    placement = ET.SubElement(settings, "placement")
+    placement.set("placement", "0")
+    placement.set("quadOffset", "4")
+    placement.set("xOffset", "0")
+    placement.set("yOffset", "0")
+    placement.set("priority", "5")
+    placement.set("dist", "0")
+    placement.set("distUnits", "MM")
+    placement.set("layerType", "PointGeometry")
+
+    rendering = ET.SubElement(settings, "rendering")
+    rendering.set("scaleVisibility", "0")
+    rendering.set("scaleMin", "0")
+    rendering.set("scaleMax", "0")
+    rendering.set("displayAll", "0")
+    rendering.set("obstacle", "1")
+    rendering.set("obstacleFactor", "1")
+
+    logger.info("Added 'Pole Nr' labeling configuration")
+    return labeling
+
+
+def set_renderer(maplayer, color: str = "0,100,255,255"):
+    """Set simple single-symbol renderer with specified color (RGBA)."""
+    existing_renderer = maplayer.find("renderer-v2")
+    if existing_renderer is not None:
+        maplayer.remove(existing_renderer)
+
+    renderer = ET.SubElement(maplayer, "renderer-v2")
+    renderer.set("type", "singleSymbol")
+    renderer.set("symbollevels", "0")
+    renderer.set("enableorderby", "0")
+
+    symbols = ET.SubElement(renderer, "symbols")
+
+    symbol = ET.SubElement(symbols, "symbol")
+    symbol.set("type", "marker")
+    symbol.set("name", "0")
+    symbol.set("alpha", "1")
+    symbol.set("clip_to_extent", "1")
+
+    layer_el = ET.SubElement(symbol, "layer")
+    layer_el.set("pass", "0")
+    layer_el.set("class", "SimpleMarker")
+    layer_el.set("enabled", "1")
+    layer_el.set("locked", "0")
+
+    props = ET.SubElement(layer_el, "Option")
+    props.set("type", "Map")
+
+    color_opt = ET.SubElement(props, "Option")
+    color_opt.set("type", "QString")
+    color_opt.set("name", "color")
+    color_opt.set("value", color)
+
+    shape_opt = ET.SubElement(props, "Option")
+    shape_opt.set("type", "QString")
+    shape_opt.set("name", "name")
+    shape_opt.set("value", "circle")
+
+    size_opt = ET.SubElement(props, "Option")
+    size_opt.set("type", "QString")
+    size_opt.set("name", "size")
+    size_opt.set("value", "3")
+
+    size_unit = ET.SubElement(props, "Option")
+    size_unit.set("type", "QString")
+    size_unit.set("name", "size_unit")
+    size_unit.set("value", "MM")
+
+    return renderer
+
+
+def fetch_oes_data() -> Dict[str, List[Tuple]]:
+    """
+    Fetch OES data with both actual and planned coordinates.
+    Returns dict with 'actual' and 'planned' lists.
     """
     try:
         import psycopg2
     except ImportError:
-        logger.error("psycopg2 not installed. Run: pip install psycopg2-binary")
+        logger.error("psycopg2 not installed")
         sys.exit(1)
 
     logger.info("Connecting to Neon database...")
     conn = psycopg2.connect(NEON_DATABASE_URL)
     cursor = conn.cursor()
 
-    # Fetch data from view
-    logger.info("Fetching OES data from v_qfield_oes_activations...")
+    # Fetch OES actual coordinates (from Excel GPS)
+    logger.info("Fetching OES actual coordinates...")
     cursor.execute("""
-        SELECT
-            drop_number,
-            activation_date,
-            serial_number,
-            CAST(latitude AS FLOAT) as latitude,
-            CAST(longitude AS FLOAT) as longitude,
-            zone,
-            pon,
-            project_name,
-            CAST(ont_rx_sig_dbm AS FLOAT) as ont_rx_sig_dbm,
-            CAST(olt_rx_sig_dbm AS FLOAT) as olt_rx_sig_dbm,
-            olt_address,
-            status,
-            team
+        SELECT drop_number, oes_latitude, oes_longitude
         FROM v_qfield_oes_activations
-        WHERE latitude IS NOT NULL
-          AND longitude IS NOT NULL
-          AND latitude != 0
-          AND longitude != 0
+        WHERE oes_latitude IS NOT NULL
+          AND oes_longitude IS NOT NULL
+          AND oes_latitude != 0
+          AND oes_longitude != 0
         ORDER BY drop_number
     """)
+    actual_raw = cursor.fetchall()
 
-    columns = [desc[0] for desc in cursor.description]
-    rows = cursor.fetchall()
+    # Filter to SA bounds
+    actual = [(dr, lat, lon) for dr, lat, lon in actual_raw
+              if is_valid_sa_coordinate(lat, lon)]
+    filtered_actual = len(actual_raw) - len(actual)
+    logger.info(f"Fetched {len(actual)} actual records ({filtered_actual} filtered outside SA)")
 
-    logger.info(f"Fetched {len(rows)} records with valid coordinates")
+    # Fetch Planned coordinates (from drops table)
+    logger.info("Fetching planned coordinates...")
+    cursor.execute("""
+        SELECT drop_number, planned_latitude, planned_longitude
+        FROM v_qfield_oes_activations
+        WHERE planned_latitude IS NOT NULL
+          AND planned_longitude IS NOT NULL
+          AND planned_latitude != 0
+          AND planned_longitude != 0
+        ORDER BY drop_number
+    """)
+    planned_raw = cursor.fetchall()
 
-    # Convert to list of dicts
-    records = []
-    min_lon, min_lat = float('inf'), float('inf')
-    max_lon, max_lat = float('-inf'), float('-inf')
-
-    for row in rows:
-        record = dict(zip(columns, row))
-        records.append(record)
-
-        # Track bounds
-        lat, lon = record['latitude'], record['longitude']
-        min_lon = min(min_lon, lon)
-        min_lat = min(min_lat, lat)
-        max_lon = max(max_lon, lon)
-        max_lat = max(max_lat, lat)
-
-    bounds = (min_lon, min_lat, max_lon, max_lat)
+    # Filter to SA bounds
+    planned = [(dr, lat, lon) for dr, lat, lon in planned_raw
+               if is_valid_sa_coordinate(lat, lon)]
+    filtered_planned = len(planned_raw) - len(planned)
+    logger.info(f"Fetched {len(planned)} planned records ({filtered_planned} filtered outside SA)")
 
     cursor.close()
     conn.close()
 
-    return records, bounds
+    return {'actual': actual, 'planned': planned}
 
 
-def create_geopackage(records: List[Dict], gpkg_path: str) -> int:
+def create_gpkg_with_two_tables(data: Dict[str, List[Tuple]], output_dir: str, report_date: datetime) -> Tuple[str, str, str, str, str]:
     """
-    Create GeoPackage file with proper structure.
+    Create GeoPackage with two tables: actual and planned.
 
-    This follows the GeoPackage spec and matches Louis's working implementation.
+    Returns: (gpkg_filename, actual_table, actual_layer_name, planned_table, planned_layer_name)
     """
+    date_str = report_date.strftime("%d-%m-%y")
+    gpkg_filename = f"OES {date_str}.gpkg"
+
+    actual_table = f"oes_{report_date.strftime('%d%m%y')}_actual"
+    planned_table = f"oes_{report_date.strftime('%d%m%y')}_planned"
+    actual_layer_name = f"OES {date_str} Actual"
+    planned_layer_name = f"OES {date_str} Planned"
+
+    gpkg_path = os.path.join(output_dir, gpkg_filename)
+
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)
 
-    logger.info(f"Creating GeoPackage: {gpkg_path}")
+    logger.info(f"Creating {gpkg_filename} with tables {actual_table} and {planned_table}")
 
     conn = sqlite3.connect(gpkg_path)
+    cur = conn.cursor()
 
-    # Create GeoPackage structure (required tables)
-    conn.executescript('''
-        -- Spatial Reference System table
-        CREATE TABLE gpkg_spatial_ref_sys (
-            srs_name TEXT NOT NULL,
-            srs_id INTEGER NOT NULL PRIMARY KEY,
-            organization TEXT NOT NULL,
-            organization_coordsys_id INTEGER NOT NULL,
-            definition TEXT NOT NULL,
-            description TEXT
-        );
+    # GeoPackage metadata tables
+    cur.execute("""CREATE TABLE gpkg_spatial_ref_sys (
+        srs_name TEXT, srs_id INTEGER PRIMARY KEY, organization TEXT,
+        organization_coordsys_id INTEGER, definition TEXT, description TEXT)""")
+    cur.execute("INSERT INTO gpkg_spatial_ref_sys VALUES ('WGS 84', 4326, 'EPSG', 4326, 'GEOGCS[\"WGS 84\"]', 'WGS 84')")
 
-        -- Add WGS84 definition
-        INSERT INTO gpkg_spatial_ref_sys VALUES
-            ('WGS 84 geodetic', 4326, 'EPSG', 4326,
-             'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]]',
-             'longitude/latitude coordinates in decimal degrees on the WGS 84 spheroid');
+    cur.execute("""CREATE TABLE gpkg_contents (
+        table_name TEXT PRIMARY KEY, data_type TEXT, identifier TEXT,
+        description TEXT, last_change TEXT, min_x REAL, min_y REAL,
+        max_x REAL, max_y REAL, srs_id INTEGER)""")
 
-        -- Contents table (layer registry)
-        CREATE TABLE gpkg_contents (
-            table_name TEXT NOT NULL PRIMARY KEY,
-            data_type TEXT NOT NULL,
-            identifier TEXT UNIQUE,
-            description TEXT DEFAULT '',
-            last_change DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-            min_x DOUBLE,
-            min_y DOUBLE,
-            max_x DOUBLE,
-            max_y DOUBLE,
-            srs_id INTEGER,
-            CONSTRAINT fk_gc_r_srs_id FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys(srs_id)
-        );
+    cur.execute("""CREATE TABLE gpkg_geometry_columns (
+        table_name TEXT, column_name TEXT, geometry_type_name TEXT,
+        srs_id INTEGER, z INTEGER, m INTEGER)""")
 
-        -- Geometry columns table
-        CREATE TABLE gpkg_geometry_columns (
-            table_name TEXT NOT NULL,
-            column_name TEXT NOT NULL,
-            geometry_type_name TEXT NOT NULL,
-            srs_id INTEGER NOT NULL,
-            z INTEGER NOT NULL,
-            m INTEGER NOT NULL,
-            CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name),
-            CONSTRAINT fk_gc_tn FOREIGN KEY (table_name) REFERENCES gpkg_contents(table_name),
-            CONSTRAINT fk_gc_srs FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys (srs_id)
-        );
-    ''')
-
-    # Create feature table
-    conn.execute(f'''
-        CREATE TABLE {LAYER_NAME} (
+    # Create both tables
+    for table_name, records, label in [(actual_table, data['actual'], 'Actual'),
+                                        (planned_table, data['planned'], 'Planned')]:
+        cur.execute(f'''CREATE TABLE "{table_name}" (
             fid INTEGER PRIMARY KEY AUTOINCREMENT,
             geom BLOB,
-            drop_number TEXT,
-            activation_date TEXT,
-            serial_number TEXT,
-            latitude REAL,
-            longitude REAL,
-            zone TEXT,
-            pon TEXT,
-            project_name TEXT,
-            ont_rx_sig_dbm REAL,
-            olt_rx_sig_dbm REAL,
-            olt_address TEXT,
-            status TEXT,
-            team TEXT,
-            label TEXT
-        )
-    ''')
+            "Pole Nr" TEXT,
+            "Vlook" TEXT,
+            lat REAL,
+            lon REAL
+        )''')
 
-    # Calculate bounds
-    min_lon = min(r['longitude'] for r in records)
-    min_lat = min(r['latitude'] for r in records)
-    max_lon = max(r['longitude'] for r in records)
-    max_lat = max(r['latitude'] for r in records)
+        cur.execute("INSERT INTO gpkg_contents VALUES (?, 'features', ?, '', datetime('now'), NULL, NULL, NULL, NULL, 4326)",
+                    (table_name, table_name))
+        cur.execute("INSERT INTO gpkg_geometry_columns VALUES (?, 'geom', 'POINT', 4326, 0, 0)", (table_name,))
 
-    # Register layer in gpkg tables
-    conn.execute('''
-        INSERT INTO gpkg_contents VALUES
-            (?, 'features', ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?, ?, ?, 4326)
-    ''', (LAYER_NAME, LAYER_NAME, 'OES Activation Points from FibreFlow', min_lon, min_lat, max_lon, max_lat))
+        for drop_number, lat, lon in records:
+            geom = create_gpkg_point(float(lon), float(lat))
+            cur.execute(f'INSERT INTO "{table_name}" (geom, "Pole Nr", "Vlook", lat, lon) VALUES (?, ?, ?, ?, ?)',
+                       (geom, drop_number, drop_number, float(lat), float(lon)))
 
-    conn.execute('''
-        INSERT INTO gpkg_geometry_columns VALUES
-            (?, 'geom', 'POINT', 4326, 0, 0)
-    ''', (LAYER_NAME,))
-
-    # Insert records
-    insert_sql = f'''
-        INSERT INTO {LAYER_NAME} (
-            geom, drop_number, activation_date, serial_number,
-            latitude, longitude, zone, pon, project_name,
-            ont_rx_sig_dbm, olt_rx_sig_dbm, olt_address, status, team, label
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    '''
-
-    count = 0
-    for record in records:
-        try:
-            geom = create_gpkg_point(record['longitude'], record['latitude'])
-
-            # Format activation date
-            act_date = record['activation_date']
-            if hasattr(act_date, 'strftime'):
-                act_date = act_date.strftime('%Y-%m-%d')
-
-            values = (
-                geom,
-                record['drop_number'],
-                str(act_date) if act_date else None,
-                record['serial_number'],
-                record['latitude'],
-                record['longitude'],
-                record['zone'],
-                record['pon'],
-                record['project_name'],
-                record['ont_rx_sig_dbm'],
-                record['olt_rx_sig_dbm'],
-                record['olt_address'],
-                record['status'],
-                record['team'],
-                record['drop_number']  # Label for map display
-            )
-            conn.execute(insert_sql, values)
-            count += 1
-        except Exception as e:
-            logger.warning(f"Skipping record {record.get('drop_number')}: {e}")
+        logger.info(f"Inserted {len(records)} records into {table_name} ({label})")
 
     conn.commit()
     conn.close()
 
-    logger.info(f"Created GeoPackage with {count} features")
-    return count
+    return gpkg_filename, actual_table, actual_layer_name, planned_table, planned_layer_name
 
 
-def create_qgis_project(gpkg_filename: str, qgs_path: str, bounds: Tuple[float, float, float, float]):
-    """
-    Create QGIS project file (.qgs) with relative paths.
+def update_qgs_with_layers(client, project_id: str, gpkg_filename: str,
+                           actual_table: str, actual_layer_name: str,
+                           planned_table: str, planned_layer_name: str,
+                           output_dir: str) -> str:
+    """Download .qgs, add both layers inside "OES Report" group."""
+    from qfieldcloud_sdk import sdk
 
-    CRITICAL:
-    - Must use relative path ./filename.gpkg, not absolute path!
-    - Must include <homePath path=""/> for relative path resolution
-    - Must use proper QGIS XML format matching real QGIS output
-    """
-    min_x, min_y, max_x, max_y = bounds
-    now = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    files = client.list_remote_files(project_id)
 
-    # Generate unique layer ID (matches QGIS format)
-    import uuid
-    layer_id = f"{LAYER_NAME}_{str(uuid.uuid4()).replace('-', '_')}"
-
-    qgs_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
-<qgis saveDateTime="{now}" version="3.40.0-Bratislava" saveUserFull="FibreFlow" saveUser="fibreflow" projectname="{PROJECT_NAME}">
-  <homePath path=""/>
-  <title>{PROJECT_NAME}</title>
-  <transaction mode="Disabled"/>
-  <projectFlags set=""/>
-  <projectCrs>
-    <spatialrefsys nativeFormat="Wkt">
-      <wkt>GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]</wkt>
-      <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
-      <srsid>3452</srsid>
-      <srid>4326</srid>
-      <authid>EPSG:4326</authid>
-      <description>WGS 84</description>
-      <projectionacronym>longlat</projectionacronym>
-      <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
-      <geographicflag>true</geographicflag>
-    </spatialrefsys>
-  </projectCrs>
-  <layer-tree-group>
-    <customproperties>
-      <Option/>
-    </customproperties>
-    <layer-tree-layer source="./{gpkg_filename}|layername={LAYER_NAME}" expanded="1" name="{LAYER_NAME}" legend_exp="" checked="Qt::Checked" patch_size="-1,-1" legend_split_behavior="0" id="{layer_id}" providerKey="ogr">
-      <customproperties>
-        <Option/>
-      </customproperties>
-    </layer-tree-layer>
-    <custom-order enabled="0">
-      <item>{layer_id}</item>
-    </custom-order>
-  </layer-tree-group>
-  <snapping-settings maxScale="0" tolerance="12" scaleDependencyMode="0" unit="1" intersection-snapping="0" enabled="0" minScale="0" type="1" self-snapping="0" mode="2">
-    <individual-layer-settings>
-      <layer-setting maxScale="0" tolerance="12" enabled="0" minScale="0" id="{layer_id}" type="1" units="1"/>
-    </individual-layer-settings>
-  </snapping-settings>
-  <relations/>
-  <polymorphicRelations/>
-  <mapcanvas name="theMapCanvas" annotationsVisible="1">
-    <units>degrees</units>
-    <extent>
-      <xmin>{min_x}</xmin>
-      <ymin>{min_y}</ymin>
-      <xmax>{max_x}</xmax>
-      <ymax>{max_y}</ymax>
-    </extent>
-    <rotation>0</rotation>
-    <destinationsrs>
-      <spatialrefsys nativeFormat="Wkt">
-        <wkt>GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]</wkt>
-        <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
-        <srsid>3452</srsid>
-        <srid>4326</srid>
-        <authid>EPSG:4326</authid>
-        <description>WGS 84</description>
-        <projectionacronym>longlat</projectionacronym>
-        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
-        <geographicflag>true</geographicflag>
-      </spatialrefsys>
-    </destinationsrs>
-    <rendermaptile>0</rendermaptile>
-  </mapcanvas>
-  <projectModels/>
-  <legend updateDrawingOrder="true">
-    <legendlayer name="{LAYER_NAME}" checked="Qt::Checked" open="true" drawingOrder="-1" showFeatureCount="0">
-      <filegroup open="true" hidden="false">
-        <legendlayerfile layerid="{layer_id}" visible="1" isInOverview="0"/>
-      </filegroup>
-    </legendlayer>
-  </legend>
-  <projectlayers>
-    <maplayer hasScaleBasedVisibilityFlag="0" type="vector" simplifyDrawingHints="0" readOnly="0" legendPlaceholderImage="" geometry="Point" labelsEnabled="1" simplifyMaxScale="1" simplifyDrawingTol="1" wkbType="Point" minScale="100000000" styleCategories="AllStyleCategories" refreshOnNotifyEnabled="0" symbologyReferenceScale="-1" autoRefreshTime="0" autoRefreshMode="Disabled" simplifyAlgorithm="0" simplifyLocal="1" refreshOnNotifyMessage="" maxScale="0">
-      <extent>
-        <xmin>{min_x}</xmin>
-        <ymin>{min_y}</ymin>
-        <xmax>{max_x}</xmax>
-        <ymax>{max_y}</ymax>
-      </extent>
-      <wgs84extent>
-        <xmin>{min_x}</xmin>
-        <ymin>{min_y}</ymin>
-        <xmax>{max_x}</xmax>
-        <ymax>{max_y}</ymax>
-      </wgs84extent>
-      <id>{layer_id}</id>
-      <datasource>./{gpkg_filename}|layername={LAYER_NAME}</datasource>
-      <keywordList>
-        <value></value>
-      </keywordList>
-      <layername>{LAYER_NAME}</layername>
-      <srs>
-        <spatialrefsys nativeFormat="Wkt">
-          <wkt>GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]</wkt>
-          <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
-          <srsid>3452</srsid>
-          <srid>4326</srid>
-          <authid>EPSG:4326</authid>
-          <description>WGS 84</description>
-          <projectionacronym>longlat</projectionacronym>
-          <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
-          <geographicflag>true</geographicflag>
-        </spatialrefsys>
-      </srs>
-      <resourceMetadata>
-        <identifier></identifier>
-        <parentidentifier></parentidentifier>
-        <language></language>
-        <type>dataset</type>
-        <title></title>
-        <abstract></abstract>
-        <links/>
-        <dates/>
-        <fees></fees>
-        <encoding></encoding>
-        <crs>
-          <spatialrefsys nativeFormat="Wkt">
-            <wkt></wkt>
-            <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
-            <srsid>0</srsid>
-            <srid>0</srid>
-            <authid></authid>
-            <description></description>
-            <projectionacronym></projectionacronym>
-            <ellipsoidacronym></ellipsoidacronym>
-            <geographicflag>false</geographicflag>
-          </spatialrefsys>
-        </crs>
-        <extent/>
-      </resourceMetadata>
-      <provider encoding="UTF-8">ogr</provider>
-      <vectorjoins/>
-      <layerDependencies/>
-      <dataDependencies/>
-      <expressionfields/>
-      <map-layer-style-manager current="default">
-        <map-layer-style name="default"/>
-      </map-layer-style-manager>
-      <auxiliaryLayer/>
-      <metadataUrls/>
-      <flags>
-        <Identifiable>1</Identifiable>
-        <Removable>1</Removable>
-        <Searchable>1</Searchable>
-        <Private>0</Private>
-      </flags>
-      <renderer-v2 type="singleSymbol" symbollevels="0" enableorderby="0" referencescale="-1" forceraster="0">
-        <symbols>
-          <symbol name="0" type="marker" force_rhr="0" alpha="1" is_animated="0" clip_to_extent="1" frame_rate="10">
-            <data_defined_properties>
-              <Option type="Map">
-                <Option name="name" value="" type="QString"/>
-                <Option name="properties"/>
-                <Option name="type" value="collection" type="QString"/>
-              </Option>
-            </data_defined_properties>
-            <layer class="SimpleMarker" enabled="1" id="0" locked="0" pass="0">
-              <Option type="Map">
-                <Option name="angle" value="0" type="QString"/>
-                <Option name="cap_style" value="square" type="QString"/>
-                <Option name="color" value="0,0,255,255,rgb:0,0,1,1" type="QString"/>
-                <Option name="horizontal_anchor_point" value="1" type="QString"/>
-                <Option name="joinstyle" value="bevel" type="QString"/>
-                <Option name="name" value="circle" type="QString"/>
-                <Option name="offset" value="0,0" type="QString"/>
-                <Option name="offset_map_unit_scale" value="3x:0,0,0,0,0,0" type="QString"/>
-                <Option name="offset_unit" value="MM" type="QString"/>
-                <Option name="outline_color" value="35,35,35,255,rgb:0.13725490196078433,0.13725490196078433,0.13725490196078433,1" type="QString"/>
-                <Option name="outline_style" value="solid" type="QString"/>
-                <Option name="outline_width" value="0" type="QString"/>
-                <Option name="outline_width_map_unit_scale" value="3x:0,0,0,0,0,0" type="QString"/>
-                <Option name="outline_width_unit" value="MM" type="QString"/>
-                <Option name="scale_method" value="diameter" type="QString"/>
-                <Option name="size" value="3" type="QString"/>
-                <Option name="size_map_unit_scale" value="3x:0,0,0,0,0,0" type="QString"/>
-                <Option name="size_unit" value="MM" type="QString"/>
-                <Option name="vertical_anchor_point" value="1" type="QString"/>
-              </Option>
-              <data_defined_properties>
-                <Option type="Map">
-                  <Option name="name" value="" type="QString"/>
-                  <Option name="properties"/>
-                  <Option name="type" value="collection" type="QString"/>
-                </Option>
-              </data_defined_properties>
-            </layer>
-          </symbol>
-        </symbols>
-        <rotation/>
-        <sizescale/>
-        <data-defined-properties>
-          <Option type="Map">
-            <Option name="name" value="" type="QString"/>
-            <Option name="properties"/>
-            <Option name="type" value="collection" type="QString"/>
-          </Option>
-        </data-defined-properties>
-      </renderer-v2>
-      <blendMode>0</blendMode>
-      <featureBlendMode>0</featureBlendMode>
-    </maplayer>
-  </projectlayers>
-  <layerorder>
-    <layer id="{layer_id}"/>
-  </layerorder>
-  <properties>
-    <Digitizing>
-      <AvoidIntersectionsMode type="int">0</AvoidIntersectionsMode>
-    </Digitizing>
-    <Gui>
-      <CanvasColorBluePart type="int">255</CanvasColorBluePart>
-      <CanvasColorGreenPart type="int">255</CanvasColorGreenPart>
-      <CanvasColorRedPart type="int">255</CanvasColorRedPart>
-      <SelectionColorAlphaPart type="int">255</SelectionColorAlphaPart>
-      <SelectionColorBluePart type="int">0</SelectionColorBluePart>
-      <SelectionColorGreenPart type="int">255</SelectionColorGreenPart>
-      <SelectionColorRedPart type="int">255</SelectionColorRedPart>
-    </Gui>
-    <Legend>
-      <filterByMap type="bool">false</filterByMap>
-    </Legend>
-    <Measurement>
-      <AreaUnits type="QString">m2</AreaUnits>
-      <DistanceUnits type="QString">meters</DistanceUnits>
-    </Measurement>
-    <PAL>
-      <CandidatesLinePerCM type="double">5</CandidatesLinePerCM>
-      <CandidatesPolygonPerCM type="double">2.5</CandidatesPolygonPerCM>
-      <DrawRectOnly type="bool">false</DrawRectOnly>
-      <DrawUnplaced type="bool">false</DrawUnplaced>
-      <PlacementEngineVersion type="int">1</PlacementEngineVersion>
-      <SearchMethod type="int">0</SearchMethod>
-      <ShowingAllLabels type="bool">false</ShowingAllLabels>
-      <ShowingCandidates type="bool">false</ShowingCandidates>
-      <ShowingPartialsLabels type="bool">true</ShowingPartialsLabels>
-      <TextFormat type="int">0</TextFormat>
-      <UnplacedColor type="QString">255,0,0,255,rgb:1,0,0,1</UnplacedColor>
-    </PAL>
-    <Paths>
-      <Absolute type="bool">false</Absolute>
-    </Paths>
-    <PositionPrecision>
-      <Automatic type="bool">true</Automatic>
-      <DecimalPlaces type="int">2</DecimalPlaces>
-    </PositionPrecision>
-  </properties>
-  <visibility-presets/>
-  <transformContext/>
-  <projectMetadata>
-    <identifier></identifier>
-    <parentidentifier></parentidentifier>
-    <language></language>
-    <type></type>
-    <title></title>
-    <abstract></abstract>
-    <links/>
-    <dates/>
-    <author>FibreFlow</author>
-    <creation>{now}</creation>
-  </projectMetadata>
-  <Annotations/>
-  <Layouts/>
-  <mapViewDocks/>
-  <main-annotation-layer refreshOnNotifyEnabled="0" type="annotation" autoRefreshTime="0" autoRefreshMode="Disabled" refreshOnNotifyMessage="">
-    <id>Sketches</id>
-    <layername>sketches</layername>
-    <srs>
-      <spatialrefsys nativeFormat="Wkt">
-        <wkt>GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]</wkt>
-        <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
-        <srsid>3452</srsid>
-        <srid>4326</srid>
-        <authid>EPSG:4326</authid>
-        <description>WGS 84</description>
-        <projectionacronym>longlat</projectionacronym>
-        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
-        <geographicflag>true</geographicflag>
-      </spatialrefsys>
-    </srs>
-    <items/>
-  </main-annotation-layer>
-  <ProjectViewSettings rotation="0" UseProjectScales="0">
-    <Scales/>
-    <DefaultViewExtent ymin="{min_y}" xmax="{max_x}" ymax="{max_y}" xmin="{min_x}">
-      <spatialrefsys nativeFormat="Wkt">
-        <wkt>GEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],MEMBER["World Geodetic System 1984 (G2139)"],MEMBER["World Geodetic System 1984 (G2296)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],CS[ellipsoidal,2],AXIS["geodetic latitude (Lat)",north,ORDER[1],ANGLEUNIT["degree",0.0174532925199433]],AXIS["geodetic longitude (Lon)",east,ORDER[2],ANGLEUNIT["degree",0.0174532925199433]],USAGE[SCOPE["Horizontal component of 3D system."],AREA["World."],BBOX[-90,-180,90,180]],ID["EPSG",4326]]</wkt>
-        <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
-        <srsid>3452</srsid>
-        <srid>4326</srid>
-        <authid>EPSG:4326</authid>
-        <description>WGS 84</description>
-        <projectionacronym>longlat</projectionacronym>
-        <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
-        <geographicflag>true</geographicflag>
-      </spatialrefsys>
-    </DefaultViewExtent>
-  </ProjectViewSettings>
-  <ProjectStyleSettings DefaultSymbolOpacity="1" projectStyleId="sketches_sketches" RandomizeDefaultSymbolColor="true">
-    <databases/>
-  </ProjectStyleSettings>
-  <ProjectTimeSettings frameRate="1" cumulativeTemporalRange="0" timeStepUnit="h" timeStep="1"/>
-  <ElevationProperties>
-    <terrainProvider type="flat">
-      <TerrainProvider scale="1" offset="0"/>
-    </terrainProvider>
-  </ElevationProperties>
-  <ProjectDisplaySettings CoordinateCustomCrs="" CoordinateType="MapCrs" CoordinateAxisOrder="Default">
-    <BearingFormat id="bearing">
-      <Option type="Map">
-        <Option name="decimal_separator" type="invalid"/>
-        <Option name="decimals" value="6" type="int"/>
-        <Option name="direction_format" value="0" type="int"/>
-        <Option name="rounding_type" value="0" type="int"/>
-        <Option name="show_plus" value="false" type="bool"/>
-        <Option name="show_thousand_separator" value="true" type="bool"/>
-        <Option name="show_trailing_zeros" value="false" type="bool"/>
-        <Option name="thousand_separator" type="invalid"/>
-      </Option>
-    </BearingFormat>
-    <GeographicCoordinateFormat id="geographiccoordinate">
-      <Option type="Map">
-        <Option name="angle_format" value="0" type="int"/>
-        <Option name="decimal_separator" type="invalid"/>
-        <Option name="decimals" value="6" type="int"/>
-        <Option name="rounding_type" value="0" type="int"/>
-        <Option name="show_leading_degree_zeros" value="false" type="bool"/>
-        <Option name="show_leading_zeros" value="false" type="bool"/>
-        <Option name="show_plus" value="false" type="bool"/>
-        <Option name="show_suffix" value="false" type="bool"/>
-        <Option name="show_thousand_separator" value="true" type="bool"/>
-        <Option name="show_trailing_zeros" value="false" type="bool"/>
-        <Option name="thousand_separator" type="invalid"/>
-      </Option>
-    </GeographicCoordinateFormat>
-    <CoordinateFormat id="coordinate">
-      <Option type="Map">
-        <Option name="decimal_separator" type="invalid"/>
-        <Option name="decimals" value="6" type="int"/>
-        <Option name="rounding_type" value="0" type="int"/>
-        <Option name="show_plus" value="false" type="bool"/>
-        <Option name="show_thousand_separator" value="true" type="bool"/>
-        <Option name="show_trailing_zeros" value="false" type="bool"/>
-        <Option name="thousand_separator" type="invalid"/>
-      </Option>
-    </CoordinateFormat>
-  </ProjectDisplaySettings>
-  <ProjectGpsSettings destinationFollowsActiveLayer="true" autoCommitFeatures="false" autoAddTrackVertices="false"/>
-</qgis>'''
-
-    with open(qgs_path, 'w') as f:
-        f.write(qgs_content)
-
-    logger.info(f"Created QGIS project: {qgs_path}")
-
-
-def upload_to_qfieldcloud(upload_dir: str, upload_qgs: bool = True):
-    """
-    Upload files to QFieldCloud using SDK.
-
-    CRITICAL: Must use qfieldcloud-sdk, NOT direct MinIO upload!
-    CRITICAL: Must include wait times between uploads for storage sync!
-
-    Args:
-        upload_dir: Directory containing files to upload
-        upload_qgs: Whether to upload QGIS project file (set False if project already has .qgs)
-    """
-    try:
-        from qfieldcloud_sdk import sdk
-        from pathlib import Path
-    except ImportError:
-        logger.error("qfieldcloud-sdk not installed. Run: pip install qfieldcloud-sdk")
-        sys.exit(1)
-
-    logger.info(f"Connecting to QFieldCloud at {QFIELD_API_URL}...")
-    client = sdk.Client(url=QFIELD_API_URL)
-    client.login(QFIELD_USERNAME, QFIELD_PASSWORD)
-    logger.info(f"Logged in as {QFIELD_USERNAME}")
-
-    # Upload GeoPackage file first
-    logger.info("Uploading GeoPackage file...")
-    gpkg_results = client.upload_files(
-        project_id=QFIELD_PROJECT_ID,
-        upload_type=sdk.FileTransferType.PROJECT,
-        project_path=upload_dir,
-        filter_glob="*.gpkg",
-        throw_on_error=True,
-        force=True
+    client.download_files(
+        files=files,
+        project_id=project_id,
+        download_type=sdk.FileTransferType.PROJECT,
+        local_dir=output_dir,
+        filter_glob="*.qgs"
     )
-    for r in gpkg_results:
-        logger.info(f"  - {r['name']}: {r['status']}")
 
-    # CRITICAL: Wait for storage sync before uploading qgs
-    logger.info("Waiting 10s for storage sync...")
+    qgs_path = None
+    qgs_name = None
+    for f in os.listdir(output_dir):
+        if f.endswith(".qgs"):
+            qgs_path = os.path.join(output_dir, f)
+            qgs_name = f
+            break
+
+    if not qgs_path:
+        logger.error("No .qgs file found in project")
+        return None
+
+    logger.info(f"Updating {qgs_name}")
+
+    tree = ET.parse(qgs_path)
+    root = tree.getroot()
+
+    # Find or create "OES Report" group
+    layer_tree = root.find(".//layer-tree-group")
+    oes_group = None
+    for group in layer_tree.findall("layer-tree-group"):
+        if group.get("name") == "OES Report":
+            oes_group = group
+            break
+
+    if oes_group is None:
+        logger.info("Creating 'OES Report' group")
+        oes_group = ET.Element("layer-tree-group")
+        oes_group.set("name", "OES Report")
+        oes_group.set("checked", "Qt::Checked")
+        oes_group.set("expanded", "1")
+        layer_tree.insert(0, oes_group)
+
+    projectlayers = root.find(".//projectlayers")
+
+    # Find template layer
+    template_maplayer = None
+    for ml in projectlayers.findall("maplayer"):
+        ln_el = ml.find("layername")
+        if ln_el is not None and "OES" in ln_el.text and ("All" in ln_el.text or "Actual" in ln_el.text):
+            if ml.find("extent") is not None:
+                template_maplayer = ml
+                logger.info(f"Found OES template layer: {ln_el.text}")
+                break
+
+    if template_maplayer is None:
+        for ml in projectlayers.findall("maplayer"):
+            ln_el = ml.find("layername")
+            if ln_el is not None and ln_el.text in ["PONs", "POP", "PONs_1"]:
+                if ml.find("extent") is not None:
+                    template_maplayer = ml
+                    logger.info(f"Using fallback template layer: {ln_el.text}")
+                    break
+
+    # Add both layers
+    layers_config = [
+        (actual_table, actual_layer_name, "0,100,255,255"),   # Blue for actual
+        (planned_table, planned_layer_name, "0,200,0,255"),   # Green for planned
+    ]
+
+    for table_name, layer_display_name, color in layers_config:
+        datasource = f"./{gpkg_filename}|layername={table_name}"
+        layer_id = f"{table_name}_{str(uuid.uuid4()).replace('-', '_')}"
+
+        # Remove existing layer with same name
+        for ltl in list(oes_group):
+            if ltl.get("name") == layer_display_name:
+                oes_group.remove(ltl)
+                logger.info(f"Removed existing layer: {layer_display_name}")
+
+        # Remove from projectlayers too
+        for maplayer in list(projectlayers):
+            layername = maplayer.find("layername")
+            if layername is not None and layername.text == layer_display_name:
+                projectlayers.remove(maplayer)
+
+        # Add layer-tree-layer
+        new_ltl = ET.Element("layer-tree-layer")
+        new_ltl.set("id", layer_id)
+        new_ltl.set("name", layer_display_name)
+        new_ltl.set("source", datasource)
+        new_ltl.set("providerKey", "ogr")
+        new_ltl.set("checked", "Qt::Checked")
+        new_ltl.set("expanded", "1")
+        new_ltl.set("legend_exp", "")
+        oes_group.insert(0, new_ltl)
+
+        # Create maplayer
+        if template_maplayer is not None:
+            maplayer = copy.deepcopy(template_maplayer)
+            maplayer.set("id", layer_id)
+            id_el = maplayer.find("id")
+            if id_el is not None:
+                id_el.text = layer_id
+            ds_el = maplayer.find("datasource")
+            if ds_el is not None:
+                ds_el.text = datasource
+            ln_el = maplayer.find("layername")
+            if ln_el is not None:
+                ln_el.text = layer_display_name
+            projectlayers.append(maplayer)
+            logger.info(f"Cloned maplayer for {layer_display_name}")
+        else:
+            logger.warning(f"No template - creating minimal maplayer for {layer_display_name}")
+            maplayer = ET.SubElement(projectlayers, "maplayer")
+            maplayer.set("id", layer_id)
+            maplayer.set("geometry", "Point")
+            maplayer.set("type", "vector")
+            maplayer.set("wkbType", "Point")
+            ds = ET.SubElement(maplayer, "datasource")
+            ds.text = datasource
+            ln = ET.SubElement(maplayer, "layername")
+            ln.text = layer_display_name
+            prov = ET.SubElement(maplayer, "provider")
+            prov.text = "ogr"
+
+        # Add labeling and renderer
+        add_pole_nr_labeling(maplayer)
+        set_renderer(maplayer, color)
+        logger.info(f"Set {color.split(',')[1]}% green renderer for {layer_display_name}")
+
+    tree.write(qgs_path, encoding="UTF-8", xml_declaration=True)
+    logger.info(f"Updated {qgs_name} with both layers")
+
+    return qgs_path
+
+
+def upload_to_qfieldcloud(output_dir: str, gpkg_filename: str,
+                          actual_table: str, actual_layer_name: str,
+                          planned_table: str, planned_layer_name: str):
+    """Upload files and trigger jobs."""
+    from qfieldcloud_sdk import sdk
+
+    logger.info("Connecting to QFieldCloud...")
+    client = sdk.Client(QFIELD_API_URL)
+    client.login(QFIELD_USERNAME, QFIELD_PASSWORD)
+
+    project_id = QFIELD_PROJECT_ID
+
+    # Upload gpkg
+    logger.info(f"Uploading {gpkg_filename}...")
+    result = list(client.upload_files(
+        project_id=project_id,
+        upload_type=sdk.FileTransferType.PROJECT,
+        project_path=output_dir,
+        filter_glob="*.gpkg"
+    ))
+    for r in result:
+        logger.info(f"  {r.get('name')} - {r.get('status')}")
+
+    # Update .qgs
+    qgs_path = update_qgs_with_layers(client, project_id, gpkg_filename,
+                                       actual_table, actual_layer_name,
+                                       planned_table, planned_layer_name,
+                                       output_dir)
+
+    if qgs_path:
+        logger.info("Uploading updated .qgs...")
+        result = list(client.upload_files(
+            project_id=project_id,
+            upload_type=sdk.FileTransferType.PROJECT,
+            project_path=output_dir,
+            filter_glob="*.qgs"
+        ))
+        for r in result:
+            logger.info(f"  {r.get('name')} - {r.get('status')}")
+
+    logger.info("Waiting 10s before triggering jobs...")
     time.sleep(10)
 
-    # Optionally upload QGIS project file
-    if upload_qgs:
-        logger.info("Uploading QGIS project file...")
-        qgs_results = client.upload_files(
-            project_id=QFIELD_PROJECT_ID,
-            upload_type=sdk.FileTransferType.PROJECT,
-            project_path=upload_dir,
-            filter_glob="*.qgs",
-            throw_on_error=True,
-            force=True
-        )
-        for r in qgs_results:
-            logger.info(f"  - {r['name']}: {r['status']}")
+    logger.info("Triggering process_projectfile...")
+    job1 = client.job_trigger(project_id, sdk.JobTypes.PROCESS_PROJECTFILE)
+    logger.info(f"Job: {job1['id']}")
 
-        # CRITICAL: Wait for storage sync before triggering jobs
-        logger.info("Waiting 10s for storage sync...")
-        time.sleep(10)
-    else:
-        logger.info("Skipping QGIS project upload (UPLOAD_QGS=false)")
-
-    # Trigger processing job and wait for completion
-    logger.info("Triggering process_projectfile job...")
-    job1 = client.job_trigger(QFIELD_PROJECT_ID, sdk.JobTypes.PROCESS_PROJECTFILE, force=True)
-    job1_id = job1['id']
-    logger.info(f"  Job ID: {job1_id}")
-
-    # Wait for process_projectfile to complete
-    logger.info("Waiting for process_projectfile to complete...")
-    for i in range(30):  # Max 60 seconds
+    for i in range(30):
         time.sleep(2)
-        status = client.job_status(job1_id)  # SDK only takes job_id
-        job_status = status.get('status', 'unknown')
-        logger.info(f"  Status: {job_status}")
-        if job_status == 'finished':
-            # Check layer validity
-            feedback = status.get('feedback', {})
-            steps = feedback.get('steps', [])
-            for step in steps:
-                if step.get('stage') == 'layer_validity':
-                    outputs = step.get('outputs', [])
-                    for out in outputs:
-                        is_valid = out.get('is_valid', False)
-                        layer_name = out.get('name', 'unknown')
-                        error = out.get('error', '')
-                        if is_valid:
-                            logger.info(f"  ✅ Layer '{layer_name}' is valid")
-                        else:
-                            logger.error(f"  ❌ Layer '{layer_name}' invalid: {error}")
+        status = client.job_status(job1['id'])
+        if status['status'] in ['finished', 'failed']:
+            logger.info(f"process_projectfile: {status['status']}")
+            if status['status'] == 'failed':
+                logger.error(f"Error: {status.get('feedback', {}).get('error', '?')[:300]}")
+                return False
             break
-        elif job_status == 'failed':
-            logger.error(f"  ❌ process_projectfile failed!")
-            feedback = status.get('feedback', {})
-            logger.error(f"  Feedback: {feedback}")
-            break
-    else:
-        logger.warning("  ⚠️ Timeout waiting for process_projectfile")
 
-    # Trigger package job
-    logger.info("Triggering package job...")
-    job2 = client.job_trigger(QFIELD_PROJECT_ID, sdk.JobTypes.PACKAGE, force=True)
-    job2_id = job2['id']
-    logger.info(f"  Job ID: {job2_id}")
+    time.sleep(10)
 
-    # Wait for package to complete
-    logger.info("Waiting for package job to complete...")
-    for i in range(30):  # Max 60 seconds
+    logger.info("Triggering package...")
+    job2 = client.job_trigger(project_id, sdk.JobTypes.PACKAGE)
+    logger.info(f"Job: {job2['id']}")
+
+    for i in range(60):
         time.sleep(2)
-        status = client.job_status(job2_id)  # SDK only takes job_id
-        job_status = status.get('status', 'unknown')
-        logger.info(f"  Status: {job_status}")
-        if job_status == 'finished':
-            logger.info("  ✅ Package job completed!")
+        status = client.job_status(job2['id'])
+        if status['status'] in ['finished', 'failed']:
+            logger.info(f"package: {status['status']}")
+            if status['status'] == 'failed':
+                logger.error(f"Error: {status.get('feedback', {}).get('error', '?')[:300]}")
+                return False
             break
-        elif job_status == 'failed':
-            logger.error(f"  ❌ Package job failed!")
-            break
-    else:
-        logger.warning("  ⚠️ Timeout waiting for package job")
+
+    outputs = status.get('feedback', {}).get('outputs', {})
+    layers = outputs.get('qgis_layers_data', {}).get('layers_by_id', {})
+    logger.info("Packaged layers:")
+    for lid, linfo in layers.items():
+        name = linfo.get('name', '?')
+        valid = linfo.get('is_valid', '?')
+        if 'OES' in name:
+            logger.info(f"  {name} - valid: {valid}")
 
     return True
 
 
 def main():
-    """Main entry point."""
-    full_sync = '--full' in sys.argv
+    """Main sync function."""
+    parser = argparse.ArgumentParser(description='Sync OES data to QFieldCloud')
+    parser.add_argument('--full', action='store_true', help='Full sync')
+    parser.add_argument('--report-date', type=str, help='Report date YYYY-MM-DD')
+    args = parser.parse_args()
 
-    logger.info("=" * 60)
-    logger.info("OES to QFieldCloud Sync Starting")
-    logger.info(f"Target Project: {QFIELD_PROJECT_ID}")
-    logger.info(f"Mode: {'FULL' if full_sync else 'INCREMENTAL'}")
-    logger.info("=" * 60)
+    report_date = parse_report_date(args.report_date)
 
-    try:
-        # Step 1: Fetch data from Neon
-        records, bounds = fetch_oes_data()
+    logger.info("=" * 50)
+    logger.info("OES to QFieldCloud Sync (Actual + Planned)")
+    logger.info(f"Report Date: {report_date.strftime('%Y-%m-%d')}")
+    logger.info("=" * 50)
 
-        if not records:
-            logger.warning("No records to sync")
-            return 0
+    import shutil
+    if os.path.exists(OUTPUT_DIR):
+        shutil.rmtree(OUTPUT_DIR)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-        # Step 2: Create output directory
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
+    # Fetch data (both actual and planned)
+    data = fetch_oes_data()
+    if not data['actual'] and not data['planned']:
+        logger.warning("No records to sync")
+        return
 
-        gpkg_filename = GPKG_FILENAME  # Use configured filename to match existing .qgs
-        qgs_filename = f"{PROJECT_NAME}.qgs"
-        gpkg_path = os.path.join(OUTPUT_DIR, gpkg_filename)
-        qgs_path = os.path.join(OUTPUT_DIR, qgs_filename)
+    # Create gpkg with both tables
+    gpkg_filename, actual_table, actual_layer_name, planned_table, planned_layer_name = \
+        create_gpkg_with_two_tables(data, OUTPUT_DIR, report_date)
 
-        # Step 3: Create GeoPackage
-        count = create_geopackage(records, gpkg_path)
+    # Upload and trigger
+    success = upload_to_qfieldcloud(OUTPUT_DIR, gpkg_filename,
+                                     actual_table, actual_layer_name,
+                                     planned_table, planned_layer_name)
 
-        # Step 4: Create QGIS project (if needed)
-        if UPLOAD_QGS:
-            create_qgis_project(gpkg_filename, qgs_path, bounds)
-
-        # Step 5: Upload to QFieldCloud
-        upload_to_qfieldcloud(OUTPUT_DIR, upload_qgs=UPLOAD_QGS)
-
-        logger.info("=" * 60)
-        logger.info(f"Sync Complete: {count} records uploaded")
-        logger.info("Data should be visible in QField app after jobs complete")
-        logger.info("=" * 60)
-
-        return 0
-
-    except Exception as e:
-        logger.error(f"Sync failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+    if success:
+        logger.info("=" * 50)
+        logger.info(f"SUCCESS: {len(data['actual'])} actual + {len(data['planned'])} planned records synced")
+        logger.info(f"  {actual_layer_name} (blue) - where technician was")
+        logger.info(f"  {planned_layer_name} (green) - where drop was planned")
+        logger.info("=" * 50)
+    else:
+        logger.error("Sync failed")
+        sys.exit(1)
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    main()
