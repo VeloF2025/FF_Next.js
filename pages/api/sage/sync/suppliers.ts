@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { createSageClientFromConfig } from '@/services/sage';
 import {
@@ -18,7 +19,7 @@ import {
 
 const logger = createLogger({ module: 'api:sage:sync:suppliers' });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -153,3 +154,5 @@ export default async function handler(
 
   return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
 }
+
+export default withAuth(handler);

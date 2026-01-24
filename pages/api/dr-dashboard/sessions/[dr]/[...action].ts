@@ -5,6 +5,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { withAuth } from '@/lib/auth';
 // BOSS VPS API for photos (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 // VLM API for evaluation
@@ -40,7 +41,7 @@ function extractStepInfo(filename: string): { step: number; label: string; criti
     return { step: 0, label: filename, critical: false };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { dr, action } = req.query;
     const drNumber = Array.isArray(dr) ? dr[0] : dr;
     const actionPath = Array.isArray(action) ? action.join('/') : action;
@@ -200,3 +201,5 @@ async function handleDetails(req: NextApiRequest, res: NextApiResponse, drNumber
     // Delegate to photos handler
     return handlePhotos(req, res, drNumber);
 }
+
+export default withAuth(handler);

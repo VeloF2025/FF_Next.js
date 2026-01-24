@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 
+import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -147,7 +148,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));
 
 // Map database row to API response
 function mapDbToStockItem(row: any) {

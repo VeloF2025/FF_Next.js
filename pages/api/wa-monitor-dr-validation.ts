@@ -12,6 +12,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import formidable from 'formidable';
 import fs from 'fs';
@@ -41,7 +42,7 @@ interface ValidationResult {
   dbTotal: number;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // GET - Fetch drops for a project/date
   if (req.method === 'GET') {
     try {
@@ -555,3 +556,5 @@ function normalizeDate(input: any, fallback: string): string {
 
   return fallback;
 }
+
+export default withAuth(handler);

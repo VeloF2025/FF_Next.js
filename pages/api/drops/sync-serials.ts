@@ -15,6 +15,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -58,7 +59,7 @@ async function fetch1MapData(drNumber: string): Promise<OneMapResponse | null> {
   }
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -279,3 +280,5 @@ export default async function handler(
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withAuth(fetch1MapData);

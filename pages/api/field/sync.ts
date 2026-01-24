@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { safeObjectQuery, safeMutation } from '../../../lib/safe-query';
 
@@ -14,7 +15,7 @@ interface SyncData {
   lastSyncTimestamp?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -94,3 +95,5 @@ export default async function handler(
     res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
+export default withAuth(handler);

@@ -2,9 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '../../../lib/db.mjs';
 import { safeArrayQuery } from '../../../lib/safe-query';
 import { apiLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '../../../lib/api-error-handler';
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   // CORS headers are now handled by withErrorHandler
   
   try {
@@ -213,4 +214,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     apiLogger.error({ error, method: req.method, path: '/api/clients' }, 'Client API request failed');
     res.status(500).json({ success: false, error: (error as Error).message });
   }
-})
+}))

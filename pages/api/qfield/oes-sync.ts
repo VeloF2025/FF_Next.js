@@ -5,6 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { spawn } from 'child_process';
 
 // VPS Configuration - Updated Jan 2026 to use Velocity Server
@@ -13,7 +14,7 @@ const VPS_USER = process.env.VPS_USER || 'velo';
 const VPS_OES_PATH = process.env.VPS_OES_PATH || '/opt/qfield-sync';
 const SSH_KEY_PATH = process.env.VPS_SSH_KEY_PATH || '/home/velo/.ssh/id_rsa';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -185,3 +186,5 @@ function parseStats(output: string): any {
 
   return stats;
 }
+
+export default withAuth(handler);

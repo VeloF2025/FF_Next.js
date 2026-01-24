@@ -17,6 +17,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -197,8 +198,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// Export with Arcjet protection
-export default withArcjetProtection(handler, ajStrict);
+// Export with Arcjet protection and auth
+export default withAuth(withArcjetProtection(handler, ajStrict));
 
 // Parse multipart form data
 function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fields; files: formidable.Files }> {

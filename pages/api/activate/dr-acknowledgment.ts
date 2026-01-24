@@ -14,6 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial } from '@/modules/activate/services/qaAutoFailService';
 
@@ -469,9 +470,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
   }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
+async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method === 'POST') {
     return handlePost(req, res);
   }
   return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
 }
+
+export default withAuth(checkExistingSubmission);

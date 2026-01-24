@@ -8,6 +8,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '@/lib/auth-mock';
+import { withAuth } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import {
@@ -34,7 +35,7 @@ interface ImportRequestBody {
   options?: ImportOptions;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -151,3 +152,5 @@ export default async function handler(
     return apiResponse.internalError(res, err);
   }
 }
+
+export default withAuth(handler);

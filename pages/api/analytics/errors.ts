@@ -6,6 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { withAuth } from '@/lib/auth';
 type ErrorSeverity = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 
 interface ErrorContext {
@@ -132,7 +133,7 @@ function shouldIgnoreError(error: ErrorEvent): boolean {
   );
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -174,3 +175,5 @@ export default async function handler(
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+export default withAuth(handler);

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { Pool } from 'pg';
 import https from 'https';
 
@@ -62,7 +63,7 @@ function qfieldRequest(endpoint: string, method = 'GET', data: any = null): Prom
   });
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -129,3 +130,5 @@ export default async function handler(
     res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
+export default withAuth(handler);

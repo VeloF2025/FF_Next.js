@@ -22,6 +22,7 @@ import {
 import { isValidDropNumber } from '@/modules/wa-monitor/types/wa-monitor.types';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 // ==================== TYPES ====================
 
 interface ScanSerialSuccessResponse {
@@ -95,7 +96,7 @@ function validateRequest(body: unknown): ValidationResult {
 
 // ==================== HANDLER ====================
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse | { error: string }>
 ): Promise<void> {
@@ -174,3 +175,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

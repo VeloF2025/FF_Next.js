@@ -9,9 +9,10 @@ import { DocumentType } from '@/types/supplier/base.types';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -275,3 +276,5 @@ async function handleDelete(id: string, req: NextApiRequest, res: NextApiRespons
     throw error;
   }
 }
+
+export default withAuth(handler);

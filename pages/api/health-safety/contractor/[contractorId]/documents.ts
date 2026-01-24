@@ -8,11 +8,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { DOCUMENT_TYPES, REQUIRED_DOCUMENTS } from '@/modules/health-safety/types/compliance.types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { contractorId } = req.query;
 
   if (!contractorId || typeof contractorId !== 'string') {
@@ -201,3 +202,5 @@ async function handlePost(contractorId: string, req: NextApiRequest, res: NextAp
     type_info: DOCUMENT_TYPES[document_type as keyof typeof DOCUMENT_TYPES],
   });
 }
+
+export default withAuth(handler);

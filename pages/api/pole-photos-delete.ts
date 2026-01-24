@@ -11,6 +11,7 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
 // Valid photo types
@@ -30,7 +31,7 @@ interface DeleteResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<DeleteResponse>
 ) {
@@ -92,3 +93,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

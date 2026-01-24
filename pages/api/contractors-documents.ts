@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -82,8 +83,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// Export with Arcjet protection
-export default withArcjetProtection(handler, ajStrict);
+// Export with Arcjet protection and auth
+export default withAuth(withArcjetProtection(handler, ajStrict));
 
 // Map database row to ContractorDocument interface
 function mapDbToDocument(row: any) {

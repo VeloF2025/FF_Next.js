@@ -12,6 +12,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR, markFeedbackSent, getDropSubmitterPhone } from '@/modules/photo-review/services/fotoDbService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 
@@ -91,7 +92,7 @@ async function sendWhatsAppFeedback(drNumber: string, message: string, project?:
   console.log(`[WhatsApp] Message sent via wa-feedback (063 841 2276) to ${projectKey} group`);
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -232,3 +233,5 @@ function formatFeedbackMessage(evaluation: any): string {
 
   return message;
 }
+
+export default withAuth(sendWhatsAppFeedback);

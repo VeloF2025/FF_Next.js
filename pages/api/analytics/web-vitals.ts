@@ -6,6 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { withAuth } from '@/lib/auth';
 interface WebVitalsMetric {
   id: string;
   name: 'FCP' | 'LCP' | 'CLS' | 'FID' | 'TTFB' | 'INP';
@@ -72,7 +73,7 @@ function isValidMetric(data: any): data is WebVitalsMetric {
   );
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -100,3 +101,5 @@ export default async function handler(
     res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+export default withAuth(handler);

@@ -7,11 +7,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { getAuth } from '../../lib/auth-mock';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -246,3 +247,5 @@ async function createSyncTables() {
     throw error;
   }
 }
+
+export default withAuth(handler);

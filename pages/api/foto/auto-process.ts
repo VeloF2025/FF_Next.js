@@ -13,6 +13,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { autoProcessDropsBatch, type AutoProcessorStats } from '@/modules/photo-review/services/autoEvaluator';
 
@@ -134,7 +135,7 @@ async function saveProcessingState(stats: AutoProcessorStats): Promise<void> {
 
 // ==================== MAIN HANDLER ====================
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -242,3 +243,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(getNewDropsForEvaluation);

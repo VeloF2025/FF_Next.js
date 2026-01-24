@@ -9,6 +9,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import type { EvaluationResult } from '@/modules/photo-review/types';
 import { saveEvaluation } from '@/modules/photo-review/services/fotoDbService';
 import {
@@ -30,7 +31,7 @@ const USE_BOSS_PRIMARY = process.env.USE_BOSS_PRIMARY !== 'false'; // Default: t
 const USE_VLM_BACKEND = process.env.USE_VLM_BACKEND !== 'false'; // Default: true (VLM for re-evaluation)
 const USE_PYTHON_BACKEND = process.env.USE_PYTHON_BACKEND === 'true'; // Fallback option
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -243,3 +244,5 @@ function generateMockEvaluation(dr_number: string): EvaluationResult {
     markdown_report: undefined,
   };
 }
+
+export default withAuth(handler);

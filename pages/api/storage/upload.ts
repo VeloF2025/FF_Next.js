@@ -12,6 +12,7 @@ import fs from 'fs';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 export const config = {
   api: {
     bodyParser: false,
@@ -27,7 +28,7 @@ interface UploadResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<UploadResponse>
 ) {
@@ -104,3 +105,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

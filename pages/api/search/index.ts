@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { Client } from 'pg';
 
 const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
@@ -9,7 +10,7 @@ const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:
  * 
  * Uses the PostgreSQL full-text search infrastructure we created
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -104,3 +105,5 @@ export default async function handler(
     await client.end();
   }
 }
+
+export default withAuth(handler);

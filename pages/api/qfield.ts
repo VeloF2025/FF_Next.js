@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 const execAsync = promisify(exec);
@@ -485,7 +486,7 @@ async function getJobStats(): Promise<{ success: boolean; stats?: JobStats; erro
   }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method === 'GET') {
       const health = await getHealthStatus();
@@ -558,3 +559,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(sshCommand);

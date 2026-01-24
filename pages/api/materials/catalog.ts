@@ -9,6 +9,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import type {
   MaterialCatalog,
   MaterialSearchParams,
@@ -19,7 +20,7 @@ import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -219,3 +220,5 @@ function mapRowToMaterial(row: Record<string, unknown>): MaterialCatalog {
     updatedAt: row.updated_at as string,
   };
 }
+
+export default withAuth(handler);

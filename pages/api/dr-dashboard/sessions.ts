@@ -5,10 +5,11 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { withAuth } from '@/lib/auth';
 // BOSS VPS API base URL (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -64,3 +65,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
     }
 }
+
+export default withAuth(handler);

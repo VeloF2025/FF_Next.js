@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-export default async function handler(
+import { withAuth } from '@/lib/auth';
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -69,3 +70,5 @@ export default async function handler(
     res.status(405).json({ error: 'Method not allowed' });
   }
 }
+
+export default withAuth(handler);

@@ -5,6 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import formidable from 'formidable';
 import fs from 'fs';
 import { exec } from 'child_process';
@@ -25,7 +26,7 @@ export const config = {
   },
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -141,3 +142,5 @@ function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fields; fi
     });
   });
 }
+
+export default withAuth(handler);

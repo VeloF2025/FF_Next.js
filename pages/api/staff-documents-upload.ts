@@ -16,6 +16,7 @@ import fs from 'fs';
 import { uploadStaffDocument, isVFStorageAvailable, deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import type { DocumentType } from '@/types/staff-document.types';
 import { logDocumentUploaded } from '@/services/staff/staffAuditService';
 
@@ -591,8 +592,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// Export with Arcjet protection
-export default withArcjetProtection(handler, ajStrict);
+// Export with Arcjet protection and auth
+export default withAuth(withArcjetProtection(handler, ajStrict));
 
 // Parse multipart form data
 function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fields; files: formidable.Files }> {

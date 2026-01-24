@@ -15,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import { getDailyDropsPerProject } from '@/modules/wa-monitor/services/waMonitorService';
 import { withArcjetProtection, ajWaMonitor } from '@/lib/arcjet';
+import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
@@ -40,5 +41,5 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// Export with Arcjet protection
-export default withArcjetProtection(handler, ajWaMonitor);
+// Export with Arcjet protection and auth
+export default withAuth(withArcjetProtection(handler, ajWaMonitor));

@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { spawn } from 'child_process';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -114,3 +115,5 @@ function extractNumber(text: string, pattern: RegExp): number {
   const match = text.match(pattern);
   return match ? parseInt(match[1].replace(/,/g, ''), 10) : 0;
 }
+
+export default withAuth(handler);

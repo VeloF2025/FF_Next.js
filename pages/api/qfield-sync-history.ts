@@ -8,9 +8,10 @@ import { neon } from '@neondatabase/serverless';
 import { getAuth } from '../../lib/auth-mock';
 import { apiResponse } from '@/lib/apiResponse';
 
+import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId } = getAuth(req);
 
   if (!userId) {
@@ -92,3 +93,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
+import { withAuth } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -144,7 +145,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));
 
 // Map database row to StaffDocument interface
 function mapDbToDocument(row: Record<string, unknown>) {

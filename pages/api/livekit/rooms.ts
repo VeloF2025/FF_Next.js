@@ -2,6 +2,7 @@
 // CRUD operations for LiveKit rooms
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import {
     createRoom,
     listRooms,
@@ -22,7 +23,7 @@ interface RoomsResponse {
     error?: string;
 }
 
-export default async function handler(
+async function handler(
     req: NextApiRequest,
     res: NextApiResponse<RoomsResponse>
 ) {
@@ -110,3 +111,5 @@ export default async function handler(
 
     return res.status(405).json({ success: false, error: 'Method not allowed' });
 }
+
+export default withAuth(handler);

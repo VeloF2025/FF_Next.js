@@ -2,13 +2,14 @@
 // Start/stop room recording
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { startRecording, stopRecording } from '@/modules/livekit/services/livekitService';
 import type { RecordingRequest, RecordingResponse } from '@/modules/livekit/types/livekit.types';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
     req: NextApiRequest,
     res: NextApiResponse<RecordingResponse>
 ) {
@@ -62,3 +63,5 @@ export default async function handler(
         return res.status(500).json({ success: false, error: error.message });
     }
 }
+
+export default withAuth(handler);

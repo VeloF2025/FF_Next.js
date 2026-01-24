@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // TODO: Replace with proper Clerk auth when ready for production
   const userId = 'dev-user-1';
   const email = 'ai@velocityfibre.co.za'; // TODO: Get from Clerk when ready
@@ -95,3 +96,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withAuth(handler);

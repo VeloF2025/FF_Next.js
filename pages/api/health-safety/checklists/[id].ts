@@ -10,9 +10,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 
+import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
@@ -157,3 +158,5 @@ async function handleDelete(id: string, res: NextApiResponse) {
 
   return apiResponse.success(res, { message: 'Template deactivated', id });
 }
+
+export default withAuth(handler);

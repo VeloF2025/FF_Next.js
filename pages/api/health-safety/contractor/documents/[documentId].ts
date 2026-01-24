@@ -9,11 +9,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { documentId } = req.query;
 
   if (!documentId || typeof documentId !== 'string') {
@@ -157,3 +158,5 @@ async function handleDelete(documentId: string, res: NextApiResponse) {
 
   return apiResponse.success(res, { message: 'Document deleted', id: documentId });
 }
+
+export default withAuth(handler);

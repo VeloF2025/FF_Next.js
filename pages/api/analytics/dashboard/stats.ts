@@ -1,11 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
+import { withAuth } from '@/lib/auth';
 import { createLoggedSql } from '@/lib/db-logger';
 
 // Initialize Neon client with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -184,4 +185,4 @@ export default withErrorHandler(async (
       }
     });
   }
-})
+}))

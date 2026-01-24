@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -27,7 +28,7 @@ const VALID_ITEM_IDS = [
 const DEFAULT_ITEMS = ['meetings', 'action-items'];
 const MAX_ITEMS = 5; // Dashboard is always pinned, plus 5 custom items
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // TODO: Replace with proper Clerk auth when ready for production
   const userId = 'dev-user-1';
 
@@ -129,3 +130,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withAuth(handler);

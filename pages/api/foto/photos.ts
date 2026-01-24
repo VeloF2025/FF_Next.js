@@ -5,6 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import type { DropRecord, Photo } from '@/modules/photo-review/types';
 import { Pool } from 'pg';
 
@@ -55,7 +56,7 @@ function getProxiedPhotoUrl(drNumber: string, filename: string): string {
   return `/api/foto/photo-proxy?url=${encodeURIComponent(bossUrl)}`;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -180,3 +181,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

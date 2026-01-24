@@ -1,13 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { FieldTask } from '../../../../src/modules/field-app/types/field-app.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
+import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse, ErrorCode } from '../../../../src/lib/apiResponse';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -207,4 +208,4 @@ export default withErrorHandler(async (
   } else {
     return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
-});
+}));

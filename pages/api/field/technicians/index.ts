@@ -1,12 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { FieldTechnician } from '../../../../src/modules/field-app/types/field-app.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
+import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -133,7 +134,7 @@ export default withErrorHandler(async (
   } else {
     res.status(405).json({ error: 'Method not allowed' });
   }
-})
+}))
 
 // Helper function to determine technician status
 function determineStatus(

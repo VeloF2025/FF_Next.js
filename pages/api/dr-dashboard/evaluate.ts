@@ -5,6 +5,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { withAuth } from '@/lib/auth';
 const VLM_URL = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_MODEL = process.env.VLM_MODEL || 'dr-verifier';
 
@@ -171,7 +172,7 @@ Return JSON with: {
 }`,
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -284,4 +285,6 @@ export const config = {
             sizeLimit: '20mb', // Large images
         },
     },
-};
+}
+
+export default withAuth(handler);;

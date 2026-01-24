@@ -2,10 +2,11 @@
 // Generates access tokens for participants to join rooms
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { generateToken } from '@/modules/livekit/services/livekitService';
 import type { TokenRequest, TokenResponse } from '@/modules/livekit/types/livekit.types';
 
-export default async function handler(
+async function handler(
     req: NextApiRequest,
     res: NextApiResponse<TokenResponse>
 ) {
@@ -40,3 +41,5 @@ export default async function handler(
         return res.status(500).json({ success: false, error: error.message });
     }
 }
+
+export default withAuth(handler);

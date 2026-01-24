@@ -24,6 +24,7 @@ import os from 'os';
 import { execSync } from 'child_process';
 import sharp from 'sharp';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '@/services/vfStorageAdapter';
 import { validateDocument, type ValidationResult } from '@/services/staff/documentValidationService';
 
@@ -576,7 +577,7 @@ function isPdfFile(file: formidable.File): boolean {
   return filename.endsWith('.pdf') || mimetype === 'application/pdf';
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<OcrPreviewResponse | { error: string }>
 ) {
@@ -987,3 +988,5 @@ function buildTopGuesses(classification: { documentType: string; confidence: num
   // TODO: Enhance OCR service to return top-3 classification guesses
   return [topGuess];
 }
+
+export default withAuth(detectImageOrientation);

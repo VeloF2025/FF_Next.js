@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { getAuth } from '../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 
@@ -21,7 +22,7 @@ interface ProcessedSOWResult {
 }
 
 // Main API handler for SOW imports
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // For testing: use mock user ID
   // TODO: Re-enable Clerk authentication
   const userId = 'test-user-123';
@@ -234,3 +235,5 @@ async function processSOWData(type: string, data: Array<Record<string, any>>): P
     errors: errors.length > 0 ? errors.slice(0, 10) : undefined, // Limit errors to first 10
   };
 }
+
+export default withAuth(handler);

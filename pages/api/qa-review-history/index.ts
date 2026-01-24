@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -28,7 +29,7 @@ interface QAReviewHistory {
   imported_at: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -99,3 +100,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

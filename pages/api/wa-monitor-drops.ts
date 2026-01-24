@@ -11,6 +11,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import {
   getPaginatedDrops,
@@ -20,7 +21,7 @@ import {
   getCompleteProjectStats,
 } from '@/modules/wa-monitor/services/waMonitorService';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
@@ -106,3 +107,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error, 'Failed to fetch QA review drops');
   }
 }
+
+export default withAuth(handler);

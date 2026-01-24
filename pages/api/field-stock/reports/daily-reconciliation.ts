@@ -19,6 +19,7 @@ import {
 } from '@/modules/field-stock/services/reconciliationService';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 // ==================== TYPES ====================
 
 interface SuccessResponse {
@@ -90,7 +91,7 @@ function validateRequest(query: Partial<Record<string, string | string[]>>): Val
 
 // ==================== HANDLER ====================
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse | { error: string }>
 ): Promise<void> {
@@ -144,3 +145,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

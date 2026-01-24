@@ -4,6 +4,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse} from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -11,7 +12,7 @@ const sql = neon(process.env.DATABASE_URL || '');
 // Lock expires after 5 minutes of inactivity
 const LOCK_TIMEOUT_MINUTES = 5;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
@@ -108,3 +109,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     error: { message: 'Method not allowed' }
   });
 }
+
+export default withAuth(handler);

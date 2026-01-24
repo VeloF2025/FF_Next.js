@@ -7,11 +7,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { contractorOnboardingService, UpdateStageRequest } from '@/services/contractor/contractorOnboardingService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { contractorId, stageId } = req.query;
 
   // Validate IDs
@@ -85,3 +86,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Allow', ['PUT']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
+
+export default withAuth(handler);

@@ -4,10 +4,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR } from '@/modules/photo-review/services/fotoDbService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -55,3 +56,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

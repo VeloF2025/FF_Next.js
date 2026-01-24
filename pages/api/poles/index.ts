@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 
@@ -14,7 +15,7 @@ type PoleData = {
   error?: string;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<PoleData>
 ) {
@@ -250,3 +251,5 @@ async function ensurePoleTableExists() {
   await sql`CREATE INDEX IF NOT EXISTS idx_sow_poles_status ON sow_poles(status)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sow_poles_number ON sow_poles(pole_number)`;
 }
+
+export default withAuth(handler);

@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { withAuth } from '@/lib/auth';
 /**
  * Database Info API Route
  * Gets database version and connection information
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -47,3 +48,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

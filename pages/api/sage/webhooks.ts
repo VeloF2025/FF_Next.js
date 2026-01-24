@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger({ module: 'api:sage:webhooks' });
@@ -25,7 +26,7 @@ interface SageWebhookPayload {
   data?: Record<string, unknown>;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -180,3 +181,5 @@ export default async function handler(
     return apiResponse.success(res, { received: true, error: 'Processing failed' });
   }
 }
+
+export default withAuth(handler);

@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/db/pool';
 
-export default async function handler(
+import { withAuth } from '@/lib/auth';
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -30,3 +31,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

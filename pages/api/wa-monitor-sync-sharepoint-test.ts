@@ -7,6 +7,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import { neon } from '@neondatabase/serverless';
 
@@ -246,7 +247,7 @@ async function syncToSharePoint(
   return { succeeded, failed };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
@@ -303,3 +304,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error, 'Test sync failed');
   }
 }
+
+export default withAuth(getAccessToken);

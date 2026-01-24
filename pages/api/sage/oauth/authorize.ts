@@ -10,13 +10,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { SageClient } from '@/services/sage';
 import { randomBytes } from 'crypto';
 
 const logger = createLogger({ module: 'api:sage:oauth:authorize' });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -90,3 +91,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

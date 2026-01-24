@@ -16,6 +16,7 @@ import {
   linkOrphanedDocument,
 } from '@/services/odoo/entities/attachmentSync';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger({ module: 'api/odoo/sync/attachments' });
@@ -26,7 +27,7 @@ const ODOO_DB = process.env.ODOO_DB || 'velocityfibre';
 const ODOO_USERNAME = process.env.ODOO_USERNAME || 'hein@velocityfibre.co.za';
 const ODOO_PASSWORD = process.env.ODOO_PASSWORD || 'Velocity@2025!';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -165,3 +166,5 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     ffEntityId,
   });
 }
+
+export default withAuth(handler);

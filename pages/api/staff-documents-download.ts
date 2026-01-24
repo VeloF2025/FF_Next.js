@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
+import { withAuth } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 import { logDocumentDownloaded } from '@/services/staff/staffAuditService';
 
@@ -105,4 +106,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));

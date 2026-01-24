@@ -2,6 +2,7 @@
 // Handle LiveKit server events
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { WebhookReceiver } from 'livekit-server-sdk';
 import { neon } from '@neondatabase/serverless';
 
@@ -28,7 +29,7 @@ async function getRawBody(req: NextApiRequest): Promise<string> {
     });
 }
 
-export default async function handler(
+async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
@@ -104,3 +105,5 @@ export default async function handler(
         return res.status(400).json({ error: error.message });
     }
 }
+
+export default withAuth(getRawBody);

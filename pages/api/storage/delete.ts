@@ -10,12 +10,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 interface DeleteResponse {
   success: boolean;
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<DeleteResponse>
 ) {
@@ -47,3 +48,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

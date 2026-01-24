@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
+import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { apiLogger } from '@/lib/logger';
 
@@ -7,7 +8,7 @@ import { apiLogger } from '@/lib/logger';
 const getSql = () => createLoggedSql(process.env.DATABASE_URL!);
 
 // API route handler for projects CRUD operations
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   // CORS handled by withErrorHandler - no need for manual headers
   
   // Handle different HTTP methods
@@ -24,7 +25,7 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
       res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
       return res.status(405).json({ error: `Method ${req.method} not allowed` });
   }
-})
+}))
 
 // GET /api/projects - Fetch all projects or single project by ID
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {

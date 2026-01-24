@@ -11,6 +11,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import {
   INCIDENT_TYPE_CONFIG,
   SEVERITY_TO_PRIORITY,
@@ -19,7 +20,7 @@ import {
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     switch (req.method) {
       case 'GET':
@@ -299,3 +300,5 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     },
   });
 }
+
+export default withAuth(handler);

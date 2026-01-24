@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-export default async function handler(
+import { withAuth } from '@/lib/auth';
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -30,3 +31,5 @@ export default async function handler(
     res.status(500).json({ error: 'Failed to export data' });
   }
 }
+
+export default withAuth(handler);

@@ -1,5 +1,6 @@
 // Recordings API - List and Delete recordings
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,7 +16,7 @@ interface Recording {
     url: string;
 }
 
-export default async function handler(
+async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
@@ -112,3 +113,5 @@ export default async function handler(
 
     return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withAuth(handler);

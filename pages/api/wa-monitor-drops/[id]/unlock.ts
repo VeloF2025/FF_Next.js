@@ -4,11 +4,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
@@ -84,3 +85,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     error: { message: 'Method not allowed' }
   });
 }
+
+export default withAuth(handler);

@@ -7,12 +7,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import type { ContractorProject, ContractorProjectWithDetails } from '@/types/contractor-project.types';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     return handleGet(req, res);
   } else if (req.method === 'POST') {
@@ -208,3 +209,5 @@ function mapDbToAssignment(row: any): ContractorProjectWithDetails {
     projectStatus: row.project_status
   };
 }
+
+export default withAuth(handler);

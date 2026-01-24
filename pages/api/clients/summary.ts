@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -56,3 +57,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 }
+
+export default withAuth(handler);

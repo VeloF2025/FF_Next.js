@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { getAuth } from '@/lib/auth-mock';
+import { withAuth } from '@/lib/auth';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
@@ -198,7 +199,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));
 
 // Map database row to StaffDocument interface
 function mapDbToDocument(row: Record<string, unknown>) {

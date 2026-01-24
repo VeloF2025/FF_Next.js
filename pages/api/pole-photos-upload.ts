@@ -13,6 +13,7 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
+import { withAuth } from '@/lib/auth';
 // Disable default body parser for file uploads
 export const config = {
   api: {
@@ -40,7 +41,7 @@ interface UploadResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<UploadResponse>
 ) {
@@ -145,3 +146,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import {
   parseFirefliesActionItems,
   findAssigneeEmail,
@@ -16,7 +17,7 @@ const sql = neon(process.env.DATABASE_URL!);
  * - Vercel cron job (every 6 hours)
  * - Manual sync button (future feature)
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -122,3 +123,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

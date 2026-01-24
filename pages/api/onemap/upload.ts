@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import formidable from 'formidable';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
@@ -238,7 +239,7 @@ async function storeInDatabase(records: any[], importId: string) {
   return recordsImported;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -323,3 +324,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(parseOneMapFile);

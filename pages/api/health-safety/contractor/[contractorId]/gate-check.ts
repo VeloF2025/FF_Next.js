@@ -10,12 +10,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { contractorId } = req.query;
 
   if (!contractorId || typeof contractorId !== 'string') {
@@ -156,3 +157,5 @@ async function getGateBreakdown(contractorId: string) {
     },
   };
 }
+
+export default withAuth(handler);

@@ -8,7 +8,8 @@ import { NeonSupplierService } from '@/services/suppliers/neonSupplierService';
 import { SupplierStatus } from '@/types/supplier/base.types';
 import { log } from '@/lib/logger';
 
-export default async function handler(
+import { withAuth } from '@/lib/auth';
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -91,3 +92,5 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     throw error;
   }
 }
+
+export default withAuth(handler);
