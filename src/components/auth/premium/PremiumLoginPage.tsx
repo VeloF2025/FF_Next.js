@@ -7,6 +7,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Link from 'next/link';
 import { Mail, Lock, ArrowLeft, Check, User } from 'lucide-react';
 import { FiberBackground } from './FiberBackground';
 import { QuoteDisplay } from './QuoteDisplay';
@@ -266,6 +267,15 @@ export function PremiumLoginPage() {
           disabled={loading}
           disableFloating
         />
+      </div>
+
+      <div className="flex justify-end">
+        <Link
+          href={`/auth/forgot-password?email=${encodeURIComponent(email)}`}
+          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          Forgot password?
+        </Link>
       </div>
 
       <VelocityButton
