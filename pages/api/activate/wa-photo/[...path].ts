@@ -2,17 +2,19 @@
  * API: /api/activate/wa-photo/[...path]
  * Proxy WhatsApp photos from VPS storage
  *
- * GET /api/activate/wa-photo/{group_jid}/{filename}
- * Serves photos stored at /opt/whatsapp-bridge/store/{group_jid}/{filename} on VPS
+ * GET /api/activate/wa-photo/{drNumber}/{filename}
+ * Serves photos stored at /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
+ *
+ * Note: This endpoint mirrors /api/activate/photo/[...path].ts for WA-specific photos
+ * Both endpoints now point to the same VPS photo viewer (port 8866)
  */
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-// VPS server where WA bridge stores photos
-const VPS_HOST = '72.61.197.178';
-const VPS_PHOTO_PORT = 8084; // nginx serving /opt/whatsapp-bridge/store/
+// VPS photo viewer endpoint (serves /var/lib/docker/volumes/boss-vps_dr_photos/_data/)
+const VPS_PHOTO_API = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -23,37 +25,45 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { path } = req.query;
 
   if (!path || !Array.isArray(path) || path.length < 2) {
-    return res.status(400).json({ error: 'Invalid path. Expected: /wa-photo/{group_jid}/{filename}' });
+    return res.status(400).json({ error: 'Invalid path. Expected: /wa-photo/{drNumber}/{filename}' });
   }
 
-  const [groupJid, filename] = path;
+  const [drNumber, filename] = path;
 
   // Security: Validate path components to prevent directory traversal
-  if (filename.includes('..') || filename.includes('/') || groupJid.includes('..') || groupJid.includes('/')) {
-    log.warn(`Rejected path traversal attempt: ${groupJid}/${filename}`);
+  if (filename.includes('..') || filename.includes('/') || drNumber.includes('..') || drNumber.includes('/')) {
+    log.warn(`[WaPhotoProxy] Rejected path traversal attempt: ${drNumber}/${filename}`);
     return res.status(400).json({ error: 'Invalid path components' });
   }
 
-  // Validate filename format (should be like DR1234567_20260124_123456_1.jpg)
-  if (!filename.match(/^DR\d+_\d{8}_\d{6}_\d+\.(jpg|jpeg|png|webp)$/i)) {
-    log.warn(`Rejected invalid filename: ${filename}`);
+  // Validate DR number format
+  if (!drNumber.match(/^DR\d+$/i)) {
+    return res.status(400).json({ error: 'Invalid DR number format' });
+  }
+
+  // Validate filename format - accepts both:
+  // - WA photos: wa_DR1234567_20260124_143756_1.jpg
+  // - Regular photos: DR1234567_ph_*.jpg
+  const validFilename = filename.match(/^(wa_)?DR\d+[_\w]+\.(jpg|jpeg|png|webp)$/i);
+  if (!validFilename) {
+    log.warn(`[WaPhotoProxy] Rejected invalid filename: ${filename}`);
     return res.status(400).json({ error: 'Invalid filename format' });
   }
 
   try {
-    // Fetch from VPS nginx serving /opt/whatsapp-bridge/store/
-    const vpsUrl = `http://${VPS_HOST}:${VPS_PHOTO_PORT}/wa-photos/${groupJid}/${filename}`;
+    // Fetch from VPS photo viewer (same as /api/activate/photo/[...path].ts)
+    const photoUrl = `${VPS_PHOTO_API}/photos/${drNumber}/${filename}`;
 
-    log.info(`Proxying WA photo from VPS: ${groupJid}/${filename}`);
+    log.info(`[WaPhotoProxy] Fetching: ${photoUrl}`);
 
-    const response = await fetch(vpsUrl, {
+    const response = await fetch(photoUrl, {
       headers: {
         'Accept': 'image/*',
       },
     });
 
     if (!response.ok) {
-      log.error(`Photo not found on VPS: ${groupJid}/${filename} (${response.status})`);
+      log.warn(`[WaPhotoProxy] Photo not found: ${drNumber}/${filename} (${response.status})`);
       return res.status(404).json({ error: 'Photo not found' });
     }
 
@@ -62,11 +72,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const buffer = Buffer.from(await response.arrayBuffer());
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600'); // Cache for 1 hour
     res.setHeader('Content-Length', buffer.length);
     return res.send(buffer);
   } catch (error) {
-    log.error(`Error proxying WA photo ${groupJid}/${filename}:`, error);
+    log.error(`[WaPhotoProxy] Error proxying photo ${drNumber}/${filename}:`, error);
     return res.status(500).json({ error: 'Failed to fetch photo' });
   }
 }
