@@ -33,6 +33,7 @@ import type {
   MismatchStatus,
   MismatchResolution,
 } from '../../types/reporting.types';
+import { ReportCard, ReportCardGrid } from './shared';
 
 interface SerialMismatchReportsProps {
   filters: ReportFilters;
@@ -250,41 +251,39 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <div className="text-sm text-gray-500 dark:text-gray-400">Total Mismatches</div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {isLoading ? '...' : data?.summary.total ?? 0}
-          </div>
-        </div>
-        <div
-          className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30"
+      <ReportCardGrid columns={4}>
+        <ReportCard
+          title="Total Mismatches"
+          value={isLoading ? '...' : data?.summary.total ?? 0}
+          color="gray"
+          icon={<AlertTriangle className="h-4 w-4" />}
+          isLoading={isLoading}
+        />
+        <ReportCard
+          title="Pending Investigation"
+          value={isLoading ? '...' : data?.summary.pending_investigation ?? 0}
+          color="red"
+          subtitle="Needs attention"
           onClick={() => setSelectedStatus('pending_investigation')}
-        >
-          <div className="text-sm text-red-600 dark:text-red-400">Pending Investigation</div>
-          <div className="text-2xl font-bold text-red-700 dark:text-red-300">
-            {isLoading ? '...' : data?.summary.pending_investigation ?? 0}
-          </div>
-        </div>
-        <div
-          className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+          isLoading={isLoading}
+        />
+        <ReportCard
+          title="Tickets Created"
+          value={isLoading ? '...' : data?.summary.ticket_created ?? 0}
+          color="blue"
+          subtitle="Being tracked"
           onClick={() => setSelectedStatus('ticket_created')}
-        >
-          <div className="text-sm text-blue-600 dark:text-blue-400">Tickets Created</div>
-          <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-            {isLoading ? '...' : data?.summary.ticket_created ?? 0}
-          </div>
-        </div>
-        <div
-          className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30"
+          isLoading={isLoading}
+        />
+        <ReportCard
+          title="Resolved"
+          value={isLoading ? '...' : data?.summary.resolved ?? 0}
+          color="green"
+          subtitle="Investigated"
           onClick={() => setSelectedStatus('resolved')}
-        >
-          <div className="text-sm text-green-600 dark:text-green-400">Resolved</div>
-          <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-            {isLoading ? '...' : data?.summary.resolved ?? 0}
-          </div>
-        </div>
-      </div>
+          isLoading={isLoading}
+        />
+      </ReportCardGrid>
 
       {/* Team Breakdown (Critical for accountability) */}
       {data?.summary.by_team && Object.keys(data.summary.by_team).length > 0 && (
