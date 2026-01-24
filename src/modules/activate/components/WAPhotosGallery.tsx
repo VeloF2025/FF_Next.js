@@ -15,7 +15,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+// Using regular img for proxied images (Next.js Image optimizer can't handle auth-protected API routes)
 import { format } from 'date-fns';
 import { User, Camera, Cpu, ZoomIn } from 'lucide-react';
 
@@ -99,11 +99,10 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
       {/* Image */}
       <div className="aspect-square relative">
         {!imageError ? (
-          <Image
+          <img
             src={imageUrl}
             alt={photo.original_filename || 'WA Photo'}
-            fill
-            className="object-cover group-hover:scale-105 transition-transform duration-200"
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             onError={() => setImageError(true)}
           />
         ) : (
