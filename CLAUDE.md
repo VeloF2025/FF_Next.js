@@ -467,6 +467,38 @@ echo 'velo2026' | sudo -S systemctl restart wa-feedback
 - Velo Test: `120363421664266245@g.us`
 - Mamelodi: `120363408849234743@g.us`
 
+**Manual DR Acknowledgment (when bridge fails):**
+
+If the bridge failed to send an acknowledgment (e.g., due to 401 auth errors), manually send:
+```bash
+# 1. Get the ack message from FibreFlow API
+ACK_DATA=$(curl -s -X POST "https://app.fibreflow.app/api/activate/dr-acknowledgment" \
+  -H "Content-Type: application/json" \
+  -d '{"dropNumber": "DR1234567"}')
+
+# 2. Extract the message
+MESSAGE=$(echo "$ACK_DATA" | jq -r '.data.message')
+echo "$MESSAGE"  # Review before sending
+
+# 3. Send to the correct group (use group JID from mapping above)
+curl -s -X POST http://72.61.197.178:8081/send-message \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"group_jid\": \"120363418298130331@g.us\",
+    \"recipient_jid\": \"0@s.whatsapp.net\",
+    \"message\": $(echo "$MESSAGE" | jq -Rs .)
+  }"
+```
+
+**Check bridge logs for failed acks:**
+```bash
+ssh root@72.61.197.178 "tail -100 /opt/whatsapp-bridge/bridge.log | grep -E '(401|FAILED|ERROR)'"
+```
+
+**Public Endpoints (no auth required - called by Go bridge):**
+- `/api/activate/dr-acknowledgment` - Get ack data for DR
+- `/api/activate/process-new-dr` - Process new DR submission
+
 ### 10-Step Photo Checklist
 | Step | Label | OneMap Types |
 |------|-------|--------------|
