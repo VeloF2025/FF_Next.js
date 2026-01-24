@@ -464,7 +464,8 @@ export type ReportCategory =
   | 'funnel'
   | 'offline'
   | 'swaps'
-  | 'mismatches';
+  | 'mismatches'
+  | 'gaps'; // Installed but Not Activated - money spent, never went live
 
 // ============================================================================
 // SERIAL MISMATCH TRACKING TYPES (Installation vs Activation)

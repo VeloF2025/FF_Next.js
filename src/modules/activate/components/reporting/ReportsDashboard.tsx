@@ -25,6 +25,7 @@ import {
   WifiOff,
   Repeat,
   FileWarning,
+  CircleDollarSign,
 } from 'lucide-react';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
@@ -37,6 +38,7 @@ import { FunnelReports } from './FunnelReports';
 import { OfflineDevicesReports } from './OfflineDevicesReports';
 import { SerialSwapReports } from './SerialSwapReports';
 import { SerialMismatchReports } from './SerialMismatchReports';
+import { InstallationGapsReports } from './InstallationGapsReports';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -87,6 +89,12 @@ const categories: CategoryTab[] = [
     label: 'Serial Mismatches',
     icon: FileWarning,
     description: 'Installation serial differs from activation serial - potential replacement or theft',
+  },
+  {
+    id: 'gaps',
+    label: 'Installation Gaps',
+    icon: CircleDollarSign,
+    description: 'Installed but not activated - money spent, work done, never went live',
   },
 ];
 
@@ -402,6 +410,9 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'mismatches' && (
           <SerialMismatchReports filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'gaps' && (
+          <InstallationGapsReports filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>

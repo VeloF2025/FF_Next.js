@@ -368,21 +368,24 @@ async function handler(
           const placeholders: string[] = [];
 
           chunk.forEach((row, idx) => {
-            const offset = idx * 3;
+            const offset = idx * 6;
             // is_oes_only is always TRUE for these records
             // project is looked up from drops table (source of truth)
-            placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, TRUE)`);
+            // oes_activated_at is set to activation_datetime or activation_date
+            placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, TRUE, $${offset + 4}, $${offset + 5}, $${offset + 6})`);
             values.push(
               row.drop_number,
               'OES Import', // Mark source as OES import
-              drToProject.get(row.drop_number) || null // Project from drops table
-              // NOTE: submitted_date is NOT set - these are OES-only activations
+              drToProject.get(row.drop_number) || null, // Project from drops table
+              row.activation_datetime || row.activation_date, // oes_activated_at
+              row.serial_number, // oes_serial
+              row.team // oes_team
             );
           });
 
           try {
             await pool.query(
-              `INSERT INTO dr_photo_unified_reviews (drop_number, photo_source, project, is_oes_only)
+              `INSERT INTO dr_photo_unified_reviews (drop_number, photo_source, project, is_oes_only, oes_activated_at, oes_serial, oes_team)
                VALUES ${placeholders.join(', ')}
                ON CONFLICT (drop_number) DO NOTHING`,
               values
@@ -436,7 +439,49 @@ async function handler(
         }
       }
 
-      log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, errors: errors.length });
+      // Step 7: Update EXISTING unified records with OES activation data
+      // These are DRs that were submitted via WhatsApp and are now also on OES
+      const existingToUpdate = oesRows.filter(row => existingUnifiedSet.has(row.drop_number));
+      if (existingToUpdate.length > 0) {
+        log.info('OESImport', `Updating ${existingToUpdate.length} existing unified records with OES activation data`);
+
+        // Build bulk update using CASE statements
+        const UPDATE_BATCH_SIZE = 100;
+        for (let i = 0; i < existingToUpdate.length; i += UPDATE_BATCH_SIZE) {
+          const chunk = existingToUpdate.slice(i, i + UPDATE_BATCH_SIZE);
+          const dropNumbersChunk = chunk.map(r => r.drop_number);
+
+          // Build arrays for the update
+          const activationTimes = chunk.map(r => r.activation_datetime || r.activation_date);
+          const serials = chunk.map(r => r.serial_number);
+          const teams = chunk.map(r => r.team);
+
+          try {
+            await pool.query(
+              `UPDATE dr_photo_unified_reviews u
+               SET
+                 oes_activated_at = COALESCE(u.oes_activated_at, data.activation_time::timestamp),
+                 oes_serial = COALESCE(u.oes_serial, data.serial),
+                 oes_team = COALESCE(u.oes_team, data.team),
+                 updated_at = NOW()
+               FROM (
+                 SELECT
+                   unnest($1::text[]) as drop_number,
+                   unnest($2::text[]) as activation_time,
+                   unnest($3::text[]) as serial,
+                   unnest($4::text[]) as team
+               ) data
+               WHERE u.drop_number = data.drop_number`,
+              [dropNumbersChunk, activationTimes, serials, teams]
+            );
+          } catch (updateErr) {
+            log.error('OESImport', `Error updating existing unified records at batch ${i}`, updateErr);
+          }
+        }
+        log.info('OESImport', `Updated ${existingToUpdate.length} existing unified records`);
+      }
+
+      log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, existingUpdated: existingToUpdate.length, errors: errors.length });
 
       // Trigger QField sync and WAIT for confirmation - Updated Jan 2026
       // IMPORTANT: Only show success confirmation after actual confirmation received
