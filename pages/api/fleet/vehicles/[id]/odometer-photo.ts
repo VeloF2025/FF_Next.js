@@ -17,6 +17,7 @@ import {
 } from '@/modules/fleet/services/fleetVlmService';
 import type { FleetOdometerHistoryRow } from '@/modules/fleet/types/check-in.types';
 import { rowToOdometerHistory } from '@/modules/fleet/types/check-in.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -65,7 +66,7 @@ interface OdometerPhotoResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -286,3 +287,5 @@ async function createAnomalyRecord(
     log.warn('Failed to create anomaly record', { error });
   }
 }
+
+export default withAuth(handler);

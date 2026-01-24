@@ -13,8 +13,9 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { getCostTrends } from '@/modules/fleet/services';
+import { withAuth } from '@/lib/auth';
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
@@ -48,4 +49,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     log.error('Failed to get cost trends', { error });
     return apiResponse.internalError(res, error);
   }
-});
+}));

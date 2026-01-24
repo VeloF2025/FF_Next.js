@@ -16,6 +16,7 @@ import { verifyLicensePlate } from '@/modules/fleet/services/fleetVlmService';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -122,7 +123,7 @@ export const config = {
   },
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -419,3 +420,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

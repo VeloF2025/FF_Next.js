@@ -13,6 +13,7 @@ import type {
   FleetFuelHistoryRow,
 } from '@/modules/fleet/types/check-in.types';
 import { rowToFuelHistory } from '@/modules/fleet/types/check-in.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -23,7 +24,7 @@ interface CreateFuelReadingRequest {
   notes?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -179,3 +180,5 @@ async function handlePost(
     },
   });
 }
+
+export default withAuth(handler);

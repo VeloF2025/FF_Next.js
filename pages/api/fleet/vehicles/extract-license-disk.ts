@@ -10,6 +10,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { extractLicenseDiskDetails } from '@/modules/fleet/services/fleetVlmService';
 import type { LicenseDiskExtractionResult } from '@/modules/fleet/types/check-in.types';
+import { withAuth } from '@/lib/auth';
 
 const MODULE = 'fleet:api:extract-license-disk';
 
@@ -31,7 +32,7 @@ export const config = {
   },
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ExtractLicenseDiskResponse>
 ) {
@@ -68,3 +69,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

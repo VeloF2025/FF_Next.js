@@ -6,12 +6,13 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import {
   getCheckRecordWithDetails,
   updateCheckRecordStatus,
 } from '@/modules/fleet/services/checkInService';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { recordId } = req.query;
 
   if (!recordId || typeof recordId !== 'string') {
@@ -52,3 +53,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

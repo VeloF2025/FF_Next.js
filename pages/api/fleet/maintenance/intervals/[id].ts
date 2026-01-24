@@ -15,8 +15,9 @@ import {
   deleteServiceInterval,
 } from '@/modules/fleet/services/maintenanceService';
 import type { UpdateServiceIntervalInput } from '@/modules/fleet/types/maintenance.types';
+import { withAuth } from '@/lib/auth';
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const { id } = req.query;
 
   if (!id || typeof id !== 'string') {
@@ -58,4 +59,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
   }
 
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
-});
+}));

@@ -14,6 +14,7 @@ import type {
 } from '@/modules/fleet/types/check-in.types';
 import { rowToOdometerHistory } from '@/modules/fleet/types/check-in.types';
 import { checkOdometerDiscrepancy } from '@/modules/fleet/services/fleetVlmService';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -27,7 +28,7 @@ interface CreateOdometerReadingRequest {
   notes?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -270,3 +271,5 @@ async function createAnomalyRecord(
     )
   `;
 }
+
+export default withAuth(handler);

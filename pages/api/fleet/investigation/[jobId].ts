@@ -10,10 +10,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { getSql } from '@/lib/neon-sql';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
 const getSqlInstance = () => getSql();
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const sql = getSqlInstance();
   const { jobId } = req.query;
 
@@ -108,4 +109,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     default:
       return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'DELETE']);
   }
-});
+}));

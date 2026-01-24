@@ -17,8 +17,9 @@ import {
   recordService,
 } from '@/modules/fleet/services/maintenanceService';
 import type { RecordServiceInput } from '@/modules/fleet/types/maintenance.types';
+import { withAuth } from '@/lib/auth';
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method === 'GET') {
     try {
       const { vehicleId, limit = '50' } = req.query;
@@ -64,4 +65,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
   }
 
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
-});
+}));

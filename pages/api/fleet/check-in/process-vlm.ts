@@ -21,6 +21,7 @@ import {
   getLatestOdometerReading,
 } from '@/modules/fleet/services/checkInService';
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -51,7 +52,7 @@ interface ProcessVlmResponse {
   processingTimeMs: number;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -273,3 +274,5 @@ export const config = {
     },
   },
 };
+
+export default withAuth(handler);

@@ -18,6 +18,7 @@ import type { AuthorizedLocation, ClassifiedTrip } from '@/modules/fleet/types';
 import formidable from 'formidable';
 import fs from 'fs';
 import { detectPatterns, calculateTotalCosts } from '@/modules/fleet';
+import { withAuth } from '@/lib/auth';
 
 // Disable body parser for file uploads
 export const config = {
@@ -60,7 +61,7 @@ async function parseForm(req: NextApiRequest): Promise<ParsedForm> {
   });
 }
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
@@ -354,4 +355,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
 
     throw error;
   }
-});
+}));

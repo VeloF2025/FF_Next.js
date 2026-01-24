@@ -14,10 +14,11 @@ import type {
   UpsertFinanceRequest,
 } from '@/modules/fleet/types';
 import { rowToVehicleFinance } from '@/modules/fleet/types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -194,3 +195,5 @@ async function handlePut(
 
   return apiResponse.success(res, finance);
 }
+
+export default withAuth(handler);

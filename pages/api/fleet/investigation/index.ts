@@ -14,10 +14,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { getSql } from '@/lib/neon-sql';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
 const getSqlInstance = () => getSql();
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
@@ -168,4 +169,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     pageSize: limitNum,
     total,
   });
-});
+}));

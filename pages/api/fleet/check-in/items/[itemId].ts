@@ -11,8 +11,9 @@ import {
   deleteCheckItem,
 } from '@/modules/fleet/services/checkInService';
 import type { CreateCheckItemInput } from '@/modules/fleet/types/check-in.types';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { itemId } = req.query;
 
   if (!itemId || typeof itemId !== 'string') {
@@ -45,3 +46,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

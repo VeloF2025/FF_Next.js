@@ -6,6 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { withAuth } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import {
@@ -119,7 +120,7 @@ interface UpdateTransactionRequest {
   odometerPhotoUrl?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -506,3 +507,5 @@ async function handlePatch(
 
   return apiResponse.success(res, { transaction });
 }
+
+export default withAuth(handler);

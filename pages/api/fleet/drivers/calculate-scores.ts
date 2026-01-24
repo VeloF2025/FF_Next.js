@@ -10,8 +10,9 @@ import { calculateAllDriverScores, calculateDriverScore } from '@/modules/fleet/
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import type { ScorePeriod } from '@/modules/fleet/types/driver-score.types';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
@@ -58,3 +59,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

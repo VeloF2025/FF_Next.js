@@ -14,10 +14,11 @@ import type {
   CreateInsuranceRequest,
 } from '@/modules/fleet/types';
 import { rowToVehicleInsurance } from '@/modules/fleet/types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -189,3 +190,5 @@ async function handlePost(
 
   return apiResponse.created(res, policy);
 }
+
+export default withAuth(handler);

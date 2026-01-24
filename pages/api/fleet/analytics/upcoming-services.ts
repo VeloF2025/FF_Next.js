@@ -13,8 +13,9 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { getUpcomingServices } from '@/modules/fleet/services';
 import type { ServiceUrgency } from '@/modules/fleet/types/maintenance.types';
+import { withAuth } from '@/lib/auth';
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
@@ -46,4 +47,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     log.error('Failed to get upcoming services', { error });
     return apiResponse.internalError(res, error);
   }
-});
+}));

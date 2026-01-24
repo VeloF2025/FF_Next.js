@@ -14,10 +14,11 @@ import type {
   CreateLicenseDiscRequest,
 } from '@/modules/fleet/types';
 import { rowToLicenseDisc } from '@/modules/fleet/types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -158,3 +159,5 @@ async function handlePost(
 
   return apiResponse.created(res, license);
 }
+
+export default withAuth(handler);

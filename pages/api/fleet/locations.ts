@@ -14,6 +14,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { getSql } from '@/lib/neon-sql';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import type { AuthorizedLocation, LocationType } from '@/modules/fleet/types';
+import { withAuth } from '@/lib/auth';
 
 const getSqlInstance = () => getSql();
 
@@ -59,7 +60,7 @@ function validateLocationType(type: string): type is LocationType {
   return validTypes.includes(type as LocationType);
 }
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const sql = getSqlInstance();
 
   switch (req.method) {
@@ -369,4 +370,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     default:
       return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   }
-});
+}));

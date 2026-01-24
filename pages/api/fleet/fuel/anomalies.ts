@@ -8,8 +8,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { getFuelAnomalies, runAnomalyDetection } from '@/modules/fleet/services';
 import type { AnomalyStatus, AnomalySeverity } from '@/modules/fleet/types/fuel-analytics.types';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const {
@@ -56,3 +57,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return apiResponse.methodNotAllowed(res, req.method || 'unknown');
 }
+
+export default withAuth(handler);
