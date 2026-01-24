@@ -1232,3 +1232,201 @@ export function drNumbersMatch(extracted: string | null, expected: string): bool
 
   return normalizedr(extracted) === normalizedr(expected);
 }
+
+// ============================================================================
+// WA PHOTO SERIAL EXTRACTION
+// ============================================================================
+
+/**
+ * Result from WA photo serial extraction
+ */
+export interface WaPhotoExtractionResult {
+  success: boolean;
+  ontSerial: string | null;
+  upsSerial: string | null;
+  confidence: number;
+  processingTimeMs: number;
+  error?: string;
+}
+
+/**
+ * Prompt for extracting ONT and UPS serials from WA photo sticker
+ * WA photos typically show a printed sticker with both serials clearly visible
+ */
+const WA_PHOTO_SERIAL_PROMPT = `You are extracting device serial numbers from a WhatsApp-submitted installation photo.
+
+This photo shows a printed sticker with TWO serial numbers that need to be captured:
+
+1. ONT SERIAL NUMBER:
+   - Starts with "ALCL" or "ALCB" (e.g., ALCLB6A9C97, ALCLB48CC3CA)
+   - Usually labeled "S/N:" or "ONT Serial"
+   - 11-12 alphanumeric characters
+   ❌ Do NOT extract SSID values (start with "ALHN-" like ALHN-C397)
+
+2. UPS SERIAL NUMBER:
+   - Starts with "GU18W" (e.g., GU18W220901234)
+   - Usually labeled "UPS Serial" or "Gizzu Serial"
+   - 13-15 alphanumeric characters
+
+Both serials should be on the same sticker/label.
+
+Respond in this exact JSON format:
+{
+  "ontSerial": {
+    "found": true/false,
+    "serial": "<serial starting with ALCL or ALCB, or null>",
+    "confidence": <0.0 to 1.0>
+  },
+  "upsSerial": {
+    "found": true/false,
+    "serial": "<serial starting with GU18W, or null>",
+    "confidence": <0.0 to 1.0>
+  }
+}
+
+IMPORTANT:
+- Only extract serials that clearly match the expected patterns
+- If text is blurry or partially visible, lower the confidence score
+- Return null for any serial you cannot confidently read`;
+
+/**
+ * Validate UPS/Gizzu serial format
+ * - Must start with GU18W
+ * - Must be 13-15 characters
+ */
+function isValidUpsSerial(serial: string | null): boolean {
+  if (!serial) return false;
+  const s = serial.trim().toUpperCase();
+
+  // Must start with GU18W (Gizzu UPS pattern)
+  if (!s.startsWith('GU18W')) {
+    log.debug('VlmExtraction', `Rejected non-GU18W UPS serial: ${serial}`);
+    return false;
+  }
+
+  // Should be 13-15 chars
+  if (s.length < 12 || s.length > 16) {
+    log.debug('VlmExtraction', `Rejected UPS serial with wrong length (${s.length}): ${serial}`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Extract ONT and UPS serials from a WhatsApp photo
+ * WA photos typically show a sticker with both serials clearly visible
+ *
+ * @param photoUrl - URL or local path to the WA photo
+ * @returns Extraction result with both serials
+ */
+export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPhotoExtractionResult> {
+  const startTime = Date.now();
+  log.info('VlmExtraction', `Extracting serials from WA photo: ${photoUrl}`);
+
+  try {
+    let base64 = await fetchPhotoAsBase64(photoUrl);
+
+    // Preprocess image (blur detection + optimization)
+    const preprocessed = await preprocessForVlm(base64, 'WA photo serial');
+    base64 = preprocessed.base64;
+
+    // Try barcode extraction first for ONT (faster, more reliable)
+    let ontFromBarcode: string | null = null;
+    if (ENABLE_BARCODE_EXTRACTION) {
+      try {
+        const barcodeResult = await extractOntSerialFromBarcode(base64);
+        if (barcodeResult.success && barcodeResult.serial) {
+          log.info('VlmExtraction', `WA photo barcode scan: ${barcodeResult.serial}`);
+          ontFromBarcode = barcodeResult.serial;
+        }
+      } catch (barcodeError) {
+        log.warn('VlmExtraction', `WA photo barcode scan failed: ${barcodeError}`);
+      }
+    }
+
+    // Call VLM for both serials (or just UPS if barcode got ONT)
+    const result = await callVlmExtraction<{
+      ontSerial: {
+        found: boolean;
+        serial: string | null;
+        confidence: number;
+      };
+      upsSerial: {
+        found: boolean;
+        serial: string | null;
+        confidence: number;
+      };
+    }>(base64, WA_PHOTO_SERIAL_PROMPT, 'WA photo serial extraction');
+
+    const processingTimeMs = Date.now() - startTime;
+
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        ontSerial: ontFromBarcode,
+        upsSerial: null,
+        confidence: ontFromBarcode ? 0.95 : 0,
+        processingTimeMs,
+        error: result.error || 'VLM extraction failed',
+      };
+    }
+
+    const { ontSerial: ontResult, upsSerial: upsResult } = result.data;
+
+    // Use barcode ONT if available (higher reliability), otherwise VLM
+    let finalOnt: string | null = null;
+    let ontConfidence = 0;
+    if (ontFromBarcode) {
+      finalOnt = ontFromBarcode;
+      ontConfidence = 0.98; // Barcode is highly reliable
+    } else if (ontResult.found && ontResult.serial) {
+      const normalized = normalizeSerial(ontResult.serial);
+      if (isValidOntSerial(normalized)) {
+        finalOnt = normalized;
+        ontConfidence = ontResult.confidence;
+      } else {
+        log.warn('VlmExtraction', `WA photo VLM returned invalid ONT: ${ontResult.serial}`);
+      }
+    }
+
+    // Validate UPS serial
+    let finalUps: string | null = null;
+    let upsConfidence = 0;
+    if (upsResult.found && upsResult.serial) {
+      const normalized = upsResult.serial.trim().toUpperCase().replace(/[\s-]/g, '');
+      if (isValidUpsSerial(normalized)) {
+        finalUps = normalized;
+        upsConfidence = upsResult.confidence;
+      } else {
+        log.warn('VlmExtraction', `WA photo VLM returned invalid UPS: ${upsResult.serial}`);
+      }
+    }
+
+    // Calculate overall confidence
+    const overallConfidence = Math.max(ontConfidence, upsConfidence);
+    const success = !!finalOnt || !!finalUps;
+
+    log.info('VlmExtraction', `WA photo extraction: ONT=${finalOnt || 'none'} (${ontConfidence.toFixed(2)}), UPS=${finalUps || 'none'} (${upsConfidence.toFixed(2)})`);
+
+    return {
+      success,
+      ontSerial: finalOnt,
+      upsSerial: finalUps,
+      confidence: overallConfidence,
+      processingTimeMs,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error('VlmExtraction', `WA photo extraction failed: ${message}`);
+
+    return {
+      success: false,
+      ontSerial: null,
+      upsSerial: null,
+      confidence: 0,
+      processingTimeMs: Date.now() - startTime,
+      error: message,
+    };
+  }
+}

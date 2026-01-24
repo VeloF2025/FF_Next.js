@@ -40,6 +40,22 @@ interface SerialMismatchReportsProps {
   refreshKey: number;
 }
 
+interface SerialComparison {
+  oes: string | null;
+  offline: string | null;
+  onemap: string | null;
+  wa_photo: string | null;
+  wa_photo_confidence: number | null;
+  wa_photo_processed: boolean;
+  sources_agree: boolean;
+  unique_count: number;
+}
+
+interface MismatchRecordExtended extends SerialMismatchRecord {
+  installation_team: string | null;
+  serial_comparison?: SerialComparison;
+}
+
 interface MismatchData {
   summary: {
     total: number;
@@ -51,7 +67,7 @@ interface MismatchData {
     by_reason: Record<string, number>;
     by_team: Record<string, number>;
   };
-  records: (SerialMismatchRecord & { installation_team: string | null })[];
+  records: MismatchRecordExtended[];
   total_count: number;
   page: number;
   page_size: number;
@@ -385,28 +401,31 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 DR Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Team
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Zone
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Original Serial (OES)
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from OES activation">
+                OES
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Current Serial (Offline)
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from offline report">
+                Offline
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from 1Map database">
+                1Map
+              </th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from WhatsApp photo VLM">
+                WA Photo
+              </th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                Days Offline
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                 Actions
               </th>
             </tr>
@@ -425,66 +444,106 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                 </td>
               </tr>
             ) : (
-              data?.records.map((record) => (
-                <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="px-4 py-3">
-                    <a
-                      href={`/activate/${record.drop_number}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline flex items-center gap-1"
-                    >
-                      {record.drop_number}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                      <Users className="h-3 w-3" />
-                      {record.installation_team || 'Unknown'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
-                    {record.zone || '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-mono text-green-600 dark:text-green-400" title="Expected serial from OES activation">
-                    {record.expected_serial || '-'}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-mono text-red-600 dark:text-red-400" title="Current serial from offline report">
-                    {record.current_serial || '-'}
-                  </td>
-                  <td className="px-4 py-3">
-                    {getStatusBadge(record.status)}
-                    {record.ticket_id && (
-                      <span className="ml-1 text-xs text-gray-500">
-                        ({record.ticket_status})
+              data?.records.map((record) => {
+                const sc = record.serial_comparison;
+                // Determine which serials match (for highlighting)
+                const oesSerial = sc?.oes?.toUpperCase();
+                const offlineSerial = sc?.offline?.toUpperCase();
+                const onemapSerial = sc?.onemap?.toUpperCase();
+                const waPhotoSerial = sc?.wa_photo?.toUpperCase();
+
+                // Helper to get cell color based on agreement with OES (reference)
+                const getSerialColor = (serial: string | null | undefined, isReference = false) => {
+                  if (!serial) return 'text-gray-400 dark:text-gray-500';
+                  if (isReference) return 'text-green-600 dark:text-green-400';
+                  if (oesSerial && serial.toUpperCase() === oesSerial) return 'text-green-600 dark:text-green-400';
+                  return 'text-red-600 dark:text-red-400';
+                };
+
+                return (
+                  <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="px-3 py-3">
+                      <a
+                        href={`/activate/${record.drop_number}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {record.drop_number}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        <Users className="h-3 w-3" />
+                        {record.installation_team || 'Unknown'}
                       </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span
-                      className={`font-medium ${
-                        record.days_offline > 60
-                          ? 'text-red-600 dark:text-red-400'
-                          : record.days_offline > 30
-                            ? 'text-yellow-600 dark:text-yellow-400'
-                            : 'text-gray-600 dark:text-gray-400'
-                      }`}
-                    >
-                      {record.days_offline} days
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {record.status === 'pending_investigation' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleCreateTicket(record.id)}
-                          disabled={actionLoading === record.id}
-                          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                          title="Create investigation ticket"
-                        >
-                          {actionLoading === record.id ? '...' : '🎫 Investigate'}
-                        </button>
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-900 dark:text-gray-100">
+                      {record.zone || '-'}
+                    </td>
+                    {/* 4-Way Serial Comparison */}
+                    <td className="px-3 py-2 text-xs font-mono" title="OES activation (reference)">
+                      <span className={getSerialColor(sc?.oes, true)}>
+                        {sc?.oes ? sc.oes.substring(sc.oes.length - 6) : '-'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs font-mono" title="Offline report">
+                      <span className={getSerialColor(sc?.offline)}>
+                        {sc?.offline ? sc.offline.substring(sc.offline.length - 6) : '-'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs font-mono" title="1Map database">
+                      <span className={getSerialColor(sc?.onemap)}>
+                        {sc?.onemap ? sc.onemap.substring(sc.onemap.length - 6) : '-'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs font-mono" title={sc?.wa_photo_processed ? `VLM confidence: ${((sc?.wa_photo_confidence || 0) * 100).toFixed(0)}%` : 'Not processed'}>
+                      {sc?.wa_photo_processed ? (
+                        <span className={getSerialColor(sc?.wa_photo)}>
+                          {sc?.wa_photo ? sc.wa_photo.substring(sc.wa_photo.length - 6) : '-'}
+                          {sc?.wa_photo_confidence && sc.wa_photo_confidence >= 0.8 && (
+                            <CheckCircle className="inline h-3 w-3 ml-1 text-green-500" />
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 italic">pending</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {getStatusBadge(record.status)}
+                      {record.ticket_id && (
+                        <span className="ml-1 text-xs text-gray-500">
+                          ({record.ticket_status})
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {record.status === 'pending_investigation' && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleCreateTicket(record.id)}
+                            disabled={actionLoading === record.id}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                            title="Create investigation ticket"
+                          >
+                            {actionLoading === record.id ? '...' : '🎫'}
+                          </button>
+                          <button
+                            onClick={() =>
+                              setResolutionModal({
+                                record,
+                                resolution: 'ont_replaced',
+                                notes: '',
+                              })
+                            }
+                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            ✓
+                          </button>
+                        </div>
+                      )}
+                      {record.status === 'ticket_created' && (
                         <button
                           onClick={() =>
                             setResolutionModal({
@@ -495,32 +554,18 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                           }
                           className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
                         >
-                          Resolve
+                          ✓
                         </button>
-                      </div>
-                    )}
-                    {record.status === 'ticket_created' && (
-                      <button
-                        onClick={() =>
-                          setResolutionModal({
-                            record,
-                            resolution: 'ont_replaced',
-                            notes: '',
-                          })
-                        }
-                        className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-                      >
-                        Resolve
-                      </button>
-                    )}
-                    {record.status === 'resolved' && record.resolved_at && (
-                      <span className="text-xs text-gray-500">
-                        {new Date(record.resolved_at).toISOString().split('T')[0]}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))
+                      )}
+                      {record.status === 'resolved' && record.resolved_at && (
+                        <span className="text-xs text-gray-500">
+                          {new Date(record.resolved_at).toISOString().split('T')[0]}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -560,10 +605,35 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
               Resolve Mismatch: {resolutionModal.record.drop_number}
             </h3>
 
-            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm">
+            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm space-y-2">
               <div><strong>Team:</strong> {resolutionModal.record.installation_team || 'Unknown'}</div>
-              <div><strong>Original:</strong> <span className="font-mono text-green-600">{resolutionModal.record.expected_serial}</span></div>
-              <div><strong>Current:</strong> <span className="font-mono text-red-600">{resolutionModal.record.current_serial}</span></div>
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                <strong className="block mb-1">4-Way Serial Comparison:</strong>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-gray-500">OES:</span>{' '}
+                    <span className="font-mono text-green-600">{resolutionModal.record.serial_comparison?.oes || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Offline:</span>{' '}
+                    <span className={`font-mono ${resolutionModal.record.serial_comparison?.offline?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
+                      {resolutionModal.record.serial_comparison?.offline || '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">1Map:</span>{' '}
+                    <span className={`font-mono ${resolutionModal.record.serial_comparison?.onemap?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
+                      {resolutionModal.record.serial_comparison?.onemap || '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">WA Photo:</span>{' '}
+                    <span className={`font-mono ${resolutionModal.record.serial_comparison?.wa_photo?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
+                      {resolutionModal.record.serial_comparison?.wa_photo || (resolutionModal.record.serial_comparison?.wa_photo_processed ? '-' : 'pending')}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-4">
