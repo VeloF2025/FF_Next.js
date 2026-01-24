@@ -3,14 +3,14 @@
  * Run migration 124: Add olt_wrong_onemap_serial column
  */
 
-const { Pool } = require('@neondatabase/serverless');
+const { Client } = require('pg');
 
-const pool = new Pool({
+const client = new Client({
   connectionString: process.env.DATABASE_URL,
 });
 
 async function runMigration() {
-  const client = await pool.connect();
+  await client.connect();
 
   try {
     console.log('Running migration 124...');
@@ -22,9 +22,12 @@ async function runMigration() {
     `);
     console.log('✓ Added olt_wrong_onemap_serial column');
 
-    // Update view
+    // Drop and recreate view (can't change column types with CREATE OR REPLACE)
+    await client.query(`DROP VIEW IF EXISTS v_olt_onemap_mismatches`);
+    console.log('✓ Dropped old view');
+
     await client.query(`
-      CREATE OR REPLACE VIEW v_olt_onemap_mismatches AS
+      CREATE VIEW v_olt_onemap_mismatches AS
       SELECT
         o.id,
         o.drop_number,
@@ -65,8 +68,7 @@ async function runMigration() {
     console.error('Migration failed:', error);
     process.exit(1);
   } finally {
-    client.release();
-    await pool.end();
+    await client.end();
   }
 }
 
