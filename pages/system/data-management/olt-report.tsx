@@ -132,6 +132,25 @@ export default function OltReportPage() {
   } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Projects state
+  const [projects, setProjects] = useState<Array<{ id: string; project_name: string; project_code: string }>>([]);
+
+  // Fetch active projects on mount
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch('/api/projects?status=active&limit=100');
+        if (res.ok) {
+          const data = await res.json();
+          setProjects(data.data?.projects || data.projects || []);
+        }
+      } catch {
+        // Silently fail - projects dropdown will just be empty
+      }
+    };
+    fetchProjects();
+  }, []);
+
   // Fetch data based on active tab
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -530,9 +549,11 @@ export default function OltReportPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
                   <option value="">All Projects</option>
-                  <option value="LAW">Lawley</option>
-                  <option value="MOH">Mohlakeng</option>
-                  <option value="MAM">Mamelodi</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.project_code || p.project_name}>
+                      {p.project_name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
