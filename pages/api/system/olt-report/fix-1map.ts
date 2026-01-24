@@ -28,6 +28,11 @@ import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
 
+// Extend timeout for 1Map API calls (4-step auth is slow)
+export const config = {
+  maxDuration: 60, // 60 seconds max for Vercel
+};
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 interface FixItem {
