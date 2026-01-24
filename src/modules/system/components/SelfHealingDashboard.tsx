@@ -1,8 +1,11 @@
 /**
  * Self-Healing Dashboard Component
  *
- * Displays daemon controls, pending approvals, classification suggestions,
+ * Displays Python daemon status, pending approvals, AI classification suggestions,
  * and recovery action history with approve/reject functionality.
+ *
+ * NOTE: Works with the AI Recovery Agent running on Velocity server (100.96.203.105)
+ * as systemd service 'ai-recovery-agent.service'.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,7 +15,6 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   Clock,
   Shield,
   Zap,
@@ -22,6 +24,7 @@ import {
   ChevronRight,
   Lightbulb,
   History,
+  Server,
 } from 'lucide-react';
 import type {
   DaemonStatus,
@@ -29,6 +32,7 @@ import type {
   ClassificationSuggestion,
   RiskLevel,
 } from '../types/self-healing.types';
+import { log } from '@/lib/logger';
 
 interface DashboardData {
   daemon: DaemonStatus;
@@ -60,7 +64,7 @@ export default function SelfHealingDashboard() {
       const result = await response.json();
       setData(result.data);
     } catch (err) {
-      console.error('Failed to load self-healing data:', err);
+      log.error('Failed to load self-healing data', { error: err });
     } finally {
       setLoading(false);
     }
@@ -79,7 +83,7 @@ export default function SelfHealingDashboard() {
 
       await fetchData();
     } catch (err) {
-      console.error('Daemon action failed:', err);
+      log.error('Daemon action failed', { error: err });
     } finally {
       setActionLoading(null);
     }
@@ -102,7 +106,7 @@ export default function SelfHealingDashboard() {
 
       await fetchData();
     } catch (err) {
-      console.error('Approval action failed:', err);
+      log.error('Approval action failed', { error: err });
     } finally {
       setActionLoading(null);
     }
@@ -238,7 +242,13 @@ function DaemonControlPanel({
             className={`w-3 h-3 rounded-full ${isRunning ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}
           />
           <div>
-            <h3 className="text-lg font-medium text-white">Self-Healing Daemon</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-medium text-white">AI Recovery Agent</h3>
+              <span className="text-xs px-2 py-0.5 bg-blue-900 text-blue-300 rounded">
+                <Server className="w-3 h-3 inline mr-1" />
+                Velocity
+              </span>
+            </div>
             <p className="text-sm text-gray-400">
               {isRunning ? (
                 <>
@@ -511,12 +521,12 @@ function RecoveryHistory() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const response = await fetch('/api/system/stats');
+        const response = await fetch('/api/system/stats?includeHistory=true');
         if (!response.ok) throw new Error('Failed to fetch');
-        // For now, show empty - would need dedicated history endpoint
-        setHistory([]);
+        const result = await response.json();
+        setHistory(result.data?.history || []);
       } catch (err) {
-        console.error('Failed to load history:', err);
+        log.error('Failed to load history', { error: err });
       } finally {
         setLoading(false);
       }
