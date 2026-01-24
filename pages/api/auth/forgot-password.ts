@@ -58,6 +58,10 @@ async function sendResetEmail(
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      tls: {
+        // Allow expired/self-signed certs (ISP mail server has expired cert)
+        rejectUnauthorized: false,
+      },
     });
 
     await transporter.sendMail({
