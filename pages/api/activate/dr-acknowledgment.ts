@@ -44,6 +44,11 @@ interface ExistingSubmission {
   qa_decision: string | null;
 }
 
+interface WAPhotoCheck {
+  hasPhoto: boolean;
+  photoCount: number;
+}
+
 interface AckRequest {
   dropNumber: string;
   project?: string;
@@ -80,6 +85,24 @@ function extractOntSerial(barcodeData: string | null): string | null {
   }
 
   return null;
+}
+
+/**
+ * Check if DR has WhatsApp serial photos submitted
+ */
+async function checkWAPhotos(dropNumber: string): Promise<WAPhotoCheck> {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) as count FROM wa_photos
+       WHERE drop_number = $1 AND purpose = 'activation'`,
+      [dropNumber]
+    );
+    const count = parseInt(result.rows[0]?.count || '0', 10);
+    return { hasPhoto: count > 0, photoCount: count };
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Failed to check WA photos for ${dropNumber}`, { error });
+    return { hasPhoto: false, photoCount: 0 };
+  }
 }
 
 /**
@@ -258,13 +281,15 @@ function generateResubmissionAckMessage(
  * Returns empty string if DR not found - Go bridge will skip sending
  *
  * IMPORTANT: Detects swapped serials (ONT in UPS field or vice versa) and warns immediately
+ * Also warns if no WhatsApp serial sticker photo was received with the DR submission
  */
 function generateAckMessage(
   dropNumber: string,
   found: boolean,
   photoCount: number,
   ontSerial: string | null,
-  upsSerial: string | null
+  upsSerial: string | null,
+  waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 }
 ): { message: string; swapped: boolean; swapDetails: string | null } {
   // If DR not found in 1Map, return empty string
   // Go bridge checks for empty message and won't send anything
@@ -303,6 +328,15 @@ function generateAckMessage(
   const photoLine =
     photoCount > 0 ? `✅ Photos: ${photoCount}` : `⚠️ Photos: None found - please upload to 1Map`;
   lines.push(photoLine);
+
+  // WA serial photo check - warn if not received
+  if (waPhotoCheck.hasPhoto) {
+    lines.push(`📷 Serial photo: ✅ Received`);
+  } else {
+    lines.push('');
+    lines.push('⚠️ *No serial photo received*');
+    lines.push('Please send ONT & UPS sticker photo with DR');
+  }
 
   // Serial status (with swap consideration)
   if (swapCheck.swapped) {
@@ -407,6 +441,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Continue with found=false - don't fail the request
     }
 
+    // Check for WhatsApp serial photos (sent with DR submission)
+    const waPhotoCheck = await checkWAPhotos(dropNumber);
+    if (waPhotoCheck.hasPhoto) {
+      log.info('DrAcknowledgment', `WA serial photo received for ${dropNumber}`, {
+        waPhotoCount: waPhotoCheck.photoCount,
+      });
+    }
+
     // Generate appropriate message based on whether this is a resubmission
     let ackResult: { message: string; swapped: boolean; swapDetails: string | null };
 
@@ -424,7 +466,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       await markForRework(dropNumber, photoCount);
     } else {
       // Normal first submission
-      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial);
+      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck);
     }
 
     const duration = Date.now() - startTime;
@@ -463,6 +505,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       isResubmission,
       submissionNumber,
       previousPhotoCount: isResubmission ? previousPhotoCount : null,
+      // WA serial photo info
+      waSerialPhoto: {
+        received: waPhotoCheck.hasPhoto,
+        count: waPhotoCheck.photoCount,
+      },
     });
   } catch (error) {
     log.error('DrAcknowledgment', 'Error generating acknowledgment', { error });

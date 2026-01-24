@@ -14,16 +14,10 @@
  * - "APPROVED" in PRDs → Trigger implementation
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+const fs = require('fs');
+const path = require('path');
 
-interface VerifiedAction {
-  type: 'changelog' | 'test' | 'implement' | 'deploy';
-  file: string;
-  context: string;
-}
-
-function detectVerifiedStatus(filePath: string, content: string): VerifiedAction | null {
+function detectVerifiedStatus(filePath, content) {
   const fileName = path.basename(filePath);
   const dirName = path.dirname(filePath);
 
@@ -66,7 +60,7 @@ function detectVerifiedStatus(filePath: string, content: string): VerifiedAction
   return null;
 }
 
-function outputWorkflowSuggestion(action: VerifiedAction): void {
+function outputWorkflowSuggestion(action) {
   console.error('');
   console.error('━'.repeat(50));
   console.error('🔔 VERIFIED STATUS DETECTED');

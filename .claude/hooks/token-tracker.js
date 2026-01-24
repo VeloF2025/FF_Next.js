@@ -1,4 +1,4 @@
-#!/usr/bin/env npx ts-node
+#!/usr/bin/env node
 
 /**
  * Token Usage Tracker Hook - FibreFlow
@@ -9,50 +9,33 @@
  * Hook Type: PostToolUse
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface HookInput {
-  session_id: string;
-  tool_name: string;
-  tool_input: Record<string, unknown>;
-  tool_result?: string;
-}
-
-interface SessionMetrics {
-  session_id: string;
-  started_at: string;
-  total_input_tokens: number;
-  total_output_tokens: number;
-  total_cost_usd: number;
-  tool_calls: number;
-  tools_used: Record<string, number>;
-}
+const fs = require('fs');
+const path = require('path');
 
 // Model pricing per 1M tokens (2025/2026 rates)
 const MODEL_PRICING = {
   'claude-opus-4-5': { input: 15.0, output: 75.0 },
   'claude-sonnet-4': { input: 3.0, output: 15.0 },
   'claude-haiku': { input: 0.25, output: 1.25 },
-  default: { input: 3.0, output: 15.0 }, // Assume Sonnet
+  default: { input: 3.0, output: 15.0 },
 };
 
 const METRICS_DIR = path.join(process.cwd(), '.claude', 'metrics');
 const METRICS_FILE = path.join(METRICS_DIR, 'token-usage.json');
 
-function estimateTokens(text: string): number {
+function estimateTokens(text) {
   if (!text) return 0;
-  return Math.ceil(text.length / 4); // ~4 chars per token
+  return Math.ceil(text.length / 4);
 }
 
-function calculateCost(inputTokens: number, outputTokens: number): number {
+function calculateCost(inputTokens, outputTokens) {
   const pricing = MODEL_PRICING.default;
   const inputCost = (inputTokens / 1_000_000) * pricing.input;
   const outputCost = (outputTokens / 1_000_000) * pricing.output;
   return inputCost + outputCost;
 }
 
-function loadSessionMetrics(sessionId: string): SessionMetrics {
+function loadSessionMetrics(sessionId) {
   try {
     if (fs.existsSync(METRICS_FILE)) {
       const data = JSON.parse(fs.readFileSync(METRICS_FILE, 'utf-8'));
@@ -75,14 +58,13 @@ function loadSessionMetrics(sessionId: string): SessionMetrics {
   };
 }
 
-function saveSessionMetrics(metrics: SessionMetrics): void {
+function saveSessionMetrics(metrics) {
   try {
-    // Ensure directory exists
     if (!fs.existsSync(METRICS_DIR)) {
       fs.mkdirSync(METRICS_DIR, { recursive: true });
     }
 
-    let data: { sessions: Record<string, SessionMetrics> } = { sessions: {} };
+    let data = { sessions: {} };
 
     try {
       if (fs.existsSync(METRICS_FILE)) {
@@ -109,18 +91,18 @@ function saveSessionMetrics(metrics: SessionMetrics): void {
 }
 
 async function main() {
-  let hookInput: HookInput | null = null;
+  let hookInput = null;
 
   try {
     // Read from stdin if available
     if (!process.stdin.isTTY) {
-      const chunks: Buffer[] = [];
+      const chunks = [];
       for await (const chunk of process.stdin) {
         chunks.push(chunk);
       }
       const input = Buffer.concat(chunks).toString('utf-8');
       if (input.trim()) {
-        hookInput = JSON.parse(input) as HookInput;
+        hookInput = JSON.parse(input);
       }
     }
   } catch {

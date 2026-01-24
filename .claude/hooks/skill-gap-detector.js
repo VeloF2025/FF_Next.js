@@ -1,4 +1,4 @@
-#!/usr/bin/env npx ts-node
+#!/usr/bin/env node
 
 /**
  * Skill Gap Detector Hook - FibreFlow
@@ -11,8 +11,8 @@
  * Environment: TOOL_INPUT contains the file path being edited
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+const fs = require('fs');
+const path = require('path');
 
 function main() {
   const toolInput = process.env.TOOL_INPUT || '';

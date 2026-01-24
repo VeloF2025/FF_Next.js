@@ -13,15 +13,8 @@
  * Creates: Skill stub in .claude/skills/{category}/{name}.md
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface SkillStub {
-  name: string;
-  category: 'modules' | 'infrastructure' | 'integrations' | 'workflows';
-  triggers: string[];
-  context: string;
-}
+const fs = require('fs');
+const path = require('path');
 
 const SKILL_TEMPLATE = `# {NAME} Skill
 
@@ -61,7 +54,7 @@ const SKILL_TEMPLATE = `# {NAME} Skill
 *Auto-generated stub. Please expand with actual documentation.*
 `;
 
-function detectSkillCreationTrigger(toolInput: string, toolResult: string): SkillStub | null {
+function detectSkillCreationTrigger(toolInput, toolResult) {
   // Pattern 1: New module directory created
   const newModuleMatch = toolInput.match(/mkdir.*src\/modules\/([^/\s"]+)/);
   if (newModuleMatch) {
@@ -104,7 +97,7 @@ function detectSkillCreationTrigger(toolInput: string, toolResult: string): Skil
   return null;
 }
 
-function createSkillStub(workDir: string, stub: SkillStub): boolean {
+function createSkillStub(workDir, stub) {
   const skillDir = path.join(workDir, '.claude', 'skills', stub.category);
   const skillPath = path.join(skillDir, `${stub.name}.md`);
 

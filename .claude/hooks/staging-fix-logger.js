@@ -1,4 +1,4 @@
-#!/usr/bin/env ts-node
+#!/usr/bin/env node
 /**
  * Staging Fix Logger Hook
  *
@@ -13,19 +13,11 @@
  * - Service restarts after errors
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+const fs = require('fs');
+const path = require('path');
 
 const SKILL_FILE = path.join(__dirname, '../skills/staging-deploy.md');
 const LOG_FILE = path.join(__dirname, '../memories/staging-fixes.json');
-
-interface StagingFix {
-  date: string;
-  issue: string;
-  rootCause: string;
-  fixApplied: string;
-  command: string;
-}
 
 // Get environment variables from Claude hooks
 const toolInput = process.env.TOOL_INPUT || '';
@@ -72,7 +64,7 @@ const FIX_PATTERNS = [
 ];
 
 // Check if this is a staging-related command
-function isStagingCommand(input: string): boolean {
+function isStagingCommand(input) {
   return input.includes('100.96.203.105') ||
          input.includes('vf.fibreflow') ||
          input.includes('/home/louis/apps/fibreflow') ||
@@ -80,7 +72,7 @@ function isStagingCommand(input: string): boolean {
 }
 
 // Detect which fix was applied
-function detectFix(input: string): StagingFix | null {
+function detectFix(input) {
   if (!isStagingCommand(input)) return null;
 
   for (const pattern of FIX_PATTERNS) {
@@ -98,7 +90,7 @@ function detectFix(input: string): StagingFix | null {
 }
 
 // Load existing fixes
-function loadFixes(): StagingFix[] {
+function loadFixes() {
   try {
     if (fs.existsSync(LOG_FILE)) {
       return JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8'));
@@ -110,7 +102,7 @@ function loadFixes(): StagingFix[] {
 }
 
 // Save fix to JSON log
-function saveFix(fix: StagingFix): void {
+function saveFix(fix) {
   const fixes = loadFixes();
 
   // Avoid duplicates (same issue on same day)
@@ -128,7 +120,7 @@ function saveFix(fix: StagingFix): void {
 }
 
 // Append to the staging-deploy.md issue log table
-function appendToSkillLog(fix: StagingFix): void {
+function appendToSkillLog(fix) {
   try {
     let content = fs.readFileSync(SKILL_FILE, 'utf-8');
 

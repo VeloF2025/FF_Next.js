@@ -1,4 +1,4 @@
-#!/usr/bin/env npx ts-node
+#!/usr/bin/env node
 
 /**
  * TDD Reminder Hook
@@ -10,17 +10,12 @@
  * happens at PR level via CI checks.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface ToolInput {
-  file_path?: string;
-  content?: string;
-}
+const fs = require('fs');
+const path = require('path');
 
 // Get tool input from environment
 const toolInput = process.env.TOOL_INPUT || '{}';
-let input: ToolInput;
+let input;
 
 try {
   input = JSON.parse(toolInput);

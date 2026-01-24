@@ -192,13 +192,14 @@ async function handler(
         EXTRACT(DAY FROM NOW() - COALESCE(o.mismatch_investigated_at, o.created_at)) as days_pending,
         o.mismatch_investigated_at as investigated_at,
         o.mismatch_resolved_at as resolved_at,
-        -- 4-way comparison: Add OneMap and WA photo serials
+        -- 5-way comparison: Add OneMap, WA photo, and OLT serials
         r.ont_serial_scanned as onemap_ont_serial,
         r.ups_serial_scanned as onemap_ups_serial,
         wa.vlm_ont_serial as wa_photo_ont_serial,
         wa.vlm_ups_serial as wa_photo_ups_serial,
         wa.vlm_confidence as wa_photo_confidence,
-        wa.vlm_processed as wa_photo_processed
+        wa.vlm_processed as wa_photo_processed,
+        o.olt_serial as olt_ont_serial
       FROM offline_devices o
       LEFT JOIN oes_activations e ON o.drop_number = e.drop_number
       LEFT JOIN maintenance_tickets t ON o.mismatch_ticket_id = t.id
@@ -221,19 +222,21 @@ async function handler(
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `, [...params, pageSizeNum, offset]);
 
-    // Map to records with team info and 4-way comparison data
+    // Map to records with team info and 5-way comparison data
     const records = recordsResult.rows.map((row) => {
       const onemapOnt = row.onemap_ont_serial ? String(row.onemap_ont_serial) : null;
       const waPhotoOnt = row.wa_photo_ont_serial ? String(row.wa_photo_ont_serial) : null;
       const oesSerial = row.original_serial ? String(row.original_serial) : (row.oes_serial ? String(row.oes_serial) : null);
       const currentSerial = row.current_serial ? String(row.current_serial) : null;
+      const oltSerial = row.olt_ont_serial ? String(row.olt_ont_serial) : null;
 
-      // Build 4-way serial comparison
+      // Build 5-way serial comparison (OES, Offline, 1Map, WA Photo, OLT)
       const serialSources = {
         oes: oesSerial,           // OES activation record (expected)
         offline: currentSerial,   // Current offline report
         onemap: onemapOnt,        // 1Map database
         waPhoto: waPhotoOnt,      // WA photo VLM extraction
+        olt: oltSerial,           // Nokia OLT report (authoritative)
       };
 
       // Count how many sources agree
@@ -271,12 +274,13 @@ async function handler(
         resolved_at: row.resolved_at
           ? new Date(row.resolved_at).toISOString()
           : null,
-        // 4-way serial comparison
+        // 5-way serial comparison
         serial_comparison: {
           oes: oesSerial,
           offline: currentSerial,
           onemap: onemapOnt,
           wa_photo: waPhotoOnt,
+          olt: oltSerial,
           wa_photo_confidence: row.wa_photo_confidence ? Number(row.wa_photo_confidence) : null,
           wa_photo_processed: row.wa_photo_processed ?? false,
           sources_agree: sourcesAgree,

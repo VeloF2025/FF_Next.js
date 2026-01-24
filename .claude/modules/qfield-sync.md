@@ -166,9 +166,45 @@ Coordinates outside these bounds are filtered out:
 
 This removes bad GPS data (e.g., coordinates in Iraq, Nepal, Indonesia).
 
+### OES Database Sync (ff_oes_activations)
+
+**Script:** `/opt/qfield-sync/sync_oes_to_qfield.py`
+
+Syncs OES activation data from FibreFlow Neon DB to QFieldCloud PostgreSQL's `ff_oes_activations` table.
+
+```bash
+# Run full sync (truncate + insert)
+cd /opt/qfield-sync && source venv/bin/activate
+python3 sync_oes_to_qfield.py --full
+
+# Delta sync (upsert only changed)
+python3 sync_oes_to_qfield.py
+```
+
+**Column Mapping (CRITICAL):**
+| Source (Neon view) | Target (QFieldCloud) |
+|--------------------|---------------------|
+| `oes_latitude` | `latitude` |
+| `oes_longitude` | `longitude` |
+
+The view `v_qfield_oes_activations` uses `oes_latitude`/`oes_longitude`, but the target table uses `latitude`/`longitude`. **Fixed 2026-01-24.**
+
+**Data Sources:**
+- `oes_activations` table: All OES Excel imports (historical + daily)
+- Initial bulk import (2026-01-15): ~6,259 records (back to July 2025)
+- Daily imports: ~150 records/day
+- Total: 7,285+ records
+
+**OES Count Discrepancy Explained:**
+- QField dashboard shows `ff_oes_activations` count (QFieldCloud DB)
+- OES Excel report only shows recent activations
+- Database contains historical archive going back to July 2025
+
 ### Troubleshooting
 - **DR numbers not showing:** Check labeling uses `Pole Nr` field
 - **Showing planned/wip/live/issue:** Renderer using categories - should be `singleSymbol`
 - **Blue dots outside project:** Check OES Excel GPS data quality
 - **Green dots missing:** Drop not matched or has no coordinates
+- **OES count mismatch:** Run `python3 sync_oes_to_qfield.py --full` on Velocity
+- **Column error in sync:** Check SELECT uses `oes_latitude`, INSERT uses `latitude`
 - **Run `/Qfield` skill** for full management commands

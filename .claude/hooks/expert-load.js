@@ -1,4 +1,4 @@
-#!/usr/bin/env npx ts-node
+#!/usr/bin/env node
 
 /**
  * Expert Load Hook - FibreFlow
@@ -7,40 +7,78 @@
  * Ensures agent has "mental model" of FF before acting.
  *
  * Hook Type: SessionStart
- *
- * What it does:
- * 1. Find expertise.yaml in .claude/
- * 2. Validate key locations still exist
- * 3. Output expertise summary for context
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as yaml from 'yaml';
+const fs = require('fs');
+const path = require('path');
 
-interface ExpertiseFile {
-  expertise: {
-    project: string;
-    domain: string;
-    version: number;
-    last_updated: string;
-    key_locations?: Record<string, string>;
-    patterns?: Array<{
-      name: string;
-      when: string;
-      example?: string;
-      notes?: string;
-    }>;
-    anti_patterns?: Array<{
-      name: string;
-      why_bad: string;
-      what_to_do: string;
-    }>;
-    commands?: Record<string, string>;
-  };
+// Simple YAML parser for basic structure (no external deps)
+function parseSimpleYaml(content) {
+  const lines = content.split('\n');
+  const result = { expertise: {} };
+  let currentSection = null;
+  let currentList = null;
+  let currentItem = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    // Top level key
+    if (line.match(/^expertise:/)) {
+      continue;
+    }
+
+    // Section headers (2 spaces)
+    const sectionMatch = line.match(/^  (\w+):\s*(.*)$/);
+    if (sectionMatch) {
+      const [, key, value] = sectionMatch;
+      if (value) {
+        result.expertise[key] = value;
+      } else {
+        currentSection = key;
+        if (key === 'key_locations' || key === 'commands') {
+          result.expertise[key] = {};
+        } else if (key === 'patterns' || key === 'anti_patterns') {
+          result.expertise[key] = [];
+          currentList = result.expertise[key];
+        }
+      }
+      continue;
+    }
+
+    // Key-value pairs in objects (4 spaces)
+    const kvMatch = line.match(/^    (\w+):\s*(.+)$/);
+    if (kvMatch && currentSection && typeof result.expertise[currentSection] === 'object' && !Array.isArray(result.expertise[currentSection])) {
+      const [, key, value] = kvMatch;
+      result.expertise[currentSection][key] = value.replace(/^['"]|['"]$/g, '');
+      continue;
+    }
+
+    // List items
+    if (line.match(/^    - /)) {
+      if (currentList) {
+        currentItem = {};
+        currentList.push(currentItem);
+      }
+      const itemMatch = line.match(/^    - (\w+):\s*(.*)$/);
+      if (itemMatch && currentItem) {
+        currentItem[itemMatch[1]] = itemMatch[2].replace(/^['"]|['"]$/g, '');
+      }
+      continue;
+    }
+
+    // List item properties (6 spaces)
+    const propMatch = line.match(/^      (\w+):\s*(.+)$/);
+    if (propMatch && currentItem) {
+      currentItem[propMatch[1]] = propMatch[2].replace(/^['"]|['"]$/g, '');
+    }
+  }
+
+  return result;
 }
 
-function findExpertiseFile(startDir: string): string | null {
+function findExpertiseFile(startDir) {
   const expertisePath = path.join(startDir, '.claude', 'expertise.yaml');
   if (fs.existsSync(expertisePath)) {
     return expertisePath;
@@ -48,11 +86,8 @@ function findExpertiseFile(startDir: string): string | null {
   return null;
 }
 
-/**
- * Detect modules without corresponding skills
- */
-function detectSkillGaps(baseDir: string): string[] {
-  const gaps: string[] = [];
+function detectSkillGaps(baseDir) {
+  const gaps = [];
   const modulesDir = path.join(baseDir, 'src', 'modules');
   const skillsDir = path.join(baseDir, '.claude', 'skills', 'modules');
 
@@ -60,17 +95,14 @@ function detectSkillGaps(baseDir: string): string[] {
     return gaps;
   }
 
-  // Get all module directories
   const modules = fs.readdirSync(modulesDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name);
 
-  // Get existing skill files (without .md extension)
   const skills = fs.readdirSync(skillsDir)
     .filter(f => f.endsWith('.md'))
     .map(f => f.replace('.md', '').toLowerCase());
 
-  // Find modules without skills
   for (const mod of modules) {
     const normalizedMod = mod.toLowerCase().replace(/-/g, '');
     const hasSkill = skills.some(s => {
@@ -88,14 +120,11 @@ function detectSkillGaps(baseDir: string): string[] {
   return gaps;
 }
 
-function validateLocations(
-  baseDir: string,
-  locations: Record<string, string>
-): { valid: string[]; missing: string[] } {
-  const valid: string[] = [];
-  const missing: string[] = [];
+function validateLocations(baseDir, locations) {
+  const valid = [];
+  const missing = [];
 
-  for (const [name, loc] of Object.entries(locations)) {
+  for (const [name, loc] of Object.entries(locations || {})) {
     const fullPath = path.join(baseDir, loc);
     if (fs.existsSync(fullPath)) {
       valid.push(name);
@@ -107,19 +136,15 @@ function validateLocations(
   return { valid, missing };
 }
 
-function formatExpertise(
-  expertise: ExpertiseFile,
-  validation: { valid: string[]; missing: string[] }
-): string {
+function formatExpertise(expertise, validation) {
   const e = expertise.expertise;
-  const lines: string[] = [];
+  const lines = [];
 
-  lines.push(`## Project Expertise: ${e.project}`);
-  lines.push(`Domain: ${e.domain} | Version: ${e.version} | Updated: ${e.last_updated}`);
+  lines.push(`## Project Expertise: ${e.project || 'Unknown'}`);
+  lines.push(`Domain: ${e.domain || 'N/A'} | Version: ${e.version || 'N/A'} | Updated: ${e.last_updated || 'N/A'}`);
   lines.push('');
 
-  // Key locations (top 5)
-  if (e.key_locations) {
+  if (e.key_locations && Object.keys(e.key_locations).length > 0) {
     lines.push('### Key Locations');
     const entries = Object.entries(e.key_locations).slice(0, 5);
     for (const [name, loc] of entries) {
@@ -129,7 +154,6 @@ function formatExpertise(
     lines.push('');
   }
 
-  // Patterns (top 3)
   if (e.patterns && e.patterns.length > 0) {
     lines.push('### Patterns');
     for (const pattern of e.patterns.slice(0, 3)) {
@@ -138,7 +162,6 @@ function formatExpertise(
     lines.push('');
   }
 
-  // Anti-patterns (top 3)
   if (e.anti_patterns && e.anti_patterns.length > 0) {
     lines.push('### Anti-Patterns (AVOID)');
     for (const ap of e.anti_patterns.slice(0, 3)) {
@@ -147,8 +170,7 @@ function formatExpertise(
     lines.push('');
   }
 
-  // Commands (top 3)
-  if (e.commands) {
+  if (e.commands && Object.keys(e.commands).length > 0) {
     lines.push('### Quick Commands');
     const cmds = Object.entries(e.commands).slice(0, 3);
     for (const [name, cmd] of cmds) {
@@ -157,7 +179,6 @@ function formatExpertise(
     lines.push('');
   }
 
-  // Validation warnings
   if (validation.missing.length > 0) {
     lines.push('### Warnings');
     lines.push('Missing locations (may have moved):');
@@ -172,45 +193,36 @@ function formatExpertise(
 async function main() {
   const workDir = process.cwd();
 
-  // Find expertise file
   const expertisePath = findExpertiseFile(workDir);
 
   if (!expertisePath) {
     console.error('[expert-load] No expertise.yaml found');
-    console.error('[expert-load] Expected at: .claude/expertise.yaml');
     return;
   }
 
-  // Load expertise
-  let expertise: ExpertiseFile;
+  let expertise;
   try {
     const content = fs.readFileSync(expertisePath, 'utf-8');
-    expertise = yaml.parse(content) as ExpertiseFile;
+    expertise = parseSimpleYaml(content);
   } catch (error) {
-    console.error(`[expert-load] Failed to parse expertise: ${error}`);
+    console.error(`[expert-load] Failed to parse expertise: ${error.message}`);
     return;
   }
 
-  // Validate locations
   const validation = validateLocations(
     workDir,
     expertise.expertise.key_locations || {}
   );
 
-  // Format output
   const formatted = formatExpertise(expertise, validation);
-
-  // Detect skill gaps
   const skillGaps = detectSkillGaps(workDir);
 
-  // Output to stderr (visible in session)
   console.error('');
   console.error('='.repeat(50));
   console.error('EXPERTISE LOADED - Read First, Validate, Then Act');
   console.error('='.repeat(50));
   console.error(formatted);
 
-  // Output skill gap detection
   if (skillGaps.length > 0) {
     console.error('');
     console.error('### SKILL GAPS DETECTED');

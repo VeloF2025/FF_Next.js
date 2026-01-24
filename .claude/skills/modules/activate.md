@@ -240,6 +240,108 @@ formatSerialFeedback(ontSerial, upsSerial)
 
 This separation ensures technicians only receive actionable feedback, not internal AI debugging info.
 
+## 4-Way Serial Verification System (Jan 2026)
+
+**Purpose**: Track and verify ONT/UPS serials across 4 sources with full audit trail.
+
+### Serial Sources
+
+| Source | Database | Field | Purpose |
+|--------|----------|-------|---------|
+| **OES** | `oes_activations` | `serial_number` | Reference truth from activation report |
+| **Offline** | `offline_devices` | `serial_number` | Current offline device report |
+| **OneMap** | `dr_photo_unified_reviews` | `ont_serial_scanned`, `ups_serial_scanned` | Scanned barcodes |
+| **WA Photo** | `wa_photos` | `vlm_ont_serial`, `vlm_ups_serial` | VLM extracted from WhatsApp photos |
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/activate/serial-verification` | GET | 4-way comparison status + badge |
+| `/api/activate/serial-history` | GET | Serial change audit trail |
+| `/api/activate/wa-photos` | GET | WA photos with VLM results |
+
+### Database Tables
+
+**`serial_change_history`** - Audit trail for ALL serial changes:
+- `change_type`: `ont_serial` or `ups_serial`
+- `old_value`, `new_value`: Change delta
+- `change_source`: `onemap_sync`, `manual_edit`, `vlm_extraction`, `wa_photo_vlm`
+- `actor`: User ID, `system`, or `vlm`
+- `metadata`: Additional context (swap detection, confidence)
+
+**`wa_photos`** - WhatsApp photos with VLM extraction:
+- `vlm_ont_serial`, `vlm_ups_serial`: Extracted serials
+- `vlm_confidence`: Extraction confidence (0-100)
+- `vlm_processed`: Boolean processing flag
+
+### Key Functions
+
+**`activityLogService.ts`**:
+```typescript
+logSerialChange(
+  drNumber: string,
+  changeType: 'ont_serial' | 'ups_serial',
+  oldValue: string | null,
+  newValue: string | null,
+  source: SerialChangeSource,
+  actor: string,
+  reason?: SerialChangeReason,
+  metadata?: Record<string, unknown>
+): Promise<{ historyId: string; activityId: string }>
+```
+
+**`vlmExtractionService.ts`**:
+```typescript
+extractSerialsFromWaPhoto(photoUrl: string): Promise<{
+  ontSerial: string | null;
+  upsSerial: string | null;
+  confidence: number;
+}>
+```
+
+### Badge Status Logic
+
+| Badge | Criteria | Color |
+|-------|----------|-------|
+| 🥇 **Gold** | Both ONT + UPS have 3+ sources agreeing | `bg-yellow-500` |
+| 🥈 **Silver** | At least one fully verified (3+ sources) | `bg-gray-400` |
+| 🥉 **Bronze** | ONT matches across 2+ sources | `bg-amber-600` |
+| ⚠️ **Warning** | Serial mismatch detected | `bg-red-500` |
+
+### Audit Script
+
+```bash
+# Run full serial status audit
+DATABASE_URL='...' node scripts/audit-serial-status.js
+
+# Filter by project
+DATABASE_URL='...' node scripts/audit-serial-status.js --project Lawley
+
+# Export to CSV
+DATABASE_URL='...' node scripts/audit-serial-status.js --output csv > audit.csv
+```
+
+### Activity Tab - Serial History View
+
+The Activity tab has 3 sub-views:
+1. **Timeline** - Event history (categorization, QA, feedback)
+2. **QA History** - Historical QA reviews
+3. **Serial History** - Serial change audit trail
+
+Serial History shows:
+- Current ONT/UPS serials
+- Change summary (total changes, ONT changes, UPS changes, swaps)
+- Timeline of all changes with old→new, source, actor, timestamp
+
+### WA Photo VLM Processing
+
+1. Photos received via WhatsApp → stored in `wa_photos` table
+2. `scripts/process-wa-photos-vlm.ts` processes unprocessed photos
+3. VLM extracts ONT/UPS serials with confidence scores
+4. Results compared to OneMap serials
+5. Mismatches/matches logged to `serial_change_history`
+
 ## Slash Commands
 
 ### `/activate` or `/dr-photo`

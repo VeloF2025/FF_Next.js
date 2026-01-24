@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * FibreFlow Pre-Commit Hook
  *
@@ -7,11 +9,9 @@
  * - Zero Tolerance checks (no console.log)
  *
  * BLOCKS commit if critical validation fails
- *
- * Triggers: Before git commit commands
  */
 
-import { execSync } from 'child_process';
+const { execSync } = require('child_process');
 
 const colors = {
   reset: '\x1b[0m',
@@ -21,22 +21,21 @@ const colors = {
   cyan: '\x1b[36m',
 };
 
-function log(message: string, color: keyof typeof colors = 'reset') {
+function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function runCommand(command: string, description: string): boolean {
+function runCommand(command, description) {
   log(`\n  Checking: ${description}...`, 'cyan');
   try {
     execSync(command, { encoding: 'utf-8', stdio: 'pipe', cwd: process.cwd() });
     log(`  ✓ ${description} passed`, 'green');
     return true;
-  } catch (error: unknown) {
+  } catch (error) {
     log(`  ✗ ${description} failed`, 'red');
-    if (error instanceof Error && 'stdout' in error) {
-      const output = (error as { stdout: string }).stdout;
+    if (error && error.stdout) {
+      const output = error.stdout;
       if (output) {
-        // Show first 20 lines of error
         const lines = output.split('\n').slice(0, 20);
         lines.forEach(line => log(`    ${line}`, 'yellow'));
         if (output.split('\n').length > 20) {
@@ -48,7 +47,7 @@ function runCommand(command: string, description: string): boolean {
   }
 }
 
-export default function hook() {
+function hook() {
   log('\n╔════════════════════════════════════════════════════════════╗', 'cyan');
   log('║  FibreFlow Pre-Commit Validation                           ║', 'cyan');
   log('╚════════════════════════════════════════════════════════════╝', 'cyan');
@@ -128,3 +127,8 @@ export default function hook() {
     throw new Error('FibreFlow validation failed - commit blocked');
   }
 }
+
+// Run the hook
+hook();
+
+module.exports = hook;

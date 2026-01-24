@@ -44,3 +44,16 @@ export {
   AUTH_COOKIE_NAME,
   type AuthenticatedNextApiRequest,
 } from './middleware';
+
+import type { NextApiRequest } from 'next';
+import type { AuthenticatedNextApiRequest } from './middleware';
+import type { AuthUser } from './types';
+
+/**
+ * Get the authenticated user from request
+ * Must be used after withAuth middleware
+ */
+export function getAuthUser(req: NextApiRequest): AuthUser | null {
+  const authReq = req as AuthenticatedNextApiRequest;
+  return authReq.user || null;
+}

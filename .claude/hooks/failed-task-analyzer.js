@@ -14,26 +14,13 @@
  * - Identifies knowledge gaps from error messages
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface FailedPattern {
-  pattern: string;
-  module: string | null;
-  count: number;
-  lastSeen: string;
-  suggestedSkill: string | null;
-}
-
-interface FailedPatternsStore {
-  patterns: FailedPattern[];
-  lastAnalyzed: string;
-}
+const fs = require('fs');
+const path = require('path');
 
 const PATTERNS_FILE = '.claude/memories/failed-patterns.json';
 const THRESHOLD = 3; // Suggest skill after 3 occurrences
 
-function loadPatterns(workDir: string): FailedPatternsStore {
+function loadPatterns(workDir) {
   const filePath = path.join(workDir, PATTERNS_FILE);
   if (fs.existsSync(filePath)) {
     try {
@@ -45,7 +32,7 @@ function loadPatterns(workDir: string): FailedPatternsStore {
   return { patterns: [], lastAnalyzed: new Date().toISOString() };
 }
 
-function savePatterns(workDir: string, store: FailedPatternsStore): void {
+function savePatterns(workDir, store) {
   const filePath = path.join(workDir, PATTERNS_FILE);
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -54,7 +41,7 @@ function savePatterns(workDir: string, store: FailedPatternsStore): void {
   fs.writeFileSync(filePath, JSON.stringify(store, null, 2));
 }
 
-function extractErrorPattern(output: string): { pattern: string; module: string | null } | null {
+function extractErrorPattern(output) {
   // Common error patterns that indicate missing knowledge
   const errorPatterns = [
     // Module-specific errors
@@ -82,7 +69,7 @@ function extractErrorPattern(output: string): { pattern: string; module: string 
   return null;
 }
 
-function suggestSkillName(pattern: string, module: string | null): string {
+function suggestSkillName(pattern, module) {
   if (module) {
     return `modules/${module}.md`;
   }
@@ -102,7 +89,7 @@ function suggestSkillName(pattern: string, module: string | null): string {
   return `workflows/${pattern.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.md`;
 }
 
-function analyzeFailure(workDir: string, output: string): void {
+function analyzeFailure(workDir, output) {
   const extracted = extractErrorPattern(output);
   if (!extracted) return;
 

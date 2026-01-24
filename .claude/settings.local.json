@@ -598,7 +598,43 @@
       "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline -3)",
       "Bash(for url in \"https://dev.fibreflow.app/api/health\" \"https://vf.fibreflow.app/api/health\" \"https://app.fibreflow.app/api/health\")",
       "Bash(git -C /home/hein/Workspace/FF_Next.js diff --stat HEAD)",
-      "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline -5)"
+      "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline -5)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js push origin master)",
+      "Bash(dmesg:*)",
+      "Bash(ps:*)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline --since=\"1 hour ago\")",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js show fbfd9209 --stat)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js show:*)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js status lib/db.ts)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline -1 -- lib/db.ts)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js add src/modules/activate/components/WAPhotosGallery.tsx)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js commit -m \"fix\\(activate\\): use regular img for WA photo thumbnails\n\nNext.js Image optimizer can''t handle auth-protected API routes\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\")",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js status --short src/modules/system/services/*.ts pages/api/system/self-healing.ts)",
+      "Bash(for:*)",
+      "Bash(do if [ -f \"$f\" ])",
+      "Bash(then js=\"$f%.ts.js\")",
+      "Bash(if [ -f \"$js\" ])",
+      "Bash(then echo \"✓ $f has $js\")",
+      "Bash(else echo \"✗ $f MISSING $js\")",
+      "Bash(do sleep 2 if curl -s https://dev.fibreflow.app/api/health)",
+      "Bash(then echo \"✅ dev.fibreflow.app is up!\" break fi echo \"Waiting for server... \\($i\\)\" done)",
+      "Bash(medium)",
+      "WebFetch(domain:chat.whatsapp.com)",
+      "Bash(then echo \"✅ Server is up!\" break fi echo \"Waiting for server... \\($i\\)\" done)",
+      "Bash(do if curl -s https://dev.fibreflow.app/api/health)",
+      "Bash(then echo \"✅ Server is up!\" break fi echo \"Waiting for server... \\($i\\)\" sleep 2 done)",
+      "Bash(TOKEN=\"faac7ae2-6e22-40c7-95c2-03649ece63d1\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''DR1733472''''&token=$TOKEN\")",
+      "mcp__chrome-devtools__evaluate_script",
+      "Bash(ONEMAP_EMAIL=\"hein@velocityfibre.co.za\" ONEMAP_PASSWORD=\"VeloF@2025\" npx tsx:*)",
+      "Bash(ONEMAP_EMAIL=hein@velocityfibre.co.za ONEMAP_PASSWORD=VeloF@2025 curl -s -c /tmp/1map_session.txt -b /tmp/1map_session.txt -X POST https://www.1map.co.za/login -H 'Content-Type: application/x-www-form-urlencoded' -d \"email=$ONEMAP_EMAIL&password=$ONEMAP_PASSWORD\" -w '\\\\n\\\\nHTTP_CODE: %{http_code}' -o /tmp/1map_login.html)",
+      "Bash(ONEMAP_EMAIL=\"hein@velocityfibre.co.za\" ONEMAP_PASSWORD=\"VeloF@2025\" node -e \"\n\\(async function\\(\\) {\n  const response = await fetch\\(''https://www.1map.co.za/login'', {\n    method: ''POST'',\n    headers: { ''Content-Type'': ''application/x-www-form-urlencoded'' },\n    body: new URLSearchParams\\({\n      email: process.env.ONEMAP_EMAIL,\n      password: process.env.ONEMAP_PASSWORD,\n    }\\).toString\\(\\),\n    redirect: ''manual'',\n  }\\);\n\n  console.log\\(''Status:'', response.status\\);\n  console.log\\(''Set-Cookie:'', response.headers.get\\(''set-cookie''\\)\\);\n  console.log\\(''Location:'', response.headers.get\\(''location''\\)\\);\n}\\)\\(\\);\n\")",
+      "Bash(ONEMAP_EMAIL=\"hein@velocityfibre.co.za\" ONEMAP_PASSWORD=\"VeloF@2025\" node:*)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js status --short docs/docs/Mismatch/ONT_SERIAL_CORRECTIONS_LOG.md)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js status --short docs/docs/Mismatch/)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js add:*)",
+      "Bash(git -C /home/hein/Workspace/FF_Next.js commit -m \"$\\(cat <<''EOF''\ndocs: add ONT serial mismatch analysis and correction log\n\n- OLT_MISMATCH_REPORT_2026-01-24.md: Analysis of 136 mismatched DRs\n- ONT_SERIAL_CORRECTIONS_LOG.md: Audit trail of 3 API corrections\n- 1MAP_API_DOCUMENTATION.md: API workflow for programmatic updates\n- olt_mismatches.txt: Raw mismatch data\n\nCorrections made via 1Map API:\n- DR1731053: ALCLB480E6E8 → ALCLB480E6E9\n- DR1736834: ALCLB48A9E42 → ALCLB48A9E55\n- DR1733472: ALCLB484D160 → ALCLB480F4B7\n\n7 additional DRs verified as already correct.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C /home/hein/.claude/skills add OneMap/)",
+      "Bash(git -C /home/hein/.claude/skills status --short)"
     ],
     "deny": [],
     "ask": [],
@@ -616,8 +652,8 @@
           },
           {
             "type": "command",
-            "command": "npx --yes ts-node .claude/hooks/expert-load.ts 2>&1 || node -e \"console.error('[expert-load] ts-node not available, skipping')\" || true",
-            "timeout": 15,
+            "command": "node .claude/hooks/expert-load.js 2>&1 || true",
+            "timeout": 10,
             "statusMessage": "Loading FF expertise..."
           }
         ]
@@ -629,7 +665,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then npx ts-node .claude/hooks/pre-commit.ts; fi",
+            "command": "if echo \"$TOOL_INPUT\" | grep -q 'git commit'; then node .claude/hooks/pre-commit.js; fi",
             "timeout": 120,
             "statusMessage": "Running pre-commit validation..."
           }
@@ -674,7 +710,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx ts-node .claude/hooks/token-tracker.ts 2>/dev/null || true",
+            "command": "node .claude/hooks/token-tracker.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Tracking tokens..."
           }
