@@ -1,0 +1,185 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                    PROCUREMENT ANALYTICS REPORT                       ║
+║                    FibreFlow / VelocityFibre                          ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+Report Generated: 2026-01-24 at 06:28:56
+Data Source: Odoo + FibreFlow Database
+
+══════════════════════════════════════════════════════════════════════
+EXECUTIVE SUMMARY
+══════════════════════════════════════════════════════════════════════
+
+  📦 Goods Receipt Notes (GRNs):            276
+     └─ Line Items:                         566
+     └─ Total Qty Received:             835,717
+
+  📋 Purchase Orders:                       199
+     └─ Total Value:              R 47,619,010.29
+
+  🧾 Vendor Invoices:                        12
+     └─ Total Invoiced:           R  1,453,783.1
+     └─ Outstanding:              R 1,453,524.83
+
+  📊 Stock Items/Products:                  260
+     └─ Total Units On-Hand:             98,491
+
+  🏢 Suppliers:                              12
+  📝 RFQs:                                    8
+
+══════════════════════════════════════════════════════════════════════
+SUPPLIER ANALYSIS
+══════════════════════════════════════════════════════════════════════
+
+Supplier                                      │ POs │  PO Value     │ GRNs │ Invoices │ Inv Value
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+CABLE FEEDER SYSTEMS AFRICA CC                │  65 │ R 4,157,882,480.64 │  112 │        4 │ R 4,825,638,272
+NEOCOM SOLUTIONS (PTY) LTD                    │  34 │ R 980,328,880.5 │   50 │        0 │         R 0
+FTTX AND ENERGY WAREHOUSE (PTY) LTD           │  44 │ R 353,160,246.66 │   58 │        0 │         R 0
+AVERGE TECHNOLOGIES (PTY) LTD                 │  19 │ R 337,753,868.8 │   20 │        8 │ R 300,549,866
+PHOTONICS FIBRE CABLING SOUTH AFRICA (PTY) LT │  16 │ R 61,397,010.9 │   18 │        0 │         R 0
+FIBERTIME NETWORKS (PTY) LTD                  │   6 │  R 21,426,048 │    4 │        0 │         R 0
+ROHCAP FIBRE MAINTENANCE (PTY) LTD            │   4 │   R 4,497,600 │    3 │        0 │         R 0
+EUROBYTE TECHNOLOGY (PTY) LTD                 │   3 │   R 631,337.5 │    5 │        0 │         R 0
+MANHOLES 4 AFRICA (PTY) LTD                   │   5 │     R 593,934 │    6 │        0 │         R 0
+LAMBDA TEST EQUIPMENT CC                      │   3 │      R 39,600 │    0 │        0 │         R 0
+Procurement Audit Supplier (PTY) LTD          │   0 │           R 0 │    0 │        0 │         R 0
+ADENDORFF MACHINERY MART CC                   │   0 │           R 0 │    0 │        0 │         R 0
+
+══════════════════════════════════════════════════════════════════════
+GOODS RECEIPT NOTES (GRNS)
+══════════════════════════════════════════════════════════════════════
+
+Monthly GRN Activity:
+
+Month    │ GRNs │ Suppliers │ Qty Received
+──────────────────────────────────────────────────
+2026-01 │   42 │         5 │      110,898 ██████
+2025-12 │   19 │         5 │       50,099 ███
+2025-11 │   18 │         3 │       52,361 ███
+2025-10 │  194 │         8 │      596,859 ████████████████████████████
+2025-09 │    3 │         1 │       25,500 
+
+Top 20 Most Received Products:
+
+Product Code          │ Qty Received │ GRNs │ Description
+────────────────────────────────────────────────────────────────────────────────────────────────────
+CAB-AER-SM-5.6-24F-MINI │      408,000 │   13 │ CAB-AER-SM-5.6-24F-MINI
+CAB-AER-SM-5.6-48F-MINI │       52,000 │    7 │ CAB-AER-SM-5.6-48F-MINI
+CONS-CAB-CLIP        │       32,921 │   19 │ CONS-CAB-CLIP
+CONS-MIDCOUPLER-F-SM-DUP-LCAPC │       32,153 │   13 │ CONS-MIDCOUPLER-F-SM-DUP-LCAPC
+CAB-AER-SM-15.8-144F │       32,000 │    4 │ CAB-AER-SM-15.8-144F
+CAB-DEADEND-4.50-6.19-MINI │       25,240 │   22 │ CAB-DEADEND-4.50-6.19-MINI
+CONS-WA-ONT-WOOD     │       21,366 │   12 │ CONS-WA-ONT-WOOD
+CAB-AER-SM-9.6-24F   │       20,000 │    1 │ CAB-AER-SM-9.6-24F
+CAB-AER-SM-9.6-96F   │       20,000 │    5 │ CAB-AER-SM-9.6-96F
+CONS-WA-PIGTAIL-SCREW │       14,700 │   10 │ CONS-WA-PIGTAIL-SCREW
+CONS-SCREW           │       13,709 │   11 │ CONS-SCREW
+DRESS-HOOK-2WAY      │       11,449 │   17 │ DRESS-HOOK-2WAY
+DRESS-SLACKBRKT-X    │       11,049 │   15 │ DRESS-SLACKBRKT-X
+CONS-SPLICEPROT-40-1.3 │       11,000 │    4 │ CONS-SPLICEPROT-40-1.3
+CAB-SPLITTER-CON-1-8-LPAPC │       10,014 │   14 │ CAB-SPLITTER-CON-1-8-LPAPC
+CONS-SPLICEPROT-40-2.5 │        8,800 │    3 │ CONS-SPLICEPROT-40-2.5
+CAB-LCAPC-SCAPC-30-3 │        8,750 │   11 │ CAB-LCAPC-SCAPC-30-3
+CAB-AER-SM-12.2-144F │        8,586 │    2 │ CAB-AER-SM-12.2-144F
+POLE-7-120-140       │        8,405 │   22 │ POLE-7-120-140
+ENCL-CONN-ODCFD0     │        4,894 │    6 │ ENCL-CONN-ODCFD0
+
+══════════════════════════════════════════════════════════════════════
+PURCHASE ORDERS
+══════════════════════════════════════════════════════════════════════
+
+Monthly PO Spend:
+
+Month    │ POs │ Total Value
+─────────────────────────────────────────────
+2026-01 │ 197 │ R  47,619,010.29 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+
+══════════════════════════════════════════════════════════════════════
+VENDOR INVOICES
+══════════════════════════════════════════════════════════════════════
+
+Total Invoices:    12
+  Paid:            3 (R 258.27)
+  Unpaid:          9
+  Partial:         0
+
+Total Invoiced:    R 1,453,783.1
+Outstanding:       R 1,453,524.83
+
+Invoice Details:
+
+Invoice #           │ Supplier                          │ Date       │ Amount       │ Status   │ Outstanding
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+BILL/2025/10/0013   │ CABLE FEEDER SYSTEMS AFRICA CC    │ 2025-10-21 │     R 258.27 │ paid     │         R 0
+BILL/2025/10/0002   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │  R 30,608.26 │ not_paid │ R 30,608.26
+BILL/2025/10/0003   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │  R 12,644.77 │ not_paid │ R 12,644.77
+BILL/2025/10/0004   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │    R 232,921 │ not_paid │   R 232,921
+BILL/2025/10/0005   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │    R 232,921 │ not_paid │   R 232,921
+BILL/2025/10/0006   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │     R 19,688 │ not_paid │    R 19,688
+BILL/2025/10/0008   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │    R 2,357.5 │ not_paid │   R 2,357.5
+BILL/2025/10/0007   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │     R 19,688 │ not_paid │    R 19,688
+BILL/2025/10/0009   │ AVERGE TECHNOLOGIES (PTY) LTD     │ 2025-10-06 │ R 240,092.17 │ not_paid │ R 240,092.17
+BILL/2025/10/0010   │ CABLE FEEDER SYSTEMS AFRICA CC    │ 2025-10-06 │ R 662,604.13 │ not_paid │ R 662,604.13
+BILL/2025/10/0011   │ CABLE FEEDER SYSTEMS AFRICA CC    │ 2025-10-06 │          R 0 │ paid     │         R 0
+BILL/2025/10/0012   │ CABLE FEEDER SYSTEMS AFRICA CC    │ 2025-10-06 │          R 0 │ paid     │         R 0
+
+══════════════════════════════════════════════════════════════════════
+INVENTORY / STOCK LEVELS
+══════════════════════════════════════════════════════════════════════
+
+Stock by Location:
+
+Location                            │ Items │ On-Hand      │ Reserved    │ Available
+──────────────────────────────────────────────────────────────────────────────────────────
+Law/Stock                           │    21 │       51,911 │           0 │      51,911
+GR/Stock                            │    18 │       18,001 │           0 │      18,001
+MamP1/Stock                         │    20 │       16,663 │           0 │      16,663
+ETW/Stock                           │     8 │        5,660 │           0 │       5,660
+WH/Stock                            │    15 │        2,109 │           0 │       2,109
+Tem2/Stock                          │     6 │        1,669 │           0 │       1,669
+Tem1/Stock                          │     5 │        1,400 │           0 │       1,400
+Moh/Stock                           │     7 │        1,078 │           0 │       1,078
+
+Low Stock Alerts (< 50 units):
+
+  ⚠️      1 │ ENCL-MANHOLE-RN1000       │ Tem2/Stock
+  ⚠️      1 │ Transport                 │ ETW/Stock
+  ⚠️      1 │ TOOL-LAUNCHLEAD-1000      │ WH/Stock
+  ⚠️      1 │ TOOL-LAUNCHLEAD-100       │ WH/Stock
+  ⚠️      1 │ ENCL-MANHOLE-KEY-RN600    │ Tem2/Stock
+  ⚠️      2 │ CONS-CAUTIONTAPE-500      │ GR/Stock
+  ⚠️      2 │ TOOL-HEATGUN-GAS          │ WH/Stock
+  ⚠️      2 │ TOOL-EXFO-MAX945HH        │ WH/Stock
+  ⚠️      2 │ CONS-FOAMSEAL             │ Law/Stock
+  ⚠️      2 │ TOOL-SUM-T72C             │ WH/Stock
+  ⚠️      2 │ ENCL-MANHOLE-KEY-RN1000   │ GR/Stock
+  ⚠️      3 │ ENCL-MANHOLE-RN600        │ Tem2/Stock
+  ⚠️      4 │ TOOL-HARNASS-BELT         │ WH/Stock
+  ⚠️      4 │ TOOL-HARNASS-LANYARD      │ WH/Stock
+  ⚠️      5 │ CONS-ALCOHOL-1L           │ Law/Stock
+  ⚠️      5 │ TOOL-BANDIT-STRAPPING     │ WH/Stock
+  ⚠️      6 │ TOOL-TOOLKIT-FTK800       │ WH/Stock
+  ⚠️      9 │ PIPE-CORR-110             │ ETW/Stock
+  ⚠️      9 │ TOOL-DRILL-CORDLESS       │ WH/Stock
+  ⚠️      9 │ TOOL-LADDER-6             │ WH/Stock
+
+══════════════════════════════════════════════════════════════════════
+DATA QUALITY & SYNC STATUS
+══════════════════════════════════════════════════════════════════════
+
+Odoo Sync Status:
+
+  ✅ GRNs synced:           276
+  ✅ GRN Items synced:      566
+  ✅ Products synced:       249
+  ✅ Suppliers synced:      11
+  ✅ Stock Levels synced:   100
+  ✅ Invoices synced:       12
+
+Last GRN Sync:     2026-01-24T04:48:55.649Z
+Last Invoice Sync: 2026-01-24T06:27:45.041Z
+
+══════════════════════════════════════════════════════════════════════
+END OF REPORT
+══════════════════════════════════════════════════════════════════════
