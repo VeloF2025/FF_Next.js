@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { logActivity } from '@/modules/activate/services/activityLogService';
 import formidable from 'formidable';
 import fs from 'fs';
 
@@ -164,18 +165,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!mismatch.oltSerial) {
         emptySerialCount++;
 
-        // Log to DR timeline
-        await client.query(
-          `INSERT INTO dr_timeline_events
-            (drop_number, event_type, description, created_by)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT DO NOTHING`,
-          [
-            mismatch.drNumber,
-            'olt_report_import',
-            'OLT report shows empty serial - requires investigation',
-            user?.id || null,
-          ]
+        // Log to activity log
+        await logActivity(
+          mismatch.drNumber,
+          'error',
+          {
+            message: 'OLT report shows empty serial - requires investigation',
+            source: 'olt_report_import',
+          },
+          user?.id || 'system'
         );
 
         results.push({

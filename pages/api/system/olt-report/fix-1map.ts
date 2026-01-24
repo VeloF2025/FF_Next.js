@@ -26,6 +26,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
+import { logActivity } from '@/modules/activate/services/activityLogService';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -53,18 +54,12 @@ async function fixSingleDR(
 
   // Skip if serial is empty
   if (!correctSerial || !correctSerial.trim()) {
-    // Log to timeline
-    await client.query(
-      `INSERT INTO dr_timeline_events
-        (drop_number, event_type, description, created_by)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT DO NOTHING`,
-      [
-        drNumber,
-        'onemap_fix_skipped',
-        'Skipped 1Map fix - empty OLT serial',
-        userId,
-      ]
+    // Log to activity log
+    await logActivity(
+      drNumber,
+      'error',
+      { message: 'Skipped 1Map fix - empty OLT serial', source: 'olt_report' },
+      userId || 'system'
     );
 
     return {
@@ -98,23 +93,19 @@ async function fixSingleDR(
         [result.oldValue, userId, userId, drNumber]
       );
 
-      // Log to timeline
-      await client.query(
-        `INSERT INTO dr_timeline_events
-          (drop_number, event_type, description, created_by, metadata)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [
-          drNumber,
-          'onemap_fix_success',
-          `1Map ONT serial updated: ${result.oldValue || 'EMPTY'} → ${correctSerial}`,
-          userId,
-          JSON.stringify({
-            propId: result.propId,
-            oldValue: result.oldValue,
-            newValue: correctSerial,
-            source: 'olt_report',
-          }),
-        ]
+      // Log to activity log
+      await logActivity(
+        drNumber,
+        'SERIAL_UPDATE',
+        {
+          details: `1Map ONT serial updated: ${result.oldValue || 'EMPTY'} → ${correctSerial}`,
+          propId: result.propId,
+          oldValue: result.oldValue,
+          newValue: correctSerial,
+          source: 'olt_report',
+          fix_type: 'onemap_fix_success',
+        },
+        userId || 'system'
       );
 
       log.info('FixOneMap', 'Successfully fixed DR', {
@@ -142,17 +133,16 @@ async function fixSingleDR(
         [drNumber]
       );
 
-      // Log to timeline
-      await client.query(
-        `INSERT INTO dr_timeline_events
-          (drop_number, event_type, description, created_by)
-         VALUES ($1, $2, $3, $4)`,
-        [
-          drNumber,
-          'onemap_fix_failed',
-          `1Map fix failed: ${result.error}`,
-          userId,
-        ]
+      // Log to activity log
+      await logActivity(
+        drNumber,
+        'error',
+        {
+          message: `1Map fix failed: ${result.error}`,
+          source: 'olt_report',
+          fix_type: 'onemap_fix_failed',
+        },
+        userId || 'system'
       );
 
       return {
