@@ -215,6 +215,8 @@ export function PremiumLoginPage() {
         </label>
         <VelocityInput
           type="email"
+          name="email"
+          id="login-email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -250,6 +252,8 @@ export function PremiumLoginPage() {
         </label>
         <VelocityInput
           type="password"
+          name="password"
+          id="login-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -306,6 +310,8 @@ export function PremiumLoginPage() {
         </label>
         <VelocityInput
           type="password"
+          name="new-password"
+          id="setup-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -329,6 +335,8 @@ export function PremiumLoginPage() {
         </label>
         <VelocityInput
           type="password"
+          name="confirm-password"
+          id="setup-confirm-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
