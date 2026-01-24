@@ -114,9 +114,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Get serials from all 4 sources
+    // Note: oes_activations only tracks ONT serial, not UPS
     const result = await sql`
       WITH oes_data AS (
-        SELECT serial_number as ont, ups_serial as ups
+        SELECT serial_number as ont
         FROM oes_activations
         WHERE drop_number = ${dropNumber}
         LIMIT 1
@@ -144,7 +145,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       )
       SELECT
         (SELECT ont FROM oes_data) as oes_ont,
-        (SELECT ups FROM oes_data) as oes_ups,
+        NULL as oes_ups, -- OES doesn't track UPS serial
         (SELECT ont FROM offline_data) as offline_ont,
         (SELECT ont FROM onemap_data) as onemap_ont,
         (SELECT ups FROM onemap_data) as onemap_ups,
@@ -163,7 +164,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ];
 
     const upsSerials = [
-      row.oes_ups as string | null,
+      null, // OES doesn't track UPS serial
       null, // No offline UPS tracking currently
       row.onemap_ups as string | null,
       row.wa_ups as string | null,
