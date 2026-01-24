@@ -187,7 +187,7 @@ export default function OltReportPage() {
   // Handle single fix
   const handleFix = async (record: OltRecord) => {
     if (!record.olt_serial) {
-      alert('Cannot fix - empty OLT serial');
+      alert('Cannot fix - empty ONT serial');
       return;
     }
 
@@ -227,7 +227,7 @@ export default function OltReportPage() {
     );
 
     if (selected.length === 0) {
-      alert('No records with valid OLT serials selected');
+      alert('No records with valid ONT serials selected');
       return;
     }
 
@@ -282,10 +282,10 @@ export default function OltReportPage() {
     });
   };
 
-  // Select all pending
+  // Select all pending with valid ONT serial
   const selectAllPending = () => {
     const pending = records.filter(
-      (r) => r.comparison_status === 'mismatch' && r.olt_serial
+      (r) => (r.fix_status === 'pending' || r.comparison_status === 'mismatch') && r.olt_serial
     );
     setSelectedRecords(new Set(pending.map((r) => r.id)));
   };
@@ -450,7 +450,7 @@ export default function OltReportPage() {
                 </p>
                 <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 space-y-1">
                   <li>Column 0 (A): DR Number</li>
-                  <li>Column 1 (B): OLT Serial (correct value)</li>
+                  <li>Column 1 (B): ONT Serial (correct value from OLT)</li>
                   <li>Column 20 (U): &quot;Drop &amp; ONT SN on 1Map matches to OLT?&quot;</li>
                   <li>Column 21 (V): Wrong 1Map Serial (if mismatch)</li>
                 </ul>
@@ -530,7 +530,7 @@ export default function OltReportPage() {
                 onClick={selectAllPending}
                 className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
-                Select all with valid OLT serial
+                Select all with valid ONT serial
               </button>
             </div>
 
@@ -546,8 +546,8 @@ export default function OltReportPage() {
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                       Zone
                     </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="OLT Serial (correct)">
-                      OLT
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="ONT Serial (correct, from OLT report)">
+                      ONT
                     </th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Current 1Map Serial">
                       1Map
