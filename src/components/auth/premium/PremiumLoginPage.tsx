@@ -16,6 +16,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { VelocityInput } from '@/components/ui/VelocityInput';
 import { VelocityButton } from '@/components/ui/VelocityButton';
 import { getRandomQuote, MotivationalQuote } from '@/data/motivational-quotes';
+import { useAuth } from '@/contexts/AuthContext';
 
 type AuthStep = 'email' | 'password' | 'setup-password';
 type EmailStatus = 'STAFF_NOT_FOUND' | 'FIRST_TIME_USER' | 'PASSWORD_REQUIRED' | 'PASSWORD_SETUP_REQUIRED' | 'USER_DISABLED';
@@ -30,6 +31,7 @@ interface StaffInfo {
 
 export function PremiumLoginPage() {
   const router = useRouter();
+  const { signInWithEmail, refreshUser } = useAuth();
   const [step, setStep] = useState<AuthStep>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,25 +102,15 @@ export function PremiumLoginPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
+      // Use AuthContext to login - this properly updates auth state
+      await signInWithEmail(email, password);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error?.message || 'Login failed');
-        return;
-      }
-
-      // Redirect to dashboard on success
+      // Redirect to dashboard on success (AuthContext is now updated)
       const returnUrl = (router.query.returnUrl as string) || '/';
       router.push(returnUrl);
-    } catch {
-      setError('Network error. Please try again.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -150,7 +142,10 @@ export function PremiumLoginPage() {
         return;
       }
 
-      // Redirect to dashboard on success (auto-logged in)
+      // Refresh AuthContext to pick up the new session
+      await refreshUser();
+
+      // Redirect to dashboard on success (AuthContext is now updated)
       const returnUrl = (router.query.returnUrl as string) || '/';
       router.push(returnUrl);
     } catch {
