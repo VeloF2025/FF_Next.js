@@ -36,9 +36,15 @@ api.interceptors.response.use(
 
     // Handle specific error codes
     if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login
+      // Handle unauthorized - redirect to sign-in with return URL
       localStorage.removeItem('auth_token')
-      window.location.href = '/login'
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname + window.location.search
+        // Don't redirect if already on sign-in page
+        if (!currentPath.startsWith('/sign-in')) {
+          window.location.href = `/sign-in?returnUrl=${encodeURIComponent(currentPath)}`
+        }
+      }
     }
 
     return Promise.reject(apiError)
