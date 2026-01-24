@@ -112,7 +112,7 @@ export default async function handler(
     await sql`
       UPDATE users
       SET
-        password_hash = ${passwordHash},
+        password = ${passwordHash},
         reset_token = NULL,
         reset_token_expires = NULL,
         password_changed_at = NOW(),
