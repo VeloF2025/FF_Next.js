@@ -207,18 +207,22 @@ async function checkWhatsAppBridge(): Promise<ServiceStatus> {
       // Check how long since last submission
       const hoursSince = (Date.now() - new Date(lastSubmission).getTime()) / (1000 * 60 * 60);
 
-      if (hoursSince < 4) {
+      // Thresholds adjusted for realistic workday patterns:
+      // - < 16h: healthy (covers normal overnight gap from 5pm to 9am next day)
+      // - 16-24h: degraded (more than expected gap, may need attention)
+      // - > 24h: down (definitely something wrong)
+      if (hoursSince < 16) {
         return {
           status: 'healthy',
           latencyMs: Date.now() - start,
           message: `Last DR ${hoursSince.toFixed(1)}h ago`,
           lastCheck: new Date().toISOString(),
         };
-      } else if (hoursSince < 12) {
+      } else if (hoursSince < 24) {
         return {
           status: 'degraded',
           latencyMs: Date.now() - start,
-          message: `No DRs for ${hoursSince.toFixed(1)}h - may be offline`,
+          message: `No DRs for ${hoursSince.toFixed(1)}h - may need attention`,
           lastCheck: new Date().toISOString(),
         };
       } else {
