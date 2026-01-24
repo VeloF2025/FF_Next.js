@@ -64,14 +64,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Build URLs for photo proxy
     const photosWithUrls = photos.map((photo) => {
-      // Extract group_jid and filename from local_path
-      // local_path format: /home/louis/whatsapp-bridge-go/store/{group_jid}/{filename}
+      // Extract DR and filename from local_path
+      // NEW local_path format: /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
       let url = '';
       if (photo.local_path) {
         const pathParts = photo.local_path.split('/');
         const filename = pathParts[pathParts.length - 1];
-        const groupJid = pathParts[pathParts.length - 2];
-        url = `/api/activate/wa-photo/${groupJid}/${filename}`;
+        const drFolder = pathParts[pathParts.length - 2];
+        // Use the existing photo proxy endpoint
+        url = `/api/activate/photo/${drFolder}/${filename}`;
       }
 
       return {

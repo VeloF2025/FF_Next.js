@@ -89,7 +89,17 @@ interface WAPhotoThumbnailProps {
 
 function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps) {
   const [imageError, setImageError] = useState(false);
-  const imageUrl = photo.proxy_url || `/api/activate/wa-photo/${photo.local_path?.replace('/home/louis/whatsapp-bridge-go/store/', '')}`;
+  // Build image URL from proxy_url or construct from local_path
+  // NEW local_path format: /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
+  const getImageUrl = () => {
+    if (photo.proxy_url) return photo.proxy_url;
+    if (!photo.local_path) return '';
+    const pathParts = photo.local_path.split('/');
+    const filename = pathParts[pathParts.length - 1];
+    const drFolder = pathParts[pathParts.length - 2];
+    return `/api/activate/photo/${drFolder}/${filename}`;
+  };
+  const imageUrl = getImageUrl();
 
   return (
     <div
@@ -171,7 +181,16 @@ interface WAPhotoLightboxProps {
 
 function WAPhotoLightbox({ photo, onClose }: WAPhotoLightboxProps) {
   const [imageError, setImageError] = useState(false);
-  const imageUrl = photo.proxy_url || `/api/activate/wa-photo/${photo.local_path?.replace('/home/louis/whatsapp-bridge-go/store/', '')}`;
+  // Build image URL from proxy_url or construct from local_path
+  const getImageUrl = () => {
+    if (photo.proxy_url) return photo.proxy_url;
+    if (!photo.local_path) return '';
+    const pathParts = photo.local_path.split('/');
+    const filename = pathParts[pathParts.length - 1];
+    const drFolder = pathParts[pathParts.length - 2];
+    return `/api/activate/photo/${drFolder}/${filename}`;
+  };
+  const imageUrl = getImageUrl();
 
   return (
     <div
