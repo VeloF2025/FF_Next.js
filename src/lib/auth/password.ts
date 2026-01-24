@@ -4,6 +4,7 @@
  */
 
 import * as bcrypt from 'bcryptjs';
+import { randomBytes, createHash } from 'crypto';
 
 // Cost factor for bcrypt (10-12 is recommended for production)
 const SALT_ROUNDS = 12;
@@ -104,4 +105,40 @@ export function generateRandomPassword(length: number = 16): string {
     .split('')
     .sort(() => Math.random() - 0.5)
     .join('');
+}
+
+/**
+ * Generate a secure password reset token
+ * Returns both the plain token (to send to user) and hashed token (to store in DB)
+ */
+export function generateResetToken(): {
+  token: string;
+  hashedToken: string;
+  expiresAt: Date;
+} {
+  // Generate 32 random bytes = 64 hex characters
+  const token = randomBytes(32).toString('hex');
+
+  // Hash the token for storage (so even if DB is compromised, tokens can't be used)
+  const hashedToken = createHash('sha256').update(token).digest('hex');
+
+  // Token expires in 1 hour
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  return { token, hashedToken, expiresAt };
+}
+
+/**
+ * Hash a reset token for comparison
+ */
+export function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Check if a reset token has expired
+ */
+export function isResetTokenExpired(expiresAt: Date | string): boolean {
+  const expiry = typeof expiresAt === 'string' ? new Date(expiresAt) : expiresAt;
+  return expiry < new Date();
 }

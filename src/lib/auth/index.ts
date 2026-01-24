@@ -15,6 +15,9 @@ export {
   verifyPassword,
   checkPasswordStrength,
   generateRandomPassword,
+  generateResetToken,
+  hashResetToken,
+  isResetTokenExpired,
 } from './password';
 
 // Session management
