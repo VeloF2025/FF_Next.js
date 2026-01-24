@@ -18,6 +18,7 @@ import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/activate/types/unified.types';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial, fuzzySerialMatch } from '@/modules/activate/services/qaAutoFailService';
+import { logSerialChange } from '@/modules/activate/services/activityLogService';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 
@@ -221,25 +222,39 @@ async function quickSyncFromOneMap(
           newUps: upsSerial,
         };
 
-        // Log to activity log
-        await pool.query(
-          `INSERT INTO dr_activity_log (id, drop_number, event_type, event_data, actor, created_at)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
-          [
+        // Log serial changes to both serial_change_history AND dr_activity_log
+        if (ontChanged) {
+          await logSerialChange(
             dropNumber,
-            'SERIAL_UPDATE',
-            JSON.stringify({
-              source: 'quick_sync',
-              changes: {
-                ont: ontChanged ? { old: currentOnt, new: ontSerial } : null,
-                ups: upsChanged ? { old: currentUps, new: upsSerial } : null,
-              },
+            'ont_serial',
+            currentOnt,
+            ontSerial,
+            'onemap_sync',
+            'system',
+            undefined,
+            {
               swap_detected: swapCheck.swapped,
               swap_details: swapCheck.details,
-            }),
+              sync_source: 'quick_sync',
+            }
+          );
+        }
+        if (upsChanged) {
+          await logSerialChange(
+            dropNumber,
+            'ups_serial',
+            currentUps,
+            upsSerial,
+            'onemap_sync',
             'system',
-          ]
-        );
+            undefined,
+            {
+              swap_detected: swapCheck.swapped,
+              swap_details: swapCheck.details,
+              sync_source: 'quick_sync',
+            }
+          );
+        }
 
         log.info(`Serial change detected for ${dropNumber}`, {
           ontChanged,

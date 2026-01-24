@@ -46,7 +46,32 @@ export type ActivityEventType =
   | 'error'
   | 'SERIAL_UPDATE'
   | 'SWAP_DETECTED'
-  | 'INSTALLATION_MISMATCH';
+  | 'INSTALLATION_MISMATCH'
+  | 'SERIAL_HISTORY_ENTRY'
+  | 'WA_PHOTO_VLM_PROCESSED'
+  | 'SERIAL_CONFIRMED'
+  | 'MANUAL_SERIAL_EDIT';
+
+/**
+ * Serial change source types
+ */
+export type SerialChangeSource =
+  | 'onemap_sync'
+  | 'manual_edit'
+  | 'vlm_extraction'
+  | 'wa_photo_vlm'
+  | 'swap_correction'
+  | 'migration';
+
+/**
+ * Serial change reason types
+ */
+export type SerialChangeReason =
+  | 'technician_update'
+  | 'swap_correction'
+  | 'replacement'
+  | 'data_fix'
+  | 'initial_capture';
 
 /**
  * Activity log entry
@@ -187,6 +212,26 @@ const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: string; i
     title: 'Installation Mismatch',
     icon: '🔴',
     iconColor: 'text-red-500',
+  },
+  SERIAL_HISTORY_ENTRY: {
+    title: 'Serial Change Logged',
+    icon: '📝',
+    iconColor: 'text-blue-500',
+  },
+  WA_PHOTO_VLM_PROCESSED: {
+    title: 'WA Photo Analyzed',
+    icon: '🤖',
+    iconColor: 'text-purple-500',
+  },
+  SERIAL_CONFIRMED: {
+    title: 'Serial Confirmed',
+    icon: '✓',
+    iconColor: 'text-green-500',
+  },
+  MANUAL_SERIAL_EDIT: {
+    title: 'Serial Manually Edited',
+    icon: '✏️',
+    iconColor: 'text-yellow-500',
   },
 };
 
@@ -927,4 +972,197 @@ export async function logFeedbackSent(drNumber: string, group: string, messageId
  */
 export async function logError(drNumber: string, message: string, details?: unknown): Promise<string> {
   return logActivity(drNumber, 'error', { message, details }, 'error-handler');
+}
+
+// ============================================================================
+// SERIAL CHANGE TRACKING
+// ============================================================================
+
+/**
+ * Log a serial change to both serial_change_history table and activity log
+ *
+ * This is the CENTRAL function for all serial change tracking.
+ * Call this whenever an ONT or UPS serial value changes.
+ *
+ * @param drNumber - The DR number
+ * @param changeType - 'ont_serial' or 'ups_serial'
+ * @param oldValue - Previous serial value (null for initial capture)
+ * @param newValue - New serial value
+ * @param source - Where the change came from
+ * @param actor - Who/what made the change
+ * @param reason - Why the change was made (optional)
+ * @param metadata - Additional context (optional)
+ */
+export async function logSerialChange(
+  drNumber: string,
+  changeType: 'ont_serial' | 'ups_serial',
+  oldValue: string | null,
+  newValue: string | null,
+  source: SerialChangeSource,
+  actor: string = 'system',
+  reason?: SerialChangeReason,
+  metadata?: Record<string, unknown>
+): Promise<{ historyId: string; activityId: string }> {
+  const sql = getDb();
+
+  // Skip if no actual change (same value)
+  if (oldValue === newValue) {
+    log.debug(`[SerialChange] Skipped - no change for ${drNumber} ${changeType}: ${oldValue}`);
+    return { historyId: '', activityId: '' };
+  }
+
+  // Detect if this looks like a swap
+  const swapDetected = detectSwapPattern(changeType, newValue);
+
+  const fullMetadata = {
+    ...metadata,
+    swap_detected: swapDetected,
+    change_classification: oldValue === null ? 'initial_capture' : 'updated',
+  };
+
+  try {
+    // 1. Insert into serial_change_history table
+    const historyResult = await sql`
+      INSERT INTO serial_change_history (
+        drop_number,
+        change_type,
+        old_value,
+        new_value,
+        change_source,
+        change_reason,
+        actor,
+        metadata
+      )
+      VALUES (
+        ${drNumber},
+        ${changeType},
+        ${oldValue},
+        ${newValue},
+        ${source},
+        ${reason || null},
+        ${actor},
+        ${JSON.stringify(fullMetadata)}
+      )
+      RETURNING id
+    `;
+
+    const historyId = historyResult[0]?.id || '';
+
+    // 2. Also log to dr_activity_log for timeline display
+    const eventData = {
+      change_type: changeType,
+      old_value: oldValue,
+      new_value: newValue,
+      source,
+      reason,
+      history_id: historyId,
+      swap_detected: swapDetected,
+    };
+
+    const activityId = await logActivity(drNumber, 'SERIAL_HISTORY_ENTRY', eventData, actor);
+
+    log.info(
+      `[SerialChange] Logged ${changeType} change for ${drNumber}: ${oldValue || 'NULL'} → ${newValue || 'NULL'} (source: ${source})`
+    );
+
+    return { historyId, activityId };
+  } catch (error) {
+    log.error(`[SerialChange] Failed to log change for ${drNumber}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Detect if a serial value looks like it's in the wrong field (swap pattern)
+ */
+function detectSwapPattern(changeType: 'ont_serial' | 'ups_serial', value: string | null): boolean {
+  if (!value) return false;
+
+  // ONT serials start with ALCL or ALCB
+  const isOntPattern = /^ALC[LB]/i.test(value);
+  // UPS serials start with GU18W
+  const isUpsPattern = /^GU18W/i.test(value);
+
+  if (changeType === 'ont_serial' && isUpsPattern) {
+    return true; // UPS serial in ONT field = swap
+  }
+  if (changeType === 'ups_serial' && isOntPattern) {
+    return true; // ONT serial in UPS field = swap
+  }
+
+  return false;
+}
+
+/**
+ * Get serial change history for a DR
+ */
+export async function getSerialHistory(
+  drNumber: string,
+  limit: number = 50
+): Promise<Array<{
+  id: string;
+  change_type: string;
+  old_value: string | null;
+  new_value: string | null;
+  change_source: string;
+  change_reason: string | null;
+  actor: string;
+  metadata: Record<string, unknown>;
+  detected_at: Date;
+}>> {
+  const sql = getDb();
+
+  const result = await sql`
+    SELECT
+      id,
+      change_type,
+      old_value,
+      new_value,
+      change_source,
+      change_reason,
+      actor,
+      metadata,
+      detected_at
+    FROM serial_change_history
+    WHERE drop_number = ${drNumber}
+    ORDER BY detected_at DESC
+    LIMIT ${limit}
+  `;
+
+  return result as Array<{
+    id: string;
+    change_type: string;
+    old_value: string | null;
+    new_value: string | null;
+    change_source: string;
+    change_reason: string | null;
+    actor: string;
+    metadata: Record<string, unknown>;
+    detected_at: Date;
+  }>;
+}
+
+/**
+ * Log WA photo VLM processing result
+ */
+export async function logWaPhotoVlmProcessed(
+  drNumber: string,
+  photoId: string,
+  extractedOnt: string | null,
+  extractedUps: string | null,
+  confidence: number,
+  matchStatus: 'match' | 'mismatch' | 'partial'
+): Promise<string> {
+  return logActivity(
+    drNumber,
+    'WA_PHOTO_VLM_PROCESSED',
+    {
+      photo_id: photoId,
+      extracted_ont: extractedOnt,
+      extracted_ups: extractedUps,
+      confidence,
+      match_status: matchStatus,
+    },
+    'vlm'
+  );
 }
