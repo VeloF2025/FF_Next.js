@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import type {
   DisciplinaryIncident,
   DisciplinaryIncidentCreate,
@@ -236,7 +237,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));
 
 // Map database row to DisciplinaryIncident interface
 function mapDbToIncident(

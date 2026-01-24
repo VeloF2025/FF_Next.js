@@ -13,6 +13,7 @@ import type {
   ServiceStatus,
   WaAdminApiResponse
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -28,7 +29,7 @@ const DEFAULT_SENDER_URL = 'http://72.61.197.178:8081';
 const DEFAULT_BRIDGE_PHONE = '+27638412276';
 const DEFAULT_SENDER_PHONE = '+27638412276';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<WaAdminApiResponse<WaServicesStatusResponse>>
 ) {
@@ -224,3 +225,5 @@ function parseServiceStatus(data: Record<string, unknown>): ServiceStatus {
   }
   return 'unknown';
 }
+
+export default withAuth(handler);

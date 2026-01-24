@@ -13,12 +13,13 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
 type AdjustmentType = 'increase' | 'decrease' | 'reallocation';
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -169,4 +170,4 @@ export default withErrorHandler(async (
     log.error('Failed to adjust budget', { projectId, adjustmentType: adjType, amount: adjustmentAmount, error });
     return apiResponse.databaseError(res, error, 'Failed to adjust budget');
   }
-});
+}));

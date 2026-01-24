@@ -21,6 +21,7 @@ import { IncomingForm, Fields, Files } from 'formidable';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
 import { log } from '@/lib/logger';
+import { withAuth, withRole } from '@/lib/auth';
 
 // Configure Neon transport based on NEON_USE_HTTP env var
 const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
@@ -342,7 +343,7 @@ function parseForm(
   });
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -691,3 +692,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(withRole('manager')(handler));

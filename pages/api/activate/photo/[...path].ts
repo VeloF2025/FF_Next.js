@@ -10,11 +10,12 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 // Internal dr-photo-api endpoint (accessible from server only)
 const INTERNAL_PHOTO_API = process.env.DR_PHOTO_API_URL || 'http://100.96.203.105:8003';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -77,6 +78,8 @@ export default async function handler(
     return res.status(500).json({ error: 'Failed to fetch photo' });
   }
 }
+
+export default withAuth(handler);
 
 // Disable body parsing for this route (we're dealing with binary data)
 export const config = {

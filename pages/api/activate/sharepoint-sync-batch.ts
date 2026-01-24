@@ -16,6 +16,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   isSharePointDrSyncEnabled,
@@ -40,7 +41,7 @@ const MAX_BATCH_SIZE = 100;
 // Rate limit delay between DRs (ms)
 const DR_RATE_LIMIT = 500;
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -336,3 +337,5 @@ async function processFullSync(
   // Then sync photos
   await processSyncPhotos(dropNumber);
 }
+
+export default withAuth(withRole('admin')(handler));

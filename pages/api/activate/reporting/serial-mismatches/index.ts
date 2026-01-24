@@ -23,6 +23,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import type {
   SerialMismatchReportResponse,
@@ -34,7 +35,7 @@ import type {
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -299,3 +300,5 @@ export default async function handler(
     client.release();
   }
 }
+
+export default withAuth(withRole('manager')(handler));

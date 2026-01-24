@@ -17,6 +17,7 @@ import {
   TicketPriority,
 } from '@/modules/maintenance/types/ticket';
 import { updateMaintenanceFlagStatus } from '@/modules/maintenance/services/waMaintenanceProcessor';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('api:maintenance:wa-ticket');
 
@@ -46,7 +47,7 @@ interface ApiResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
@@ -188,3 +189,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

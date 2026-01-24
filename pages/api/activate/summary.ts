@@ -18,6 +18,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import type { DRSummary, DRState, QADecision } from '@/modules/activate/types/summary.types';
 
 // Configure Neon transport based on NEON_USE_HTTP env var
@@ -123,7 +124,7 @@ function calculateStepsCovered(vlmCategorization: any[], photosMetadata: any[]):
   return stepsSet.size;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -321,3 +322,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

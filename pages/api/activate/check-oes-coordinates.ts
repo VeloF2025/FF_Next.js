@@ -7,6 +7,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
+import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 
 
 // Configure Neon transport based on NEON_USE_HTTP env var
@@ -27,7 +28,7 @@ const pool = new Pool({
     'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
 });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -123,3 +124,4 @@ export default async function handler(
     });
   }
 }
+export default withAuth(handler);

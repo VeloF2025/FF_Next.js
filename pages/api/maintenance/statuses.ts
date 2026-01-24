@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -27,7 +28,7 @@ interface TicketStatus {
   qcontact_status: string | null;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const sql = neon(DATABASE_URL);
 
   if (req.method === 'GET') {
@@ -127,3 +128,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).json({ success: false, error: 'Method not allowed' });
 }
+
+export default withAuth(handler);

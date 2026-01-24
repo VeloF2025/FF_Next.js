@@ -9,10 +9,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { getMigrationStatus } from '@/modules/maintenance/services/ticketMigrationService';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('maintenance:migration-status');
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -39,3 +40,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

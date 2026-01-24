@@ -15,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 // Configure Neon transport based on NEON_USE_HTTP env var
@@ -43,7 +44,7 @@ interface StaffOption {
   position: string | null;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -119,3 +120,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

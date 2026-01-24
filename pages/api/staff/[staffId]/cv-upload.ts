@@ -11,6 +11,7 @@ import fs from 'fs';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { uploadStaffDocument, deleteStaffDocument } from '@/services/vfStorageAdapter';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffCVUploadAPI');
@@ -168,4 +169,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));

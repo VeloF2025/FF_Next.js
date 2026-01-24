@@ -15,10 +15,11 @@ import type {
   CreateBudgetItemRequest,
   FiberBudgetCategoryCode,
 } from '@/types/procurement/material-catalog.types';
+import { withAuth } from '@/lib/auth';
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -301,3 +302,5 @@ async function handlePost(
     return apiResponse.databaseError(res, error, 'Failed to create budget item');
   }
 }
+
+export default withAuth(handler);

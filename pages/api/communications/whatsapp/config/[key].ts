@@ -13,6 +13,7 @@ import type {
   WaServiceConfigInput,
   WaAdminApiResponse
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -21,7 +22,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<WaAdminApiResponse<WaServiceConfig>>
 ) {
@@ -224,3 +225,5 @@ async function logAdminAction(
     console.error('[WA Admin] Failed to log audit action:', error);
   }
 }
+
+export default withAuth(handler);

@@ -8,8 +8,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { phaseOperations, stepOperations, taskOperations } from '@/services/projects/phases/neonPhaseService';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -84,3 +85,5 @@ export default async function handler(
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+export default withAuth(handler);

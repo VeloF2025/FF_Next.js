@@ -11,6 +11,7 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -39,7 +40,7 @@ const BOQ_CATEGORY_MAP: Record<string, string> = {
   provisional: 'CONTINGENCY',
 };
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -296,7 +297,7 @@ export default withErrorHandler(async (
     log.error('Failed to sync budget from BOQ', { projectId, boqId, error });
     return apiResponse.databaseError(res, error, 'Failed to sync budget from BOQ');
   }
-});
+}));
 
 /**
  * Map BOQ category name to budget category code

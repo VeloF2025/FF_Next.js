@@ -13,6 +13,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -209,8 +210,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 /**
  * Main handler
  */
-export default async function handler(
-  req: NextApiRequest,
+async function handler(
+  req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method === 'GET') {
@@ -221,3 +222,5 @@ export default async function handler(
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
   }
 }
+
+export default withAuth(withRole('admin')(handler));

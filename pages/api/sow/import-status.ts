@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -11,7 +12,7 @@ type ImportStatusData = {
   error?: string;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ImportStatusData>
 ) {
@@ -90,3 +91,5 @@ export default async function handler(
     return res.status(500).json({ success: false, data: null, error: 'Internal server error' });
   }
 }
+
+export default withAuth(handler);

@@ -23,6 +23,7 @@ import type {
   VerificationProgress,
   VerificationStepNumber,
 } from '@/modules/maintenance/types/verification';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -92,7 +93,7 @@ function calculateProgress(steps: VerificationStep[]): VerificationProgress {
   };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { ticketId } = req.query;
 
   if (!ticketId || typeof ticketId !== 'string') {
@@ -157,3 +158,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     error: { message: 'Method not allowed' },
   });
 }
+
+export default withAuth(handler);

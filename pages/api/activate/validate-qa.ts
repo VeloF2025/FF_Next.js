@@ -14,6 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   validateBatch,
@@ -278,7 +279,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
 /**
  * Main handler
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -290,3 +291,5 @@ export default async function handler(
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
   }
 }
+
+export default withAuth(handler);

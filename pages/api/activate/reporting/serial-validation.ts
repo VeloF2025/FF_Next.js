@@ -14,8 +14,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSerialValidationReport } from '@/modules/activate/services/reportingService';
 import { log } from '@/lib/logger';
+import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -67,3 +68,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(withRole('manager')(handler));

@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth, withRole } from '@/lib/auth';
 import {
   isSharePointDrSyncEnabled,
   getSharePointDrConfig,
@@ -30,7 +31,7 @@ import type {
   SharePointSyncStatusResponse,
 } from '@/modules/activate/types/sharepoint.types';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -190,3 +191,5 @@ async function handleSync(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(withRole('admin')(handler));

@@ -1,11 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '../../../lib/auth-mock';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Projects Search API Route
  * GET /api/projects/search?q={query} - Search projects
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -56,3 +57,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

@@ -21,6 +21,7 @@ import {
   getPhotosForDR,
   getFlaggedDRs,
 } from '@/modules/maintenance/services/waMaintenanceProcessor';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('api:maintenance:wa-messages');
 
@@ -32,7 +33,7 @@ function getDb() {
   return neon(databaseUrl);
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -132,3 +133,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

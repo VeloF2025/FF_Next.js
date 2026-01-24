@@ -9,6 +9,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaGroupConfig, WaGroupConfigInput, WaAdminApiResponse } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -17,7 +18,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<WaAdminApiResponse<WaGroupConfig | WaGroupConfig[]>>
 ) {
@@ -178,3 +179,5 @@ async function logAdminAction(
     // Don't fail the main operation if audit logging fails
   }
 }
+
+export default withAuth(handler);

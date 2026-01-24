@@ -6,10 +6,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuditLog } from '@/services/staff/staffAuditService';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('StaffAuditLogAPI');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -43,3 +44,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Failed to fetch audit log' });
   }
 }
+
+export default withAuth(handler);

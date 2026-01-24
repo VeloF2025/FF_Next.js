@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import type { DocumentType, VerificationStatus } from '@/types/staff-document.types';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentsAPI');
@@ -114,7 +115,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));
 
 // Map database row to StaffDocument interface
 function mapDbToDocument(row: Record<string, unknown>) {

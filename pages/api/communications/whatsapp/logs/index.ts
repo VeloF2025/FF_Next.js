@@ -12,6 +12,7 @@ import type {
   WaMessageLogFilters,
   WaPaginatedResponse
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -20,7 +21,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<WaPaginatedResponse<WaMessageLog>>
 ) {
@@ -119,3 +120,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

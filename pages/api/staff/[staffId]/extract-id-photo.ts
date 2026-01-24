@@ -11,6 +11,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import sharp from 'sharp';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ExtractIdPhotoAPI');
@@ -288,4 +289,4 @@ If no face photo found: {"found": false}`;
   }
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));

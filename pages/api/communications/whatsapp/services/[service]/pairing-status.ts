@@ -13,6 +13,7 @@ import type {
   WaAdminApiResponse,
   WaPairingStatus,
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -33,7 +34,7 @@ interface PairingStatusResponse extends WaPairingStatus {
   phone_number: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<WaAdminApiResponse<PairingStatusResponse>>
 ) {
@@ -137,3 +138,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

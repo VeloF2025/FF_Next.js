@@ -2,11 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { getSql } from '@/lib/neon-sql';
+import { withAuth } from '@/lib/auth';
 
 // Create a new SQL instance for each request to avoid connection issues
 const getSqlInstance = () => getSql();
 
-export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const sql = getSqlInstance();
   // CORS handled by withErrorHandler
   
@@ -438,4 +439,4 @@ export default withErrorHandler(async (req: NextApiRequest, res: NextApiResponse
     
     res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
-})
+}));

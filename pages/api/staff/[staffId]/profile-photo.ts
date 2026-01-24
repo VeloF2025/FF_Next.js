@@ -11,6 +11,7 @@ import fs from 'fs';
 import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffProfilePhotoAPI');
@@ -174,4 +175,4 @@ function getExtension(mimeType: string): string {
   return mimeToExt[mimeType] || 'jpg';
 }
 
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));

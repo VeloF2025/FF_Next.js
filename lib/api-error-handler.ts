@@ -25,11 +25,12 @@ export type ApiResponse<T = any> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 /**
  * Wraps an API handler with error handling
+ * Generic R extends NextApiRequest to support AuthenticatedNextApiRequest
  */
-export function withErrorHandler<T = any>(
-  handler: (req: NextApiRequest, res: NextApiResponse<ApiResponse<T>>) => Promise<void>
+export function withErrorHandler<T = any, R extends NextApiRequest = NextApiRequest>(
+  handler: (req: R, res: NextApiResponse<ApiResponse<T>>) => Promise<void>
 ) {
-  return async (req: NextApiRequest, res: NextApiResponse<ApiResponse<T>>) => {
+  return async (req: R, res: NextApiResponse<ApiResponse<T>>) => {
     const startTime = Date.now();
     
     try {

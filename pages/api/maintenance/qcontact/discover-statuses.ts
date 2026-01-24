@@ -16,6 +16,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import {
   createFiberTimeQContactClient,
 } from '@/modules/maintenance/services/fibertimeQContactClient';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('qcontact-discover-statuses');
 
@@ -34,7 +35,7 @@ interface DiscoveryResult {
   discoveredAt: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -164,3 +165,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

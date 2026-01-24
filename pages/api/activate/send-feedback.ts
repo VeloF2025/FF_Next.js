@@ -16,6 +16,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
 
@@ -757,7 +758,7 @@ async function logWhatsAppMessage(params: WaMessageLogParams): Promise<void> {
 /**
  * Main handler
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -767,3 +768,5 @@ export default async function handler(
 
   return handlePost(req, res);
 }
+
+export default withAuth(handler);

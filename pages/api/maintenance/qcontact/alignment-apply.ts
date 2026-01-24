@@ -21,6 +21,7 @@ import {
   AlignmentFix,
 } from '@/modules/maintenance/services/qcontactAlignmentService';
 import { TicketStatus } from '@/modules/maintenance/types/ticket';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('qcontact-alignment-apply');
 
@@ -32,7 +33,7 @@ interface ApplyRequest {
 // Validate TicketStatus
 const validStatuses = Object.values(TicketStatus);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -86,3 +87,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

@@ -13,6 +13,7 @@ import {
   processPendingPhotos,
   getPhotoStats,
 } from '@/modules/maintenance/services/maintenancePhotoService';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('api:maintenance:process-photos');
 
@@ -22,7 +23,7 @@ interface ApiResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
@@ -86,3 +87,5 @@ export default async function handler(
     error: 'Method not allowed',
   });
 }
+
+export default withAuth(handler);

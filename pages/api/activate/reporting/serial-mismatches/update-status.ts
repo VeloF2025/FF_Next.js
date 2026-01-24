@@ -16,6 +16,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import type { MismatchStatus, MismatchResolution } from '@/modules/activate/types/reporting.types';
 
@@ -31,7 +32,7 @@ interface UpdateStatusBody {
 const VALID_STATUSES: MismatchStatus[] = ['pending_investigation', 'ticket_created', 'resolved', 'false_positive'];
 const VALID_RESOLUTIONS: MismatchResolution[] = ['ont_replaced', 'data_corrected', 'theft_confirmed', 'false_alarm', 'other'];
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -120,3 +121,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(withRole('manager')(handler));

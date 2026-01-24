@@ -16,6 +16,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 
@@ -353,7 +354,7 @@ function extractOntSerial(barcodeData: string | null): string | null {
 /**
  * Main handler
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -363,3 +364,5 @@ export default async function handler(
 
   return handlePost(req, res);
 }
+
+export default withAuth(handler);

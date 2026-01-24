@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { safeArrayQuery, safeMutation } from '../../../lib/safe-query';
 import { apiResponse } from '../../../lib/apiResponse';
 import { logUpdate, logDelete } from '../../../lib/db-logger';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Project API Route
@@ -15,7 +16,7 @@ import { logUpdate, logDelete } from '../../../lib/db-logger';
 // Create a new connection for each request to avoid connection pooling issues
 const getSql = () => neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -145,3 +146,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

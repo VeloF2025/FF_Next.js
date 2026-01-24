@@ -15,6 +15,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -42,7 +43,7 @@ interface TimeToActivationResponse {
   daily_averages: DailyAvg[];
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<TimeToActivationResponse | { error: string }>
 ) {
@@ -179,3 +180,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(withRole('manager')(handler));

@@ -3,6 +3,7 @@ import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import * as XLSX from 'xlsx';
 import { processPoles, processDrops, processFibre } from '../../../src/services/sow/processor/dataProcessors';
+import { withAuth } from '@/lib/auth';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -14,7 +15,7 @@ export const config = {
   },
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -177,3 +178,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

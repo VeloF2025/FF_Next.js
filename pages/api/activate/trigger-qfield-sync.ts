@@ -7,8 +7,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { withAuth, withRole } from '@/lib/auth';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -85,3 +86,4 @@ export default async function handler(
     });
   }
 }
+export default withAuth(withRole('admin')(handler));

@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { StaffNotificationService, NotificationResult } from '@/services/staff/staffNotificationService';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('StaffSendAlertsAPI');
 
@@ -21,7 +22,7 @@ interface SendAlertsResponse {
   message: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<SendAlertsResponse | { error: string }>
 ) {
@@ -85,3 +86,5 @@ export default async function handler(
     return res.status(500).json({ error: 'Failed to send alerts' });
   }
 }
+
+export default withAuth(handler);

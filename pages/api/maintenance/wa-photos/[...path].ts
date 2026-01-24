@@ -9,6 +9,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('maintenance:wa-photos');
 
@@ -16,7 +17,7 @@ const logger = createLogger('maintenance:wa-photos');
 const VPS_HOST = process.env.VPS_HOST || '72.61.197.178';
 const VPS_PHOTO_BASE = '/opt/whatsapp-bridge/store';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -66,3 +67,5 @@ export default async function handler(
     return res.status(500).json({ error: 'Failed to fetch photo' });
   }
 }
+
+export default withAuth(handler);

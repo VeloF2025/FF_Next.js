@@ -7,8 +7,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { validateDocument } from '@/services/staff/documentValidationService';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -52,3 +53,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

@@ -16,6 +16,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import https from 'https';
 import { log } from '@/lib/logger';
+import { withAuth, withRole } from '@/lib/auth';
 
 // Configure Neon transport based on NEON_USE_HTTP env var
 const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
@@ -223,7 +224,7 @@ async function uploadAsGeoPackage(
   log.info('OESSync', 'GeoPackage upload not yet implemented, using GeoJSON');
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -363,3 +364,4 @@ export default async function handler(
     });
   }
 }
+export default withAuth(withRole('admin')(handler));

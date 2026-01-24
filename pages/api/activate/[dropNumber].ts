@@ -15,6 +15,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '@/modules/activate/types/unified.types';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial, fuzzySerialMatch } from '@/modules/activate/services/qaAutoFailService';
 
@@ -806,7 +807,7 @@ async function fetchFromOneMapRecord(dropNumber: string): Promise<{
 /**
  * Main handler
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
@@ -828,3 +829,5 @@ export default async function handler(
       return apiResponse.methodNotAllowed(res);
   }
 }
+
+export default withAuth(handler);

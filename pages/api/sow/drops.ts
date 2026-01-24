@@ -12,6 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
+import { withAuth } from '@/lib/auth';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -202,4 +203,4 @@ async function handler(
 }
 
 // Export with Arcjet protection
-export default withArcjetProtection(handler, aj);
+export default withAuth(withArcjetProtection(handler, aj));

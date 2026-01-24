@@ -19,10 +19,11 @@ import {
   parseExcelTickets,
   generateThreeWayAlignmentReport,
 } from '@/modules/maintenance/services/threeWayAlignmentService';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('maintenance:three-way-alignment');
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -70,3 +71,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

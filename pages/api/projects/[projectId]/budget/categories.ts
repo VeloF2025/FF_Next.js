@@ -15,10 +15,11 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withErrorHandler(async (
+export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -279,7 +280,7 @@ export default withErrorHandler(async (
 
   // Method not allowed
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
-});
+}));
 
 /**
  * Transform database category row to API response

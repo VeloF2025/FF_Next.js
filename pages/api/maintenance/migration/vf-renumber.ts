@@ -20,10 +20,11 @@ import {
   rollbackMigration,
   getMigrationStatus,
 } from '@/modules/maintenance/services/ticketMigrationService';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('maintenance:vf-renumber');
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -91,3 +92,5 @@ export default async function handler(
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

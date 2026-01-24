@@ -14,6 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon transport based on NEON_USE_HTTP env var
 // HTTP is more reliable for persistent servers, WebSocket is faster
@@ -813,7 +814,7 @@ async function getActiveProjects(): Promise<string[]> {
   return result.rows.map((row: any) => row.project_name);
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
   if (req.method !== 'GET') {
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
@@ -903,3 +904,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

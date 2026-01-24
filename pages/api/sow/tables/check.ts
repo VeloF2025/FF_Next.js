@@ -1,11 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '../../../../lib/auth-mock';
+import { withAuth } from '@/lib/auth';
 
 /**
  * SOW Tables Check API Route
  * GET /api/sow/tables/check - Check if SOW tables exist
  */
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -54,3 +55,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

@@ -16,6 +16,7 @@ import {
   type IncomingWAMessage,
   type ProcessedMessage,
 } from '@/modules/maintenance/services/waMaintenanceProcessor';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('api:maintenance:wa-message');
 
@@ -29,7 +30,7 @@ interface ApiResponse {
   error?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
@@ -139,3 +140,5 @@ export const config = {
     },
   },
 };
+
+export default withAuth(handler);

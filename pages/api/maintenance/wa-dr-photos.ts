@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('maintenance:wa-dr-photos');
 
@@ -19,7 +20,7 @@ interface Photo {
   url: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -81,3 +82,5 @@ export default async function handler(
     return res.status(500).json({ error: 'Failed to fetch photos' });
   }
 }
+
+export default withAuth(handler);

@@ -22,10 +22,11 @@ import {
   formatZodError,
   z,
 } from '../../../src/lib/schemas';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -340,3 +341,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);

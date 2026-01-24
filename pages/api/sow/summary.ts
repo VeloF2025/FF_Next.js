@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '../../../lib/auth-mock';
 import { sql } from '../../../lib/db.mjs';
+import { withAuth } from '@/lib/auth';
 
 type SummarData = {
   success: boolean;
@@ -9,7 +10,7 @@ type SummarData = {
   error?: string;
 };
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<SummarData>
 ) {
@@ -114,3 +115,5 @@ export default async function handler(
     return res.status(500).json({ success: false, data: null, error: 'Internal server error' });
   }
 }
+
+export default withAuth(handler);

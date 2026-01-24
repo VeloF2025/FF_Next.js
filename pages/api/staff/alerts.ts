@@ -10,6 +10,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffAlertsAPI');
@@ -57,7 +58,7 @@ interface AlertsResponse {
   compliance?: ComplianceStats;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<AlertsResponse | { error: string }>
 ) {
@@ -365,3 +366,5 @@ async function getComplianceStats(): Promise<ComplianceStats> {
     compliancePercentage,
   };
 }
+
+export default withAuth(handler);

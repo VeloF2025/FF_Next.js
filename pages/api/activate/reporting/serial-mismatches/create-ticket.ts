@@ -15,6 +15,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
+import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -25,7 +26,7 @@ interface CreateTicketBody {
   notes?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -159,3 +160,5 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(withRole('manager')(handler));

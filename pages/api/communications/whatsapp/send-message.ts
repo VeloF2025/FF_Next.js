@@ -8,6 +8,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse, WaTestMessageResult } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { withAuth } from '@/lib/auth';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -25,7 +26,7 @@ interface SendMessageInput {
   mention_phone?: string;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<WaAdminApiResponse<WaTestMessageResult>>
 ) {
@@ -227,3 +228,5 @@ async function logAdminAction(
     console.error('[WA Admin] Failed to log audit action:', error);
   }
 }
+
+export default withAuth(handler);
