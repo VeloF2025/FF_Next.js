@@ -118,7 +118,11 @@ async function getRecentActivity(): Promise<Array<{
   timestamp: Date;
   success?: boolean;
 }>> {
-  const { db } = await import('@/lib/db');
+  const module = await import('@/lib/db');
+  const db = module.db || module.default;
+  if (!db) {
+    return [];
+  }
 
   // Get recent incidents, actions, and approvals
   const result = await db.query(`
@@ -165,7 +169,8 @@ async function getRecentActivity(): Promise<Array<{
     LIMIT 15
   `);
 
-  return result.rows;
+  // Handle both pg Pool result (has .rows) and neon result (is array)
+  return Array.isArray(result) ? result : (result?.rows || []);
 }
 
 export default withAuth(withRole('super_admin')(withErrorHandler(handler)));

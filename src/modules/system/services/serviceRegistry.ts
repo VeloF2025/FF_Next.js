@@ -7,10 +7,30 @@
 
 import { log } from '@/lib/logger';
 
+// Normalize query result to always have rows array
+function normalizeResult<T>(result: unknown): { rows: T[]; rowCount: number } {
+  if (Array.isArray(result)) {
+    return { rows: result as T[], rowCount: result.length };
+  }
+  const r = result as { rows?: T[]; rowCount?: number };
+  return { rows: r.rows || [], rowCount: r.rowCount || r.rows?.length || 0 };
+}
+
 // Use dynamic import to avoid bundling issues
 async function getDb() {
-  const { db } = await import('@/lib/db');
-  return db;
+  const module = await import('@/lib/db');
+  // Try named export first, fallback to default
+  const db = module.db || module.default;
+  if (!db) {
+    throw new Error('Database connection not available');
+  }
+  // Wrap db to normalize query results
+  return {
+    query: async <T = Record<string, unknown>>(text: string, values?: unknown[]) => {
+      const result = await db.query(text, values);
+      return normalizeResult<T>(result);
+    }
+  };
 }
 import type {
   ServiceDefinition,
