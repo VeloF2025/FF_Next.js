@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, Download, FileDown, Activity, BarChart3, MapPin, HeartPulse, Server } from 'lucide-react';
+import { Settings, Download, FileDown, Activity, BarChart3, HeartPulse, Server } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -48,14 +48,6 @@ export const systemSection: NavSection = {
       permissions: [Permission.SYSTEM_ADMIN],
       rbacKey: 'system', // Admin-only via RBAC
       external: true,
-    },
-    {
-      to: '/qfield',
-      icon: MapPin,
-      label: 'QField',
-      shortLabel: 'QField',
-      permissions: [Permission.SYSTEM_ADMIN],
-      rbacKey: 'system', // Admin-only via RBAC
     },
     {
       to: '/downloads',
