@@ -20,6 +20,29 @@ const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
 const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
 const LAYER_ID = '5121';
 const BASE_URL = 'https://www.1map.co.za';
+const FETCH_TIMEOUT_MS = 8000; // 8 second timeout per request
+
+/**
+ * Fetch with timeout
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 interface OneMapRecord {
   prop_id: string;
@@ -73,7 +96,7 @@ class OneMapApiService {
     try {
       // Step 1: GET login page for CSRF token
       log.info('OneMapAPI', 'Step 1: Getting CSRF token...');
-      const loginPage = await fetch(`${BASE_URL}/login`);
+      const loginPage = await fetchWithTimeout(`${BASE_URL}/login`);
       const html = await loginPage.text();
       const csrfMatch = html.match(/name="_csrf"\s+value="([^"]+)"/);
       const csrf = csrfMatch ? csrfMatch[1] : null;
@@ -92,7 +115,7 @@ class OneMapApiService {
 
       // Step 2: POST login with CSRF
       log.info('OneMapAPI', 'Step 2: Authenticating...');
-      const loginResponse = await fetch(`${BASE_URL}/login`, {
+      const loginResponse = await fetchWithTimeout(`${BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -117,7 +140,7 @@ class OneMapApiService {
 
       // Step 3: Visit app to initialize layer access (CRITICAL!)
       log.info('OneMapAPI', 'Step 3: Initializing layer access...');
-      await fetch(`${BASE_URL}/app?layer=${LAYER_ID}`, {
+      await fetchWithTimeout(`${BASE_URL}/app?layer=${LAYER_ID}`, {
         headers: { Cookie: `connect.sid=${this.sessionCookie}` },
       });
 
@@ -125,7 +148,8 @@ class OneMapApiService {
       log.info('OneMapAPI', 'Authentication successful');
       return true;
     } catch (error) {
-      log.error('OneMapAPI', 'Authentication failed', { error });
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      log.error('OneMapAPI', isTimeout ? 'Authentication timed out' : 'Authentication failed', { error });
       return false;
     }
   }
@@ -167,7 +191,7 @@ class OneMapApiService {
         limit: '50',
       });
 
-      const response = await fetch(`${BASE_URL}/api/apps/app/getattributes`, {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/apps/app/getattributes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -189,11 +213,12 @@ class OneMapApiService {
 
       return { success: true, records };
     } catch (error) {
-      log.error('OneMapAPI', 'Search failed', { drNumber, error });
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      log.error('OneMapAPI', isTimeout ? 'Search timed out' : 'Search failed', { drNumber, error });
       return {
         success: false,
         records: [],
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: isTimeout ? '1Map API timeout - try again' : (error instanceof Error ? error.message : 'Unknown error'),
       };
     }
   }
@@ -233,7 +258,7 @@ class OneMapApiService {
         items: JSON.stringify({ prop_id: propId, ph_ont: newOntSerial }),
       });
 
-      const response = await fetch(`${BASE_URL}/api/apps/app/attributes`, {
+      const response = await fetchWithTimeout(`${BASE_URL}/api/apps/app/attributes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -264,13 +289,14 @@ class OneMapApiService {
         propId,
       };
     } catch (error) {
-      log.error('OneMapAPI', 'Update failed', { propId, error });
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      log.error('OneMapAPI', isTimeout ? 'Update timed out' : 'Update failed', { propId, error });
       return {
         success: false,
         oldValue: null,
         newValue: newOntSerial,
         propId,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: isTimeout ? '1Map API timeout - try again' : (error instanceof Error ? error.message : 'Unknown error'),
       };
     }
   }
