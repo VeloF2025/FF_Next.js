@@ -634,7 +634,9 @@
       "Bash(git -C /home/hein/Workspace/FF_Next.js add:*)",
       "Bash(git -C /home/hein/Workspace/FF_Next.js commit -m \"$\\(cat <<''EOF''\ndocs: add ONT serial mismatch analysis and correction log\n\n- OLT_MISMATCH_REPORT_2026-01-24.md: Analysis of 136 mismatched DRs\n- ONT_SERIAL_CORRECTIONS_LOG.md: Audit trail of 3 API corrections\n- 1MAP_API_DOCUMENTATION.md: API workflow for programmatic updates\n- olt_mismatches.txt: Raw mismatch data\n\nCorrections made via 1Map API:\n- DR1731053: ALCLB480E6E8 → ALCLB480E6E9\n- DR1736834: ALCLB48A9E42 → ALCLB48A9E55\n- DR1733472: ALCLB484D160 → ALCLB480F4B7\n\n7 additional DRs verified as already correct.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git -C /home/hein/.claude/skills add OneMap/)",
-      "Bash(git -C /home/hein/.claude/skills status --short)"
+      "Bash(git -C /home/hein/.claude/skills status --short)",
+      "Bash(do sleep 3 if curl -s https://dev.fibreflow.app/api/health)",
+      "Bash(then echo \"✅ dev.fibreflow.app is up!\" break fi echo \"Waiting... \\($i\\)\" done)"
     ],
     "deny": [],
     "ask": [],

@@ -187,15 +187,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         continue;
       }
 
-      // Update offline_devices with OLT serial
+      // Update offline_devices with OLT serial AND wrong 1Map serial
       const updateResult = await client.query(
         `UPDATE offline_devices
          SET olt_serial = $1,
              olt_report_id = $2,
-             olt_imported_at = NOW()
+             olt_imported_at = NOW(),
+             olt_wrong_onemap_serial = $4
          WHERE drop_number = $3
          RETURNING id`,
-        [mismatch.oltSerial, importId, mismatch.drNumber]
+        [mismatch.oltSerial, importId, mismatch.drNumber, mismatch.wrongOneMapSerial]
       );
 
       if (updateResult.rowCount === 0) {
