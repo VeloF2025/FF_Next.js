@@ -6,7 +6,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Users, Shield, Key, Search, ChevronRight, ChevronDown,
-  Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus, Settings
+  Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus, Settings,
+  Plus, Copy, Trash2, Lock
 } from 'lucide-react';
 import { UserPermissionsModal } from './UserPermissionsModal';
 
@@ -27,9 +28,15 @@ interface UserWithRole {
 }
 
 interface RoleWithPermissions {
+  id: string;
   name: string;
   displayName: string;
+  description: string | null;
+  color: string;
+  isSystem: boolean;
+  isActive: boolean;
   permissions: PermissionWithActions[];
+  permissionCount: number;
   userCount: number;
 }
 
@@ -79,6 +86,16 @@ export function AccessControlTab() {
   // Modal state
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserWithRole | null>(null);
   const [savingRolePermission, setSavingRolePermission] = useState<string | null>(null);
+
+  // Role management state
+  const [showCreateRoleModal, setShowCreateRoleModal] = useState(false);
+  const [showCloneRoleModal, setShowCloneRoleModal] = useState(false);
+  const [roleToClone, setRoleToClone] = useState<RoleWithPermissions | null>(null);
+  const [roleToDelete, setRoleToDelete] = useState<RoleWithPermissions | null>(null);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleDisplayName, setNewRoleDisplayName] = useState('');
+  const [newRoleDescription, setNewRoleDescription] = useState('');
+  const [savingRole, setSavingRole] = useState(false);
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -223,6 +240,127 @@ export function AccessControlTab() {
       }
       return next;
     });
+  };
+
+  // Create new role
+  const createRole = async () => {
+    if (!newRoleName || !newRoleDisplayName) {
+      setError('Role name and display name are required');
+      return;
+    }
+
+    try {
+      setSavingRole(true);
+      setError(null);
+
+      const res = await fetch('/api/admin/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newRoleName.toLowerCase().replace(/\s+/g, '_'),
+          displayName: newRoleDisplayName,
+          description: newRoleDescription || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage(`Role "${newRoleDisplayName}" created successfully`);
+        setShowCreateRoleModal(false);
+        setNewRoleName('');
+        setNewRoleDisplayName('');
+        setNewRoleDescription('');
+        await fetchRoles();
+        setSelectedRole(data.data.name);
+      } else {
+        setError(data.error?.message || 'Failed to create role');
+      }
+    } catch (err) {
+      setError('Failed to create role');
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  // Clone role
+  const cloneRole = async () => {
+    if (!roleToClone || !newRoleName || !newRoleDisplayName) {
+      setError('Role name and display name are required');
+      return;
+    }
+
+    try {
+      setSavingRole(true);
+      setError(null);
+
+      const res = await fetch('/api/admin/roles/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceRole: roleToClone.name,
+          newName: newRoleName.toLowerCase().replace(/\s+/g, '_'),
+          newDisplayName: newRoleDisplayName,
+          description: newRoleDescription || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage(`Role "${newRoleDisplayName}" cloned from "${roleToClone.displayName}" with ${data.data.permissionsCloned} permissions`);
+        setShowCloneRoleModal(false);
+        setRoleToClone(null);
+        setNewRoleName('');
+        setNewRoleDisplayName('');
+        setNewRoleDescription('');
+        await fetchRoles();
+        setSelectedRole(data.data.name);
+      } else {
+        setError(data.error?.message || 'Failed to clone role');
+      }
+    } catch (err) {
+      setError('Failed to clone role');
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  // Delete role
+  const deleteRole = async () => {
+    if (!roleToDelete) return;
+
+    try {
+      setSavingRole(true);
+      setError(null);
+
+      const res = await fetch(`/api/admin/roles/${roleToDelete.name}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage(`Role "${roleToDelete.displayName}" deleted successfully`);
+        setRoleToDelete(null);
+        await fetchRoles();
+        if (selectedRole === roleToDelete.name) {
+          setSelectedRole(roles[0]?.name || null);
+        }
+      } else {
+        setError(data.error?.message || 'Failed to delete role');
+      }
+    } catch (err) {
+      setError('Failed to delete role');
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  // Open clone modal
+  const openCloneModal = (role: RoleWithPermissions) => {
+    setRoleToClone(role);
+    setNewRoleName('');
+    setNewRoleDisplayName(`${role.displayName} (Copy)`);
+    setNewRoleDescription(`Cloned from ${role.displayName}`);
+    setShowCloneRoleModal(true);
   };
 
   // Provision users from staff
@@ -382,23 +520,76 @@ export function AccessControlTab() {
       <div className="grid grid-cols-4 gap-6">
         {/* Role list */}
         <div className="col-span-1 space-y-2">
-          <h4 className="text-sm font-medium text-[var(--ff-text-secondary)] mb-3">Roles</h4>
-          {roles.map((role) => (
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium text-[var(--ff-text-secondary)]">Roles</h4>
             <button
+              onClick={() => {
+                setNewRoleName('');
+                setNewRoleDisplayName('');
+                setNewRoleDescription('');
+                setShowCreateRoleModal(true);
+              }}
+              className="p-1.5 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+              title="Create new role"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          {roles.map((role) => (
+            <div
               key={role.name}
-              onClick={() => setSelectedRole(role.name)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+              className={`group relative rounded-lg transition-colors ${
                 selectedRole === role.name
-                  ? 'bg-blue-500/20 border border-blue-500/50 text-[var(--ff-text-primary)]'
-                  : 'bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]'
+                  ? 'bg-blue-500/20 border border-blue-500/50'
+                  : 'bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
               }`}
             >
-              <div>
-                <div className="font-medium">{role.displayName}</div>
-                <div className="text-xs text-[var(--ff-text-tertiary)]">{role.userCount} users</div>
+              <button
+                onClick={() => setSelectedRole(role.name)}
+                className="w-full flex items-center justify-between px-4 py-3 text-left text-[var(--ff-text-primary)]"
+              >
+                <div className="flex items-center gap-2">
+                  {role.isSystem && (
+                    <Lock className="w-3.5 h-3.5 text-[var(--ff-text-tertiary)]" title="System role" />
+                  )}
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: role.color }}
+                  />
+                  <div>
+                    <div className="font-medium">{role.displayName}</div>
+                    <div className="text-xs text-[var(--ff-text-tertiary)]">{role.userCount} users</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+              </button>
+
+              {/* Action buttons on hover */}
+              <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCloneModal(role);
+                  }}
+                  className="p-1 rounded text-[var(--ff-text-tertiary)] hover:text-blue-400 hover:bg-blue-500/20"
+                  title="Clone role"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                {!role.isSystem && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRoleToDelete(role);
+                    }}
+                    className="p-1 rounded text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/20"
+                    title="Delete role"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-            </button>
+            </div>
           ))}
         </div>
 
@@ -713,6 +904,185 @@ export function AccessControlTab() {
             fetchRoles();
           }}
         />
+      )}
+
+      {/* Create Role Modal */}
+      {showCreateRoleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Create New Role</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Role Name (internal)
+                </label>
+                <input
+                  type="text"
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+                  placeholder="e.g., qa_reviewer"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]"
+                />
+                <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
+                  Lowercase letters, numbers, and underscores only
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={newRoleDisplayName}
+                  onChange={(e) => setNewRoleDisplayName(e.target.value)}
+                  placeholder="e.g., QA Reviewer"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={newRoleDescription}
+                  onChange={(e) => setNewRoleDescription(e.target.value)}
+                  placeholder="Describe this role's purpose..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowCreateRoleModal(false)}
+                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createRole}
+                disabled={!newRoleName || !newRoleDisplayName || savingRole}
+                className="flex items-center px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingRole && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Create Role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clone Role Modal */}
+      {showCloneRoleModal && roleToClone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">Clone Role</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
+              Cloning <span className="font-medium text-[var(--ff-text-primary)]">{roleToClone.displayName}</span> with {roleToClone.permissionCount} permissions
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  New Role Name (internal)
+                </label>
+                <input
+                  type="text"
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+                  placeholder="e.g., qa_reviewer"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={newRoleDisplayName}
+                  onChange={(e) => setNewRoleDisplayName(e.target.value)}
+                  placeholder="e.g., QA Reviewer"
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={newRoleDescription}
+                  onChange={(e) => setNewRoleDescription(e.target.value)}
+                  placeholder="Describe this role's purpose..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCloneRoleModal(false);
+                  setRoleToClone(null);
+                }}
+                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={cloneRole}
+                disabled={!newRoleName || !newRoleDisplayName || savingRole}
+                className="flex items-center px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingRole && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                <Copy className="w-4 h-4 mr-2" />
+                Clone Role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Role Confirmation */}
+      {roleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">Delete Role</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
+              Are you sure you want to delete <span className="font-medium text-red-400">{roleToDelete.displayName}</span>?
+              {roleToDelete.userCount > 0 && (
+                <span className="block mt-2 text-yellow-400">
+                  ⚠️ This role has {roleToDelete.userCount} user(s). You must reassign them first.
+                </span>
+              )}
+            </p>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setRoleToDelete(null)}
+                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteRole}
+                disabled={roleToDelete.userCount > 0 || savingRole}
+                className="flex items-center px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingRole && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Role
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
