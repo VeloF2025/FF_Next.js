@@ -10,6 +10,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { pipelineProjectService } from '@/modules/pipeline/services/pipelineProjectService';
 import type { UpdatePipelineProjectInput } from '@/modules/pipeline/types';
+import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -99,4 +100,4 @@ async function handleDelete(
   return apiResponse.success(res, { message: 'Project deleted successfully' });
 }
 
-export default withErrorHandler(handler);
+export default withAuth(withErrorHandler(handler));

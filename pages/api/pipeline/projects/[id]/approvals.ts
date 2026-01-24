@@ -10,6 +10,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { pipelineApprovalService } from '@/modules/pipeline/services/pipelineApprovalService';
 import { pipelineProjectService } from '@/modules/pipeline/services/pipelineProjectService';
 import type { CreateApprovalInput } from '@/modules/pipeline/types';
+import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -84,4 +85,4 @@ async function handlePost(
   return apiResponse.created(res, approvalWithType);
 }
 
-export default withErrorHandler(handler);
+export default withAuth(withErrorHandler(handler));

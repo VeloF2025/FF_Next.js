@@ -13,6 +13,7 @@ import type {
   PipelineProjectSort,
   CreatePipelineProjectInput,
 } from '@/modules/pipeline/types';
+import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -134,4 +135,4 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.created(res, projectWithRelations);
 }
 
-export default withErrorHandler(handler);
+export default withAuth(withErrorHandler(handler));

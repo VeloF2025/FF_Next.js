@@ -10,6 +10,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { pipelineApprovalService } from '@/modules/pipeline/services/pipelineApprovalService';
 import type { UpdateApprovalInput } from '@/modules/pipeline/types';
+import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -87,4 +88,4 @@ async function handleDelete(
   return apiResponse.success(res, { message: 'Approval deleted successfully' });
 }
 
-export default withErrorHandler(handler);
+export default withAuth(withErrorHandler(handler));

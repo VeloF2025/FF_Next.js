@@ -9,6 +9,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { pipelineApprovalService } from '@/modules/pipeline/services/pipelineApprovalService';
 import type { UploadApprovalDocumentInput } from '@/modules/pipeline/types';
+import { withAuth } from '@/lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -63,4 +64,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).json({ error: `Method ${req.method} not allowed` });
 }
 
-export default withErrorHandler(handler);
+export default withAuth(withErrorHandler(handler));
