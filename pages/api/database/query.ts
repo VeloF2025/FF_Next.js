@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { getAuth } from '../../../lib/auth-mock';
 
 /**
@@ -59,4 +59,4 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('admin')(handler));

@@ -7,7 +7,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -88,4 +88,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('admin')(handler));

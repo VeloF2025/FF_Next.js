@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/auth';
+import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 // Initialize Neon client
@@ -154,4 +154,4 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withRole('manager')(handler));
