@@ -14,6 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
 import type { DRSummary, DRState } from '../types/summary.types';
+import type { SerialVerificationResult } from '@/pages/api/activate/serial-verification';
 
 interface DrSummaryPageProps {
   dropNumber: string;
@@ -52,10 +53,26 @@ export function DrSummaryPage({
   const [summary, setSummary] = useState<DRSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [verification, setVerification] = useState<SerialVerificationResult | null>(null);
 
   useEffect(() => {
     fetchSummary();
+    fetchVerification();
   }, [dropNumber]);
+
+  const fetchVerification = async () => {
+    try {
+      const response = await fetch(`/api/activate/serial-verification?dropNumber=${encodeURIComponent(dropNumber)}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data) {
+          setVerification(result.data);
+        }
+      }
+    } catch {
+      // Silent fail - badge just won't show
+    }
+  };
 
   const fetchSummary = async () => {
     setLoading(true);
@@ -192,9 +209,19 @@ export function DrSummaryPage({
 
       {/* QA Status Card - Full Width */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-          QA Status
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            QA Status
+          </h3>
+          {verification && verification.overallStatus !== 'none' && (
+            <SerialVerificationBadge
+              status={verification.overallStatus}
+              label={verification.badgeLabel}
+              ontSources={verification.ontVerification.sourcesWithData}
+              upsSources={verification.upsVerification.sourcesWithData}
+            />
+          )}
+        </div>
 
         <div className="space-y-4">
           {/* Photo Progress */}
@@ -226,12 +253,24 @@ export function DrSummaryPage({
               <p className="text-sm font-mono text-gray-900 dark:text-white truncate">
                 {summary.equipment.ontSerial || '-'}
               </p>
+              {verification && verification.ontVerification.sourcesWithData > 1 && (
+                <SerialSourceIndicator
+                  sources={verification.ont}
+                  verification={verification.ontVerification}
+                />
+              )}
             </div>
             <div>
               <span className="text-xs text-gray-500 dark:text-gray-400">UPS Serial</span>
               <p className="text-sm font-mono text-gray-900 dark:text-white truncate">
                 {summary.equipment.upsSerial || '-'}
               </p>
+              {verification && verification.upsVerification.sourcesWithData > 1 && (
+                <SerialSourceIndicator
+                  sources={verification.ups}
+                  verification={verification.upsVerification}
+                />
+              )}
             </div>
           </div>
 
@@ -380,6 +419,138 @@ function TeamItem({
           <span className="text-gray-500 dark:text-gray-400 text-xs ml-1">({detail})</span>
         )}
       </span>
+    </div>
+  );
+}
+
+/**
+ * Serial Source Indicator
+ *
+ * Shows which sources have data and whether they agree
+ */
+function SerialSourceIndicator({
+  sources,
+  verification,
+}: {
+  sources: {
+    oes: string | null;
+    offline: string | null;
+    onemap: string | null;
+    waPhoto: string | null;
+    waPhotoConfidence: number | null;
+  };
+  verification: {
+    sourcesWithData: number;
+    sourcesAgreeing: number;
+    allAgree: boolean;
+    status: string;
+  };
+}) {
+  const sourceList = [
+    { key: 'oes', label: 'OES', value: sources.oes },
+    { key: 'offline', label: 'Offline', value: sources.offline },
+    { key: 'onemap', label: '1Map', value: sources.onemap },
+    { key: 'waPhoto', label: 'WA', value: sources.waPhoto },
+  ];
+
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      {sourceList.map((src) => (
+        <span
+          key={src.key}
+          className={`
+            inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-medium
+            ${
+              src.value
+                ? verification.allAgree
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
+                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
+                : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+            }
+          `}
+          title={`${src.label}: ${src.value || 'No data'}`}
+        >
+          {src.label[0]}
+        </span>
+      ))}
+      {verification.allAgree && verification.sourcesWithData >= 2 && (
+        <span className="text-green-600 dark:text-green-400 text-[10px] ml-1">✓</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Serial Verification Badge
+ *
+ * Displays verification status based on 4-way serial comparison:
+ * - Gold: 4/4 sources agree (OES, Offline, 1Map, WA Photo)
+ * - Silver: 3/4 sources agree
+ * - Bronze: 2 sources agree
+ * - Warning: Serial mismatch detected
+ */
+function SerialVerificationBadge({
+  status,
+  label,
+  ontSources,
+  upsSources,
+}: {
+  status: 'gold' | 'silver' | 'bronze' | 'warning' | 'none';
+  label: string;
+  ontSources: number;
+  upsSources: number;
+}) {
+  const badgeStyles: Record<string, { bg: string; text: string; border: string; icon: string; glow?: string }> = {
+    gold: {
+      bg: 'bg-gradient-to-r from-yellow-400 to-amber-500',
+      text: 'text-amber-900',
+      border: 'border-yellow-500',
+      icon: '🏆',
+      glow: 'shadow-lg shadow-yellow-400/50',
+    },
+    silver: {
+      bg: 'bg-gradient-to-r from-gray-300 to-gray-400',
+      text: 'text-gray-800',
+      border: 'border-gray-400',
+      icon: '✓',
+    },
+    bronze: {
+      bg: 'bg-gradient-to-r from-orange-300 to-orange-400',
+      text: 'text-orange-900',
+      border: 'border-orange-400',
+      icon: '◉',
+    },
+    warning: {
+      bg: 'bg-red-100 dark:bg-red-900/50',
+      text: 'text-red-700 dark:text-red-300',
+      border: 'border-red-400 dark:border-red-600',
+      icon: '⚠️',
+    },
+    none: {
+      bg: 'bg-gray-100 dark:bg-gray-700',
+      text: 'text-gray-600 dark:text-gray-400',
+      border: 'border-gray-300 dark:border-gray-600',
+      icon: '',
+    },
+  };
+
+  const style = badgeStyles[status];
+  const totalSources = Math.max(ontSources, upsSources);
+
+  return (
+    <div
+      className={`
+        inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold
+        border ${style.bg} ${style.text} ${style.border} ${style.glow || ''}
+        transition-all duration-200 hover:scale-105
+      `}
+      title={`ONT: ${ontSources}/4 sources | UPS: ${upsSources}/4 sources`}
+    >
+      <span className="text-sm">{style.icon}</span>
+      <span>{label}</span>
+      {status === 'gold' && (
+        <span className="ml-1 text-[10px] opacity-75">({totalSources}/4)</span>
+      )}
     </div>
   );
 }
