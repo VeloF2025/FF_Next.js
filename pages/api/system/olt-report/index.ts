@@ -80,6 +80,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (view === 'pending') {
       conditions.push(`m.fix_status = 'pending'`);
+      conditions.push(`m.olt_serial IS NOT NULL`);
+      conditions.push(`m.wrong_onemap_serial IS NOT NULL`);
+    } else if (view === 'needs_investigation') {
+      // Records that need manual investigation (no wrong serial)
+      conditions.push(`m.fix_status = 'pending'`);
+      conditions.push(`(m.wrong_onemap_serial IS NULL OR m.olt_serial IS NULL)`);
     } else if (view === 'fixed') {
       conditions.push(`m.fix_status = 'fixed'`);
     } else if (view === 'empty') {
@@ -135,7 +141,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Get summary stats from olt_mismatch_records
     const statsResult = await client.query(`
       SELECT
-        COUNT(*) FILTER (WHERE fix_status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE fix_status = 'pending' AND olt_serial IS NOT NULL AND wrong_onemap_serial IS NOT NULL) as pending,
+        COUNT(*) FILTER (WHERE fix_status = 'pending' AND (wrong_onemap_serial IS NULL OR olt_serial IS NULL)) as needs_investigation,
         COUNT(*) FILTER (WHERE fix_status = 'fixed') as fixed,
         COUNT(*) FILTER (WHERE fix_status = 'empty_serial') as empty,
         COUNT(*) as total
@@ -143,6 +150,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `);
     const stats = {
       pending: Number(statsResult.rows[0].pending) || 0,
+      needs_investigation: Number(statsResult.rows[0].needs_investigation) || 0,
       fixed: Number(statsResult.rows[0].fixed) || 0,
       empty: Number(statsResult.rows[0].empty) || 0,
       total: Number(statsResult.rows[0].total) || 0,

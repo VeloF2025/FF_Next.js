@@ -28,7 +28,7 @@ import {
   Search,
 } from 'lucide-react';
 
-type TabId = 'import' | 'pending' | 'history';
+type TabId = 'import' | 'pending' | 'needs_investigation' | 'history';
 
 interface OltRecord {
   id: string;
@@ -71,9 +71,10 @@ interface ImportRecord {
 
 interface Stats {
   pending: number;
+  needs_investigation: number;
   fixed: number;
   empty: number;
-  match: number;
+  total: number;
 }
 
 export default function OltReportPage() {
@@ -99,7 +100,7 @@ export default function OltReportPage() {
   // Data state
   const [records, setRecords] = useState<OltRecord[]>([]);
   const [imports, setImports] = useState<ImportRecord[]>([]);
-  const [stats, setStats] = useState<Stats>({ pending: 0, fixed: 0, empty: 0, match: 0 });
+  const [stats, setStats] = useState<Stats>({ pending: 0, needs_investigation: 0, fixed: 0, empty: 0, total: 0 });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 50;
@@ -144,7 +145,7 @@ export default function OltReportPage() {
         setImports(result.imports || []);
       } else {
         setRecords(result.records || []);
-        setStats(result.stats || { pending: 0, fixed: 0, empty: 0, match: 0 });
+        setStats(result.stats || { pending: 0, needs_investigation: 0, fixed: 0, empty: 0, total: 0 });
       }
       setTotal(result.total || 0);
     } catch (err) {
@@ -337,8 +338,13 @@ export default function OltReportPage() {
     { id: 'import', label: 'Import', icon: <Upload className="h-4 w-4" /> },
     {
       id: 'pending',
-      label: `Pending (${stats.pending})`,
-      icon: <AlertTriangle className="h-4 w-4" />,
+      label: `Fixable (${stats.pending})`,
+      icon: <Wrench className="h-4 w-4" />,
+    },
+    {
+      id: 'needs_investigation',
+      label: `Investigate (${stats.needs_investigation})`,
+      icon: <Search className="h-4 w-4" />,
     },
     {
       id: 'history',
@@ -375,12 +381,21 @@ export default function OltReportPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="font-medium">Pending</span>
+            <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+              <Wrench className="h-5 w-5" />
+              <span className="font-medium">Fixable</span>
             </div>
             <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
               {stats.pending}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+              <Search className="h-5 w-5" />
+              <span className="font-medium">Investigate</span>
+            </div>
+            <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
+              {stats.needs_investigation}
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -393,21 +408,12 @@ export default function OltReportPage() {
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-              <Search className="h-5 w-5" />
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <XCircle className="h-5 w-5" />
               <span className="font-medium">Empty ONT</span>
             </div>
             <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
               {stats.empty}
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-              <CheckCircle className="h-5 w-5" />
-              <span className="font-medium">Match</span>
-            </div>
-            <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
-              {stats.match}
             </div>
           </div>
         </div>
@@ -536,11 +542,11 @@ export default function OltReportPage() {
           </div>
         )}
 
-        {/* Pending Tab */}
-        {activeTab === 'pending' && (
+        {/* Pending / Needs Investigation Tab */}
+        {(activeTab === 'pending' || activeTab === 'needs_investigation') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            {/* Bulk Actions */}
-            {selectedRecords.size > 0 && (
+            {/* Bulk Actions - only for fixable pending */}
+            {activeTab === 'pending' && selectedRecords.size > 0 && (
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-orange-50 dark:bg-orange-900/20 flex items-center gap-4">
                 <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
                   {selectedRecords.size} selected
@@ -566,15 +572,24 @@ export default function OltReportPage() {
               </div>
             )}
 
-            {/* Select All */}
-            <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
-              <button
-                onClick={selectAllPending}
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Select all with valid ONT serial
-              </button>
-            </div>
+            {/* Select All - only for fixable */}
+            {activeTab === 'pending' && (
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-4">
+                <button
+                  onClick={selectAllPending}
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Select all with valid ONT serial
+                </button>
+              </div>
+            )}
+            {activeTab === 'needs_investigation' && (
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-sm text-yellow-600 dark:text-yellow-400">
+                  ⚠️ These records need manual investigation - missing 1Map serial data
+                </span>
+              </div>
+            )}
 
             {/* Table */}
             <div className="overflow-x-auto">
@@ -702,7 +717,7 @@ export default function OltReportPage() {
                             )}
                           </td>
                           <td className="px-3 py-3">
-                            {isMismatch && !isEmpty && (
+                            {activeTab === 'pending' && isMismatch && !isEmpty && (
                               <button
                                 onClick={() => handleFix(record)}
                                 disabled={fixing === record.drop_number}
@@ -715,6 +730,17 @@ export default function OltReportPage() {
                                 )}
                                 Fix
                               </button>
+                            )}
+                            {activeTab === 'needs_investigation' && (
+                              <a
+                                href={`https://www.1map.co.za/app?layer=5121&search=${record.drop_number}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                1Map
+                              </a>
                             )}
                           </td>
                         </tr>
