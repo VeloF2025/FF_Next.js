@@ -343,8 +343,8 @@ class OneMapApiService {
 
     // Step 3: Find record to update - priority order:
     // 1. Record with wrong ONT (if specified)
-    // 2. Record with status "Home Installation: Installed"
-    // 3. First record (if only one)
+    // 2. Record with status "Home Installation: Installed" (highest prop_id if multiple)
+    // 3. Highest prop_id from all records
     let target: OneMapRecord | undefined;
 
     if (wrongSerial) {
@@ -354,21 +354,21 @@ class OneMapApiService {
     }
 
     if (!target) {
-      target = records.find((r) => r.status === 'Home Installation: Installed');
-    }
-
-    if (!target && records.length === 1) {
-      target = records[0];
+      // Find all with "Home Installation: Installed" status
+      const installedRecords = records.filter((r) => r.status === 'Home Installation: Installed');
+      if (installedRecords.length > 0) {
+        // Pick the one with highest prop_id (most recent)
+        target = installedRecords.sort((a, b) =>
+          parseInt(b.prop_id) - parseInt(a.prop_id)
+        )[0];
+      }
     }
 
     if (!target) {
-      return {
-        success: false,
-        oldValue: null,
-        newValue: correctSerial,
-        propId: '',
-        error: `Multiple records found for ${drNumber}, cannot determine which to update`,
-      };
+      // No installed status found - pick highest prop_id from all records
+      target = records.sort((a, b) =>
+        parseInt(b.prop_id) - parseInt(a.prop_id)
+      )[0];
     }
 
     // Step 4: Update the record
