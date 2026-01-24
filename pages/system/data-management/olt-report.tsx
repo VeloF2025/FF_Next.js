@@ -634,7 +634,9 @@ export default function OltReportPage() {
                     </tr>
                   ) : (
                     records.map((record) => {
-                      const isMismatch = record.comparison_status === 'mismatch';
+                      // Records in pending/investigate tabs ARE mismatches by definition
+                      // They're from olt_mismatch_records which only contains mismatches
+                      const isMismatch = activeTab === 'pending' || activeTab === 'needs_investigation' || record.comparison_status === 'mismatch';
                       const isEmpty = !record.olt_serial;
 
                       return (
