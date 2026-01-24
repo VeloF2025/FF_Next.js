@@ -637,7 +637,9 @@
       "Bash(git -C /home/hein/.claude/skills status --short)",
       "Bash(do sleep 3 if curl -s https://dev.fibreflow.app/api/health)",
       "Bash(then echo \"✅ dev.fibreflow.app is up!\" break fi echo \"Waiting... \\($i\\)\" done)",
-      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj.gwc.azure.neon.tech/neondb?sslmode=require' node:*)"
+      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj.gwc.azure.neon.tech/neondb?sslmode=require' node:*)",
+      "Bash(then echo \"✅ Server is ready\")",
+      "Bash(then echo \"✅ Dev is up\")"
     ],
     "deny": [],
     "ask": [],

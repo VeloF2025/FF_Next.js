@@ -5,7 +5,7 @@
  *
  * Tabs:
  * - Import: Upload Excel file
- * - Pending: OLT vs 1Map mismatches awaiting fix
+ * - Pending: ONT vs 1Map mismatches awaiting fix
  * - History: Import history and fixed records
  *
  * Status: WORKING
@@ -353,7 +353,7 @@ export default function OltReportPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
               <Search className="h-5 w-5" />
-              <span className="font-medium">Empty Serial</span>
+              <span className="font-medium">Empty ONT</span>
             </div>
             <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
               {stats.empty}
@@ -485,7 +485,7 @@ export default function OltReportPage() {
                     <li>Total Records: {uploadResult.stats.totalRecords}</li>
                     <li>Matches: {uploadResult.stats.matchCount}</li>
                     <li>Mismatches: {uploadResult.stats.mismatchCount}</li>
-                    <li>Empty Serials (skipped): {uploadResult.stats.emptySerialCount}</li>
+                    <li>Empty ONT (skipped): {uploadResult.stats.emptySerialCount}</li>
                     <li>Updated: {uploadResult.stats.updatedCount}</li>
                   </ul>
                 </div>
