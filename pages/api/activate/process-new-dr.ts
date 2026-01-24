@@ -19,7 +19,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+// NOTE: No withAuth - this endpoint is called by Go WhatsApp Bridge without credentials
 import { log } from '@/lib/logger';
 import {
   categorizePhotos,
@@ -667,4 +667,5 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+// Public endpoint - called by Go WhatsApp Bridge
+export default handler;

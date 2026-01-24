@@ -14,7 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neonConfig, Pool } from '@neondatabase/serverless';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+// NOTE: No withAuth - this endpoint is called by Go WhatsApp Bridge without credentials
 import { log } from '@/lib/logger';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial } from '@/modules/activate/services/qaAutoFailService';
 
@@ -477,4 +477,5 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Method not allowed');
 }
 
-export default withAuth(checkExistingSubmission);
+// Public endpoint - called by Go WhatsApp Bridge
+export default handler;
