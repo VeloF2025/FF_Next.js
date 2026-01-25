@@ -145,7 +145,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Verify the target user exists and is an admin
       const targetUserResult = await client.query(
-        `SELECT id, email, name, role FROM users WHERE id = $1`,
+        `SELECT id, email, first_name, last_name, role,
+                COALESCE(first_name || ' ' || last_name, first_name, last_name, email) as name
+         FROM users WHERE id = $1`,
         [escalateTo]
       );
 

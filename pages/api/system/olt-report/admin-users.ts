@@ -27,18 +27,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const result = await client.query(`
-      SELECT id, email, name
+      SELECT id, email, first_name, last_name,
+             COALESCE(first_name || ' ' || last_name, first_name, last_name, email) as display_name
       FROM users
       WHERE role = 'admin'
         AND is_active = true
-      ORDER BY name ASC, email ASC
+      ORDER BY first_name ASC, last_name ASC, email ASC
     `);
 
     return apiResponse.success(res, {
       users: result.rows.map((u) => ({
         id: u.id,
         email: u.email,
-        name: u.name || u.email,
+        name: u.display_name || u.email,
       })),
     });
   } catch (error) {

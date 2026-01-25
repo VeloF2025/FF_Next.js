@@ -150,7 +150,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         i.imported_at as import_date,
         i.project,
         et.email as escalated_to_email,
-        et.name as escalated_to_name,
+        COALESCE(et.first_name || ' ' || et.last_name, et.first_name, et.last_name, et.email) as escalated_to_name,
         eb.email as escalated_by_email
       FROM olt_mismatch_records m
       LEFT JOIN olt_report_imports i ON m.import_id = i.id
