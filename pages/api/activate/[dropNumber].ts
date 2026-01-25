@@ -11,7 +11,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
@@ -22,22 +22,9 @@ import { logSerialChange } from '@/modules/activate/services/activityLogService'
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 
-// Configure Neon transport based on NEON_USE_HTTP env var
-const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
-
-if (!useHttpTransport) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ws = require('ws');
-    neonConfig.webSocketConstructor = ws;
-  } catch {
-    // ws not available, will use HTTP
-  }
-}
-
-// CRITICAL: Use correct Neon endpoint (ep-dry-night-a9qyh4sj)
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 /**

@@ -15,7 +15,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
 import { IncomingForm, Fields, Files } from 'formidable';
 import * as XLSX from 'xlsx';
@@ -23,23 +23,9 @@ import fs from 'fs';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 
-// Configure Neon transport based on NEON_USE_HTTP env var
-const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
-
-if (!useHttpTransport) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ws = require('ws');
-    neonConfig.webSocketConstructor = ws;
-  } catch {
-    // ws not available, will use HTTP
-  }
-}
-
 const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 // Disable body parser for file uploads

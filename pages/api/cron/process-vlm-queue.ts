@@ -14,7 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 import ws from 'ws';
 import { log } from '@/lib/logger';
 import {
