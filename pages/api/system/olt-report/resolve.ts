@@ -108,18 +108,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         [resolutionType, notes || null, user?.id, recordId]
       );
 
-      // Log to DR activity
-      await logActivity(
-        drNumber,
-        'INVESTIGATION_RESOLVED',
-        {
-          details: `OLT mismatch investigation resolved as: ${resolutionType}`,
-          resolutionType,
-          notes: notes || null,
-          source: 'olt_report',
-        },
-        user?.id || 'system'
-      );
+      // Log to DR activity (non-blocking - don't fail if logging fails)
+      try {
+        await logActivity(
+          drNumber,
+          'INVESTIGATION_RESOLVED',
+          {
+            details: `OLT mismatch investigation resolved as: ${resolutionType}`,
+            resolutionType,
+            notes: notes || null,
+            source: 'olt_report',
+          },
+          user?.id || 'system'
+        );
+      } catch (activityError) {
+        log.warn('OltReportResolve', 'Failed to log activity (non-blocking)', { activityError, drNumber });
+      }
 
       log.info('OltReportResolve', 'Investigation resolved', {
         recordId,
@@ -174,18 +178,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         [notes || null, escalateTo, user?.id, recordId]
       );
 
-      // Log to DR activity
-      await logActivity(
-        drNumber,
-        'ESCALATED_TO_ADMIN',
-        {
-          details: `OLT mismatch investigation escalated to ${targetUser.name || targetUser.email}`,
-          escalatedTo: targetUser.email,
-          notes: notes || null,
-          source: 'olt_report',
-        },
-        user?.id || 'system'
-      );
+      // Log to DR activity (non-blocking - don't fail if logging fails)
+      try {
+        await logActivity(
+          drNumber,
+          'ESCALATED_TO_ADMIN',
+          {
+            details: `OLT mismatch investigation escalated to ${targetUser.name || targetUser.email}`,
+            escalatedTo: targetUser.email,
+            notes: notes || null,
+            source: 'olt_report',
+          },
+          user?.id || 'system'
+        );
+      } catch (activityError) {
+        log.warn('OltReportResolve', 'Failed to log escalation activity (non-blocking)', { activityError, drNumber });
+      }
 
       // Send email notification to the admin
       try {
