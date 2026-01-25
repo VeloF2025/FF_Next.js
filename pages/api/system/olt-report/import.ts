@@ -227,17 +227,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             continue;
           }
         } else if (existing.fix_status === 'pending' || existing.fix_status === 'empty_serial') {
-          // Already pending - update with latest import info instead of duplicating
+          // Already pending - update serial data but keep original import_id for audit trail
           const newFixStatus = !mismatch.oltSerial ? 'empty_serial' : 'pending';
           await client.query(
             `UPDATE olt_mismatch_records
-             SET import_id = $1,
-                 olt_serial = $2,
-                 wrong_onemap_serial = $3,
-                 row_index = $4,
-                 fix_status = $5
-             WHERE id = $6`,
-            [importId, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, newFixStatus, existing.id]
+             SET olt_serial = $1,
+                 wrong_onemap_serial = $2,
+                 row_index = $3,
+                 fix_status = $4
+             WHERE id = $5`,
+            [mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, newFixStatus, existing.id]
           );
 
           alreadyPendingCount++;
