@@ -15,7 +15,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from '@neondatabase/serverless';
+import db from '@/lib/db';
 import * as XLSX from 'xlsx';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
@@ -29,8 +29,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 interface OltRecord {
   drNumber: string;
@@ -101,7 +99,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  const client = await pool.connect();
+  const client = await db.connect();
   const user = getAuthUser(req);
 
   try {

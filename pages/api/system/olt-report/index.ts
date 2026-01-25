@@ -13,19 +13,17 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from '@neondatabase/serverless';
+import db from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
-  const client = await pool.connect();
+  const client = await db.connect();
 
   try {
     const {

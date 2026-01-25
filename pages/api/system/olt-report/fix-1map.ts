@@ -21,7 +21,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from '@neondatabase/serverless';
+import db from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
@@ -32,8 +32,6 @@ import { logActivity } from '@/modules/activate/services/activityLogService';
 export const config = {
   maxDuration: 60, // 60 seconds max for Vercel
 };
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 interface FixItem {
   drNumber: string;
@@ -52,7 +50,7 @@ interface FixResult {
 }
 
 async function fixSingleDR(
-  client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never,
+  client: Awaited<ReturnType<typeof db.connect>>,
   item: FixItem,
   userId: string | null
 ): Promise<FixResult> {
@@ -266,7 +264,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  const client = await pool.connect();
+  const client = await db.connect();
   const user = getAuthUser(req);
 
   try {
