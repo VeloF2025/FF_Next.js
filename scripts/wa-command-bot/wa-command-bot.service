@@ -1,0 +1,20 @@
+[Unit]
+Description=WhatsApp Command Bot for FibreFlow
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/wa-command-bot
+Environment=DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+Environment=WA_SENDER_URL=http://localhost:8081
+Environment=WEBHOOK_PORT=8086
+Environment=LOG_LEVEL=INFO
+ExecStart=/opt/wa-command-bot/venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

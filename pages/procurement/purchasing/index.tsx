@@ -187,7 +187,7 @@ function RequisitionsTabContent() {
             placeholder="Search requisitions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -207,7 +207,7 @@ function RequisitionsTabContent() {
             <div
               key={req.id}
               onClick={() => router.push(`/procurement/requisitions/${req.id}`)}
-              className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-blue-500/50 cursor-pointer transition-colors"
+              className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-blue-500/50 cursor-pointer transition-colors"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -290,7 +290,7 @@ function PurchaseOrdersTabContent() {
             placeholder="Search purchase orders..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -310,7 +310,7 @@ function PurchaseOrdersTabContent() {
             <div
               key={po.id}
               onClick={() => router.push(`/procurement/purchase-orders/${po.id}`)}
-              className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-blue-500/50 cursor-pointer transition-colors"
+              className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-blue-500/50 cursor-pointer transition-colors"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -393,7 +393,7 @@ function GRNTabContent() {
             placeholder="Search GRNs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -413,7 +413,7 @@ function GRNTabContent() {
             <div
               key={grn.id}
               onClick={() => router.push(`/procurement/grn/${grn.id}`)}
-              className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-blue-500/50 cursor-pointer transition-colors"
+              className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-blue-500/50 cursor-pointer transition-colors"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -456,7 +456,7 @@ export default function PurchasingPage({ projectId }: PurchasingPageProps) {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Page Header */}
-        <div className="border-b border-[var(--ff-border-primary)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/10">

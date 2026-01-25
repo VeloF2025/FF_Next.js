@@ -232,7 +232,7 @@ export default function NewRequisitionPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -254,7 +254,7 @@ export default function NewRequisitionPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="requisitions" />
           </div>
         </div>
@@ -270,7 +270,7 @@ export default function NewRequisitionPage() {
           )}
 
           {/* Details Section */}
-          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6 mb-6">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 mb-6">
             <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Requisition Details</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -284,7 +284,7 @@ export default function NewRequisitionPage() {
                   <select
                     value={projectId}
                     onChange={(e) => setProjectId(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                    className="w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
                     disabled={isLoadingProjects}
                   >
                     <option value="">Select a project</option>
@@ -308,7 +308,7 @@ export default function NewRequisitionPage() {
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   placeholder="e.g., Operations, Finance"
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   maxLength={100}
                 />
               </div>
@@ -325,7 +325,7 @@ export default function NewRequisitionPage() {
                     value={requiredDate}
                     onChange={(e) => setRequiredDate(e.target.value)}
                     min={getMinDate()}
-                    className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   />
                 </div>
                 {fieldErrors.requiredDate && (
@@ -339,7 +339,7 @@ export default function NewRequisitionPage() {
                 <select
                   value={urgency}
                   onChange={(e) => setUrgency(e.target.value as RequisitionUrgency)}
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
                 >
                   {URGENCY_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -360,14 +360,14 @@ export default function NewRequisitionPage() {
                   placeholder="Additional notes or instructions..."
                   rows={3}
                   maxLength={1000}
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Items Section */}
-          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6 mb-6">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Items</h2>
               <button
@@ -390,7 +390,7 @@ export default function NewRequisitionPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--ff-border-default)]">
+                  <tr className="border-b border-[var(--ff-border-light)]">
                     <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                       Description *
                     </th>
@@ -409,7 +409,7 @@ export default function NewRequisitionPage() {
                     <th className="px-3 py-2 w-10"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--ff-border-default)]">
+                <tbody className="divide-y divide-[var(--ff-border-light)]">
                   {items.map((item, index) => (
                     <tr key={item.id} className="group">
                       <td className="px-3 py-2">
@@ -418,7 +418,7 @@ export default function NewRequisitionPage() {
                           value={item.itemDescription}
                           onChange={(e) => updateItem(index, 'itemDescription', e.target.value)}
                           placeholder="Item description"
-                          className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                         />
                         {fieldErrors[`item_${index}_description`] && (
                           <p className="mt-1 text-xs text-red-400">{fieldErrors[`item_${index}_description`]}</p>
@@ -432,7 +432,7 @@ export default function NewRequisitionPage() {
                           placeholder="0"
                           min="0"
                           step="0.001"
-                          className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                         />
                         {fieldErrors[`item_${index}_quantity`] && (
                           <p className="mt-1 text-xs text-red-400">{fieldErrors[`item_${index}_quantity`]}</p>
@@ -442,7 +442,7 @@ export default function NewRequisitionPage() {
                         <select
                           value={item.uom}
                           onChange={(e) => updateItem(index, 'uom', e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                          className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
                         >
                           {UOM_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -463,7 +463,7 @@ export default function NewRequisitionPage() {
                             placeholder="0.00"
                             min="0"
                             step="0.01"
-                            className="w-full pl-7 pr-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                            className="w-full pl-7 pr-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                           />
                         </div>
                       </td>
@@ -491,7 +491,7 @@ export default function NewRequisitionPage() {
           </div>
 
           {/* Summary Section */}
-          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6 mb-6">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 mb-6">
             <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Summary</h2>
 
             <div className="flex justify-between items-center">

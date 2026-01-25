@@ -174,7 +174,7 @@ export default function ApprovalsPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -202,7 +202,7 @@ export default function ApprovalsPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="overview" />
           </div>
         </div>
@@ -211,7 +211,7 @@ export default function ApprovalsPage() {
         <div className="p-6">
           {/* Stats */}
           <div className="mb-6 grid grid-cols-4 gap-4">
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Total Pending</span>
                 <span className="text-2xl font-semibold text-[var(--ff-text-primary)]">
@@ -219,7 +219,7 @@ export default function ApprovalsPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Requisitions</span>
                 <span className="px-2 py-0.5 rounded-full text-sm bg-blue-500/20 text-blue-400">
@@ -227,7 +227,7 @@ export default function ApprovalsPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Purchase Orders</span>
                 <span className="px-2 py-0.5 rounded-full text-sm bg-green-500/20 text-green-400">
@@ -235,7 +235,7 @@ export default function ApprovalsPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Overdue</span>
                 <span className="px-2 py-0.5 rounded-full text-sm bg-red-500/20 text-red-400">
@@ -254,13 +254,13 @@ export default function ApprovalsPage() {
                 placeholder="Search by document number, requester..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               />
             </div>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as WorkflowType | 'all')}
-              className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             >
               <option value="all">All Types</option>
               <option value="purchase_requisition">Requisitions</option>
@@ -309,7 +309,7 @@ export default function ApprovalsPage() {
                 return (
                   <div
                     key={task.id}
-                    className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-[var(--ff-border-light)] transition-colors"
+                    className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-[var(--ff-border-light)] transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
                       {/* Left: Document info */}
@@ -403,7 +403,7 @@ export default function ApprovalsPage() {
         {/* Reject Modal */}
         {showRejectModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
                 Reject Approval Request
               </h3>
@@ -416,7 +416,7 @@ export default function ApprovalsPage() {
                   onChange={(e) => setRejectReason(e.target.value)}
                   rows={3}
                   placeholder="Please provide a reason for rejection..."
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-red-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-red-500/50 resize-none"
                 />
               </div>
               <div className="flex justify-end gap-3">

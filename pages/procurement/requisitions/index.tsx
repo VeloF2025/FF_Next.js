@@ -94,7 +94,7 @@ export default function RequisitionsPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -121,7 +121,7 @@ export default function RequisitionsPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="requisitions" />
           </div>
         </div>
@@ -137,10 +137,10 @@ export default function RequisitionsPage() {
                 placeholder="Search requisitions..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
               />
             </div>
-            <button className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
+            <button className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
               <Filter className="h-4 w-4" />
               Filters
             </button>
@@ -154,7 +154,7 @@ export default function RequisitionsPage() {
               return (
                 <div
                   key={status}
-                  className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg"
+                  className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-[var(--ff-text-secondary)]">{config.label}</span>
@@ -191,10 +191,10 @@ export default function RequisitionsPage() {
               </p>
             </div>
           ) : (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--ff-border-default)]">
+                  <tr className="border-b border-[var(--ff-border-light)]">
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                       Requisition #
                     </th>
@@ -222,7 +222,7 @@ export default function RequisitionsPage() {
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--ff-border-default)]">
+                <tbody className="divide-y divide-[var(--ff-border-light)]">
                   {filteredRequisitions.map((req) => {
                     const status = statusConfig[req.status];
                     const urgency = urgencyConfig[req.urgency];

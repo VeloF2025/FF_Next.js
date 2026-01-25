@@ -41,6 +41,12 @@ interface OltRecord {
   matchStatus: string;
   wrongOneMapSerial: string | null;
   rowIndex: number;
+  hasUpsSwap: boolean; // True if wrongOneMapSerial starts with GU18 (UPS serial in ONT field)
+}
+
+// Helper to detect UPS serial pattern (starts with GU18)
+function isUpsSerial(serial: string | null): boolean {
+  return !!serial && serial.toUpperCase().startsWith('GU18');
 }
 
 interface ImportResult {
@@ -92,6 +98,7 @@ async function parseExcelFile(filePath: string): Promise<OltRecord[]> {
         matchStatus,
         wrongOneMapSerial,
         rowIndex: i + 1, // 1-based for user display
+        hasUpsSwap: isUpsSerial(wrongOneMapSerial), // Detect UPS serial in ONT field
       });
     }
   }
@@ -203,9 +210,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             // Insert new record with needs_reinvestigation status
             await client.query(
               `INSERT INTO olt_mismatch_records
-                (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status)
-               VALUES ($1, $2, $3, $4, $5, 'needs_reinvestigation')`,
-              [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex]
+                (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status, has_ups_swap)
+               VALUES ($1, $2, $3, $4, $5, 'needs_reinvestigation', $6)`,
+              [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, mismatch.hasUpsSwap]
             );
 
             await logActivity(
@@ -237,9 +244,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
              SET olt_serial = $1,
                  wrong_onemap_serial = $2,
                  row_index = $3,
-                 fix_status = $4
-             WHERE id = $5`,
-            [mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, newFixStatus, existing.id]
+                 fix_status = $4,
+                 has_ups_swap = $5
+             WHERE id = $6`,
+            [mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, newFixStatus, mismatch.hasUpsSwap, existing.id]
           );
 
           alreadyPendingCount++;
@@ -263,9 +271,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       await client.query(
         `INSERT INTO olt_mismatch_records
-          (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, fixStatus]
+          (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status, has_ups_swap)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, fixStatus, mismatch.hasUpsSwap]
       );
 
       // Handle empty OLT serial - log but don't try to update offline_devices

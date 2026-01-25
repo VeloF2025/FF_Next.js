@@ -100,7 +100,7 @@ export default function GRNDetailPage() {
       <AppLayout>
         <div className="min-h-screen bg-[var(--ff-bg-primary)]">
           {/* Header */}
-          <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+          <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
             <div className="px-6 py-4">
               <div className="flex items-center gap-3">
                 <button
@@ -143,7 +143,7 @@ export default function GRNDetailPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -200,7 +200,7 @@ export default function GRNDetailPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="grn" />
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function GRNDetailPage() {
             <div className="col-span-2 space-y-6">
               {/* Purchase Order Link */}
               {grn.purchaseOrderNumber && (
-                <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+                <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
                   <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-2">
                     <FileText className="h-4 w-4" />
                     Source Purchase Order
@@ -227,7 +227,7 @@ export default function GRNDetailPage() {
               )}
 
               {/* Items */}
-              <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+              <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
                 <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
                   Items Received ({grn.totalItems})
                 </h3>
@@ -236,7 +236,7 @@ export default function GRNDetailPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-[var(--ff-border-default)]">
+                        <tr className="border-b border-[var(--ff-border-light)]">
                           <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                             Item
                           </th>
@@ -257,7 +257,7 @@ export default function GRNDetailPage() {
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[var(--ff-border-default)]">
+                      <tbody className="divide-y divide-[var(--ff-border-light)]">
                         {grn.items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-3 py-3">
@@ -308,7 +308,7 @@ export default function GRNDetailPage() {
                 )}
 
                 {/* Totals */}
-                <div className="mt-4 pt-4 border-t border-[var(--ff-border-default)]">
+                <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
                   <div className="flex justify-end gap-6 text-sm">
                     <div className="text-[var(--ff-text-secondary)]">
                       Total Received:{' '}
@@ -344,7 +344,7 @@ export default function GRNDetailPage() {
 
               {/* Notes */}
               {grn.notes && (
-                <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+                <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
                   <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-2">Notes</h3>
                   <p className="text-sm text-[var(--ff-text-secondary)]">{grn.notes}</p>
                 </div>
@@ -354,7 +354,7 @@ export default function GRNDetailPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Delivery Details */}
-              <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+              <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
                 <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
                   Delivery Details
                 </h3>
@@ -408,7 +408,7 @@ export default function GRNDetailPage() {
 
               {/* Inspection */}
               {grn.inspectionRequired && (
-                <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+                <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
                   <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
                     Inspection
                   </h3>
@@ -448,7 +448,7 @@ export default function GRNDetailPage() {
               )}
 
               {/* Personnel */}
-              <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+              <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
                 <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
                   Personnel
                 </h3>

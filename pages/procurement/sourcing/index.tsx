@@ -61,7 +61,7 @@ export default function SourcingPage({ projectId, projectName }: SourcingPagePro
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Page Header */}
-        <div className="border-b border-[var(--ff-border-primary)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-500/10">

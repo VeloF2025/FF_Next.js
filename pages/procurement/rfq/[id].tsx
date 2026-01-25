@@ -252,7 +252,7 @@ export default function RFQDetailPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <button
               onClick={() => router.push('/procurement/rfq')}
@@ -301,7 +301,7 @@ export default function RFQDetailPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Overview Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <Calendar className="h-4 w-4" />
                     <span className="text-xs">Due Date</span>
@@ -310,7 +310,7 @@ export default function RFQDetailPage() {
                     {formatDate(rfq.dueDate)}
                   </p>
                 </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <Package className="h-4 w-4" />
                     <span className="text-xs">Items</span>
@@ -319,7 +319,7 @@ export default function RFQDetailPage() {
                     {rfq.items.length}
                   </p>
                 </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <Users className="h-4 w-4" />
                     <span className="text-xs">Suppliers</span>
@@ -328,7 +328,7 @@ export default function RFQDetailPage() {
                     {rfq.suppliers.length}
                   </p>
                 </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <MessageSquare className="h-4 w-4" />
                     <span className="text-xs">Quotes</span>
@@ -341,15 +341,15 @@ export default function RFQDetailPage() {
 
               {/* Description */}
               {rfq.description && (
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                   <h3 className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">Description</h3>
                   <p className="text-[var(--ff-text-primary)]">{rfq.description}</p>
                 </div>
               )}
 
               {/* Tabs */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg overflow-hidden">
-                <div className="flex border-b border-[var(--ff-border-default)]">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+                <div className="flex border-b border-[var(--ff-border-light)]">
                   {(['items', 'suppliers', 'quotes'] as const).map((tab) => (
                     <button
                       key={tab}
@@ -481,7 +481,7 @@ export default function RFQDetailPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Summary */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Summary</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
@@ -506,7 +506,7 @@ export default function RFQDetailPage() {
               </div>
 
               {/* Actions */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Actions</h3>
                 <div className="space-y-2">
                   {rfq.status === 'draft' && (

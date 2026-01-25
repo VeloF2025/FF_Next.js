@@ -67,15 +67,35 @@ export default withAuth(withErrorHandler(async (
         LIMIT 500
       `;
 
-      // Get recent movements across all projects (if table exists)
+      // Get recent movements with item details
       try {
         movements = await sql`
-          SELECT * FROM stock_movements
-          ORDER BY movement_date DESC
-          LIMIT 20
+          SELECT
+            sm.id,
+            sm.reference_number,
+            sm.movement_type,
+            sm.from_location,
+            sm.to_location,
+            sm.status,
+            sm.movement_date,
+            sm.confirmed_at,
+            sm.notes,
+            sm.source_type,
+            sm.odoo_picking_id,
+            (
+              SELECT COUNT(*) FROM stock_movement_items smi
+              WHERE smi.stock_movement_id = sm.id
+            ) as item_count,
+            (
+              SELECT COALESCE(SUM(smi.actual_quantity), 0) FROM stock_movement_items smi
+              WHERE smi.stock_movement_id = sm.id
+            ) as total_quantity
+          FROM stock_movements sm
+          ORDER BY sm.movement_date DESC
+          LIMIT 50
         `;
       } catch {
-        // stock_movements table might not exist yet
+        // stock_movements table might not have data yet
         movements = [];
       }
 

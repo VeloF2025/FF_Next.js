@@ -275,7 +275,7 @@ function CategoriesTabContent() {
             placeholder="Search categories..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -291,7 +291,7 @@ function CategoriesTabContent() {
         {filtered.map((cat) => (
           <div
             key={cat.id}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
             onClick={() => openEditModal(cat)}
           >
             <div className="flex items-center justify-between">
@@ -329,7 +329,7 @@ function CategoriesTabContent() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
-          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-default)]">
+          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-light)]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                 {editingCategory ? 'Edit Category' : 'New Category'}
@@ -347,7 +347,7 @@ function CategoriesTabContent() {
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                   placeholder="e.g., ONT, CABLE"
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                 />
               </div>
 
@@ -358,7 +358,7 @@ function CategoriesTabContent() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., ONT Devices"
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                 />
               </div>
 
@@ -369,7 +369,7 @@ function CategoriesTabContent() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional description"
                   rows={3}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
                 />
               </div>
 
@@ -379,7 +379,7 @@ function CategoriesTabContent() {
                   id="cat-is-active"
                   checked={formData.is_active}
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="rounded border-[var(--ff-border-default)]"
+                  className="rounded border-[var(--ff-border-light)]"
                 />
                 <label htmlFor="cat-is-active" className="text-sm text-[var(--ff-text-secondary)]">Active</label>
               </div>
@@ -578,7 +578,7 @@ function BundlesTabContent() {
             placeholder="Search bundles..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -595,7 +595,7 @@ function BundlesTabContent() {
           <div
             key={bundle.id}
             onClick={() => openEditModal(bundle)}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -640,7 +640,7 @@ function BundlesTabContent() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
-          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-default)]">
+          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-light)]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                 {editingBundle ? 'Edit Bundle' : 'New Bundle'}
@@ -658,7 +658,7 @@ function BundlesTabContent() {
                   value={formData.bundle_code}
                   onChange={(e) => setFormData({ ...formData, bundle_code: e.target.value.toUpperCase() })}
                   placeholder="e.g., INST-FTTH"
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                 />
               </div>
 
@@ -669,7 +669,7 @@ function BundlesTabContent() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., FTTH Installation Kit"
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
                 />
               </div>
 
@@ -678,7 +678,7 @@ function BundlesTabContent() {
                 <select
                   value={formData.bundle_type}
                   onChange={(e) => setFormData({ ...formData, bundle_type: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
                 >
                   <option value="installation">Installation</option>
                   <option value="maintenance">Maintenance</option>
@@ -695,7 +695,7 @@ function BundlesTabContent() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional description"
                   rows={3}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
                 />
               </div>
 
@@ -705,7 +705,7 @@ function BundlesTabContent() {
                   id="bundle-is-active"
                   checked={formData.is_active}
                   onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="rounded border-[var(--ff-border-default)]"
+                  className="rounded border-[var(--ff-border-light)]"
                 />
                 <label htmlFor="bundle-is-active" className="text-sm text-[var(--ff-text-secondary)]">Active</label>
               </div>
@@ -872,7 +872,7 @@ function StockTakesTabContent() {
             placeholder="Search stock takes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -888,7 +888,7 @@ function StockTakesTabContent() {
         {filtered.map((take) => (
           <div
             key={take.id}
-            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-indigo-500/50 transition-colors"
+            className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-indigo-500/50 transition-colors"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -928,7 +928,7 @@ function StockTakesTabContent() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
-          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-default)]">
+          <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6 border border-[var(--ff-border-light)]">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Stock Take</h2>
               <button onClick={closeModal} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
@@ -942,7 +942,7 @@ function StockTakesTabContent() {
                 <select
                   value={formData.stock_take_type}
                   onChange={(e) => setFormData({ ...formData, stock_take_type: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)]"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
                 >
                   <option value="full">Full Stock Take</option>
                   <option value="partial">Partial Stock Take</option>
@@ -958,7 +958,7 @@ function StockTakesTabContent() {
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="Optional notes about this stock take"
                   rows={3}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] resize-none"
                 />
               </div>
             </div>
@@ -1113,13 +1113,13 @@ function BundleReportsTabContent() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-4 p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-default)]">
+      <div className="flex flex-wrap items-end gap-4 p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
         <div>
           <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Project</label>
           <select
             value={projectId}
             onChange={(e) => setProjectId(e.target.value)}
-            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
           >
             <option value="">All Projects</option>
             {projects.map(p => (
@@ -1133,7 +1133,7 @@ function BundleReportsTabContent() {
           <select
             value={bundleType}
             onChange={(e) => setBundleType(e.target.value)}
-            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+            className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
           >
             <option value="">All Types</option>
             <option value="installation">Installation</option>
@@ -1152,7 +1152,7 @@ function BundleReportsTabContent() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+              className="pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
             />
           </div>
         </div>
@@ -1165,7 +1165,7 @@ function BundleReportsTabContent() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+              className="pl-10 pr-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
             />
           </div>
         </div>
@@ -1224,7 +1224,7 @@ function BundleReportsTabContent() {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--ff-border-default)]">
+            <tbody className="divide-y divide-[var(--ff-border-light)]">
               {reportData.data.map((row, idx) => (
                 <tr key={idx} className="hover:bg-[var(--ff-bg-secondary)]">
                   {Object.entries(row).map(([key, value], cidx) => (
@@ -1268,7 +1268,7 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Page Header */}
-        <div className="border-b border-[var(--ff-border-primary)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-indigo-500/10">

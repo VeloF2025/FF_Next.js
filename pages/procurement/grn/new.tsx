@@ -305,7 +305,7 @@ export default function NewGRNPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -331,7 +331,7 @@ export default function NewGRNPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="grn" />
           </div>
         </div>
@@ -347,7 +347,7 @@ export default function NewGRNPage() {
           )}
 
           {/* Purchase Order Selection */}
-          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
             <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
               Source Purchase Order (Optional)
             </h3>
@@ -356,7 +356,7 @@ export default function NewGRNPage() {
                 value={selectedPOId}
                 onChange={(e) => setSelectedPOId(e.target.value)}
                 disabled={isLoadingData}
-                className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none"
+                className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none"
               >
                 <option value="">No linked PO (standalone receipt)</option>
                 {purchaseOrders.map((po) => (
@@ -370,7 +370,7 @@ export default function NewGRNPage() {
           </div>
 
           {/* Delivery Info */}
-          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
             <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">
               Delivery Information
             </h3>
@@ -388,7 +388,7 @@ export default function NewGRNPage() {
                     required
                     disabled={isLoadingData || !!selectedPOId}
                     className={`w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none ${
-                      fieldErrors.supplierId ? 'border-red-500' : 'border-[var(--ff-border-default)]'
+                      fieldErrors.supplierId ? 'border-red-500' : 'border-[var(--ff-border-light)]'
                     }`}
                   >
                     <option value="">Select supplier</option>
@@ -418,7 +418,7 @@ export default function NewGRNPage() {
                     required
                     disabled={isLoadingData}
                     className={`w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 appearance-none ${
-                      fieldErrors.warehouseId ? 'border-red-500' : 'border-[var(--ff-border-default)]'
+                      fieldErrors.warehouseId ? 'border-red-500' : 'border-[var(--ff-border-light)]'
                     }`}
                   >
                     <option value="">Select warehouse</option>
@@ -445,7 +445,7 @@ export default function NewGRNPage() {
                   value={deliveryNoteNumber}
                   onChange={(e) => setDeliveryNoteNumber(e.target.value)}
                   placeholder="e.g., DN-12345"
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
 
@@ -459,7 +459,7 @@ export default function NewGRNPage() {
                   value={carrier}
                   onChange={(e) => setCarrier(e.target.value)}
                   placeholder="e.g., DHL, FedEx"
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
 
@@ -473,7 +473,7 @@ export default function NewGRNPage() {
                   value={vehicleNumber}
                   onChange={(e) => setVehicleNumber(e.target.value)}
                   placeholder="e.g., ABC 123 GP"
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
 
@@ -487,7 +487,7 @@ export default function NewGRNPage() {
                   value={receivingBay}
                   onChange={(e) => setReceivingBay(e.target.value)}
                   placeholder="e.g., Bay 1"
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
             </div>
@@ -499,7 +499,7 @@ export default function NewGRNPage() {
                   type="checkbox"
                   checked={inspectionRequired}
                   onChange={(e) => setInspectionRequired(e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--ff-border-default)] bg-[var(--ff-bg-tertiary)] text-emerald-500 focus:ring-emerald-500/50"
+                  className="w-4 h-4 rounded border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] text-emerald-500 focus:ring-emerald-500/50"
                 />
                 <span className="text-sm text-[var(--ff-text-secondary)]">
                   Inspection required before accepting goods
@@ -509,7 +509,7 @@ export default function NewGRNPage() {
           </div>
 
           {/* Items */}
-          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">
                 Items Received
@@ -534,7 +534,7 @@ export default function NewGRNPage() {
               {items.map((item, index) => (
                 <div
                   key={item.id}
-                  className="p-4 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg"
+                  className="p-4 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <span className="text-sm font-medium text-[var(--ff-text-secondary)]">
@@ -562,7 +562,7 @@ export default function NewGRNPage() {
                         value={item.itemCode}
                         onChange={(e) => updateItem(index, 'itemCode', e.target.value)}
                         placeholder="SKU"
-                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       />
                     </div>
 
@@ -579,7 +579,7 @@ export default function NewGRNPage() {
                         className={`w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${
                           fieldErrors[`item_${index}_description`]
                             ? 'border-red-500'
-                            : 'border-[var(--ff-border-default)]'
+                            : 'border-[var(--ff-border-light)]'
                         }`}
                       />
                     </div>
@@ -596,7 +596,7 @@ export default function NewGRNPage() {
                         onChange={(e) =>
                           updateItem(index, 'quantityReceived', e.target.value === '' ? '' : Number(e.target.value))
                         }
-                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       />
                     </div>
 
@@ -612,7 +612,7 @@ export default function NewGRNPage() {
                         onChange={(e) =>
                           updateItem(index, 'quantityRejected', e.target.value === '' ? '' : Number(e.target.value))
                         }
-                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       />
                     </div>
 
@@ -624,7 +624,7 @@ export default function NewGRNPage() {
                       <select
                         value={item.uom}
                         onChange={(e) => updateItem(index, 'uom', e.target.value)}
-                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       >
                         {UOM_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -646,7 +646,7 @@ export default function NewGRNPage() {
                         value={item.lotNumber}
                         onChange={(e) => updateItem(index, 'lotNumber', e.target.value)}
                         placeholder="LOT-12345"
-                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       />
                     </div>
                     <div className="col-span-2">
@@ -658,7 +658,7 @@ export default function NewGRNPage() {
                         value={item.notes}
                         onChange={(e) => updateItem(index, 'notes', e.target.value)}
                         placeholder="Any notes about this item"
-                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                        className="w-full px-3 py-2 text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       />
                     </div>
                   </div>
@@ -667,7 +667,7 @@ export default function NewGRNPage() {
             </div>
 
             {/* Totals */}
-            <div className="mt-4 pt-4 border-t border-[var(--ff-border-default)]">
+            <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
               <div className="flex justify-end gap-6 text-sm">
                 <div className="text-[var(--ff-text-secondary)]">
                   Total Received: <span className="font-medium text-[var(--ff-text-primary)]">{totals.received}</span>
@@ -683,14 +683,14 @@ export default function NewGRNPage() {
           </div>
 
           {/* Notes */}
-          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+          <div className="mb-6 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
             <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-4">Notes</h3>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Any additional notes about this receipt..."
-              className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+              className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
             />
           </div>
 

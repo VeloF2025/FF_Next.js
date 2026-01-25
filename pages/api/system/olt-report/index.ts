@@ -125,6 +125,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         m.fix_attempted_at,
         m.fix_result,
         m.fix_old_value,
+        m.has_ups_swap,
         m.created_at,
         i.filename as import_filename,
         i.imported_at as import_date,
@@ -162,6 +163,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ) as needs_investigation,
         COUNT(*) FILTER (WHERE fix_status = 'fixed') as fixed,
         COUNT(*) FILTER (WHERE fix_status = 'empty_serial') as empty,
+        COUNT(*) FILTER (WHERE has_ups_swap = true) as ups_swap,
+        COUNT(*) FILTER (WHERE has_ups_swap = true AND fix_status = 'pending') as ups_swap_pending,
         COUNT(*) as total
       FROM olt_mismatch_records
     `);
@@ -170,6 +173,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       needs_investigation: Number(statsResult.rows[0].needs_investigation) || 0,
       fixed: Number(statsResult.rows[0].fixed) || 0,
       empty: Number(statsResult.rows[0].empty) || 0,
+      ups_swap: Number(statsResult.rows[0].ups_swap) || 0,
+      ups_swap_pending: Number(statsResult.rows[0].ups_swap_pending) || 0,
       total: Number(statsResult.rows[0].total) || 0,
     };
 

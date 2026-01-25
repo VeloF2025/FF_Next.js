@@ -182,7 +182,7 @@ function BudgetTabContent() {
       </StatCardGrid>
 
       {/* Templates Section */}
-      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Budget Templates</h3>
           <button
@@ -197,7 +197,7 @@ function BudgetTabContent() {
           {templates.slice(0, 6).map((template) => (
             <div
               key={template.id}
-              className="p-3 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg hover:border-amber-500/50 transition-colors"
+              className="p-3 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:border-amber-500/50 transition-colors"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -230,7 +230,7 @@ function BudgetTabContent() {
               placeholder="Search projects..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] text-sm"
+              className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] text-sm"
             />
           </div>
         </div>
@@ -242,7 +242,7 @@ function BudgetTabContent() {
             return (
               <div
                 key={budget.project_id}
-                className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-amber-500/50 transition-colors"
+                className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-amber-500/50 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -355,7 +355,7 @@ function CostCentersTabContent() {
     return (
       <div key={center.id}>
         <div
-          className={`p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg hover:border-amber-500/50 transition-colors ${
+          className={`p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-amber-500/50 transition-colors ${
             depth > 0 ? 'ml-6 mt-2' : ''
           }`}
         >
@@ -448,7 +448,7 @@ function CostCentersTabContent() {
             placeholder="Search cost centers..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)]"
           />
         </div>
         <button
@@ -484,7 +484,7 @@ export default function FinancialPage({ projectId }: FinancialPageProps) {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Page Header */}
-        <div className="border-b border-[var(--ff-border-primary)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-amber-500/10">

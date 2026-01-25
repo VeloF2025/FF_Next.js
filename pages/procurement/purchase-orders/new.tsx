@@ -217,7 +217,7 @@ export default function NewPurchaseOrderPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center gap-3">
               <button
@@ -241,7 +241,7 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="purchase-orders" />
           </div>
         </div>
@@ -255,7 +255,7 @@ export default function NewPurchaseOrderPage() {
           )}
 
           {/* Supplier & Project Section */}
-          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
             <div className="flex items-center gap-2 mb-4">
               <Building className="h-5 w-5 text-blue-400" />
               <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Supplier & Project</h2>
@@ -269,7 +269,7 @@ export default function NewPurchaseOrderPage() {
                 <select
                   value={supplierId || ''}
                   onChange={(e) => setSupplierId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   required
                 >
                   <option value="">Select a supplier</option>
@@ -288,7 +288,7 @@ export default function NewPurchaseOrderPage() {
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">No project</option>
                   {projects.map((project) => (
@@ -302,7 +302,7 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Delivery Section */}
-          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
             <div className="flex items-center gap-2 mb-4">
               <Truck className="h-5 w-5 text-blue-400" />
               <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Delivery Details</h2>
@@ -317,7 +317,7 @@ export default function NewPurchaseOrderPage() {
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                   placeholder="Full delivery address..."
                   required
                 />
@@ -332,14 +332,14 @@ export default function NewPurchaseOrderPage() {
                   value={deliveryDate}
                   onChange={(e) => setDeliveryDate(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
             </div>
           </div>
 
           {/* Payment Section */}
-          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
             <div className="flex items-center gap-2 mb-4">
               <CreditCard className="h-5 w-5 text-blue-400" />
               <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Payment Terms</h2>
@@ -353,7 +353,7 @@ export default function NewPurchaseOrderPage() {
                 <select
                   value={paymentTerms}
                   onChange={(e) => setPaymentTerms(e.target.value)}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   required
                 >
                   {PAYMENT_TERMS.map((term) => (
@@ -371,7 +371,7 @@ export default function NewPurchaseOrderPage() {
                 <select
                   value={vatRate}
                   onChange={(e) => setVatRate(parseInt(e.target.value, 10))}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   {VAT_RATES.map((rate) => (
                     <option key={rate.value} value={rate.value}>
@@ -389,7 +389,7 @@ export default function NewPurchaseOrderPage() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                   placeholder="Additional notes..."
                 />
               </div>
@@ -397,7 +397,7 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Items Section */}
-          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Items</h2>
               <button
@@ -413,7 +413,7 @@ export default function NewPurchaseOrderPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--ff-border-default)]">
+                  <tr className="border-b border-[var(--ff-border-light)]">
                     <th className="px-2 py-2 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
                       Description <span className="text-red-400">*</span>
                     </th>
@@ -435,7 +435,7 @@ export default function NewPurchaseOrderPage() {
                     <th className="px-2 py-2 w-10"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--ff-border-default)]">
+                <tbody className="divide-y divide-[var(--ff-border-light)]">
                   {items.map((item, index) => (
                     <tr key={item.id}>
                       <td className="px-2 py-2">
@@ -443,7 +443,7 @@ export default function NewPurchaseOrderPage() {
                           type="text"
                           value={item.itemDescription}
                           onChange={(e) => handleItemChange(index, 'itemDescription', e.target.value)}
-                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           placeholder="Item description"
                         />
                       </td>
@@ -452,7 +452,7 @@ export default function NewPurchaseOrderPage() {
                           type="text"
                           value={item.itemCode}
                           onChange={(e) => handleItemChange(index, 'itemCode', e.target.value)}
-                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           placeholder="SKU"
                         />
                       </td>
@@ -463,14 +463,14 @@ export default function NewPurchaseOrderPage() {
                           onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
                           min="0"
                           step="1"
-                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] text-right focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] text-right focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                         />
                       </td>
                       <td className="px-2 py-2">
                         <select
                           value={item.uom}
                           onChange={(e) => handleItemChange(index, 'uom', e.target.value)}
-                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                         >
                           {UOM_OPTIONS.map((uom) => (
                             <option key={uom.value} value={uom.value}>
@@ -490,7 +490,7 @@ export default function NewPurchaseOrderPage() {
                             onChange={(e) => handleItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.01"
-                            className="w-full pl-6 pr-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded text-sm text-[var(--ff-text-primary)] text-right focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            className="w-full pl-6 pr-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] text-right focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           />
                         </div>
                       </td>
@@ -515,7 +515,7 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Summary */}
-          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+          <div className="mb-6 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
             <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Summary</h2>
             <div className="space-y-2 max-w-xs ml-auto">
               <div className="flex justify-between">
@@ -526,7 +526,7 @@ export default function NewPurchaseOrderPage() {
                 <span className="text-[var(--ff-text-secondary)]">VAT ({vatRate}%)</span>
                 <span className="text-[var(--ff-text-primary)]">{formatCurrency(vatAmount)}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-[var(--ff-border-default)]">
+              <div className="flex justify-between pt-2 border-t border-[var(--ff-border-light)]">
                 <span className="text-[var(--ff-text-primary)] font-medium">Total</span>
                 <span className="text-[var(--ff-text-primary)] font-semibold text-lg">{formatCurrency(total)}</span>
               </div>
@@ -538,7 +538,7 @@ export default function NewPurchaseOrderPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 border border-[var(--ff-border-default)] text-[var(--ff-text-secondary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
+              className="px-4 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               Cancel
             </button>

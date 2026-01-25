@@ -191,7 +191,7 @@ export default function BOQDetailPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <button
               onClick={() => router.push('/procurement/boq')}
@@ -244,7 +244,7 @@ export default function BOQDetailPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Overview Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <Package className="h-4 w-4" />
                     <span className="text-xs">Items</span>
@@ -253,7 +253,7 @@ export default function BOQDetailPage() {
                     {items.length}
                   </p>
                 </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <FileText className="h-4 w-4" />
                     <span className="text-xs">Total Value</span>
@@ -262,7 +262,7 @@ export default function BOQDetailPage() {
                     {formatCurrency(items.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0))}
                   </p>
                 </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <Calendar className="h-4 w-4" />
                     <span className="text-xs">Created</span>
@@ -271,7 +271,7 @@ export default function BOQDetailPage() {
                     {formatDate(boq.createdAt)}
                   </p>
                 </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                   <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
                     <User className="h-4 w-4" />
                     <span className="text-xs">Uploaded By</span>
@@ -284,15 +284,15 @@ export default function BOQDetailPage() {
 
               {/* Description */}
               {boq.description && (
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                   <h3 className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">Description</h3>
                   <p className="text-[var(--ff-text-primary)]">{boq.description}</p>
                 </div>
               )}
 
               {/* Items Table */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg overflow-hidden">
-                <div className="px-6 py-4 border-b border-[var(--ff-border-default)]">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+                <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
                   <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                     Items ({items.length})
                   </h3>
@@ -312,7 +312,7 @@ export default function BOQDetailPage() {
                           <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Total</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[var(--ff-border-default)]">
+                      <tbody className="divide-y divide-[var(--ff-border-light)]">
                         {items.map((item, index) => (
                           <tr key={item.id || index} className="hover:bg-[var(--ff-bg-hover)]">
                             <td className="px-4 py-3 text-sm text-[var(--ff-text-primary)] font-mono">
@@ -355,7 +355,7 @@ export default function BOQDetailPage() {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Summary */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Summary</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">

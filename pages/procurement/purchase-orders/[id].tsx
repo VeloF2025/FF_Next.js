@@ -260,7 +260,7 @@ export default function PurchaseOrderDetailPage() {
             <button
               onClick={() => router.push(`/procurement/purchase-orders/${id}/edit`)}
               disabled={actionLoading}
-              className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               <Edit className="h-4 w-4" />
               Edit
@@ -445,7 +445,7 @@ export default function PurchaseOrderDetailPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -481,13 +481,13 @@ export default function PurchaseOrderDetailPage() {
           </div>
 
           {/* Procurement Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="purchase-orders" />
           </div>
         </div>
 
         {/* Content Tabs */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6">
             <nav className="flex space-x-1">
               {tabs.map((tab) => {
@@ -516,7 +516,7 @@ export default function PurchaseOrderDetailPage() {
           {activeTab === 'details' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Supplier Information */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-5">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Building2 className="h-5 w-5 text-blue-400" />
                   <h3 className="font-semibold text-[var(--ff-text-primary)]">Supplier Information</h3>
@@ -548,7 +548,7 @@ export default function PurchaseOrderDetailPage() {
               </div>
 
               {/* Delivery Information */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-5">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <MapPin className="h-5 w-5 text-green-400" />
                   <h3 className="font-semibold text-[var(--ff-text-primary)]">Delivery Information</h3>
@@ -566,7 +566,7 @@ export default function PurchaseOrderDetailPage() {
               </div>
 
               {/* Payment Terms */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-5">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <CreditCard className="h-5 w-5 text-purple-400" />
                   <h3 className="font-semibold text-[var(--ff-text-primary)]">Payment Terms</h3>
@@ -590,7 +590,7 @@ export default function PurchaseOrderDetailPage() {
               </div>
 
               {/* Summary */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-5">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
                 <h3 className="font-semibold text-[var(--ff-text-primary)] mb-4">Summary</h3>
                 <dl className="space-y-3">
                   <div className="flex justify-between">
@@ -601,7 +601,7 @@ export default function PurchaseOrderDetailPage() {
                     <dt className="text-[var(--ff-text-secondary)]">VAT ({purchaseOrder.taxRate}%)</dt>
                     <dd className="text-[var(--ff-text-primary)]">{formatCurrency(purchaseOrder.taxAmount)}</dd>
                   </div>
-                  <div className="flex justify-between pt-3 border-t border-[var(--ff-border-default)]">
+                  <div className="flex justify-between pt-3 border-t border-[var(--ff-border-light)]">
                     <dt className="font-semibold text-[var(--ff-text-primary)]">Total</dt>
                     <dd className="font-semibold text-[var(--ff-text-primary)] text-lg">{formatCurrency(purchaseOrder.totalAmount)}</dd>
                   </div>
@@ -611,10 +611,10 @@ export default function PurchaseOrderDetailPage() {
           )}
 
           {activeTab === 'items' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--ff-border-default)]">
+                  <tr className="border-b border-[var(--ff-border-light)]">
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">#</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Description</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Code</th>
@@ -627,7 +627,7 @@ export default function PurchaseOrderDetailPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--ff-border-default)]">
+                <tbody className="divide-y divide-[var(--ff-border-light)]">
                   {purchaseOrder.items.map((item) => {
                     const receiptStatus = getItemReceiptStatus(item);
                     return (
@@ -655,7 +655,7 @@ export default function PurchaseOrderDetailPage() {
           )}
 
           {activeTab === 'receipts' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               {purchaseOrder.receipts.length === 0 ? (
                 <div className="text-center py-12">
                   <Truck className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
@@ -664,14 +664,14 @@ export default function PurchaseOrderDetailPage() {
               ) : (
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-[var(--ff-border-default)]">
+                    <tr className="border-b border-[var(--ff-border-light)]">
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">GRN Number</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Received Date</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Received By</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Items</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--ff-border-default)]">
+                  <tbody className="divide-y divide-[var(--ff-border-light)]">
                     {purchaseOrder.receipts.map((receipt) => (
                       <tr
                         key={receipt.id}
@@ -691,14 +691,14 @@ export default function PurchaseOrderDetailPage() {
           )}
 
           {activeTab === 'history' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
               <div className="space-y-6">
                 {purchaseOrder.history.map((event, index) => (
                   <div key={event.id} className="flex gap-4">
                     <div className="flex flex-col items-center">
                       <div className="w-3 h-3 rounded-full bg-blue-500" />
                       {index < purchaseOrder.history.length - 1 && (
-                        <div className="w-0.5 h-full bg-[var(--ff-border-default)] mt-2" />
+                        <div className="w-0.5 h-full bg-[var(--ff-border-light)] mt-2" />
                       )}
                     </div>
                     <div className="flex-1 pb-6">

@@ -354,7 +354,7 @@ export default function RequisitionDetailPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -419,7 +419,7 @@ export default function RequisitionDetailPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="requisitions" />
           </div>
         </div>
@@ -464,7 +464,7 @@ export default function RequisitionDetailPage() {
               {activeTab === 'details' && (
                 <div className="grid grid-cols-2 gap-6">
                   {/* Project Info */}
-                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-4">
                       <FolderOpen className="h-5 w-5 text-purple-400" />
                       <h3 className="font-medium text-[var(--ff-text-primary)]">Project</h3>
@@ -482,7 +482,7 @@ export default function RequisitionDetailPage() {
                   </div>
 
                   {/* Request Info */}
-                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-4">
                       <Building className="h-5 w-5 text-purple-400" />
                       <h3 className="font-medium text-[var(--ff-text-primary)]">Request Details</h3>
@@ -506,7 +506,7 @@ export default function RequisitionDetailPage() {
                   </div>
 
                   {/* Requester Info */}
-                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-4">
                       <User className="h-5 w-5 text-purple-400" />
                       <h3 className="font-medium text-[var(--ff-text-primary)]">Requested By</h3>
@@ -516,7 +516,7 @@ export default function RequisitionDetailPage() {
                   </div>
 
                   {/* Summary */}
-                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                  <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-4">
                       <Calendar className="h-5 w-5 text-purple-400" />
                       <h3 className="font-medium text-[var(--ff-text-primary)]">Summary</h3>
@@ -537,7 +537,7 @@ export default function RequisitionDetailPage() {
 
                   {/* Notes */}
                   {requisition.notes && (
-                    <div className="col-span-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                    <div className="col-span-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                       <h3 className="font-medium text-[var(--ff-text-primary)] mb-2">Notes</h3>
                       <p className="text-[var(--ff-text-secondary)]">{requisition.notes}</p>
                     </div>
@@ -545,7 +545,7 @@ export default function RequisitionDetailPage() {
 
                   {/* Approval Info */}
                   {requisition.approvedByName && (
-                    <div className="col-span-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-4">
+                    <div className="col-span-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-4">
                         {requisition.status === 'approved' ? (
                           <CheckCircle className="h-5 w-5 text-green-400" />
@@ -567,10 +567,10 @@ export default function RequisitionDetailPage() {
               )}
 
               {activeTab === 'items' && (
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg overflow-hidden">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-[var(--ff-border-default)]">
+                      <tr className="border-b border-[var(--ff-border-light)]">
                         <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider w-12">
                           #
                         </th>
@@ -594,7 +594,7 @@ export default function RequisitionDetailPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[var(--ff-border-default)]">
+                    <tbody className="divide-y divide-[var(--ff-border-light)]">
                       {requisition.items.map((item, index) => (
                         <tr key={item.id} className="hover:bg-[var(--ff-bg-hover)]">
                           <td className="px-4 py-3 text-[var(--ff-text-tertiary)]">
@@ -625,7 +625,7 @@ export default function RequisitionDetailPage() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t-2 border-[var(--ff-border-default)] bg-[var(--ff-bg-tertiary)]">
+                      <tr className="border-t-2 border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
                         <td colSpan={5} className="px-4 py-3 text-right font-medium text-[var(--ff-text-primary)]">
                           Total ({requisition.itemCount} items)
                         </td>
@@ -640,7 +640,7 @@ export default function RequisitionDetailPage() {
               )}
 
               {activeTab === 'history' && (
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6">
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                   <div className="space-y-6">
                     {requisition.history
                       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -655,7 +655,7 @@ export default function RequisitionDetailPage() {
                                 <EventIcon className="h-4 w-4" />
                               </div>
                               {index < requisition.history.length - 1 && (
-                                <div className="absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-full bg-[var(--ff-border-default)]" />
+                                <div className="absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-full bg-[var(--ff-border-light)]" />
                               )}
                             </div>
                             <div className="flex-1 pb-6">
@@ -688,7 +688,7 @@ export default function RequisitionDetailPage() {
         {/* Convert to PO Modal */}
         {showConvertModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg p-6 max-w-lg w-full mx-4">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-lg w-full mx-4">
               <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
                 Convert to Purchase Order
               </h3>
@@ -710,7 +710,7 @@ export default function RequisitionDetailPage() {
                   <select
                     value={convertForm.supplierId}
                     onChange={(e) => setConvertForm({ ...convertForm, supplierId: e.target.value })}
-                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   >
                     <option value="">Select supplier...</option>
                     {suppliers.map((s) => (
@@ -730,7 +730,7 @@ export default function RequisitionDetailPage() {
                     onChange={(e) => setConvertForm({ ...convertForm, deliveryAddress: e.target.value })}
                     rows={3}
                     placeholder="Enter delivery address (minimum 10 characters)"
-                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                   />
                 </div>
 
@@ -743,7 +743,7 @@ export default function RequisitionDetailPage() {
                       type="date"
                       value={convertForm.expectedDeliveryDate}
                       onChange={(e) => setConvertForm({ ...convertForm, expectedDeliveryDate: e.target.value })}
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     />
                   </div>
                   <div>
@@ -753,7 +753,7 @@ export default function RequisitionDetailPage() {
                     <select
                       value={convertForm.paymentTerms}
                       onChange={(e) => setConvertForm({ ...convertForm, paymentTerms: e.target.value })}
-                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
                       <option value="COD">COD</option>
                       <option value="Net 7">Net 7</option>
@@ -775,7 +775,7 @@ export default function RequisitionDetailPage() {
                     onChange={(e) => setConvertForm({ ...convertForm, notes: e.target.value })}
                     rows={2}
                     placeholder="Any additional notes for the PO"
-                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                    className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                   />
                 </div>
               </div>

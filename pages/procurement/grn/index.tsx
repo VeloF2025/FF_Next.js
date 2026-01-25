@@ -98,7 +98,7 @@ export default function GRNListPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
-        <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -125,7 +125,7 @@ export default function GRNListPage() {
           </div>
 
           {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-default)]">
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
             <ProcurementTabs activeTab="grn" />
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function GRNListPage() {
         <div className="p-6">
           {/* Stats */}
           <div className="mb-6 grid grid-cols-5 gap-4">
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Total GRNs</span>
                 <span className="text-lg font-semibold text-[var(--ff-text-primary)]">
@@ -142,7 +142,7 @@ export default function GRNListPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Receiving</span>
                 <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/20 text-blue-400">
@@ -150,7 +150,7 @@ export default function GRNListPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Inspecting</span>
                 <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/20 text-yellow-400">
@@ -158,7 +158,7 @@ export default function GRNListPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Completed</span>
                 <span className="px-2 py-0.5 rounded-full text-xs bg-green-500/20 text-green-400">
@@ -166,7 +166,7 @@ export default function GRNListPage() {
                 </span>
               </div>
             </div>
-            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg">
+            <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Discrepancies</span>
                 <span className="px-2 py-0.5 rounded-full text-xs bg-red-500/20 text-red-400">
@@ -185,13 +185,13 @@ export default function GRNListPage() {
                 placeholder="Search GRNs, PO numbers, suppliers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as GRNStatus | 'all')}
-              className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+              className="px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
             >
               <option value="all">All Statuses</option>
               <option value="draft">Draft</option>
@@ -201,7 +201,7 @@ export default function GRNListPage() {
               <option value="partial">Partial</option>
               <option value="rejected">Rejected</option>
             </select>
-            <button className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-default)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
+            <button className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors">
               <Filter className="h-4 w-4" />
               More Filters
             </button>
@@ -238,10 +238,10 @@ export default function GRNListPage() {
               </button>
             </div>
           ) : (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-default)] rounded-lg overflow-hidden">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[var(--ff-border-default)]">
+                  <tr className="border-b border-[var(--ff-border-light)]">
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
                       GRN #
                     </th>
@@ -269,7 +269,7 @@ export default function GRNListPage() {
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[var(--ff-border-default)]">
+                <tbody className="divide-y divide-[var(--ff-border-light)]">
                   {filteredGRNs.map((grn) => {
                     const status = statusConfig[grn.status];
                     const StatusIcon = status.icon;

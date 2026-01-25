@@ -6,15 +6,20 @@
  * Uses the OneMap API service with 4-step authentication to:
  * 1. Search for the DR in 1Map
  * 2. Update ph_ont with the correct OLT serial
- * 3. Log the old value for rollback capability
- * 4. Update the DR timeline
+ * 3. If wrongSerial starts with "GU18", also update ph_ups (UPS serial swap detected)
+ * 4. Log old values for rollback capability
+ * 5. Update the DR timeline
  *
  * Request body:
  * - drNumber: string (required)
- * - correctSerial: string (required) - The OLT serial to set
- * - wrongSerial: string (optional) - Helps identify correct record if multiple
+ * - correctSerial: string (required) - The OLT serial to set for ph_ont
+ * - wrongSerial: string (optional) - Helps identify correct record; if starts with "GU18", also sets ph_ups
  * - bulk: boolean (optional) - If true, process multiple DRs
  * - items: Array<{drNumber, correctSerial, wrongSerial}> (for bulk)
+ *
+ * UPS Serial Detection:
+ * When wrongSerial starts with "GU18", it indicates the technician swapped ONT and UPS serials.
+ * In this case, both ph_ont (with correctSerial) and ph_ups (with wrongSerial) are updated.
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
@@ -52,6 +57,17 @@ interface FixResult {
   newValue: string;
   error?: string;
   alreadyCorrect?: boolean;
+  // UPS serial info (when wrongSerial starts with GU18)
+  upsSerial?: {
+    oldValue: string | null;
+    newValue: string | null;
+    updated: boolean;
+  };
+}
+
+// Helper to detect UPS serial pattern (starts with GU18)
+function isUpsSerial(serial: string | undefined | null): boolean {
+  return !!serial && serial.toUpperCase().startsWith('GU18');
 }
 
 async function fixSingleDR(
@@ -63,7 +79,6 @@ async function fixSingleDR(
 
   // Skip if serial is empty
   if (!correctSerial || !correctSerial.trim()) {
-    // Log to activity log
     await logActivity(
       drNumber,
       'error',
@@ -82,14 +97,39 @@ async function fixSingleDR(
   }
 
   try {
-    // Call OneMap API to fix the serial
-    const result = await oneMapApi.fixDrOntSerial(drNumber, correctSerial, wrongSerial);
+    // Detect if wrongSerial is a UPS serial (starts with GU18)
+    // This indicates the technician swapped ONT and UPS serials
+    const hasUpsSerial = isUpsSerial(wrongSerial);
+    const upsSerialToSet = hasUpsSerial ? wrongSerial : null;
+
+    // Use dual update if UPS serial detected, otherwise single update
+    if (hasUpsSerial) {
+      log.info('FixOneMap', 'UPS serial detected - will update both ph_ont and ph_ups', {
+        drNumber,
+        ontSerial: correctSerial,
+        upsSerial: wrongSerial,
+      });
+    }
+
+    const result = hasUpsSerial
+      ? await oneMapApi.fixDrOntAndUpsSerial(drNumber, correctSerial, upsSerialToSet, wrongSerial)
+      : await oneMapApi.fixDrOntSerial(drNumber, correctSerial, wrongSerial);
 
     if (result.success) {
-      // Check if already correct (no update was made)
       const alreadyCorrect = result.error === 'Already correct';
       const fixResult = alreadyCorrect ? 'already_correct' : 'success';
       const resolution = alreadyCorrect ? 'already_correct' : 'data_corrected';
+
+      // Build fix details for DB storage
+      const fixDetails: Record<string, unknown> = {
+        ont_old: 'ont' in result ? result.ont.oldValue : result.oldValue,
+        ont_new: correctSerial,
+      };
+      if (hasUpsSerial && 'ups' in result) {
+        fixDetails.ups_old = result.ups.oldValue;
+        fixDetails.ups_new = result.ups.newValue;
+        fixDetails.ups_updated = result.ups.updated;
+      }
 
       // Update offline_devices tracking (if exists)
       await client.query(
@@ -104,7 +144,7 @@ async function fixSingleDR(
              mismatch_resolved_at = NOW(),
              mismatch_resolved_by = $5
          WHERE drop_number = $6`,
-        [fixResult, result.oldValue, userId, resolution, userId, drNumber]
+        [fixResult, JSON.stringify(fixDetails), userId, resolution, userId, drNumber]
       );
 
       // Update olt_mismatch_records (always)
@@ -117,7 +157,7 @@ async function fixSingleDR(
              fix_by = $3
          WHERE drop_number = $4
            AND fix_status = 'pending'`,
-        [fixResult, result.oldValue, userId, drNumber]
+        [fixResult, JSON.stringify(fixDetails), userId, drNumber]
       );
 
       // Log to activity log with appropriate message
@@ -126,9 +166,10 @@ async function fixSingleDR(
           drNumber,
           'SERIAL_VERIFIED',
           {
-            details: `1Map already has correct ONT serial: ${correctSerial} - no update needed`,
-            propId: result.propId,
-            currentValue: correctSerial,
+            details: `1Map already has correct serials - no update needed`,
+            propId: 'propId' in result ? result.propId : null,
+            ont: correctSerial,
+            ups: upsSerialToSet,
             source: 'olt_report',
             fix_type: 'already_correct',
           },
@@ -137,46 +178,57 @@ async function fixSingleDR(
 
         log.info('FixOneMap', 'DR already correct - skipped update', {
           drNumber,
-          propId: result.propId,
+          propId: 'propId' in result ? result.propId : null,
           currentSerial: correctSerial,
         });
       } else {
+        const ontOldValue = 'ont' in result ? result.ont.oldValue : result.oldValue;
+        let details = `1Map ONT serial updated: ${ontOldValue || 'EMPTY'} → ${correctSerial}`;
+        if (hasUpsSerial && 'ups' in result && result.ups.updated) {
+          details += ` | UPS serial updated: ${result.ups.oldValue || 'EMPTY'} → ${result.ups.newValue}`;
+        }
+
         await logActivity(
           drNumber,
           'SERIAL_UPDATE',
           {
-            details: `1Map ONT serial updated: ${result.oldValue || 'EMPTY'} → ${correctSerial}`,
-            propId: result.propId,
-            oldValue: result.oldValue,
-            newValue: correctSerial,
+            details,
+            propId: 'propId' in result ? result.propId : null,
+            ont: { oldValue: ontOldValue, newValue: correctSerial },
+            ups: hasUpsSerial && 'ups' in result
+              ? { oldValue: result.ups.oldValue, newValue: result.ups.newValue, updated: result.ups.updated }
+              : null,
             source: 'olt_report',
-            fix_type: 'onemap_fix_success',
+            fix_type: hasUpsSerial ? 'onemap_fix_ont_and_ups' : 'onemap_fix_success',
           },
           userId || 'system'
         );
 
         log.info('FixOneMap', 'Successfully fixed DR', {
           drNumber,
-          propId: result.propId,
-          oldValue: result.oldValue,
-          newValue: correctSerial,
+          propId: 'propId' in result ? result.propId : null,
+          ontOldValue,
+          ontNewValue: correctSerial,
+          upsUpdated: hasUpsSerial && 'ups' in result ? result.ups.updated : false,
         });
       }
 
       return {
         drNumber,
         success: true,
-        propId: result.propId,
-        oldValue: result.oldValue,
+        propId: 'propId' in result ? result.propId : null,
+        oldValue: 'ont' in result ? result.ont.oldValue : result.oldValue,
         newValue: correctSerial,
         alreadyCorrect,
+        upsSerial: hasUpsSerial && 'ups' in result
+          ? { oldValue: result.ups.oldValue, newValue: result.ups.newValue, updated: result.ups.updated }
+          : undefined,
       };
     } else {
       // Check if DR was not found in 1Map - move to investigate
       const notFoundError = result.error?.toLowerCase().includes('not found');
 
       if (notFoundError) {
-        // Move to not_found - DR doesn't exist in 1Map
         await client.query(
           `UPDATE olt_mismatch_records
            SET fix_status = 'not_found',
@@ -230,7 +282,6 @@ async function fixSingleDR(
         [result.error || 'Unknown error', drNumber]
       );
 
-      // Log to activity log
       await logActivity(
         drNumber,
         'error',
@@ -245,8 +296,8 @@ async function fixSingleDR(
       return {
         drNumber,
         success: false,
-        propId: result.propId || null,
-        oldValue: result.oldValue,
+        propId: 'propId' in result ? result.propId : null,
+        oldValue: 'ont' in result ? result.ont.oldValue : result.oldValue,
         newValue: correctSerial,
         error: result.error,
       };
