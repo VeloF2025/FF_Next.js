@@ -24,8 +24,12 @@ None
 - `boqs` - Bill of Quantities
 - `rfqs` - Request for Quotes
 - `quotes` - Supplier responses
-- `purchase_orders` - Purchase orders
-- `stock_positions` - Stock tracking
+- `purchase_orders` - Purchase orders (215)
+- `goods_receipt_notes` - GRNs (276)
+- `goods_receipt_items` - GRN line items
+- `stock_items` - Inventory from Odoo (260 items)
+- `stock_movements` - Unified movements (source_type: 'odoo'/'fibreflow')
+- `stock_movement_items` - Movement line items (604)
 
 ### Key Queries
 - Filter RFQ by projectId, status, supplierId
@@ -110,3 +114,27 @@ useProcurementPermissions(projectId)
 - **Drum Tracking**: Stock tracking includes drum-specific movements
 - **Compliance Layer**: Compliance reporting layer required
 - **Separate KPI**: KPI dashboard separate from standard reporting
+- **Stock Tables**: Use `stock_items` NOT `stock_positions` (positions is empty)
+- **Movement Source**: `source_type='odoo'` for synced, `source_type='fibreflow'` for native
+- **GRN Trigger Disabled**: `tr_grn_stock_update` disabled - API handles stock updates
+- **Odoo Independence**: FibreFlow designed to work without Odoo sync long-term
+
+## Stock Movements Architecture (2026-01-25)
+```
+Odoo (stock.picking) ──sync──► stock_movements (source_type='odoo')
+                                      │
+FibreFlow GRN Confirm ─────────► stock_movements (source_type='fibreflow')
+                                      │
+                                      ▼
+                              stock_movement_items
+                                      │
+                                      ▼
+                              stock_items.qty_available
+```
+
+## Key APIs
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/procurement/grn-confirm` | Confirm GRN, create movement, update stock |
+| `GET/POST /api/odoo/sync/stock-movements` | Sync Odoo pickings to FibreFlow |
+| `GET /api/procurement/stock` | Stock items + recent movements |
