@@ -399,7 +399,11 @@ export default function FleetVehiclesPage() {
                   </tr>
                 ) : (
                   filteredVehicles.map((vehicle) => {
-                    const status = statusConfig[vehicle.status];
+                    const status = statusConfig[vehicle.status as keyof typeof statusConfig] || {
+                      label: vehicle.status || 'Unknown',
+                      color: 'bg-gray-100 text-gray-800',
+                      icon: Car,
+                    };
                     const StatusIcon = status.icon;
                     return (
                       <tr
