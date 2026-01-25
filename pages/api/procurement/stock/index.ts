@@ -39,64 +39,81 @@ export default withAuth(withErrorHandler(async (
 
   if (req.method === 'GET') {
     try {
-      // Query real data from database
+      // Query stock_items table (Odoo synced data)
       let stockData;
       let movements = [];
-      
-      if (projectId && projectId !== 'all') {
-        // Get stock positions for specific project
-        stockData = await sql`
-          SELECT * FROM stock_positions 
-          WHERE project_id = ${projectId}
-          ORDER BY updated_at DESC
-        `;
-        
-        // Get recent movements
-        movements = await sql`
-          SELECT * FROM stock_movements 
-          WHERE project_id = ${projectId}
-          ORDER BY movement_date DESC
-          LIMIT 10
-        `;
-      } else {
-        // Get all stock positions with aggregations
-        stockData = await sql`
-          SELECT * FROM stock_positions 
-          WHERE is_active = true
-          ORDER BY updated_at DESC
-          LIMIT 200
-        `;
-          
-        // Get recent movements across all projects
+
+      // Get all stock items from Odoo sync
+      stockData = await sql`
+        SELECT
+          id,
+          item_code,
+          name,
+          description,
+          category,
+          qty_available,
+          qty_reserved,
+          qty_on_order,
+          standard_cost,
+          uom,
+          min_stock_level,
+          max_stock_level,
+          odoo_product_id,
+          odoo_synced_at,
+          created_at,
+          updated_at
+        FROM stock_items
+        ORDER BY name ASC
+        LIMIT 500
+      `;
+
+      // Get recent movements across all projects (if table exists)
+      try {
         movements = await sql`
           SELECT * FROM stock_movements
           ORDER BY movement_date DESC
           LIMIT 20
         `;
+      } catch {
+        // stock_movements table might not exist yet
+        movements = [];
       }
-      
+
+      // Helper function to determine stock status
+      const getStockStatus = (qty: number, minLevel: number): 'in_stock' | 'low_stock' | 'out_of_stock' => {
+        if (qty === 0) return 'out_of_stock';
+        if (minLevel > 0 && qty <= minLevel) return 'low_stock';
+        return 'in_stock';
+      };
+
       // Transform data to match expected format
-      const transformedItems: StockItemResponse[] = stockData.map(stock => ({
-        id: stock.id,
-        itemCode: stock.item_code,
-        name: stock.item_name,
-        description: stock.description || '',
-        category: stock.category || 'General',
-        projectId: stock.project_id,
-        warehouse: stock.warehouse_location || 'Main Warehouse',
-        location: stock.bin_location || '',
-        quantity: Number(stock.available_quantity || 0),
-        unit: stock.uom,
-        minQuantity: Number(stock.reorder_level || 0),
-        maxQuantity: Number(stock.max_stock_level || 0),
-        unitCost: Number(stock.average_unit_cost || 0),
-        totalValue: Number(stock.total_value || 0),
-        supplier: '', // Will need to join with suppliers table if available
-        lastRestocked: stock.last_movement_date || new Date().toISOString(),
-        status: stock.stock_status as 'in_stock' | 'low_stock' | 'out_of_stock' || 'in_stock',
-        createdAt: stock.created_at || new Date().toISOString(),
-        updatedAt: stock.updated_at || new Date().toISOString(),
-      }));
+      const transformedItems: StockItemResponse[] = stockData.map(stock => {
+        const quantity = Number(stock.qty_available || 0);
+        const minQuantity = Number(stock.min_stock_level || 0);
+        const unitCost = Number(stock.standard_cost || 0);
+
+        return {
+          id: stock.id,
+          itemCode: stock.item_code || '',
+          name: stock.name || 'Unnamed Item',
+          description: stock.description || '',
+          category: stock.category || 'General',
+          projectId: '', // Not project-specific in Odoo
+          warehouse: 'Odoo Warehouse',
+          location: '',
+          quantity,
+          unit: stock.uom || 'EA',
+          minQuantity,
+          maxQuantity: Number(stock.max_stock_level || 0),
+          unitCost,
+          totalValue: quantity * unitCost,
+          supplier: '', // Would need supplier join
+          lastRestocked: stock.odoo_synced_at || stock.updated_at || new Date().toISOString(),
+          status: getStockStatus(quantity, minQuantity),
+          createdAt: stock.created_at || new Date().toISOString(),
+          updatedAt: stock.updated_at || new Date().toISOString(),
+        };
+      });
       
       // Calculate stock statistics
       const lowStockItems = transformedItems.filter(item =>
