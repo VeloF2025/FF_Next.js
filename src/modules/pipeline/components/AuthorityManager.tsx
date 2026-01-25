@@ -177,9 +177,8 @@ export function AuthorityManager({ currentUserId }: AuthorityManagerProps) {
         : '/api/pipeline/authorities';
       const method = editingAuthority ? 'PUT' : 'POST';
 
-      const body = editingAuthority
-        ? { ...formData, updated_by: currentUserId }
-        : { ...formData, created_by: currentUserId };
+      // Note: created_by/updated_by not sent - FK references staff table, not users
+      const body = formData;
 
       const res = await fetch(url, {
         method,
