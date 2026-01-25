@@ -26,9 +26,13 @@ import {
   History,
   XCircle,
   Search,
+  BarChart3,
+  Download,
+  Calendar,
 } from 'lucide-react';
 
-type TabId = 'import' | 'pending' | 'needs_investigation' | 'history';
+type TabId = 'import' | 'pending' | 'needs_investigation' | 'history' | 'reporting';
+type ReportPeriod = 'today' | 'yesterday' | 'week' | '30days' | 'all';
 
 interface OltRecord {
   id: string;
@@ -137,6 +141,17 @@ export default function OltReportPage() {
 
   // Projects state
   const [projects, setProjects] = useState<Array<{ id: string; project_name: string; project_code: string }>>([]);
+
+  // Reporting state
+  const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('all');
+  const [reportData, setReportData] = useState<{
+    summary: { total: number; fixed: number; pending: number; empty_serial: number; not_found: number; needs_reinvestigation: number };
+    records: OltRecord[];
+    fixesByDay: Array<{ date: string; count: number }>;
+    imports: Array<{ id: string; filename: string; project: string; mismatch_count: number; fixed_count: number; pending_count: number; imported_at: string }>;
+  } | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Fetch active projects on mount
   useEffect(() => {
@@ -400,6 +415,56 @@ export default function OltReportPage() {
     setImportDetail(null);
   };
 
+  // Fetch reporting data
+  const fetchReportData = useCallback(async (period: ReportPeriod) => {
+    setReportLoading(true);
+    try {
+      const res = await fetch(`/api/system/olt-report/reporting?period=${period}`);
+      const data = await res.json();
+      if (data.success) {
+        setReportData(data.data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch report');
+    } finally {
+      setReportLoading(false);
+    }
+  }, []);
+
+  // Handle period change
+  const handlePeriodChange = (period: ReportPeriod) => {
+    setReportPeriod(period);
+    fetchReportData(period);
+  };
+
+  // Export to CSV
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/system/olt-report/reporting?period=${reportPeriod}&format=csv`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `olt-report-${reportPeriod}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Export failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Fetch report data when switching to reporting tab
+  useEffect(() => {
+    if (activeTab === 'reporting' && !reportData) {
+      fetchReportData(reportPeriod);
+    }
+  }, [activeTab, reportData, reportPeriod, fetchReportData]);
+
   // Render tabs
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'import', label: 'Import', icon: <Upload className="h-4 w-4" /> },
@@ -417,6 +482,11 @@ export default function OltReportPage() {
       id: 'history',
       label: 'History',
       icon: <History className="h-4 w-4" />,
+    },
+    {
+      id: 'reporting',
+      label: 'Reporting',
+      icon: <BarChart3 className="h-4 w-4" />,
     },
   ];
 
@@ -971,6 +1041,226 @@ export default function OltReportPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Reporting Tab */}
+        {activeTab === 'reporting' && (
+          <div className="space-y-6">
+            {/* Period Filter & Export */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Period:</span>
+                <div className="flex gap-1">
+                  {(['today', 'yesterday', 'week', '30days', 'all'] as ReportPeriod[]).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => handlePeriodChange(p)}
+                      className={`px-3 py-1.5 text-sm rounded ${
+                        reportPeriod === p
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {p === 'today' ? 'Today' :
+                       p === 'yesterday' ? 'Yesterday' :
+                       p === 'week' ? 'This Week' :
+                       p === '30days' ? '30 Days' : 'All Time'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={handleExport}
+                disabled={exporting || !reportData}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {exporting ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                Export CSV
+              </button>
+            </div>
+
+            {reportLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="h-6 w-6 animate-spin text-orange-500" />
+                <span className="ml-2 text-gray-600 dark:text-gray-400">Loading report...</span>
+              </div>
+            ) : reportData ? (
+              <>
+                {/* Summary Stats */}
+                <div className="grid grid-cols-6 gap-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{reportData.summary.total}</div>
+                    <div className="text-sm text-gray-500">Total Records</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{reportData.summary.fixed}</div>
+                    <div className="text-sm text-green-600 dark:text-green-400">Fixed</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">{reportData.summary.pending}</div>
+                    <div className="text-sm text-red-600 dark:text-red-400">Pending</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
+                    <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{reportData.summary.empty_serial}</div>
+                    <div className="text-sm text-yellow-600 dark:text-yellow-400">Empty Serial</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{reportData.summary.not_found}</div>
+                    <div className="text-sm text-blue-600 dark:text-blue-400">Not Found</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{reportData.summary.needs_reinvestigation}</div>
+                    <div className="text-sm text-purple-600 dark:text-purple-400">Reinvestigate</div>
+                  </div>
+                </div>
+
+                {/* Fixes by Day Chart */}
+                {reportData.fixesByDay.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">Fixes by Day</h3>
+                    <div className="flex items-end gap-1 h-32">
+                      {reportData.fixesByDay.slice(0, 14).reverse().map((day, idx) => {
+                        const maxCount = Math.max(...reportData.fixesByDay.map(d => Number(d.count)));
+                        const height = maxCount > 0 ? (Number(day.count) / maxCount) * 100 : 0;
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center">
+                            <div
+                              className="w-full bg-green-500 rounded-t"
+                              style={{ height: `${height}%`, minHeight: day.count ? '4px' : '0' }}
+                              title={`${day.date}: ${day.count} fixes`}
+                            />
+                            <span className="text-xs text-gray-500 mt-1 truncate w-full text-center">
+                              {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Import Summary */}
+                {reportData.imports.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Imports Summary</h3>
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mismatches</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fixed</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pending</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Imported</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {reportData.imports.map((imp) => {
+                          const progress = imp.mismatch_count > 0
+                            ? Math.round((Number(imp.fixed_count) / imp.mismatch_count) * 100)
+                            : 0;
+                          return (
+                            <tr key={imp.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="px-4 py-2 text-blue-600 dark:text-blue-400">{imp.filename}</td>
+                              <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{imp.project || '-'}</td>
+                              <td className="px-4 py-2">{imp.mismatch_count}</td>
+                              <td className="px-4 py-2 text-green-600 dark:text-green-400">{imp.fixed_count}</td>
+                              <td className="px-4 py-2 text-red-600 dark:text-red-400">{imp.pending_count}</td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div
+                                      className="bg-green-500 h-2 rounded-full"
+                                      style={{ width: `${progress}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-gray-500">{progress}%</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-gray-500 text-xs">
+                                {new Date(imp.imported_at).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Detailed Records Table */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                      All Records ({reportData.records.length})
+                    </h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-96">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">DR</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ONT (Correct)</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">1Map (Wrong)</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Old Value</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fixed At</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Import</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {reportData.records.slice(0, 100).map((rec) => (
+                          <tr key={rec.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td className="px-3 py-2 font-mono text-blue-600 dark:text-blue-400">
+                              <a href={`/activate/${rec.drop_number}`} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {rec.drop_number}
+                              </a>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-green-600 dark:text-green-400">{rec.olt_serial || '-'}</td>
+                            <td className="px-3 py-2 font-mono text-red-600 dark:text-red-400">{rec.wrong_onemap_serial || '-'}</td>
+                            <td className="px-3 py-2">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+                                rec.fix_status === 'fixed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                rec.fix_status === 'pending' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                rec.fix_status === 'empty_serial' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                              }`}>
+                                {rec.fix_status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-gray-500">{rec.fix_old_value || '-'}</td>
+                            <td className="px-3 py-2 text-gray-500 text-xs">
+                              {rec.fix_attempted_at ? new Date(rec.fix_attempted_at).toLocaleString() : '-'}
+                            </td>
+                            <td className="px-3 py-2 text-gray-500 text-xs truncate max-w-32" title={rec.import_filename || ''}>
+                              {rec.import_filename || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {reportData.records.length > 100 && (
+                      <div className="px-4 py-2 text-sm text-gray-500 bg-gray-50 dark:bg-gray-700">
+                        Showing 100 of {reportData.records.length} records. Export to CSV to see all.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                No report data available
+              </div>
+            )}
           </div>
         )}
       </div>
