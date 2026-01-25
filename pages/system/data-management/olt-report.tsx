@@ -1061,7 +1061,7 @@ export default function OltReportPage() {
                             {activeTab === 'needs_investigation' && (
                               <div className="flex items-center gap-1">
                                 <a
-                                  href={`https://www.1map.co.za/apps/app?layer=5121&search=${record.drop_number}`}
+                                  href={`https://www.1map.co.za/apps/app?workspace=${encodeURIComponent('Home Signup & Home Installation')}&search=${record.drop_number}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -1094,7 +1094,7 @@ export default function OltReportPage() {
                             {activeTab === 'escalations' && (
                               <div className="flex items-center gap-1">
                                 <a
-                                  href={`https://www.1map.co.za/apps/app?layer=5121&search=${record.drop_number}`}
+                                  href={`https://www.1map.co.za/apps/app?workspace=${encodeURIComponent('Home Signup & Home Installation')}&search=${record.drop_number}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
