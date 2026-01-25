@@ -259,7 +259,7 @@ export default function ProcurementPage({
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
               {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
               {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
-              {activeTab === 'stock' && <PlaceholderTab title="Stock Movement" icon={Package} description="Track inventory movements" />}
+              {activeTab === 'stock' && <StockTabContent />}
               {activeTab === 'field-stock' && <FieldStockTabContent />}
               {activeTab === 'suppliers' && <SuppliersTabContent />}
               {activeTab === 'reports' && <PlaceholderTab title="Procurement Reports" icon={ClipboardList} description="Generate and view reports" />}
@@ -354,6 +354,28 @@ function FieldStockTabContent() {
       </div>
       <p className="text-[var(--ff-text-secondary)]">
         Track and manage inventory in the field. Click &quot;Open Field Stock&quot; to access the full control panel.
+      </p>
+    </div>
+  );
+}
+
+function StockTabContent() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Package className="h-6 w-6 text-purple-500" />
+          <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">Stock Management</h3>
+        </div>
+        <Link
+          href="/procurement/inventory?tab=items"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          View Inventory <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <p className="text-[var(--ff-text-secondary)]">
+        View stock items, categories, bundles, and stock takes. Click &quot;View Inventory&quot; to access the full Inventory Management page.
       </p>
     </div>
   );

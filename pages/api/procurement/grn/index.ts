@@ -28,7 +28,7 @@ export default withAuth(withErrorHandler(async (
         SELECT
           grn.*,
           po.po_number as purchase_order_number,
-          s.company_name as supplier_name,
+          COALESCE(s.company_name, s.name) as supplier_name,
           sl.name as warehouse_name
         FROM goods_receipt_notes grn
         LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id

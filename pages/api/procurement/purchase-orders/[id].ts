@@ -42,7 +42,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.po_number,
         po.status,
         po.supplier_id,
-        s.company_name as supplier_name,
+        COALESCE(s.company_name, s.name) as supplier_name,
         s.contact_email as supplier_email,
         s.contact_phone as supplier_phone,
         po.project_id,
