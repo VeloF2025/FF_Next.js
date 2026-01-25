@@ -39,6 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
  * - limit: number - Items per page (default 20)
  */
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
+  try {
   const {
     search,
     approval_type_id,
@@ -124,6 +125,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     limit: limitNum,
     totalPages: Math.ceil(total / limitNum),
   });
+  } catch (err) {
+    console.error('[authorities/index] handleGet error:', err);
+    throw err;
+  }
 }
 
 /**
