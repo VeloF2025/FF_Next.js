@@ -94,6 +94,9 @@ export default function OltReportPage() {
       mismatchCount: number;
       emptySerialCount: number;
       updatedCount: number;
+      alreadyFixedCount?: number;
+      alreadyPendingCount?: number;
+      needsReinvestigationCount?: number;
     };
   } | null>(null);
 
@@ -599,8 +602,23 @@ export default function OltReportPage() {
                     <li>Total Records: {uploadResult.stats.totalRecords}</li>
                     <li>Matches: {uploadResult.stats.matchCount}</li>
                     <li>Mismatches: {uploadResult.stats.mismatchCount}</li>
+                    {uploadResult.stats.alreadyFixedCount !== undefined && uploadResult.stats.alreadyFixedCount > 0 && (
+                      <li className="text-blue-600 dark:text-blue-400">
+                        ✓ Already Fixed (skipped): {uploadResult.stats.alreadyFixedCount}
+                      </li>
+                    )}
+                    {uploadResult.stats.alreadyPendingCount !== undefined && uploadResult.stats.alreadyPendingCount > 0 && (
+                      <li className="text-yellow-600 dark:text-yellow-400">
+                        ↺ Already Pending (updated): {uploadResult.stats.alreadyPendingCount}
+                      </li>
+                    )}
+                    {uploadResult.stats.needsReinvestigationCount !== undefined && uploadResult.stats.needsReinvestigationCount > 0 && (
+                      <li className="text-orange-600 dark:text-orange-400">
+                        ⚠ Needs Re-investigation: {uploadResult.stats.needsReinvestigationCount}
+                      </li>
+                    )}
                     <li>Empty ONT (skipped): {uploadResult.stats.emptySerialCount}</li>
-                    <li>Updated: {uploadResult.stats.updatedCount}</li>
+                    <li>New Records: {uploadResult.stats.updatedCount}</li>
                   </ul>
                 </div>
               )}

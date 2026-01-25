@@ -51,12 +51,15 @@ interface ImportResult {
     emptySerialCount: number;
     notFoundCount: number;
     updatedCount: number;
+    alreadyFixedCount: number;
+    alreadyPendingCount: number;
+    needsReinvestigationCount: number;
   };
   mismatches: Array<{
     drNumber: string;
     oltSerial: string | null;
     wrongSerial: string | null;
-    status: 'updated' | 'empty_serial' | 'not_found';
+    status: 'updated' | 'empty_serial' | 'not_found' | 'already_fixed' | 'already_pending' | 'needs_reinvestigation';
   }>;
 }
 
@@ -154,33 +157,112 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
     const importId = importResult.rows[0].id;
 
-    // Process mismatches - insert ALL into olt_mismatch_records
+    // Process mismatches - check for duplicates before inserting
     const results: ImportResult['mismatches'] = [];
     let emptySerialCount = 0;
     let notFoundCount = 0;
     let updatedCount = 0;
+    let alreadyFixedCount = 0;
+    let alreadyPendingCount = 0;
+    let needsReinvestigationCount = 0;
 
     for (const mismatch of mismatches) {
-      // Determine initial status
+      // Check if this DR already exists in olt_mismatch_records
+      const existingRecord = await client.query(
+        `SELECT id, fix_status, olt_serial, fix_old_value
+         FROM olt_mismatch_records
+         WHERE drop_number = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [mismatch.drNumber]
+      );
+
+      if (existingRecord.rows.length > 0) {
+        const existing = existingRecord.rows[0];
+
+        if (existing.fix_status === 'fixed') {
+          // DR was already fixed - check if the serial matches
+          const existingOltSerial = existing.olt_serial?.toUpperCase();
+          const newOltSerial = mismatch.oltSerial?.toUpperCase();
+
+          if (existingOltSerial === newOltSerial) {
+            // Same serial, already fixed - skip
+            alreadyFixedCount++;
+            results.push({
+              drNumber: mismatch.drNumber,
+              oltSerial: mismatch.oltSerial,
+              wrongSerial: mismatch.wrongOneMapSerial,
+              status: 'already_fixed',
+            });
+            continue;
+          } else {
+            // Different serial after fix - needs reinvestigation
+            // Insert new record with needs_reinvestigation status
+            await client.query(
+              `INSERT INTO olt_mismatch_records
+                (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status)
+               VALUES ($1, $2, $3, $4, $5, 'needs_reinvestigation')`,
+              [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex]
+            );
+
+            await logActivity(
+              mismatch.drNumber,
+              'INVESTIGATE',
+              {
+                message: `New OLT serial mismatch after previous fix. Previous: ${existingOltSerial}, New: ${newOltSerial}`,
+                source: 'olt_report_import',
+                previousSerial: existingOltSerial,
+                newSerial: newOltSerial,
+              },
+              user?.id || 'system'
+            );
+
+            needsReinvestigationCount++;
+            results.push({
+              drNumber: mismatch.drNumber,
+              oltSerial: mismatch.oltSerial,
+              wrongSerial: mismatch.wrongOneMapSerial,
+              status: 'needs_reinvestigation',
+            });
+            continue;
+          }
+        } else if (existing.fix_status === 'pending' || existing.fix_status === 'empty_serial') {
+          // Already pending - update with latest import info instead of duplicating
+          await client.query(
+            `UPDATE olt_mismatch_records
+             SET import_id = $1,
+                 olt_serial = $2,
+                 wrong_onemap_serial = $3,
+                 row_index = $4,
+                 fix_status = CASE WHEN $2 IS NULL OR $2 = '' THEN 'empty_serial' ELSE 'pending' END
+             WHERE id = $5`,
+            [importId, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, existing.id]
+          );
+
+          alreadyPendingCount++;
+          results.push({
+            drNumber: mismatch.drNumber,
+            oltSerial: mismatch.oltSerial,
+            wrongSerial: mismatch.wrongOneMapSerial,
+            status: 'already_pending',
+          });
+          continue;
+        }
+        // For other statuses (not_found, needs_reinvestigation), allow new insert
+      }
+
+      // New DR - insert into olt_mismatch_records
       let fixStatus = 'pending';
       if (!mismatch.oltSerial) {
         fixStatus = 'empty_serial';
         emptySerialCount++;
       }
 
-      // Insert into olt_mismatch_records (tracks ALL mismatches)
       await client.query(
         `INSERT INTO olt_mismatch_records
           (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [
-          importId,
-          mismatch.drNumber,
-          mismatch.oltSerial,
-          mismatch.wrongOneMapSerial,
-          mismatch.rowIndex,
-          fixStatus,
-        ]
+        [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, fixStatus]
       );
 
       // Handle empty OLT serial - log but don't try to update offline_devices
@@ -258,6 +340,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         emptySerialCount,
         notFoundCount,
         updatedCount,
+        alreadyFixedCount,
+        alreadyPendingCount,
+        needsReinvestigationCount,
       },
       mismatches: results,
     };

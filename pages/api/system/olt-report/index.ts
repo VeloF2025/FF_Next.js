@@ -88,9 +88,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Records needing manual investigation:
       // 1. No correct serial to upload (empty olt_serial)
       // 2. DR not found in 1Map (fix_status = 'not_found')
+      // 3. Serial changed after fix (fix_status = 'needs_reinvestigation')
       conditions.push(`(
         (m.fix_status = 'pending' AND (m.olt_serial IS NULL OR m.olt_serial = ''))
         OR m.fix_status = 'not_found'
+        OR m.fix_status = 'needs_reinvestigation'
       )`)
     } else if (view === 'fixed') {
       conditions.push(`m.fix_status = 'fixed'`);
@@ -146,13 +148,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get summary stats from olt_mismatch_records
     // Fixable = has correct ONT serial (olt_serial from column B) and still pending
-    // Investigate = no correct serial OR not found in 1Map (fix_status = 'not_found')
+    // Investigate = no correct serial OR not found in 1Map OR needs reinvestigation
     const statsResult = await client.query(`
       SELECT
         COUNT(*) FILTER (WHERE fix_status = 'pending' AND olt_serial IS NOT NULL AND olt_serial != '') as pending,
         COUNT(*) FILTER (WHERE
           (fix_status = 'pending' AND (olt_serial IS NULL OR olt_serial = ''))
           OR fix_status = 'not_found'
+          OR fix_status = 'needs_reinvestigation'
         ) as needs_investigation,
         COUNT(*) FILTER (WHERE fix_status = 'fixed') as fixed,
         COUNT(*) FILTER (WHERE fix_status = 'empty_serial') as empty,
