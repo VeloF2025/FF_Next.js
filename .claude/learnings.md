@@ -88,3 +88,57 @@ const filtered = staff.filter(item => {
 - [ ] Any DataGrid/table with search functionality
 
 **Affected Areas:** All list pages with search/filter functionality.
+
+---
+
+## 2026-01-25: Database Connection Pattern - Use Inline pg Pool
+
+**Issue:** Using `import db from '@/lib/db'` and `db.connect()` causes runtime errors in production builds:
+```
+TypeError: s.default.connect is not a function
+```
+
+**Root Cause:** The `lib/db.ts` default export doesn't work correctly when compiled. The minified code (`s.default.connect`) fails to resolve the Pool's connect method.
+
+**Bad Pattern:**
+```typescript
+// ❌ Causes runtime errors in production
+import db from '@/lib/db';
+
+async function handler(req, res) {
+  const client = await db.connect();  // TypeError: s.default.connect is not a function
+  // ...
+}
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Works reliably in production
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
+
+async function handler(req, res) {
+  const client = await pool.connect();
+  try {
+    // ... use client
+  } finally {
+    client.release();
+  }
+}
+```
+
+**Key Points:**
+1. **Use inline Pool from 'pg'** - not the lib/db module
+2. **Always use SSL** - `ssl: { rejectUnauthorized: false }` for Neon
+3. **Always release client** - in finally block to prevent connection leaks
+4. **Use HTTP, not WebSocket** - `pg` driver uses HTTP which is stable; `@neondatabase/serverless` uses WebSocket which fails when database sleeps
+
+**When to use each driver:**
+- `pg` (HTTP) - Stable, recommended for API routes
+- `@neondatabase/serverless` (WebSocket) - Only if you need real-time/streaming features and can handle connection drops
+
+**Affected Areas:** All API routes that need database connections, especially in `/pages/api/`.
