@@ -45,6 +45,7 @@ import type {
 } from '../types';
 import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 import { ProjectDocumentManager } from './ProjectDocumentManager';
+import { AddApprovalModal } from './AddApprovalModal';
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
   new: 'New',
@@ -142,6 +143,7 @@ export function PipelineProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedApproval, setSelectedApproval] = useState<PipelineProjectApprovalWithType | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addApprovalOpen, setAddApprovalOpen] = useState(false);
   const [savingLegalDocs, setSavingLegalDocs] = useState(false);
   const [legalDocsChanged, setLegalDocsChanged] = useState(false);
   const [legalDocs, setLegalDocs] = useState({
@@ -217,6 +219,14 @@ export function PipelineProjectDetail() {
 
   const handleApprovalUpdate = () => {
     // Reload data after approval update
+    loadProject();
+  };
+
+  const handleAddApproval = () => {
+    setAddApprovalOpen(true);
+  };
+
+  const handleAddApprovalSuccess = () => {
     loadProject();
   };
 
@@ -438,7 +448,10 @@ export function PipelineProjectDetail() {
             {approvals.length === 0 ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-8 border border-[var(--ff-border-light)] text-center">
                 <p className="text-[var(--ff-text-secondary)]">No approvals configured yet</p>
-                <button className="mt-4 flex items-center gap-1 mx-auto text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]">
+                <button
+                  onClick={handleAddApproval}
+                  className="mt-4 flex items-center gap-1 mx-auto text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]"
+                >
                   <Plus className="w-4 h-4" />
                   Add Approval
                 </button>
@@ -552,7 +565,10 @@ export function PipelineProjectDetail() {
                       <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                         Other Approvals ({otherApprovals.length})
                       </h2>
-                      <button className="flex items-center gap-1 text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]">
+                      <button
+                        onClick={handleAddApproval}
+                        className="flex items-center gap-1 text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]"
+                      >
                         <Plus className="w-4 h-4" />
                         Add
                       </button>
@@ -951,6 +967,18 @@ export function PipelineProjectDetail() {
           onUpdate={handleApprovalUpdate}
           currentUserId={currentUser?.id}
           currentUserRole={drawerUserRole}
+        />
+      )}
+
+      {/* Add Approval Modal */}
+      {id && typeof id === 'string' && (
+        <AddApprovalModal
+          isOpen={addApprovalOpen}
+          onClose={() => setAddApprovalOpen(false)}
+          onSuccess={handleAddApprovalSuccess}
+          projectId={id}
+          province={project?.province || undefined}
+          municipality={project?.municipality || undefined}
         />
       )}
     </div>
