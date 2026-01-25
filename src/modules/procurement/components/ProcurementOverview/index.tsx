@@ -57,28 +57,28 @@ export function ProcurementOverview({
           value={aggregateMetrics?.totalActiveRFQs ?? 0}
           icon={FileQuestion}
           color="blue"
-          href="/procurement/rfq"
+          href="/procurement/sourcing?tab=rfq"
         />
         <StatCard
           label="Purchase Orders"
           value={aggregateMetrics?.totalPurchaseOrders ?? 0}
           icon={ShoppingCart}
           color="purple"
-          href="/procurement/purchase-orders"
+          href="/procurement/purchasing?tab=purchase-orders"
         />
         <StatCard
           label="Stock Items"
           value={aggregateMetrics?.totalStockItems ?? 0}
           icon={Boxes}
           color="green"
-          href="/procurement/stock-items"
+          href="/procurement/inventory?tab=items"
         />
         <StatCard
           label="Suppliers"
           value={aggregateMetrics?.totalSuppliers ?? 0}
           icon={Truck}
           color="orange"
-          href="/suppliers"
+          href="/procurement/sourcing?tab=suppliers"
         />
         <StatCard
           label="Cycle Days"
@@ -105,14 +105,14 @@ export function ProcurementOverview({
           title="Bill of Quantities"
           description="Create and manage project BOQs"
           icon={FileSpreadsheet}
-          href="/procurement/boq"
+          href="/procurement/sourcing?tab=boq"
           color="blue"
         />
         <ActionCard
           title="Request for Quote"
           description="Send RFQs to suppliers"
           icon={FileQuestion}
-          href="/procurement/rfq"
+          href="/procurement/sourcing?tab=rfq"
           color="cyan"
           badge={aggregateMetrics?.totalActiveRFQs}
         />
@@ -120,14 +120,14 @@ export function ProcurementOverview({
           title="Quote Evaluation"
           description="Compare and select quotes"
           icon={Scale}
-          href="/procurement/quotes"
+          href="/procurement/purchasing?tab=quotes"
           color="purple"
         />
         <ActionCard
           title="Purchase Orders"
           description="Manage purchase orders"
           icon={ShoppingCart}
-          href="/procurement/purchase-orders"
+          href="/procurement/purchasing?tab=purchase-orders"
           color="indigo"
           badge={aggregateMetrics?.totalPurchaseOrders}
         />
@@ -135,21 +135,21 @@ export function ProcurementOverview({
           title="Goods Receipt"
           description="Record received goods"
           icon={PackageCheck}
-          href="/procurement/grn"
+          href="/procurement/purchasing?tab=grn"
           color="green"
         />
         <ActionCard
           title="Stock Management"
           description="Track inventory levels"
           icon={Package}
-          href="/procurement/stock"
+          href="/procurement/inventory?tab=stock"
           color="teal"
         />
         <ActionCard
           title="Suppliers"
           description="Manage supplier database"
           icon={Truck}
-          href="/suppliers"
+          href="/procurement/sourcing?tab=suppliers"
           color="orange"
           badge={aggregateMetrics?.totalSuppliers}
         />
@@ -157,7 +157,7 @@ export function ProcurementOverview({
           title="Budget Overview"
           description="Track spending and budgets"
           icon={Wallet}
-          href="/procurement/budget"
+          href="/procurement/financial?tab=budget"
           color="amber"
         />
         <ActionCard
@@ -227,12 +227,12 @@ function StatCard({ label, value, icon: Icon, color, subtitle, href }: StatCardP
 // Workflow Stepper Component
 function WorkflowStepper() {
   const steps = [
-    { id: 'boq', label: 'BOQ', href: '/procurement/boq', icon: FileSpreadsheet },
-    { id: 'rfq', label: 'RFQ', href: '/procurement/rfq', icon: FileQuestion },
-    { id: 'quotes', label: 'Quotes', href: '/procurement/quotes', icon: Scale },
-    { id: 'po', label: 'PO', href: '/procurement/purchase-orders', icon: ShoppingCart },
-    { id: 'grn', label: 'GRN', href: '/procurement/grn', icon: PackageCheck },
-    { id: 'stock', label: 'Stock', href: '/procurement/stock', icon: Boxes },
+    { id: 'boq', label: 'BOQ', href: '/procurement/sourcing?tab=boq', icon: FileSpreadsheet },
+    { id: 'rfq', label: 'RFQ', href: '/procurement/sourcing?tab=rfq', icon: FileQuestion },
+    { id: 'quotes', label: 'Quotes', href: '/procurement/purchasing?tab=quotes', icon: Scale },
+    { id: 'po', label: 'PO', href: '/procurement/purchasing?tab=purchase-orders', icon: ShoppingCart },
+    { id: 'grn', label: 'GRN', href: '/procurement/purchasing?tab=grn', icon: PackageCheck },
+    { id: 'stock', label: 'Stock', href: '/procurement/inventory?tab=stock', icon: Boxes },
   ];
 
   return (
