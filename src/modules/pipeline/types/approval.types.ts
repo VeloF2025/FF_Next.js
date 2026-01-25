@@ -55,6 +55,8 @@ export type FollowupStatus = 'overdue' | 'today' | 'upcoming' | 'scheduled';
 // Approval Type Configuration
 // ============================================================================
 
+export type ApprovalConditionType = 'rural_only' | 'urban_only' | null;
+
 export interface PipelineApprovalType {
   id: string;
   code: string;
@@ -62,6 +64,8 @@ export interface PipelineApprovalType {
   description: string | null;
   category: ApprovalCategory;
   default_required: boolean;
+  is_compulsory: boolean;
+  condition_type: ApprovalConditionType;
   typical_duration_days: number | null;
   default_authority_name: string | null;
   default_authority_contact: string | null;
@@ -86,6 +90,7 @@ export interface PipelineProjectApproval {
   id: string;
   pipeline_project_id: string;
   approval_type_id: string;
+  service_authority_id: string | null;
 
   // Status
   status: ApprovalStatus;
@@ -179,6 +184,8 @@ export interface PipelineProjectApprovalWithType extends PipelineProjectApproval
   approval_type_code: string;
   approval_type_name: string;
   approval_type_category: ApprovalCategory;
+  approval_type_is_compulsory: boolean;
+  approval_type_condition_type: ApprovalConditionType;
 }
 
 export interface ExpiringApproval extends PipelineProjectApprovalWithType {
@@ -279,6 +286,7 @@ export interface AlertRecipient {
 export interface CreateApprovalInput {
   pipeline_project_id: string;
   approval_type_id: string;
+  service_authority_id?: string;
   is_required?: boolean;
   authority_name?: string;
   authority_contact_name?: string;
@@ -292,6 +300,7 @@ export interface CreateApprovalInput {
 export interface UpdateApprovalInput {
   status?: ApprovalStatus;
   is_required?: boolean;
+  service_authority_id?: string | null;
 
   // Application
   application_date?: string | null;

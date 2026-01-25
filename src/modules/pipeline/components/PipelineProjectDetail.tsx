@@ -27,12 +27,21 @@ import {
   RefreshCw,
   XCircle,
   ChevronRight,
+  FileSignature,
+  Trees,
+  Upload,
+  ExternalLink,
+  Save,
+  Loader2,
+  Shield,
 } from 'lucide-react';
 import type {
   PipelineProjectWithRelations,
   PipelineProjectApprovalWithType,
   PipelineStatus,
   ApprovalStatus,
+  LeaseStatus,
+  CessionStatus,
 } from '../types';
 import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 import { ProjectDocumentManager } from './ProjectDocumentManager';
@@ -133,6 +142,17 @@ export function PipelineProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedApproval, setSelectedApproval] = useState<PipelineProjectApprovalWithType | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [savingLegalDocs, setSavingLegalDocs] = useState(false);
+  const [legalDocsChanged, setLegalDocsChanged] = useState(false);
+  const [legalDocs, setLegalDocs] = useState({
+    is_rural: false,
+    lease_agreement_status: 'not_started' as LeaseStatus,
+    lease_agreement_date: '',
+    lease_agreement_document_url: '',
+    cession_status: 'not_started' as CessionStatus,
+    cession_date: '',
+    cession_document_url: '',
+  });
 
   // Map auth role to drawer role
   const drawerUserRole = useMemo((): 'pm' | 'ops' | 'admin' | 'viewer' => {
@@ -151,6 +171,40 @@ export function PipelineProjectDetail() {
     }
   }, [currentUser]);
 
+  // Split approvals into compulsory and other
+  const { compulsoryApprovals, otherApprovals } = useMemo(() => {
+    const isRural = legalDocs.is_rural || project?.is_rural || false;
+
+    const compulsory: PipelineProjectApprovalWithType[] = [];
+    const other: PipelineProjectApprovalWithType[] = [];
+
+    for (const approval of approvals) {
+      // Check if this is a conditional approval
+      const conditionType = approval.approval_type_condition_type;
+
+      // Skip rural-only approvals if not rural
+      if (conditionType === 'rural_only' && !isRural) {
+        // Still show it but mark as not applicable
+        other.push(approval);
+        continue;
+      }
+
+      // Skip urban-only approvals if rural
+      if (conditionType === 'urban_only' && isRural) {
+        other.push(approval);
+        continue;
+      }
+
+      if (approval.approval_type_is_compulsory) {
+        compulsory.push(approval);
+      } else {
+        other.push(approval);
+      }
+    }
+
+    return { compulsoryApprovals: compulsory, otherApprovals: other };
+  }, [approvals, legalDocs.is_rural, project?.is_rural]);
+
   const handleApprovalClick = (approval: PipelineProjectApprovalWithType) => {
     setSelectedApproval(approval);
     setDrawerOpen(true);
@@ -164,6 +218,57 @@ export function PipelineProjectDetail() {
   const handleApprovalUpdate = () => {
     // Reload data after approval update
     loadProject();
+  };
+
+  // Initialize legal docs when project loads
+  useEffect(() => {
+    if (project) {
+      setLegalDocs({
+        is_rural: project.is_rural || false,
+        lease_agreement_status: project.lease_agreement_status || 'not_started',
+        lease_agreement_date: project.lease_agreement_date || '',
+        lease_agreement_document_url: project.lease_agreement_document_url || '',
+        cession_status: project.cession_status || 'not_started',
+        cession_date: project.cession_date || '',
+        cession_document_url: project.cession_document_url || '',
+      });
+      setLegalDocsChanged(false);
+    }
+  }, [project]);
+
+  const handleLegalDocChange = <K extends keyof typeof legalDocs>(
+    key: K,
+    value: typeof legalDocs[K]
+  ) => {
+    setLegalDocs((prev) => ({ ...prev, [key]: value }));
+    setLegalDocsChanged(true);
+  };
+
+  const saveLegalDocs = async () => {
+    if (!id) return;
+    setSavingLegalDocs(true);
+    try {
+      const response = await fetch(`/api/pipeline/projects/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_rural: legalDocs.is_rural,
+          lease_agreement_status: legalDocs.lease_agreement_status,
+          lease_agreement_date: legalDocs.lease_agreement_date || null,
+          lease_agreement_document_url: legalDocs.lease_agreement_document_url || null,
+          cession_status: legalDocs.cession_status,
+          cession_date: legalDocs.cession_date || null,
+          cession_document_url: legalDocs.cession_document_url || null,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save');
+      setLegalDocsChanged(false);
+      loadProject();
+    } catch (err) {
+      console.error('Failed to save legal docs:', err);
+    } finally {
+      setSavingLegalDocs(false);
+    }
   };
 
   useEffect(() => {
@@ -329,101 +434,225 @@ export function PipelineProjectDetail() {
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content - Approvals */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                Approval Gates
-              </h2>
-              <button className="flex items-center gap-1 text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]">
-                <Plus className="w-4 h-4" />
-                Add Approval
-              </button>
-            </div>
-
+          <div className="lg:col-span-2 space-y-6">
             {approvals.length === 0 ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-8 border border-[var(--ff-border-light)] text-center">
                 <p className="text-[var(--ff-text-secondary)]">No approvals configured yet</p>
+                <button className="mt-4 flex items-center gap-1 mx-auto text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]">
+                  <Plus className="w-4 h-4" />
+                  Add Approval
+                </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {approvals.map((approval) => {
-                  const statusStyle = APPROVAL_STATUS_COLORS[approval.status];
-                  const daysUntilExpiry = getDaysUntilExpiry(approval.expiry_date);
-                  const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
-                  const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
-
-                  return (
-                    <div
-                      key={approval.id}
-                      onClick={() => handleApprovalClick(approval)}
-                      className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)] hover:border-[var(--ff-accent)] transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className={`p-2 rounded-lg ${statusStyle.bg}`}>
-                          <span className={statusStyle.text}>{statusStyle.icon}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium text-[var(--ff-text-primary)]">
-                              {approval.approval_type_name}
-                            </h3>
-                            <span
-                              className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}
-                            >
-                              {approval.status.replace(/_/g, ' ')}
-                            </span>
-                          </div>
-                          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-                            {approval.authority_name || 'No authority specified'}
-                          </p>
-
-                          {/* Internal Approval Status */}
-                          {approval.internal_status !== 'ops_approved' && (
-                            <div className="mt-2 text-xs">
-                              <span className="text-[var(--ff-text-secondary)]">Internal: </span>
-                              <span
-                                className={
-                                  approval.internal_status === 'pending'
-                                    ? 'text-yellow-600 dark:text-yellow-400'
-                                    : approval.internal_status === 'pm_approved'
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : approval.internal_status === 'rejected'
-                                    ? 'text-red-600 dark:text-red-400'
-                                    : 'text-green-600 dark:text-green-400'
-                                }
-                              >
-                                {approval.internal_status.replace(/_/g, ' ')}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Expiry Warning */}
-                          {approval.expiry_date && (
-                            <div className="mt-2 flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-[var(--ff-text-secondary)]" />
-                              <span
-                                className={`text-sm ${
-                                  isExpired
-                                    ? 'text-red-600 dark:text-red-400 font-medium'
-                                    : isExpiringSoon
-                                    ? 'text-yellow-600 dark:text-yellow-400'
-                                    : 'text-[var(--ff-text-secondary)]'
-                                }`}
-                              >
-                                {isExpired
-                                  ? `Expired ${Math.abs(daysUntilExpiry!)} days ago`
-                                  : `Expires ${formatDate(approval.expiry_date)}`}
-                                {isExpiringSoon && !isExpired && ` (${daysUntilExpiry} days)`}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-[var(--ff-text-secondary)]" />
-                      </div>
+              <>
+                {/* Compulsory Approvals */}
+                {compulsoryApprovals.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-red-500" />
+                        Compulsory Approvals ({compulsoryApprovals.length})
+                      </h2>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="space-y-3">
+                      {compulsoryApprovals.map((approval) => {
+                        const statusStyle = APPROVAL_STATUS_COLORS[approval.status];
+                        const daysUntilExpiry = getDaysUntilExpiry(approval.expiry_date);
+                        const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+                        const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
+                        const isRuralOnly = approval.approval_type_condition_type === 'rural_only';
+
+                        return (
+                          <div
+                            key={approval.id}
+                            onClick={() => handleApprovalClick(approval)}
+                            className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)] hover:border-[var(--ff-accent)] transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className={`p-2 rounded-lg ${statusStyle.bg}`}>
+                                <span className={statusStyle.text}>{statusStyle.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="font-medium text-[var(--ff-text-primary)]">
+                                      {approval.approval_type_name}
+                                    </h3>
+                                    {isRuralOnly && (
+                                      <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded flex items-center gap-1">
+                                        <Trees className="w-3 h-3" />
+                                        Rural
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}
+                                  >
+                                    {approval.status.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+                                  {approval.authority_name || 'No authority specified'}
+                                </p>
+
+                                {/* Internal Approval Status */}
+                                {approval.internal_status !== 'ops_approved' && (
+                                  <div className="mt-2 text-xs">
+                                    <span className="text-[var(--ff-text-secondary)]">Internal: </span>
+                                    <span
+                                      className={
+                                        approval.internal_status === 'pending'
+                                          ? 'text-yellow-600 dark:text-yellow-400'
+                                          : approval.internal_status === 'pm_approved'
+                                          ? 'text-blue-600 dark:text-blue-400'
+                                          : approval.internal_status === 'rejected'
+                                          ? 'text-red-600 dark:text-red-400'
+                                          : 'text-green-600 dark:text-green-400'
+                                      }
+                                    >
+                                      {approval.internal_status.replace(/_/g, ' ')}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Expiry Warning */}
+                                {approval.expiry_date && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                                    <span
+                                      className={`text-sm ${
+                                        isExpired
+                                          ? 'text-red-600 dark:text-red-400 font-medium'
+                                          : isExpiringSoon
+                                          ? 'text-yellow-600 dark:text-yellow-400'
+                                          : 'text-[var(--ff-text-secondary)]'
+                                      }`}
+                                    >
+                                      {isExpired
+                                        ? `Expired ${Math.abs(daysUntilExpiry!)} days ago`
+                                        : `Expires ${formatDate(approval.expiry_date)}`}
+                                      {isExpiringSoon && !isExpired && ` (${daysUntilExpiry} days)`}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Approvals */}
+                {otherApprovals.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                        Other Approvals ({otherApprovals.length})
+                      </h2>
+                      <button className="flex items-center gap-1 text-sm text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]">
+                        <Plus className="w-4 h-4" />
+                        Add
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {otherApprovals.map((approval) => {
+                        const statusStyle = APPROVAL_STATUS_COLORS[approval.status];
+                        const daysUntilExpiry = getDaysUntilExpiry(approval.expiry_date);
+                        const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+                        const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
+                        const isConditional = approval.approval_type_condition_type !== null;
+                        const isRural = legalDocs.is_rural || project?.is_rural || false;
+                        const isNotApplicable =
+                          (approval.approval_type_condition_type === 'rural_only' && !isRural) ||
+                          (approval.approval_type_condition_type === 'urban_only' && isRural);
+
+                        return (
+                          <div
+                            key={approval.id}
+                            onClick={() => handleApprovalClick(approval)}
+                            className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)] hover:border-[var(--ff-accent)] transition-colors cursor-pointer ${
+                              isNotApplicable ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <div className="flex items-start gap-4">
+                              <div className={`p-2 rounded-lg ${statusStyle.bg}`}>
+                                <span className={statusStyle.text}>{statusStyle.icon}</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="font-medium text-[var(--ff-text-primary)]">
+                                      {approval.approval_type_name}
+                                    </h3>
+                                    {isNotApplicable && (
+                                      <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400 rounded">
+                                        N/A
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}
+                                  >
+                                    {isNotApplicable ? 'Not Applicable' : approval.status.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+                                  {approval.authority_name || 'No authority specified'}
+                                </p>
+
+                                {/* Internal Approval Status */}
+                                {!isNotApplicable && approval.internal_status !== 'ops_approved' && (
+                                  <div className="mt-2 text-xs">
+                                    <span className="text-[var(--ff-text-secondary)]">Internal: </span>
+                                    <span
+                                      className={
+                                        approval.internal_status === 'pending'
+                                          ? 'text-yellow-600 dark:text-yellow-400'
+                                          : approval.internal_status === 'pm_approved'
+                                          ? 'text-blue-600 dark:text-blue-400'
+                                          : approval.internal_status === 'rejected'
+                                          ? 'text-red-600 dark:text-red-400'
+                                          : 'text-green-600 dark:text-green-400'
+                                      }
+                                    >
+                                      {approval.internal_status.replace(/_/g, ' ')}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Expiry Warning */}
+                                {!isNotApplicable && approval.expiry_date && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                                    <span
+                                      className={`text-sm ${
+                                        isExpired
+                                          ? 'text-red-600 dark:text-red-400 font-medium'
+                                          : isExpiringSoon
+                                          ? 'text-yellow-600 dark:text-yellow-400'
+                                          : 'text-[var(--ff-text-secondary)]'
+                                      }`}
+                                    >
+                                      {isExpired
+                                        ? `Expired ${Math.abs(daysUntilExpiry!)} days ago`
+                                        : `Expires ${formatDate(approval.expiry_date)}`}
+                                      {isExpiringSoon && !isExpired && ` (${daysUntilExpiry} days)`}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -460,6 +689,149 @@ export function PipelineProjectDetail() {
                   <span className="text-[var(--ff-text-primary)]">
                     {formatCurrency(project.estimated_value)}
                   </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Legal Documents */}
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+                  <FileSignature className="w-4 h-4" />
+                  Legal Documents
+                </h3>
+                {legalDocsChanged && (
+                  <button
+                    onClick={saveLegalDocs}
+                    disabled={savingLegalDocs}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-[var(--ff-accent)] text-white rounded hover:bg-[var(--ff-accent-hover)] disabled:opacity-50"
+                  >
+                    {savingLegalDocs ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Save className="w-3 h-3" />
+                    )}
+                    Save
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                {/* Rural Project Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={legalDocs.is_rural}
+                    onChange={(e) => handleLegalDocChange('is_rural', e.target.checked)}
+                    className="w-4 h-4 rounded border-[var(--ff-border-light)] text-[var(--ff-accent)] focus:ring-[var(--ff-accent)]"
+                  />
+                  <span className="flex items-center gap-2 text-sm text-[var(--ff-text-primary)]">
+                    <Trees className="w-4 h-4 text-green-600" />
+                    Rural Project
+                  </span>
+                </label>
+                {legalDocs.is_rural && (
+                  <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded flex items-center gap-1">
+                    <Shield className="w-3 h-3" />
+                    Tribal Authority approval required
+                  </p>
+                )}
+
+                {/* Lease Agreement */}
+                <div className="pt-3 border-t border-[var(--ff-border-light)]">
+                  <p className="text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                    Lease Agreement
+                  </p>
+                  <div className="space-y-2">
+                    <select
+                      value={legalDocs.lease_agreement_status}
+                      onChange={(e) =>
+                        handleLegalDocChange('lease_agreement_status', e.target.value as LeaseStatus)
+                      }
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]"
+                    >
+                      <option value="not_started">Not Started</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="signed">Signed</option>
+                      <option value="received">Received</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={legalDocs.lease_agreement_date}
+                      onChange={(e) => handleLegalDocChange('lease_agreement_date', e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]"
+                      placeholder="Date"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={legalDocs.lease_agreement_document_url}
+                        onChange={(e) =>
+                          handleLegalDocChange('lease_agreement_document_url', e.target.value)
+                        }
+                        placeholder="Document URL"
+                        className="flex-1 px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]"
+                      />
+                      {legalDocs.lease_agreement_document_url && (
+                        <a
+                          href={legalDocs.lease_agreement_document_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1.5 border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-tertiary)]"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cession */}
+                <div className="pt-3 border-t border-[var(--ff-border-light)]">
+                  <p className="text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                    Cession
+                  </p>
+                  <div className="space-y-2">
+                    <select
+                      value={legalDocs.cession_status}
+                      onChange={(e) =>
+                        handleLegalDocChange('cession_status', e.target.value as CessionStatus)
+                      }
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]"
+                    >
+                      <option value="not_started">Not Started</option>
+                      <option value="signed">Signed</option>
+                      <option value="received">Received</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={legalDocs.cession_date}
+                      onChange={(e) => handleLegalDocChange('cession_date', e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]"
+                      placeholder="Date"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={legalDocs.cession_document_url}
+                        onChange={(e) =>
+                          handleLegalDocChange('cession_document_url', e.target.value)
+                        }
+                        placeholder="Document URL"
+                        className="flex-1 px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]"
+                      />
+                      {legalDocs.cession_document_url && (
+                        <a
+                          href={legalDocs.cession_document_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2 py-1.5 border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-tertiary)]"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

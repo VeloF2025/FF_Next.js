@@ -27,8 +27,10 @@ import type {
   PipelineProjectApprovalWithType,
   ApprovalStatus,
   InternalApprovalStatus,
+  ServiceAuthority,
 } from '../types';
 import { DocumentManager } from './DocumentManager';
+import { AuthorityPicker } from './AuthorityPicker';
 
 interface ApprovalDetailDrawerProps {
   approval: PipelineProjectApprovalWithType;
@@ -95,6 +97,8 @@ export function ApprovalDetailDrawer({
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [showApproveForm, setShowApproveForm] = useState(false);
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [showAuthorityPicker, setShowAuthorityPicker] = useState(false);
+  const [savingAuthority, setSavingAuthority] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Form state for submission
@@ -244,6 +248,38 @@ export function ApprovalDetailDrawer({
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAuthoritySelect(authority: ServiceAuthority | null) {
+    if (!authority) {
+      setShowAuthorityPicker(false);
+      return;
+    }
+
+    setSavingAuthority(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/pipeline/approvals/${approval.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_authority_id: authority.id,
+          authority_name: authority.authority_name,
+          authority_contact_name: authority.contact_name,
+          authority_contact_email: authority.contact_email,
+          authority_contact_phone: authority.contact_phone,
+          authority_address: authority.physical_address,
+          updated_by: currentUserId,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to update authority');
+      onUpdate();
+      setShowAuthorityPicker(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save authority');
+    } finally {
+      setSavingAuthority(false);
     }
   }
 
@@ -609,47 +645,80 @@ export function ApprovalDetailDrawer({
 
           {/* Authority Information */}
           <div>
-            <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
-              <Building2 className="w-4 h-4" />
-              Authority Information
-            </h3>
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
-              {approval.authority_name ? (
-                <>
-                  <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                    {approval.authority_name}
-                  </p>
-                  {approval.authority_contact_name && (
-                    <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      {approval.authority_contact_name}
-                    </p>
-                  )}
-                  {approval.authority_contact_email && (
-                    <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      {approval.authority_contact_email}
-                    </p>
-                  )}
-                  {approval.authority_contact_phone && (
-                    <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      {approval.authority_contact_phone}
-                    </p>
-                  )}
-                  {approval.authority_address && (
-                    <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      {approval.authority_address}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-[var(--ff-text-tertiary)] italic">
-                  No authority information recorded
-                </p>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Authority Information
+              </h3>
+              {currentUserRole !== 'viewer' && !showAuthorityPicker && (
+                <button
+                  onClick={() => setShowAuthorityPicker(true)}
+                  className="text-xs text-[var(--ff-accent)] hover:text-[var(--ff-accent-hover)]"
+                >
+                  {approval.authority_name ? 'Change' : 'Select Authority'}
+                </button>
               )}
             </div>
+
+            {showAuthorityPicker ? (
+              <div className="space-y-3">
+                <AuthorityPicker
+                  approvalTypeId={approval.approval_type_id}
+                  approvalTypeName={approval.approval_type_name}
+                  value={null}
+                  onChange={handleAuthoritySelect}
+                  disabled={savingAuthority}
+                  allowCreate={currentUserRole === 'admin'}
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setShowAuthorityPicker(false)}
+                    disabled={savingAuthority}
+                    className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-secondary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
+                {approval.authority_name ? (
+                  <>
+                    <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                      {approval.authority_name}
+                    </p>
+                    {approval.authority_contact_name && (
+                      <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        {approval.authority_contact_name}
+                      </p>
+                    )}
+                    {approval.authority_contact_email && (
+                      <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
+                        <Mail className="w-4 h-4" />
+                        {approval.authority_contact_email}
+                      </p>
+                    )}
+                    {approval.authority_contact_phone && (
+                      <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        {approval.authority_contact_phone}
+                      </p>
+                    )}
+                    {approval.authority_address && (
+                      <p className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        {approval.authority_address}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-[var(--ff-text-tertiary)] italic">
+                    No authority information recorded
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Application Details */}

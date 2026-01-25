@@ -155,7 +155,7 @@ export async function createProject(
       project_manager_id, wayleaves_officer_id, operations_manager_id,
       estimated_value, estimated_homes_passed, estimated_km,
       target_start_date, target_completion_date,
-      notes, tags, custom_fields, created_by
+      is_rural, notes, tags, custom_fields, created_by
     ) VALUES (
       ${input.project_name},
       ${input.description || null},
@@ -178,6 +178,7 @@ export async function createProject(
       ${input.estimated_km || null},
       ${input.target_start_date || null},
       ${input.target_completion_date || null},
+      ${input.is_rural || false},
       ${input.notes || null},
       ${JSON.stringify(input.tags || [])},
       ${JSON.stringify(input.custom_fields || {})},
@@ -293,6 +294,16 @@ export async function updateProject(
   addUpdate('estimated_km', input.estimated_km);
   addUpdate('target_start_date', input.target_start_date);
   addUpdate('target_completion_date', input.target_completion_date);
+  // Legal documents
+  addUpdate('lease_agreement_status', input.lease_agreement_status);
+  addUpdate('lease_agreement_date', input.lease_agreement_date);
+  addUpdate('lease_agreement_document_url', input.lease_agreement_document_url);
+  addUpdate('lease_agreement_notes', input.lease_agreement_notes);
+  addUpdate('cession_status', input.cession_status);
+  addUpdate('cession_date', input.cession_date);
+  addUpdate('cession_document_url', input.cession_document_url);
+  addUpdate('cession_notes', input.cession_notes);
+  addUpdate('is_rural', input.is_rural);
   addUpdate('notes', input.notes);
   if (input.tags !== undefined) {
     addUpdate('tags', JSON.stringify(input.tags));

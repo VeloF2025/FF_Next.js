@@ -25,6 +25,10 @@ export type Priority = 'low' | 'medium' | 'high' | 'critical';
 
 export type SyncStatus = 'pending' | 'synced' | 'conflict' | 'error';
 
+// Lease and Cession status types
+export type LeaseStatus = 'not_started' | 'in_progress' | 'signed' | 'received';
+export type CessionStatus = 'not_started' | 'signed' | 'received';
+
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -97,6 +101,19 @@ export interface PipelineProject {
   planned_project_id: string | null;
   transitioned_at: string | null;
   transitioned_by: string | null;
+
+  // Legal Documents
+  lease_agreement_status: LeaseStatus;
+  lease_agreement_date: string | null;
+  lease_agreement_document_url: string | null;
+  lease_agreement_notes: string | null;
+  cession_status: CessionStatus;
+  cession_date: string | null;
+  cession_document_url: string | null;
+  cession_notes: string | null;
+
+  // Rural flag (for conditional services like Tribal Authority)
+  is_rural: boolean;
 
   // Additional
   notes: string | null;
@@ -180,6 +197,7 @@ export interface CreatePipelineProjectInput {
   estimated_km?: number;
   target_start_date?: string;
   target_completion_date?: string;
+  is_rural?: boolean;
   notes?: string;
   tags?: string[];
   custom_fields?: Record<string, unknown>;
@@ -209,6 +227,16 @@ export interface UpdatePipelineProjectInput {
   estimated_km?: number | null;
   target_start_date?: string | null;
   target_completion_date?: string | null;
+  // Legal documents
+  lease_agreement_status?: LeaseStatus;
+  lease_agreement_date?: string | null;
+  lease_agreement_document_url?: string | null;
+  lease_agreement_notes?: string | null;
+  cession_status?: CessionStatus;
+  cession_date?: string | null;
+  cession_document_url?: string | null;
+  cession_notes?: string | null;
+  is_rural?: boolean;
   notes?: string;
   tags?: string[];
   custom_fields?: Record<string, unknown>;

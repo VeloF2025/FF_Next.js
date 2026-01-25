@@ -9,6 +9,9 @@ export * from './project.types';
 // Approval types
 export * from './approval.types';
 
+// Authority types (service providers contacts database)
+export * from './authority.types';
+
 // Smartsheet integration types
 export * from './smartsheet.types';
 

@@ -60,7 +60,9 @@ export async function getApprovalById(
       a.*,
       t.code AS approval_type_code,
       t.name AS approval_type_name,
-      t.category AS approval_type_category
+      t.category AS approval_type_category,
+      COALESCE(t.is_compulsory, false) AS approval_type_is_compulsory,
+      t.condition_type AS approval_type_condition_type
     FROM pipeline_project_approvals a
     JOIN pipeline_approval_types t ON a.approval_type_id = t.id
     WHERE a.id = ${id}
@@ -77,7 +79,9 @@ export async function getProjectApprovals(
       a.*,
       t.code AS approval_type_code,
       t.name AS approval_type_name,
-      t.category AS approval_type_category
+      t.category AS approval_type_category,
+      COALESCE(t.is_compulsory, false) AS approval_type_is_compulsory,
+      t.condition_type AS approval_type_condition_type
     FROM pipeline_project_approvals a
     JOIN pipeline_approval_types t ON a.approval_type_id = t.id
     WHERE a.pipeline_project_id = ${projectId}
