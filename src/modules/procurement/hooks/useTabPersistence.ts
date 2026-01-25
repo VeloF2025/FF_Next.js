@@ -3,7 +3,7 @@
  * Manages active tab state with localStorage persistence and URL sync
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 
 interface UseTabPersistenceOptions {
@@ -44,6 +44,7 @@ export function useTabPersistence({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [isInitialized, setIsInitialized] = useState(false);
+  const hasInitializedRef = useRef(false);
 
   const storageKey = `procurement_${pageKey}_tab`;
 
@@ -53,34 +54,34 @@ export function useTabPersistence({
 
     const urlTab = router.query.tab as string | undefined;
 
-    // Validate URL tab
+    // URL param always takes priority
     if (urlTab && validTabs.includes(urlTab)) {
       setActiveTab(urlTab);
-      // Also save to localStorage when coming from URL
+      // Save to localStorage when coming from URL
       try {
         localStorage.setItem(storageKey, urlTab);
       } catch {
         // Ignore localStorage errors
       }
-    } else {
-      // Try localStorage
+      hasInitializedRef.current = true;
+      setIsInitialized(true);
+      return;
+    }
+
+    // Only use localStorage on first initialization when no URL param
+    if (!hasInitializedRef.current) {
       try {
         const savedTab = localStorage.getItem(storageKey);
         if (savedTab && validTabs.includes(savedTab)) {
           setActiveTab(savedTab);
-          // Update URL to match saved tab (shallow, no reload)
-          router.replace(
-            { pathname: router.pathname, query: { ...router.query, tab: savedTab } },
-            undefined,
-            { shallow: true }
-          );
+          // Don't replace URL - just set state. User can navigate with tabs.
         } else {
-          // Use default
           setActiveTab(defaultTab);
         }
       } catch {
         setActiveTab(defaultTab);
       }
+      hasInitializedRef.current = true;
     }
 
     setIsInitialized(true);
