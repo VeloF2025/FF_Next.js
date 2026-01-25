@@ -110,6 +110,8 @@ const VelocityInput = React.forwardRef<HTMLInputElement, VelocityInputProps>(
         {...props}
         ref={ref}
         type={actualType}
+        value={value}
+        defaultValue={defaultValue}
         className={cn(
           'peer',
           className

@@ -308,7 +308,7 @@ function CostCentersTabContent() {
       const res = await fetch('/api/procurement/cost-centers');
       const data = await res.json();
       if (data.success) {
-        setCostCenters(data.data || []);
+        setCostCenters(data.data?.cost_centers || []);
       }
     } catch (err) {
       log.error('Failed to fetch cost centers', err);
