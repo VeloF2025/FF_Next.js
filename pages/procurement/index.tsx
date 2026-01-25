@@ -22,7 +22,9 @@ import {
   ArrowRight,
   Loader2,
   Send,
-  ClipboardList
+  ClipboardList,
+  FileInput,
+  PackageCheck
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -53,10 +55,12 @@ export default function ProcurementPage({
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[] | undefined>();
   const [tabBadges, setTabBadges] = useState<Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>>({
     overview: {},
+    requisitions: {},
     boq: {},
     rfq: {},
     quotes: {},
     'purchase-orders': {},
+    grn: {},
     stock: {},
     'field-stock': {},
     suppliers: {},
@@ -207,7 +211,7 @@ export default function ProcurementPage({
       <ProcurementPortalProvider value={contextValue}>
         <div className="min-h-screen bg-[var(--ff-bg-primary)]">
           {/* Page Header */}
-          <div className="border-b border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)]">
+          <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
             <div className="px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-purple-500/10">
@@ -223,7 +227,7 @@ export default function ProcurementPage({
             </div>
 
             {/* Tab Navigation */}
-            <div className="px-6 border-t border-[var(--ff-border-default)]">
+            <div className="px-6 border-t border-[var(--ff-border-light)]">
               <ProcurementTabs />
             </div>
           </div>
@@ -255,10 +259,12 @@ export default function ProcurementPage({
             {/* Tab Content */}
             <div className="mt-6">
               {activeTab === 'overview' && <DashboardTabContent project={selectedProject} aggregateMetrics={aggregateMetrics} isLoading={isLoading} />}
+              {activeTab === 'requisitions' && <RequisitionsTabContent />}
               {activeTab === 'boq' && <PlaceholderTab title="Bill of Quantities" icon={FileText} description="Manage project BOQ items" />}
               {activeTab === 'rfq' && <PlaceholderTab title="Request for Quotations" icon={Send} description="Create and manage RFQs" />}
               {activeTab === 'quotes' && <PlaceholderTab title="Quote Evaluation" icon={Quote} description="Evaluate and compare supplier quotes" />}
               {activeTab === 'purchase-orders' && <PurchaseOrdersTabContent />}
+              {activeTab === 'grn' && <GoodsReceiptTabContent />}
               {activeTab === 'stock' && <StockTabContent />}
               {activeTab === 'field-stock' && <FieldStockTabContent />}
               {activeTab === 'suppliers' && <SuppliersTabContent />}
@@ -283,7 +289,7 @@ interface PlaceholderTabProps {
 
 function PlaceholderTab({ title, icon: Icon, description }: PlaceholderTabProps) {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-8">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-8">
       <div className="text-center">
         <Icon className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">{title}</h3>
@@ -317,7 +323,7 @@ function DashboardTabContent({
 
 function PurchaseOrdersTabContent() {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <ShoppingCart className="h-6 w-6 text-purple-500" />
@@ -339,7 +345,7 @@ function PurchaseOrdersTabContent() {
 
 function FieldStockTabContent() {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <MapPin className="h-6 w-6 text-purple-500" />
@@ -361,7 +367,7 @@ function FieldStockTabContent() {
 
 function StockTabContent() {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Package className="h-6 w-6 text-purple-500" />
@@ -383,7 +389,7 @@ function StockTabContent() {
 
 function SuppliersTabContent() {
   return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border)] p-6">
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Truck className="h-6 w-6 text-purple-500" />
@@ -398,6 +404,50 @@ function SuppliersTabContent() {
       </div>
       <p className="text-[var(--ff-text-secondary)]">
         View and manage your supplier database. Click &quot;Manage Suppliers&quot; to access the full Suppliers Portal.
+      </p>
+    </div>
+  );
+}
+
+function RequisitionsTabContent() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <FileInput className="h-6 w-6 text-purple-500" />
+          <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">Requisitions</h3>
+        </div>
+        <Link
+          href="/procurement/requisitions"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          View All <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <p className="text-[var(--ff-text-secondary)]">
+        Create and manage purchase requisitions. Click &quot;View All&quot; to access the full Requisitions page.
+      </p>
+    </div>
+  );
+}
+
+function GoodsReceiptTabContent() {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <PackageCheck className="h-6 w-6 text-emerald-500" />
+          <h3 className="text-xl font-semibold text-[var(--ff-text-primary)]">Goods Receipt Notes</h3>
+        </div>
+        <Link
+          href="/procurement/grn"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+        >
+          View All <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <p className="text-[var(--ff-text-secondary)]">
+        Receive and inspect deliveries. Click &quot;View All&quot; to access the full Goods Receipt Notes page.
       </p>
     </div>
   );
