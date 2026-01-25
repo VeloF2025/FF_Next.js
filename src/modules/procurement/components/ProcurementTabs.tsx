@@ -181,17 +181,17 @@ export function ProcurementTabs({
       return;
     }
 
-    // Call the tab change callback (for context-based usage)
-    onTabChange(tab.id);
-
     // Tabs that should show inline content on the main procurement page
     const inlineContentTabs = ['overview', 'reports'];
 
     // Navigate directly to dedicated page for tabs with their own pages
-    // Only show inline content for Dashboard and Reports
     if (tab.path && !inlineContentTabs.includes(tab.id)) {
       router.push(tab.path);
+      return; // Don't update tab state - we're navigating away
     }
+
+    // Only update tab state for inline content tabs
+    onTabChange(tab.id);
   };
 
   // Get tab display state
