@@ -1,15 +1,18 @@
 /**
  * Version Checker Component
  * Checks for new deployments and prompts user to refresh
+ * Subtle toast notification that matches app UI/UX
  */
 
 'use client';
 
 import { useEffect, useState } from 'react';
+import { RefreshCw, X } from 'lucide-react';
 
 export function VersionChecker() {
-  const [showRefreshBanner, setShowRefreshBanner] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string | null>(null);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
     // Get initial version from meta tag
@@ -23,37 +26,54 @@ export function VersionChecker() {
         const data = await response.json();
 
         if (data.version && currentVersion && data.version !== currentVersion) {
-          setShowRefreshBanner(true);
+          setShowNotification(true);
           clearInterval(interval); // Stop checking once update detected
         }
-      } catch (error) {
+      } catch {
         // Silently fail - don't interrupt user experience
-        console.log('Version check failed:', error);
       }
     }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(interval);
   }, [currentVersion]);
 
-  if (!showRefreshBanner) return null;
+  const handleDismiss = () => {
+    setIsDismissed(true);
+    // Show again after 30 minutes if not refreshed
+    setTimeout(() => setIsDismissed(false), 30 * 60 * 1000);
+  };
+
+  if (!showNotification || isDismissed) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white px-4 py-3 shadow-lg">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          <span className="font-medium">
-            A new version of FibreFlow is available!
-          </span>
+    <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+      <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-700/50 rounded-lg shadow-xl p-3 max-w-xs">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center">
+            <RefreshCw className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-slate-200">
+              Update available
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Refresh to get the latest features
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              Refresh now &rarr;
+            </button>
+          </div>
+          <button
+            onClick={handleDismiss}
+            className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={() => window.location.reload()}
-          className="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
-        >
-          Refresh Now
-        </button>
       </div>
     </div>
   );
