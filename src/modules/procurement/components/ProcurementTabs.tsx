@@ -184,12 +184,12 @@ export function ProcurementTabs({
     // Call the tab change callback (for context-based usage)
     onTabChange(tab.id);
 
-    // Navigate to the tab's path if:
-    // 1. Path exists and differs from current path
-    // 2. We're NOT on the main /procurement page (which has inline tab content)
-    // This prevents "abort fetching" errors when showing inline content
-    const isOnMainProcurementPage = router.pathname === '/procurement';
-    if (tab.path && router.pathname !== tab.path && !isOnMainProcurementPage) {
+    // Tabs that should show inline content on the main procurement page
+    const inlineContentTabs = ['overview', 'reports'];
+
+    // Navigate directly to dedicated page for tabs with their own pages
+    // Only show inline content for Dashboard and Reports
+    if (tab.path && !inlineContentTabs.includes(tab.id)) {
       router.push(tab.path);
     }
   };
