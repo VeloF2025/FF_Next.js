@@ -87,14 +87,14 @@ async function handler(
 
     // Fetch evaluation data from database
     const evaluationQuery = `
-      SELECT 
-        dr_number,
+      SELECT
+        drop_number as dr_number,
         overall_status,
         average_score,
         feedback_sent,
         evaluation_date,
         created_at
-      FROM foto_ai_reviews
+      FROM dr_photo_unified_reviews
       ORDER BY evaluation_date DESC
     `;
 

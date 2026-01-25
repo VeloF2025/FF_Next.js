@@ -78,9 +78,9 @@ async function handler(
       newStatus: status,
     });
 
-    // Also update foto_ai_reviews if it exists
+    // Also update unified table (after migration 127)
     await pool.query(`
-      UPDATE foto_ai_reviews
+      UPDATE dr_photo_unified_reviews
       SET
         serial_swap_status = $1,
         serial_swap_corrected_at = CASE

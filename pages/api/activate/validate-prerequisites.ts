@@ -142,10 +142,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       message,
     };
 
-    // Update foto_ai_reviews with prerequisites check result
+    // Update unified table with prerequisites check result (after migration 127)
     const newPhase = prerequisites.passed && photosCheck.exists ? 'photo_review' : 'prerequisites';
     await pool.query(
-      `UPDATE foto_ai_reviews
+      `UPDATE dr_photo_unified_reviews
        SET
          prerequisites_passed = $1,
          prerequisites_checked_at = NOW(),
@@ -153,7 +153,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
          onemap_ups_serial = $3,
          qa_phase = $4,
          updated_at = NOW()
-       WHERE dr_number = $5`,
+       WHERE drop_number = $5`,
       [prerequisites.passed, ontSerial, upsSerial, newPhase, dropNumber]
     );
 

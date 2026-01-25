@@ -3,7 +3,7 @@
  * Database operations for AI photo evaluations
  * Uses Neon PostgreSQL serverless client
  *
- * Table: foto_ai_reviews
+ * Table: dr_photo_unified_reviews (after migration 127)
  * Purpose: Store AI evaluation results for installation drops
  */
 
@@ -31,7 +31,7 @@ export async function getEvaluationByDR(drNumber: string): Promise<EvaluationRes
     const sql = getDbConnection();
     const rows = await sql`
       SELECT
-        dr_number,
+        drop_number as dr_number,
         overall_status,
         average_score,
         total_steps,
@@ -43,8 +43,8 @@ export async function getEvaluationByDR(drNumber: string): Promise<EvaluationRes
         evaluation_date,
         created_at,
         updated_at
-      FROM foto_ai_reviews
-      WHERE dr_number = ${drNumber}
+      FROM dr_photo_unified_reviews
+      WHERE drop_number = ${drNumber}
       LIMIT 1
     `;
 
@@ -99,7 +99,7 @@ export async function getAllEvaluations(filters?: {
 
     const rows = await sql`
       SELECT
-        dr_number,
+        drop_number as dr_number,
         overall_status,
         average_score,
         total_steps,
@@ -111,7 +111,7 @@ export async function getAllEvaluations(filters?: {
         evaluation_date,
         created_at,
         updated_at
-      FROM foto_ai_reviews
+      FROM dr_photo_unified_reviews
       ${sql.unsafe(whereClause)}
       ORDER BY evaluation_date DESC
     `;
@@ -137,38 +137,20 @@ export async function saveEvaluation(evaluation: EvaluationResult): Promise<Eval
     // Convert step_results to JSON string for JSONB column
     const stepResultsJson = JSON.stringify(evaluation.step_results);
 
+    // Update unified table directly (after migration 127)
     await sql`
-      INSERT INTO foto_ai_reviews (
-        dr_number,
-        overall_status,
-        average_score,
-        total_steps,
-        passed_steps,
-        step_results,
-        markdown_report,
-        feedback_sent,
-        evaluation_date
-      ) VALUES (
-        ${evaluation.dr_number},
-        ${evaluation.overall_status},
-        ${evaluation.average_score},
-        ${evaluation.total_steps},
-        ${evaluation.passed_steps},
-        ${stepResultsJson}::jsonb,
-        ${evaluation.markdown_report || null},
-        ${evaluation.feedback_sent},
-        ${evaluation.evaluation_date || new Date()}
-      )
-      ON CONFLICT (dr_number)
-      DO UPDATE SET
-        overall_status = EXCLUDED.overall_status,
-        average_score = EXCLUDED.average_score,
-        total_steps = EXCLUDED.total_steps,
-        passed_steps = EXCLUDED.passed_steps,
-        step_results = EXCLUDED.step_results,
-        markdown_report = EXCLUDED.markdown_report,
-        evaluation_date = EXCLUDED.evaluation_date,
+      UPDATE dr_photo_unified_reviews
+      SET
+        overall_status = ${evaluation.overall_status},
+        average_score = ${evaluation.average_score},
+        total_steps = ${evaluation.total_steps},
+        passed_steps = ${evaluation.passed_steps},
+        step_results = ${stepResultsJson}::jsonb,
+        markdown_report = ${evaluation.markdown_report || null},
+        feedback_sent = ${evaluation.feedback_sent},
+        evaluation_date = ${evaluation.evaluation_date || new Date()},
         updated_at = NOW()
+      WHERE drop_number = ${evaluation.dr_number}
     `;
 
     // Fetch and return the saved evaluation
@@ -194,12 +176,12 @@ export async function markFeedbackSent(drNumber: string): Promise<EvaluationResu
     const sql = getDbConnection();
 
     await sql`
-      UPDATE foto_ai_reviews
+      UPDATE dr_photo_unified_reviews
       SET
         feedback_sent = true,
         feedback_sent_at = NOW(),
         updated_at = NOW()
-      WHERE dr_number = ${drNumber}
+      WHERE drop_number = ${drNumber}
     `;
 
     const updated = await getEvaluationByDR(drNumber);

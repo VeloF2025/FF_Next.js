@@ -121,23 +121,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       hasIssueClassification: !!issueClassification?.issueType,
     });
 
-    // Get current review data from dr_photo_unified_reviews (main table) and foto_ai_reviews (VLM data)
+    // Get current review data from unified table (after migration 127)
     const reviewResult = await pool.query(
       `SELECT
-         u.drop_number,
-         u.photos_metadata::text as photos,
-         u.vlm_categorization_results::text as vlm_categorization,
-         u.ont_serial_scanned as onemap_ont_serial,
-         u.ups_serial_scanned as onemap_ups_serial,
-         f.vlm_power_meter_dbm,
-         f.vlm_ont_serial_step6,
-         f.vlm_ont_serial_step9,
-         f.vlm_dr_number_step9,
-         f.step_coverage::text,
-         f.missing_steps
-       FROM dr_photo_unified_reviews u
-       LEFT JOIN foto_ai_reviews f ON f.dr_number = u.drop_number
-       WHERE u.drop_number = $1
+         drop_number,
+         photos_metadata::text as photos,
+         vlm_categorization_results::text as vlm_categorization,
+         ont_serial_scanned as onemap_ont_serial,
+         ups_serial_scanned as onemap_ups_serial,
+         vlm_power_meter_dbm,
+         vlm_ont_serial_step6,
+         vlm_ont_serial_step9,
+         vlm_dr_number_step9,
+         step_coverage::text,
+         missing_steps
+       FROM dr_photo_unified_reviews
+       WHERE drop_number = $1
        LIMIT 1`,
       [dropNumber]
     );
@@ -198,21 +197,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // Determine the next phase based on draft status
     const nextPhase = isDraft ? 'final_decision' : 'feedback';
 
-    await pool.query(
-      `UPDATE foto_ai_reviews
-       SET
-         qa_decision = $1,
-         qa_decision_reasons = $2,
-         qa_decision_at = NOW(),
-         qa_decision_by = $3,
-         qa_decision_notes = $4,
-         qa_phase = $6,
-         updated_at = NOW()
-       WHERE dr_number = $5`,
-      [decision, JSON.stringify(reasons), userId || null, finalNotes || null, dropNumber, nextPhase]
-    );
-
-    // Also update dr_photo_unified_reviews for DR Review Summary display
+    // Update unified table (after migration 127 - no longer need foto_ai_reviews)
     const vlmQaResults = {
       power_meter: {
         value: review.vlm_power_meter_dbm,
@@ -268,6 +253,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
          qa_internal_notes = $19,
          qa_technician_feedback = $20,
          qa_issue_classification = $21::jsonb,
+         qa_phase = $22,
          human_review_status = CASE WHEN $18 THEN 'in_progress' ELSE 'completed' END,
          human_review_completed_at = CASE WHEN $18 THEN NULL ELSE NOW() END,
          reviewed_at = CASE WHEN $18 THEN NULL ELSE NOW() END,
@@ -306,6 +292,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         internalNotes || null,
         technicianFeedback || null,
         JSON.stringify(issueClassification || {}),
+        nextPhase,
       ]
     );
 
@@ -463,40 +450,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       [dropNumber]
     );
 
-    // Fallback to foto_ai_reviews if not found
     if (result.rows.length === 0) {
-      const fallbackResult = await pool.query(
-        `SELECT
-           qa_decision,
-           qa_decision_reasons::text,
-           qa_decision_at,
-           qa_decision_by,
-           qa_decision_notes,
-           qa_phase
-         FROM foto_ai_reviews
-         WHERE dr_number = $1
-         LIMIT 1`,
-        [dropNumber]
-      );
-
-      if (fallbackResult.rows.length === 0) {
-        return apiResponse.notFound(res, 'DR review', dropNumber);
-      }
-
-      const review = fallbackResult.rows[0];
-      return apiResponse.success(res, {
-        drNumber: dropNumber,
-        decision: review.qa_decision,
-        reasons: review.qa_decision_reasons ? JSON.parse(review.qa_decision_reasons) : [],
-        decidedAt: review.qa_decision_at,
-        decidedBy: review.qa_decision_by,
-        notes: review.qa_decision_notes,
-        phase: review.qa_phase,
-        isDraft: false,
-        internalNotes: null,
-        technicianFeedback: null,
-        issueClassification: null,
-      });
+      return apiResponse.notFound(res, 'DR review', dropNumber);
     }
 
     const review = result.rows[0];

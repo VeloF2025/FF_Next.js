@@ -61,23 +61,23 @@ async function getNewDropsForEvaluation(limit: number = 10): Promise<Array<{
 
     // Query for new drops that:
     // 1. Were created in the last 24 hours
-    // 2. Haven't been evaluated yet (no entry in foto_ai_reviews)
+    // 2. Haven't been evaluated yet (overall_status is pending or null)
     // 3. Have a valid drop number
+    // After migration 127: Use unified table directly
     const rows = await sql`
       SELECT
-        qpr.drop_number,
-        qpr.project,
-        qpr.created_at,
-        qpr.submitted_by
-      FROM qa_photo_reviews qpr
-      LEFT JOIN foto_ai_reviews far ON qpr.drop_number = far.dr_number
+        drop_number,
+        project_name as project,
+        created_at,
+        submitted_by
+      FROM dr_photo_unified_reviews
       WHERE
-        far.dr_number IS NULL  -- Not yet evaluated
-        AND qpr.drop_number IS NOT NULL
-        AND qpr.drop_number != ''
-        AND qpr.created_at >= ${hoursAgo}
-        AND qpr.project NOT IN ('Marketing Activations', 'Unknown')
-      ORDER BY qpr.created_at ASC
+        (overall_status IS NULL OR overall_status = 'pending')
+        AND drop_number IS NOT NULL
+        AND drop_number != ''
+        AND created_at >= ${hoursAgo}
+        AND project_name NOT IN ('Marketing Activations', 'Unknown')
+      ORDER BY created_at ASC
       LIMIT ${limit}
     `;
 

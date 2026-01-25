@@ -88,21 +88,20 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     log.info('ExtractData', `Starting data extraction for ${dropNumber}`, { force });
 
-    // Get categorized photos from dr_photo_unified_reviews and cached VLM results from foto_ai_reviews
+    // Get categorized photos and VLM results from unified table (after migration 127)
     const reviewResult = await pool.query(
       `SELECT
-         u.drop_number as dr_number,
-         u.photos_metadata::text as photos,
-         u.vlm_categorization_results::text as vlm_categorization,
-         u.ont_serial_scanned as onemap_ont_serial,
-         u.ups_serial_scanned as onemap_ups_serial,
-         f.vlm_power_meter_dbm,
-         f.vlm_ont_serial_step6,
-         f.vlm_ont_serial_step9,
-         f.vlm_dr_number_step9
-       FROM dr_photo_unified_reviews u
-       LEFT JOIN foto_ai_reviews f ON f.dr_number = u.drop_number
-       WHERE u.drop_number = $1
+         drop_number as dr_number,
+         photos_metadata::text as photos,
+         vlm_categorization_results::text as vlm_categorization,
+         ont_serial_scanned as onemap_ont_serial,
+         ups_serial_scanned as onemap_ups_serial,
+         vlm_power_meter_dbm,
+         vlm_ont_serial_step6,
+         vlm_ont_serial_step9,
+         vlm_dr_number_step9
+       FROM dr_photo_unified_reviews
+       WHERE drop_number = $1
        LIMIT 1`,
       [dropNumber]
     );
@@ -242,49 +241,27 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       drMatch: serialResult.drMatch,
     });
 
-    // Use UPSERT to create or update foto_ai_reviews row
+    // Update extraction results directly in unified table (after migration 127)
     await pool.query(
-      `INSERT INTO foto_ai_reviews (
-         dr_number,
-         vlm_power_meter_dbm,
-         vlm_power_meter_status,
-         vlm_ont_serial_step6,
-         vlm_ont_serial_step9,
-         vlm_dr_number_step9,
-         serial_validation_status,
-         serial_validation_details,
-         serial_extraction_method_step6,
-         serial_extraction_method_step9,
-         data_validation_completed,
-         data_validation_completed_at,
-         qa_phase,
-         onemap_ont_serial,
-         onemap_ups_serial,
-         overall_status,
-         average_score,
-         passed_steps,
-         step_results,
-         created_at,
-         updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, NOW(), 'final_decision', $11, $12, 'PASS', 0, 0, '[]'::jsonb, NOW(), NOW())
-       ON CONFLICT (dr_number) DO UPDATE SET
-         vlm_power_meter_dbm = EXCLUDED.vlm_power_meter_dbm,
-         vlm_power_meter_status = EXCLUDED.vlm_power_meter_status,
-         vlm_ont_serial_step6 = EXCLUDED.vlm_ont_serial_step6,
-         vlm_ont_serial_step9 = EXCLUDED.vlm_ont_serial_step9,
-         vlm_dr_number_step9 = EXCLUDED.vlm_dr_number_step9,
-         serial_validation_status = EXCLUDED.serial_validation_status,
-         serial_validation_details = EXCLUDED.serial_validation_details,
-         serial_extraction_method_step6 = EXCLUDED.serial_extraction_method_step6,
-         serial_extraction_method_step9 = EXCLUDED.serial_extraction_method_step9,
+      `UPDATE dr_photo_unified_reviews SET
+         vlm_power_meter_dbm = $1,
+         vlm_power_meter_status = $2,
+         vlm_ont_serial_step6 = $3,
+         vlm_ont_serial_step9 = $4,
+         vlm_dr_number_step9 = $5,
+         serial_validation_status = $6,
+         serial_validation_details = $7,
+         serial_extraction_method_step6 = $8,
+         serial_extraction_method_step9 = $9,
          data_validation_completed = true,
          data_validation_completed_at = NOW(),
          qa_phase = 'final_decision',
-         onemap_ont_serial = COALESCE(EXCLUDED.onemap_ont_serial, foto_ai_reviews.onemap_ont_serial),
-         onemap_ups_serial = COALESCE(EXCLUDED.onemap_ups_serial, foto_ai_reviews.onemap_ups_serial),
-         updated_at = NOW()`,
+         onemap_ont_serial = COALESCE($10, onemap_ont_serial),
+         onemap_ups_serial = COALESCE($11, onemap_ups_serial),
+         overall_status = 'PASS',
+         updated_at = NOW()
+       WHERE drop_number = $12`,
       [
-        dropNumber,
         extraction.powerMeter?.value ?? null,
         powerMeterResult.status,
         extraction.ontSerialStep6?.serial ?? null,
@@ -296,6 +273,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         extraction.step9?.ontSerial.extractionMethod ?? 'vlm',
         review.onemap_ont_serial ?? null,
         review.onemap_ups_serial ?? null,
+        dropNumber,
       ]
     );
 
