@@ -118,8 +118,9 @@ export function PremiumLoginPage() {
       setPassword(actualPassword);
     }
 
-    // Validate: password shouldn't be the email (Chrome autofill bug with multi-step forms)
-    if (actualPassword === email || actualPassword.includes('@')) {
+    // Validate: password shouldn't be exactly the email (Chrome autofill bug with multi-step forms)
+    // Only check exact match - passwords CAN contain @ symbols legitimately
+    if (actualPassword === email) {
       setError('Please enter your password, not your email address. If Chrome autofilled incorrectly, please clear and re-enter your password.');
       setPassword('');
       if (passwordRef.current) {
