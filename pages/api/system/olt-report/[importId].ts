@@ -10,17 +10,22 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import db from '@/lib/db';
+import { Pool } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
-  const client = await db.connect();
+  const client = await pool.connect();
   const { importId } = req.query;
 
   try {

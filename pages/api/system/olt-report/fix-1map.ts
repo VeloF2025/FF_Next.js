@@ -21,12 +21,17 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import db from '@/lib/db';
+import { Pool, PoolClient } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
 
 // Extend timeout for 1Map API calls (4-step auth is slow)
 export const config = {
@@ -50,7 +55,7 @@ interface FixResult {
 }
 
 async function fixSingleDR(
-  client: Awaited<ReturnType<typeof db.connect>>,
+  client: PoolClient,
   item: FixItem,
   userId: string | null
 ): Promise<FixResult> {
@@ -264,7 +269,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  const client = await db.connect();
+  const client = await pool.connect();
   const user = getAuthUser(req);
 
   try {
