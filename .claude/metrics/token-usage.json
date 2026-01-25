@@ -3,16 +3,16 @@
     "37f60eb6-3466-4aaf-83b0-52c90656ee2d": {
       "session_id": "37f60eb6-3466-4aaf-83b0-52c90656ee2d",
       "started_at": "2026-01-25T15:22:37.918Z",
-      "total_input_tokens": 18409,
+      "total_input_tokens": 18954,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.05522699999999999,
-      "tool_calls": 80,
+      "total_cost_usd": 0.056861999999999996,
+      "tool_calls": 88,
       "tools_used": {
         "Read": 21,
         "Grep": 2,
-        "Bash": 17,
+        "Bash": 24,
         "Task": 1,
-        "TodoWrite": 6,
+        "TodoWrite": 7,
         "Edit": 32,
         "Write": 1
       }
@@ -20,16 +20,16 @@
     "e7f98949-d55e-4347-a95f-3ac42184a1b5": {
       "session_id": "e7f98949-d55e-4347-a95f-3ac42184a1b5",
       "started_at": "2026-01-25T15:22:32.964Z",
-      "total_input_tokens": 19007,
+      "total_input_tokens": 20536,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.05702100000000001,
-      "tool_calls": 74,
+      "total_cost_usd": 0.06160800000000001,
+      "tool_calls": 87,
       "tools_used": {
         "Read": 14,
         "Glob": 4,
-        "TodoWrite": 8,
+        "TodoWrite": 9,
         "Write": 3,
-        "Bash": 27,
+        "Bash": 39,
         "Edit": 4,
         "mcp__claude-in-chrome__tabs_context_mcp": 2,
         "mcp__claude-in-chrome__navigate": 2,
@@ -39,14 +39,26 @@
     "fa74656c-7265-4749-8435-50d7951a8301": {
       "session_id": "fa74656c-7265-4749-8435-50d7951a8301",
       "started_at": "2026-01-25T15:37:42.221Z",
-      "total_input_tokens": 1253,
+      "total_input_tokens": 1508,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.003759,
-      "tool_calls": 9,
+      "total_cost_usd": 0.004524,
+      "tool_calls": 10,
       "tools_used": {
-        "Bash": 7,
+        "Bash": 8,
         "Read": 1,
         "Edit": 1
+      }
+    },
+    "22f2b7bd-8008-4f45-a284-cd208544e8c9": {
+      "session_id": "22f2b7bd-8008-4f45-a284-cd208544e8c9",
+      "started_at": "2026-01-25T17:13:11.649Z",
+      "total_input_tokens": 191,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.0005729999999999999,
+      "tool_calls": 5,
+      "tools_used": {
+        "Read": 1,
+        "Bash": 4
       }
     }
   }

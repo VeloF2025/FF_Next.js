@@ -44,6 +44,7 @@ export default function GRNDetailPage() {
   const [grn, setGrn] = useState<GoodsReceiptNote | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,6 +71,40 @@ export default function GRNDetailPage() {
 
     fetchGRN();
   }, [id]);
+
+  const handleConfirmGRN = async () => {
+    if (!grn || !id) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to confirm GRN ${grn.grnNumber}?\n\nThis will:\n• Update stock quantities\n• Create a stock movement record\n• Mark the GRN as received`
+    );
+
+    if (!confirmed) return;
+
+    setIsConfirming(true);
+    try {
+      const response = await fetch('/api/procurement/grn-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grnId: id }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state to reflect new status
+        setGrn(prev => prev ? { ...prev, status: 'completed' as GRNStatus } : null);
+        alert(`GRN confirmed successfully!\n\nItems processed: ${data.data.summary.itemsProcessed}\nTotal quantity received: ${data.data.summary.totalQuantityReceived}`);
+      } else {
+        alert(`Failed to confirm GRN: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      log.error('Failed to confirm GRN', err);
+      alert('Failed to confirm GRN. Please try again.');
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '-';
@@ -180,20 +215,30 @@ export default function GRNDetailPage() {
 
               {/* Actions */}
               <div className="flex items-center gap-2">
-                {grn.status === 'draft' && (
-                  <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                    Start Receiving
+                {(grn.status === 'draft' || grn.status === 'receiving') && (
+                  <button
+                    onClick={handleConfirmGRN}
+                    disabled={isConfirming}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isConfirming ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Confirming...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        Confirm Receipt
+                      </>
+                    )}
                   </button>
                 )}
-                {grn.status === 'receiving' && (
-                  <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                    Complete Receipt
-                  </button>
-                )}
-                {grn.status === 'inspecting' && (
-                  <button className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                    Complete Inspection
-                  </button>
+                {grn.status === 'completed' && (
+                  <span className="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Completed
+                  </span>
                 )}
               </div>
             </div>

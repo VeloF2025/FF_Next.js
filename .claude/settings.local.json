@@ -698,7 +698,9 @@
       "Bash(then echo \"✅ Dev server is up!\" break fi echo \"Waiting... \\($i\\)\" done)",
       "Bash(then echo \"✅ Server is up!\" break fi echo \"Waiting... \\($i\\)\" done)",
       "Bash(TOKEN=\"faac7ae2-6e22-40c7-95c2-03649ece63d1\" echo \"=== Checking DR1733276 in 1Map ===\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''DR1733276''''&token=$TOKEN\")",
-      "Bash(TOKEN=\"faac7ae2-6e22-40c7-95c2-03649ece63d1\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''DR1733276''''&token=$TOKEN\")"
+      "Bash(TOKEN=\"faac7ae2-6e22-40c7-95c2-03649ece63d1\" curl -s \"https://www.1map.co.za/api/v1/data/5121?CQL_FILTER=drp=''''DR1733276''''&token=$TOKEN\")",
+      "Bash(ODOO_URL='https://velocityfibre.odoo.com':*)",
+      "Bash(ODOO_DB='velocityfibre' )"
     ],
     "deny": [],
     "ask": [],
