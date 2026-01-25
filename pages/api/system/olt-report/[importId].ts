@@ -74,7 +74,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           drop_number,
           event_type,
           event_data,
-          created_by,
+          actor,
           created_at
         FROM dr_activity_log
         WHERE drop_number = ANY($1)
