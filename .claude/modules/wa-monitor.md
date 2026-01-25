@@ -16,6 +16,10 @@
 FibreFlow APIs → wa-feedback (Velocity:8092) → VPS sender (8081) → WhatsApp
                                                                       ↓
                               Neon DB ← VPS bridge (8083) ← WhatsApp incoming
+                                                   ↓
+                                           SQLite (messages.db)
+                                                   ↓
+                                        Command Bot (8086) → responses
 ```
 
 **Why VPS?** WhatsApp services run on Hostinger VPS for redundancy. If Velocity goes down, DR submissions still get captured.
@@ -25,7 +29,8 @@ FibreFlow APIs → wa-feedback (Velocity:8092) → VPS sender (8081) → WhatsAp
 | Service | Port | Purpose |
 |---------|------|---------|
 | `whatsapp-sender` | 8081 | **SENDING** - REST API `/send-message` |
-| `whatsapp-bridge` | 8083 | **RECEIVING** - Incoming messages → DB |
+| `whatsapp-bridge` | 8083 | **RECEIVING** - Incoming messages → SQLite |
+| `wa-command-bot` | 8086 | **COMMANDS** - `!status`, `!restart` from admin groups |
 
 ```bash
 ssh root@72.61.197.178
@@ -68,12 +73,53 @@ wa-monitor-prod (Port 8090) - Python monitor for group monitoring
 
 ### Monitored WhatsApp Groups
 
-| Project | Group JID |
-|---------|-----------|
-| Lawley | `120363418298130331@g.us` |
-| Mohadin | `120363421532174586@g.us` |
-| Velo Test | `120363421664266245@g.us` |
-| Mamelodi | `120363408849234743@g.us` |
+| Project | Group JID | Purpose |
+|---------|-----------|---------|
+| Lawley | `120363418298130331@g.us` | DR submissions |
+| Mohadin | `120363421532174586@g.us` | DR submissions |
+| Mamelodi | `120363408849234743@g.us` | DR submissions |
+| Mohadin QA | `120363424360693693@g.us` | Maintenance tracking |
+| Velo Test | `120363421664266245@g.us` | Testing + Commands |
+| AI Recovery | `120363423864087150@g.us` | **Admin commands** |
+| Marketing Activations | `120363422808656601@g.us` | DR submissions |
+
+### WhatsApp Command Bot (VPS Port 8086)
+
+Infrastructure management via WhatsApp commands from admin groups.
+
+**Admin Groups:** Velo Test, AI Recovery Alerts
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `!help` | Show all commands |
+| `!status` | All service health |
+| `!status <service>` | Specific service status |
+| `!restart <service>` | Restart a service |
+| `!health` | Quick health summary |
+| `!pending` | Show pending approvals |
+| `!approve <token>` | Approve dangerous action |
+
+**Service Aliases:** `vlm`, `qfield`, `production`, `staging`, `dev`, `grafana`, `portainer`, `pdfcraft`, `wa-feedback`, `wa-bridge`, `wa-sender`
+
+**How it works:**
+1. Bot polls SQLite (`/opt/whatsapp-bridge/store/messages.db`) every 2 seconds
+2. Detects commands starting with `!` or `/` from admin groups
+3. Executes command and sends response back to WhatsApp
+4. Dangerous actions require approval token
+
+```bash
+# Service management
+ssh root@72.61.197.178
+systemctl status wa-command-bot
+systemctl restart wa-command-bot
+journalctl -u wa-command-bot -f
+
+# Health check
+curl http://localhost:8086/health
+```
+
+**Code:** `/opt/wa-command-bot/main.py`
 
 ## Dependencies
 
@@ -159,6 +205,8 @@ Steps are stored as `step_01` through `step_12` boolean columns in database.
 - **Unified Phone Number**: All messages (acks + feedback) come from 082 418 9511
 - **Message Deletion**: Messages can be deleted within 1 hour via `/delete-message`
 - **Ack Filter**: Bridge skips messages containing "Received!" to prevent infinite loop
+- **Bridge Group Tracking**: Groups must be in `main.go` PROJECTS map - SQLite chats table alone is NOT enough
+- **Command Bot Polling**: Bot polls SQLite every 2 seconds, only processes `!` or `/` prefixed messages
 
 ## Quick Commands
 
@@ -217,6 +265,55 @@ curl -s -X POST http://72.61.197.178:8081/send-message \
 ```bash
 ssh root@72.61.197.178 "tail -100 /opt/whatsapp-bridge/bridge.log | grep -E '(401|FAILED|ERROR)'"
 ```
+
+### Adding New Groups to Bridge
+
+The bridge has a **hardcoded** list of tracked groups in `main.go`. Messages from non-tracked groups are received but NOT stored to SQLite.
+
+**Source location:** `/home/louis/whatsapp-bridge-go/main.go` (Velocity server)
+
+**Steps to add a new group:**
+
+1. **Edit the PROJECTS map** in main.go:
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105
+sudo nano /home/louis/whatsapp-bridge-go/main.go
+```
+
+2. **Add entry to PROJECTS** (around line 40):
+```go
+"New Project": {
+    "group_jid":          "120363XXXXXXXXXX@g.us",
+    "project_name":       "Project Name",
+    "group_description": "Description",
+},
+```
+
+3. **Compile:**
+```bash
+cd /home/louis/whatsapp-bridge-go
+sudo go build -o whatsapp-bridge-new .
+```
+
+4. **Deploy to VPS:**
+```bash
+# Copy via local machine (Velocity can't SSH to VPS directly)
+sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new ~/
+scp ~/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
+rm ~/whatsapp-bridge-new
+```
+
+5. **Replace and restart on VPS:**
+```bash
+ssh root@72.61.197.178
+systemctl stop whatsapp-bridge
+cp /opt/whatsapp-bridge/whatsapp-bridge /opt/whatsapp-bridge/whatsapp-bridge.backup
+mv /opt/whatsapp-bridge/whatsapp-bridge-new /opt/whatsapp-bridge/whatsapp-bridge
+chmod +x /opt/whatsapp-bridge/whatsapp-bridge
+systemctl start whatsapp-bridge
+```
+
+**Note:** Adding a group to SQLite `chats` table alone is NOT enough - the filtering is in the compiled Go code.
 
 ## WhatsApp Portal (Admin UI)
 

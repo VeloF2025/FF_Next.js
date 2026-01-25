@@ -186,3 +186,71 @@ const StatusIcon = status.icon;  // Always defined
 - Add new values to config if they're legitimate statuses
 
 **Affected Areas:** Any component using config objects for status/type display (vehicles, projects, staff, etc.).
+
+---
+
+## 2026-01-25: Users Table Schema - Use first_name/last_name, Not name
+
+**Issue:** `column "name" does not exist` or `column et.name does not exist` when querying users table for display names.
+
+**Root Cause:** The `users` table has `first_name` and `last_name` columns, NOT a `name` column. This is a common mistake when writing queries that JOIN to the users table.
+
+**Bad Pattern:**
+```typescript
+// ❌ Crashes - column "name" doesn't exist
+const result = await client.query(`
+  SELECT id, email, name FROM users WHERE role = 'admin'
+`);
+
+// ❌ Crashes when joining
+const result = await client.query(`
+  SELECT m.*, u.name as assigned_to_name
+  FROM records m
+  LEFT JOIN users u ON m.assigned_to = u.id
+`);
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Use COALESCE with first_name and last_name
+const result = await client.query(`
+  SELECT id, email, first_name, last_name,
+         COALESCE(first_name || ' ' || last_name, first_name, last_name, email) as display_name
+  FROM users
+  WHERE role = 'admin'
+`);
+
+// ✅ Same pattern for JOINs
+const result = await client.query(`
+  SELECT m.*,
+         COALESCE(u.first_name || ' ' || u.last_name, u.first_name, u.last_name, u.email) as assigned_to_name
+  FROM records m
+  LEFT JOIN users u ON m.assigned_to = u.id
+`);
+```
+
+**COALESCE Explained:**
+The pattern `COALESCE(first_name || ' ' || last_name, first_name, last_name, email)` handles all cases:
+1. Both names exist: "John Smith"
+2. Only first_name: "John"
+3. Only last_name: "Smith"
+4. Neither name: falls back to email
+
+**Users Table Schema:**
+```sql
+users (
+  id UUID PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  first_name VARCHAR(100),  -- NOT "name"
+  last_name VARCHAR(100),
+  role VARCHAR(50),  -- 'admin', 'manager', 'user'
+  is_active BOOLEAN DEFAULT true,
+  ...
+)
+```
+
+**Affected Areas:** Any API route or query that JOINs to the users table or needs to display user names. Common cases:
+- Escalation lookups (escalated_to, escalated_by)
+- Assignment lookups (assigned_to, created_by)
+- Audit trails (modified_by, approved_by)
+- Admin user dropdowns
