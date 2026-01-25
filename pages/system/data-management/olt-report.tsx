@@ -383,11 +383,11 @@ export default function OltReportPage() {
       if (data.success) {
         setImportDetail(data.data);
       } else {
-        alert('Failed to load import details');
+        alert(`Failed to load import details: ${data.error?.message || JSON.stringify(data.error) || 'Unknown error'}`);
         setSelectedImportId(null);
       }
-    } catch {
-      alert('Failed to load import details');
+    } catch (err) {
+      alert(`Failed to load import details: ${err instanceof Error ? err.message : 'Network error'}`);
       setSelectedImportId(null);
     } finally {
       setLoadingDetail(false);
