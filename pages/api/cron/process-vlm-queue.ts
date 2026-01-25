@@ -376,9 +376,11 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    log.error('ProcessVlmQueue', 'Fatal error', { error });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    log.error('ProcessVlmQueue', `Fatal error: ${errorMessage}`, { stack: errorStack });
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to process VLM queue',
+      error: errorMessage || 'Failed to process VLM queue',
     });
   }
 }
