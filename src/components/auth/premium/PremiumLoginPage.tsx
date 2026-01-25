@@ -4,7 +4,7 @@
  * Supports: Multi-step flow for first-time users and returning users
  */
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -43,22 +43,33 @@ export function PremiumLoginPage() {
   const [quote, setQuote] = useState<MotivationalQuote | null>(null);
   const [mounted, setMounted] = useState(false);
 
+  // Refs to read actual DOM values (for browser autofill)
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
   // Initialize quote on mount (client-side only for randomness)
   useEffect(() => {
     setMounted(true);
     setQuote(getRandomQuote());
   }, []);
 
+
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
+    // Get email from DOM (handles browser autofill that bypasses React onChange)
+    const actualEmail = emailRef.current?.value || email;
+    if (actualEmail !== email) {
+      setEmail(actualEmail);
+    }
+
     try {
       const res = await fetch('/api/auth/check-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: actualEmail }),
       });
 
       const data = await res.json();
@@ -101,9 +112,27 @@ export function PremiumLoginPage() {
     setLoading(true);
     setError(null);
 
+    // Get password from DOM (handles browser autofill that bypasses React onChange)
+    const actualPassword = passwordRef.current?.value || password;
+    if (actualPassword !== password) {
+      setPassword(actualPassword);
+    }
+
+    // Validate: password shouldn't be the email (Chrome autofill bug with multi-step forms)
+    if (actualPassword === email || actualPassword.includes('@')) {
+      setError('Please enter your password, not your email address. If Chrome autofilled incorrectly, please clear and re-enter your password.');
+      setPassword('');
+      if (passwordRef.current) {
+        passwordRef.current.value = '';
+        passwordRef.current.focus();
+      }
+      setLoading(false);
+      return;
+    }
+
     try {
       // Use AuthContext to login - this properly updates auth state
-      await signInWithEmail(email, password);
+      await signInWithEmail(email, actualPassword);
 
       // Redirect to dashboard on success (AuthContext is now updated)
       const returnUrl = (router.query.returnUrl as string) || '/';
@@ -208,15 +237,17 @@ export function PremiumLoginPage() {
   };
 
   const renderEmailStep = () => (
-    <form onSubmit={handleEmailSubmit} className="space-y-5">
+    <form onSubmit={handleEmailSubmit} className="space-y-5" autoComplete="on">
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-2">
           Email Address
         </label>
         <VelocityInput
+          key="email-input"
+          ref={emailRef}
           type="email"
-          name="email"
-          id="login-email"
+          name="username"
+          id="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -224,7 +255,7 @@ export function PremiumLoginPage() {
           icon={<Mail className="w-5 h-5" />}
           iconPosition="left"
           placeholder="you@company.com"
-          autoComplete="email"
+          autoComplete="username"
           disabled={loading}
           disableFloating
         />
@@ -245,26 +276,36 @@ export function PremiumLoginPage() {
   );
 
   const renderPasswordStep = () => (
-    <form onSubmit={handlePasswordSubmit} className="space-y-5">
+    <form onSubmit={handlePasswordSubmit} className="space-y-5" autoComplete="on">
+      {/* Hidden pre-filled username field - Critical for Chrome password manager in multi-step forms
+          Per Chromium docs: include username field (prefilled), hidden with CSS on password page
+          This lets password managers detect which account is being logged into */}
+      <input
+        type="email"
+        name="username"
+        autoComplete="username"
+        value={email}
+        readOnly
+        tabIndex={-1}
+        aria-hidden="true"
+        style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }}
+      />
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
+        <label htmlFor="current-password" className="block text-sm font-medium text-slate-300 mb-2">
           Password
         </label>
-        <VelocityInput
+        <input
+          ref={passwordRef}
           type="password"
           name="password"
-          id="login-password"
+          id="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          variant="neon-green"
-          icon={<Lock className="w-5 h-5" />}
-          iconPosition="left"
-          showPasswordReveal
           placeholder="Enter your password"
           autoComplete="current-password"
           disabled={loading}
-          disableFloating
+          className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
         />
       </div>
 
