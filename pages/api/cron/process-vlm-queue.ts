@@ -15,7 +15,6 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
-import ws from 'ws';
 import { log } from '@/lib/logger';
 import {
   categorizePhotos,
@@ -29,9 +28,6 @@ import {
   validateSerialCrossReference,
   type DrValidationData,
 } from '@/modules/activate/services/qaAutoFailService';
-
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
 
 const pool = new Pool({
   connectionString:
