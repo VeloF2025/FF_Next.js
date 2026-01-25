@@ -677,7 +677,7 @@ export function PipelineProjectDetail() {
             {/* Project Info */}
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
               <h3 className="font-semibold text-[var(--ff-text-primary)] mb-4">Project Details</h3>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-4 text-sm">
                 {project.client_name && (
                   <div className="flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-[var(--ff-text-secondary)]" />
