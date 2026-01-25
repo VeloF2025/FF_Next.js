@@ -142,3 +142,47 @@ async function handler(req, res) {
 - `@neondatabase/serverless` (WebSocket) - Only if you need real-time/streaming features and can handle connection drops
 
 **Affected Areas:** All API routes that need database connections, especially in `/pages/api/`.
+
+---
+
+## 2026-01-25: Config Lookup Fallback Pattern
+
+**Issue:** `TypeError: Cannot read properties of undefined (reading 'icon')` when accessing properties from a config lookup where the key doesn't exist.
+
+**Root Cause:** Using a config object to map status/type values to display properties without handling unknown values.
+
+**Bad Pattern:**
+```typescript
+// ❌ Crashes if vehicle.status is not in statusConfig
+const statusConfig = {
+  active: { label: 'Active', icon: Car },
+  maintenance: { label: 'Maintenance', icon: Wrench },
+  retired: { label: 'Retired', icon: XCircle },
+};
+
+const status = statusConfig[vehicle.status];
+const StatusIcon = status.icon;  // TypeError if status is undefined
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Fallback for unknown values
+const status = statusConfig[vehicle.status as keyof typeof statusConfig] || {
+  label: vehicle.status || 'Unknown',
+  color: 'bg-gray-100 text-gray-800',
+  icon: Car,  // Default icon
+};
+const StatusIcon = status.icon;  // Always defined
+```
+
+**Key Points:**
+1. **Always provide a fallback** when using config lookups with dynamic keys
+2. **Use the raw value as label** - `vehicle.status || 'Unknown'` shows actual value
+3. **Neutral styling for unknowns** - gray color indicates unexpected state
+4. **Default icon** - use a sensible default that won't look broken
+
+**Also Consider:**
+- Database cleanup: Fix inconsistent values at the source (e.g., `inactive` → `retired`)
+- Add new values to config if they're legitimate statuses
+
+**Affected Areas:** Any component using config objects for status/type display (vehicles, projects, staff, etc.).
