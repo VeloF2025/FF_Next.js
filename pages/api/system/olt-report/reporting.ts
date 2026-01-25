@@ -147,20 +147,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // CSV Export
     if (format === 'csv') {
+      // Helper to safely escape CSV values
+      const escapeCSV = (val: unknown): string => {
+        const str = String(val ?? '');
+        // Escape quotes by doubling them
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      // Helper to format date safely
+      const formatDate = (val: unknown): string => {
+        if (!val) return '';
+        try {
+          return new Date(val as string).toISOString();
+        } catch {
+          return '';
+        }
+      };
+
       const csvRows = [
         ['DR Number', 'ONT Serial (Correct)', '1Map Serial (Wrong)', 'Status', 'Old Value', 'Fixed At', 'Import File', 'Project', 'Imported At', 'Fixed By'].join(','),
         ...records.map(r => [
-          r.drop_number,
-          r.olt_serial || '',
-          r.wrong_onemap_serial || '',
-          r.fix_status,
-          r.fix_old_value || '',
-          r.fix_attempted_at ? new Date(r.fix_attempted_at).toISOString() : '',
-          (r.import_filename || '').replace(/,/g, ';'),
-          r.project || '',
-          r.imported_at ? new Date(r.imported_at).toISOString() : '',
-          r.fixed_by || ''
-        ].map(v => `"${v}"`).join(','))
+          escapeCSV(r.drop_number),
+          escapeCSV(r.olt_serial),
+          escapeCSV(r.wrong_onemap_serial),
+          escapeCSV(r.fix_status),
+          escapeCSV(r.fix_old_value),
+          escapeCSV(formatDate(r.fix_attempted_at)),
+          escapeCSV(r.import_filename),
+          escapeCSV(r.project),
+          escapeCSV(formatDate(r.imported_at)),
+          escapeCSV(r.fixed_by)
+        ].join(','))
       ].join('\n');
 
       res.setHeader('Content-Type', 'text/csv');

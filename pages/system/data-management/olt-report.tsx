@@ -442,6 +442,19 @@ export default function OltReportPage() {
     setExporting(true);
     try {
       const res = await fetch(`/api/system/olt-report/reporting?period=${reportPeriod}&format=csv`);
+
+      // Check if response is OK
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: { message: 'Unknown error' } }));
+        throw new Error(errorData.error?.message || 'Export failed');
+      }
+
+      // Check content type is CSV
+      const contentType = res.headers.get('content-type');
+      if (!contentType?.includes('text/csv')) {
+        throw new Error('Server did not return CSV data');
+      }
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
