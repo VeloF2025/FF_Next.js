@@ -49,6 +49,38 @@ export function AllProjectsOverview({
         </p>
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Button variant="outline" onClick={() => navigate('/procurement/reports')} className="flex items-center gap-2 h-auto p-4">
+          <BarChart3 className="h-5 w-5 text-blue-400" />
+          <div className="text-left">
+            <div className="font-medium text-[var(--ff-text-primary)]">Generate Reports</div>
+            <div className="text-sm text-[var(--ff-text-secondary)]">Cross-project analytics</div>
+          </div>
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/procurement/rfq')} className="flex items-center gap-2 h-auto p-4">
+          <TrendingUp className="h-5 w-5 text-green-400" />
+          <div className="text-left">
+            <div className="font-medium text-[var(--ff-text-primary)]">New RFQ</div>
+            <div className="text-sm text-[var(--ff-text-secondary)]">Create quotation request</div>
+          </div>
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/suppliers')} className="flex items-center gap-2 h-auto p-4">
+          <Users className="h-5 w-5 text-purple-400" />
+          <div className="text-left">
+            <div className="font-medium text-[var(--ff-text-primary)]">Manage Suppliers</div>
+            <div className="text-sm text-[var(--ff-text-secondary)]">View supplier database</div>
+          </div>
+        </Button>
+        <Button variant="outline" onClick={() => navigate('/procurement/inventory')} className="flex items-center gap-2 h-auto p-4">
+          <Package className="h-5 w-5 text-orange-400" />
+          <div className="text-left">
+            <div className="font-medium text-[var(--ff-text-primary)]">Stock Overview</div>
+            <div className="text-sm text-[var(--ff-text-secondary)]">Inventory management</div>
+          </div>
+        </Button>
+      </div>
+
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
@@ -247,59 +279,6 @@ export function AllProjectsOverview({
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
-        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Organization-Wide Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate('/app/procurement/reports')}
-            className="flex items-center gap-2 h-auto p-4"
-          >
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-            <div className="text-left">
-              <div className="font-medium">Generate Reports</div>
-              <div className="text-sm text-gray-500">Cross-project analytics</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={() => navigate('/app/procurement/suppliers')}
-            className="flex items-center gap-2 h-auto p-4"
-          >
-            <Users className="h-5 w-5 text-green-600" />
-            <div className="text-left">
-              <div className="font-medium">Supplier Management</div>
-              <div className="text-sm text-gray-500">Performance tracking</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={() => navigate('/app/procurement/stock')}
-            className="flex items-center gap-2 h-auto p-4"
-          >
-            <Package className="h-5 w-5 text-purple-600" />
-            <div className="text-left">
-              <div className="font-medium">Stock Overview</div>
-              <div className="text-sm text-gray-500">Inventory across sites</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={() => navigate('/app/analytics')}
-            className="flex items-center gap-2 h-auto p-4"
-          >
-            <TrendingUp className="h-5 w-5 text-orange-600" />
-            <div className="text-left">
-              <div className="font-medium">Advanced Analytics</div>
-              <div className="text-sm text-gray-500">Predictive insights</div>
-            </div>
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -143,6 +143,49 @@ export function FieldStockDashboard() {
         </button>
       </div>
 
+      {/* Quick Actions - Moved to top for better accessibility */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+          <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+            <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <p className="font-medium text-[var(--ff-text-primary)]">Issue Stock</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Create new picking</p>
+          </div>
+        </button>
+
+        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+          <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+            <ScanLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <p className="font-medium text-[var(--ff-text-primary)]">Record Consumption</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Link material to job</p>
+          </div>
+        </button>
+
+        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+          <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
+            <ArrowRightLeft className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <p className="font-medium text-[var(--ff-text-primary)]">Process Return</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Return unused stock</p>
+          </div>
+        </button>
+
+        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-default)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
+          <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
+            <MapPin className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div>
+            <p className="font-medium text-[var(--ff-text-primary)]">Manage Locations</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">View all locations</p>
+          </div>
+        </button>
+      </div>
+
       {/* Alerts Section */}
       {summary && (summary.alerts.lowStock > 0 || summary.alerts.pendingReturns > 0 || summary.alerts.blockedContractors > 0) && (
         <div className="space-y-2">
@@ -187,51 +230,6 @@ export function FieldStockDashboard() {
         />
       </div>
 
-      {/* Quick Actions */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <button className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-blue-500 hover:bg-blue-50 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-blue-900/20">
-            <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-              <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">Issue Stock</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Create new picking</p>
-            </div>
-          </button>
-
-          <button className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-green-500 hover:bg-green-50 dark:border-gray-600 dark:hover:border-green-500 dark:hover:bg-green-900/20">
-            <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-              <ScanLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">Record Consumption</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Link material to job</p>
-            </div>
-          </button>
-
-          <button className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-purple-500 hover:bg-purple-50 dark:border-gray-600 dark:hover:border-purple-500 dark:hover:bg-purple-900/20">
-            <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
-              <ArrowRightLeft className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">Process Return</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Return unused stock</p>
-            </div>
-          </button>
-
-          <button className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 text-left hover:border-orange-500 hover:bg-orange-50 dark:border-gray-600 dark:hover:border-orange-500 dark:hover:bg-orange-900/20">
-            <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
-              <MapPin className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">Manage Locations</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">View all locations</p>
-            </div>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
