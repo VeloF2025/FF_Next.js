@@ -31,7 +31,7 @@ import {
   Calendar,
 } from 'lucide-react';
 
-type TabId = 'import' | 'pending' | 'needs_investigation' | 'history' | 'reporting';
+type TabId = 'import' | 'pending' | 'needs_investigation' | 'escalations' | 'history' | 'reporting';
 type ReportPeriod = 'today' | 'yesterday' | 'week' | '30days' | 'all';
 
 interface OltRecord {
@@ -77,8 +77,16 @@ interface Stats {
   pending: number;
   needs_investigation: number;
   fixed: number;
+  resolved: number;
+  escalated: number;
   empty: number;
   total: number;
+}
+
+interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
 }
 
 export default function OltReportPage() {
@@ -107,7 +115,7 @@ export default function OltReportPage() {
   // Data state
   const [records, setRecords] = useState<OltRecord[]>([]);
   const [imports, setImports] = useState<ImportRecord[]>([]);
-  const [stats, setStats] = useState<Stats>({ pending: 0, needs_investigation: 0, fixed: 0, empty: 0, total: 0 });
+  const [stats, setStats] = useState<Stats>({ pending: 0, needs_investigation: 0, fixed: 0, resolved: 0, escalated: 0, empty: 0, total: 0 });
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 50;
@@ -142,6 +150,18 @@ export default function OltReportPage() {
   // Projects state
   const [projects, setProjects] = useState<Array<{ id: string; project_name: string; project_code: string }>>([]);
 
+  // Investigation/Escalation state
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [escalatingRecord, setEscalatingRecord] = useState<OltRecord | null>(null);
+  const [selectedAdmin, setSelectedAdmin] = useState<string>('');
+  const [escalationNotes, setEscalationNotes] = useState<string>('');
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolvingRecord, setResolvingRecord] = useState<OltRecord | null>(null);
+  const [resolutionType, setResolutionType] = useState<string>('');
+  const [resolutionNotes, setResolutionNotes] = useState<string>('');
+
   // Reporting state
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('all');
   const [reportData, setReportData] = useState<{
@@ -153,7 +173,7 @@ export default function OltReportPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Fetch active projects on mount
+  // Fetch active projects and admin users on mount
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -166,7 +186,21 @@ export default function OltReportPage() {
         // Silently fail - projects dropdown will just be empty
       }
     };
+
+    const fetchAdminUsers = async () => {
+      try {
+        const res = await fetch('/api/system/olt-report/admin-users');
+        if (res.ok) {
+          const data = await res.json();
+          setAdminUsers(data.data?.users || data.users || []);
+        }
+      } catch {
+        // Silently fail
+      }
+    };
+
     fetchProjects();
+    fetchAdminUsers();
   }, []);
 
   // Fetch data based on active tab
@@ -478,6 +512,76 @@ export default function OltReportPage() {
     }
   }, [activeTab, reportData, reportPeriod, fetchReportData]);
 
+  // Handle escalation
+  const handleEscalate = async () => {
+    if (!escalatingRecord || !selectedAdmin) return;
+
+    setResolving(escalatingRecord.id);
+    try {
+      const res = await fetch('/api/system/olt-report/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordId: escalatingRecord.id,
+          action: 'escalate',
+          escalateTo: selectedAdmin,
+          notes: escalationNotes,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success || data.data?.success) {
+        alert(`Escalated ${escalatingRecord.drop_number} to admin`);
+        setShowEscalateModal(false);
+        setEscalatingRecord(null);
+        setSelectedAdmin('');
+        setEscalationNotes('');
+        fetchData();
+      } else {
+        alert(`Escalation failed: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`Escalation failed: ${err instanceof Error ? err.message : 'Network error'}`);
+    } finally {
+      setResolving(null);
+    }
+  };
+
+  // Handle resolve
+  const handleResolve = async () => {
+    if (!resolvingRecord || !resolutionType) return;
+
+    setResolving(resolvingRecord.id);
+    try {
+      const res = await fetch('/api/system/olt-report/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordId: resolvingRecord.id,
+          action: 'resolve',
+          resolutionType,
+          notes: resolutionNotes,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success || data.data?.success) {
+        alert(`Resolved ${resolvingRecord.drop_number} as ${resolutionType}`);
+        setShowResolveModal(false);
+        setResolvingRecord(null);
+        setResolutionType('');
+        setResolutionNotes('');
+        fetchData();
+      } else {
+        alert(`Resolution failed: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`Resolution failed: ${err instanceof Error ? err.message : 'Network error'}`);
+    } finally {
+      setResolving(null);
+    }
+  };
+
   // Render tabs
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
     { id: 'import', label: 'Import', icon: <Upload className="h-4 w-4" /> },
@@ -490,6 +594,11 @@ export default function OltReportPage() {
       id: 'needs_investigation',
       label: `Investigate (${stats.needs_investigation})`,
       icon: <Search className="h-4 w-4" />,
+    },
+    {
+      id: 'escalations',
+      label: `Escalations (${stats.escalated})`,
+      icon: <AlertTriangle className="h-4 w-4" />,
     },
     {
       id: 'history',
@@ -529,7 +638,7 @@ export default function OltReportPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-6 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
               <Wrench className="h-5 w-5" />
@@ -549,12 +658,30 @@ export default function OltReportPage() {
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+              <AlertTriangle className="h-5 w-5" />
+              <span className="font-medium">Escalated</span>
+            </div>
+            <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
+              {stats.escalated}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
               <CheckCircle className="h-5 w-5" />
               <span className="font-medium">Fixed</span>
             </div>
             <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
               {stats.fixed}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">Resolved</span>
+            </div>
+            <div className="text-2xl font-bold mt-2 text-gray-900 dark:text-white">
+              {stats.resolved}
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -709,8 +836,8 @@ export default function OltReportPage() {
           </div>
         )}
 
-        {/* Pending / Needs Investigation Tab */}
-        {(activeTab === 'pending' || activeTab === 'needs_investigation') && (
+        {/* Pending / Needs Investigation / Escalations Tab */}
+        {(activeTab === 'pending' || activeTab === 'needs_investigation' || activeTab === 'escalations') && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             {/* Bulk Actions - only for fixable pending */}
             {activeTab === 'pending' && (selectedRecords.size > 0 || bulkProgress) && (
@@ -776,7 +903,15 @@ export default function OltReportPage() {
             {activeTab === 'needs_investigation' && (
               <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                 <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                  ⚠️ These records need manual investigation - missing 1Map serial data
+                  ⚠️ These records need manual investigation - missing 1Map serial data.
+                  Click ✓ to resolve or ⚠ to escalate to admin.
+                </span>
+              </div>
+            )}
+            {activeTab === 'escalations' && (
+              <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-sm text-purple-600 dark:text-purple-400">
+                  📋 Records escalated to admin for review. Resolve when investigation is complete.
                 </span>
               </div>
             )}
@@ -924,15 +1059,61 @@ export default function OltReportPage() {
                               </button>
                             )}
                             {activeTab === 'needs_investigation' && (
-                              <a
-                                href={`https://www.1map.co.za/app?layer=5121&search=${record.drop_number}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                1Map
-                              </a>
+                              <div className="flex items-center gap-1">
+                                <a
+                                  href={`https://www.1map.co.za/app?layer=5121&search=${record.drop_number}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  title="View in 1Map"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    setResolvingRecord(record);
+                                    setShowResolveModal(true);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                  title="Resolve"
+                                >
+                                  <CheckCircle className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEscalatingRecord(record);
+                                    setShowEscalateModal(true);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                                  title="Escalate to Admin"
+                                >
+                                  <AlertTriangle className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                            {activeTab === 'escalations' && (
+                              <div className="flex items-center gap-1">
+                                <a
+                                  href={`https://www.1map.co.za/app?layer=5121&search=${record.drop_number}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  title="View in 1Map"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    setResolvingRecord(record);
+                                    setShowResolveModal(true);
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                  title="Resolve"
+                                >
+                                  <CheckCircle className="h-3 w-3" />
+                                  Resolve
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1277,6 +1458,151 @@ export default function OltReportPage() {
           </div>
         )}
       </div>
+
+      {/* Escalate Modal */}
+      {showEscalateModal && escalatingRecord && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Escalate to Admin
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Escalating: <strong>{escalatingRecord.drop_number}</strong>
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Select Admin
+                </label>
+                <select
+                  value={selectedAdmin}
+                  onChange={(e) => setSelectedAdmin(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">Select admin...</option>
+                  {adminUsers.map((admin) => (
+                    <option key={admin.id} value={admin.id}>
+                      {admin.name} ({admin.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  value={escalationNotes}
+                  onChange={(e) => setEscalationNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Add notes about why this needs admin review..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEscalateModal(false);
+                  setEscalatingRecord(null);
+                  setSelectedAdmin('');
+                  setEscalationNotes('');
+                }}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEscalate}
+                disabled={!selectedAdmin || resolving === escalatingRecord.id}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+              >
+                {resolving === escalatingRecord.id ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                Escalate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resolve Modal */}
+      {showResolveModal && resolvingRecord && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Resolve Investigation
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Resolving: <strong>{resolvingRecord.drop_number}</strong>
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Resolution Type
+                </label>
+                <select
+                  value={resolutionType}
+                  onChange={(e) => setResolutionType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">Select resolution...</option>
+                  <option value="manually_fixed">Manually Fixed in 1Map</option>
+                  <option value="closed_invalid">Invalid Record/Data</option>
+                  <option value="closed_no_data">Missing Data - Cannot Fix</option>
+                  <option value="closed_false_positive">False Positive - Not a Real Mismatch</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Add resolution notes..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowResolveModal(false);
+                  setResolvingRecord(null);
+                  setResolutionType('');
+                  setResolutionNotes('');
+                }}
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResolve}
+                disabled={!resolutionType || resolving === resolvingRecord.id}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {resolving === resolvingRecord.id ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4" />
+                )}
+                Resolve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Detail Modal */}
       {selectedImportId && (

@@ -97,6 +97,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         OR m.fix_status = 'not_found'
         OR m.fix_status = 'needs_reinvestigation'
       )`)
+    } else if (view === 'escalations') {
+      // Records escalated to the current user (admin view)
+      const { userId } = req.query;
+      if (userId) {
+        conditions.push(`m.escalated_to = $${paramIndex}`);
+        params.push(userId as string);
+        paramIndex++;
+      } else {
+        conditions.push(`m.fix_status = 'escalated'`);
+      }
+    } else if (view === 'resolved') {
+      conditions.push(`m.fix_status = 'resolved'`);
     } else if (view === 'fixed') {
       conditions.push(`m.fix_status = 'fixed'`);
     } else if (view === 'empty') {
@@ -126,19 +138,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         m.fix_result,
         m.fix_old_value,
         m.has_ups_swap,
+        m.resolution_type,
+        m.resolution_notes,
+        m.escalated_to,
+        m.escalated_at,
+        m.escalated_by,
+        m.resolved_at,
+        m.resolved_by,
         m.created_at,
         i.filename as import_filename,
         i.imported_at as import_date,
-        i.project
+        i.project,
+        et.email as escalated_to_email,
+        et.name as escalated_to_name,
+        eb.email as escalated_by_email
       FROM olt_mismatch_records m
       LEFT JOIN olt_report_imports i ON m.import_id = i.id
+      LEFT JOIN users et ON m.escalated_to = et.id
+      LEFT JOIN users eb ON m.escalated_by = eb.id
       ${whereClause}
       ORDER BY
         CASE m.fix_status
           WHEN 'pending' THEN 0
-          WHEN 'empty_serial' THEN 1
-          WHEN 'fixed' THEN 2
-          ELSE 3
+          WHEN 'escalated' THEN 1
+          WHEN 'empty_serial' THEN 2
+          WHEN 'fixed' THEN 3
+          WHEN 'resolved' THEN 4
+          ELSE 5
         END,
         m.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -162,6 +188,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           OR fix_status = 'needs_reinvestigation'
         ) as needs_investigation,
         COUNT(*) FILTER (WHERE fix_status = 'fixed') as fixed,
+        COUNT(*) FILTER (WHERE fix_status = 'resolved') as resolved,
+        COUNT(*) FILTER (WHERE fix_status = 'escalated') as escalated,
         COUNT(*) FILTER (WHERE fix_status = 'empty_serial') as empty,
         COUNT(*) FILTER (WHERE has_ups_swap = true) as ups_swap,
         COUNT(*) FILTER (WHERE has_ups_swap = true AND fix_status = 'pending') as ups_swap_pending,
@@ -172,6 +200,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       pending: Number(statsResult.rows[0].pending) || 0,
       needs_investigation: Number(statsResult.rows[0].needs_investigation) || 0,
       fixed: Number(statsResult.rows[0].fixed) || 0,
+      resolved: Number(statsResult.rows[0].resolved) || 0,
+      escalated: Number(statsResult.rows[0].escalated) || 0,
       empty: Number(statsResult.rows[0].empty) || 0,
       ups_swap: Number(statsResult.rows[0].ups_swap) || 0,
       ups_swap_pending: Number(statsResult.rows[0].ups_swap_pending) || 0,
