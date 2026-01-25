@@ -31,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `SELECT
         i.*,
         u.email as imported_by_email,
-        u.name as imported_by_name
+        CONCAT(u.first_name, ' ', u.last_name) as imported_by_name
       FROM olt_report_imports i
       LEFT JOIN users u ON i.imported_by = u.id
       WHERE i.id = $1`,
@@ -49,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `SELECT
         m.*,
         u.email as fixed_by_email,
-        u.name as fixed_by_name
+        CONCAT(u.first_name, ' ', u.last_name) as fixed_by_name
       FROM olt_mismatch_records m
       LEFT JOIN users u ON m.fix_by = u.id
       WHERE m.import_id = $1
