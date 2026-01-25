@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { query } from '@/lib/db/pool';
+import { sql } from '@/lib/neon';
 import { withAuth } from '@/lib/auth';
 import type {
   UpdateServiceAuthorityInput,
@@ -44,23 +44,22 @@ async function handleGet(
   res: NextApiResponse,
   id: string
 ) {
-  const result = await query<ServiceAuthorityWithType>(
-    `SELECT
-       sa.*,
-       pat.name as approval_type_name,
-       pat.code as approval_type_code,
-       pat.category as approval_type_category
-     FROM pipeline_service_authorities sa
-     LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
-     WHERE sa.id = $1`,
-    [id]
-  );
+  const result = (await sql`
+    SELECT
+      sa.*,
+      pat.name as approval_type_name,
+      pat.code as approval_type_code,
+      pat.category as approval_type_category
+    FROM pipeline_service_authorities sa
+    LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+    WHERE sa.id = ${id}
+  `) as ServiceAuthorityWithType[];
 
-  if (result.rows.length === 0) {
+  if (result.length === 0) {
     return apiResponse.notFound(res, 'Authority', id);
   }
 
-  return apiResponse.success(res, result.rows[0]);
+  return apiResponse.success(res, result[0]);
 }
 
 /**
@@ -74,69 +73,44 @@ async function handlePut(
 ) {
   const input = req.body as UpdateServiceAuthorityInput;
 
-  // Build dynamic update query
-  const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
-  let paramIndex = 1;
+  // First check if the authority exists
+  const existing = (await sql`
+    SELECT id FROM pipeline_service_authorities WHERE id = ${id}
+  `) as { id: string }[];
 
-  const fields: Array<keyof UpdateServiceAuthorityInput> = [
-    'approval_type_id',
-    'province',
-    'municipality',
-    'region',
-    'authority_name',
-    'department',
-    'contact_name',
-    'contact_title',
-    'contact_email',
-    'contact_phone',
-    'contact_mobile',
-    'physical_address',
-    'postal_address',
-    'office_hours',
-    'website',
-    'typical_turnaround_days',
-    'application_fee',
-    'notes',
-    'is_active',
-  ];
-
-  for (const field of fields) {
-    if (input[field] !== undefined) {
-      updates.push(`${field} = $${paramIndex}`);
-      values.push(input[field] as string | number | boolean | null);
-      paramIndex++;
-    }
-  }
-
-  if (updates.length === 0) {
-    return apiResponse.badRequest(res, 'No fields to update');
-  }
-
-  // Always update updated_at
-  updates.push(`updated_at = NOW()`);
-
-  if (input.updated_by) {
-    updates.push(`updated_by = $${paramIndex}`);
-    values.push(input.updated_by);
-    paramIndex++;
-  }
-
-  values.push(id);
-
-  const result = await query<ServiceAuthorityWithType>(
-    `UPDATE pipeline_service_authorities
-     SET ${updates.join(', ')}
-     WHERE id = $${paramIndex}
-     RETURNING *`,
-    values
-  );
-
-  if (result.rows.length === 0) {
+  if (existing.length === 0) {
     return apiResponse.notFound(res, 'Authority', id);
   }
 
-  return apiResponse.success(res, result.rows[0]);
+  // Update with all provided fields
+  const result = (await sql`
+    UPDATE pipeline_service_authorities SET
+      approval_type_id = COALESCE(${input.approval_type_id ?? null}, approval_type_id),
+      province = CASE WHEN ${input.province !== undefined} THEN ${input.province ?? null} ELSE province END,
+      municipality = CASE WHEN ${input.municipality !== undefined} THEN ${input.municipality ?? null} ELSE municipality END,
+      region = CASE WHEN ${input.region !== undefined} THEN ${input.region ?? null} ELSE region END,
+      authority_name = COALESCE(${input.authority_name ?? null}, authority_name),
+      department = CASE WHEN ${input.department !== undefined} THEN ${input.department ?? null} ELSE department END,
+      contact_name = CASE WHEN ${input.contact_name !== undefined} THEN ${input.contact_name ?? null} ELSE contact_name END,
+      contact_title = CASE WHEN ${input.contact_title !== undefined} THEN ${input.contact_title ?? null} ELSE contact_title END,
+      contact_email = CASE WHEN ${input.contact_email !== undefined} THEN ${input.contact_email ?? null} ELSE contact_email END,
+      contact_phone = CASE WHEN ${input.contact_phone !== undefined} THEN ${input.contact_phone ?? null} ELSE contact_phone END,
+      contact_mobile = CASE WHEN ${input.contact_mobile !== undefined} THEN ${input.contact_mobile ?? null} ELSE contact_mobile END,
+      physical_address = CASE WHEN ${input.physical_address !== undefined} THEN ${input.physical_address ?? null} ELSE physical_address END,
+      postal_address = CASE WHEN ${input.postal_address !== undefined} THEN ${input.postal_address ?? null} ELSE postal_address END,
+      office_hours = CASE WHEN ${input.office_hours !== undefined} THEN ${input.office_hours ?? null} ELSE office_hours END,
+      website = CASE WHEN ${input.website !== undefined} THEN ${input.website ?? null} ELSE website END,
+      typical_turnaround_days = CASE WHEN ${input.typical_turnaround_days !== undefined} THEN ${input.typical_turnaround_days ?? null} ELSE typical_turnaround_days END,
+      application_fee = CASE WHEN ${input.application_fee !== undefined} THEN ${input.application_fee ?? null} ELSE application_fee END,
+      notes = CASE WHEN ${input.notes !== undefined} THEN ${input.notes ?? null} ELSE notes END,
+      is_active = COALESCE(${input.is_active ?? null}, is_active),
+      updated_at = NOW(),
+      updated_by = COALESCE(${input.updated_by ?? null}, updated_by)
+    WHERE id = ${id}
+    RETURNING *
+  `) as ServiceAuthorityWithType[];
+
+  return apiResponse.success(res, result[0]);
 }
 
 /**
@@ -148,15 +122,14 @@ async function handleDelete(
   res: NextApiResponse,
   id: string
 ) {
-  const result = await query(
-    `UPDATE pipeline_service_authorities
-     SET is_active = false, updated_at = NOW()
-     WHERE id = $1
-     RETURNING id`,
-    [id]
-  );
+  const result = (await sql`
+    UPDATE pipeline_service_authorities
+    SET is_active = false, updated_at = NOW()
+    WHERE id = ${id}
+    RETURNING id
+  `) as { id: string }[];
 
-  if (result.rows.length === 0) {
+  if (result.length === 0) {
     return apiResponse.notFound(res, 'Authority', id);
   }
 
