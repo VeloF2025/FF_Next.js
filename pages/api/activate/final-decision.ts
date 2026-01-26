@@ -99,6 +99,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // Get current user (fallback when Clerk not available)
     const userId = req.headers['x-user-id'] as string | undefined || 'system';
 
+    // Look up user's name for activity logging
+    let reviewerName = 'unknown';
+    if (userId && userId !== 'system') {
+      try {
+        const userResult = await pool.query(
+          `SELECT name FROM users WHERE id = $1::uuid`,
+          [userId]
+        );
+        if (userResult.rows[0]?.name) {
+          reviewerName = userResult.rows[0].name;
+        }
+      } catch (err) {
+        log.warn('FinalDecision', `Could not look up user name for ${userId}`, err);
+      }
+    }
+
     log.info('FinalDecision', `Recording decision ${decision} for ${dropNumber}`, {
       userId,
       hasNotes: !!notes,
@@ -307,11 +323,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             reasons,
             reasonDescriptions,
             notes: finalNotes || null,
+            reviewer: reviewerName,
+            reviewerId: userId || 'system',
             stepsApproved: Object.entries(stepCounts)
               .filter(([_, count]) => count > 0)
               .map(([step]) => `step_${step.padStart(2, '0')}`),
+            approved: Object.keys(stepCounts).filter(k => stepCounts[parseInt(k)] > 0).length,
+            rejected: 10 - Object.keys(stepCounts).filter(k => stepCounts[parseInt(k)] > 0).length,
           },
-          'user',
           userId || 'system'
         );
       } catch (activityError) {

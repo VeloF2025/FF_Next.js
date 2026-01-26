@@ -420,9 +420,28 @@ export async function getActivityTimeline(
         if (typeof reviewerDisplay === 'string' && uuidRegex.test(reviewerDisplay)) {
           reviewerDisplay = userNameMap.get(reviewerDisplay) || 'unknown';
         }
-        const approvedCount = data.approved || 0;
-        const rejectedCount = data.rejected || 0;
-        description = `Reviewed by ${reviewerDisplay}. ${approvedCount} approved, ${rejectedCount} rejected`;
+        // Also check reviewerId for legacy records
+        if (reviewerDisplay === 'unknown' && data.reviewerId) {
+          const reviewerId = String(data.reviewerId);
+          if (uuidRegex.test(reviewerId)) {
+            reviewerDisplay = userNameMap.get(reviewerId) || 'unknown';
+          }
+        }
+
+        // Handle both old format (approved/rejected counts) and new format (stepsApproved array)
+        let approvedCount = 0;
+        let rejectedCount = 0;
+        if (data.stepsApproved && Array.isArray(data.stepsApproved)) {
+          approvedCount = data.stepsApproved.length;
+          rejectedCount = 10 - approvedCount;
+        } else {
+          approvedCount = Number(data.approved) || 0;
+          rejectedCount = Number(data.rejected) || 0;
+        }
+
+        // Include decision if present
+        const decisionText = data.decision ? ` Decision: ${data.decision}.` : '';
+        description = `Reviewed by ${reviewerDisplay}.${decisionText} ${approvedCount} steps approved, ${rejectedCount} steps missing`;
         break;
       }
       case 'step_approved':
