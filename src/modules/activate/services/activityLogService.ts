@@ -366,11 +366,11 @@ export async function getActivityTimeline(
     try {
       const uuidArray = Array.from(uuidsToLookup);
       const userRows = await sql`
-        SELECT id::text, name FROM users WHERE id = ANY(${uuidArray}::uuid[])
+        SELECT id::text, first_name, last_name FROM users WHERE id = ANY(${uuidArray}::uuid[])
       `;
       for (const row of userRows) {
-        if (row.name) {
-          userNameMap.set(row.id, row.name);
+        if (row.first_name || row.last_name) {
+          userNameMap.set(row.id, [row.first_name, row.last_name].filter(Boolean).join(' '));
         }
       }
     } catch (err) {
@@ -1029,11 +1029,11 @@ export async function logHumanReviewCompleted(
   try {
     const sql = getDb();
     const userRows = await sql`
-      SELECT name FROM users WHERE id = ${userId}::uuid
+      SELECT first_name, last_name FROM users WHERE id = ${userId}::uuid
     `;
     const firstRow = userRows[0];
-    if (firstRow && firstRow.name) {
-      reviewerName = String(firstRow.name);
+    if (firstRow && (firstRow.first_name || firstRow.last_name)) {
+      reviewerName = [firstRow.first_name, firstRow.last_name].filter(Boolean).join(' ');
     }
   } catch (err) {
     log.warn('ActivityLog', `Could not look up user name for ${userId}: ${err}`);

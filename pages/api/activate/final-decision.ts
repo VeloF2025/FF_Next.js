@@ -104,11 +104,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     if (userId && userId !== 'system') {
       try {
         const userResult = await pool.query(
-          `SELECT name FROM users WHERE id = $1::uuid`,
+          `SELECT first_name, last_name FROM users WHERE id = $1::uuid`,
           [userId]
         );
-        if (userResult.rows[0]?.name) {
-          reviewerName = userResult.rows[0].name;
+        const user = userResult.rows[0];
+        if (user && (user.first_name || user.last_name)) {
+          reviewerName = [user.first_name, user.last_name].filter(Boolean).join(' ');
         }
       } catch (err) {
         log.warn('FinalDecision', `Could not look up user name for ${userId}`, err);

@@ -144,9 +144,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         CASE
           WHEN u.qa_decision_by = 'system' THEN 'System'
           WHEN u.qa_decision_by IS NOT NULL AND u.qa_decision_by ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-               THEN (SELECT name FROM users WHERE id::text = u.qa_decision_by)
+               THEN (SELECT CONCAT_WS(' ', first_name, last_name) FROM users WHERE id::text = u.qa_decision_by)
           WHEN u.human_reviewer_id IS NOT NULL AND u.human_reviewer_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-               THEN (SELECT name FROM users WHERE id::text = u.human_reviewer_id)
+               THEN (SELECT CONCAT_WS(' ', first_name, last_name) FROM users WHERE id::text = u.human_reviewer_id)
           ELSE COALESCE(u.qa_decision_by, 'Unknown')
         END as reviewer_name
       FROM dr_photo_unified_reviews u
