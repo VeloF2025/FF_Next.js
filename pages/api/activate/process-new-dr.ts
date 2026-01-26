@@ -36,6 +36,9 @@ import {
 } from '@/lib/sharepointDrSyncService';
 import type { DrFolderInfo } from '@/modules/activate/types/sharepoint.types';
 
+// BOSS API (1Map data cached on dr-photo-api service)
+const BOSS_API_HOST = 'http://100.96.203.105:8003';
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -84,6 +87,98 @@ interface DropsTableRecord {
   drop_number: string;
   project_id: string;
   project_name: string;
+}
+
+/**
+ * Contact info from BOSS API (1Map data)
+ * UNIFIED ARCHITECTURE: This is fetched once during processing and stored in unified table
+ */
+interface SubscriberContact {
+  subscriber_name: string | null;
+  subscriber_phone: string | null;
+  subscriber_email: string | null;
+  subscriber_language: string | null;
+  signup_agent: string | null;
+  installer_name: string | null;
+}
+
+/**
+ * Contact info from maintenance_tickets (QContact data)
+ * UNIFIED ARCHITECTURE: This is fetched once during processing and stored in unified table
+ */
+interface QContactInfo {
+  qcontact_name: string | null;
+  qcontact_phone: string | null;
+  qcontact_email: string | null;
+}
+
+/**
+ * Fetch subscriber contact info from BOSS API (1Map data)
+ * Returns contact fields to be stored in unified table during processing
+ */
+async function fetchSubscriberContact(dropNumber: string): Promise<SubscriberContact | null> {
+  try {
+    const response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000), // 5s timeout
+    });
+
+    if (!response.ok) {
+      log.warn('ProcessNewDr', `BOSS API returned ${response.status} for ${dropNumber}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Build full name from first + last
+    const firstName = data.contact_person_name || data.contact_name || '';
+    const lastName = data.contact_person_surname || data.contact_surname || '';
+    const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || null;
+
+    return {
+      subscriber_name: fullName,
+      subscriber_phone: data.contact_number || data.contact_phone || null,
+      subscriber_email: data.email_address || data.contact_email || null,
+      subscriber_language: data.language || null,
+      signup_agent: data.signup_agent || null,
+      installer_name: data.installer_name || null,
+    };
+  } catch (error) {
+    log.warn('ProcessNewDr', `BOSS API fetch failed for ${dropNumber}`, error);
+    return null;
+  }
+}
+
+/**
+ * Fetch QContact info from maintenance_tickets table
+ * Returns contact fields to be stored in unified table during processing
+ */
+async function fetchQContactInfo(dropNumber: string): Promise<QContactInfo | null> {
+  try {
+    const result = await pool.query(
+      `SELECT client_name, client_contact, client_email
+       FROM maintenance_tickets
+       WHERE dr_number = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [dropNumber]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      qcontact_name: row.client_name || null,
+      qcontact_phone: row.client_contact || null,
+      qcontact_email: row.client_email || null,
+    };
+  } catch (error) {
+    log.warn('ProcessNewDr', `QContact fetch failed for ${dropNumber}`, error);
+    return null;
+  }
 }
 
 /**
@@ -351,6 +446,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     let submissionCount = 1;
     let previousSubmission: PreviousSubmission | null = null;
 
+    // === FETCH CONTACT INFO (UNIFIED ARCHITECTURE) ===
+    // Fetch contact data ONCE during processing and store in unified table
+    // This avoids runtime queries to BOSS API and maintenance_tickets on every page view
+    const [subscriberContact, qContactInfo] = await Promise.all([
+      fetchSubscriberContact(dropNumber),
+      fetchQContactInfo(dropNumber),
+    ]);
+
+    log.info('ProcessNewDr', `Contact info for ${dropNumber}`, {
+      hasSubscriberContact: !!subscriberContact,
+      hasQContactInfo: !!qContactInfo,
+      subscriberName: subscriberContact?.subscriber_name || null,
+      qcontactName: qContactInfo?.qcontact_name || null,
+    });
+
     if (existingUnified) {
       // DR exists in unified table - this is a resubmission
       isResubmission = true;
@@ -367,6 +477,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Note: submitted_date is preserved from original submission, not overwritten
       // WhatsApp context is updated for resubmission to enable reply threading on new feedback
       // Clear is_oes_only flag since this is now a real submission
+      // UNIFIED ARCHITECTURE: Store contact info during processing
       await pool.query(
         `UPDATE dr_photo_unified_reviews
          SET
@@ -381,6 +492,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            wa_group_jid = COALESCE($8, wa_group_jid),
            wa_received_at = CASE WHEN $5 IS NOT NULL THEN NOW() ELSE wa_received_at END,
            is_oes_only = FALSE,
+           -- Contact info from BOSS API (1Map)
+           subscriber_name = COALESCE($9, subscriber_name),
+           subscriber_phone = COALESCE($10, subscriber_phone),
+           subscriber_email = COALESCE($11, subscriber_email),
+           subscriber_language = COALESCE($12, subscriber_language),
+           signup_agent = COALESCE($13, signup_agent),
+           installer_name = COALESCE($14, installer_name),
+           -- Contact info from QContact/maintenance_tickets
+           qcontact_name = COALESCE($15, qcontact_name),
+           qcontact_phone = COALESCE($16, qcontact_phone),
+           qcontact_email = COALESCE($17, qcontact_email),
            updated_at = NOW()
          WHERE drop_number = $4`,
         [
@@ -392,6 +514,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           waSenderJid || null,
           waOriginalText || null,
           waGroupJid || null,
+          subscriberContact?.subscriber_name || null,
+          subscriberContact?.subscriber_phone || null,
+          subscriberContact?.subscriber_email || null,
+          subscriberContact?.subscriber_language || null,
+          subscriberContact?.signup_agent || null,
+          subscriberContact?.installer_name || null,
+          qContactInfo?.qcontact_name || null,
+          qContactInfo?.qcontact_phone || null,
+          qContactInfo?.qcontact_email || null,
         ]
       );
 
@@ -414,12 +545,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         original_created_at: originalCreatedAt,
       });
 
+      // UNIFIED ARCHITECTURE: Store contact info during processing
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date, sender_phone,
            wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
-           created_at, updated_at, submission_history, is_oes_only
-         ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10, FALSE)`,
+           created_at, updated_at, submission_history, is_oes_only,
+           subscriber_name, subscriber_phone, subscriber_email, subscriber_language,
+           signup_agent, installer_name,
+           qcontact_name, qcontact_phone, qcontact_email
+         ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10, FALSE,
+           $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
         [
           dropNumber,
           project || existingQA.project,
@@ -443,7 +579,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             feedback_sent_at: null,
             step_completion: {},
             note: `Originally submitted via WhatsApp to ${existingQA.project}`,
-          }])
+          }]),
+          // Contact info from BOSS API (1Map)
+          subscriberContact?.subscriber_name || null,
+          subscriberContact?.subscriber_phone || null,
+          subscriberContact?.subscriber_email || null,
+          subscriberContact?.subscriber_language || null,
+          subscriberContact?.signup_agent || null,
+          subscriberContact?.installer_name || null,
+          // Contact info from QContact/maintenance_tickets
+          qContactInfo?.qcontact_name || null,
+          qContactInfo?.qcontact_phone || null,
+          qContactInfo?.qcontact_email || null,
         ]
       );
 
@@ -451,13 +598,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       submissionCount = 1;
     } else {
       // Brand new DR - create fresh record with WhatsApp message context for reply threading
+      // UNIFIED ARCHITECTURE: Store contact info during processing
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date,
            wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
-           created_at, updated_at, is_oes_only
+           created_at, updated_at, is_oes_only,
+           subscriber_name, subscriber_phone, subscriber_email, subscriber_language,
+           signup_agent, installer_name,
+           qcontact_name, qcontact_phone, qcontact_email
          )
-         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, NOW(), NOW(), NOW(), FALSE)`,
+         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, NOW(), NOW(), NOW(), FALSE,
+           $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
           dropNumber,
           project || null,
@@ -466,10 +618,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           waSenderJid || null,
           waOriginalText || null,
           waGroupJid || null,
+          // Contact info from BOSS API (1Map)
+          subscriberContact?.subscriber_name || null,
+          subscriberContact?.subscriber_phone || null,
+          subscriberContact?.subscriber_email || null,
+          subscriberContact?.subscriber_language || null,
+          subscriberContact?.signup_agent || null,
+          subscriberContact?.installer_name || null,
+          // Contact info from QContact/maintenance_tickets
+          qContactInfo?.qcontact_name || null,
+          qContactInfo?.qcontact_phone || null,
+          qContactInfo?.qcontact_email || null,
         ]
       );
       log.info('ProcessNewDr', `Created new record for ${dropNumber}`, {
         hasWaContext: !!(waMessageId && waSenderJid),
+        hasContactInfo: !!(subscriberContact || qContactInfo),
       });
     }
 

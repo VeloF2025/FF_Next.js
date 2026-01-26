@@ -1,125 +1,48 @@
 /**
- * Migration 131: Fleet Portal Sessions
+ * Migration 131: Add contact fields to dr_photo_unified_reviews
  *
- * Creates tables for plate-based portal authentication:
- * - fleet_portal_sessions: Session records for plate-authenticated users
- * - fleet_portal_session_activity: Audit log of portal actions
+ * Run with: node scripts/migrations/run-migration-131.js
  */
 
-const { neon } = require('@neondatabase/serverless');
+const { Pool } = require('pg');
+const fs = require('fs');
+const path = require('path');
+
+const DATABASE_URL = process.env.DATABASE_URL ||
+  'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
 
 async function runMigration() {
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (!databaseUrl) {
-    console.error('DATABASE_URL environment variable is required');
-    process.exit(1);
-  }
-
-  console.log('Starting migration 131: Fleet Portal Sessions...');
-  console.log('Database:', databaseUrl.includes('ep-dry-night') ? 'PRODUCTION' : 'DEVELOPMENT');
-
-  const sql = neon(databaseUrl);
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
 
   try {
-    // Create fleet_portal_sessions table
-    console.log('Creating fleet_portal_sessions table...');
-    await sql`
-      CREATE TABLE IF NOT EXISTS fleet_portal_sessions (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          vehicle_id UUID NOT NULL REFERENCES fleet_vehicles(id),
-          driver_id UUID REFERENCES staff(id),
-          plate_scanned VARCHAR(20) NOT NULL,
-          confidence NUMERIC(5,4),
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          expires_at TIMESTAMPTZ NOT NULL,
-          ip_address VARCHAR(45),
-          user_agent TEXT,
-          is_active BOOLEAN DEFAULT true,
-          revoked_at TIMESTAMPTZ,
-          revoked_by UUID REFERENCES staff(id),
-          revoke_reason TEXT
-      )
-    `;
-    console.log('✓ Created fleet_portal_sessions table');
+    console.log('Running migration 131: Add contact fields to dr_photo_unified_reviews');
 
-    // Create indexes
-    console.log('Creating indexes...');
+    const sqlPath = path.join(__dirname, '131_unified_contact_fields.sql');
+    const sql = fs.readFileSync(sqlPath, 'utf8');
 
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_fleet_portal_sessions_vehicle
-          ON fleet_portal_sessions(vehicle_id, is_active)
-          WHERE is_active = true
-    `;
-    console.log('✓ Created vehicle index');
+    await pool.query(sql);
 
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_fleet_portal_sessions_driver
-          ON fleet_portal_sessions(driver_id)
-          WHERE driver_id IS NOT NULL
-    `;
-    console.log('✓ Created driver index');
+    console.log('✅ Migration 131 completed successfully');
 
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_fleet_portal_sessions_expires
-          ON fleet_portal_sessions(expires_at)
-          WHERE is_active = true
-    `;
-    console.log('✓ Created expires index');
+    // Verify columns exist
+    const result = await pool.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'dr_photo_unified_reviews'
+      AND column_name IN ('subscriber_name', 'subscriber_phone', 'subscriber_email', 'subscriber_language',
+                          'qcontact_name', 'qcontact_phone', 'qcontact_email', 'signup_agent', 'installer_name')
+    `);
 
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_fleet_portal_sessions_ip
-          ON fleet_portal_sessions(ip_address, created_at DESC)
-    `;
-    console.log('✓ Created IP index');
+    console.log('New columns added:', result.rows.map(r => r.column_name).join(', '));
 
-    // Create activity log table
-    console.log('Creating fleet_portal_session_activity table...');
-    await sql`
-      CREATE TABLE IF NOT EXISTS fleet_portal_session_activity (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          session_id UUID NOT NULL REFERENCES fleet_portal_sessions(id) ON DELETE CASCADE,
-          action VARCHAR(50) NOT NULL,
-          details JSONB,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          ip_address VARCHAR(45)
-      )
-    `;
-    console.log('✓ Created fleet_portal_session_activity table');
-
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_fleet_portal_activity_session
-          ON fleet_portal_session_activity(session_id, created_at DESC)
-    `;
-    console.log('✓ Created activity session index');
-
-    // Add comments
-    await sql`
-      COMMENT ON TABLE fleet_portal_sessions IS
-          'Portal sessions created via plate-based authentication. Scanning a license plate creates an 8-hour session for vehicle interactions.'
-    `;
-
-    await sql`
-      COMMENT ON TABLE fleet_portal_session_activity IS
-          'Audit log of actions taken during a portal session'
-    `;
-
-    console.log('\n✅ Migration 131 completed successfully!');
-
-    // Verify tables exist
-    const tables = await sql`
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name IN ('fleet_portal_sessions', 'fleet_portal_session_activity')
-      ORDER BY table_name
-    `;
-
-    console.log('\nCreated tables:');
-    tables.forEach((t) => console.log(`  - ${t.table_name}`));
   } catch (error) {
-    console.error('\n❌ Migration failed:', error.message);
+    console.error('❌ Migration failed:', error.message);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

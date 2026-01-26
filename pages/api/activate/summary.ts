@@ -5,9 +5,12 @@
  * Method: GET
  * Query: dropNumber (required)
  *
- * Consolidates data from:
- * - BOSS API (1Map data: installer_name, signup_agent, photos, serials)
- * - dr_photo_unified_reviews (main review data)
+ * UNIFIED ARCHITECTURE (Jan 2026):
+ * ALL DR data is now stored in dr_photo_unified_reviews during processing.
+ * This endpoint reads from the unified table - NO live API calls.
+ *
+ * Data sources (read-only, all pre-stored):
+ * - dr_photo_unified_reviews (main data including contact info)
  * - oes_activations (activation date, team, optical metrics)
  * - drops (installation date - fallback)
  * - qa_photo_reviews (submitter info)
@@ -25,9 +28,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
-
-// BOSS API (1Map data cached on WA Monitor service)
-const ONEMAP_HOST = 'http://100.96.203.105:8003';
 
 /**
  * Determine current state of the DR based on available data
@@ -47,40 +47,34 @@ function determineState(
 }
 
 /**
- * Build subscriber contact info from 1Map and QContact sources
+ * Build subscriber contact info from UNIFIED TABLE data
+ * UNIFIED ARCHITECTURE: Contact info is stored in dr_photo_unified_reviews during processing
  * Returns both sources and whether they differ (to show Contact 1 / Contact 2)
  */
 function buildSubscriberContact(
-  bossData: {
-    contact_name: string | null;
-    contact_surname: string | null;
-    contact_number: string | null;
-    contact_email: string | null;
-    language: string | null;
-  } | null,
-  maintenance: {
-    client_name: string | null;
-    client_contact: string | null;
-    client_email: string | null;
+  unified: {
+    subscriber_name: string | null;
+    subscriber_phone: string | null;
+    subscriber_email: string | null;
+    subscriber_language: string | null;
+    qcontact_name: string | null;
+    qcontact_phone: string | null;
+    qcontact_email: string | null;
   } | null
 ): DRSummary['subscriberContact'] {
-  // Build 1Map contact (subscriber who signed up)
-  const oneMapName = bossData?.contact_name && bossData?.contact_surname
-    ? `${bossData.contact_name} ${bossData.contact_surname}`.trim()
-    : bossData?.contact_name || bossData?.contact_surname || null;
-
-  const oneMapContact = (bossData?.contact_name || bossData?.contact_number) ? {
-    name: oneMapName,
-    phone: bossData?.contact_number || null,
-    email: bossData?.contact_email || null,
-    language: bossData?.language || null,
+  // Build 1Map contact (subscriber who signed up) from unified table
+  const oneMapContact = (unified?.subscriber_name || unified?.subscriber_phone) ? {
+    name: unified.subscriber_name || null,
+    phone: unified.subscriber_phone || null,
+    email: unified.subscriber_email || null,
+    language: unified.subscriber_language || null,
   } : null;
 
-  // Build QContact contact (customer who reported issue)
-  const qContactContact = maintenance?.client_name || maintenance?.client_contact ? {
-    name: maintenance.client_name || null,
-    phone: maintenance.client_contact || null,
-    email: maintenance.client_email || null,
+  // Build QContact contact (customer who reported issue) from unified table
+  const qContactContact = (unified?.qcontact_name || unified?.qcontact_phone) ? {
+    name: unified.qcontact_name || null,
+    phone: unified.qcontact_phone || null,
+    email: unified.qcontact_email || null,
   } : null;
 
   // Determine if contacts differ
@@ -102,56 +96,6 @@ function buildSubscriberContact(
     qContact: qContactContact,
     contactsDiffer,
   };
-}
-
-/**
- * Extract step coverage from VLM categorization results (preferred) or photos metadata
- */
-/**
- * Fetch DR data from BOSS API (1Map data)
- * Returns installer_name, signup_agent, and other 1Map data
- */
-async function fetchBossApiData(dropNumber: string): Promise<{
-  installer_name: string | null;
-  signup_agent: string | null;
-  ont_barcode: string | null;
-  ups_serial: string | null;
-  // Subscriber contact from 1Map (added Jan 2026)
-  contact_name: string | null;
-  contact_surname: string | null;
-  contact_number: string | null;
-  contact_email: string | null;
-  language: string | null;
-} | null> {
-  try {
-    const response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000), // 5s timeout
-    });
-
-    if (!response.ok) {
-      log.warn('DRSummary', `BOSS API returned ${response.status} for ${dropNumber}`);
-      return null;
-    }
-
-    const data = await response.json();
-    return {
-      installer_name: data.installer_name || null,
-      signup_agent: data.signup_agent || null,
-      ont_barcode: data.ont_barcode || null,
-      ups_serial: data.ups_serial || null,
-      // Subscriber contact fields from 1Map
-      contact_name: data.contact_person_name || data.contact_name || null,
-      contact_surname: data.contact_person_surname || data.contact_surname || null,
-      contact_number: data.contact_number || data.contact_phone || null,
-      contact_email: data.email_address || data.contact_email || null,
-      language: data.language || null,
-    };
-  } catch (error) {
-    log.warn('DRSummary', `BOSS API fetch failed for ${dropNumber}`, error);
-    return null;
-  }
 }
 
 function calculateStepsCovered(vlmCategorization: any[], photosMetadata: any[]): number {
@@ -197,11 +141,9 @@ async function handler(
   try {
     log.info('DRSummary', `Fetching summary for ${dropNumber}`);
 
-    // Query BOSS API (1Map) and database tables in parallel
-    const [bossData, unifiedResult, oesResult, dropsResult, qaResult, maintenanceResult] = await Promise.all([
-      // BOSS API: installer_name, signup_agent, serials from 1Map
-      fetchBossApiData(dropNumber),
-      // Main unified review data (including resubmission fields)
+    // UNIFIED ARCHITECTURE: All data from database tables only - NO live API calls
+    const [unifiedResult, oesResult, dropsResult, qaResult] = await Promise.all([
+      // Main unified review data (including contact info stored during processing)
       pool.query(
         `SELECT
            drop_number,
@@ -220,7 +162,18 @@ async function handler(
            created_at,
            updated_at,
            submission_count,
-           (submission_history->0->>'photo_count')::int as previous_photo_count
+           (submission_history->0->>'photo_count')::int as previous_photo_count,
+           -- Contact info from 1Map (stored during process-new-dr)
+           subscriber_name,
+           subscriber_phone,
+           subscriber_email,
+           subscriber_language,
+           signup_agent,
+           installer_name,
+           -- Contact info from QContact (stored during process-new-dr)
+           qcontact_name,
+           qcontact_phone,
+           qcontact_email
          FROM dr_photo_unified_reviews
          WHERE drop_number = $1`,
         [dropNumber]
@@ -265,27 +218,12 @@ async function handler(
          LIMIT 1`,
         [dropNumber]
       ),
-
-      // Maintenance tickets (QContact client info) - uses dr_number column
-      pool.query(
-        `SELECT
-           client_name,
-           client_contact,
-           client_email,
-           address
-         FROM maintenance_tickets
-         WHERE dr_number = $1
-         ORDER BY created_at DESC
-         LIMIT 1`,
-        [dropNumber]
-      ),
     ]);
 
     const unified = unifiedResult.rows[0];
     const oes = oesResult.rows[0];
     const drop = dropsResult.rows[0];
     const qa = qaResult.rows[0];
-    const maintenance = maintenanceResult.rows[0];
 
     // If no data found anywhere
     if (!unified && !oes && !drop && !qa) {
@@ -348,12 +286,12 @@ async function handler(
           phone: qa?.sender_phone || null,
         },
         installer: {
-          // Prefer BOSS API (1Map) data, fallback to drops table
-          name: bossData?.installer_name || drop?.installed_by_name || null,
+          // UNIFIED: installer_name stored in unified table, fallback to drops
+          name: unified?.installer_name || drop?.installed_by_name || null,
           id: drop?.installed_by_id || null,
         },
-        // Signup agent from 1Map (fieldnme2)
-        signupAgent: bossData?.signup_agent || null,
+        // UNIFIED: signup_agent stored in unified table
+        signupAgent: unified?.signup_agent || null,
         oesTeam: oes?.team || null,
         reviewer: unified?.reviewed_by || null,
       },
@@ -373,8 +311,8 @@ async function handler(
 
       photoPreview,
 
-      // Subscriber contact info from 1Map and QContact (Jan 2026)
-      subscriberContact: buildSubscriberContact(bossData, maintenance),
+      // UNIFIED: Subscriber contact info from unified table (stored during processing)
+      subscriberContact: buildSubscriberContact(unified),
 
       // Resubmission tracking (Jan 2026)
       submission_count: unified?.submission_count || 1,
