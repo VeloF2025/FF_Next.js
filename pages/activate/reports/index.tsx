@@ -1,7 +1,6 @@
 /**
- * QA Centre Page - DR List with Search/Filters
- * Lists DRs for QA review with search, date filters, and pagination
- * Clicking a DR navigates to the detail review page
+ * Activate Reports Page
+ * Analytics and reporting dashboards for DR activations
  * Uses ModulePage for tab navigation: Dashboard, QA Centre, Reports
  */
 
@@ -9,16 +8,16 @@ import type { NextPage } from 'next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { activateConfig } from '@/modules/navigation';
-import { QaCentrePage } from '@/modules/activate/components/QaCentrePage';
+import { DrListPage } from '@/modules/activate/components/DrListPage';
 
-const QaCentreIndexPage: NextPage = () => {
+const ActivateReportsPage: NextPage = () => {
   return (
     <AppLayout>
       <ModulePage config={activateConfig}>
-        <QaCentrePage />
+        <DrListPage showTab="reports" />
       </ModulePage>
     </AppLayout>
   );
 };
 
-export default QaCentreIndexPage;
+export default ActivateReportsPage;

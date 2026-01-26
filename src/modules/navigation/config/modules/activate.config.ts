@@ -2,12 +2,13 @@
  * Activate Module Navigation Configuration
  *
  * Provides tab-based navigation for the Activate module:
- * - Dashboard: DR photo review and activation overview
- * - QA Centre: Quality assurance workflow
+ * - Dashboard: Overview stats and project breakdown
+ * - QA Centre: DR list for quality assurance review
+ * - Reports: Analytics and reporting dashboards
  */
 
-import { LayoutDashboard, ClipboardCheck } from 'lucide-react';
-import type { ModuleNavigationConfig } from '../types';
+import { LayoutDashboard, ClipboardCheck, BarChart3 } from 'lucide-react';
+import type { ModuleNavigationConfig } from '../../types';
 
 export const activateConfig: ModuleNavigationConfig = {
   moduleId: 'activate',
@@ -31,6 +32,14 @@ export const activateConfig: ModuleNavigationConfig = {
       icon: ClipboardCheck,
       path: '/activate/qa-centre',
       rbacKey: 'activate.qa-centre',
+    },
+    {
+      id: 'reports',
+      label: 'Reports',
+      shortLabel: 'Reports',
+      icon: BarChart3,
+      path: '/activate/reports',
+      rbacKey: 'activate.reports',
     },
   ],
 };

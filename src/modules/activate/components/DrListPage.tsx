@@ -1,9 +1,8 @@
 /**
  * Activate Dashboard Component
  * Main entry page for Activate module
- * Shows stats overview and tabs: Dashboard, Reports
- * DR list has moved to QA Centre (/activate/qa-centre)
- * Data imports have moved to Data Sync (/system/data-sync?group=activate)
+ * Shows stats overview with expandable project/zone/pon breakdown
+ * Tab navigation is handled by ModulePage - this component receives showTab prop
  *
  * Uses ActivateDataContext for shared state and auto-refresh
  */
@@ -12,8 +11,8 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, LayoutDashboard, BarChart3, Filter, X, Download, ChevronRight, ChevronDown } from 'lucide-react';
-import type { ZoneBreakdown, PonBreakdown, PoleBreakdown, DrBreakdown } from '../types/reporting.types';
+import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown } from 'lucide-react';
+import type { ZoneBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ReportsDashboard } from './reporting/ReportsDashboard';
 import {
@@ -25,14 +24,19 @@ import {
 
 type TabType = 'dashboard' | 'reports';
 
+interface DrListPageProps {
+  /** Which tab content to show - controlled by parent ModulePage */
+  showTab?: TabType;
+}
+
 // ============================================================================
 // WRAPPER COMPONENT (Provides Context)
 // ============================================================================
 
-export function DrListPage() {
+export function DrListPage({ showTab = 'dashboard' }: DrListPageProps) {
   return (
     <ActivateDataProvider refreshInterval={30000} autoRefreshEnabled={true}>
-      <DashboardPageContent />
+      <DashboardPageContent showTab={showTab} />
     </ActivateDataProvider>
   );
 }
@@ -41,7 +45,7 @@ export function DrListPage() {
 // MAIN CONTENT (Consumes Context)
 // ============================================================================
 
-function DashboardPageContent() {
+function DashboardPageContent({ showTab }: { showTab: TabType }) {
   const router = useRouter();
 
   // Get shared data from context
@@ -57,8 +61,7 @@ function DashboardPageContent() {
     lastRefreshAt,
   } = useActivateData();
 
-  // Local UI state
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  // Local UI state - tab is now controlled by parent via showTab prop
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -270,33 +273,21 @@ function DashboardPageContent() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Activate Dashboard
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Overview of installations and activations
-            </p>
+        {/* Header - only show on dashboard tab */}
+        {showTab === 'dashboard' && (
+          <div className="mb-6 flex justify-between items-center">
+            <div>
+              <button
+                onClick={refresh}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                title="Refresh data"
+              >
+                <RefreshCw className={`h-4 w-4 text-gray-600 dark:text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="text-sm text-gray-700 dark:text-gray-300">REFRESH</span>
+              </button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={refresh}
-              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              title="Refresh data"
-            >
-              <RefreshCw className={`h-4 w-4 text-gray-600 dark:text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
-              <span className="text-sm text-gray-700 dark:text-gray-300">REFRESH</span>
-            </button>
-            <button
-              onClick={() => router.push('/activate/qa-centre')}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-            >
-              <span className="text-sm">Open QA Centre</span>
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* System Health Status */}
         <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
@@ -314,36 +305,8 @@ function DashboardPageContent() {
           </div>
         </div>
 
-        {/* Tab Navigation - Dashboard and Reports (Import tabs moved to /system/data-sync) */}
-        <div className="mb-6">
-          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
-                activeTab === 'dashboard'
-                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-            </button>
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium text-sm transition-colors border-b-2 -mb-px ${
-                activeTab === 'reports'
-                  ? 'text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Reports
-            </button>
-          </div>
-        </div>
-
         {/* Dashboard Tab Content */}
-        {activeTab === 'dashboard' && (
+        {showTab === 'dashboard' && (
           <>
             {/* Dashboard Stats - Order: Total, Installed, Activated, Not Reviewed, Reviewed */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -816,26 +779,11 @@ function DashboardPageContent() {
               </div>
             </div>
 
-            {/* Call to Action - Go to QA Centre */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 text-center">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-2">
-                Ready to review DRs?
-              </h3>
-              <p className="text-blue-700 dark:text-blue-300 mb-4">
-                Head to the QA Centre to search, filter, and review individual drop receipts.
-              </p>
-              <button
-                onClick={() => router.push('/activate/qa-centre')}
-                className="px-6 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
-              >
-                Go to QA Centre →
-              </button>
-            </div>
           </>
         )}
 
         {/* Reports Tab Content */}
-        {activeTab === 'reports' && (
+        {showTab === 'reports' && (
           <ReportsDashboard />
         )}
       </div>
