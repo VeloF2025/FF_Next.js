@@ -94,7 +94,10 @@ export function ProjectTeamTab({ projectId }: ProjectTeamTabProps) {
 
   if (!teamData) return null;
 
-  const filteredMembers = teamData.members.filter(m =>
+  // Defensive: ensure members and stats exist
+  const members = teamData.members || [];
+  const stats = teamData.stats || { staff: 0, contractors: 0, total: 0 };
+  const filteredMembers = members.filter(m =>
     filter === 'all' || m.person_type === filter
   );
 
@@ -104,19 +107,19 @@ export function ProjectTeamTab({ projectId }: ProjectTeamTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           label="Total Team"
-          value={teamData.stats.total}
+          value={stats.total}
           icon="users"
           color="blue"
         />
         <StatCard
           label="Staff Members"
-          value={teamData.stats.staff}
+          value={stats.staff}
           icon="user"
           color="green"
         />
         <StatCard
           label="Contractors"
-          value={teamData.stats.contractors}
+          value={stats.contractors}
           icon="briefcase"
           color="purple"
         />

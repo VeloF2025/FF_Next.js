@@ -76,22 +76,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ORDER BY is_primary DESC, person_type, name
         `;
 
-    // Format response
-    const response = teamMembers.map(member => ({
-      personId: member.person_id,
-      personType: member.person_type,
+    // Format members
+    const members = teamMembers.map(member => ({
+      person_id: member.person_id,
+      person_type: member.person_type,
       name: member.name,
       email: member.email,
       phone: member.phone,
       role: member.role,
-      startDate: member.start_date,
-      endDate: member.end_date,
-      isActive: member.is_active,
-      isPrimary: member.is_primary,
-      createdAt: member.created_at,
+      start_date: member.start_date,
+      end_date: member.end_date,
+      is_active: member.is_active,
+      is_primary: member.is_primary,
+      created_at: member.created_at,
     }));
 
-    return apiResponse.success(res, response);
+    // Find primary manager
+    const primary = members.find(m => m.is_primary && m.person_type === 'staff');
+    const primaryManager = primary
+      ? { staff_id: primary.person_id, name: primary.name, role: primary.role || 'Project Manager', is_primary: true }
+      : null;
+
+    // Calculate stats
+    const stats = {
+      staff: members.filter(m => m.person_type === 'staff').length,
+      contractors: members.filter(m => m.person_type === 'contractor').length,
+      total: members.length,
+    };
+
+    return apiResponse.success(res, { primaryManager, members, stats });
   } catch (error) {
     log.error('Error fetching project team', { error, projectId });
     return apiResponse.internalError(res, error as Error);
