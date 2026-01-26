@@ -1,14 +1,13 @@
 /**
  * Project Management section configuration
- *
- * Pipeline, Tasks, Daily Progress, and Health & Safety are now tabs under /projects
- * See: src/modules/navigation/config/modules/projects.config.ts
  */
 
 import {
   FolderKanban,
   Building2,
   Briefcase,
+  GitBranch,
+  ShieldCheck,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -24,6 +23,22 @@ export const projectSection: NavSection = {
       shortLabel: 'Proj',
       permissions: [],
       rbacKey: 'projects.list',
+    },
+    {
+      to: '/pipeline',
+      icon: GitBranch,
+      label: 'Pipeline',
+      shortLabel: 'Pipeline',
+      permissions: [],
+      rbacKey: 'pipeline.list',
+    },
+    {
+      to: '/health-safety',
+      icon: ShieldCheck,
+      label: 'Health & Safety',
+      shortLabel: 'H&S',
+      permissions: [],
+      rbacKey: 'health-safety.list',
     },
     {
       to: '/clients',
