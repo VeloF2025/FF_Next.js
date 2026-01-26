@@ -83,7 +83,7 @@ export function SuppliersPage() {
       {/* Filters */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
         <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
+          <form onSubmit={(e) => e.preventDefault()} className="flex-1 min-w-[200px]">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
               <Input
@@ -94,7 +94,7 @@ export function SuppliersPage() {
                 className="pl-10 w-full"
               />
             </div>
-          </div>
+          </form>
 
           <select
             value={statusFilter}

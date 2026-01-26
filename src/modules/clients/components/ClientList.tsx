@@ -25,8 +25,21 @@ export function ClientList() {
     queryFn: () => clientService.getClientSummary()
   });
 
+  // Filter clients locally for instant search (more responsive than API-only)
+  const filteredClients = clients?.filter((client: any) => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      client.name?.toLowerCase().includes(search) ||
+      client.email?.toLowerCase().includes(search) ||
+      client.phone?.toLowerCase().includes(search) ||
+      client.company?.toLowerCase().includes(search)
+    );
+  });
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    // Also update filter for API-side search (e.g., if more data on server)
     setFilter(prev => ({ ...prev, searchTerm }));
   };
 
@@ -47,7 +60,7 @@ export function ClientList() {
 
   const handleExport = async () => {
     try {
-      const blob = await clientService.export.exportToExcel(clients);
+      const blob = await clientService.export.exportToExcel(filteredClients);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -92,8 +105,8 @@ export function ClientList() {
       <ClientListHeader
         onImport={() => setShowImport(true)}
         onExport={handleExport}
-        clientCount={clients?.length || 0}
-        filter={filter}
+        clientCount={filteredClients?.length || 0}
+        filter={{ ...filter, searchTerm }}
       />
 
       {summary && <ClientSummaryCards summary={summary} />}
@@ -122,8 +135,8 @@ export function ClientList() {
         </button>
       </div>
 
-      <ClientTable 
-        clients={clients}
+      <ClientTable
+        clients={filteredClients}
         isLoading={isLoading}
         error={error}
         onDelete={handleDelete}

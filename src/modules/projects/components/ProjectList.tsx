@@ -31,9 +31,8 @@ export function ProjectList() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-  };
+  // Search filters instantly as you type - no form submit needed
+  // Form wrapper kept for accessibility (Enter key support)
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
@@ -116,7 +115,7 @@ export function ProjectList() {
       {/* Search and Filters */}
       <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)]">
         <div className="flex items-center gap-4">
-          <form onSubmit={handleSearch} className="flex-1 max-w-md">
+          <form onSubmit={(e) => e.preventDefault()} className="flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--ff-text-tertiary)] h-4 w-4" />
               <input
