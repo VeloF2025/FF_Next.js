@@ -248,56 +248,60 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
 
   // Skeleton component
   const Skeleton = ({ className }: { className?: string }) => (
-    <div className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className || ''}`} />
+    <div className={`animate-pulse bg-[var(--ff-bg-tertiary)] rounded ${className || ''}`} />
   );
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-            <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading Dashboard</h3>
-            <p className="text-red-600 dark:text-red-400">{error}</p>
-            <button
-              onClick={refresh}
-              className="mt-4 px-4 py-2 bg-red-600 dark:bg-red-500 text-white rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
-            >
-              Retry
-            </button>
+      <div className="space-y-6">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+          <div className="flex items-start gap-3 mb-4">
+            <X className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-400 mb-1">Error Loading Dashboard</h3>
+              <p className="text-sm text-red-300">{error}</p>
+            </div>
           </div>
+          <button
+            onClick={refresh}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="space-y-6">
         {/* Header - only show on dashboard tab */}
         {showTab === 'dashboard' && (
-          <div className="mb-6 flex justify-between items-center">
+          <div className="flex justify-between items-center">
             <div>
               <button
                 onClick={refresh}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Refresh data"
               >
-                <RefreshCw className={`h-4 w-4 text-gray-600 dark:text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="text-sm text-gray-700 dark:text-gray-300">REFRESH</span>
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
             </div>
           </div>
         )}
 
         {/* System Health Status */}
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">System Status:</span>
+              <span className="text-sm font-medium text-[var(--ff-text-secondary)]">System Status:</span>
               <SystemHealthDashboard compact autoRefresh refreshInterval={60} />
             </div>
             {lastRefreshAt && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)]">
                 <Calendar className="h-4 w-4" />
                 Last updated: {lastRefreshAt.toLocaleTimeString()}
               </div>
@@ -309,63 +313,63 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
         {showTab === 'dashboard' && (
           <>
             {/* Dashboard Stats - Order: Total, Installed, Activated, Not Reviewed, Reviewed */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {/* Total Drops */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Total Drops</h3>
-                  {isLoading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400" />}
+                  <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Total Drops</h3>
+                  {isLoading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--ff-primary-500)]" />}
                 </div>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{dashboardStats.totalDrops}</p>
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">{dashboardStats.totalDrops}</p>
                 )}
               </div>
 
               {/* Installed - DRs from WhatsApp */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
-                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Installed</h3>
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Installed</h3>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{dashboardStats.installed}</p>
+                  <p className="text-2xl font-bold text-blue-500 mt-1">{dashboardStats.installed}</p>
                 )}
               </div>
 
               {/* Activated - DRs in OES report */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
-                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Activated</h3>
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Activated</h3>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">{dashboardStats.activated}</p>
+                  <p className="text-2xl font-bold text-purple-500 mt-1">{dashboardStats.activated}</p>
                 )}
               </div>
 
               {/* Not Reviewed - Feedback not yet sent */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
-                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Not Reviewed</h3>
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Not Reviewed</h3>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-500 mt-1">{dashboardStats.notReviewed}</p>
+                  <p className="text-2xl font-bold text-yellow-500 mt-1">{dashboardStats.notReviewed}</p>
                 )}
               </div>
 
               {/* Reviewed - QA feedback sent */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
-                <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Reviewed</h3>
+              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Reviewed</h3>
                 {isLoading ? (
                   <Skeleton className="h-8 w-16 mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{dashboardStats.reviewed}</p>
+                  <p className="text-2xl font-bold text-green-500 mt-1">{dashboardStats.reviewed}</p>
                 )}
               </div>
             </div>
 
             {/* Filter Panel */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4 mb-6">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
               <div className="flex items-center justify-between">
                 {/* Search placeholder for consistency with QA Centre */}
                 <div className="flex-1 max-w-md">
@@ -373,11 +377,11 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                     <input
                       type="text"
                       placeholder="Search drop number..."
-                      className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
                       disabled
                       title="Use QA Centre for search"
                     />
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--ff-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
@@ -389,14 +393,14 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                     onClick={() => setShowFilters(!showFilters)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                       showFilters || hasActiveFilters
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-[var(--ff-primary-500)] text-white'
+                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]/80'
                     }`}
                   >
                     <Filter className="h-4 w-4" />
                     Filters
                     {hasActiveFilters && (
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-white text-blue-600 rounded-full">
+                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-white text-[var(--ff-primary-500)] rounded-full">
                         Active
                       </span>
                     )}
@@ -417,43 +421,43 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
 
               {/* Expanded Filters */}
               {showFilters && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {/* From Date */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         From Date
                       </label>
                       <input
                         type="date"
                         value={filters.dateFrom}
                         onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
                       />
                     </div>
 
                     {/* To Date */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         To Date
                       </label>
                       <input
                         type="date"
                         value={filters.dateTo}
                         onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
                       />
                     </div>
 
                     {/* Status Filter */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         Status
                       </label>
                       <select
                         value={filters.statusFilter}
                         onChange={(e) => setFilters(prev => ({ ...prev, statusFilter: e.target.value as 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed' }))}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
                       >
                         <option value="all">All Statuses</option>
                         <option value="installed">Installed</option>
@@ -465,13 +469,13 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
 
                     {/* Project Filter */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         Project
                       </label>
                       <select
                         value={filters.projectFilter}
                         onChange={(e) => setFilters(prev => ({ ...prev, projectFilter: e.target.value }))}
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+                        className="w-full px-3 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
                       >
                         <option value="all">All Projects</option>
                         {uniqueProjects.map(project => (
@@ -485,7 +489,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                   <div className="flex justify-end mt-4">
                     <button
                       onClick={handleClearFilters}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
                     >
                       <X className="h-4 w-4" />
                       Clear All Filters
@@ -496,12 +500,12 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
             </div>
 
             {/* Daily Stats Per Project */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                   Numbers per Project
                   {hasActiveFilters && (
-                    <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                    <span className="ml-2 text-sm font-normal text-[var(--ff-text-secondary)]">
                       (Filtered Results)
                     </span>
                   )}
@@ -515,8 +519,8 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                       onClick={() => handleQuickFilter(filter)}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         getActiveQuickFilter() === filter
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          ? 'bg-[var(--ff-primary-500)] text-white'
+                          : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]/80'
                       }`}
                     >
                       {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'last7days' ? 'Last 7 days' : 'All'}
@@ -525,18 +529,18 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
+                  <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Project</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wider">Installed</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wider">Activated</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-600 dark:text-yellow-500 uppercase tracking-wider">Not Reviewed</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-green-600 dark:text-green-500 uppercase tracking-wider">Reviewed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Project</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider">Installed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-500 uppercase tracking-wider">Activated</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-500 uppercase tracking-wider">Not Reviewed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-green-500 uppercase tracking-wider">Reviewed</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
                     {isLoading ? (
                       Array.from({ length: 4 }).map((_, i) => (
                         <tr key={`skeleton-${i}`}>
@@ -550,7 +554,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                       ))
                     ) : projectStats.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--ff-text-secondary)]">
                           No data available for the selected filters.
                         </td>
                       </tr>
@@ -568,26 +572,26 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                             <React.Fragment key={stat.project}>
                               {/* Project Row */}
                               <tr
-                                className="hover:bg-gray-50 dark:hover:bg-gray-900/30 cursor-pointer"
+                                className="hover:bg-[var(--ff-bg-tertiary)]/50 cursor-pointer"
                                 onClick={() => toggleProject(stat.project)}
                               >
-                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-[var(--ff-text-primary)]">
                                   <div className="flex items-center gap-2">
                                     {isLoadingZones ? (
-                                      <div className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full" />
+                                      <div className="animate-spin h-4 w-4 border-2 border-[var(--ff-primary-500)] border-t-transparent rounded-full" />
                                     ) : isExpanded ? (
-                                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                                      <ChevronDown className="h-4 w-4 text-[var(--ff-text-secondary)]" />
                                     ) : (
-                                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                                      <ChevronRight className="h-4 w-4 text-[var(--ff-text-secondary)]" />
                                     )}
                                     {stat.project}
                                   </div>
                                 </td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{stat.total}</td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-600 dark:text-blue-400">{stat.installed ?? 0}</td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 dark:text-purple-400">{stat.activated ?? 0}</td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-600 dark:text-yellow-500">{stat.notReviewed}</td>
-                                <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-500">{stat.reviewed}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]">{stat.total}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-blue-500">{stat.installed ?? 0}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-500">{stat.activated ?? 0}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-yellow-500">{stat.notReviewed}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-green-500">{stat.reviewed}</td>
                               </tr>
 
                               {/* Zone Rows (when expanded) */}
@@ -599,16 +603,16 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                   <React.Fragment key={zoneKey}>
                                     {/* Zone Row */}
                                     <tr
-                                      className="bg-gray-50 dark:bg-gray-900/20 hover:bg-gray-100 dark:hover:bg-gray-900/40 cursor-pointer"
+                                      className="bg-[var(--ff-bg-tertiary)]/30 hover:bg-[var(--ff-bg-tertiary)]/50 cursor-pointer"
                                       onClick={(e) => { e.stopPropagation(); toggleZone(zoneKey); }}
                                     >
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                                         <div className="flex items-center gap-2 pl-6">
                                           {zone.pons && zone.pons.length > 0 ? (
                                             isZoneExpanded ? (
-                                              <ChevronDown className="h-3 w-3 text-gray-400" />
+                                              <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
                                             ) : (
-                                              <ChevronRight className="h-3 w-3 text-gray-400" />
+                                              <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
                                             )
                                           ) : (
                                             <span className="w-3" />
@@ -616,11 +620,11 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                           {zone.zone_name}
                                         </div>
                                       </td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{zone.total}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-500 dark:text-blue-400">{zone.installed}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-500 dark:text-purple-400">{zone.activated}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-yellow-500 dark:text-yellow-400">{zone.notReviewed}</td>
-                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-green-500 dark:text-green-400">{zone.reviewed}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--ff-text-tertiary)]">{zone.total}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-400">{zone.installed}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-purple-400">{zone.activated}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-yellow-400">{zone.notReviewed}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-green-400">{zone.reviewed}</td>
                                     </tr>
 
                                     {/* PON Rows (when zone expanded) */}
@@ -632,16 +636,16 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                       return (
                                         <React.Fragment key={ponKey}>
                                           <tr
-                                            className={`bg-gray-100 dark:bg-gray-900/40 ${hasPoles ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-900/60' : ''}`}
+                                            className={`bg-[var(--ff-bg-tertiary)]/50 ${hasPoles ? 'cursor-pointer hover:bg-[var(--ff-bg-tertiary)]/70' : ''}`}
                                             onClick={(e) => { if (hasPoles) { e.stopPropagation(); togglePon(ponKey); } }}
                                           >
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-[var(--ff-text-tertiary)]">
                                               <div className="flex items-center gap-2 pl-12">
                                                 {hasPoles ? (
                                                   isPonExpanded ? (
-                                                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                                                    <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
                                                   ) : (
-                                                    <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                    <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
                                                   )
                                                 ) : (
                                                   <span className="w-3" />
@@ -649,11 +653,11 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                                 {pon.pon_name}
                                               </div>
                                             </td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{pon.total}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-400 dark:text-blue-300">{pon.installed}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-400 dark:text-purple-300">{pon.activated}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-400 dark:text-yellow-300">{pon.notReviewed}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-green-400 dark:text-green-300">{pon.reviewed}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-[var(--ff-text-tertiary)]">{pon.total}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-400">{pon.installed}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-400">{pon.activated}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-400">{pon.notReviewed}</td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-green-400">{pon.reviewed}</td>
                                           </tr>
 
                                           {/* Pole Rows (when PON expanded) */}
@@ -665,24 +669,24 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                             return (
                                               <React.Fragment key={poleKey}>
                                                 <tr
-                                                  className={`bg-gray-150 dark:bg-gray-900/60 ${hasDrs ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-900/80' : ''}`}
+                                                  className={`bg-[var(--ff-bg-tertiary)]/60 ${hasDrs ? 'cursor-pointer hover:bg-[var(--ff-bg-tertiary)]/80' : ''}`}
                                                   onClick={(e) => { if (hasDrs) { e.stopPropagation(); togglePole(poleKey); } }}
                                                 >
-                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-[var(--ff-text-tertiary)]">
                                                     <div className="pl-20 flex items-center gap-2">
                                                       {hasDrs ? (
                                                         isPoleExpanded ? (
-                                                          <ChevronDown className="h-3 w-3 text-gray-400" />
+                                                          <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
                                                         ) : (
-                                                          <ChevronRight className="h-3 w-3 text-gray-400" />
+                                                          <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
                                                         )
                                                       ) : (
-                                                        <span className="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded-full" style={{ width: '8px', height: '8px' }} />
+                                                        <span className="w-3 h-3 bg-[var(--ff-border-light)] rounded-full" style={{ width: '8px', height: '8px' }} />
                                                       )}
                                                       {pole.pole_name}
                                                     </div>
                                                   </td>
-                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">{pole.total}</td>
+                                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-[var(--ff-text-tertiary)]">{pole.total}</td>
                                                   <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-300 dark:text-blue-400">{pole.installed}</td>
                                                   <td className="px-4 py-2 whitespace-nowrap text-sm text-purple-300 dark:text-purple-400">{pole.activated}</td>
                                                   <td className="px-4 py-2 whitespace-nowrap text-sm text-yellow-300 dark:text-yellow-400">{pole.notReviewed}</td>
@@ -693,7 +697,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                                 {isPoleExpanded && pole.drs?.map((dr) => (
                                                   <tr
                                                     key={`${poleKey}_${dr.drop_number}`}
-                                                    className="bg-gray-200 dark:bg-gray-900/80 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                                                    className="bg-[var(--ff-bg-tertiary)]/80 cursor-pointer hover:bg-[var(--ff-primary-500)]/10"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       router.push(`/activate/qa-centre/${dr.drop_number}`);
@@ -701,7 +705,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                                   >
                                                     <td className="px-4 py-2 whitespace-nowrap text-sm">
                                                       <div className="pl-28 flex items-center gap-2">
-                                                        <span className="text-blue-500 dark:text-blue-400 hover:underline font-mono">
+                                                        <span className="text-[var(--ff-primary-500)] hover:underline font-mono">
                                                           {dr.drop_number}
                                                         </span>
                                                         {dr.qa_status === 'pass' && <span className="text-green-500 text-xs">✓</span>}
@@ -709,7 +713,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                                                         {dr.qa_status === 'rework' && <span className="text-yellow-500 text-xs">↻</span>}
                                                       </div>
                                                     </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-400 dark:text-gray-500">1</td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-[var(--ff-text-tertiary)]">1</td>
                                                     <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-300 dark:text-blue-400">
                                                       {dr.is_installed ? 1 : 0}
                                                     </td>
@@ -737,35 +741,35 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                           );
                         })}
                         {/* Summary Row */}
-                        <tr className="bg-gray-100 dark:bg-gray-900/80 font-semibold border-t-2 border-gray-300 dark:border-gray-600">
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                        <tr className="bg-[var(--ff-bg-secondary)] font-semibold border-t-2 border-[var(--ff-border-light)]">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-[var(--ff-text-primary)]">
                             <div className="pl-6">Total</div>
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-[var(--ff-text-primary)]">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
                             ).reduce((sum, s) => sum + s.total, 0)}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-600 dark:text-blue-400">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-500">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
                             ).reduce((sum, s) => sum + (s.installed ?? 0), 0)}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-purple-600 dark:text-purple-400">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-purple-500">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
                             ).reduce((sum, s) => sum + (s.activated ?? 0), 0)}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-yellow-600 dark:text-yellow-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-yellow-500">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
                             ).reduce((sum, s) => sum + s.notReviewed, 0)}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-500">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-green-500">
                             {(filters.projectFilter !== 'all'
                               ? projectStats.filter(s => s.project === filters.projectFilter)
                               : projectStats
@@ -786,7 +790,6 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
         {showTab === 'reports' && (
           <ReportsDashboard />
         )}
-      </div>
     </div>
   );
 }
