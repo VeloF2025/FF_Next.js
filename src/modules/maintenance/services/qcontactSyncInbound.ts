@@ -772,20 +772,30 @@ export async function syncFiberTimeInboundTickets(
   try {
     const client = getDefaultFiberTimeQContactClient();
 
-    // Fetch cases from FiberTime QContact
-    const response = await client.listCases({
-      assignedTo: options.assignedTo || MAINTENANCE_VELOCITY_ID,
-      page: options.page || 1,
-      pageSize: options.pageSize || 50,
-    });
+    // Pagination setup - fetch ALL pages
+    const pageSize = options.pageSize || 50;
+    let currentPage = options.page || 1;
+    let hasMore = true;
+    let totalTickets = 0;
 
-    logger.info('Fetched cases from FiberTime QContact', {
-      count: response.results.length,
-      total: response.total,
-    });
+    while (hasMore) {
+      // Fetch cases from FiberTime QContact
+      const response = await client.listCases({
+        assignedTo: options.assignedTo || MAINTENANCE_VELOCITY_ID,
+        page: currentPage,
+        pageSize,
+      });
 
-    // Process each case
-    for (const ftCase of response.results) {
+      logger.info('Fetched cases from FiberTime QContact', {
+        page: currentPage,
+        count: response.results.length,
+        total: response.total,
+      });
+
+      totalTickets = response.total || 0;
+
+      // Process each case on this page
+      for (const ftCase of response.results) {
       stats.total_processed++;
 
       let qcontactTicket: QContactTicket;
@@ -846,6 +856,16 @@ export async function syncFiberTimeInboundTickets(
         });
       }
     }
+
+      // Check if there are more pages
+      const processedSoFar = currentPage * pageSize;
+      hasMore = response.results.length === pageSize && processedSoFar < totalTickets;
+
+      if (hasMore) {
+        currentPage++;
+        logger.debug('Fetching next page', { nextPage: currentPage, totalTickets });
+      }
+    } // End of pagination while loop
 
     const duration_seconds = (Date.now() - startTime) / 1000;
     const completed_at = new Date();
