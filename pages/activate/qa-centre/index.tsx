@@ -4,15 +4,16 @@
  * Clicking a DR navigates to the detail review page
  */
 
+import type { NextPage } from 'next';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { QaCentrePage } from '@/modules/activate/components/QaCentrePage';
-import type { ReactElement } from 'react';
-import type { NextPageWithLayout } from '@/pages/_app';
 
-const QaCentreIndexPage: NextPageWithLayout = () => {
-  return <QaCentrePage />;
+const QaCentreIndexPage: NextPage = () => {
+  return (
+    <AppLayout>
+      <QaCentrePage />
+    </AppLayout>
+  );
 };
-
-// No sidebar layout - fullscreen for better UX
-QaCentreIndexPage.getLayout = (page: ReactElement) => page;
 
 export default QaCentreIndexPage;

@@ -4,15 +4,16 @@
  * Users can click a DR to review or search for specific DRs
  */
 
+import type { NextPage } from 'next';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { DrListPage } from '@/modules/activate/components/DrListPage';
-import type { ReactElement } from 'react';
-import type { NextPageWithLayout } from '@/pages/_app';
 
-const DrPhotoUnifiedIndexPage: NextPageWithLayout = () => {
-  return <DrListPage />;
+const ActivateIndexPage: NextPage = () => {
+  return (
+    <AppLayout>
+      <DrListPage />
+    </AppLayout>
+  );
 };
 
-// No sidebar layout - fullscreen for better UX
-DrPhotoUnifiedIndexPage.getLayout = (page: ReactElement) => page;
-
-export default DrPhotoUnifiedIndexPage;
+export default ActivateIndexPage;
