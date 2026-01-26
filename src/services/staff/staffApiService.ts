@@ -73,6 +73,9 @@ interface DbStaff {
   nextOfKinPhone?: string;
   nextOfKinRelationship?: string;
   nextOfKinAddress?: string;
+  // Emergency contact fields (camelCase from API aliases)
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   emergencyContactRelationship?: string;
   // Bank details fields (camelCase from API aliases)
   bankName?: string;
@@ -193,8 +196,8 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     trainingRecords: [],
     createdBy: '',
     lastModifiedBy: '',
-    emergencyContactName: dbStaff.emergency_contact_name,
-    emergencyContactPhone: dbStaff.emergency_contact_phone,
+    emergencyContactName: dbStaff.emergencyContactName,
+    emergencyContactPhone: dbStaff.emergencyContactPhone,
     hourlyRate: dbStaff.hourly_rate,
     salaryAmount: dbStaff.salary,
     salaryGrade: dbStaff.salaryGrade,
