@@ -137,6 +137,8 @@ export interface SyncOperationResult {
   qcontact_ticket_id: string | null;
   error_message: string | null;
   synced_at: Date;
+  /** Whether this was a create or update operation */
+  operation_type?: 'create' | 'update' | 'skip';
 }
 
 /**

@@ -306,7 +306,7 @@ async function checkDuplicate(qcontactTicketId: string): Promise<string | null> 
 
 /**
  * Sync a single ticket from QContact to FibreFlow
- * 🟢 WORKING: Creates ticket or skips if duplicate exists
+ * 🟢 WORKING: Creates ticket or updates if duplicate exists
  *
  * @param qcontactTicket - Ticket data from QContact
  * @returns Sync operation result
@@ -326,18 +326,47 @@ export async function syncSingleInboundTicket(
     const existingTicketId = await checkDuplicate(qcontactTicket.id);
 
     if (existingTicketId) {
-      logger.info('Ticket already exists, skipping', {
+      // UPDATE existing ticket's status instead of skipping
+      const mappedStatus = mapQContactStatusToFibreFlow(qcontactTicket.status);
+
+      const updateSql = `
+        UPDATE maintenance_tickets
+        SET status = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING id, status
+      `;
+
+      const updateResult = await queryOne<{ id: string; status: string }>(
+        updateSql,
+        [mappedStatus, existingTicketId]
+      );
+
+      logger.info('Updated existing ticket status', {
         qcontactTicketId: qcontactTicket.id,
         existingTicketId,
+        qcontactStatus: qcontactTicket.status,
+        newStatus: mappedStatus,
       });
+
+      // Create sync log for update
+      const syncLogId = await createSyncLog(
+        qcontactTicket.id,
+        existingTicketId,
+        SyncType.STATUS_UPDATE,
+        SyncStatus.SUCCESS,
+        { qcontact_status: qcontactTicket.status },
+        { new_status: mappedStatus },
+        null
+      );
 
       return {
         success: true,
-        sync_log_id: '', // No log created for skipped tickets
+        sync_log_id: syncLogId,
         ticket_id: existingTicketId,
         qcontact_ticket_id: qcontactTicket.id,
         error_message: null,
         synced_at: new Date(),
+        operation_type: 'update',
       };
     }
 
@@ -429,6 +458,7 @@ export async function syncSingleInboundTicket(
       qcontact_ticket_id: qcontactTicket.id,
       error_message: null,
       synced_at: new Date(),
+      operation_type: 'create',
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -536,9 +566,11 @@ export async function syncInboundTickets(
         if (result.success) {
           stats.successful++;
 
-          // Check if it was a new ticket (has sync_log_id) or existing (skipped)
-          if (result.sync_log_id && result.sync_log_id !== '') {
+          // Track operation type: create, update, or skip
+          if (result.operation_type === 'create') {
             stats.created++;
+          } else if (result.operation_type === 'update') {
+            stats.updated++;
           } else {
             stats.skipped++;
           }
@@ -792,8 +824,11 @@ export async function syncFiberTimeInboundTickets(
       if (result.success) {
         stats.successful++;
 
-        if (result.sync_log_id && result.sync_log_id !== '') {
+        // Track operation type: create, update, or skip
+        if (result.operation_type === 'create') {
           stats.created++;
+        } else if (result.operation_type === 'update') {
+          stats.updated++;
         } else {
           stats.skipped++;
         }
