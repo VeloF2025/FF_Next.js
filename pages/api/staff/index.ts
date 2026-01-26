@@ -355,6 +355,22 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           return value !== undefined ? (value || null) : undefined;
         };
 
+        // Helper function for UUID fields - empty string should become null
+        const getUuidFieldValue = (camelCase: string, snakeCase?: string) => {
+          const value = updates[camelCase] ?? updates[snakeCase || ''];
+          if (value === undefined) return undefined;
+          if (!value || value === '') return null; // Empty string -> null for UUID fields
+          return value;
+        };
+
+        // Helper function for date fields - empty string should become null
+        const getDateFieldValue = (camelCase: string, snakeCase?: string) => {
+          const value = updates[camelCase] ?? updates[snakeCase || ''];
+          if (value === undefined) return undefined;
+          if (!value || value === '') return null; // Empty string -> null for date fields
+          return value;
+        };
+
         // Personal info fields
         const alternatePhone = getFieldValue('alternativePhone', 'alternate_phone');
         const whatsappId = getFieldValue('whatsappId', 'whatsapp_id');
@@ -367,7 +383,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
         // Employment fields
         const level = getFieldValue('level');
-        const reportsTo = getFieldValue('reportsTo', 'reports_to');
+        const reportsTo = getUuidFieldValue('reportsTo', 'reports_to');
         const experienceYears = updates.experienceYears ?? updates.experience_years ?? undefined;
         const contractType = getFieldValue('contractType', 'contract_type') || getFieldValue('saContractType');
         const maxProjectCount = updates.maxProjectCount ?? updates.max_project_count ?? undefined;
@@ -396,9 +412,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         const idNumber = getFieldValue('idNumber', 'id_number');
         const passportNumber = getFieldValue('passportNumber', 'passport_number');
         const passportCountry = getFieldValue('passportCountry', 'passport_country');
-        const passportExpiry = getFieldValue('passportExpiry', 'passport_expiry');
+        const passportExpiry = getDateFieldValue('passportExpiry', 'passport_expiry');
         const workPermitNumber = getFieldValue('workPermitNumber', 'work_permit_number');
-        const workPermitExpiry = getFieldValue('workPermitExpiry', 'work_permit_expiry');
+        const workPermitExpiry = getDateFieldValue('workPermitExpiry', 'work_permit_expiry');
 
         // Emergency contact fields (stored in JSONB emergency_contact column)
         const emergencyContactName = getFieldValue('emergencyContactName', 'emergency_contact_name');
@@ -430,7 +446,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         const taxStatus = getFieldValue('taxStatus', 'tax_status');
         const taxNumber = getFieldValue('taxNumber', 'tax_number');
         const probationStatus = getFieldValue('probationStatus', 'probation_status');
-        const probationEndDate = getFieldValue('probationEndDate', 'probation_end_date');
+        const probationEndDate = getDateFieldValue('probationEndDate', 'probation_end_date');
         const probationExtended = updates.probationExtended ?? updates.probation_extended ?? undefined;
         const probationExtensionReason = getFieldValue('probationExtensionReason', 'probation_extension_reason');
         const noticePeriod = getFieldValue('noticePeriod', 'notice_period');
