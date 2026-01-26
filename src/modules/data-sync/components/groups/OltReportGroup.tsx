@@ -148,6 +148,17 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     Array<{ id: string; project_name: string; project_code: string }>
   >([]);
 
+  // Resolve/Escalate state
+  const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
+  const [showEscalateModal, setShowEscalateModal] = useState<string | null>(null);
+  const [resolutionType, setResolutionType] = useState<string>('');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [escalateTo, setEscalateTo] = useState('');
+  const [escalateNotes, setEscalateNotes] = useState('');
+  const [adminUsers, setAdminUsers] = useState<Array<{ id: string; email: string; name: string }>>([]);
+  const [resolving, setResolving] = useState(false);
+  const [escalating, setEscalating] = useState(false);
+
   // Reporting state
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('all');
   const [reportData, setReportData] = useState<{
@@ -179,7 +190,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
   }, [activeTab, onTabChange]);
 
-  // Fetch projects on mount
+  // Fetch projects and admin users on mount
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -192,7 +203,19 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         // Silently fail
       }
     };
+    const fetchAdminUsers = async () => {
+      try {
+        const res = await fetch('/api/system/olt-report/admin-users');
+        if (res.ok) {
+          const data = await res.json();
+          setAdminUsers(data.data || data || []);
+        }
+      } catch {
+        // Silently fail
+      }
+    };
     fetchProjects();
+    fetchAdminUsers();
   }, []);
 
   // Fetch stats
@@ -401,6 +424,76 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       setError('Bulk fix failed');
     } finally {
       setBulkFixing(false);
+    }
+  };
+
+  // Handle resolve
+  const handleResolve = async (recordId: string) => {
+    if (!resolutionType) {
+      setError('Please select a resolution type');
+      return;
+    }
+    setResolving(true);
+    try {
+      const res = await fetch('/api/system/olt-report/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordId,
+          action: 'resolve',
+          resolutionType,
+          notes: resolutionNotes || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success || data.data?.success) {
+        setShowResolveModal(null);
+        setResolutionType('');
+        setResolutionNotes('');
+        fetchRecords('needs_investigation');
+        fetchStats();
+      } else {
+        setError(data.error?.message || data.error || 'Resolve failed');
+      }
+    } catch {
+      setError('Resolve failed');
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  // Handle escalate
+  const handleEscalate = async (recordId: string) => {
+    if (!escalateTo) {
+      setError('Please select an admin to escalate to');
+      return;
+    }
+    setEscalating(true);
+    try {
+      const res = await fetch('/api/system/olt-report/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordId,
+          action: 'escalate',
+          escalateTo,
+          notes: escalateNotes || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success || data.data?.success) {
+        setShowEscalateModal(null);
+        setEscalateTo('');
+        setEscalateNotes('');
+        fetchRecords('needs_investigation');
+        fetchStats();
+      } else {
+        setError(data.error?.message || data.error || 'Escalate failed');
+      }
+    } catch {
+      setError('Escalate failed');
+    } finally {
+      setEscalating(false);
     }
   };
 
@@ -784,6 +877,26 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                               Fix
                             </button>
                           )}
+                          {currentTab === 'investigate' && (
+                            <>
+                              <button
+                                onClick={() => setShowResolveModal(record.id)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                                title="Mark as resolved"
+                              >
+                                <CheckCircle className="w-3 h-3" />
+                                Resolve
+                              </button>
+                              <button
+                                onClick={() => setShowEscalateModal(record.id)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                                title="Escalate to admin"
+                              >
+                                <AlertTriangle className="w-3 h-3" />
+                                Escalate
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -944,6 +1057,137 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               No report data available
             </div>
           )}
+        </div>
+      )}
+
+      {/* Resolve Modal */}
+      {showResolveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 w-full max-w-md border border-[var(--ff-border-light)]">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
+              Resolve Investigation
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Resolution Type
+                </label>
+                <select
+                  value={resolutionType}
+                  onChange={(e) => setResolutionType(e.target.value)}
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="">Select resolution...</option>
+                  <option value="manually_fixed">Manually Fixed in 1Map</option>
+                  <option value="closed_invalid">Closed - Invalid Record</option>
+                  <option value="closed_no_data">Closed - Missing Data</option>
+                  <option value="closed_false_positive">Closed - False Positive</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                  placeholder="Add any notes about this resolution..."
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowResolveModal(null);
+                    setResolutionType('');
+                    setResolutionNotes('');
+                  }}
+                  className="px-4 py-2 text-sm bg-[var(--ff-bg-tertiary)] rounded-lg hover:bg-[var(--ff-bg-tertiary)]/80"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleResolve(showResolveModal)}
+                  disabled={!resolutionType || resolving}
+                  className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {resolving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  Resolve
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Escalate Modal */}
+      {showEscalateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 w-full max-w-md border border-[var(--ff-border-light)]">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
+              Escalate to Admin
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Escalate To
+                </label>
+                <select
+                  value={escalateTo}
+                  onChange={(e) => setEscalateTo(e.target.value)}
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                >
+                  <option value="">Select admin...</option>
+                  {adminUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={escalateNotes}
+                  onChange={(e) => setEscalateNotes(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                  placeholder="Explain why this needs escalation..."
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowEscalateModal(null);
+                    setEscalateTo('');
+                    setEscalateNotes('');
+                  }}
+                  className="px-4 py-2 text-sm bg-[var(--ff-bg-tertiary)] rounded-lg hover:bg-[var(--ff-bg-tertiary)]/80"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleEscalate(showEscalateModal)}
+                  disabled={!escalateTo || escalating}
+                  className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {escalating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4" />
+                  )}
+                  Escalate
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
