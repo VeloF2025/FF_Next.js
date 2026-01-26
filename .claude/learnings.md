@@ -254,3 +254,105 @@ users (
 - Assignment lookups (assigned_to, created_by)
 - Audit trails (modified_by, approved_by)
 - Admin user dropdowns
+
+---
+
+## 2026-01-26: Tab-Based Navigation Pattern
+
+**Context:** FibreFlow modules are migrating from sidebar sub-items to horizontal tab navigation at the top of each page. This provides a cleaner UI and better module organization.
+
+**Architecture:**
+
+```
+src/modules/navigation/           # Navigation system
+├── config/
+│   ├── modules/                  # Per-module tab configs
+│   │   ├── maintenance.config.ts
+│   │   └── [module].config.ts
+│   ├── registry.ts               # Module registration
+│   └── index.ts                  # Exports
+├── components/
+│   ├── ModuleTabs.tsx            # Horizontal tab bar
+│   └── SubTabs.tsx               # Sub-tab navigation
+├── hooks/
+│   └── useModuleTabs.ts          # Tab state management
+└── types.ts                      # TypeScript types
+
+src/components/module-page/       # Page wrapper
+├── ModulePage.tsx                # Unified page wrapper
+├── ModuleHeader.tsx              # Header with icon/title/actions
+└── types.ts
+```
+
+**Module Config Pattern:**
+
+```typescript
+// src/modules/navigation/config/modules/[module].config.ts
+import type { ModuleNavigationConfig } from '../../types';
+
+export const [module]Config: ModuleNavigationConfig = {
+  moduleId: '[module]',
+  moduleName: '[Module Name]',
+  description: '[Description]',
+  basePath: '/[module]',
+  icon: ModuleIcon,
+  tabs: [
+    { id: 'dashboard', label: 'Dashboard', icon: Icon, path: '/[module]' },
+    { id: 'sub-page', label: 'Sub Page', icon: Icon, path: '/[module]/sub-page' },
+  ],
+};
+```
+
+**Page Wrapper Pattern:**
+
+```typescript
+// app/(main)/[module]/[page]/client.tsx
+import { ModulePage } from '@/components/module-page';
+import { [module]Config } from '@/modules/navigation';
+
+export default function PageClient() {
+  const headerActions = <button>Action</button>;  // Optional
+
+  return (
+    <ModulePage config={[module]Config} headerActions={headerActions}>
+      <div>{/* Page content */}</div>
+    </ModulePage>
+  );
+}
+```
+
+**Sidebar Reduction:**
+
+```typescript
+// Before: 7 items
+items: [
+  { to: '/module', label: 'Dashboard' },
+  { to: '/module/page1', label: 'Page 1' },
+  // ... 5 more items
+]
+
+// After: 1 item (tabs handle sub-navigation)
+items: [
+  { to: '/module', label: 'Module Name', icon: ModuleIcon },
+]
+```
+
+**Key Files:**
+| Component | Location |
+|-----------|----------|
+| ModulePage | `src/components/module-page/ModulePage.tsx` |
+| ModuleTabs | `src/modules/navigation/components/ModuleTabs.tsx` |
+| useModuleTabs | `src/modules/navigation/hooks/useModuleTabs.ts` |
+| Configs | `src/modules/navigation/config/modules/*.config.ts` |
+
+**Reference Implementation:**
+- Module: Maintenance
+- Commit: `96ea3f84` - feat(maintenance): migrate to horizontal tab navigation
+- Skill: `/navigation` - Full migration process
+
+**Affected Areas:** All modules being migrated to tab-based navigation. Current status:
+- [x] Maintenance - Completed (2026-01-26)
+- [ ] Procurement - Pending
+- [ ] Fleet - Pending
+- [ ] Projects - Pending
+- [ ] HR/Staff - Pending

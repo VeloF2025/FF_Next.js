@@ -103,6 +103,19 @@ Skills are automatically loaded when relevant keywords or contexts are detected.
 
 ---
 
+## Navigation Skills
+
+### `navigation/navigation.md`
+**Trigger:** /navigation, migrate to tabs, tab navigation, convert sidebar, horizontal tabs
+- Migrate modules from sidebar sub-items to horizontal tab navigation
+- Create module navigation configs
+- Wrap pages with ModulePage component
+- Update sidebar config to single entry
+- Verify tabs with browser automation
+- Reference implementation: Maintenance module (commit `96ea3f84`)
+
+---
+
 ## Workflow Skills
 
 ### `workflows/oes-import.md`
