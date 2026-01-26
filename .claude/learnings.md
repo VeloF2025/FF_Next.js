@@ -449,6 +449,41 @@ Benefits:
 
 ---
 
+## 2026-01-26: Nokia OES Format Change - Stack Ref. Column Added
+
+**Issue:** OES import preview showed wrong data - Status displayed dB values (`-26.21`), Team displayed coordinates (`-21.307682`).
+
+**Root Cause:** Nokia changed their OES Excel report format - added "Stack Ref." column at position E (index 4), shifting all subsequent columns by 1.
+
+**Old Format (13 columns):**
+```
+A: Drop Number, B: Serial, C: Timestamp, D: OLT Address,
+E: ONT Rx SIG, F: Link Budget ONT→OLT, G: OLT Rx SIG, H: Link Budget OLT→ONT,
+I: Status, J: Latitude, K: Longitude, L: Current ONT RX, M: Team
+```
+
+**New Format (14 columns) - Jan 2026:**
+```
+A: Drop Number, B: Serial, C: Timestamp, D: OLT Address,
+E: Stack Ref. ← NEW!
+F: ONT Rx SIG, G: Link Budget ONT→OLT, H: OLT Rx SIG, I: Link Budget OLT→ONT,
+J: Status, K: Latitude, L: Longitude, M: Current ONT RX, N: Team
+```
+
+**Fix Applied:**
+1. Updated column indices in `parseOESExcel()` (row[4] → row[5], etc.)
+2. Added `stack_ref` field to OESRow interface
+3. Added `stack_ref VARCHAR(100)` column to `oes_activations` table
+4. Updated INSERT/UPSERT query to include `stack_ref`
+
+**Reference:**
+- File: `pages/api/activate/import-oes.ts`
+- Commit: `79e97a07` - fix(oes-import): update parser for new Nokia OES format with Stack Ref column
+
+**Lesson:** When external data sources change format, check column positions first. The preview showing numeric values in text fields is a clear sign of column misalignment.
+
+---
+
 ## 2026-01-26: Type Casting in PostgreSQL JOINs
 
 **Issue:** `operator does not exist: text = uuid` or `operator does not exist: character varying = uuid` when joining tables with mismatched ID column types.
