@@ -34,13 +34,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Get counts with more nuanced grouping
-    // "Pending/Fixable" = records with OLT serial that can be fixed
-    // "Needs Investigation" = records without OLT serial or marked for investigation
+    // "Pending/Fixable" = only 'pending' status with OLT serial (DR exists in 1Map, can be auto-fixed)
+    // "Needs Investigation" = 'not_found' (DR not in 1Map), empty_serial, or no OLT serial
     const result = await pool.query(`
       SELECT
         CASE
-          WHEN fix_status IN ('pending', 'not_found') AND olt_serial IS NOT NULL THEN 'pending'
-          WHEN fix_status IN ('needs_investigation', 'needs_reinvestigation', 'empty_serial') OR olt_serial IS NULL THEN 'needs_investigation'
+          WHEN fix_status = 'pending' AND olt_serial IS NOT NULL THEN 'pending'
+          WHEN fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial') OR olt_serial IS NULL THEN 'needs_investigation'
           ELSE fix_status
         END as category,
         COUNT(*)::int as count
