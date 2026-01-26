@@ -72,14 +72,126 @@ function excelDateTimeToISO(serial: number): string {
   return date.toISOString();
 }
 
+// Expected headers for validation (Jan 2026 format - 14 columns)
+const EXPECTED_HEADERS = [
+  'Drop Number',
+  'Serial Number',
+  'Timestamp',
+  'OLT Address',
+  'Stack Ref.',
+  'ONT Rx SIG (dBm)',
+  'Link Budget ONT->OLT (dB)',
+  'OLT Rx SIG (dBm)',
+  'Link Budget OLT->ONT (dB)',
+  'Status',
+  'Latitude',
+  'Longitude',
+  'Current ONT RX',
+  'Team',
+];
+
+interface ParseResult {
+  rows: OESRow[];
+  warnings: string[];
+  headerMismatch: boolean;
+}
+
 /**
- * Parse Excel file and extract OES data
+ * Validate Excel headers match expected format
  */
-function parseOESExcel(filePath: string): OESRow[] {
+function validateHeaders(headers: any[]): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+
+  // Check column count
+  if (headers.length < 14) {
+    warnings.push(`Column count mismatch: expected 14, got ${headers.length}. Format may have changed.`);
+  } else if (headers.length > 14) {
+    warnings.push(`Extra columns detected: expected 14, got ${headers.length}. New columns may have been added.`);
+  }
+
+  // Check key headers are in expected positions
+  const headerChecks = [
+    { index: 0, expected: 'Drop Number', actual: headers[0] },
+    { index: 4, expected: 'Stack Ref.', actual: headers[4] },
+    { index: 9, expected: 'Status', actual: headers[9] },
+    { index: 13, expected: 'Team', actual: headers[13] },
+  ];
+
+  for (const check of headerChecks) {
+    const actualStr = String(check.actual || '').trim();
+    if (!actualStr.toLowerCase().includes(check.expected.toLowerCase().split(' ')[0])) {
+      warnings.push(`Header mismatch at column ${check.index + 1}: expected "${check.expected}", got "${actualStr}"`);
+    }
+  }
+
+  return { valid: warnings.length === 0, warnings };
+}
+
+/**
+ * Validate data values look correct (detect column misalignment)
+ */
+function validateDataSample(rows: OESRow[]): string[] {
+  const warnings: string[] = [];
+  const sampleSize = Math.min(10, rows.length);
+
+  let statusNumericCount = 0;
+  let teamNumericCount = 0;
+  let invalidStatusCount = 0;
+
+  for (let i = 0; i < sampleSize; i++) {
+    const row = rows[i];
+
+    // Status should be text like "Active" or "Inactive", not numbers
+    if (row.status && !isNaN(parseFloat(row.status))) {
+      statusNumericCount++;
+    }
+
+    // Status should be "Active" or "Inactive" typically
+    if (row.status && !['active', 'inactive', ''].includes(row.status.toLowerCase())) {
+      invalidStatusCount++;
+    }
+
+    // Team should be alphanumeric like "law6", "moa1", not coordinates like "-21.307682"
+    if (row.team && /^-?\d+\.\d+$/.test(row.team)) {
+      teamNumericCount++;
+    }
+  }
+
+  if (statusNumericCount > sampleSize / 2) {
+    warnings.push(`⚠️ Status column contains numeric values (${statusNumericCount}/${sampleSize} rows). Columns may be misaligned!`);
+  }
+
+  if (teamNumericCount > sampleSize / 2) {
+    warnings.push(`⚠️ Team column contains coordinate-like values (${teamNumericCount}/${sampleSize} rows). Columns may be misaligned!`);
+  }
+
+  if (invalidStatusCount > sampleSize / 2 && statusNumericCount === 0) {
+    warnings.push(`⚠️ Status values unexpected: ${rows.slice(0, 3).map(r => r.status).join(', ')}. Expected "Active" or "Inactive".`);
+  }
+
+  return warnings;
+}
+
+/**
+ * Parse Excel file and extract OES data with validation
+ */
+function parseOESExcel(filePath: string): ParseResult {
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0]; // Use first sheet (OLT DATA)
   const sheet = workbook.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+  const warnings: string[] = [];
+  let headerMismatch = false;
+
+  // Validate headers
+  if (data.length > 0) {
+    const headerValidation = validateHeaders(data[0]);
+    if (!headerValidation.valid) {
+      headerMismatch = true;
+      warnings.push(...headerValidation.warnings);
+    }
+  }
 
   // Skip header row
   const rows: OESRow[] = [];
@@ -126,7 +238,13 @@ function parseOESExcel(filePath: string): OESRow[] {
     });
   }
 
-  return rows;
+  // Validate data sample for column alignment issues
+  if (rows.length > 0) {
+    const dataWarnings = validateDataSample(rows);
+    warnings.push(...dataWarnings);
+  }
+
+  return { rows, warnings, headerMismatch };
 }
 
 /**
@@ -168,26 +286,34 @@ async function handler(
     const filePath = uploadedFile.filepath;
     const action = Array.isArray(fields.action) ? fields.action[0] : fields.action;
 
-    // Parse the Excel file
+    // Parse the Excel file with validation
     log.info('OESImport', `Parsing file: ${uploadedFile.originalFilename}`);
-    const oesRows = parseOESExcel(filePath);
+    const parseResult = parseOESExcel(filePath);
+    const { rows: oesRows, warnings, headerMismatch } = parseResult;
+
+    // Log warnings if any
+    if (warnings.length > 0) {
+      log.warn('OESImport', 'Format validation warnings detected', { warnings, headerMismatch });
+    }
 
     // Clean up temp file
     fs.unlinkSync(filePath);
 
     if (action === 'preview') {
-      // Return preview data
+      // Return preview data with warnings
       return res.status(200).json({
         success: true,
         preview: oesRows,
         totalRows: oesRows.length,
+        warnings: warnings.length > 0 ? warnings : undefined,
+        headerMismatch,
       });
     }
 
     if (action === 'import') {
       const reportDate = Array.isArray(fields.reportDate) ? fields.reportDate[0] : fields.reportDate;
 
-      log.info('OESImport', `Importing ${oesRows.length} rows (batch mode)`, { reportDate });
+      log.info('OESImport', `Importing ${oesRows.length} rows (batch mode)`, { reportDate, warningCount: warnings.length });
 
       // Create import batch
       const batchResult = await pool.query(
