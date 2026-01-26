@@ -159,6 +159,12 @@ async function handler(
            feedback_sent_at,
            reviewed_at,
            reviewed_by,
+           CASE
+             WHEN reviewed_by = 'system' THEN 'System'
+             WHEN reviewed_by IS NOT NULL AND reviewed_by ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                  THEN (SELECT CONCAT_WS(' ', first_name, last_name) FROM users WHERE id::text = reviewed_by)
+             ELSE reviewed_by
+           END as reviewer_name,
            created_at,
            updated_at,
            submission_count,
@@ -293,7 +299,7 @@ async function handler(
         // UNIFIED: signup_agent stored in unified table
         signupAgent: unified?.signup_agent || null,
         oesTeam: oes?.team || null,
-        reviewer: unified?.reviewed_by || null,
+        reviewer: unified?.reviewer_name || unified?.reviewed_by || null,
       },
 
       qaStatus: {

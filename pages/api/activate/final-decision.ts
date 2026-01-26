@@ -12,7 +12,7 @@ import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import {
   evaluateAutoFail,
   getFailReasonDescription,
@@ -96,25 +96,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       );
     }
 
-    // Get current user (fallback when Clerk not available)
-    const userId = req.headers['x-user-id'] as string | undefined || 'system';
-
-    // Look up user's name for activity logging
-    let reviewerName = 'unknown';
-    if (userId && userId !== 'system') {
-      try {
-        const userResult = await pool.query(
-          `SELECT first_name, last_name FROM users WHERE id = $1::uuid`,
-          [userId]
-        );
-        const user = userResult.rows[0];
-        if (user && (user.first_name || user.last_name)) {
-          reviewerName = [user.first_name, user.last_name].filter(Boolean).join(' ');
-        }
-      } catch (err) {
-        log.warn('FinalDecision', `Could not look up user name for ${userId}`, err);
-      }
-    }
+    // Get current user from auth middleware
+    const authReq = req as AuthenticatedNextApiRequest;
+    const userId = authReq.user?.id || 'system';
+    const reviewerName = authReq.user?.name || 'unknown';
 
     log.info('FinalDecision', `Recording decision ${decision} for ${dropNumber}`, {
       userId,
