@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, Download, FileDown, Activity, BarChart3, HeartPulse, Server, AlertTriangle } from 'lucide-react';
+import { Settings, Download, FileDown, Activity, BarChart3, HeartPulse, Server, Database } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -32,12 +32,12 @@ export const systemSection: NavSection = {
       rbacKey: 'system', // Admin-only via RBAC
     },
     {
-      to: '/system/data-management/olt-report',
-      icon: AlertTriangle,
-      label: 'OLT Reports',
-      shortLabel: 'OLT',
+      to: '/system/data-sync',
+      icon: Database,
+      label: 'Data Sync',
+      shortLabel: 'Sync',
       permissions: [Permission.SYSTEM_ADMIN],
-      rbacKey: 'system.data-management',
+      rbacKey: 'system.data-sync',
     },
     {
       to: XYOPS_URL,
