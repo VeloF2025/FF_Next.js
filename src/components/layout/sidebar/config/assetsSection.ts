@@ -7,14 +7,15 @@ import { Package } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const assetsSection: NavSection = {
-  section: 'ASSETS',
+  section: 'Assets',
   sectionId: 'assets',
+  sectionLink: '/assets',
   isCollapsible: false,
   items: [
     {
       to: '/assets',
       icon: Package,
-      label: 'Asset Management',
+      label: 'Assets',
       shortLabel: 'Assets',
       permissions: [],
       rbacKey: 'assets',

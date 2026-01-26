@@ -7,8 +7,9 @@ import { ClipboardCheck } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const activateSection: NavSection = {
-  section: 'ACTIVATE',
+  section: 'Activate',
   sectionId: 'activate',
+  sectionLink: '/activate',
   isCollapsible: false,
   items: [
     {

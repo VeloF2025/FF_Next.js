@@ -9,8 +9,9 @@ import { ShoppingCart } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const procurementSection: NavSection = {
-  section: 'PROCUREMENT',
+  section: 'Procurement',
   sectionId: 'procurement',
+  sectionLink: '/procurement',
   isCollapsible: false,
   items: [
     {

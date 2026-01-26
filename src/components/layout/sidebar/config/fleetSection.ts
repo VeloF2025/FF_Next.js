@@ -9,14 +9,15 @@ import { Car } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const fleetSection: NavSection = {
-  section: 'FLEET',
+  section: 'Fleet',
   sectionId: 'fleet',
+  sectionLink: '/fleet',
   isCollapsible: false,
   items: [
     {
       to: '/fleet',
       icon: Car,
-      label: 'Fleet Management',
+      label: 'Fleet',
       shortLabel: 'Fleet',
       permissions: [],
       rbacKey: 'fleet.main',

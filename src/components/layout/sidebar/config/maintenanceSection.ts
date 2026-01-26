@@ -9,8 +9,9 @@ import { Wrench } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const maintenanceSection: NavSection = {
-  section: 'MAINTENANCE',
+  section: 'Maintenance',
   sectionId: 'maintenance',
+  sectionLink: '/maintenance',
   isCollapsible: false,
   items: [
     {
