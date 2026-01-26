@@ -123,3 +123,29 @@ Visual feedback for async operations:
 - Integrated NAFNet deblurring service
 - Added draft state support for QA Wizard
 - Improved serial swap detection with auto-ticketing
+- **UNIFIED ARCHITECTURE** - All data from database, no live API calls on page views
+
+## UNIFIED ARCHITECTURE (Critical)
+
+**Principle**: ALL DR data stored in `dr_photo_unified_reviews` during processing. Page views read from database ONLY.
+
+**Data Sources (stored during `process-new-dr.ts`):**
+- Photos metadata, serials, QA status
+- Subscriber contact (subscriber_name, subscriber_phone, subscriber_email)
+- QContact info (qcontact_name, qcontact_phone)
+- Installer/signup agent info
+
+**BOSS API (port 8003) Usage:**
+| When | Allowed? |
+|------|----------|
+| Page view / data display | ❌ NO - use unified table |
+| `process-new-dr.ts` | ✅ YES - initial processing |
+| `ensure-data.ts` | ✅ YES - once when opening QA Wizard |
+| `dr-acknowledgment.ts` | ✅ YES - DR submission (before record exists) |
+| `refresh.ts` POST | ✅ YES - user-initiated manual refresh |
+| `photo/[...path].ts` | ✅ YES - photo serving (proxy) |
+
+**Manual Refresh:**
+```bash
+POST /api/activate/refresh?dropNumber=DR1234567
+```
