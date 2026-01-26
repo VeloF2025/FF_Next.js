@@ -1,24 +1,23 @@
 /**
  * WhatsApp Group Test Message API
  * POST /api/communications/whatsapp/groups/[id]/test - Send a test message to a group
+ *
+ * Uses wa_monitored_groups table (same as unified bridge)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
+import { Pool } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse, WaTestMessageResult } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
-
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
+  ssl: { rejectUnauthorized: false },
 });
 
-// Service URLs - use Tailscale IP for consistency across environments
-const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://72.61.197.178:8081';
+// Unified bridge URL (port 8083)
+const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';
 
 async function handler(
   req: NextApiRequest,
@@ -38,10 +37,10 @@ async function handler(
   }
 
   try {
-    // Get the group
+    // Get the group from wa_monitored_groups
     const groupResult = await pool.query(
-      `SELECT id, project_name, group_jid, group_name, enabled
-      FROM wa_group_config
+      `SELECT id, group_name, project_name, group_jid, group_type, is_active
+      FROM wa_monitored_groups
       WHERE id = $1::uuid`,
       [id]
     );
@@ -55,63 +54,47 @@ async function handler(
 
     const group = groupResult.rows[0];
 
-    if (!group.enabled) {
+    if (!group.is_active) {
       return res.status(400).json({
         success: false,
-        error: 'Cannot send test message to disabled group',
+        error: 'Cannot send test message to inactive group',
       });
     }
 
-    // Get test message template from database
-    const templateResult = await pool.query(
-      `SELECT template_content FROM wa_message_templates
-      WHERE template_key = 'test_message' AND enabled = true`
-    );
-
-    let messageContent: string;
-    if (templateResult.rows.length > 0) {
-      // Use template with variable substitution
-      messageContent = templateResult.rows[0].template_content
-        .replace('{{timestamp}}', new Date().toISOString())
-        .replace('{{service}}', 'FibreFlow Communications Admin')
-        .replace('{{groupName}}', group.group_name || group.project_name);
-    } else {
-      // Fallback message
-      messageContent = `🧪 *Test Message from FibreFlow*
+    // Construct test message
+    const messageContent = `🧪 *Test Message from FibreFlow*
 
 This is a test message to verify WhatsApp connectivity.
 
 Sent at: ${new Date().toISOString()}
-Group: ${group.group_name || group.project_name}
+Group: ${group.group_name}
+Type: ${group.group_type}
 
 If you received this message, the connection is working! ✅`;
-    }
 
-    // Send the test message via WhatsApp Sender service
+    // Send the test message via unified WhatsApp Bridge
     const sendResult = await sendTestMessage(group.group_jid, messageContent);
 
     // Log the message
-    await pool.query(
-      `INSERT INTO wa_message_logs (
-        direction, service, message_type, group_jid, message_content,
-        status, project, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-      [
-        'outbound',
-        'sender',
-        'test',
-        group.group_jid,
-        messageContent,
-        sendResult.success ? 'sent' : 'failed',
-        group.project_name,
-      ]
-    );
-
-    // Log admin action
-    await logAdminAction('test_message', 'group', id, null, {
-      group_jid: group.group_jid,
-      success: sendResult.success,
-    }, req);
+    try {
+      await pool.query(
+        `INSERT INTO wa_message_logs (
+          direction, service, message_type, group_jid, message_content,
+          status, project, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [
+          'outbound',
+          'bridge',
+          'test',
+          group.group_jid,
+          messageContent,
+          sendResult.success ? 'sent' : 'failed',
+          group.project_name,
+        ]
+      );
+    } catch (logError) {
+      console.warn('[WA Test] Failed to log message:', logError);
+    }
 
     if (!sendResult.success) {
       return res.status(500).json({
@@ -124,7 +107,7 @@ If you received this message, the connection is working! ✅`;
     return res.status(200).json({
       success: true,
       data: sendResult,
-      message: `Test message sent to "${group.project_name}"`,
+      message: `Test message sent to "${group.group_name}"`,
     });
 
   } catch (error) {
@@ -134,14 +117,14 @@ If you received this message, the connection is working! ✅`;
 }
 
 /**
- * Send test message via WhatsApp Sender service
+ * Send test message via unified WhatsApp Bridge
  */
 async function sendTestMessage(
   groupJid: string,
   message: string
 ): Promise<WaTestMessageResult> {
   try {
-    const response = await fetch(`${WA_SENDER_URL}/send-message`, {
+    const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -181,40 +164,6 @@ async function sendTestMessage(
       sent_at: new Date().toISOString(),
       error_message: errorMessage,
     };
-  }
-}
-
-/**
- * Log admin action to audit table
- */
-async function logAdminAction(
-  action: string,
-  entityType: string,
-  entityId: string | null,
-  oldValue: unknown,
-  newValue: unknown,
-  req: NextApiRequest
-) {
-  try {
-    const userEmail = req.headers['x-user-email'] as string || null;
-    const ipAddress = req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || null;
-
-    await pool.query(
-      `INSERT INTO wa_admin_audit_log (
-        action, entity_type, entity_id, old_value, new_value, user_email, ip_address
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        action,
-        entityType,
-        entityId,
-        oldValue ? JSON.stringify(oldValue) : null,
-        newValue ? JSON.stringify(newValue) : null,
-        userEmail,
-        typeof ipAddress === 'string' ? ipAddress.split(',')[0] : ipAddress,
-      ]
-    );
-  } catch (error) {
-    console.error('[WA Admin] Failed to log audit action:', error);
   }
 }
 

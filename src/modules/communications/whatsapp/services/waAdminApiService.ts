@@ -94,29 +94,34 @@ export const monitoredGroupsApi = {
 };
 
 // ============================================
-// Groups API (Legacy - wa_group_config)
+// Groups API (uses wa_monitored_groups - same as unified bridge)
 // ============================================
 export const groupsApi = {
-  list: (enabled?: boolean) =>
-    fetchApi<WaGroupConfig[]>(`/groups${enabled !== undefined ? `?enabled=${enabled}` : ''}`),
+  list: (isActive?: boolean, groupType?: WaGroupType) => {
+    const params = new URLSearchParams();
+    if (isActive !== undefined) params.set('is_active', String(isActive));
+    if (groupType) params.set('group_type', groupType);
+    const query = params.toString();
+    return fetchApi<WaMonitoredGroup[]>(`/groups${query ? `?${query}` : ''}`);
+  },
 
   get: (id: string) =>
-    fetchApi<WaGroupConfig>(`/groups/${id}`),
+    fetchApi<WaMonitoredGroup>(`/groups/${id}`),
 
-  create: (input: WaGroupConfigInput) =>
-    fetchApi<WaGroupConfig>('/groups', {
+  create: (input: WaMonitoredGroupInput) =>
+    fetchApi<WaMonitoredGroup>('/groups', {
       method: 'POST',
       body: JSON.stringify(input),
     }),
 
-  update: (id: string, input: Partial<WaGroupConfigInput>) =>
-    fetchApi<WaGroupConfig>(`/groups/${id}`, {
+  update: (id: string, input: Partial<WaMonitoredGroupInput>) =>
+    fetchApi<WaMonitoredGroup>(`/groups/${id}`, {
       method: 'PUT',
       body: JSON.stringify(input),
     }),
 
   delete: (id: string) =>
-    fetchApi<WaGroupConfig>(`/groups/${id}`, {
+    fetchApi<WaMonitoredGroup>(`/groups/${id}`, {
       method: 'DELETE',
     }),
 

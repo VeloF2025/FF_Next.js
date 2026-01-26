@@ -1,5 +1,6 @@
 /**
  * Groups Tab - WhatsApp Group Management
+ * Uses wa_monitored_groups table (same as unified bridge)
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -16,16 +17,22 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { waAdminApi } from '../services/waAdminApiService';
-import type { WaGroupConfig, WaGroupConfigInput } from '../types/wa-admin.types';
+import type { WaMonitoredGroup, WaMonitoredGroupInput, WaGroupType } from '../types/wa-admin.types';
+
+const GROUP_TYPE_OPTIONS: { value: WaGroupType; label: string; description: string }[] = [
+  { value: 'dr_submission', label: 'DR Submission', description: 'DR photo submissions - processed and acknowledged' },
+  { value: 'maintenance', label: 'Maintenance', description: 'Maintenance photos - reactions on success/failure' },
+  { value: 'admin', label: 'Admin', description: 'Admin commands only (for wa-command-bot)' },
+];
 
 const GroupsTab: React.FC = () => {
-  const [groups, setGroups] = useState<WaGroupConfig[]>([]);
+  const [groups, setGroups] = useState<WaMonitoredGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editingGroup, setEditingGroup] = useState<WaGroupConfig | null>(null);
+  const [editingGroup, setEditingGroup] = useState<WaMonitoredGroup | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [testingGroupId, setTestingGroupId] = useState<string | null>(null);
-  const [deletingGroup, setDeletingGroup] = useState<WaGroupConfig | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<WaMonitoredGroup | null>(null);
 
   const fetchGroups = useCallback(async () => {
     setLoading(true);
@@ -46,25 +53,25 @@ const GroupsTab: React.FC = () => {
     fetchGroups();
   }, [fetchGroups]);
 
-  const handleCreate = async (input: WaGroupConfigInput) => {
+  const handleCreate = async (input: WaMonitoredGroupInput) => {
     const result = await waAdminApi.groups.create(input);
 
     if (result.success) {
       setIsCreating(false);
       fetchGroups();
-      toast.success('Group created successfully');
+      toast.success('Group created successfully. Bridge will auto-reload.');
     } else {
       toast.error(result.error || 'Failed to create group');
     }
   };
 
-  const handleUpdate = async (id: string, input: Partial<WaGroupConfigInput>) => {
+  const handleUpdate = async (id: string, input: Partial<WaMonitoredGroupInput>) => {
     const result = await waAdminApi.groups.update(id, input);
 
     if (result.success) {
       setEditingGroup(null);
       fetchGroups();
-      toast.success('Group updated successfully');
+      toast.success('Group updated successfully. Bridge will auto-reload.');
     } else {
       toast.error(result.error || 'Failed to update group');
     }
@@ -77,7 +84,7 @@ const GroupsTab: React.FC = () => {
 
     if (result.success) {
       fetchGroups();
-      toast.success('Group deleted successfully');
+      toast.success('Group deleted successfully. Bridge will auto-reload.');
     } else {
       toast.error(result.error || 'Failed to delete group');
     }
@@ -85,13 +92,13 @@ const GroupsTab: React.FC = () => {
     setDeletingGroup(null);
   };
 
-  const handleTest = async (group: WaGroupConfig) => {
+  const handleTest = async (group: WaMonitoredGroup) => {
     setTestingGroupId(group.id);
 
     const result = await waAdminApi.groups.test(group.id);
 
     if (result.success) {
-      toast.success(`Test message sent to "${group.project_name}"`);
+      toast.success(`Test message sent to "${group.group_name}"`);
     } else {
       toast.error(`Failed to send test message: ${result.error}`);
     }
@@ -128,9 +135,14 @@ const GroupsTab: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-          WhatsApp Groups
-        </h3>
+        <div>
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            WhatsApp Groups
+          </h3>
+          <p className="text-sm text-[var(--ff-text-secondary)]">
+            Manage groups monitored by the unified bridge. Changes auto-reload the bridge.
+          </p>
+        </div>
 
         <button
           onClick={() => setIsCreating(true)}
@@ -143,10 +155,11 @@ const GroupsTab: React.FC = () => {
 
       {/* Groups Table */}
       <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden overflow-x-auto">
-        <table className="w-full min-w-[600px]">
+        <table className="w-full min-w-[700px]">
           <thead className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
             <tr>
-              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Project</th>
+              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Group</th>
+              <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Type</th>
               <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Group JID</th>
               <th scope="col" className="text-left px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Status</th>
               <th scope="col" className="text-right px-4 py-3 text-sm font-medium text-[var(--ff-text-secondary)]">Actions</th>
@@ -155,7 +168,7 @@ const GroupsTab: React.FC = () => {
           <tbody>
             {groups.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
+                <td colSpan={5} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   No groups configured. Click &quot;Add Group&quot; to create one.
                 </td>
               </tr>
@@ -164,11 +177,14 @@ const GroupsTab: React.FC = () => {
                 <tr key={group.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-secondary)]">
                   <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium text-[var(--ff-text-primary)]">{group.project_name}</p>
-                      {group.group_name && (
-                        <p className="text-xs text-[var(--ff-text-secondary)]">{group.group_name}</p>
+                      <p className="font-medium text-[var(--ff-text-primary)]">{group.group_name}</p>
+                      {group.project_name && (
+                        <p className="text-xs text-[var(--ff-text-secondary)]">Project: {group.project_name}</p>
                       )}
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <GroupTypeBadge type={group.group_type} />
                   </td>
                   <td className="px-4 py-3">
                     <code className="text-xs bg-[var(--ff-bg-tertiary)] px-2 py-1 rounded">
@@ -176,13 +192,13 @@ const GroupsTab: React.FC = () => {
                     </code>
                   </td>
                   <td className="px-4 py-3">
-                    {group.enabled ? (
+                    {group.is_active ? (
                       <span className="inline-flex items-center gap-1 text-green-600 text-sm">
-                        <CheckCircle className="w-4 h-4" aria-hidden="true" /> Enabled
+                        <CheckCircle className="w-4 h-4" aria-hidden="true" /> Active
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[var(--ff-text-secondary)] text-sm">
-                        <XCircle className="w-4 h-4" aria-hidden="true" /> Disabled
+                        <XCircle className="w-4 h-4" aria-hidden="true" /> Inactive
                       </span>
                     )}
                   </td>
@@ -190,9 +206,10 @@ const GroupsTab: React.FC = () => {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleTest(group)}
-                        disabled={testingGroupId === group.id || !group.enabled}
+                        disabled={testingGroupId === group.id || !group.is_active}
                         className="p-1.5 text-blue-600 hover:bg-blue-500/10 dark:hover:bg-blue-500/20 rounded transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label={`Send test message to ${group.project_name}`}
+                        aria-label={`Send test message to ${group.group_name}`}
+                        title="Send test message"
                       >
                         {testingGroupId === group.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
@@ -203,14 +220,16 @@ const GroupsTab: React.FC = () => {
                       <button
                         onClick={() => setEditingGroup(group)}
                         className="p-1.5 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
-                        aria-label={`Edit ${group.project_name}`}
+                        aria-label={`Edit ${group.group_name}`}
+                        title="Edit group"
                       >
                         <Edit2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <button
                         onClick={() => setDeletingGroup(group)}
                         className="p-1.5 text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-                        aria-label={`Delete ${group.project_name}`}
+                        aria-label={`Delete ${group.group_name}`}
+                        title="Delete group"
                       >
                         <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
@@ -235,7 +254,7 @@ const GroupsTab: React.FC = () => {
             if (editingGroup) {
               handleUpdate(editingGroup.id, input);
             } else {
-              handleCreate(input as WaGroupConfigInput);
+              handleCreate(input as WaMonitoredGroupInput);
             }
           }}
         />
@@ -244,7 +263,7 @@ const GroupsTab: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {deletingGroup && (
         <ConfirmDeleteModal
-          groupName={deletingGroup.project_name}
+          groupName={deletingGroup.group_name}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeletingGroup(null)}
         />
@@ -253,19 +272,35 @@ const GroupsTab: React.FC = () => {
   );
 };
 
+const GroupTypeBadge: React.FC<{ type: WaGroupType }> = ({ type }) => {
+  const config = {
+    dr_submission: { label: 'DR', bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/30' },
+    maintenance: { label: 'Maint', bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/30' },
+    admin: { label: 'Admin', bg: 'bg-amber-500/20', text: 'text-amber-400', border: 'border-amber-500/30' },
+  };
+  const c = config[type] || config.dr_submission;
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text} border ${c.border}`}>
+      {c.label}
+    </span>
+  );
+};
+
 interface GroupFormModalProps {
-  group: WaGroupConfig | null;
+  group: WaMonitoredGroup | null;
   onClose: () => void;
-  onSave: (input: WaGroupConfigInput | Partial<WaGroupConfigInput>) => void;
+  onSave: (input: WaMonitoredGroupInput | Partial<WaMonitoredGroupInput>) => void;
 }
 
 const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave }) => {
-  const [formData, setFormData] = useState<WaGroupConfigInput>({
-    project_name: group?.project_name || '',
-    group_jid: group?.group_jid || '',
+  const [formData, setFormData] = useState<WaMonitoredGroupInput>({
     group_name: group?.group_name || '',
-    phone_number: group?.phone_number || '',
-    enabled: group?.enabled ?? true,
+    group_jid: group?.group_jid || '',
+    project_name: group?.project_name || '',
+    group_type: group?.group_type || 'dr_submission',
+    description: group?.description || '',
+    is_active: group?.is_active ?? true,
   });
   const [saving, setSaving] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -328,17 +363,17 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 space-y-4">
             <div>
-              <label htmlFor="project_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                Project Name *
+              <label htmlFor="group_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                Group Name *
               </label>
               <input
                 ref={firstInputRef}
-                id="project_name"
+                id="group_name"
                 type="text"
-                value={formData.project_name}
-                onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
+                value={formData.group_name}
+                onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
                 className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="e.g., Lawley"
+                placeholder="e.g., Lawley DR Photos"
                 required
                 aria-required="true"
               />
@@ -360,48 +395,69 @@ const GroupFormModal: React.FC<GroupFormModalProps> = ({ group, onClose, onSave 
                 aria-describedby="group_jid_help"
               />
               <p id="group_jid_help" className="mt-1 text-xs text-[var(--ff-text-secondary)]">
-                Must end with @g.us for WhatsApp groups
+                Must end with @g.us. Get this from bridge logs after adding the phone to the group.
               </p>
             </div>
 
             <div>
-              <label htmlFor="group_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                Group Name
+              <label htmlFor="project_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                Project Name
               </label>
               <input
-                id="group_name"
+                id="project_name"
                 type="text"
-                value={formData.group_name || ''}
-                onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
+                value={formData.project_name || ''}
+                onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
                 className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="e.g., Lawley DR Photos"
+                placeholder="e.g., Lawley"
               />
             </div>
 
             <div>
-              <label htmlFor="phone_number" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                Phone Number
+              <label htmlFor="group_type" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                Group Type *
+              </label>
+              <select
+                id="group_type"
+                value={formData.group_type}
+                onChange={(e) => setFormData({ ...formData, group_type: e.target.value as WaGroupType })}
+                className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {GROUP_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-[var(--ff-text-secondary)]">
+                {GROUP_TYPE_OPTIONS.find(o => o.value === formData.group_type)?.description}
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                Description
               </label>
               <input
-                id="phone_number"
+                id="description"
                 type="text"
-                value={formData.phone_number || ''}
-                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                value={formData.description || ''}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 className="w-full px-3 py-2 border border-[var(--ff-border-medium)] rounded bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="e.g., +27711796125"
+                placeholder="e.g., Lawley DR submissions"
               />
             </div>
 
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                id="enabled"
-                checked={formData.enabled}
-                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                id="is_active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                 className="w-4 h-4 text-green-500 border-[var(--ff-border-medium)] rounded focus:ring-green-500"
               />
-              <label htmlFor="enabled" className="text-sm text-[var(--ff-text-primary)]">
-                Enabled
+              <label htmlFor="is_active" className="text-sm text-[var(--ff-text-primary)]">
+                Active
               </label>
             </div>
           </div>
@@ -487,6 +543,7 @@ const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ groupName, onCo
         </div>
         <p id="delete-dialog-desc" className="text-[var(--ff-text-secondary)] mb-6">
           Are you sure you want to delete &quot;{groupName}&quot;? This action cannot be undone.
+          The bridge will stop monitoring this group.
         </p>
         <div className="flex justify-end gap-3">
           <button

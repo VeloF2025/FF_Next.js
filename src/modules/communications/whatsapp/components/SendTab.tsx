@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { waAdminApi } from '../services/waAdminApiService';
-import type { WaGroupConfig, WaMessageLog } from '../types/wa-admin.types';
+import type { WaMonitoredGroup, WaMessageLog } from '../types/wa-admin.types';
 
 interface SendMessageInput {
   group_id: string;
@@ -24,7 +24,7 @@ interface SendMessageInput {
 }
 
 const SendTab: React.FC = () => {
-  const [groups, setGroups] = useState<WaGroupConfig[]>([]);
+  const [groups, setGroups] = useState<WaMonitoredGroup[]>([]);
   const [recentMessages, setRecentMessages] = useState<WaMessageLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -36,15 +36,19 @@ const SendTab: React.FC = () => {
   const MAX_MESSAGE_LENGTH = 4096;
 
   const fetchGroups = useCallback(async () => {
-    const result = await waAdminApi.groups.list(true); // Only enabled groups
+    const result = await waAdminApi.groups.list(true); // Only active groups
     if (result.success && result.data) {
-      setGroups(result.data);
-      // Auto-select Velo Test group if available
-      const veloTest = result.data.find(g => g.project_name.toLowerCase().includes('velo test'));
+      const data = result.data;
+      setGroups(data);
+      // Auto-select Velo Server group if available
+      const veloTest = data.find(g =>
+        g.group_name?.toLowerCase().includes('velo server') ||
+        g.project_name?.toLowerCase().includes('velo')
+      );
       if (veloTest) {
         setSelectedGroup(veloTest.id);
-      } else if (result.data.length > 0) {
-        setSelectedGroup(result.data[0].id);
+      } else if (data.length > 0 && data[0]) {
+        setSelectedGroup(data[0].id);
       }
     }
   }, []);
@@ -165,7 +169,7 @@ const SendTab: React.FC = () => {
                 <option value="">Select a group...</option>
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>
-                    {group.project_name} {group.group_name ? `(${group.group_name})` : ''}
+                    {group.group_name}{group.project_name ? ` (${group.project_name})` : ''}
                   </option>
                 ))}
               </select>

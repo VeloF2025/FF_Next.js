@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { waAdminApi } from '../services/waAdminApiService';
-import type { WaGroupConfig } from '../types/wa-admin.types';
+import type { WaMonitoredGroup } from '../types/wa-admin.types';
 
 interface ChatMessage {
   id: string;
@@ -30,7 +30,7 @@ interface ChatMessage {
 }
 
 const ChatTab: React.FC = () => {
-  const [groups, setGroups] = useState<WaGroupConfig[]>([]);
+  const [groups, setGroups] = useState<WaMonitoredGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -48,15 +48,17 @@ const ChatTab: React.FC = () => {
   const fetchGroups = useCallback(async () => {
     const result = await waAdminApi.groups.list(true);
     if (result.success && result.data) {
-      setGroups(result.data);
-      // Auto-select Velo Test group if available
-      const veloTest = result.data.find(g =>
-        g.project_name.toLowerCase().includes('velo test')
+      const data = result.data;
+      setGroups(data);
+      // Auto-select Velo Server group if available
+      const veloTest = data.find(g =>
+        g.group_name?.toLowerCase().includes('velo server') ||
+        g.project_name?.toLowerCase().includes('velo')
       );
       if (veloTest) {
         setSelectedGroup(veloTest.id);
-      } else if (result.data.length > 0) {
-        setSelectedGroup(result.data[0].id);
+      } else if (data.length > 0 && data[0]) {
+        setSelectedGroup(data[0].id);
       }
     }
     setLoading(false);
@@ -198,7 +200,7 @@ const ChatTab: React.FC = () => {
               <option value="">Select a group...</option>
               {groups.map((group) => (
                 <option key={group.id} value={group.id}>
-                  {group.project_name}
+                  {group.group_name}{group.project_name ? ` (${group.project_name})` : ''}
                 </option>
               ))}
             </select>
