@@ -57,6 +57,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importPhase, setImportPhase] = useState<ImportPhase | null>(null);
+  const [formatWarnings, setFormatWarnings] = useState<string[]>([]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -108,8 +109,16 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       }
 
       setPreviewData(result);
+
+      // Handle format warnings
+      if (result.warnings && result.warnings.length > 0) {
+        setFormatWarnings(result.warnings);
+      } else {
+        setFormatWarnings([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
+      setFormatWarnings([]);
     } finally {
       setIsParsing(false);
       setImportPhase(null);
@@ -169,6 +178,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
     setPreviewData(null);
     setImportResult(null);
     setError(null);
+    setFormatWarnings([]);
     if (triggerRefresh) {
       onImportComplete?.();
     }
@@ -276,6 +286,31 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
         <div className="flex items-center justify-center gap-2 py-4">
           <Loader2 className="w-5 h-5 animate-spin text-orange-600" />
           <span className="text-gray-600 dark:text-gray-400">Parsing file...</span>
+        </div>
+      )}
+
+      {/* Format Warnings */}
+      {formatWarnings.length > 0 && !importResult && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2">
+                Format Validation Warnings
+              </h4>
+              <ul className="space-y-1 text-sm text-amber-700 dark:text-amber-300">
+                {formatWarnings.map((warning, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span className="text-amber-500">•</span>
+                    <span>{warning}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                Review the preview data carefully. If columns look misaligned, the Excel format may have changed.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

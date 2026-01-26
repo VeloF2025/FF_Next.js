@@ -70,13 +70,101 @@ interface ImportResult {
     wrongSerial: string | null;
     status: 'updated' | 'empty_serial' | 'not_found' | 'already_fixed' | 'already_pending' | 'needs_reinvestigation';
   }>;
+  warnings?: string[];
 }
 
-async function parseExcelFile(filePath: string): Promise<OltRecord[]> {
+// Expected header keywords for key columns
+const EXPECTED_COLUMN_HINTS = {
+  0: ['drop', 'dr'], // Column A - Drop Number
+  1: ['serial', 'ont'], // Column B - OLT Serial
+  20: ['match', '1map', 'olt'], // Column U - Match Status
+  21: ['wrong', 'serial', '1map'], // Column V - Wrong 1Map Serial
+};
+
+interface ParseResult {
+  records: OltRecord[];
+  warnings: string[];
+  headerMismatch: boolean;
+}
+
+/**
+ * Validate OLT Report headers at key column positions
+ */
+function validateOltHeaders(headers: string[]): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+
+  // Check minimum column count
+  if (headers.length < 22) {
+    warnings.push(`Column count mismatch: expected at least 22, got ${headers.length}. Format may have changed.`);
+    return { valid: false, warnings };
+  }
+
+  // Check key columns contain expected keywords
+  for (const [colIndex, keywords] of Object.entries(EXPECTED_COLUMN_HINTS)) {
+    const idx = parseInt(colIndex);
+    const header = String(headers[idx] || '').toLowerCase();
+    const hasKeyword = keywords.some(kw => header.includes(kw));
+
+    if (!hasKeyword && header.length > 0) {
+      const colLetter = String.fromCharCode(65 + idx);
+      warnings.push(`Column ${colLetter} (${idx + 1}): expected "${keywords.join('/')}" related, got "${headers[idx]}"`);
+    }
+  }
+
+  return { valid: warnings.length === 0, warnings };
+}
+
+/**
+ * Validate OLT data sample for column alignment issues
+ */
+function validateOltDataSample(records: OltRecord[]): string[] {
+  const warnings: string[] = [];
+  const sampleSize = Math.min(10, records.length);
+
+  let invalidDrCount = 0;
+  let numericMatchStatusCount = 0;
+
+  for (let i = 0; i < sampleSize; i++) {
+    const record = records[i];
+
+    // DR number should match pattern
+    if (!record.drNumber.match(/^DR\d+$/i)) {
+      invalidDrCount++;
+    }
+
+    // Match status should be text like "Match" or "Not Match", not numeric
+    if (record.matchStatus && !isNaN(parseFloat(record.matchStatus))) {
+      numericMatchStatusCount++;
+    }
+  }
+
+  if (invalidDrCount > sampleSize / 2) {
+    warnings.push(`⚠️ DR numbers don't match expected format (${invalidDrCount}/${sampleSize} invalid). Columns may be misaligned!`);
+  }
+
+  if (numericMatchStatusCount > sampleSize / 2) {
+    warnings.push(`⚠️ Match Status contains numeric values (${numericMatchStatusCount}/${sampleSize}). Columns may be misaligned!`);
+  }
+
+  return warnings;
+}
+
+async function parseExcelFile(filePath: string): Promise<ParseResult> {
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
+
+  const warnings: string[] = [];
+  let headerMismatch = false;
+
+  // Validate headers
+  const headers = data[0] || [];
+  const headerValidation = validateOltHeaders(headers);
+  if (!headerValidation.valid) {
+    headerMismatch = true;
+    warnings.push(...headerValidation.warnings);
+  }
 
   const records: OltRecord[] = [];
 
@@ -103,7 +191,13 @@ async function parseExcelFile(filePath: string): Promise<OltRecord[]> {
     }
   }
 
-  return records;
+  // Validate data sample
+  if (records.length > 0) {
+    const dataWarnings = validateOltDataSample(records);
+    warnings.push(...dataWarnings);
+  }
+
+  return { records, warnings, headerMismatch };
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -132,15 +226,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ? fields.project[0]
       : fields.project || null;
 
-    // Parse Excel file
+    // Parse Excel file with validation
     log.info('OltReportImport', 'Parsing Excel file', { filename: file.originalFilename });
-    const records = await parseExcelFile(file.filepath);
+    const { records, warnings, headerMismatch } = await parseExcelFile(file.filepath);
+
+    // Log warnings if any
+    if (warnings.length > 0) {
+      log.warn('OltReportImport', 'Format validation warnings detected', { warnings, headerMismatch });
+    }
 
     // Clean up temp file
     fs.unlinkSync(file.filepath);
 
     if (records.length === 0) {
-      return apiResponse.badRequest(res, 'No valid records found in Excel file');
+      return apiResponse.badRequest(res, 'No valid records found in Excel file' + (warnings.length > 0 ? `. Warnings: ${warnings.join('; ')}` : ''));
     }
 
     // Start transaction
@@ -356,6 +455,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         needsReinvestigationCount,
       },
       mismatches: results,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
 
     log.info('OltReportImport', 'Import completed', {

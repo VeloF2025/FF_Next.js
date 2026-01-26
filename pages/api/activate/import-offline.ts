@@ -69,6 +69,32 @@ interface SummaryReportRow {
 
 type ReportFormat = 'audit' | 'summary';
 
+// Expected headers for validation
+const SUMMARY_EXPECTED_HEADERS = [
+  'Zone',
+  'Planned PON',
+  'Drop No',
+  'Serial No',
+  'Last Down Reason',
+  'Offline Longer than',
+];
+
+const AUDIT_EXPECTED_HEADERS = [
+  'stack_ref_filter',
+  'serial_number',
+  'drop_number',
+  'last_down_reason',
+  'days_since_last_inform',
+  'offline_days_bucket',
+];
+
+interface ParseResult {
+  rows: ParsedOfflineRow[];
+  format: ReportFormat;
+  warnings: string[];
+  headerMismatch: boolean;
+}
+
 interface ParsedOfflineRow {
   drop_number: string;
   serial_number: string;
@@ -185,6 +211,84 @@ function detectReportFormat(headers: string[]): ReportFormat {
 }
 
 /**
+ * Validate headers match expected format
+ */
+function validateHeaders(headers: string[], format: ReportFormat): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+  const expectedHeaders = format === 'summary' ? SUMMARY_EXPECTED_HEADERS : AUDIT_EXPECTED_HEADERS;
+
+  // Check for expected headers
+  const missingHeaders: string[] = [];
+  for (const expected of expectedHeaders) {
+    const found = headers.some(h =>
+      h.toLowerCase().includes(expected.toLowerCase()) ||
+      expected.toLowerCase().includes(h.toLowerCase())
+    );
+    if (!found) {
+      missingHeaders.push(expected);
+    }
+  }
+
+  if (missingHeaders.length > 0) {
+    warnings.push(`Missing expected headers: ${missingHeaders.join(', ')}`);
+  }
+
+  // Check column count is reasonable
+  if (format === 'summary' && headers.length < 10) {
+    warnings.push(`Summary report should have 10+ columns, got ${headers.length}. Format may have changed.`);
+  } else if (format === 'audit' && headers.length < 8) {
+    warnings.push(`Audit report should have 8+ columns, got ${headers.length}. Format may have changed.`);
+  }
+
+  return { valid: warnings.length === 0, warnings };
+}
+
+/**
+ * Validate data sample for column alignment issues
+ */
+function validateDataSample(rows: ParsedOfflineRow[]): string[] {
+  const warnings: string[] = [];
+  const sampleSize = Math.min(10, rows.length);
+
+  let invalidDropCount = 0;
+  let invalidSerialCount = 0;
+  let numericReasonCount = 0;
+
+  for (let i = 0; i < sampleSize; i++) {
+    const row = rows[i];
+
+    // Drop number should start with DR
+    if (row.drop_number && !row.drop_number.startsWith('DR')) {
+      invalidDropCount++;
+    }
+
+    // Serial number should look like a serial (alphanumeric, usually starts with ALCL)
+    if (row.serial_number && /^-?\d+\.\d+$/.test(row.serial_number)) {
+      invalidSerialCount++;
+    }
+
+    // Last down reason should be text, not numeric
+    if (row.last_down_reason && !isNaN(parseFloat(row.last_down_reason))) {
+      numericReasonCount++;
+    }
+  }
+
+  if (invalidDropCount > sampleSize / 2) {
+    warnings.push(`⚠️ Drop numbers don't match expected format (${invalidDropCount}/${sampleSize} invalid). Columns may be misaligned!`);
+  }
+
+  if (invalidSerialCount > sampleSize / 2) {
+    warnings.push(`⚠️ Serial numbers contain coordinate-like values (${invalidSerialCount}/${sampleSize}). Columns may be misaligned!`);
+  }
+
+  if (numericReasonCount > sampleSize / 2) {
+    warnings.push(`⚠️ Last Down Reason contains numeric values (${numericReasonCount}/${sampleSize}). Columns may be misaligned!`);
+  }
+
+  return warnings;
+}
+
+/**
  * Parse Summary Report row to common format
  */
 function parseSummaryRow(row: SummaryReportRow): ParsedOfflineRow | null {
@@ -257,11 +361,13 @@ function parseAuditRow(row: AuditReportRow): ParsedOfflineRow | null {
 }
 
 /**
- * Parse Excel file and extract Offline Data
+ * Parse Excel file and extract Offline Data with validation
  * Supports both Summary Report and Audit Report formats
  */
-function parseOfflineExcel(filePath: string): { rows: ParsedOfflineRow[]; format: ReportFormat } {
+function parseOfflineExcel(filePath: string): ParseResult {
   const workbook = XLSX.readFile(filePath);
+  const warnings: string[] = [];
+  let headerMismatch = false;
 
   // Find the appropriate sheet based on format
   // Summary: "Offline - Detail"
@@ -290,7 +396,14 @@ function parseOfflineExcel(filePath: string): { rows: ParsedOfflineRow[]; format
   const headers = rawData[0] || [];
   const format = detectReportFormat(headers);
 
-  log.info('OfflineImport', `Detected format: ${format}`, { sheetName, headerCount: headers.length });
+  // Validate headers
+  const headerValidation = validateHeaders(headers, format);
+  if (!headerValidation.valid) {
+    headerMismatch = true;
+    warnings.push(...headerValidation.warnings);
+  }
+
+  log.info('OfflineImport', `Detected format: ${format}`, { sheetName, headerCount: headers.length, warningCount: warnings.length });
 
   // Parse based on format
   const data = XLSX.utils.sheet_to_json(sheet);
@@ -307,7 +420,13 @@ function parseOfflineExcel(filePath: string): { rows: ParsedOfflineRow[]; format
       .filter((row): row is ParsedOfflineRow => row !== null);
   }
 
-  return { rows, format };
+  // Validate data sample for column alignment issues
+  if (rows.length > 0) {
+    const dataWarnings = validateDataSample(rows);
+    warnings.push(...dataWarnings);
+  }
+
+  return { rows, format, warnings, headerMismatch };
 }
 
 /**
@@ -351,7 +470,12 @@ async function handler(
     const action = Array.isArray(fields.action) ? fields.action[0] : fields.action;
 
     log.info('OfflineImport', `Parsing file: ${uploadedFile.originalFilename}`);
-    const { rows: offlineRows, format: reportFormat } = parseOfflineExcel(filePath);
+    const { rows: offlineRows, format: reportFormat, warnings, headerMismatch } = parseOfflineExcel(filePath);
+
+    // Log warnings if any
+    if (warnings.length > 0) {
+      log.warn('OfflineImport', 'Format validation warnings detected', { warnings, headerMismatch });
+    }
 
     fs.unlinkSync(filePath);
 
@@ -379,6 +503,8 @@ async function handler(
           return acc;
         }, {} as Record<string, number>),
         zoneSummary,
+        warnings: warnings.length > 0 ? warnings : undefined,
+        headerMismatch,
       });
     }
 
