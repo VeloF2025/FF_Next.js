@@ -161,6 +161,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   // Reporting state
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('all');
+  const [reportStatusFilter, setReportStatusFilter] = useState<string>('all');
   const [reportData, setReportData] = useState<{
     summary: {
       total: number;
@@ -182,6 +183,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }>;
   } | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Sync URL with active tab on mount
   useEffect(() => {
@@ -287,6 +289,31 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       setReportLoading(false);
     }
   }, [reportPeriod]);
+
+  // Export CSV
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/system/olt-report/reporting?period=${reportPeriod}&format=csv`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `olt-report-${reportPeriod}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        setError('Export failed');
+      }
+    } catch {
+      setError('Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Load data based on current tab
   useEffect(() => {
@@ -993,28 +1020,42 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
       {currentTab === 'reporting' && (
         <div className="space-y-6">
-          {/* Period Selector */}
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-[var(--ff-text-secondary)]">Period:</span>
-            <div className="flex gap-2">
-              {(['today', 'yesterday', 'week', '30days', 'all'] as ReportPeriod[]).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setReportPeriod(period)}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    reportPeriod === period
-                      ? 'bg-[var(--ff-accent)] text-white'
-                      : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
-                  }`}
-                >
-                  {period === 'all'
-                    ? 'All Time'
-                    : period === '30days'
-                    ? '30 Days'
-                    : period.charAt(0).toUpperCase() + period.slice(1)}
-                </button>
-              ))}
+          {/* Period Selector and Export */}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-[var(--ff-text-secondary)]">Period:</span>
+              <div className="flex gap-2">
+                {(['today', 'yesterday', 'week', '30days', 'all'] as ReportPeriod[]).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setReportPeriod(period)}
+                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                      reportPeriod === period
+                        ? 'bg-[var(--ff-accent)] text-white'
+                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                    }`}
+                  >
+                    {period === 'all'
+                      ? 'All Time'
+                      : period === '30days'
+                      ? '30 Days'
+                      : period.charAt(0).toUpperCase() + period.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
+            <button
+              onClick={handleExportCSV}
+              disabled={exporting || !reportData}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export CSV
+            </button>
           </div>
 
           {reportLoading ? (
@@ -1022,36 +1063,155 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
             </div>
           ) : reportData ? (
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-                <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  {reportData.summary.total}
+            <>
+              {/* Summary Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <button
+                  onClick={() => setReportStatusFilter('all')}
+                  className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-colors ${
+                    reportStatusFilter === 'all' ? 'border-[var(--ff-accent)]' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-border-medium)]'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
+                    {reportData.summary.total}
+                  </div>
+                  <div className="text-sm text-[var(--ff-text-secondary)]">Total Records</div>
+                </button>
+                <button
+                  onClick={() => setReportStatusFilter('fixed')}
+                  className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-colors ${
+                    reportStatusFilter === 'fixed' ? 'border-green-400' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-border-medium)]'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-green-400">{reportData.summary.fixed}</div>
+                  <div className="text-sm text-[var(--ff-text-secondary)]">Fixed</div>
+                </button>
+                <button
+                  onClick={() => setReportStatusFilter('pending')}
+                  className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-colors ${
+                    reportStatusFilter === 'pending' ? 'border-amber-400' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-border-medium)]'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-amber-400">
+                    {reportData.summary.pending}
+                  </div>
+                  <div className="text-sm text-[var(--ff-text-secondary)]">Pending</div>
+                </button>
+                <button
+                  onClick={() => setReportStatusFilter('empty_serial')}
+                  className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-colors ${
+                    reportStatusFilter === 'empty_serial' ? 'border-gray-400' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-border-medium)]'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-[var(--ff-text-tertiary)]">
+                    {reportData.summary.empty_serial}
+                  </div>
+                  <div className="text-sm text-[var(--ff-text-secondary)]">Empty Serial</div>
+                </button>
+                <button
+                  onClick={() => setReportStatusFilter('not_found')}
+                  className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-colors ${
+                    reportStatusFilter === 'not_found' ? 'border-red-400' : 'border-[var(--ff-border-light)] hover:border-[var(--ff-border-medium)]'
+                  }`}
+                >
+                  <div className="text-2xl font-bold text-red-400">
+                    {reportData.summary.not_found}
+                  </div>
+                  <div className="text-sm text-[var(--ff-text-secondary)]">Not Found</div>
+                </button>
+              </div>
+
+              {/* Records Table */}
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+                <div className="p-4 border-b border-[var(--ff-border-light)]">
+                  <h3 className="font-semibold text-[var(--ff-text-primary)]">
+                    Records {reportStatusFilter !== 'all' && `(${reportStatusFilter})`}
+                  </h3>
                 </div>
-                <div className="text-sm text-[var(--ff-text-secondary)]">Total Records</div>
-              </div>
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-                <div className="text-2xl font-bold text-green-400">{reportData.summary.fixed}</div>
-                <div className="text-sm text-[var(--ff-text-secondary)]">Fixed</div>
-              </div>
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-                <div className="text-2xl font-bold text-amber-400">
-                  {reportData.summary.pending}
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-[var(--ff-bg-tertiary)]">
+                      <tr className="border-b border-[var(--ff-border-light)]">
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">DR Number</th>
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OLT Serial</th>
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">1Map Serial</th>
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Import File</th>
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.records
+                        .filter(r => reportStatusFilter === 'all' || r.fix_status === reportStatusFilter)
+                        .slice(0, 100)
+                        .map((record) => (
+                          <tr key={record.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
+                            <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{record.drop_number}</td>
+                            <td className="py-3 px-4 text-green-400 font-mono">{record.olt_serial || '-'}</td>
+                            <td className="py-3 px-4 text-red-400 font-mono">{record.wrong_onemap_serial || '-'}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                record.fix_status === 'fixed' ? 'bg-green-500/20 text-green-400' :
+                                record.fix_status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
+                                record.fix_status === 'not_found' ? 'bg-red-500/20 text-red-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {record.fix_status || 'unknown'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{record.import_filename || '-'}</td>
+                            <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                              {record.created_at ? new Date(record.created_at).toLocaleDateString() : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                  {reportData.records.filter(r => reportStatusFilter === 'all' || r.fix_status === reportStatusFilter).length > 100 && (
+                    <div className="p-4 text-center text-sm text-[var(--ff-text-secondary)]">
+                      Showing first 100 records. Export CSV for complete data.
+                    </div>
+                  )}
                 </div>
-                <div className="text-sm text-[var(--ff-text-secondary)]">Pending</div>
               </div>
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-                <div className="text-2xl font-bold text-[var(--ff-text-tertiary)]">
-                  {reportData.summary.empty_serial}
+
+              {/* Imports Summary */}
+              {reportData.imports.length > 0 && (
+                <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+                  <div className="p-4 border-b border-[var(--ff-border-light)]">
+                    <h3 className="font-semibold text-[var(--ff-text-primary)]">Imports Summary</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Filename</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Project</th>
+                          <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Mismatches</th>
+                          <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Fixed</th>
+                          <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Pending</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Imported</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.imports.map((imp) => (
+                          <tr key={imp.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
+                            <td className="py-3 px-4 text-[var(--ff-text-primary)]">{imp.filename}</td>
+                            <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{imp.project || '-'}</td>
+                            <td className="py-3 px-4 text-right text-amber-400">{imp.mismatch_count}</td>
+                            <td className="py-3 px-4 text-right text-green-400">{imp.fixed_count}</td>
+                            <td className="py-3 px-4 text-right text-[var(--ff-text-secondary)]">{imp.pending_count}</td>
+                            <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                              {new Date(imp.imported_at).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="text-sm text-[var(--ff-text-secondary)]">Empty Serial</div>
-              </div>
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-                <div className="text-2xl font-bold text-red-400">
-                  {reportData.summary.not_found}
-                </div>
-                <div className="text-sm text-[var(--ff-text-secondary)]">Not Found</div>
-              </div>
-            </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-12 text-[var(--ff-text-tertiary)]">
               No report data available
