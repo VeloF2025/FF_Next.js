@@ -4,6 +4,7 @@
 
 import { Users, Plus, Upload, Settings, Filter, Download } from 'lucide-react';
 import { PermissionGate } from '@/components/PermissionGate';
+import type { StaffFilter } from '@/types/staff.types';
 
 interface StaffListHeaderProps {
   totalStaff: number;
@@ -15,6 +16,7 @@ interface StaffListHeaderProps {
   onImport: () => void;
   onSettings: () => void;
   onExport: () => void;
+  filter?: StaffFilter;
 }
 
 export function StaffListHeader({
@@ -26,8 +28,14 @@ export function StaffListHeader({
   onAddStaff,
   onImport,
   onSettings,
-  onExport
+  onExport,
+  filter
 }: StaffListHeaderProps) {
+  // Build export label based on active filters
+  const hasFilters = filter?.status || filter?.department || filter?.position || filter?.searchTerm;
+  const exportLabel = hasFilters
+    ? `Export ${filter?.status || 'Filtered'}`
+    : 'Export All';
   return (
     <div className="bg-[var(--ff-bg-secondary)] shadow-sm border-b border-[var(--ff-border-light)]">
       <div className="px-6 py-4">
@@ -53,10 +61,11 @@ export function StaffListHeader({
             </button>
             <button
               onClick={onExport}
+              title={`Export ${hasFilters ? 'filtered' : 'all'} staff to CSV`}
               className="px-4 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-md text-sm font-medium hover:bg-[var(--ff-bg-hover)] flex items-center"
             >
               <Download className="h-4 w-4 mr-2" />
-              Export
+              {exportLabel}
             </button>
             <PermissionGate permission="people.staff" action="create">
               <button

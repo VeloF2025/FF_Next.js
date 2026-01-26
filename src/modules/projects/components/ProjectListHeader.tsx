@@ -8,10 +8,17 @@ interface ProjectListHeaderProps {
   onImport?: () => void;
   onExport?: () => void;
   projectCount?: number;
+  hasFilters?: boolean;
+  filterLabel?: string;
 }
 
-export function ProjectListHeader({ onImport, onExport, projectCount = 0 }: ProjectListHeaderProps) {
+export function ProjectListHeader({ onImport, onExport, projectCount = 0, hasFilters = false, filterLabel }: ProjectListHeaderProps) {
   const router = useRouter();
+
+  // Build export label based on active filters
+  const exportLabel = hasFilters
+    ? `Export ${filterLabel || 'Filtered'}`
+    : 'Export All';
 
   return (
     <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
@@ -39,10 +46,11 @@ export function ProjectListHeader({ onImport, onExport, projectCount = 0 }: Proj
           {onExport && projectCount > 0 && (
             <button
               onClick={onExport}
+              title={`Export ${hasFilters ? 'filtered' : 'all'} projects to CSV`}
               className="flex items-center gap-2 px-4 py-2 text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               <Download className="h-4 w-4" />
-              Export
+              {exportLabel}
             </button>
           )}
 

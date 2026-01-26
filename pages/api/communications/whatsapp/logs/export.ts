@@ -127,8 +127,19 @@ async function handler(
 
     const csv = csvRows.join('\n');
 
-    // Set headers for file download
-    const filename = `wa_message_logs_${new Date().toISOString().split('T')[0]}.csv`;
+    // Build descriptive filename with active filters
+    const filterParts: string[] = [];
+    if (filters.direction) filterParts.push(filters.direction);
+    if (filters.status) filterParts.push(filters.status);
+    if (filters.project) filterParts.push(filters.project.replace(/\s+/g, '-'));
+    if (filters.drop_number) filterParts.push(filters.drop_number);
+
+    const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+    const dateSuffix = filters.date_from && filters.date_to
+      ? `-${filters.date_from}-to-${filters.date_to}`
+      : `-${new Date().toISOString().split('T')[0]}`;
+
+    const filename = `wa_message_logs${filterSuffix}${dateSuffix}.csv`;
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 

@@ -3,15 +3,23 @@
 import { useRouter } from 'next/router';
 import { Plus, Upload, Download } from 'lucide-react';
 import { PermissionGate } from '@/components/PermissionGate';
+import type { ClientFilter } from '@/types/client.types';
 
 interface ClientListHeaderProps {
   onImport: () => void;
   onExport: () => void;
   clientCount: number;
+  filter?: ClientFilter;
 }
 
-export function ClientListHeader({ onImport, onExport, clientCount }: ClientListHeaderProps) {
+export function ClientListHeader({ onImport, onExport, clientCount, filter }: ClientListHeaderProps) {
   const router = useRouter();
+
+  // Build export label based on active filters
+  const hasFilters = filter?.status || filter?.type || filter?.searchTerm;
+  const exportLabel = hasFilters
+    ? `Export ${filter?.status || 'Filtered'}`
+    : 'Export All';
 
   return (
     <div className="flex items-center justify-between">
@@ -32,10 +40,11 @@ export function ClientListHeader({ onImport, onExport, clientCount }: ClientList
         <button
           onClick={onExport}
           disabled={clientCount === 0}
+          title={`Export ${hasFilters ? 'filtered' : 'all'} clients to Excel`}
           className="inline-flex items-center px-4 py-2 text-sm font-medium text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Download className="h-4 w-4 mr-2" />
-          Export
+          {exportLabel}
         </button>
         <PermissionGate permission="clients.list" action="create">
           <button

@@ -138,10 +138,17 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `offline-devices-${filters.dateFrom}-to-${filters.dateTo}.csv`;
+    // Build descriptive filename with active filters
+    const filterParts: string[] = [];
+    if (selectedZone) filterParts.push(`zone${selectedZone}`);
+    if (selectedBucket) filterParts.push(selectedBucket.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, ''));
+    if (selectedMatchStatus) filterParts.push(selectedMatchStatus);
+    if (serialMismatchOnly) filterParts.push('mismatches');
+    const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+    a.download = `offline-devices${filterSuffix}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [data, filters]);
+  }, [data, filters, selectedZone, selectedBucket, selectedMatchStatus, serialMismatchOnly]);
 
   const totalPages = data ? Math.ceil(data.total_count / pageSize) : 0;
 
@@ -156,10 +163,11 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
         {data && data.total_count > 0 && (
           <button
             onClick={handleExport}
+            title={`Export ${selectedZone || selectedBucket || selectedMatchStatus || serialMismatchOnly ? 'filtered' : 'all'} offline devices to CSV`}
             className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors"
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            Export {selectedMatchStatus ? selectedMatchStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : serialMismatchOnly ? 'Mismatches' : 'All'} CSV
           </button>
         )}
       </div>

@@ -233,7 +233,12 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `activate-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.xlsx`;
+      // Build descriptive filename with active filters
+      const filterParts: string[] = [];
+      if (filters.statusFilter !== 'all') filterParts.push(filters.statusFilter);
+      if (filters.projectFilter !== 'all') filterParts.push(filters.projectFilter.replace(/\s+/g, '-'));
+      const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+      a.download = `activate-export${filterSuffix}-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(downloadUrl);
@@ -411,10 +416,10 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                     onClick={handleExport}
                     disabled={isExporting}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Export filtered data to Excel"
+                    title={`Export ${hasActiveFilters ? 'filtered' : 'all'} data to Excel`}
                   >
                     <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
-                    {isExporting ? 'Exporting...' : 'Export Excel'}
+                    {isExporting ? 'Exporting...' : `Export ${filters.statusFilter !== 'all' ? filters.statusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} Excel`}
                   </button>
                 </div>
               </div>

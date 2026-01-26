@@ -89,7 +89,14 @@ export function StaffList() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `staff_export_${new Date().toISOString().split('T')[0]}.csv`;
+      // Build descriptive filename with active filters
+      const filterParts: string[] = [];
+      if (filter.status) filterParts.push(filter.status);
+      if (filter.department) filterParts.push(filter.department.replace(/\s+/g, '-'));
+      if (filter.position) filterParts.push(filter.position.replace(/\s+/g, '-'));
+      if (filter.searchTerm) filterParts.push('search');
+      const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+      a.download = `staff${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -153,6 +160,7 @@ export function StaffList() {
         onImport={() => setShowImport(true)}
         onSettings={() => router.push('/staff/settings')}
         onExport={handleExport}
+        filter={filter}
       />
 
       {showFilters && (

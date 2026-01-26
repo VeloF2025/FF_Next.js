@@ -187,6 +187,10 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
     try {
       const params = new URLSearchParams();
       params.set('format', 'csv');
+      // Include current filters in export
+      if (selectedStatus) params.set('status', selectedStatus);
+      if (selectedTeam) params.set('team', selectedTeam);
+      if (selectedZone) params.set('zone', selectedZone);
 
       const res = await fetch(`/api/activate/reporting/serial-mismatches?${params}`);
       if (!res.ok) throw new Error('Failed to export');
@@ -195,7 +199,11 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ont-serial-mismatches-${new Date().toISOString().split('T')[0]}.csv`;
+      // Build descriptive filename with active filters
+      const statusLabel = selectedStatus ? selectedStatus.replace(/_/g, '-') : 'all';
+      const teamLabel = selectedTeam ? `-${selectedTeam.replace(/\s+/g, '-')}` : '';
+      const zoneLabel = selectedZone ? `-zone${selectedZone}` : '';
+      a.download = `ont-serial-mismatches-${statusLabel}${teamLabel}${zoneLabel}-${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
     } catch (err) {
       alert('Export failed');
@@ -390,9 +398,10 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
         <button
           onClick={handleExport}
           className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+          title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records${selectedTeam ? ` for ${selectedTeam}` : ''}${selectedZone ? ` in zone ${selectedZone}` : ''}`}
         >
           <Download className="h-4 w-4" />
-          Export CSV
+          Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} CSV
         </button>
       </div>
 

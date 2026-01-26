@@ -52,8 +52,51 @@ export function ProjectList() {
   };
 
   const handleExport = async () => {
-    // TODO: Implement export functionality
-    notificationService.info('Export functionality coming soon');
+    try {
+      // Export filtered projects to CSV
+      const csvContent = filteredProjects.map((project: any) => ({
+        'Name': project.name || '',
+        'Client': project.client_name || '',
+        'Status': project.status || '',
+        'Priority': project.priority || '',
+        'City': project.city || '',
+        'Province': project.province || '',
+        'Total Drops': project.total_drops || 0,
+        'Completed Drops': project.completed_drops || 0,
+        'Start Date': project.start_date || '',
+        'End Date': project.end_date || '',
+      }));
+
+      if (csvContent.length === 0) {
+        notificationService.info('No projects to export');
+        return;
+      }
+
+      const firstRow = csvContent[0];
+      const csv = [
+        Object.keys(firstRow).join(','),
+        ...csvContent.map(row => Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Build descriptive filename with active filters
+      const filterParts: string[] = [];
+      if (selectedStatus.length > 0) filterParts.push(selectedStatus.join('-'));
+      if (selectedPriority.length > 0) filterParts.push(selectedPriority.join('-'));
+      if (searchTerm) filterParts.push('search');
+      const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+      a.download = `projects${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      notificationService.success(`Exported ${filteredProjects.length} projects`);
+    } catch (error) {
+      notificationService.error('Failed to export projects');
+    }
   };
 
   const statuses = ['PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'];
@@ -61,9 +104,11 @@ export function ProjectList() {
 
   return (
     <div className="space-y-6">
-      <ProjectListHeader 
+      <ProjectListHeader
         onExport={handleExport}
         projectCount={filteredProjects.length}
+        hasFilters={selectedStatus.length > 0 || selectedPriority.length > 0 || !!searchTerm}
+        filterLabel={selectedStatus.length > 0 ? selectedStatus[0] : undefined}
       />
 
       <ProjectSummaryCards projects={projects} />

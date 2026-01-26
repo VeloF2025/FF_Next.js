@@ -114,6 +114,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       params.set('dateFrom', filters.dateFrom);
       params.set('dateTo', filters.dateTo);
       if (filters.project) params.set('project', filters.project);
+      if (selectedStatus) params.set('status', selectedStatus);
       params.set('format', 'csv');
 
       const res = await fetch(`/api/activate/reporting/serial-swaps?${params}`);
@@ -123,7 +124,9 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `serial-swaps-${filters.dateFrom}-to-${filters.dateTo}.csv`;
+      // Build descriptive filename with status filter
+      const statusLabel = selectedStatus ? selectedStatus.replace(/_/g, '-') : 'all';
+      a.download = `serial-swaps-${statusLabel}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
       a.click();
     } catch (err) {
       alert('Export failed');
@@ -229,9 +232,10 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
         <button
           onClick={handleExport}
           className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+          title={`Export ${selectedStatus ? selectedStatus.replace(/_/g, ' ') : 'all'} records to CSV`}
         >
           <Download className="h-4 w-4" />
-          Export CSV
+          Export {selectedStatus ? selectedStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'All'} CSV
         </button>
       </div>
 

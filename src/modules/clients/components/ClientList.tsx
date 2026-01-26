@@ -51,7 +51,13 @@ export function ClientList() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `clients_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      // Build descriptive filename with active filters
+      const filterParts: string[] = [];
+      if (filter.status) filterParts.push(filter.status);
+      if (filter.type) filterParts.push(filter.type);
+      if (filter.searchTerm) filterParts.push('search');
+      const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+      a.download = `clients${filterSuffix}-${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -83,10 +89,11 @@ export function ClientList() {
 
   return (
     <div className="p-6 space-y-6">
-      <ClientListHeader 
+      <ClientListHeader
         onImport={() => setShowImport(true)}
         onExport={handleExport}
         clientCount={clients?.length || 0}
+        filter={filter}
       />
 
       {summary && <ClientSummaryCards summary={summary} />}
