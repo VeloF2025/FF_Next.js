@@ -51,6 +51,9 @@ interface DbStaff {
   passportCountry?: string;
   passportExpiry?: string;
   nationality?: string;
+  idNumber?: string;
+  workPermitNumber?: string;
+  workPermitExpiry?: string;
   // Photo verification fields (camelCase from API aliases)
   profilePhotoUrl?: string;
   idPhotoUrl?: string;
@@ -61,6 +64,10 @@ interface DbStaff {
   cvUploadedAt?: string;
   bio?: string;
   workLocation?: string;
+  salaryGrade?: string;
+  weeklyHours?: number;
+  noticePeriodDays?: number;
+  specializations?: string[];
   // Next of kin fields
   nextOfKinName?: string;
   nextOfKinPhone?: string;
@@ -74,6 +81,21 @@ interface DbStaff {
   bankAccountType?: string;
   bankAccountHolder?: string;
   bankDetailsVerifiedAt?: string;
+  // SA Compliance fields (camelCase from API aliases)
+  uifStatus?: string;
+  uifNumber?: string;
+  coidaStatus?: string;
+  taxStatus?: string;
+  taxNumber?: string;
+  probationStatus?: string;
+  probationEndDate?: string;
+  probationExtended?: boolean;
+  probationExtensionReason?: string;
+  noticePeriod?: string;
+  // Exit fields
+  exitType?: string;
+  exitReason?: string;
+  isRehireable?: boolean;
 }
 
 /**
@@ -156,7 +178,7 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     updatedAt: toTimestamp(dbStaff.updated_at),
     // Required fields with defaults
     experienceYears: dbStaff.experience_years || 0,
-    specializations: [],
+    specializations: (dbStaff.specializations || []) as string[],
     contractType: (dbStaff.contract_type || 'permanent') as StaffMember['contractType'],
     workingHours: dbStaff.working_hours || '08:00-17:00',
     availableWeekends: dbStaff.available_weekends || false,
@@ -175,12 +197,18 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     emergencyContactPhone: dbStaff.emergency_contact_phone,
     hourlyRate: dbStaff.hourly_rate,
     salaryAmount: dbStaff.salary,
+    salaryGrade: dbStaff.salaryGrade,
+    weeklyHours: dbStaff.weeklyHours,
+    noticePeriodDays: dbStaff.noticePeriodDays,
     // Identity document fields
     saIdNumber: dbStaff.saIdNumber,
     passportNumber: dbStaff.passportNumber,
     passportCountry: dbStaff.passportCountry,
     passportExpiry: dbStaff.passportExpiry,
     nationality: dbStaff.nationality,
+    idNumber: dbStaff.idNumber,
+    workPermitNumber: dbStaff.workPermitNumber,
+    workPermitExpiry: dbStaff.workPermitExpiry,
     // Photo verification fields
     profilePhotoUrl: dbStaff.profilePhotoUrl,
     idPhotoUrl: dbStaff.idPhotoUrl,
@@ -204,6 +232,21 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     bankAccountType: dbStaff.bankAccountType,
     bankAccountHolder: dbStaff.bankAccountHolder,
     bankDetailsVerifiedAt: dbStaff.bankDetailsVerifiedAt ? toTimestamp(dbStaff.bankDetailsVerifiedAt) : undefined,
+    // SA Compliance fields
+    uifStatus: dbStaff.uifStatus as StaffMember['uifStatus'],
+    uifNumber: dbStaff.uifNumber,
+    coidaStatus: dbStaff.coidaStatus as StaffMember['coidaStatus'],
+    taxStatus: dbStaff.taxStatus as StaffMember['taxStatus'],
+    taxNumber: dbStaff.taxNumber,
+    probationStatus: dbStaff.probationStatus as StaffMember['probationStatus'],
+    probationEndDate: dbStaff.probationEndDate ? toTimestamp(dbStaff.probationEndDate) : undefined,
+    probationExtended: dbStaff.probationExtended,
+    probationExtensionReason: dbStaff.probationExtensionReason,
+    noticePeriod: dbStaff.noticePeriod as StaffMember['noticePeriod'],
+    // Exit fields
+    exitType: dbStaff.exitType as StaffMember['exitType'],
+    exitReason: dbStaff.exitReason,
+    isRehireable: dbStaff.isRehireable,
   };
 }
 
@@ -240,7 +283,7 @@ function toDateStringOrNull(value: unknown): string | null {
  * Transform StaffMember to database format
  */
 function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff> {
-  return {
+  const result: Partial<DbStaff> = {
     id: staff.id,
     employee_id: staff.employeeId,
     name: staff.name,
@@ -272,12 +315,58 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
     available_nights: staff.availableNights,
     time_zone: staff.timeZone,
     experience_years: staff.experienceYears,
+    max_project_count: staff.maxProjectCount,
     // Identity document fields - use empty string or null to allow clearing
     saIdNumber: staff.saIdNumber ?? null,
     passportNumber: staff.passportNumber ?? null,
     passportCountry: staff.passportCountry ?? null,
     passportExpiry: toDateStringOrNull(staff.passportExpiry),
   };
+
+  // Emergency contact relationship
+  if ('emergencyContactRelationship' in staff) {
+    result.emergencyContactRelationship = staff.emergencyContactRelationship;
+  }
+
+  // Next of kin fields
+  if ('nextOfKinName' in staff) result.nextOfKinName = staff.nextOfKinName;
+  if ('nextOfKinPhone' in staff) result.nextOfKinPhone = staff.nextOfKinPhone;
+  if ('nextOfKinRelationship' in staff) result.nextOfKinRelationship = staff.nextOfKinRelationship;
+  if ('nextOfKinAddress' in staff) result.nextOfKinAddress = staff.nextOfKinAddress;
+
+  // Bank details
+  if ('bankName' in staff) result.bankName = staff.bankName;
+  if ('bankAccountNumber' in staff) result.bankAccountNumber = staff.bankAccountNumber;
+  if ('bankBranchCode' in staff) result.bankBranchCode = staff.bankBranchCode;
+  if ('bankAccountType' in staff) result.bankAccountType = staff.bankAccountType;
+
+  // SA Compliance fields - map to camelCase for API (matches RETURNING aliases)
+  if ('uifStatus' in staff) (result as any).uifStatus = staff.uifStatus;
+  if ('uifNumber' in staff) (result as any).uifNumber = staff.uifNumber;
+  if ('coidaStatus' in staff) (result as any).coidaStatus = staff.coidaStatus;
+  if ('taxStatus' in staff) (result as any).taxStatus = staff.taxStatus;
+  if ('taxNumber' in staff) (result as any).taxNumber = staff.taxNumber;
+  if ('probationStatus' in staff) (result as any).probationStatus = staff.probationStatus;
+  if ('probationEndDate' in staff) (result as any).probationEndDate = toDateStringOrNull(staff.probationEndDate);
+  if ('probationExtended' in staff) (result as any).probationExtended = staff.probationExtended;
+  if ('probationExtensionReason' in staff) (result as any).probationExtensionReason = staff.probationExtensionReason;
+  if ('noticePeriod' in staff) (result as any).noticePeriod = staff.noticePeriod;
+  if ('noticePeriodDays' in staff) (result as any).noticePeriodDays = staff.noticePeriodDays;
+  if ('weeklyHours' in staff) (result as any).weeklyHours = staff.weeklyHours;
+  if ('idNumber' in staff) (result as any).idNumber = staff.idNumber;
+  if ('workPermitNumber' in staff) (result as any).workPermitNumber = staff.workPermitNumber;
+  if ('workPermitExpiry' in staff) (result as any).workPermitExpiry = toDateStringOrNull(staff.workPermitExpiry);
+  if ('salaryGrade' in staff) (result as any).salaryGrade = staff.salaryGrade;
+  if ('benefitsPackage' in staff) (result as any).benefitsPackage = staff.benefitsPackage;
+  if ('bio' in staff) result.bio = staff.bio;
+  if ('specializations' in staff) (result as any).specializations = staff.specializations;
+
+  // Exit fields
+  if ('exitType' in staff) (result as any).exitType = staff.exitType;
+  if ('exitReason' in staff) (result as any).exitReason = staff.exitReason;
+  if ('isRehireable' in staff) (result as any).isRehireable = staff.isRehireable;
+
+  return result;
 }
 
 export const staffApiService = {

@@ -99,6 +99,28 @@ export interface StaffMember {
   /** All required compliance fields are completed */
   complianceComplete?: boolean;
 
+  // Flat compliance fields (for API and forms)
+  /** UIF registration status */
+  uifStatus?: string;
+  /** UIF registration number */
+  uifNumber?: string;
+  /** COIDA registration status */
+  coidaStatus?: string;
+  /** Tax status (PAYE, provisional, etc.) */
+  taxStatus?: string;
+  /** Probation status */
+  probationStatus?: string;
+  /** Notice period type */
+  noticePeriod?: string;
+  /** Weekly working hours */
+  weeklyHours?: number;
+  /** SA ID number (13 digits) */
+  idNumber?: string;
+  /** Work permit number (for foreign nationals) */
+  workPermitNumber?: string;
+  /** Work permit expiry date */
+  workPermitExpiry?: Timestamp | string;
+
   // Exit/Termination Data (for former employees)
   /** Type of exit - voluntary, involuntary, retirement, etc. */
   exitType?: ExitType;
