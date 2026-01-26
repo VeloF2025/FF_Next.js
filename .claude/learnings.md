@@ -868,3 +868,224 @@ items: [
 **Reference:**
 - Commit: `4268067f` - refactor(routes): move Health & Safety and Pipeline under /projects
 - Navigation Config: `src/modules/navigation/config/modules/projects.config.ts`
+
+---
+
+## 2026-01-26: Filter-Aware CSV Export Pattern
+
+**Context:** All CSV/Excel exports should reflect the current filter state and include filter info in the filename.
+
+**Pattern Components:**
+
+1. **Dynamic Button Text** - Shows what's being exported:
+```tsx
+// In header/toolbar component
+const hasFilters = filter?.status || filter?.type || filter?.searchTerm;
+const exportLabel = hasFilters
+  ? `Export ${filter?.status || 'Filtered'}`
+  : 'Export All';
+
+<button onClick={onExport} title={`Export ${hasFilters ? 'filtered' : 'all'} data to CSV`}>
+  <Download className="h-4 w-4" />
+  {exportLabel}
+</button>
+```
+
+2. **Descriptive Filename** - Includes active filters:
+```typescript
+// In export handler
+const filterParts: string[] = [];
+if (filter.status) filterParts.push(filter.status);
+if (filter.department) filterParts.push(filter.department.replace(/\s+/g, '-'));
+if (filter.searchTerm) filterParts.push('search');
+const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+a.download = `staff${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
+// Result: "staff-active-Engineering-2026-01-26.csv"
+```
+
+3. **API-Side Filtering** (if export via API endpoint):
+```typescript
+// pages/api/module/export.ts
+const filterParts: string[] = [];
+if (filters.direction) filterParts.push(filters.direction);
+if (filters.status) filterParts.push(filters.status);
+if (filters.project) filterParts.push(filters.project.replace(/\s+/g, '-'));
+
+const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
+const filename = `module_export${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
+
+res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+```
+
+**Components Updated (2026-01-26):**
+| Module | Component | Filter Fields |
+|--------|-----------|---------------|
+| Staff | StaffList, StaffListHeader | status, department, position |
+| Clients | ClientList, ClientListHeader | status, type |
+| Projects | ProjectList, ProjectListHeader | status, priority |
+| WA Logs | LogsTab, export.ts API | direction, status, project, drop_number |
+| Activate DR List | DrListPage | statusFilter, projectFilter |
+| Serial Mismatch | SerialMismatchReports | status, team, zone |
+| Serial Swap | SerialSwapReports | status |
+| Offline Devices | OfflineDevicesReports | zone, bucket, matchStatus, serialMismatchOnly |
+
+**Reference Commit:** `51dbdd1e` - feat(exports): add filter-aware CSV exports across all modules
+
+**Key Principles:**
+1. **Export what's shown** - The exported data should match what the user sees on screen
+2. **Filename tells the story** - User can identify export contents from filename alone
+3. **Dynamic button feedback** - User knows what they're exporting before clicking
+4. **Pass filters to header** - Header component needs filter state for dynamic button text
+
+---
+
+## 2026-01-26: Access Control System - Settings vs Dedicated Page
+
+**Context:** FibreFlow has a comprehensive RBAC (Role-Based Access Control) system accessible at Settings > Access Control tab.
+
+**Location:** `/settings` → Access Control tab (NOT a separate page in System section)
+
+**Components:**
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `AccessControlTab.tsx` | `src/components/settings/AccessControlTab.tsx` | Main 1089-line RBAC UI |
+| `UserPermissionsModal` | Inside AccessControlTab | Individual user permission overrides |
+| Settings page | `src/pages/Settings.tsx` | Tab container |
+
+**Three Sub-Tabs:**
+
+1. **Users (61)** - User management
+   - Search, filter by role/status
+   - Role dropdown selector (immediate change)
+   - "Permissions" button opens individual override modal
+   - "Deactivate" action
+
+2. **Roles (9)** - Role permission matrix
+   - Role list with user counts
+   - Permission grid: VIEW | CREATE | EDIT columns
+   - Editable checkboxes per permission
+   - Super Admin is not editable (71 permissions)
+
+3. **Permissions** - Permission hierarchy tree
+   - 12 modules: Dashboard, Projects, Activations, Field Operations, Maintenance, People, Clients, Contractors, Procurement, Assets, Fleet, Communications
+   - Expandable to show sub-permissions
+
+**Role Hierarchy (levels):**
+```
+6: super_admin (all permissions, not editable)
+5: system
+4: admin (Administrator)
+3: manager
+2: technician (Field Technician)
+1: viewer
+```
+
+**Individual Permission Overrides:**
+The `UserPermissionsModal` allows granting/revoking specific permissions beyond the user's role:
+- From Role (checkbox) - inherited from role
+- Custom Grant (green) - manually granted
+- Custom Revoke (red X) - manually revoked
+- No Access (unchecked)
+- Auto-save functionality
+- "Show only custom overrides" filter
+
+**Database Tables:**
+| Table | Purpose |
+|-------|---------|
+| `access_permissions` | Permission definitions |
+| `role_permissions` | Role-to-permission mappings |
+| `user_permission_overrides` | Individual user grants/revokes with expiry |
+
+**APIs:**
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/admin/permissions` | GET | List all permissions (flat or tree) |
+| `/api/admin/roles` | GET | List roles with permissions |
+| `/api/admin/users/[userId]/permissions` | GET/POST/DELETE | User permission overrides |
+
+**Key Learning:** Don't create duplicate Access Control pages. The functionality already exists in Settings.
+
+**Reference Files:**
+- `src/components/settings/AccessControlTab.tsx` - Main component (1089 lines)
+- `src/lib/permissions/index.ts` - Permission service
+- `src/lib/auth/middleware.ts` - Auth middleware with `withAuth`, `withRole`, `withPermission`
+
+---
+
+## 2026-01-26: Settings Page Full-Width for Data Tables
+
+**Issue:** Access Control tab data table was constrained by `max-w-4xl` container, making the user table cramped.
+
+**Solution:** Conditionally remove width constraints for tabs that need full width (like data tables).
+
+**Pattern:**
+```tsx
+// src/pages/Settings.tsx
+const isFullWidth = activeTab === 'access';
+
+return (
+  <div className={`p-6 ${isFullWidth ? '' : 'max-w-4xl mx-auto'}`}>
+    {renderTabContent()}
+  </div>
+);
+```
+
+**When to Use Full Width:**
+- Data tables with many columns
+- Complex forms with side-by-side layouts
+- Permission matrices
+
+**When to Keep Constrained:**
+- Simple forms (General settings)
+- Theme selection
+- Toggle lists
+
+---
+
+## 2026-01-26: Photo Fetching API Architecture (BOSS API)
+
+**Current Implementation**: All photo fetching goes through the BOSS API Docker container on Velocity server.
+
+**BOSS API Host:** `http://100.96.203.105:8003`
+
+**API Endpoints Used:**
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/record/{dropNumber}` | GET | Get DR metadata (photo list, serials, status) |
+| `/api/download/{dropNumber}` | POST | Trigger photo download from 1Map cloud to local cache |
+| `/api/photo/{dropNumber}/{filename}` | GET | Serve actual photo file |
+| `/health` | GET | Health check |
+
+**Data Flow:**
+```
+1Map Cloud → BOSS API (caching layer) → FibreFlow APIs → Browser
+    ↓                   ↓
+  Source          Local cache at:
+                  /var/lib/docker/volumes/boss_dr_photos/_data/{DR}/
+```
+
+**Files using BOSS API:**
+
+| File | Endpoint Used | When |
+|------|---------------|------|
+| `dr-acknowledgment.ts` | `/api/record/` | DR submission (check photo count) |
+| `process-new-dr.ts` | `/api/record/` | Initial processing |
+| `ensure-data.ts` | `/api/record/`, `/api/download/` | QA Wizard open (sync new photos) |
+| `refresh.ts` | `/api/record/`, `/api/download/` | User-initiated refresh |
+| `fetch-photos.ts` | `/api/record/`, `/api/download/` | Legacy photo fetch |
+| `extract-data.ts` | `/api/photo/` | VLM data extraction (actual image URLs) |
+| `photo/[...path].ts` | `/api/photo/` | Photo proxy (serves to browser) |
+| `health-check.ts` | `/health` | System health check |
+| `photoFetchService.ts` | `/api/record/`, `/api/download/` | Service layer with retry logic |
+
+**Environment Variable:**
+```bash
+ONEMAP_HOST=http://100.96.203.105:8003  # Default if not set
+BOSS_API_HOST=http://100.96.203.105:8003  # Alias used in some files
+VELOCITY_PHOTO_URL=http://100.96.203.105:8003  # For photo proxy
+```
+
+**Note:** "BOSS API", "ONEMAP_HOST", and "Velocity Photo API" all refer to the same service - the Docker container on Velocity that caches 1Map data.
+
+---

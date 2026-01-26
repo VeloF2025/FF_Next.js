@@ -6,6 +6,9 @@
 import type {
   WaGroupConfig,
   WaGroupConfigInput,
+  WaMonitoredGroup,
+  WaMonitoredGroupInput,
+  WaGroupType,
   WaMessageTemplate,
   WaMessageTemplateInput,
   WaServiceConfig,
@@ -58,7 +61,40 @@ async function fetchApi<T>(
 }
 
 // ============================================
-// Groups API
+// Monitored Groups API (Bridge Configuration)
+// ============================================
+export const monitoredGroupsApi = {
+  list: (groupType?: WaGroupType, isActive?: boolean) => {
+    const params = new URLSearchParams();
+    if (groupType) params.set('group_type', groupType);
+    if (isActive !== undefined) params.set('is_active', String(isActive));
+    const query = params.toString();
+    return fetchApi<WaMonitoredGroup[]>(`/monitored-groups${query ? `?${query}` : ''}`);
+  },
+
+  get: (id: string) =>
+    fetchApi<WaMonitoredGroup>(`/monitored-groups/${id}`),
+
+  create: (input: WaMonitoredGroupInput) =>
+    fetchApi<WaMonitoredGroup>('/monitored-groups', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  update: (id: string, input: Partial<WaMonitoredGroupInput>) =>
+    fetchApi<WaMonitoredGroup>(`/monitored-groups/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
+
+  delete: (id: string) =>
+    fetchApi<WaMonitoredGroup>(`/monitored-groups/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// ============================================
+// Groups API (Legacy - wa_group_config)
 // ============================================
 export const groupsApi = {
   list: (enabled?: boolean) =>
@@ -286,6 +322,7 @@ export const phonesApi = {
 
 // Combined export
 export const waAdminApi = {
+  monitoredGroups: monitoredGroupsApi,
   groups: groupsApi,
   templates: templatesApi,
   config: configApi,

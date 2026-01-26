@@ -13,6 +13,7 @@ import {
   MessageCircle,
   MessageSquare,
   Send,
+  MonitorSmartphone,
 } from 'lucide-react';
 import type { WaAdminTab } from './types/wa-admin.types';
 
@@ -20,6 +21,7 @@ import type { WaAdminTab } from './types/wa-admin.types';
 import ServicesTab from './components/ServicesTab';
 import ChatTab from './components/ChatTab';
 import SendTab from './components/SendTab';
+import MonitoredGroupsTab from './components/MonitoredGroupsTab';
 import GroupsTab from './components/GroupsTab';
 import TemplatesTab from './components/TemplatesTab';
 import LogsTab from './components/LogsTab';
@@ -36,6 +38,7 @@ const tabs: TabConfig[] = [
   { id: 'services', label: 'Services', icon: Radio, component: ServicesTab },
   { id: 'chat', label: 'Chat', icon: MessageSquare, component: ChatTab },
   { id: 'send', label: 'Send', icon: Send, component: SendTab },
+  { id: 'monitored', label: 'Monitored', icon: MonitorSmartphone, component: MonitoredGroupsTab },
   { id: 'groups', label: 'Groups', icon: Users, component: GroupsTab },
   { id: 'templates', label: 'Templates', icon: FileText, component: TemplatesTab },
   { id: 'logs', label: 'Logs', icon: ScrollText, component: LogsTab },

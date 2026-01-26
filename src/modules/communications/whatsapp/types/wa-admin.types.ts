@@ -231,6 +231,32 @@ export interface WaSendMessageInput {
 }
 
 // ============================================
+// Monitored Groups (Bridge Configuration)
+// ============================================
+export type WaGroupType = 'dr_submission' | 'maintenance' | 'admin';
+
+export interface WaMonitoredGroup {
+  id: string;
+  group_jid: string;
+  group_name: string;
+  project_name: string | null;
+  group_type: WaGroupType;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WaMonitoredGroupInput {
+  group_jid: string;
+  group_name: string;
+  project_name?: string;
+  group_type?: WaGroupType;
+  description?: string;
+  is_active?: boolean;
+}
+
+// ============================================
 // Tab Types for UI
 // ============================================
-export type WaAdminTab = 'services' | 'chat' | 'send' | 'groups' | 'templates' | 'logs' | 'settings';
+export type WaAdminTab = 'services' | 'chat' | 'send' | 'monitored' | 'groups' | 'templates' | 'logs' | 'settings';
