@@ -36,6 +36,7 @@ interface OESRow {
   activation_date: string;
   activation_datetime: string | null; // Full timestamp if available
   olt_address: string;
+  stack_ref: string; // Added Jan 2026 - new column in Nokia OES report
   ont_rx_sig_dbm: number | null;
   link_budget_ont_olt_db: number | null;
   olt_rx_sig_dbm: number | null;
@@ -102,21 +103,26 @@ function parseOESExcel(filePath: string): OESRow[] {
       activationDate = String(row[2] || '');
     }
 
+    // Column mapping updated Jan 2026 - "Stack Ref." added at index 4
+    // A=0:Drop, B=1:Serial, C=2:Timestamp, D=3:OLT Address, E=4:Stack Ref.,
+    // F=5:ONT Rx, G=6:Link ONT->OLT, H=7:OLT Rx, I=8:Link OLT->ONT,
+    // J=9:Status, K=10:Lat, L=11:Lon, M=12:Current ONT RX, N=13:Team
     rows.push({
       drop_number: dropNumber,
       serial_number: String(row[1] || '').trim(),
       activation_date: activationDate,
       activation_datetime: activationDatetime,
       olt_address: String(row[3] || '').trim(),
-      ont_rx_sig_dbm: row[4] !== undefined ? parseFloat(row[4]) : null,
-      link_budget_ont_olt_db: row[5] !== undefined ? parseFloat(row[5]) : null,
-      olt_rx_sig_dbm: row[6] !== undefined ? parseFloat(row[6]) : null,
-      link_budget_olt_ont_db: row[7] !== undefined ? parseFloat(row[7]) : null,
-      status: String(row[8] || '').trim(),
-      latitude: row[9] !== undefined ? parseFloat(row[9]) : null,
-      longitude: row[10] !== undefined ? parseFloat(row[10]) : null,
-      current_ont_rx: row[11] !== undefined ? parseFloat(row[11]) : null,
-      team: String(row[12] || '').trim(),
+      stack_ref: String(row[4] || '').trim(),
+      ont_rx_sig_dbm: row[5] !== undefined ? parseFloat(row[5]) : null,
+      link_budget_ont_olt_db: row[6] !== undefined ? parseFloat(row[6]) : null,
+      olt_rx_sig_dbm: row[7] !== undefined ? parseFloat(row[7]) : null,
+      link_budget_olt_ont_db: row[8] !== undefined ? parseFloat(row[8]) : null,
+      status: String(row[9] || '').trim(),
+      latitude: row[10] !== undefined ? parseFloat(row[10]) : null,
+      longitude: row[11] !== undefined ? parseFloat(row[11]) : null,
+      current_ont_rx: row[12] !== undefined ? parseFloat(row[12]) : null,
+      team: String(row[13] || '').trim(),
     });
   }
 
@@ -221,8 +227,8 @@ async function handler(
 
         chunk.forEach((row, idx) => {
           const dropId = dropsMap.get(row.drop_number) || null;
-          const offset = idx * 16;
-          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16})`);
+          const offset = idx * 17; // 17 columns now (added stack_ref)
+          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17})`);
           values.push(
             row.drop_number,
             dropId,
@@ -230,6 +236,7 @@ async function handler(
             row.activation_date,
             row.activation_datetime, // Full timestamp if available
             row.olt_address,
+            row.stack_ref, // Added Jan 2026
             row.ont_rx_sig_dbm,
             row.link_budget_ont_olt_db,
             row.olt_rx_sig_dbm,
@@ -247,7 +254,7 @@ async function handler(
           await pool.query(
             `INSERT INTO oes_activations (
                drop_number, drop_id, serial_number, activation_date, activation_datetime, olt_address,
-               ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
+               stack_ref, ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
                status, latitude, longitude, current_ont_rx, team, import_batch_id
              ) VALUES ${placeholders.join(', ')}
              ON CONFLICT (drop_number) DO UPDATE SET
@@ -256,6 +263,7 @@ async function handler(
                activation_date = EXCLUDED.activation_date,
                activation_datetime = COALESCE(EXCLUDED.activation_datetime, oes_activations.activation_datetime),
                olt_address = EXCLUDED.olt_address,
+               stack_ref = EXCLUDED.stack_ref,
                ont_rx_sig_dbm = EXCLUDED.ont_rx_sig_dbm,
                link_budget_ont_olt_db = EXCLUDED.link_budget_ont_olt_db,
                olt_rx_sig_dbm = EXCLUDED.olt_rx_sig_dbm,
