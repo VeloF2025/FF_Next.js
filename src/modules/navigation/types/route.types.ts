@@ -16,6 +16,7 @@ export type ModuleId =
   | 'procurement'
   | 'assets'
   | 'fleet'
+  | 'staff'
   | 'people'
   | 'analytics'
   | 'communications'

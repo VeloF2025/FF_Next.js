@@ -1,10 +1,23 @@
-'use client';
+/**
+ * Staff Import Page
+ * Import staff members from CSV/Excel files
+ */
 
-import type { NextPage } from 'next';
-import { StaffImportAdvanced } from '../../src/modules/staff/components/StaffImportAdvanced';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { staffConfig } from '@/modules/navigation';
+import { StaffImportAdvanced } from '@/modules/staff/components/StaffImportAdvanced';
 
-const StaffImportPage: NextPage = () => {
-  return <StaffImportAdvanced />;
+export default function StaffImportPage() {
+  return (
+    <AppLayout>
+      <ModulePage config={staffConfig}>
+        <StaffImportAdvanced />
+      </ModulePage>
+    </AppLayout>
+  );
+}
+
+export const getServerSideProps = async () => {
+  return { props: {} };
 };
-
-export default StaffImportPage;

@@ -49,4 +49,5 @@ export {
   assetsConfig,
   procurementConfig,
   activateConfig,
+  staffConfig,
 } from './config';
