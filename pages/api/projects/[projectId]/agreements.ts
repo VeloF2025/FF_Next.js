@@ -43,7 +43,7 @@ async function handler(
     case 'GET': {
       try {
         // Try to fetch from contractor_agreements table
-        const agreements = await safeArrayQuery<Agreement>(
+        const agreements = await safeArrayQuery(
           async () => sql`
             SELECT
               ca.id,
@@ -137,7 +137,7 @@ async function handler(
     }
 
     default:
-      return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }
 
