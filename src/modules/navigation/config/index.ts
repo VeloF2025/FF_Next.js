@@ -10,6 +10,7 @@ import { assetsConfig } from './modules/assets.config';
 import { procurementConfig } from './modules/procurement.config';
 import { activateConfig } from './modules/activate.config';
 import { staffConfig } from './modules/staff.config';
+import { projectsConfig } from './modules/projects.config';
 
 // Register all module configs
 registerModuleConfig(maintenanceConfig);
@@ -18,6 +19,7 @@ registerModuleConfig(assetsConfig);
 registerModuleConfig(procurementConfig);
 registerModuleConfig(activateConfig);
 registerModuleConfig(staffConfig);
+registerModuleConfig(projectsConfig);
 
 // Re-export everything
 export {
@@ -35,3 +37,4 @@ export { assetsConfig };
 export { procurementConfig };
 export { activateConfig };
 export { staffConfig };
+export { projectsConfig };

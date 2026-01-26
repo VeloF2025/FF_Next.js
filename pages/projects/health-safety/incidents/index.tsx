@@ -1,6 +1,7 @@
 /**
- * H&S Incidents List redirect
- * /health-safety/incidents → /projects/health-safety/incidents
+ * Health & Safety Incidents List
+ * /projects/health-safety/incidents - Redirect to main incidents page
+ * (Full implementation at /health-safety/incidents)
  */
 
 import type { GetServerSideProps } from 'next';
@@ -8,8 +9,8 @@ import type { GetServerSideProps } from 'next';
 export const getServerSideProps: GetServerSideProps = async () => {
   return {
     redirect: {
-      destination: '/projects/health-safety/incidents',
-      permanent: true,
+      destination: '/health-safety/incidents',
+      permanent: false,
     },
   };
 };

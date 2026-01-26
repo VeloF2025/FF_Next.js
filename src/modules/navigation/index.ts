@@ -50,4 +50,5 @@ export {
   procurementConfig,
   activateConfig,
   staffConfig,
+  projectsConfig,
 } from './config';

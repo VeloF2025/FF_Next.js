@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+// import { NavigationProvider } from '@/modules/navigation';  // Temporarily disabled
 import { reportWebVitals } from '@/lib/performance';
 import { initErrorTracking } from '@/lib/errorTracking';
 import { VersionChecker } from '@/components/VersionChecker';
@@ -47,6 +48,7 @@ function MyApp({ Component, pageProps }: AppProps) {
       <AuthProvider>
         <ThemeProvider enableSystemTheme={false}>
           <QueryClientProvider client={queryClient}>
+            {/* NavigationProvider temporarily disabled */}
             <Component {...pageProps} />
             <Toaster
               position="top-right"

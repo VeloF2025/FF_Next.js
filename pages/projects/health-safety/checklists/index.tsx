@@ -1,6 +1,7 @@
 /**
- * H&S Checklists redirect
- * /health-safety/checklists → /projects/health-safety/checklists
+ * Health & Safety Checklists
+ * /projects/health-safety/checklists - Redirect to main checklists page
+ * (Full implementation at /health-safety/checklists)
  */
 
 import type { GetServerSideProps } from 'next';
@@ -8,8 +9,8 @@ import type { GetServerSideProps } from 'next';
 export const getServerSideProps: GetServerSideProps = async () => {
   return {
     redirect: {
-      destination: '/projects/health-safety/checklists',
-      permanent: true,
+      destination: '/health-safety/checklists',
+      permanent: false,
     },
   };
 };

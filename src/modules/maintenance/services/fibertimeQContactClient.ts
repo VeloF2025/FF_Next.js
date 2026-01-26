@@ -525,17 +525,35 @@ export class FiberTimeQContactClient {
   async listCases(options: ListCasesOptions = {}): Promise<FiberTimeCaseResponse> {
     const assignedToId = options.assignedTo || MAINTENANCE_VELOCITY_ID;
 
-    // Build filter JSON
+    // Build filter JSON - filter by assigned_to AND exclude Closed status
+    const conditions: Array<{ name: string; value: string; operator: string }> = [
+      {
+        name: 'assigned_to',
+        value: assignedToId,
+        operator: 'equals',
+      },
+    ];
+
+    // Optionally filter by status (exclude Closed by default to get active tickets)
+    if (options.status) {
+      conditions.push({
+        name: 'status',
+        value: options.status,
+        operator: 'equals',
+      });
+    } else {
+      // Exclude Closed tickets to get active ones first
+      conditions.push({
+        name: 'status',
+        value: 'Closed',
+        operator: 'not_equals',
+      });
+    }
+
     const filters = JSON.stringify([
       {
         operator: 'all',
-        conditions: [
-          {
-            name: 'assigned_to',
-            value: assignedToId,
-            operator: 'equals',
-          },
-        ],
+        conditions,
       },
     ]);
 

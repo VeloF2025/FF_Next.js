@@ -4,12 +4,9 @@ import { useState, useEffect, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import dynamic from 'next/dynamic';
-
-// Dynamically import components to avoid SSR issues
-const Sidebar = dynamic(() => import('./Sidebar').then(mod => ({ default: mod.Sidebar })), { ssr: false });
-const Header = dynamic(() => import('./Header').then(mod => ({ default: mod.Header })), { ssr: false });
-const Footer = dynamic(() => import('./Footer').then(mod => ({ default: mod.Footer })), { ssr: false });
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import { Footer } from './Footer';
 
 interface PageMeta {
   title: string;
