@@ -23,7 +23,11 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
+// BOSS API - Docker container on Velocity that caches 1Map photo data
+// LEGITIMATE USE: This endpoint is called once per DR submission to check
+// if the DR exists in 1Map and get current photo/serial status for the
+// acknowledgment message. DR doesn't exist in unified table yet at this point.
+const BOSS_API_HOST = process.env.BOSS_API_HOST || 'http://100.96.203.105:8003';
 
 interface ExistingSubmission {
   submission_count: number;
@@ -397,7 +401,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      const response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
+      const response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
         signal: controller.signal,
       });
 

@@ -25,7 +25,10 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-const ONEMAP_HOST = 'http://100.96.203.105:8003';
+// BOSS API - Docker container on Velocity that caches 1Map photo data
+// LEGITIMATE USE: This endpoint is called once when opening QA Wizard
+// to ensure photos are downloaded for review (not on every page view)
+const BOSS_API_HOST = 'http://100.96.203.105:8003';
 
 interface EnsureDataRequest {
   dropNumber: string;
@@ -203,7 +206,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
 }> {
   try {
     // Try to get record from OneMap
-    let response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
+    let response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
       signal: AbortSignal.timeout(10000), // 10s timeout
     });
 
@@ -211,7 +214,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
     if (response.status === 404 || response.status === 422) {
       log.info('EnsureData', `Record not found on OneMap, triggering download for ${dropNumber}`);
 
-      const downloadResponse = await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
+      const downloadResponse = await fetch(`${BOSS_API_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
         signal: AbortSignal.timeout(15000), // 15s timeout for download
       });
@@ -221,7 +224,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Retry fetch
-        response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
+        response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
           signal: AbortSignal.timeout(10000),
         });
       }
@@ -239,7 +242,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
     if (localPhotos.length === 0 && data.photo_count > 0) {
       log.info('EnsureData', `Photos on cloud but not local for ${dropNumber}, triggering download`);
 
-      await fetch(`${ONEMAP_HOST}/api/download/${dropNumber}`, {
+      await fetch(`${BOSS_API_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
         signal: AbortSignal.timeout(15000),
       });
@@ -247,7 +250,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
       // Wait and retry
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
-      const retryResponse = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
+      const retryResponse = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
         signal: AbortSignal.timeout(10000),
       });
 

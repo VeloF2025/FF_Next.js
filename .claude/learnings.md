@@ -62,8 +62,40 @@ const result = await pool.query(`
 **Affected Files:**
 - `pages/api/activate/process-new-dr.ts` - Stores contact info
 - `pages/api/activate/summary.ts` - Reads from unified table only
+- `pages/api/activate/[dropNumber].ts` - Reads from unified table only
 - `scripts/migrations/131_unified_contact_fields.sql` - Added columns
 - `scripts/backfill-contact-info.js` - Backfill for existing DRs
+
+### BOSS API Usage Classification
+
+**BOSS API Host:** `http://100.96.203.105:8003` (Docker container on Velocity server)
+
+The BOSS API is a caching layer for 1Map photo data. Here's when to use it:
+
+**✅ LEGITIMATE BOSS API Calls:**
+
+| Endpoint | Purpose | When Called |
+|----------|---------|-------------|
+| `dr-acknowledgment.ts` | Check if DR exists, get photo count for WhatsApp ack | Once per DR submission |
+| `ensure-data.ts` | Download photos before QA review | Once when opening QA Wizard |
+| `refresh.ts` | Manual refresh when user clicks "Refresh" | On-demand, user-initiated |
+| `process-new-dr.ts` | Fetch photos/contact info during processing | Once during DR processing |
+| `photo/[...path].ts` | Serve actual photo images | Every photo display (required) |
+
+**❌ NEVER Call BOSS API From:**
+
+| Endpoint | Why |
+|----------|-----|
+| `[dropNumber].ts` GET | Page view - use unified table |
+| `summary.ts` | Page view - use unified table |
+| Any listing/dashboard | Use unified table |
+
+**Key Principle:** BOSS API calls are only legitimate for:
+1. **Initial processing** (once per DR)
+2. **Photo serving** (images can't be stored in DB)
+3. **User-initiated refresh** (explicit action)
+
+Never for passive page views or data display.
 
 ---
 
