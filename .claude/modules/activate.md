@@ -92,6 +92,7 @@ src/modules/activate/
 | `/api/activate/send-feedback` | POST | WhatsApp feedback |
 | `/api/activate/dr-acknowledgment` | POST | First WA response |
 | `/api/activate/reporting/*` | GET | 8 report endpoints |
+| `/api/activate/refresh` | POST | Manual data refresh from BOSS API |
 | `/api/activate/health-check` | GET | 5-service health |
 
 ## Serial Swap Detection
