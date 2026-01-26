@@ -110,7 +110,6 @@ export default async function handler(
           COUNT(*) FILTER (WHERE status IN ('completed', 'complete'))::int as completed_count,
           COUNT(*) FILTER (WHERE status = 'on_hold')::int as on_hold_count
         FROM projects
-        WHERE deleted_at IS NULL
       `
     );
 
@@ -135,7 +134,6 @@ export default async function handler(
           COALESCE(SUM(COALESCE(committed_cost, 0)), 0)::numeric as total_committed,
           COALESCE(SUM(COALESCE(actual_cost, 0)), 0)::numeric as total_actual
         FROM projects
-        WHERE deleted_at IS NULL
           AND status IN ('active', 'in_progress', 'planning', 'planned')
       `
     );
@@ -164,7 +162,6 @@ export default async function handler(
           COUNT(*)::int as total_drops,
           COUNT(*) FILTER (WHERE status IN ('completed', 'activated', 'installed'))::int as completed_drops
         FROM drops
-        WHERE deleted_at IS NULL
       `
     );
 
@@ -220,7 +217,6 @@ export default async function handler(
             COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed'))::int as open_tickets,
             COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed') AND priority IN ('critical', 'high'))::int as critical_tickets
           FROM maintenance_tickets
-          WHERE deleted_at IS NULL
         `
       );
       maintenance = maintenanceRows[0] || maintenance;
@@ -271,12 +267,9 @@ export default async function handler(
           c.name as client_name,
           p.status,
           COALESCE(p.progress, 0)::int as progress,
-          COALESCE(s.name, u.name) as manager_name
+          p.project_manager as manager_name
         FROM projects p
         LEFT JOIN clients c ON p.client_id = c.id
-        LEFT JOIN staff s ON p.project_manager_id = s.id
-        LEFT JOIN users u ON p.project_manager_id::text = u.id
-        WHERE p.deleted_at IS NULL
         ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC
         LIMIT 10
       `
@@ -289,8 +282,7 @@ export default async function handler(
         async () => sql`
           SELECT COUNT(*)::int as at_risk_count
           FROM projects
-          WHERE deleted_at IS NULL
-            AND status IN ('active', 'in_progress')
+          WHERE status IN ('active', 'in_progress')
             AND (
               (budget > 0 AND actual_cost > budget)
               OR (progress < 25 AND created_at < NOW() - INTERVAL '30 days')
