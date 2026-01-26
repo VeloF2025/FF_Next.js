@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
@@ -9,13 +9,17 @@ import { ProjectInfoCard } from './detail/ProjectInfoCard';
 import { ProjectProgressCard } from './detail/ProjectProgressCard';
 import { ProjectDetailHeader } from './detail/ProjectDetailHeader';
 import { ProjectStatusBadges } from './detail/ProjectStatusBadges';
-import { ProjectTabs } from './detail/ProjectTabs';
+import { ProjectTabs, TabId } from './detail/ProjectTabs';
 import { ProjectKeyDetails } from './detail/ProjectKeyDetails';
 import { ProjectQuickStats } from './detail/ProjectQuickStats';
 import { ProjectHierarchyTab } from './detail/ProjectHierarchyTab';
 import { ProjectTimelineTab } from './detail/ProjectTimelineTab';
 import { ProjectDetailLoading } from './detail/ProjectDetailLoading';
 import { ProjectDetailNotFound } from './detail/ProjectDetailNotFound';
+// Sprint 1: New tab components
+import { ProjectTeamTab } from './detail/ProjectTeamTab';
+import { ProjectProcurementTab } from './detail/ProjectProcurementTab';
+import { ProjectMaintenanceTab } from './detail/ProjectMaintenanceTab';
 
 interface ProjectDetailProps {
   projectId: string;
@@ -24,12 +28,42 @@ interface ProjectDetailProps {
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const router = useRouter();
   const id = projectId;
-  type TabId = 'overview' | 'hierarchy' | 'sow' | 'timeline' | 'budget' | 'hs';
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  
+  const [tabBadges, setTabBadges] = useState<Record<string, number>>({});
+
   const { data: project, isLoading, error } = useProject(id!);
   const { data: hierarchy, isLoading: isHierarchyLoading } = useProjectHierarchy(id!);
   const deleteMutation = useDeleteProject();
+
+  // Fetch badge counts for tabs
+  useEffect(() => {
+    async function fetchBadges() {
+      try {
+        const [teamRes, maintenanceRes] = await Promise.all([
+          fetch(`/api/projects/${id}/team`),
+          fetch(`/api/projects/${id}/maintenance-summary`),
+        ]);
+
+        const badges: Record<string, number> = {};
+
+        if (teamRes.ok) {
+          const teamData = await teamRes.json();
+          badges.team = teamData.data?.stats?.total || 0;
+        }
+
+        if (maintenanceRes.ok) {
+          const maintenanceData = await maintenanceRes.json();
+          badges.maintenance = maintenanceData.data?.active || 0;
+        }
+
+        setTabBadges(badges);
+      } catch {
+        // Silently fail - badges are optional
+      }
+    }
+
+    if (id) fetchBadges();
+  }, [id]);
 
   if (isLoading) {
     return <ProjectDetailLoading />;
@@ -57,7 +91,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       <ProjectStatusBadges project={project} />
 
-      <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} badges={tabBadges} />
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
@@ -76,6 +110,18 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'team' && (
+        <ProjectTeamTab projectId={id!} />
+      )}
+
+      {activeTab === 'procurement' && (
+        <ProjectProcurementTab projectId={id!} />
+      )}
+
+      {activeTab === 'maintenance' && (
+        <ProjectMaintenanceTab projectId={id!} />
       )}
 
       {activeTab === 'hierarchy' && (

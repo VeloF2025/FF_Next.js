@@ -57,11 +57,25 @@ export const calculatePercentage = (progress: number): number => {
 };
 
 /**
- * Get tab configuration
+ * Tab configuration type
  */
-export const getTabConfig = () => [
+export interface TabConfig {
+  id: string;
+  label: string;
+  icon?: string;
+  badge?: number;
+}
+
+/**
+ * Get tab configuration
+ * Sprint 1: Added Team, Procurement, Maintenance tabs
+ */
+export const getTabConfig = (): TabConfig[] => [
   { id: 'overview', label: 'Overview' },
-  { id: 'hierarchy', label: 'Project Hierarchy' },
+  { id: 'team', label: 'Team' },
+  { id: 'procurement', label: 'Procurement' },
+  { id: 'maintenance', label: 'Maintenance' },
+  { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'sow', label: 'SOW Data' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'budget', label: 'Budget' },
