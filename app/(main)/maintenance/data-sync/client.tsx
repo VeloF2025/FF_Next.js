@@ -6,9 +6,13 @@
  * Combined page with tabs for:
  * - QContact Sync: Bidirectional synchronization with QContact system
  * - Weekly Import: Excel file imports for maintenance reports
+ *
+ * 🟢 WORKING: Data sync page integrates ModulePage for consistent tab navigation
  */
 
 import React, { useState, useEffect } from 'react';
+import { ModulePage } from '@/components/module-page';
+import { maintenanceConfig } from '@/modules/navigation';
 import { RefreshCw, FileUp, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, AlertTriangle, GitCompare, FileSpreadsheet, MessageSquare } from 'lucide-react';
 
 // QContact Sync components
@@ -301,16 +305,9 @@ export default function DataSyncPageClient() {
   const triggerSync = useTriggerManualSync();
 
   return (
-    <div className="p-6">
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Data Sync</h1>
-        <p className="text-[var(--ff-text-secondary)]">
-          Sync tickets with QContact or import weekly maintenance reports
-        </p>
-      </div>
-
-      {/* Tab Navigation */}
+    <ModulePage config={maintenanceConfig}>
+      <div className="flex flex-col h-full">
+        {/* Sub-Tab Navigation (internal to this page) */}
       <div className="mb-6 border-b border-[var(--ff-border-light)]">
         <nav className="flex gap-1" aria-label="Tabs">
           {tabs.map((tab) => {
@@ -412,6 +409,7 @@ export default function DataSyncPageClient() {
           <WATrackingDashboard />
         </div>
       )}
-    </div>
+      </div>
+    </ModulePage>
   );
 }

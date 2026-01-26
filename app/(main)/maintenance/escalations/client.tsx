@@ -10,10 +10,12 @@
  * - Escalation resolution tracking
  * - Fault trend visualization
  *
- * 🟢 WORKING: Escalation management page integrates escalation components
+ * 🟢 WORKING: Escalation management page integrates ModulePage for consistent tab navigation
  */
 
 import { useState, useEffect } from 'react';
+import { ModulePage } from '@/components/module-page';
+import { maintenanceConfig } from '@/modules/navigation';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { EscalationList } from '@/modules/maintenance/components/Escalation/EscalationList';
 import { EscalationAlert } from '@/modules/maintenance/components/Escalation/EscalationAlert';
@@ -72,15 +74,9 @@ export default function EscalationsPageClient() {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Escalation Management</h1>
-        <p className="text-[var(--ff-text-secondary)]">
-          Track and resolve repeat faults and infrastructure-level issues
-        </p>
-      </div>
-
-      {/* Escalation Alerts - High priority warnings */}
+    <ModulePage config={maintenanceConfig}>
+      <div className="flex flex-col h-full">
+        {/* Escalation Alerts - High priority warnings */}
       {alerts.length > 0 && (
         <div className="mb-6 space-y-3">
           {alerts.map((alert) => (
@@ -134,6 +130,7 @@ export default function EscalationsPageClient() {
           <RepeatFaultMap escalations={escalations} />
         </div>
       )}
-    </div>
+      </div>
+    </ModulePage>
   );
 }

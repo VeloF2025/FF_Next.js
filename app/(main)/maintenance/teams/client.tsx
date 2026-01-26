@@ -9,9 +9,13 @@
  * - Edit team details
  * - View team members
  * - Delete (soft) teams
+ *
+ * 🟢 WORKING: Teams page integrates ModulePage for consistent tab navigation
  */
 
 import { useState, useMemo } from 'react';
+import { ModulePage } from '@/components/module-page';
+import { maintenanceConfig } from '@/modules/navigation';
 import {
   Users,
   Plus,
@@ -220,24 +224,21 @@ export default function TeamsPageClient() {
   const isSubmitting = createTeam.isPending || updateTeam.isPending;
   const isDeleting = deleteTeam.isPending;
 
-  return (
-    <div className="p-6 h-full flex flex-col">
-      {/* Header */}
-      <div className="mb-6 flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Teams</h1>
-          <p className="text-[var(--ff-text-secondary)]">Manage internal and contractor teams</p>
-        </div>
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Create Team
-        </button>
-      </div>
+  // Header actions for ModulePage
+  const headerActions = (
+    <button
+      onClick={handleCreate}
+      className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-primary-500)] text-white rounded-lg hover:bg-[var(--ff-primary-600)] transition-colors"
+    >
+      <Plus className="w-5 h-5" />
+      Create Team
+    </button>
+  );
 
-      {/* Filters */}
+  return (
+    <ModulePage config={maintenanceConfig} headerActions={headerActions}>
+      <div className="flex flex-col h-full">
+        {/* Filters */}
       <div className="mb-6 flex flex-wrap items-center gap-4">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -456,7 +457,8 @@ export default function TeamsPageClient() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModulePage>
   );
 }
 

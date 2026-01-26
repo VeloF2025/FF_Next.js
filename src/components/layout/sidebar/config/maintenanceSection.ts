@@ -1,78 +1,25 @@
 /**
  * Maintenance navigation section configuration
+ *
+ * Sub-navigation is handled by horizontal tabs at the top of the page.
+ * This section only contains the main entry point to the Maintenance module.
  */
 
-import {
-  Wrench,
-  LayoutDashboard,
-  Database,
-  AlertTriangle,
-  ArrowRightLeft,
-  ShieldAlert,
-  Users
-} from 'lucide-react';
+import { Wrench } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const maintenanceSection: NavSection = {
   section: 'MAINTENANCE',
   sectionId: 'maintenance',
-  isCollapsible: true,
+  isCollapsible: false,
   items: [
     {
       to: '/maintenance',
-      icon: LayoutDashboard,
-      label: 'Dashboard',
-      shortLabel: 'Dash',
+      icon: Wrench,
+      label: 'Maintenance',
+      shortLabel: 'Maint',
       permissions: [],
       rbacKey: 'maintenance.main',
-    },
-    {
-      to: '/maintenance/tickets',
-      icon: Wrench,
-      label: 'Work Orders',
-      shortLabel: 'Orders',
-      permissions: [],
-      rbacKey: 'maintenance.tickets',
-    },
-    {
-      to: '/maintenance/teams',
-      icon: Users,
-      label: 'Teams',
-      shortLabel: 'Teams',
-      permissions: [],
-      rbacKey: 'maintenance',
-    },
-    {
-      to: '/maintenance/data-sync',
-      icon: Database,
-      label: 'Data Sync',
-      shortLabel: 'Sync',
-      permissions: [],
-      rbacKey: 'maintenance',
-    },
-    {
-      to: '/maintenance/escalations',
-      icon: AlertTriangle,
-      label: 'Escalations',
-      shortLabel: 'Escal',
-      permissions: [],
-      rbacKey: 'maintenance.escalations',
-    },
-    {
-      to: '/maintenance/handover',
-      icon: ArrowRightLeft,
-      label: 'Handover Center',
-      shortLabel: 'Handover',
-      permissions: [],
-      rbacKey: 'maintenance',
-    },
-    {
-      to: '/maintenance/risks',
-      icon: ShieldAlert,
-      label: 'Risk Acceptance',
-      shortLabel: 'Risks',
-      permissions: [],
-      rbacKey: 'maintenance',
     },
   ]
 };

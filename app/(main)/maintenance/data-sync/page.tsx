@@ -1,8 +1,8 @@
 /**
  * Data Sync Page (Server Component Wrapper)
  *
- * Combined page for QContact Sync and Weekly Import with tabs.
- * The dynamic export forces dynamic rendering to avoid prerendering issues with Clerk.
+ * This is a Server Component that wraps the client-side DataSyncPageClient.
+ * The dynamic export forces dynamic rendering to avoid prerendering issues.
  */
 
 export const dynamic = 'force-dynamic';

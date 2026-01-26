@@ -3,7 +3,7 @@
 /**
  * Risk Acceptance Review Page Client Component
  *
- * 🟢 WORKING: Manages QA risk acceptances and conditional approvals
+ * 🟢 WORKING: Manages QA risk acceptances using ModulePage for consistent tab navigation
  *
  * Features:
  * - Active risk acceptances list
@@ -14,6 +14,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { ModulePage } from '@/components/module-page';
+import { maintenanceConfig } from '@/modules/navigation';
 import { AlertTriangle, Clock, CheckCircle, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
 import { RiskAcceptanceStatus } from '@/modules/maintenance/types/riskAcceptance';
 
@@ -155,26 +157,22 @@ export default function RiskAcceptanceReviewPageClient() {
     }
   };
 
-  return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Risk Acceptance Review</h1>
-          <p className="text-[var(--ff-text-secondary)]">
-            Track and manage conditional QA approvals and risk acceptances
-          </p>
-        </div>
-        <button
-          onClick={fetchRisks}
-          disabled={isLoading}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
+  // Header actions for ModulePage
+  const headerActions = (
+    <button
+      onClick={fetchRisks}
+      disabled={isLoading}
+      className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
+    >
+      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+      Refresh
+    </button>
+  );
 
-      {/* Filter Tabs with Counts */}
+  return (
+    <ModulePage config={maintenanceConfig} headerActions={headerActions}>
+      <div className="flex flex-col h-full">
+        {/* Filter Tabs with Counts */}
       <div className="mb-6 flex gap-2 border-b border-[var(--ff-border-light)]">
         <button
           onClick={() => setFilter('active')}
@@ -358,6 +356,7 @@ export default function RiskAcceptanceReviewPageClient() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </ModulePage>
   );
 }

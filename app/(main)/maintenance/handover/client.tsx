@@ -3,7 +3,7 @@
 /**
  * Handover Center Page Client Component
  *
- * 🟢 WORKING: Manages ticket handover process between teams
+ * 🟢 WORKING: Manages ticket handover process between teams using ModulePage for consistent tab navigation
  *
  * Features:
  * - Tickets pending handover (Build → QA, QA → Maintenance)
@@ -13,6 +13,8 @@
  * - Handover history and audit trail
  */
 
+import { ModulePage } from '@/components/module-page';
+import { maintenanceConfig } from '@/modules/navigation';
 import { HandoverWizard } from '@/modules/maintenance/components/Handover/HandoverWizard';
 import { HandoverHistory } from '@/modules/maintenance/components/Handover/HandoverHistory';
 import { useState, useEffect, useCallback } from 'react';
@@ -164,28 +166,22 @@ export default function HandoverCenterPageClient() {
     }
   };
 
-  return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Handover Center</h1>
-          <p className="text-[var(--ff-text-secondary)]">
-            Manage ticket handovers between Build, QA, and Maintenance teams
-          </p>
-        </div>
-        {viewMode === 'pending' && (
-          <button
-            onClick={fetchPendingHandovers}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        )}
-      </div>
+  // Header actions for ModulePage
+  const headerActions = viewMode === 'pending' ? (
+    <button
+      onClick={fetchPendingHandovers}
+      disabled={isLoading}
+      className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
+    >
+      <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+      Refresh
+    </button>
+  ) : null;
 
-      {/* View Mode Toggle */}
+  return (
+    <ModulePage config={maintenanceConfig} headerActions={headerActions}>
+      <div className="flex flex-col h-full">
+        {/* View Mode Toggle */}
       <div className="mb-6 flex gap-2 border-b border-[var(--ff-border-light)]">
         <button
           onClick={() => setViewMode('pending')}
@@ -526,6 +522,7 @@ export default function HandoverCenterPageClient() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </ModulePage>
   );
 }
