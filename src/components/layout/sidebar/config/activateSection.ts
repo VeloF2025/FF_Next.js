@@ -1,31 +1,23 @@
 /**
  * Activate section configuration
- * Top-level section for DR photo QA and activation management
+ * Single entry point - all navigation handled via horizontal tabs
  */
 
-import { LayoutDashboard, ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const activateSection: NavSection = {
   section: 'ACTIVATE',
   sectionId: 'activate',
-  isCollapsible: true,
+  isCollapsible: false,
   items: [
     {
       to: '/activate',
-      icon: LayoutDashboard,
-      label: 'Dashboard',
-      shortLabel: 'Dash',
-      permissions: [],
-      rbacKey: 'activate.main',
-    },
-    {
-      to: '/activate/qa-centre',
       icon: ClipboardCheck,
-      label: 'QA Centre',
-      shortLabel: 'QA',
+      label: 'Activate',
+      shortLabel: 'Activate',
       permissions: [],
-      rbacKey: 'activate.qa-centre',
+      rbacKey: 'activate',
     },
   ],
 };

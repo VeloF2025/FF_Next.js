@@ -5,7 +5,6 @@
 
 export const dynamic = 'force-dynamic';
 
-import { Suspense } from 'react';
 import Link from 'next/link';
 import {
   Package,
@@ -16,6 +15,7 @@ import {
   ArrowRight,
   Plus
 } from 'lucide-react';
+import AssetsClient from './client';
 
 async function getDashboardStats() {
   try {
@@ -73,6 +73,7 @@ export default async function AssetDashboardPage() {
   const stats = await getDashboardStats();
 
   return (
+    <AssetsClient>
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
@@ -218,5 +219,6 @@ export default async function AssetDashboardPage() {
         </div>
       </div>
     </div>
+    </AssetsClient>
   );
 }

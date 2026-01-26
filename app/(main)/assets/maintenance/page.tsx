@@ -14,6 +14,7 @@ import {
   CheckCircle,
   Clock,
 } from 'lucide-react';
+import AssetsClient from '../client';
 
 interface MaintenanceRecord {
   id: string;
@@ -85,6 +86,7 @@ export default async function MaintenancePage() {
   ]);
 
   return (
+    <AssetsClient>
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
@@ -238,5 +240,6 @@ export default async function MaintenancePage() {
         </div>
       </div>
     </div>
+    </AssetsClient>
   );
 }

@@ -46,4 +46,7 @@ export {
   getActiveSubTabByPath,
   maintenanceConfig,
   fleetConfig,
+  assetsConfig,
+  procurementConfig,
+  activateConfig,
 } from './config';

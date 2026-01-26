@@ -7,6 +7,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { Plus, Loader2 } from 'lucide-react';
 import { AssetListClient } from './AssetListClient';
+import AssetsClient from '../client';
 
 function AssetListLoading() {
   return (
@@ -18,24 +19,26 @@ function AssetListLoading() {
 
 export default async function AssetsListPage() {
   return (
-    <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assets</h1>
-          <p className="text-gray-600">Manage all company assets</p>
+    <AssetsClient>
+      <div className="p-6">
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Assets</h1>
+            <p className="text-gray-600">Manage all company assets</p>
+          </div>
+          <Link
+            href="/assets/new"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Add Asset
+          </Link>
         </div>
-        <Link
-          href="/assets/new"
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Add Asset
-        </Link>
-      </div>
 
-      <Suspense fallback={<AssetListLoading />}>
-        <AssetListClient />
-      </Suspense>
-    </div>
+        <Suspense fallback={<AssetListLoading />}>
+          <AssetListClient />
+        </Suspense>
+      </div>
+    </AssetsClient>
   );
 }

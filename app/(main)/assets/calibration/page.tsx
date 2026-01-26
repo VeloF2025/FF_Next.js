@@ -15,6 +15,7 @@ import {
   Clock,
   FileText,
 } from 'lucide-react';
+import AssetsClient from '../client';
 
 interface CalibrationRecord {
   id: string;
@@ -105,6 +106,7 @@ export default async function CalibrationPage() {
   const neverCalibrated = assets.filter((a) => getCalibrationStatus(a).status === 'never');
 
   return (
+    <AssetsClient>
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
@@ -378,5 +380,6 @@ export default async function CalibrationPage() {
         </div>
       </div>
     </div>
+    </AssetsClient>
   );
 }

@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { CheckoutClient } from './CheckoutClient';
+import AssetsClient from '../client';
 
 interface PageProps {
   searchParams: Promise<{ assetId?: string }>;
@@ -68,25 +69,27 @@ export default async function CheckoutPage({ searchParams }: PageProps) {
   ]);
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <Link
-          href="/assets/list"
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Assets
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Check Out Asset</h1>
-        <p className="text-gray-600">Assign an asset to a staff member, project, or vehicle</p>
-      </div>
+    <AssetsClient>
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="mb-6">
+          <Link
+            href="/assets/list"
+            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Assets
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Check Out Asset</h1>
+          <p className="text-gray-600">Assign an asset to a staff member, project, or vehicle</p>
+        </div>
 
-      <CheckoutClient
-        assets={assets}
-        preselectedAssetId={assetId}
-        staffMembers={staffMembers}
-        projects={projects}
-      />
-    </div>
+        <CheckoutClient
+          assets={assets}
+          preselectedAssetId={assetId}
+          staffMembers={staffMembers}
+          projects={projects}
+        />
+      </div>
+    </AssetsClient>
   );
 }
