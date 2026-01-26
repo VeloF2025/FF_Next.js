@@ -13,12 +13,14 @@
  * 🟢 WORKING: Dashboard page integrates TicketingDashboard component
  */
 
+import { ModulePage } from '@/components/module-page';
+import { maintenanceConfig } from '@/modules/navigation';
 import { TicketingDashboard } from '@/modules/maintenance/components/Dashboard/TicketingDashboard';
 
 export default function TicketingPageClient() {
   return (
-    <div className="p-6">
+    <ModulePage config={maintenanceConfig}>
       <TicketingDashboard />
-    </div>
+    </ModulePage>
   );
 }
