@@ -9,7 +9,7 @@
  * 4. Appropriate form opens for selected action
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import toast from 'react-hot-toast';
@@ -37,9 +37,9 @@ import {
   History,
   Clock,
   ExternalLink,
-  Settings2,
+  LogOut,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePortalSession } from '@/modules/fleet/portal';
 import { VehicleCalibrationModal } from '@/modules/fleet/check-in/components/VehicleCalibrationModal';
 
 // Types
@@ -100,7 +100,15 @@ interface FuelFormData {
 
 export default function VehiclePortalPage() {
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const {
+    session,
+    vehicle: portalVehicle,
+    driver: portalDriver,
+    isLoading: sessionLoading,
+    isAuthenticated,
+    authenticateWithPlate,
+    logout,
+  } = usePortalSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,9 +120,31 @@ export default function VehiclePortalPage() {
   const [verificationResult, setVerificationResult] = useState<PlateVerificationResult | null>(null);
   const [verifiedVehicle, setVerifiedVehicle] = useState<Vehicle | null>(null);
 
+  // When already authenticated (session exists), skip to verified step
+  useEffect(() => {
+    if (isAuthenticated && portalVehicle && !verifiedVehicle) {
+      // Map portal vehicle to local Vehicle type
+      setVerifiedVehicle({
+        id: portalVehicle.id,
+        registration: portalVehicle.registration,
+        make: portalVehicle.make,
+        model: portalVehicle.model,
+        year: portalVehicle.year,
+        vehicleType: portalVehicle.vehicleType,
+        color: portalVehicle.color,
+        assignedStaffName: portalVehicle.assignedDriver?.name || null,
+        assignedDriver: portalVehicle.assignedDriver,
+        lastOdometer: portalVehicle.lastOdometer,
+        lastFuel: portalVehicle.lastFuel,
+        lastCheckIn: portalVehicle.lastCheckIn,
+      });
+      setStep('verified');
+    }
+  }, [isAuthenticated, portalVehicle, verifiedVehicle]);
+
   // Fuel form state
   const [fuelForm, setFuelForm] = useState<FuelFormData>({
-    transactionDate: new Date().toISOString().split('T')[0],
+    transactionDate: new Date().toISOString().split('T')[0] || '',
     amountRand: '',
     litres: '',
     pricePerLitre: '',
@@ -172,8 +202,8 @@ export default function VehiclePortalPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...calibration,
-          calibratedByName: currentUser?.fullName || 'Unknown Driver',
-          calibratedById: currentUser?.staffId,
+          calibratedByName: session?.driverName || 'Unknown Driver',
+          calibratedById: session?.driverId,
         }),
       });
 
@@ -190,59 +220,86 @@ export default function VehiclePortalPage() {
     }
   };
 
-  // Handle plate photo capture
+  // Handle plate photo capture - this IS the login
   const handlePlateCapture = useCallback(async (file: File) => {
     setPlatePhotoFile(file);
     const previewUrl = URL.createObjectURL(file);
     setPlatePhotoUrl(previewUrl);
 
-    // Start verification
+    // Start verification/authentication
     setVerifying(true);
     try {
       // Convert to base64
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
+        const base64 = (reader.result as string).split(',')[1] || '';
 
-        // Call VLM to verify plate
-        const response = await fetch('/api/fleet/portal/verify-plate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ platePhotoBase64: base64 }),
+        // Call plate-auth API - this creates a session (no password needed!)
+        const result = await authenticateWithPlate(base64);
+
+        setVerificationResult({
+          success: result.success,
+          extractedPlate: result.extractedPlate,
+          confidence: result.confidence,
+          vehicle: result.vehicle ? {
+            id: result.vehicle.id,
+            registration: result.vehicle.registration,
+            make: result.vehicle.make,
+            model: result.vehicle.model,
+            year: result.vehicle.year,
+            vehicleType: result.vehicle.vehicleType,
+            color: result.vehicle.color,
+            assignedStaffName: result.vehicle.assignedDriver?.name || null,
+            assignedDriver: result.vehicle.assignedDriver,
+            lastOdometer: result.vehicle.lastOdometer,
+            lastFuel: result.vehicle.lastFuel,
+            lastCheckIn: result.vehicle.lastCheckIn,
+          } : null,
+          error: result.error,
         });
 
-        const data = await response.json();
-
-        if (response.ok && data.data) {
-          setVerificationResult(data.data);
-          if (data.data.success && data.data.vehicle) {
-            setVerifiedVehicle(data.data.vehicle);
-            setStep('verified');
-            toast.success(`Vehicle verified: ${data.data.vehicle.registration}`);
-          } else {
-            toast.error(data.data.error || 'Could not verify plate');
-          }
+        if (result.success && result.vehicle) {
+          setVerifiedVehicle({
+            id: result.vehicle.id,
+            registration: result.vehicle.registration,
+            make: result.vehicle.make,
+            model: result.vehicle.model,
+            year: result.vehicle.year,
+            vehicleType: result.vehicle.vehicleType,
+            color: result.vehicle.color,
+            assignedStaffName: result.vehicle.assignedDriver?.name || null,
+            assignedDriver: result.vehicle.assignedDriver,
+            lastOdometer: result.vehicle.lastOdometer,
+            lastFuel: result.vehicle.lastFuel,
+            lastCheckIn: result.vehicle.lastCheckIn,
+          });
+          setStep('verified');
+          toast.success(`Logged in: ${result.vehicle.registration}`);
         } else {
-          toast.error(data.error || 'Verification failed');
+          toast.error(result.error || 'Could not verify plate');
         }
+
+        setVerifying(false);
       };
       reader.readAsDataURL(file);
     } catch (err) {
       toast.error('Failed to verify plate');
-    } finally {
       setVerifying(false);
     }
-  }, []);
+  }, [authenticateWithPlate]);
 
-  // Reset and try again
+  // Reset and try again (logout)
   const handleReset = () => {
+    // Clear portal session
+    logout();
+
     setStep('capture');
     setPlatePhotoUrl(null);
     setPlatePhotoFile(null);
     setVerificationResult(null);
     setVerifiedVehicle(null);
     setFuelForm({
-      transactionDate: new Date().toISOString().split('T')[0],
+      transactionDate: new Date().toISOString().split('T')[0] || '',
       amountRand: '',
       litres: '',
       pricePerLitre: '',
@@ -419,25 +476,36 @@ export default function VehiclePortalPage() {
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                   Vehicle Portal
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {currentUser?.displayName || 'Driver'}
-                </p>
+                {isAuthenticated && session && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {session.driverName || session.vehicleRegistration}
+                  </p>
+                )}
               </div>
             </div>
             {step !== 'capture' && (
               <button
                 onClick={handleReset}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex items-center gap-2"
+                title="Logout / Switch Vehicle"
               >
-                <RefreshCw className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               </button>
             )}
           </div>
         </div>
 
         <div className="max-w-lg mx-auto px-4 py-6">
+          {/* Loading state - checking for existing session */}
+          {sessionLoading && step === 'capture' && (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Checking session...</p>
+            </div>
+          )}
+
           {/* Step 1: Capture Plate */}
-          {step === 'capture' && (
+          {!sessionLoading && step === 'capture' && (
             <div className="space-y-6">
               <div className="text-center">
                 <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -807,7 +875,7 @@ export default function VehiclePortalPage() {
               vehicleRegistration={verifiedVehicle.registration}
               vehicleMake={verifiedVehicle.make || undefined}
               vehicleModel={verifiedVehicle.model || undefined}
-              driverName={currentUser?.fullName || 'Unknown Driver'}
+              driverName={session?.driverName || 'Unknown Driver'}
             />
           )}
 

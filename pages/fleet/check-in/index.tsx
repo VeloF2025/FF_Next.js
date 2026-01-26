@@ -8,6 +8,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Car, Loader2, Search, AlertTriangle, CheckCircle, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePortalSession } from '@/modules/fleet/portal';
 import { AppLayout } from '@/components/layout';
 import { CheckInForm } from '@/modules/fleet/check-in/components/CheckInForm';
 import { CheckInSummary } from '@/modules/fleet/check-in/components/CheckInSummary';
@@ -26,11 +27,13 @@ type PageState = 'select-vehicle' | 'check-in' | 'complete';
 export default function CheckInPage() {
   const router = useRouter();
   const { currentUser } = useAuth();
+  const { session: portalSession } = usePortalSession();
 
   // URL params - vehicle pre-selected from portal
   const urlVehicleId = router.query.vehicleId as string | undefined;
   const urlCheckType = router.query.type as CheckType | undefined;
-  const isVehicleLocked = Boolean(urlVehicleId); // Lock selection when coming from portal
+  const isFromPortal = Boolean(urlVehicleId); // Coming from portal with pre-selected vehicle
+  const isVehicleLocked = isFromPortal; // Lock selection when coming from portal
 
   const [pageState, setPageState] = useState<PageState>('select-vehicle');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -149,9 +152,13 @@ export default function CheckInPage() {
     (v.model && v.model.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Get driver info
-  const driverId = currentUser?.id || '';
-  const driverName = currentUser?.displayName || 'Unknown Driver';
+  // Get driver info - prioritize portal session (plate-based auth) over traditional auth
+  const driverId = (isFromPortal && portalSession?.driverId)
+    ? portalSession.driverId
+    : currentUser?.id || '';
+  const driverName = (isFromPortal && portalSession?.driverName)
+    ? portalSession.driverName
+    : currentUser?.displayName || 'Unknown Driver';
 
   return (
     <>
