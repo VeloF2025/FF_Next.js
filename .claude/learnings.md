@@ -447,6 +447,8 @@ items: [
 
 **Affected Areas:** All modules being migrated to tab-based navigation. Current status:
 - [x] Maintenance - Completed (2026-01-26)
+- [x] Activate - Completed (2026-01-26) - Dashboard, QA Centre, Reports tabs
+- [x] Assets - Completed (2026-01-26)
 - [ ] Procurement - Pending
 - [ ] Fleet - Pending
 - [ ] Projects - Pending
@@ -694,3 +696,175 @@ JOIN projects p ON mt.project_id::text = p.id::text
 - `rfqs.project_id` - VARCHAR
 
 **Best Practice:** When creating views that join across multiple tables, always cast to `::text` for safety.
+
+---
+
+## 2026-01-26: CSS Variables Pattern for Component Styling
+
+**Issue:** Components using hardcoded Tailwind dark mode classes (`bg-white dark:bg-gray-800`) created inconsistency when the design system evolved.
+
+**Root Cause:** Hardcoded color values scattered across components make theme changes difficult and create visual inconsistencies.
+
+**Bad Pattern:**
+```tsx
+// ❌ Hardcoded dark mode classes - hard to maintain
+<div className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+  <span className="text-gray-900 dark:text-white">Primary</span>
+  <span className="text-gray-600 dark:text-gray-400">Secondary</span>
+</div>
+```
+
+**Good Pattern:**
+```tsx
+// ✅ CSS variables - centralized theme control
+<div className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
+  <span className="text-[var(--ff-text-primary)]">Primary</span>
+  <span className="text-[var(--ff-text-secondary)]">Secondary</span>
+</div>
+```
+
+**FibreFlow CSS Variables:**
+| Variable | Light Mode | Dark Mode | Usage |
+|----------|------------|-----------|-------|
+| `--ff-bg-primary` | white | gray-900 | Page background |
+| `--ff-bg-secondary` | white | gray-800 | Card backgrounds |
+| `--ff-bg-tertiary` | gray-50 | gray-900/50 | Nested backgrounds, table headers |
+| `--ff-text-primary` | gray-900 | white | Headings, main text |
+| `--ff-text-secondary` | gray-600 | gray-400 | Labels, descriptions |
+| `--ff-text-tertiary` | gray-400 | gray-500 | Muted text, placeholders |
+| `--ff-border-light` | gray-200 | gray-700 | Card borders, dividers |
+| `--ff-primary-500` | blue-600 | blue-500 | Primary actions, links |
+
+**When to Keep Semantic Colors:**
+Status indicators should stay as Tailwind classes (not CSS variables):
+- `text-blue-500` - Installed count
+- `text-purple-500` - Activated count
+- `text-yellow-500` - Pending/Warning
+- `text-green-500` - Success/Reviewed
+- `text-red-500` - Error/Failed
+
+**Reference:**
+- Commit: `2645549f` - fix(activate): update DrListPage styling to match UI theme spec
+- File: `src/modules/activate/components/DrListPage.tsx`
+
+---
+
+## 2026-01-26: ModulePage Content Wrapper Pattern
+
+**Issue:** Double padding when components wrap their own content in padded containers, but ModulePage already provides `p-6` padding.
+
+**Root Cause:** Content components were designed before ModulePage existed, and had their own outer padding/background.
+
+**Bad Pattern:**
+```tsx
+// ❌ Component has its own padding - creates double padding inside ModulePage
+function MyComponent() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* content */}
+      </div>
+    </div>
+  );
+}
+```
+
+**Good Pattern:**
+```tsx
+// ✅ Component uses space-y-6 for internal spacing only
+function MyComponent() {
+  return (
+    <div className="space-y-6">
+      {/* ModulePage provides p-6 padding, bg comes from layout */}
+      <Card>...</Card>
+      <Card>...</Card>
+    </div>
+  );
+}
+```
+
+**ModulePage Structure:**
+```tsx
+<ModulePage config={moduleConfig}>
+  {/* Header with icon, title, description */}
+  {/* Tab navigation with px-6 */}
+  <div className="p-6">  {/* Content area - padding provided here */}
+    {children}           {/* Your component goes here - NO outer padding needed */}
+  </div>
+</ModulePage>
+```
+
+**Checklist When Converting to ModulePage:**
+1. Remove outer `min-h-screen bg-* p-*` wrapper
+2. Remove `max-w-7xl mx-auto` container (unless specifically needed)
+3. Use `space-y-6` for vertical spacing between sections
+4. Keep card/section backgrounds (`bg-[var(--ff-bg-secondary)]`)
+
+**Reference:**
+- Component: `src/components/module-page/ModulePage.tsx`
+- Example: `src/modules/activate/components/DrListPage.tsx`
+
+---
+
+## 2026-01-26: Route Restructuring with Redirect Pages
+
+**Context:** FibreFlow is consolidating project-related modules under `/projects/` namespace for cleaner URL structure.
+
+**Pattern:** Old routes become simple redirect pages, new routes contain the actual content.
+
+**Redirect Page Pattern:**
+```tsx
+// pages/health-safety/index.tsx (OLD location - now a redirect)
+import type { GetServerSideProps } from 'next';
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  return {
+    redirect: {
+      destination: '/projects/health-safety',
+      permanent: true,  // 301 redirect for SEO
+    },
+  };
+};
+
+export default function RedirectPage() {
+  return null;  // Never rendered
+}
+```
+
+**New Page Location:**
+```tsx
+// pages/projects/health-safety/index.tsx (NEW location)
+import { HealthSafetyDashboard } from '@/modules/health-safety/components';
+
+export default function HealthSafetyPage() {
+  return <HealthSafetyDashboard />;
+}
+```
+
+**Route Restructuring Map:**
+| Old Route | New Route | Status |
+|-----------|-----------|--------|
+| `/health-safety/*` | `/projects/health-safety/*` | ✅ Completed |
+| `/pipeline/*` | `/projects/pipeline/*` | ✅ Completed |
+| `/daily-progress` | `/projects/progress` | ✅ Completed |
+| `/tasks` | `/projects/tasks` | ✅ Completed |
+
+**Benefits:**
+1. **SEO Friendly** - 301 redirects preserve link juice
+2. **Backwards Compatible** - Old bookmarks/links still work
+3. **Clean Namespace** - Related modules grouped under `/projects/`
+4. **Gradual Migration** - Can migrate one module at a time
+
+**Sidebar Update:**
+When restructuring routes, update sidebar config to point to new locations:
+```typescript
+// src/components/layout/sidebar/config/projectSection.ts
+items: [
+  { to: '/projects/health-safety', label: 'Health & Safety' },  // Not /health-safety
+  { to: '/projects/pipeline', label: 'Pipeline' },              // Not /pipeline
+]
+```
+
+**Reference:**
+- Commit: `4268067f` - refactor(routes): move Health & Safety and Pipeline under /projects
+- Navigation Config: `src/modules/navigation/config/modules/projects.config.ts`
