@@ -204,11 +204,25 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
     }
 
     const row = result.rows[0];
+    let categorizations = row.vlm_categorization_results || [];
+    let status = row.vlm_categorization_status;
+
+    // Detect corrupted results: status is 'categorized' but results are empty objects
+    // This happens when cron job stored data with wrong property names
+    if (
+      (status === 'categorized' || status === 'approved') &&
+      categorizations.length > 0 &&
+      categorizations.every((c: Record<string, unknown>) => !c.vlm_predicted_step && !c.photo_filename)
+    ) {
+      log.warn('CategorizePhotos', `Detected corrupted VLM results for ${dropNumber}, resetting to pending`);
+      status = 'pending';
+      categorizations = [];
+    }
 
     return apiResponse.success(res, {
       dropNumber,
-      status: row.vlm_categorization_status,
-      categorizations: row.vlm_categorization_results || [],
+      status,
+      categorizations,
       categorizedAt: row.vlm_categorized_at,
       approvedBy: row.vlm_approved_by,
       approvedAt: row.vlm_approved_at,

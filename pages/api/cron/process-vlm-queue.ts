@@ -116,46 +116,27 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
     if (dr.vlm_categorization_status !== 'categorized' && dr.vlm_categorization_status !== 'approved') {
       log.info('ProcessVlmQueue', `Categorizing photos for ${dropNumber}`);
 
-      // Prepare photos for categorization
-      const photoInputs: PhotoInput[] = [];
-      for (const photo of photos) {
-        try {
-          // Fetch photo from OneMap
-          const photoUrl = `${ONEMAP_HOST}/api/photo/${dropNumber}/${photo.filename}`;
-          const photoResponse = await fetch(photoUrl, {
-            signal: AbortSignal.timeout(10000),
-          });
-
-          if (photoResponse.ok) {
-            const buffer = await photoResponse.arrayBuffer();
-            const base64 = Buffer.from(buffer).toString('base64');
-            const contentType = photoResponse.headers.get('content-type') || 'image/jpeg';
-
-            photoInputs.push({
-              filename: photo.filename,
-              base64,
-              mimeType: contentType,
-            });
-          }
-        } catch (e) {
-          log.warn('ProcessVlmQueue', `Failed to fetch photo ${photo.filename}: ${e}`);
-        }
-      }
+      // Prepare photos for categorization - pass URLs, categorizePhotos will fetch them
+      const photoInputs: PhotoInput[] = photos.map((photo) => ({
+        filename: photo.filename,
+        url: `${ONEMAP_HOST}/api/photo/${dropNumber}/${photo.filename}`,
+        original_type: null,
+        original_step: photo.step ?? null,
+      }));
 
       if (photoInputs.length > 0) {
         // Run VLM categorization
         const catResult = await categorizePhotos(dropNumber, photoInputs);
-        categorization = catResult.map((r) => ({
-          photo_filename: r.filename,
-          vlm_predicted_step: r.predictedStep,
-          vlm_confidence: r.confidence,
-        }));
 
-        // Save categorization results
+        // Store the full VlmCategorizationResult objects (use correct property names!)
+        categorization = catResult;
+
+        // Save categorization results with proper timestamp
         await pool.query(
           `UPDATE dr_photo_unified_reviews
            SET vlm_categorization_status = 'categorized',
                vlm_categorization_results = $1,
+               vlm_categorized_at = NOW(),
                updated_at = NOW()
            WHERE drop_number = $2`,
           [JSON.stringify(categorization), dropNumber]
