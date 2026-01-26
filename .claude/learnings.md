@@ -356,3 +356,123 @@ items: [
 - [ ] Fleet - Pending
 - [ ] Projects - Pending
 - [ ] HR/Staff - Pending
+
+---
+
+## 2026-01-26: API Response Structure Must Match Component Expectations
+
+**Issue:** `Cannot read properties of undefined (reading 'filter')` when clicking the Team tab on Project Detail page.
+
+**Root Cause:** The API returned a flat array but the component expected a structured object with `members`, `stats`, and `primaryManager` properties.
+
+**Bad Pattern (API):**
+```typescript
+// ❌ Returns flat array - component will crash trying to access .members
+const response = teamMembers.map(member => ({...}));
+return apiResponse.success(res, response);
+```
+
+**Good Pattern (API):**
+```typescript
+// ✅ Returns structured object matching component expectations
+const members = teamMembers.map(member => ({...}));
+const primaryManager = members.find(m => m.is_primary) || null;
+const stats = {
+  staff: members.filter(m => m.person_type === 'staff').length,
+  contractors: members.filter(m => m.person_type === 'contractor').length,
+  total: members.length,
+};
+return apiResponse.success(res, { primaryManager, members, stats });
+```
+
+**Component Defensive Pattern:**
+```typescript
+// ✅ Always add defensive null checks even when API should return correct structure
+const members = teamData.members || [];
+const stats = teamData.stats || { staff: 0, contractors: 0, total: 0 };
+const filteredMembers = members.filter(m => ...);
+```
+
+**Key Learnings:**
+1. **Document API response shape** in component interfaces
+2. **Add defensive defaults** for all nested properties
+3. **Test API responses** before building UI components
+4. **Match snake_case vs camelCase** - be consistent (this codebase uses snake_case for DB fields)
+
+**Affected Areas:** All new tab components that consume project APIs:
+- `ProjectTeamTab.tsx` - uses `/api/projects/[projectId]/team`
+- `ProjectProcurementTab.tsx` - uses `/api/projects/[projectId]/procurement-summary`
+- `ProjectMaintenanceTab.tsx` - uses `/api/projects/[projectId]/maintenance-summary`
+
+---
+
+## 2026-01-26: Project Hub Database Views
+
+**Context:** Sprint 1 created two database views for unified project data:
+
+**v_project_team View:**
+```sql
+-- Unified staff + contractors for a project
+SELECT
+  sp.project_id,
+  sp.staff_id::text as person_id,
+  'staff' as person_type,
+  COALESCE(s.first_name || ' ' || s.last_name, 'Unknown') as name,
+  s.email, s.phone, sp.role,
+  sp.is_active, sp.is_primary
+FROM staff_projects sp
+JOIN staff s ON s.id = sp.staff_id
+UNION ALL
+SELECT
+  cp.project_id,
+  cp.contractor_id::text as person_id,
+  'contractor' as person_type,
+  c.company_name as name,
+  c.email, c.phone, cp.role,
+  cp.is_active, cp.is_primary_contractor as is_primary
+FROM contractor_projects cp
+JOIN contractors c ON c.id = cp.contractor_id;
+```
+
+**PM Tracking Pattern:**
+- Old: `projects.project_manager` (UUID to staff)
+- New: `staff_projects.is_primary` (boolean flag)
+
+Benefits:
+- Single source of truth in junction table
+- Supports multiple PMs per project if needed
+- Works with unified team view
+
+**Migration Reference:**
+- Migration: `scripts/migrations/130_system_integration.sql`
+- PM Migration: `scripts/migrations/run-pm-migration.js`
+
+---
+
+## 2026-01-26: Type Casting in PostgreSQL JOINs
+
+**Issue:** `operator does not exist: text = uuid` or `operator does not exist: character varying = uuid` when joining tables with mismatched ID column types.
+
+**Root Cause:** Some tables store `project_id` as UUID, others as TEXT or VARCHAR. PostgreSQL requires explicit casting.
+
+**Bad Pattern:**
+```sql
+-- ❌ Fails if maintenance_tickets.project_id is TEXT but projects.id is UUID
+SELECT * FROM maintenance_tickets mt
+JOIN projects p ON mt.project_id = p.id
+```
+
+**Good Pattern:**
+```sql
+-- ✅ Cast both sides to text for safe comparison
+SELECT * FROM maintenance_tickets mt
+JOIN projects p ON mt.project_id::text = p.id::text
+```
+
+**Affected Tables (project_id column types):**
+- `projects.id` - UUID
+- `staff_projects.project_id` - UUID
+- `maintenance_tickets.project_id` - TEXT
+- `rfqs.project_id` - VARCHAR
+
+**Best Practice:** When creating views that join across multiple tables, always cast to `::text` for safety.
