@@ -484,6 +484,94 @@ J: Status, K: Latitude, L: Longitude, M: Current ONT RX, N: Team
 
 ---
 
+## 2026-01-26: Excel Import Validation Pattern
+
+**Context:** All Excel imports (OES, ARCH, OLT Report) now have format validation to detect column misalignment before data corruption occurs.
+
+**Validation Pattern:**
+
+```typescript
+// 1. Define expected headers
+const EXPECTED_HEADERS = ['Drop Number', 'Serial Number', 'Status', 'Team'];
+
+// 2. Validate headers at key positions
+function validateHeaders(headers: string[]): { valid: boolean; warnings: string[] } {
+  const warnings: string[] = [];
+
+  // Check column count
+  if (headers.length < 14) {
+    warnings.push(`Column count mismatch: expected 14, got ${headers.length}`);
+  }
+
+  // Check key header positions contain expected keywords
+  const expectedAt = { 0: 'drop', 9: 'status', 13: 'team' };
+  for (const [idx, keyword] of Object.entries(expectedAt)) {
+    if (!headers[+idx]?.toLowerCase().includes(keyword)) {
+      warnings.push(`Column ${idx}: expected "${keyword}", got "${headers[+idx]}"`);
+    }
+  }
+
+  return { valid: warnings.length === 0, warnings };
+}
+
+// 3. Validate data sample for alignment issues
+function validateDataSample(rows: Row[]): string[] {
+  const warnings: string[] = [];
+  const sampleSize = Math.min(10, rows.length);
+
+  let badStatusCount = 0;
+  for (let i = 0; i < sampleSize; i++) {
+    // Status should be text like "Active", not numeric like "-26.21"
+    if (!isNaN(parseFloat(rows[i].status))) badStatusCount++;
+  }
+
+  if (badStatusCount > sampleSize / 2) {
+    warnings.push(`⚠️ Status contains numeric values. Columns may be misaligned!`);
+  }
+
+  return warnings;
+}
+```
+
+**API Response Pattern:**
+```typescript
+return res.status(200).json({
+  success: true,
+  preview: rows,
+  totalRows: rows.length,
+  warnings: warnings.length > 0 ? warnings : undefined,
+  headerMismatch,
+});
+```
+
+**UI Display Pattern:**
+```tsx
+{formatWarnings.length > 0 && (
+  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded-lg p-4">
+    <AlertTriangle className="w-5 h-5 text-amber-600" />
+    <h4>Format Validation Warnings</h4>
+    <ul>
+      {formatWarnings.map((w, i) => <li key={i}>{w}</li>)}
+    </ul>
+  </div>
+)}
+```
+
+**Files with validation:**
+- `pages/api/activate/import-oes.ts` - OES Import (14 columns)
+- `pages/api/activate/import-offline.ts` - ARCH Import (Summary/Audit formats)
+- `pages/api/system/olt-report/import.ts` - OLT Report (22+ columns)
+
+**Key Detection Patterns:**
+| Issue | Detection |
+|-------|-----------|
+| Column count changed | `headers.length !== expected` |
+| Column shifted | Numeric value in text field |
+| Wrong format | Missing expected keywords in headers |
+| Coordinate in text field | `/^-?\d+\.\d+$/` matches team/status |
+
+---
+
 ## 2026-01-26: Type Casting in PostgreSQL JOINs
 
 **Issue:** `operator does not exist: text = uuid` or `operator does not exist: character varying = uuid` when joining tables with mismatched ID column types.
