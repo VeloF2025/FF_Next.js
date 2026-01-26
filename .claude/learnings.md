@@ -4,6 +4,69 @@
 
 ---
 
+## 2026-01-26: Unified Architecture - Store Data During Processing, Not During Display
+
+**Issue:** Summary page was making live API calls to BOSS API (1Map) and querying maintenance_tickets table on every page view. This was:
+1. Slow (API calls add latency)
+2. Confusing (some data from DB, some from live API)
+3. Unreliable (API timeouts affect user experience)
+
+**Root Cause:** Architectural inconsistency where some DR data was stored in the unified table during processing, but contact info was fetched live during display.
+
+**Solution:** UNIFIED ARCHITECTURE - ALL DR data should be stored in `dr_photo_unified_reviews` during processing (in `process-new-dr.ts`), then display endpoints simply read from the unified table.
+
+**Migration 131 added these columns:**
+```sql
+-- Subscriber contact from 1Map
+subscriber_name, subscriber_phone, subscriber_email, subscriber_language
+
+-- QContact/Maintenance contact
+qcontact_name, qcontact_phone, qcontact_email
+
+-- Staff info from 1Map
+signup_agent, installer_name
+```
+
+**Pattern to follow:**
+```typescript
+// ✅ GOOD: Fetch and store during processing (process-new-dr.ts)
+const [subscriberContact, qContactInfo] = await Promise.all([
+  fetchSubscriberContact(dropNumber),  // BOSS API
+  fetchQContactInfo(dropNumber),       // maintenance_tickets
+]);
+
+await pool.query(`
+  INSERT INTO dr_photo_unified_reviews (
+    drop_number, subscriber_name, subscriber_phone, ...
+  ) VALUES ($1, $2, $3, ...)
+`, [dropNumber, subscriberContact?.subscriber_name, ...]);
+
+// ❌ BAD: Fetch live during display (summary.ts - OLD approach)
+const bossData = await fetchBossApiData(dropNumber);  // Live API call on every view
+```
+
+**Summary API now simply reads:**
+```typescript
+// ✅ GOOD: Read from unified table only
+const result = await pool.query(`
+  SELECT drop_number, subscriber_name, subscriber_phone, ...
+  FROM dr_photo_unified_reviews
+  WHERE drop_number = $1
+`, [dropNumber]);
+```
+
+**For existing DRs:** Run `node scripts/backfill-contact-info.js` to populate contact info for DRs processed before this change.
+
+**Key Principle:** The unified table (`dr_photo_unified_reviews`) is the single source of truth for DR data. All data should be stored there during processing, not fetched live during display.
+
+**Affected Files:**
+- `pages/api/activate/process-new-dr.ts` - Stores contact info
+- `pages/api/activate/summary.ts` - Reads from unified table only
+- `scripts/migrations/131_unified_contact_fields.sql` - Added columns
+- `scripts/backfill-contact-info.js` - Backfill for existing DRs
+
+---
+
 ## 2026-01-22: Use Dev Mode for Local Development
 
 **Issue:** Repeated `ChunkLoadError` and React error #423 when running production build locally (`npm run build && npm start`). After each rebuild, browser tries to load old cached chunk URLs that no longer exist.
