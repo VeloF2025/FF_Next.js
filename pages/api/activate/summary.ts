@@ -266,7 +266,7 @@ async function handler(
         [dropNumber]
       ),
 
-      // Maintenance tickets (QContact client info)
+      // Maintenance tickets (QContact client info) - uses dr_number column
       pool.query(
         `SELECT
            client_name,
@@ -274,7 +274,7 @@ async function handler(
            client_email,
            address
          FROM maintenance_tickets
-         WHERE drop_number = $1
+         WHERE dr_number = $1
          ORDER BY created_at DESC
          LIMIT 1`,
         [dropNumber]
