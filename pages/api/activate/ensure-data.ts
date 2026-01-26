@@ -19,6 +19,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
+import { logPhotosSynced } from '@/modules/activate/services/activityLogService';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -108,8 +109,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         [dropNumber]
       );
 
-      // Fetch data from OneMap
-      const fetchResult = await fetchAndUpdateFromOneMap(dropNumber);
+      // Fetch data from OneMap (new record, so previous count is 0)
+      const fetchResult = await fetchAndUpdateFromOneMap(dropNumber, 0);
 
       return apiResponse.success(res, {
         status: fetchResult.photoCount > 0 ? 'refreshed' : 'partial',
@@ -133,8 +134,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const hasOntSerial = !!existing.ont_serial_scanned;
     const hasUpsSerial = !!existing.ups_serial_scanned;
 
-    // Fast path: Data is complete and not forced refresh
-    if (!force && hasPhotos && (hasOntSerial || hasUpsSerial)) {
+    // Check if 1Map has more photos than we have in DB (even if data seems complete)
+    // This handles the case where photos were added to 1Map after initial sync
+    const oneMapCheck = await check1MapPhotoCount(dropNumber);
+    const needsPhotoSync = oneMapCheck.cloudCount > photoCount;
+
+    if (needsPhotoSync) {
+      log.info('EnsureData', `1Map has more photos for ${dropNumber}`, {
+        dbCount: photoCount,
+        cloudCount: oneMapCheck.cloudCount,
+        localCount: oneMapCheck.localCount,
+      });
+    }
+
+    // Fast path: Data is complete, not forced, and no new photos in 1Map
+    if (!force && !needsPhotoSync && hasPhotos && (hasOntSerial || hasUpsSerial)) {
       log.info('EnsureData', `Data complete for ${dropNumber}`, {
         photoCount,
         hasOntSerial,
@@ -154,15 +168,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       } as EnsureDataResponse);
     }
 
-    // 3. Data incomplete or force refresh - fetch from OneMap
+    // 3. Data incomplete, force refresh, or new photos available - fetch from OneMap
+    const refreshReason = force ? 'forced' : needsPhotoSync ? 'new_photos_available' : 'incomplete';
     log.info('EnsureData', `Refreshing data for ${dropNumber}`, {
-      reason: force ? 'forced' : 'incomplete',
+      reason: refreshReason,
       hasPhotos,
       hasOntSerial,
       hasUpsSerial,
+      needsPhotoSync,
     });
 
-    const fetchResult = await fetchAndUpdateFromOneMap(dropNumber);
+    const fetchResult = await fetchAndUpdateFromOneMap(dropNumber, photoCount);
 
     // Determine final status
     const finalHasPhotos = fetchResult.photoCount > 0;
@@ -197,9 +213,36 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 }
 
 /**
+ * Check how many photos 1Map has for this DR (cloud vs local)
+ */
+async function check1MapPhotoCount(dropNumber: string): Promise<{
+  cloudCount: number;
+  localCount: number;
+}> {
+  try {
+    const response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!response.ok) {
+      return { cloudCount: 0, localCount: 0 };
+    }
+
+    const data = await response.json();
+    return {
+      cloudCount: data.photo_count || 0,
+      localCount: data.local_photos?.length || 0,
+    };
+  } catch (error) {
+    log.warn('EnsureData', `Failed to check 1Map photo count for ${dropNumber}`, { error });
+    return { cloudCount: 0, localCount: 0 };
+  }
+}
+
+/**
  * Fetch data from OneMap and update unified table
  */
-async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
+async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: number = 0): Promise<{
   photoCount: number;
   ontSerial: string | null;
   upsSerial: string | null;
@@ -236,36 +279,34 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
     }
 
     const data = await response.json();
-    const localPhotos = data.local_photos || [];
+    let localPhotos = data.local_photos || [];
+    const cloudPhotoCount = data.photo_count || 0;
 
-    // If record exists but no local photos, try downloading
-    if (localPhotos.length === 0 && data.photo_count > 0) {
-      log.info('EnsureData', `Photos on cloud but not local for ${dropNumber}, triggering download`);
+    // If cloud has more photos than local, trigger download to get ALL photos
+    if (cloudPhotoCount > localPhotos.length) {
+      log.info('EnsureData', `Cloud has more photos than local for ${dropNumber}`, {
+        cloudCount: cloudPhotoCount,
+        localCount: localPhotos.length,
+      });
 
-      await fetch(`${BOSS_API_HOST}/api/download/${dropNumber}`, {
+      const downloadResponse = await fetch(`${BOSS_API_HOST}/api/download/${dropNumber}`, {
         method: 'POST',
-        signal: AbortSignal.timeout(15000),
+        signal: AbortSignal.timeout(60000), // 60s timeout for large downloads
       });
 
-      // Wait and retry
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      if (downloadResponse.ok) {
+        // Wait for photos to be processed
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
-      const retryResponse = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
-        signal: AbortSignal.timeout(10000),
-      });
+        // Retry fetch to get updated local_photos
+        const retryResponse = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
+          signal: AbortSignal.timeout(10000),
+        });
 
-      if (retryResponse.ok) {
-        const retryData = await retryResponse.json();
-        const retryPhotos = retryData.local_photos || [];
-
-        if (retryPhotos.length > 0) {
-          // Update with retried data
-          await updateUnifiedTable(dropNumber, retryPhotos, retryData.ont_barcode, retryData.ups_serial);
-          return {
-            photoCount: retryPhotos.length,
-            ontSerial: extractOntSerial(retryData.ont_barcode),
-            upsSerial: retryData.ups_serial || null,
-          };
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          localPhotos = retryData.local_photos || [];
+          log.info('EnsureData', `After download: ${localPhotos.length} local photos for ${dropNumber}`);
         }
       }
     }
@@ -273,8 +314,19 @@ async function fetchAndUpdateFromOneMap(dropNumber: string): Promise<{
     // Update unified table with fetched data
     await updateUnifiedTable(dropNumber, localPhotos, data.ont_barcode, data.ups_serial);
 
+    // Log photo sync event if photos were added
+    const newPhotoCount = localPhotos.length;
+    if (newPhotoCount > previousPhotoCount) {
+      try {
+        await logPhotosSynced(dropNumber, previousPhotoCount, newPhotoCount, '1Map', 'qa_wizard');
+        log.info('EnsureData', `Logged photo sync for ${dropNumber}: ${previousPhotoCount} → ${newPhotoCount}`);
+      } catch (logError) {
+        log.warn('EnsureData', `Failed to log photo sync for ${dropNumber}`, { error: logError });
+      }
+    }
+
     return {
-      photoCount: localPhotos.length,
+      photoCount: newPhotoCount,
       ontSerial: extractOntSerial(data.ont_barcode),
       upsSerial: data.ups_serial || null,
     };
@@ -313,6 +365,7 @@ async function updateUnifiedTable(
        photos_metadata = $2,
        ont_serial_scanned = COALESCE($3, ont_serial_scanned),
        ups_serial_scanned = COALESCE($4, ups_serial_scanned),
+       photos_fetched_at = COALESCE(photos_fetched_at, NOW()),
        updated_at = NOW()
      WHERE drop_number = $5`,
     [photos.length, JSON.stringify(photos), ontSerial, upsSerial, dropNumber]
@@ -348,7 +401,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   return handlePost(req, res);

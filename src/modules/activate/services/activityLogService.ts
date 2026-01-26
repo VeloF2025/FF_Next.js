@@ -33,6 +33,7 @@ export type ActivityEventType =
   | 'whatsapp_submitted'
   | 'dr_acknowledged'
   | 'photos_fetched'
+  | 'PHOTOS_SYNCED'
   | 'attribute_categorized'
   | 'vlm_qa_started'
   | 'vlm_qa_completed'
@@ -142,6 +143,11 @@ const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: string; i
     title: 'Photos Fetched',
     icon: '📷',
     iconColor: 'text-purple-500',
+  },
+  PHOTOS_SYNCED: {
+    title: 'Photos Synced',
+    icon: '🔄',
+    iconColor: 'text-blue-500',
   },
   attribute_categorized: {
     title: 'Photos Categorized',
@@ -357,6 +363,11 @@ export async function getActivityTimeline(
         break;
       case 'photos_fetched':
         description = `${data.count || 0} photos from ${data.source || 'OneMap'}`;
+        break;
+      case 'PHOTOS_SYNCED':
+        description = data.newPhotos
+          ? `Synced ${data.newPhotos} new photos (${data.previousCount || 0} → ${data.newCount || 0})`
+          : `${data.newCount || 0} photos synced from ${data.source || '1Map'}`;
         break;
       case 'attribute_categorized':
         description = `${data.categorized || 0}/${data.total || 0} photos categorized, ${data.needsVlm || 0} need VLM`;
@@ -852,6 +863,30 @@ export async function logPhotosFetched(
   count: number
 ): Promise<string> {
   return logActivity(drNumber, 'photos_fetched', { source, count }, 'onemap-api');
+}
+
+/**
+ * Log photos synced (when new photos are downloaded from 1Map)
+ */
+export async function logPhotosSynced(
+  drNumber: string,
+  previousCount: number,
+  newCount: number,
+  source: string = '1Map',
+  trigger: string = 'user'
+): Promise<string> {
+  return logActivity(
+    drNumber,
+    'PHOTOS_SYNCED',
+    {
+      previousCount,
+      newCount,
+      newPhotos: newCount - previousCount,
+      source,
+      trigger,
+    },
+    trigger === 'user' ? 'user' : 'system'
+  );
 }
 
 /**
