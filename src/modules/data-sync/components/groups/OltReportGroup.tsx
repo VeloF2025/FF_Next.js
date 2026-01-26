@@ -294,13 +294,17 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const handleExportCSV = async () => {
     setExporting(true);
     try {
-      const res = await fetch(`/api/system/olt-report/reporting?period=${reportPeriod}&format=csv`);
+      const res = await fetch(
+        `/api/system/olt-report/reporting?period=${reportPeriod}&status=${reportStatusFilter}&format=csv`
+      );
       if (res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `olt-report-${reportPeriod}-${new Date().toISOString().split('T')[0]}.csv`;
+        // Build descriptive filename matching the current filter
+        const statusLabel = reportStatusFilter === 'all' ? 'all-records' : reportStatusFilter.replace(/_/g, '-');
+        a.download = `olt-report-${statusLabel}-${reportPeriod}-${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -1048,13 +1052,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               onClick={handleExportCSV}
               disabled={exporting || !reportData}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+              title={`Export ${reportStatusFilter === 'all' ? 'all records' : reportStatusFilter.replace(/_/g, ' ')} to CSV`}
             >
               {exporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              Export CSV
+              Export {reportStatusFilter === 'all' ? 'All' : reportStatusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} CSV
             </button>
           </div>
 

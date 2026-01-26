@@ -6,6 +6,7 @@
  * Query params:
  * - period: 'today' | 'yesterday' | 'week' | '30days' | 'all' (default: 'all')
  * - format: 'json' | 'csv' (default: 'json')
+ * - status: 'all' | 'fixed' | 'pending' | 'empty_serial' | 'not_found' (default: 'all')
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
@@ -62,6 +63,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const period = (req.query.period as Period) || 'all';
     const format = (req.query.format as string) || 'json';
+    const statusFilter = (req.query.status as string) || 'all';
     const { start, end } = getDateRange(period);
 
     // Build date condition
@@ -150,6 +152,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // CSV Export
     if (format === 'csv') {
+      // Filter records based on status filter
+      const filteredRecords = statusFilter === 'all'
+        ? records
+        : records.filter(r => r.fix_status === statusFilter);
+
       // Helper to safely escape CSV values
       const escapeCSV = (val: unknown): string => {
         const str = String(val ?? '');
@@ -169,7 +176,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       const csvRows = [
         ['DR Number', 'ONT Serial (Correct)', '1Map Serial (Wrong)', 'Status', 'Old Value', 'Fixed At', 'Import File', 'Project', 'Imported At', 'Fixed By'].join(','),
-        ...records.map(r => [
+        ...filteredRecords.map(r => [
           escapeCSV(r.drop_number),
           escapeCSV(r.olt_serial),
           escapeCSV(r.wrong_onemap_serial),
@@ -183,8 +190,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ].join(','))
       ].join('\n');
 
+      // Build filename with status filter
+      const statusLabel = statusFilter === 'all' ? 'all-records' : statusFilter.replace(/_/g, '-');
+      const filename = `olt-report-${statusLabel}-${period}-${new Date().toISOString().split('T')[0]}.csv`;
+
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename=olt-report-${period}-${new Date().toISOString().split('T')[0]}.csv`);
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
       return res.send(csvRows);
     }
 
