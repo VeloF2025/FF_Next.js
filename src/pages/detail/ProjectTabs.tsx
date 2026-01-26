@@ -6,7 +6,7 @@
 
 import { getTabConfig } from './ProjectDetailUtils';
 
-export type TabId = 'overview' | 'team' | 'procurement' | 'maintenance' | 'hierarchy' | 'sow' | 'timeline' | 'budget' | 'hs';
+export type TabId = 'overview' | 'team' | 'procurement' | 'maintenance' | 'hierarchy' | 'sow' | 'agreements' | 'timeline' | 'budget' | 'hs';
 
 interface ProjectTabsProps {
   activeTab: TabId;

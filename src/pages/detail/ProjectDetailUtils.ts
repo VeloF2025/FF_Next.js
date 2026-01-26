@@ -77,6 +77,7 @@ export const getTabConfig = (): TabConfig[] => [
   { id: 'maintenance', label: 'Maintenance' },
   { id: 'hierarchy', label: 'Hierarchy' },
   { id: 'sow', label: 'SOW Data' },
+  { id: 'agreements', label: 'Agreements' },
   { id: 'timeline', label: 'Timeline' },
   { id: 'budget', label: 'Budget' },
   { id: 'hs', label: 'Health & Safety' },

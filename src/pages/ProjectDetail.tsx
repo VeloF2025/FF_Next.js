@@ -20,6 +20,8 @@ import { ProjectDetailNotFound } from './detail/ProjectDetailNotFound';
 import { ProjectTeamTab } from './detail/ProjectTeamTab';
 import { ProjectProcurementTab } from './detail/ProjectProcurementTab';
 import { ProjectMaintenanceTab } from './detail/ProjectMaintenanceTab';
+// PRD-058: Agreements tab
+import { ProjectAgreementsTab } from './detail/ProjectAgreementsTab';
 
 interface ProjectDetailProps {
   projectId: string;
@@ -130,6 +132,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'sow' && (
         <EnhancedSOWDisplay projectId={id!} projectName={project.name} />
+      )}
+
+      {activeTab === 'agreements' && (
+        <ProjectAgreementsTab projectId={id!} />
       )}
 
       {activeTab === 'timeline' && (
