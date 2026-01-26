@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { fleetConfig } from '@/modules/navigation';
 import {
   Car,
   Truck,
@@ -181,10 +183,30 @@ export default function FleetDashboardPage() {
     fetchData();
   }, []);
 
+  // Header actions for ModulePage
+  const headerActions = (
+    <div className="flex gap-3">
+      <Link href="/fleet/vehicles">
+        <button className="px-4 py-2 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors flex items-center gap-2">
+          <Car className="w-4 h-4" />
+          All Vehicles
+        </button>
+      </Link>
+      <Link href="/fleet/investigation">
+        <button className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors flex items-center gap-2">
+          <FileSearch className="w-4 h-4" />
+          New Investigation
+        </button>
+      </Link>
+    </div>
+  );
+
   if (loading) {
     return (
       <AppLayout>
-        <FleetDashboardSkeleton />
+        <ModulePage config={fleetConfig} headerActions={headerActions} isLoading>
+          <FleetDashboardSkeleton />
+        </ModulePage>
       </AppLayout>
     );
   }
@@ -192,44 +214,23 @@ export default function FleetDashboardPage() {
   if (error) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-[var(--ff-text-primary)]">{error}</p>
+        <ModulePage config={fleetConfig} headerActions={headerActions}>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-[var(--ff-text-primary)]">{error}</p>
+            </div>
           </div>
-        </div>
+        </ModulePage>
       </AppLayout>
     );
   }
 
   return (
     <AppLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Fleet Dashboard</h1>
-            <p className="text-[var(--ff-text-secondary)]">
-              Vehicle management and GPS investigation overview
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Link href="/fleet/vehicles">
-              <button className="px-4 py-2 bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors flex items-center gap-2">
-                <Car className="w-4 h-4" />
-                All Vehicles
-              </button>
-            </Link>
-            <Link href="/fleet/investigation">
-              <button className="px-4 py-2 bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] transition-colors flex items-center gap-2">
-                <FileSearch className="w-4 h-4" />
-                New Investigation
-              </button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
+      <ModulePage config={fleetConfig} headerActions={headerActions}>
+        <div className="space-y-6">
+          {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Total Vehicles"
@@ -333,6 +334,7 @@ export default function FleetDashboardPage() {
           </Link>
         </div>
       </div>
+      </ModulePage>
     </AppLayout>
   );
 }

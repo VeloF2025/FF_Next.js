@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { fleetConfig } from '@/modules/navigation';
 import { notificationService } from '@/services/core/NotificationService';
 import {
   Wrench,
@@ -409,6 +411,7 @@ export default function FleetMaintenancePage() {
   if (loading) {
     return (
       <AppLayout>
+        <ModulePage config={fleetConfig}>
         <div className="p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Fleet Maintenance</h1>
@@ -416,6 +419,7 @@ export default function FleetMaintenancePage() {
           </div>
           <LoadingSkeleton />
         </div>
+      </ModulePage>
       </AppLayout>
     );
   }
@@ -423,6 +427,7 @@ export default function FleetMaintenancePage() {
   if (error) {
     return (
       <AppLayout>
+        <ModulePage config={fleetConfig}>
         <div className="p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Fleet Maintenance</h1>
@@ -442,12 +447,14 @@ export default function FleetMaintenancePage() {
             </button>
           </div>
         </div>
+      </ModulePage>
       </AppLayout>
     );
   }
 
   return (
     <AppLayout>
+        <ModulePage config={fleetConfig}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -764,6 +771,7 @@ export default function FleetMaintenancePage() {
           </div>
         )}
       </div>
-    </AppLayout>
+    </ModulePage>
+      </AppLayout>
   );
 }

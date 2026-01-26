@@ -6,6 +6,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { fleetConfig } from '@/modules/navigation';
 import {
   FileSearch,
   Upload,
@@ -160,6 +162,7 @@ export default function FleetInvestigationPage() {
 
   return (
     <AppLayout>
+        <ModulePage config={fleetConfig}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div>
@@ -319,6 +322,7 @@ export default function FleetInvestigationPage() {
           )}
         </div>
       </div>
-    </AppLayout>
+    </ModulePage>
+      </AppLayout>
   );
 }

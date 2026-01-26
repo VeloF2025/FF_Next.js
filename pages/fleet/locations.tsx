@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { fleetConfig } from '@/modules/navigation';
 import {
   MapPin,
   Plus,
@@ -79,6 +81,7 @@ export default function FleetLocationsPage() {
 
   return (
     <AppLayout>
+        <ModulePage config={fleetConfig}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -245,6 +248,7 @@ export default function FleetLocationsPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+    </ModulePage>
+      </AppLayout>
   );
 }

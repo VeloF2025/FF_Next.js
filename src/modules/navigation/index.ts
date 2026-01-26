@@ -45,4 +45,5 @@ export {
   getActiveTabByPath,
   getActiveSubTabByPath,
   maintenanceConfig,
+  fleetConfig,
 } from './config';

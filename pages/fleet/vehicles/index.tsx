@@ -6,6 +6,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { fleetConfig } from '@/modules/navigation';
 import { notificationService } from '@/services/core/NotificationService';
 import {
   Car,
@@ -294,6 +296,7 @@ export default function FleetVehiclesPage() {
 
   return (
     <AppLayout>
+        <ModulePage config={fleetConfig}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -776,6 +779,7 @@ export default function FleetVehiclesPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+    </ModulePage>
+      </AppLayout>
   );
 }

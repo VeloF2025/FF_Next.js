@@ -6,6 +6,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { fleetConfig } from '@/modules/navigation';
 import { notificationService } from '@/services/core/NotificationService';
 import {
   BarChart3,
@@ -140,6 +142,7 @@ export default function FleetDriversPage() {
 
   return (
     <AppLayout>
+        <ModulePage config={fleetConfig}>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div>
@@ -218,6 +221,7 @@ export default function FleetDriversPage() {
           </>
         )}
       </div>
-    </AppLayout>
+    </ModulePage>
+      </AppLayout>
   );
 }

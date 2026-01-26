@@ -58,7 +58,7 @@ export function ModulePage({
   } = useModuleTabs({ config, tabBadges });
 
   return (
-    <div className="min-h-screen bg-[var(--ff-bg-primary)]">
+    <div className="flex flex-col min-h-full bg-[var(--ff-bg-primary)]">
       {/* Header Section */}
       <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
         {/* Module Header */}
