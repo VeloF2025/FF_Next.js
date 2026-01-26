@@ -26,6 +26,8 @@ import {
   Download,
   Calendar,
   Loader2,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import type { OltTabId } from '../../types';
 
@@ -133,6 +135,13 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   // Fix state
   const [fixing, setFixing] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkFixing, setBulkFixing] = useState(false);
+  const [bulkFixResult, setBulkFixResult] = useState<{
+    total: number;
+    successCount: number;
+    failCount: number;
+  } | null>(null);
 
   // Projects state
   const [projects, setProjects] = useState<
@@ -319,22 +328,27 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
     setFixing(record.id);
     try {
-      const res = await fetch('/api/system/olt-report/fix', {
+      const res = await fetch('/api/system/olt-report/fix-1map', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recordId: record.id,
-          dropNumber: record.drop_number,
+          drNumber: record.drop_number,
           correctSerial: record.olt_serial,
+          wrongSerial: record.wrong_onemap_serial,
         }),
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (data.success || data.data?.success) {
         fetchRecords('pending');
         fetchStats();
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(record.id);
+          return next;
+        });
       } else {
-        setError(data.error || 'Fix failed');
+        setError(data.error?.message || data.error || 'Fix failed');
       }
     } catch {
       setError('Fix failed');
@@ -342,6 +356,78 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       setFixing(null);
     }
   };
+
+  // Handle bulk fix
+  const handleBulkFix = async () => {
+    const selectedRecords = records.filter(
+      (r) => selectedIds.has(r.id) && r.olt_serial
+    );
+    if (selectedRecords.length === 0) return;
+
+    setBulkFixing(true);
+    setBulkFixResult(null);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/system/olt-report/fix-1map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bulk: true,
+          items: selectedRecords.map((r) => ({
+            drNumber: r.drop_number,
+            correctSerial: r.olt_serial,
+            wrongSerial: r.wrong_onemap_serial,
+          })),
+        }),
+      });
+
+      const data = await res.json();
+      const result = data.data || data;
+
+      if (result.bulk) {
+        setBulkFixResult({
+          total: result.total,
+          successCount: result.successCount,
+          failCount: result.failCount,
+        });
+        setSelectedIds(new Set());
+        fetchRecords('pending');
+        fetchStats();
+      } else {
+        setError(data.error?.message || 'Bulk fix failed');
+      }
+    } catch {
+      setError('Bulk fix failed');
+    } finally {
+      setBulkFixing(false);
+    }
+  };
+
+  // Selection helpers
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const fixableRecords = records.filter((r) => r.olt_serial);
+    if (selectedIds.size === fixableRecords.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(fixableRecords.map((r) => r.id)));
+    }
+  };
+
+  const fixableRecords = records.filter((r) => r.olt_serial);
+  const allSelected = fixableRecords.length > 0 && selectedIds.size === fixableRecords.length;
 
   return (
     <div className="space-y-6">
@@ -527,6 +613,59 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         currentTab === 'investigate' ||
         currentTab === 'escalations') && (
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+          {/* Bulk Action Bar */}
+          {currentTab === 'pending' && records.length > 0 && (
+            <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-[var(--ff-text-secondary)]">
+                  {selectedIds.size > 0 ? (
+                    <>{selectedIds.size} of {fixableRecords.length} selected</>
+                  ) : (
+                    <>{fixableRecords.length} records ready to fix</>
+                  )}
+                </span>
+                {bulkFixResult && (
+                  <span className="text-sm">
+                    <span className="text-green-400">{bulkFixResult.successCount} fixed</span>
+                    {bulkFixResult.failCount > 0 && (
+                      <span className="text-red-400 ml-2">{bulkFixResult.failCount} failed</span>
+                    )}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--ff-bg-tertiary)] rounded hover:bg-[var(--ff-bg-tertiary)]/80"
+                >
+                  {allSelected ? (
+                    <CheckSquare className="w-4 h-4 text-[var(--ff-accent)]" />
+                  ) : (
+                    <Square className="w-4 h-4" />
+                  )}
+                  {allSelected ? 'Deselect All' : 'Select All'}
+                </button>
+                <button
+                  onClick={handleBulkFix}
+                  disabled={selectedIds.size === 0 || bulkFixing}
+                  className="flex items-center gap-2 px-4 py-1.5 bg-[var(--ff-accent)] text-white text-sm rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {bulkFixing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Fixing {selectedIds.size}...
+                    </>
+                  ) : (
+                    <>
+                      <Wrench className="w-4 h-4" />
+                      Fix Selected ({selectedIds.size})
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
@@ -541,6 +680,20 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                    {currentTab === 'pending' && (
+                      <th className="w-12 py-3 px-4">
+                        <button
+                          onClick={toggleSelectAll}
+                          className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)]"
+                        >
+                          {allSelected ? (
+                            <CheckSquare className="w-5 h-5 text-[var(--ff-accent)]" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                      </th>
+                    )}
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
                       DR Number
                     </th>
@@ -562,8 +715,28 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                   {records.map((record) => (
                     <tr
                       key={record.id}
-                      className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]"
+                      className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] ${
+                        selectedIds.has(record.id) ? 'bg-[var(--ff-accent)]/10' : ''
+                      }`}
                     >
+                      {currentTab === 'pending' && (
+                        <td className="w-12 py-3 px-4">
+                          {record.olt_serial ? (
+                            <button
+                              onClick={() => toggleSelect(record.id)}
+                              className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)]"
+                            >
+                              {selectedIds.has(record.id) ? (
+                                <CheckSquare className="w-5 h-5 text-[var(--ff-accent)]" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
+                          ) : (
+                            <span className="w-5 h-5 block" />
+                          )}
+                        </td>
+                      )}
                       <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">
                         {record.drop_number}
                       </td>
@@ -600,7 +773,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                           {currentTab === 'pending' && record.olt_serial && (
                             <button
                               onClick={() => handleFix(record)}
-                              disabled={fixing === record.id}
+                              disabled={fixing === record.id || bulkFixing}
                               className="flex items-center gap-1 px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50"
                             >
                               {fixing === record.id ? (
