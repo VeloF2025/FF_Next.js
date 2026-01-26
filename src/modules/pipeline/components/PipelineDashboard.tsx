@@ -17,7 +17,10 @@ import {
   TrendingUp,
   Building2,
   RefreshCw,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
+import { PipelineKanban } from './PipelineKanban';
 import type {
   PipelineDashboardStats,
   PipelineProjectSummary,
@@ -49,14 +52,18 @@ const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
   critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400' },
 };
 
+type ViewMode = 'table' | 'kanban';
+
 export function PipelineDashboard() {
   const [stats, setStats] = useState<PipelineDashboardStats | null>(null);
   const [projects, setProjects] = useState<PipelineProjectSummary[]>([]);
+  const [allProjects, setAllProjects] = useState<PipelineProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | ''>('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
 
   // RBAC: Check if user is super_admin for Smartsheet sync access
   const { currentUser } = useAuth();
@@ -76,7 +83,7 @@ export function PipelineDashboard() {
         setStats(statsData.data);
       }
 
-      // Load projects
+      // Load projects for table view (paginated)
       const params = new URLSearchParams({
         page: String(page),
         limit: '20',
@@ -90,10 +97,38 @@ export function PipelineDashboard() {
         setProjects(projectsData.data.projects);
         setTotalPages(projectsData.data.totalPages);
       }
+
+      // Load all projects for Kanban view (no pagination)
+      const allProjectsRes = await fetch('/api/pipeline/projects?limit=500');
+      const allProjectsData = await allProjectsRes.json();
+      if (allProjectsData.success) {
+        setAllProjects(allProjectsData.data.projects);
+      }
     } catch (error) {
       console.error('Failed to load pipeline data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (projectId: string, newStatus: PipelineStatus) => {
+    try {
+      const response = await fetch(`/api/pipeline/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pipeline_status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+
+      // Refresh data after successful update
+      loadData();
+    } catch (error) {
+      console.error('Failed to update project status:', error);
+      // Revert will happen via loadData refresh
+      loadData();
     }
   };
 
@@ -120,6 +155,31 @@ export function PipelineDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            <div className="flex items-center border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-2 transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-[var(--ff-accent)] text-white'
+                    : 'hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
+                }`}
+                title="Table View"
+              >
+                <List className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`p-2 transition-colors ${
+                  viewMode === 'kanban'
+                    ? 'bg-[var(--ff-accent)] text-white'
+                    : 'hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'
+                }`}
+                title="Kanban View"
+              >
+                <LayoutGrid className="w-5 h-5" />
+              </button>
+            </div>
             {/* Smartsheet Sync - Super Admin Only */}
             {isSuperAdmin && (
               <SmartsheetSyncPanel compact onSyncComplete={loadData} />
@@ -219,43 +279,55 @@ export function PipelineDashboard() {
           <AlertsDashboard compact />
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--ff-text-secondary)]" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
-            />
-          </div>
+        {/* Kanban View */}
+        {viewMode === 'kanban' && (
+          <PipelineKanban
+            projects={allProjects}
+            onStatusChange={handleStatusChange}
+            loading={loading}
+          />
+        )}
 
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-[var(--ff-text-secondary)]" />
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as PipelineStatus | '');
-                setPage(1);
-              }}
-              className="px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]"
-            >
-              <option value="">All Statuses</option>
-              {Object.entries(STATUS_COLORS).map(([status, { label }]) => (
-                <option key={status} value={status}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+        {/* Table View */}
+        {viewMode === 'table' && (
+          <>
+            {/* Filters */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--ff-text-secondary)]" />
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
+                />
+              </div>
 
-        {/* Projects Table */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value as PipelineStatus | '');
+                    setPage(1);
+                  }}
+                  className="px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]"
+                >
+                  <option value="">All Statuses</option>
+                  {Object.entries(STATUS_COLORS).map(([status, { label }]) => (
+                    <option key={status} value={status}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Projects Table */}
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] overflow-hidden">
           <table className="w-full">
             <thead>
@@ -415,6 +487,8 @@ export function PipelineDashboard() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </div>
   );
