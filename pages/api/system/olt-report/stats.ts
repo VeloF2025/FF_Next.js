@@ -33,12 +33,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
+    // Get counts with more nuanced grouping
+    // "Pending/Fixable" = records with OLT serial that can be fixed
+    // "Needs Investigation" = records without OLT serial or marked for investigation
     const result = await pool.query(`
       SELECT
-        fix_status,
+        CASE
+          WHEN fix_status IN ('pending', 'not_found') AND olt_serial IS NOT NULL THEN 'pending'
+          WHEN fix_status IN ('needs_investigation', 'needs_reinvestigation', 'empty_serial') OR olt_serial IS NULL THEN 'needs_investigation'
+          ELSE fix_status
+        END as category,
         COUNT(*)::int as count
       FROM olt_mismatch_records
-      GROUP BY fix_status
+      GROUP BY category
     `);
 
     const stats: Stats = {
@@ -52,15 +59,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     for (const row of result.rows) {
-      const status = row.fix_status?.toLowerCase() || 'pending';
+      const category = row.category?.toLowerCase() || 'pending';
       const count = row.count;
 
-      if (status === 'pending') stats.pending = count;
-      else if (status === 'needs_investigation' || status === 'needs_reinvestigation') stats.needs_investigation += count;
-      else if (status === 'fixed') stats.fixed = count;
-      else if (status === 'resolved') stats.resolved = count;
-      else if (status === 'escalated') stats.escalated = count;
-      else if (status === 'empty_serial') stats.empty = count;
+      if (category === 'pending') stats.pending = count;
+      else if (category === 'needs_investigation') stats.needs_investigation = count;
+      else if (category === 'fixed') stats.fixed = count;
+      else if (category === 'resolved') stats.resolved = count;
+      else if (category === 'escalated') stats.escalated = count;
+      else if (category === 'empty_serial') stats.empty = count;
 
       stats.total += count;
     }

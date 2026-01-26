@@ -38,9 +38,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const params: string[] = [];
 
     if (status === 'pending') {
-      whereClause = "WHERE r.fix_status = 'pending'";
+      // Pending includes 'pending' and 'not_found' - both are fixable if they have OLT serial
+      whereClause = "WHERE r.fix_status IN ('pending', 'not_found') AND r.olt_serial IS NOT NULL";
     } else if (status === 'needs_investigation') {
-      whereClause = "WHERE r.fix_status IN ('needs_investigation', 'needs_reinvestigation', 'empty_serial')";
+      // Needs investigation: empty_serial, needs_reinvestigation, or records without OLT serial
+      whereClause = "WHERE r.fix_status IN ('needs_investigation', 'needs_reinvestigation', 'empty_serial') OR r.olt_serial IS NULL";
     } else if (status === 'fixed') {
       whereClause = "WHERE r.fix_status = 'fixed'";
     } else if (status === 'escalated') {
