@@ -1,0 +1,159 @@
+# WhatsApp Unified Bridge - Quick Reference
+
+> Last updated: 2026-01-26
+
+## Service Locations
+
+| Service | Server | Port | Status |
+|---------|--------|------|--------|
+| Unified Bridge | VPS (72.61.197.178) | 8083 | **ACTIVE** |
+| Command Bot | VPS | 8086 | Active |
+| WA Feedback Proxy | Velocity (100.96.203.105) | 8092 | Active |
+| ~~WhatsApp Sender~~ | ~~VPS~~ | ~~8081~~ | **DISABLED** |
+
+## Quick Health Checks
+
+```bash
+# Unified bridge health
+curl -s http://72.61.197.178:8083/health | jq .
+
+# List monitored groups
+curl -s http://72.61.197.178:8083/groups | jq .
+
+# Reload groups from database (no restart needed)
+curl -s http://72.61.197.178:8083/reload-groups
+
+# WA Feedback proxy health
+curl -s http://100.96.203.105:8092/health
+```
+
+## Send Test Message
+
+```bash
+curl -s -X POST http://72.61.197.178:8083/send-message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "group_jid": "120363423864087150@g.us",
+    "recipient_jid": "0@s.whatsapp.net",
+    "message": "Test message from bridge"
+  }'
+```
+
+**Note:** Use `120363423864087150@g.us` (Velo Server) for test messages.
+
+## Current Monitored Groups (7)
+
+| Group | Type | JID |
+|-------|------|-----|
+| Lawley | dr_submission | `120363418298130331@g.us` |
+| Mohadin | dr_submission | `120363421532174586@g.us` |
+| Mamelodi | dr_submission | `120363408849234743@g.us` |
+| Marketing Activations | dr_submission | `120363422808656601@g.us` |
+| Mohadin Maintenance | maintenance | `120363424360693693@g.us` |
+| Lawley Maintenance | maintenance | `120363423947610853@g.us` |
+| Velo Server | admin | `120363423864087150@g.us` |
+
+## Adding New Groups
+
+### Step 1: Add bridge phone to group
+Add **+27 63 841 2276** to the WhatsApp group
+
+### Step 2: Find the Group JID
+```bash
+# Send a message in the group, then check logs
+ssh root@72.61.197.178 "tail -20 /opt/whatsapp-bridge/bridge.log | grep 'Storing message'"
+# Look for: 📝 Storing message from 120363XXXXXXXXXX@g.us
+```
+
+### Step 3: Add to database
+```bash
+DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+const { neon } = require('@neondatabase/serverless');
+const sql = neon(process.env.DATABASE_URL);
+(async () => {
+  await sql\`INSERT INTO wa_monitored_groups
+    (group_jid, group_name, project_name, group_type, description)
+    VALUES
+    ('120363XXXXXXXXXX@g.us', 'Group Name', 'Project', 'dr_submission', 'Description')\`;
+  console.log('Group added');
+})();
+"
+```
+
+### Step 4: Reload groups
+```bash
+curl http://72.61.197.178:8083/reload-groups
+```
+
+## SSH Access
+
+```bash
+# VPS (WhatsApp services)
+ssh root@72.61.197.178
+
+# Velocity (FibreFlow apps)
+ssh velo@100.96.203.105  # Password: velo2026
+```
+
+## Service Management (VPS)
+
+```bash
+# Bridge service
+systemctl status whatsapp-bridge
+systemctl restart whatsapp-bridge
+journalctl -u whatsapp-bridge -f
+
+# Command bot
+systemctl status wa-command-bot
+systemctl restart wa-command-bot
+
+# Logs
+tail -f /opt/whatsapp-bridge/bridge.log
+```
+
+## Troubleshooting
+
+### Bridge not responding
+```bash
+ssh root@72.61.197.178
+systemctl status whatsapp-bridge
+# If stopped:
+systemctl start whatsapp-bridge
+```
+
+### Messages not being received
+1. Check bridge is connected: `curl http://72.61.197.178:8083/health`
+2. Verify group is in database: `curl http://72.61.197.178:8083/groups`
+3. If group missing, add it and reload
+
+### Session expired (needs re-pairing)
+```bash
+# Check pairing state in /health response
+curl http://72.61.197.178:8083/health | jq '.needs_auth, .pairing_state'
+# If needs_auth: true, service needs QR code scan
+```
+
+## Database Schema
+
+```sql
+CREATE TABLE wa_monitored_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_jid VARCHAR(100) UNIQUE NOT NULL,
+  group_name VARCHAR(200) NOT NULL,
+  project_name VARCHAR(200),
+  group_type VARCHAR(50) DEFAULT 'dr_submission',  -- dr_submission, maintenance, admin
+  description TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+## Related Files
+
+| File | Purpose |
+|------|---------|
+| `.claude/modules/wa-monitor.md` | Full module documentation |
+| `/home/louis/whatsapp-bridge-go/main.go` | Bridge source (Velocity) |
+| `/opt/whatsapp-bridge/` | Deployed binary (VPS) |
+| `/home/louis/wa-feedback-service/` | Feedback proxy (Velocity) |

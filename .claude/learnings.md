@@ -1089,3 +1089,111 @@ VELOCITY_PHOTO_URL=http://100.96.203.105:8003  # For photo proxy
 **Note:** "BOSS API", "ONEMAP_HOST", and "Velocity Photo API" all refer to the same service - the Docker container on Velocity that caches 1Map data.
 
 ---
+
+## 2026-01-26: Unified WhatsApp Bridge Architecture
+
+**Context:** Consolidated two separate WhatsApp services (sender on 8081, receiver/bridge on 8083) into a single unified service on port 8083.
+
+**Why Unified?**
+1. Single service handles both sending AND receiving
+2. Groups managed via database (`wa_monitored_groups`), not hardcoded
+3. No service restart needed to add new groups (use `/reload-groups`)
+4. Reduced complexity and potential for session conflicts
+
+**Architecture:**
+```
+                    ┌─────────────────────────────────────────────────────┐
+                    │           UNIFIED BRIDGE (VPS:8083)                 │
+                    │              +27 63 841 2276                        │
+                    ├─────────────────────────────────────────────────────┤
+FibreFlow APIs ───► │  SEND                    │  RECEIVE                │
+wa-feedback:8092    │  • /send-message         │  • DR submissions       │
+                    │  • /delete-message       │  • Maintenance photos   │
+                    │  • /react                │  • Admin commands       │
+                    │  • /groups               │                         │
+                    │  • /reload-groups        │                         │
+                    └─────────────────────────────────────────────────────┘
+                                          │
+                    ┌─────────────────────┼─────────────────────┐
+                    ▼                     ▼                     ▼
+              SQLite (local)        Neon DB               Command Bot
+              messages.db        wa_monitored_groups        (8086)
+```
+
+**Key Services:**
+
+| Service | Server | Port | Purpose |
+|---------|--------|------|---------|
+| `whatsapp-bridge` | VPS (72.61.197.178) | 8083 | Unified send + receive |
+| `wa-command-bot` | VPS | 8086 | WhatsApp admin commands |
+| `wa-feedback` | Velocity (100.96.203.105) | 8092 | Proxy to VPS bridge |
+| ~~`whatsapp-sender`~~ | ~~VPS~~ | ~~8081~~ | **DISABLED** - merged into bridge |
+
+**Unified Bridge Endpoints:**
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check with connection status |
+| `/send-message` | POST | Send message with @mention support |
+| `/delete-message` | POST | Delete sent message (within 1 hour) |
+| `/react` | POST | Send emoji reaction (👍 or ❌) |
+| `/groups` | GET | List monitored groups from database |
+| `/reload-groups` | GET | Reload groups from DB without restart |
+| `/list-recent` | GET | List deletable messages from last hour |
+
+**DB-Driven Groups Pattern:**
+
+Groups are stored in `wa_monitored_groups` table and loaded into memory at startup:
+
+```go
+type MonitoredGroup struct {
+    ID          string
+    GroupJID    string    // e.g., "120363418298130331@g.us"
+    GroupName   string    // e.g., "Lawley"
+    ProjectName string    // e.g., "Lawley"
+    GroupType   string    // "dr_submission", "maintenance", "admin"
+    Description string
+    IsActive    bool
+}
+```
+
+**Group Types:**
+- `dr_submission` - DR photo submissions → processed and acknowledged
+- `maintenance` - Maintenance photos → 👍 reaction on success, ❌ on failure
+- `admin` - WhatsApp commands only (for wa-command-bot)
+
+**Adding New Groups:**
+
+1. **Via FibreFlow UI:** `/communications/whatsapp` → Groups tab
+2. **Via Direct SQL:**
+```sql
+INSERT INTO wa_monitored_groups (group_jid, group_name, project_name, group_type, description)
+VALUES ('120363XXXXXXXXXX@g.us', 'Group Name', 'Project', 'dr_submission', 'Description');
+```
+3. **Reload without restart:**
+```bash
+curl http://72.61.197.178:8083/reload-groups
+```
+
+**Finding Group JID:**
+1. Add the bridge phone (+27 63 841 2276) to the WhatsApp group
+2. Send any message in the group
+3. Check bridge logs: `ssh root@72.61.197.178 "tail -20 /opt/whatsapp-bridge/bridge.log"`
+4. Look for line: `📝 Storing message from GROUP_JID`
+
+**Fallback Behavior:**
+The bridge has a hardcoded `PROJECTS` map as fallback if DB is unreachable. DB-loaded groups take priority.
+
+**Key Files:**
+| File | Location | Purpose |
+|------|----------|---------|
+| `main.go` | `/home/louis/whatsapp-bridge-go/` (Velocity) | Bridge source code |
+| `whatsapp-bridge` | `/opt/whatsapp-bridge/` (VPS) | Compiled binary |
+| `wa-feedback-service.js` | `/home/louis/wa-feedback-service/` (Velocity) | Proxy service |
+| `wa-monitor.md` | `.claude/modules/` | Full documentation |
+
+**Reference:**
+- Plan: `.claude/plans/toasty-jumping-pearl.md` (Unified WhatsApp Bridge Implementation)
+- Module doc: `.claude/modules/wa-monitor.md`
+
+---

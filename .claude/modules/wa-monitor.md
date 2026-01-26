@@ -9,47 +9,60 @@
 | **Category** | monitoring |
 | **Server** | Velocity Server 100.96.203.105 |
 
-## Infrastructure (Updated Jan 2026 - VPS Migration)
+## Infrastructure (Updated Jan 2026 - Unified Bridge)
 
 ### Architecture Overview
 ```
-FibreFlow APIs → wa-feedback (Velocity:8092) → VPS sender (8081) → WhatsApp
-                                                                      ↓
-                              Neon DB ← VPS bridge (8083) ← WhatsApp incoming
-                                                   ↓
-                                           SQLite (messages.db)
-                                                   ↓
-                                        Command Bot (8086) → responses
+                    ┌─────────────────────────────────────────────────────┐
+                    │           UNIFIED BRIDGE (VPS:8083)                 │
+                    │              +27638412276                           │
+                    ├─────────────────────────────────────────────────────┤
+FibreFlow APIs ───► │  SEND                    │  RECEIVE                │
+wa-feedback:8092    │  • /send-message         │  • DR submissions       │
+                    │  • /delete-message       │  • Maintenance photos   │
+                    │  • /react                │  • Admin commands       │
+                    │  • /groups               │                         │
+                    │  • /reload-groups        │                         │
+                    └─────────────────────────────────────────────────────┘
+                                          │
+                    ┌─────────────────────┼─────────────────────┐
+                    ▼                     ▼                     ▼
+              SQLite (local)        Neon DB               Command Bot
+              messages.db        wa_monitored_groups        (8086)
 ```
 
-**Why VPS?** WhatsApp services run on Hostinger VPS for redundancy. If Velocity goes down, DR submissions still get captured.
+**Why Unified?** Single service handles both sending and receiving. Groups are DB-driven via `wa_monitored_groups` table, manageable from FibreFlow WA Portal UI.
 
 ### WhatsApp Services on VPS (72.61.197.178)
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| `whatsapp-sender` | 8081 | **SENDING** - REST API `/send-message` |
-| `whatsapp-bridge` | 8083 | **RECEIVING** - Incoming messages → SQLite |
+| `whatsapp-bridge` | 8083 | **UNIFIED** - Send + Receive + Groups from DB |
 | `wa-command-bot` | 8086 | **COMMANDS** - `!status`, `!restart` from admin groups |
+| ~~`whatsapp-sender`~~ | ~~8081~~ | **DISABLED** - Merged into unified bridge |
 
 ```bash
 ssh root@72.61.197.178
 
-# Health checks
-curl http://72.61.197.178:8081/health  # Sender
-curl http://72.61.197.178:8083/health  # Bridge
+# Health check
+curl http://72.61.197.178:8083/health
+
+# List groups (from database)
+curl http://72.61.197.178:8083/groups
+
+# Reload groups from DB (no restart needed)
+curl http://72.61.197.178:8083/reload-groups
 
 # Logs
-tail -f /opt/whatsapp-sender/sender.log
 tail -f /opt/whatsapp-bridge/bridge.log
 
-# Restart services
-systemctl restart whatsapp-sender whatsapp-bridge
+# Restart service
+systemctl restart whatsapp-bridge
 ```
 
 ### WA Feedback Proxy (Velocity 100.96.203.105:8092)
 
-Routes FibreFlow API calls to VPS sender:
+Routes FibreFlow API calls to unified bridge:
 ```bash
 curl http://100.96.203.105:8092/health
 echo 'velo2026' | sudo -S systemctl restart wa-feedback
@@ -62,7 +75,7 @@ echo 'velo2026' | sudo -S systemctl restart wa-feedback
 wa-monitor-prod (Port 8090) - Python monitor for group monitoring
 ```
 
-### Sender Service Endpoints (Port 8081)
+### Unified Bridge Endpoints (Port 8083)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -70,24 +83,34 @@ wa-monitor-prod (Port 8090) - Python monitor for group monitoring
 | `/send-message` | POST | Send message with @mention, returns `message_id` |
 | `/delete-message` | POST | Delete a sent message (within 1 hour) |
 | `/list-recent` | GET | List deletable messages from last hour |
+| `/react` | POST | Send emoji reaction (👍 or ❌) |
+| `/groups` | GET | List monitored groups from database |
+| `/reload-groups` | GET | Reload groups from DB without restart |
 
-### Monitored WhatsApp Groups
+### Monitored WhatsApp Groups (Database-Driven)
 
-| Project | Group JID | Purpose |
-|---------|-----------|---------|
-| Lawley | `120363418298130331@g.us` | DR submissions |
-| Mohadin | `120363421532174586@g.us` | DR submissions |
-| Mamelodi | `120363408849234743@g.us` | DR submissions |
-| Mohadin QA | `120363424360693693@g.us` | Maintenance tracking |
-| Velo Test | `120363421664266245@g.us` | Testing + Commands |
-| AI Recovery | `120363423864087150@g.us` | **Admin commands** |
-| Marketing Activations | `120363422808656601@g.us` | DR submissions |
+Groups are managed via the FibreFlow WA Portal UI (`/communications/whatsapp` → Groups tab) and stored in `wa_monitored_groups` table.
+
+| Group Name | Type | Project | JID |
+|------------|------|---------|-----|
+| Lawley | dr_submission | Lawley | `120363418298130331@g.us` |
+| Mohadin | dr_submission | Mohadin | `120363421532174586@g.us` |
+| Mamelodi | dr_submission | Mamelodi | `120363408849234743@g.us` |
+| Marketing Activations | dr_submission | Marketing | `120363422808656601@g.us` |
+| Mohadin Maintenance | maintenance | Mohadin | `120363424360693693@g.us` |
+| Lawley Maintenance | maintenance | Lawley | `120363423947610853@g.us` |
+| Velo Server | admin | - | `120363423864087150@g.us` |
+
+**Group Types:**
+- `dr_submission` - DR photo submissions → processed and acknowledged
+- `maintenance` - Maintenance photos → 👍 reaction on success, ❌ on failure
+- `admin` - Commands only (for wa-command-bot)
 
 ### WhatsApp Command Bot (VPS Port 8086)
 
 Infrastructure management via WhatsApp commands from admin groups.
 
-**Admin Groups:** Velo Test, AI Recovery Alerts
+**Admin Groups:** Velo Server
 
 **Commands:**
 | Command | Description |
