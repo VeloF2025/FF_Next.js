@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, RefreshCw, Calendar, Download, Filter, X, ArrowLeft } from 'lucide-react';
+import { Search, RefreshCw, Calendar, Download, Filter, X } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import {
   ActivateDataProvider,
@@ -464,63 +464,43 @@ function QaCentrePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/activate')}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-              title="Back to Dashboard"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-                QA Centre
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                Review and validate DR photos
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={refresh}
-            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            title="Refresh data"
-          >
-            <RefreshCw className={`h-4 w-4 text-gray-600 dark:text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
-            <span className="text-sm text-gray-700 dark:text-gray-300">REFRESH</span>
-          </button>
-        </div>
-
+    <div className="space-y-6">
         {/* System Health Status */}
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">System Status:</span>
+              <span className="text-sm font-medium text-[var(--ff-text-secondary)]">System Status:</span>
               <SystemHealthDashboard compact autoRefresh refreshInterval={60} />
             </div>
-            {lastRefreshAt && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <Calendar className="h-4 w-4" />
-                Last updated: {lastRefreshAt.toLocaleTimeString()}
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              {lastRefreshAt && (
+                <div className="flex items-center gap-2 text-sm text-[var(--ff-text-tertiary)]">
+                  <Calendar className="h-4 w-4" />
+                  Last updated: {lastRefreshAt.toLocaleTimeString()}
+                </div>
+              )}
+              <button
+                onClick={refresh}
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                title="Refresh data"
+              >
+                <RefreshCw className={`h-4 w-4 text-[var(--ff-text-secondary)] ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="text-sm text-[var(--ff-text-secondary)]">Refresh</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Quick Filter Buttons */}
-        <div className="mb-4 flex gap-2">
+        <div className="flex gap-2">
           {(['today', 'yesterday', 'last7days', 'all'] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => handleQuickFilter(filter)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 getActiveQuickFilter() === filter
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ? 'bg-[var(--ff-primary-500)] text-white'
+                  : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
               }`}
             >
               {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'last7days' ? 'Last 7 days' : 'All'}
@@ -529,7 +509,7 @@ function QaCentrePageContent() {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6 mb-6">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
           <div className="flex flex-col gap-4">
             {/* Search Bar Row */}
             <div className="flex items-center gap-4">
@@ -706,14 +686,14 @@ function QaCentrePageContent() {
         </div>
 
         {/* DR List */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 overflow-hidden">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
           {/* Summary Header */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="bg-[var(--ff-bg-tertiary)] px-6 py-4 border-b border-[var(--ff-border-light)]">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                 Showing {filteredDrops.length} of {pagination.totalCount > 0 ? pagination.totalCount : drops.length} drops
                 {pagination.totalPages > 1 && (
-                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                  <span className="ml-2 text-sm font-normal text-[var(--ff-text-secondary)]">
                     (Page {currentPage} of {pagination.totalPages})
                   </span>
                 )}
@@ -923,8 +903,8 @@ function QaCentrePageContent() {
                     disabled={!pagination.hasPreviousPage}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                       pagination.hasPreviousPage
-                        ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                        ? 'bg-[var(--ff-primary-500)] text-white hover:opacity-90'
+                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
                     }`}
                   >
                     ← Previous
@@ -934,8 +914,8 @@ function QaCentrePageContent() {
                     disabled={!pagination.hasNextPage}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                       pagination.hasNextPage
-                        ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                        ? 'bg-[var(--ff-primary-500)] text-white hover:opacity-90'
+                        : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
                     }`}
                   >
                     Next →
@@ -945,7 +925,6 @@ function QaCentrePageContent() {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }
