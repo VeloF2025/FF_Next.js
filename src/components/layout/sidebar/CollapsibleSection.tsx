@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { SidebarStyles } from './types';
 import type { ThemeConfig } from '@/types/theme.types';
@@ -15,6 +17,8 @@ interface CollapsibleSectionProps {
   themeConfig: ThemeConfig;
   hasActiveItem: boolean;
   children: React.ReactNode;
+  sectionLink?: string; // If provided, section header becomes a direct link
+  sectionIcon?: React.ComponentType<{ className?: string }>; // Icon for linked sections
 }
 
 export function CollapsibleSection({
@@ -28,7 +32,11 @@ export function CollapsibleSection({
   themeConfig,
   hasActiveItem,
   children,
+  sectionLink,
+  sectionIcon: SectionIcon,
 }: CollapsibleSectionProps) {
+  const pathname = usePathname();
+
   const handleClick = (e: React.MouseEvent) => {
     if (isCollapsible) {
       onToggle(sectionId, e.shiftKey);
@@ -37,6 +45,32 @@ export function CollapsibleSection({
 
   // In collapsed sidebar mode (icons-only), always show items
   const showContent = isCollapsed || isExpanded || !isCollapsible;
+
+  // Check if this linked section is active
+  const isLinkActive = sectionLink && pathname?.startsWith(sectionLink);
+
+  // If sectionLink is provided, render as a direct navigation link (no children/dropdown)
+  if (sectionLink) {
+    return (
+      <div className={`${isCollapsed ? 'px-2' : 'px-4'} mb-4`}>
+        <Link
+          href={sectionLink}
+          className={`w-full flex items-center gap-3 text-sm font-medium px-3 py-2.5 rounded-lg transition-colors ${
+            isLinkActive
+              ? 'bg-white/10 text-white'
+              : 'hover:bg-white/5 text-gray-300 hover:text-white'
+          }`}
+          style={{
+            color: isLinkActive ? themeConfig.colors.primary[400] : sidebarStyles.textColor,
+            backgroundColor: isLinkActive ? `${themeConfig.colors.primary[500]}20` : undefined
+          }}
+        >
+          {SectionIcon && <SectionIcon className="w-5 h-5 flex-shrink-0" />}
+          {!isCollapsed && <span>{sectionTitle}</span>}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className={`${isCollapsed ? 'px-2' : 'px-4'} mb-4`}>

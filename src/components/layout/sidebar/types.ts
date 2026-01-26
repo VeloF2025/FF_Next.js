@@ -19,6 +19,7 @@ export interface NavSection {
   items: NavItem[];
   isCollapsible?: boolean;
   defaultExpanded?: boolean;
+  sectionLink?: string; // If provided, section header becomes a direct link (no dropdown)
 }
 
 export interface SidebarProps {

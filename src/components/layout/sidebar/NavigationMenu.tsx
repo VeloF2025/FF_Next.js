@@ -227,6 +227,8 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
               sidebarStyles={sidebarStyles}
               themeConfig={themeConfig}
               hasActiveItem={sectionHasActiveItem(section)}
+              sectionLink={section.sectionLink}
+              sectionIcon={section.sectionLink ? section.items[0]?.icon : undefined}
             >
             {section.items.map((item) => {
               // Handle group items (collapsible with subItems)
