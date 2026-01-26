@@ -297,48 +297,21 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
         </div>
       </div>
 
-      {/* Emergency Contact & Next of Kin */}
-      {(staff.emergencyContactName || staff.emergencyContactPhone || staff.nextOfKinName || staff.nextOfKinPhone) && (
+      {/* Emergency Contact */}
+      {(staff.emergencyContactName || staff.emergencyContactPhone) && (
         <div>
-          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Emergency Contacts</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Emergency Contact */}
-            {(staff.emergencyContactName || staff.emergencyContactPhone) && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                <p className="text-xs font-medium text-red-400 uppercase mb-2">Emergency Contact</p>
-                {staff.emergencyContactName && (
-                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.emergencyContactName}</p>
-                )}
-                {staff.emergencyContactRelationship && (
-                  <p className="text-sm text-[var(--ff-text-secondary)]">{staff.emergencyContactRelationship}</p>
-                )}
-                {staff.emergencyContactPhone && (
-                  <a href={`tel:${staff.emergencyContactPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
-                    {staff.emergencyContactPhone}
-                  </a>
-                )}
-              </div>
+          <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Emergency Contact</h2>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 max-w-md">
+            {staff.emergencyContactName && (
+              <p className="font-medium text-[var(--ff-text-primary)]">{staff.emergencyContactName}</p>
             )}
-
-            {/* Next of Kin */}
-            {(staff.nextOfKinName || staff.nextOfKinPhone) && (
-              <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-                <p className="text-xs font-medium text-[var(--ff-text-muted)] uppercase mb-2">Next of Kin</p>
-                {staff.nextOfKinName && (
-                  <p className="font-medium text-[var(--ff-text-primary)]">{staff.nextOfKinName}</p>
-                )}
-                {staff.nextOfKinRelationship && (
-                  <p className="text-sm text-[var(--ff-text-secondary)]">{staff.nextOfKinRelationship}</p>
-                )}
-                {staff.nextOfKinPhone && (
-                  <a href={`tel:${staff.nextOfKinPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
-                    {staff.nextOfKinPhone}
-                  </a>
-                )}
-                {staff.nextOfKinAddress && (
-                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{staff.nextOfKinAddress}</p>
-                )}
-              </div>
+            {staff.emergencyContactRelationship && (
+              <p className="text-sm text-[var(--ff-text-secondary)]">{staff.emergencyContactRelationship}</p>
+            )}
+            {staff.emergencyContactPhone && (
+              <a href={`tel:${staff.emergencyContactPhone}`} className="text-sm text-blue-400 hover:text-blue-300">
+                {staff.emergencyContactPhone}
+              </a>
             )}
           </div>
         </div>
