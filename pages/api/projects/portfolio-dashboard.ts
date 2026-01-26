@@ -264,7 +264,7 @@ export default async function handler(
         SELECT
           p.id,
           p.project_name,
-          c.name as client_name,
+          c.company_name as client_name,
           p.status,
           COALESCE(p.progress, 0)::int as progress,
           p.project_manager as manager_name
