@@ -343,6 +343,42 @@ export async function getActivityTimeline(
   // 1. Get activity log entries
   const history = await getActivityHistory(drNumber, limit);
 
+  // 2. Collect UUIDs that need name lookup (for legacy records)
+  const uuidsToLookup = new Set<string>();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  for (const entry of history) {
+    if (entry.event_type === 'human_review_completed') {
+      const reviewer = entry.event_data?.reviewer;
+      if (typeof reviewer === 'string' && uuidRegex.test(reviewer)) {
+        uuidsToLookup.add(reviewer);
+      }
+    }
+    // Also check actor field for UUID lookups
+    if (entry.actor && uuidRegex.test(entry.actor)) {
+      uuidsToLookup.add(entry.actor);
+    }
+  }
+
+  // 3. Batch lookup user names for UUIDs
+  const userNameMap = new Map<string, string>();
+  if (uuidsToLookup.size > 0) {
+    try {
+      const uuidArray = Array.from(uuidsToLookup);
+      const userRows = await sql`
+        SELECT id::text, name FROM users WHERE id = ANY(${uuidArray}::uuid[])
+      `;
+      for (const row of userRows) {
+        if (row.name) {
+          userNameMap.set(row.id, row.name);
+        }
+      }
+    } catch (err) {
+      log.warn('ActivityLog', `Could not batch lookup user names: ${err}`);
+    }
+  }
+
+  // 4. Build timeline entries with resolved names
   for (const entry of history) {
     const metadata = EVENT_METADATA[entry.event_type] || {
       title: entry.event_type,
@@ -378,9 +414,17 @@ export async function getActivityTimeline(
       case 'vlm_qa_failed':
         description = data.error ? String(data.error) : 'QA validation failed';
         break;
-      case 'human_review_completed':
-        description = `Reviewed by ${data.reviewer || 'unknown'}`;
+      case 'human_review_completed': {
+        // Resolve reviewer name - check if it's a UUID and look it up
+        let reviewerDisplay = data.reviewer || 'unknown';
+        if (typeof reviewerDisplay === 'string' && uuidRegex.test(reviewerDisplay)) {
+          reviewerDisplay = userNameMap.get(reviewerDisplay) || 'unknown';
+        }
+        const approvedCount = data.approved || 0;
+        const rejectedCount = data.rejected || 0;
+        description = `Reviewed by ${reviewerDisplay}. ${approvedCount} approved, ${rejectedCount} rejected`;
         break;
+      }
       case 'step_approved':
         description = `Step ${data.step}: ${data.stepLabel || ''}`;
         break;
@@ -406,6 +450,12 @@ export async function getActivityTimeline(
         description = JSON.stringify(data).slice(0, 100);
     }
 
+    // Resolve actor name if it's a UUID
+    let actorDisplay = entry.actor;
+    if (actorDisplay && uuidRegex.test(actorDisplay)) {
+      actorDisplay = userNameMap.get(actorDisplay) || actorDisplay;
+    }
+
     timeline.push({
       id: entry.id,
       timestamp: entry.created_at,
@@ -414,7 +464,7 @@ export async function getActivityTimeline(
       description,
       icon: metadata.icon,
       iconColor: metadata.iconColor,
-      actor: entry.actor,
+      actor: actorDisplay,
       metadata: entry.event_data,
     });
   }
@@ -955,10 +1005,25 @@ export async function logHumanReviewCompleted(
   approved: number,
   rejected: number
 ): Promise<string> {
+  // Look up the user's name for display
+  let reviewerName = 'unknown';
+  try {
+    const sql = getDb();
+    const userRows = await sql`
+      SELECT name FROM users WHERE id = ${userId}::uuid
+    `;
+    const firstRow = userRows[0];
+    if (firstRow && firstRow.name) {
+      reviewerName = String(firstRow.name);
+    }
+  } catch (err) {
+    log.warn('ActivityLog', `Could not look up user name for ${userId}: ${err}`);
+  }
+
   return logActivity(
     drNumber,
     'human_review_completed',
-    { reviewer: userId, approved, rejected },
+    { reviewer: reviewerName, reviewerId: userId, approved, rejected },
     userId
   );
 }

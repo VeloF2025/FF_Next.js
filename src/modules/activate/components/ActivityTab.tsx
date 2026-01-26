@@ -27,8 +27,7 @@ interface TimelineEntry {
   description: string;
   icon: string;
   iconColor: string;
-  actorType: 'system' | 'user' | 'vlm';
-  actorId: string | null;
+  actor: string | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -72,6 +71,7 @@ interface QAReviewHistory {
   steps_total: number;
   steps_percent: number;
   imported_at: string;
+  source?: 'excel_import' | 'desktop_qa';
 }
 
 interface SerialHistoryEntry {
@@ -485,8 +485,20 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               >
                 <div className="flex items-center gap-4">
                   <div className="text-left">
-                    <div className="font-medium">
-                      {formatDate(review.review_date)}
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {formatDate(review.review_date)}
+                      </span>
+                      {/* Source Badge */}
+                      {review.source === 'desktop_qa' ? (
+                        <span className="px-1.5 py-0.5 text-xs rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                          Desktop QA
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                          Excel Import
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm opacity-75">
                       by {review.reviewer || 'Unknown'}
