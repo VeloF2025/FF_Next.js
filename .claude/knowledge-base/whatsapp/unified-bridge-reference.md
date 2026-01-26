@@ -53,19 +53,40 @@ curl -s -X POST http://72.61.197.178:8083/send-message \
 | Lawley Maintenance | maintenance | `120363423947610853@g.us` |
 | Velo Server | admin | `120363423864087150@g.us` |
 
-## Adding New Groups
+## Managing Groups
 
-### Step 1: Add bridge phone to group
+### Option A: WA Portal UI (Recommended)
+
+Navigate to **Communications → WhatsApp → Groups tab**
+
+Features:
+- View all monitored groups with type badges
+- Add new groups with type selection (DR Submission, Maintenance, Admin)
+- Edit existing groups (name, JID, type, description, active status)
+- Delete groups
+- Send test messages
+- **Bridge auto-reloads** after any change
+
+Group Types:
+| Type | Badge | Purpose |
+|------|-------|---------|
+| `dr_submission` | Purple | DR photo submissions - processed and acknowledged |
+| `maintenance` | Blue | Maintenance photos - reactions on success/failure |
+| `admin` | Gray | Admin commands only (for wa-command-bot) |
+
+### Option B: Direct Database + CLI
+
+#### Step 1: Add bridge phone to group
 Add **+27 63 841 2276** to the WhatsApp group
 
-### Step 2: Find the Group JID
+#### Step 2: Find the Group JID
 ```bash
 # Send a message in the group, then check logs
 ssh root@72.61.197.178 "tail -20 /opt/whatsapp-bridge/bridge.log | grep 'Storing message'"
 # Look for: 📝 Storing message from 120363XXXXXXXXXX@g.us
 ```
 
-### Step 3: Add to database
+#### Step 3: Add to database
 ```bash
 DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
 const { neon } = require('@neondatabase/serverless');
@@ -80,7 +101,7 @@ const sql = neon(process.env.DATABASE_URL);
 "
 ```
 
-### Step 4: Reload groups
+#### Step 4: Reload groups
 ```bash
 curl http://72.61.197.178:8083/reload-groups
 ```

@@ -1197,3 +1197,151 @@ The bridge has a hardcoded `PROJECTS` map as fallback if DB is unreachable. DB-l
 - Module doc: `.claude/modules/wa-monitor.md`
 
 ---
+
+## 2026-01-26: WA Portal Database Unification Pattern
+
+**Issue:** WA Portal UI (`/communications/whatsapp` → Groups tab) was using a different database table (`wa_group_config`) than the unified bridge (`wa_monitored_groups`).
+
+**Root Cause:** Historical split where portal and bridge evolved independently with different tables.
+
+**Bad Pattern:**
+```
+WA Portal UI ───► wa_group_config (4 rows)      ❌ Disconnected
+                      │
+                      └── enabled, phone_number, capture_photos
+
+Unified Bridge ───► wa_monitored_groups (7 rows) ❌ Different table
+                      │
+                      └── group_type, is_active, description
+```
+
+**Good Pattern:**
+```
+WA Portal UI ─────┐
+                  ├──► wa_monitored_groups (single source of truth)
+Unified Bridge ───┘
+```
+
+**Migration Commit:** `e0592f52`
+
+**Files Updated:**
+
+| File | Change |
+|------|--------|
+| `pages/api/communications/whatsapp/groups/index.ts` | `wa_group_config` → `wa_monitored_groups` |
+| `pages/api/communications/whatsapp/groups/[id].ts` | Same + bridge reload trigger |
+| `pages/api/communications/whatsapp/groups/[id]/test.ts` | Port 8081 → 8083 |
+| `GroupsTab.tsx` | Added `group_type` dropdown |
+| `ChatTab.tsx`, `SendTab.tsx` | `WaGroupConfig` → `WaMonitoredGroup` |
+| `waAdminApiService.ts` | Updated types |
+
+**Bridge Auto-Reload:**
+```typescript
+// Trigger after any CRUD operation
+try {
+  await fetch('http://72.61.197.178:8083/reload-groups', { method: 'GET' });
+} catch (e) {
+  console.warn('[WA Groups] Failed to trigger bridge reload:', e);
+}
+```
+
+**Type Safety for Optional Fields:**
+```typescript
+// ❌ BAD: project_name might be null
+const veloTest = data.find(g => g.project_name.toLowerCase().includes('velo'));
+
+// ✅ GOOD: Null-safe with optional chaining
+const veloTest = data.find(g =>
+  g.group_name?.toLowerCase().includes('velo server') ||
+  g.project_name?.toLowerCase().includes('velo')
+);
+```
+
+**Key Principle:** WA Portal and Bridge should ALWAYS use the same database table. Changes in UI should immediately reflect in bridge behavior.
+
+---
+
+## 2026-01-26: DR Activity Timeline System
+
+**Context:** The Activate module has a comprehensive activity tracking system that logs all DR lifecycle events.
+
+**Database Table:** `dr_activity_log`
+
+**Schema:**
+```sql
+CREATE TABLE dr_activity_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  drop_number VARCHAR(20) NOT NULL,
+  event_type VARCHAR(50) NOT NULL,
+  event_title VARCHAR(200) NOT NULL,
+  event_description TEXT,
+  event_data JSONB,
+  actor_type VARCHAR(50),  -- 'system', 'user', 'vlm', 'whatsapp-sender'
+  actor_id UUID,
+  actor_name VARCHAR(200),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**Event Types & Actors:**
+
+| Event Type | Title | Actor | When Logged |
+|------------|-------|-------|-------------|
+| `dr_received` | DR Received | system | WhatsApp submission received |
+| `photos_categorized` | AI Photo Categorization | vlm | VLM categorizes photos |
+| `vlm_validated` | VLM QA Validated | vlm | Automated QA validation |
+| `human_review_complete` | Human Review Complete | user | QA Wizard Phase 2-3 |
+| `final_decision` | Final Decision | user | Phase 4 PASS/FAIL/REWORK |
+| `feedback_sent` | Feedback Sent | whatsapp-sender | WhatsApp message sent |
+| `serial_updated` | Serial Updated | user | Manual serial correction |
+| `serial_verified` | Serial Verified | system | 1Map serial confirmed |
+
+**Activity Tab UI Components:**
+
+1. **Timeline Sub-Tab** - Chronological event list
+   - Event icon with color-coded dot
+   - Title, description, timestamp
+   - Actor attribution (by vlm, by user, by whatsapp-sender)
+
+2. **QA History Sub-Tab** - Historic QA reviews
+   - From `qa_review_history` table (Excel imports)
+   - Shows reviewer, decision, timestamps
+
+3. **Serial History Sub-Tab** - Serial change tracking
+   - From `olt_mismatch_records` table
+   - Shows old→new serial corrections
+
+**Logging Pattern:**
+```typescript
+// Log activity event
+await pool.query(`
+  INSERT INTO dr_activity_log (
+    drop_number, event_type, event_title, event_description,
+    event_data, actor_type, actor_name
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+`, [
+  dropNumber,
+  'feedback_sent',
+  'Feedback Sent',
+  `Sent to ${groupJid}`,
+  JSON.stringify({ message_id, group_jid }),
+  'whatsapp-sender',
+  'whatsapp-sender',
+]);
+```
+
+**DR Summary Tab Components:**
+
+| Section | Data Source | Fields |
+|---------|-------------|--------|
+| **Timeline** | `dr_photo_unified_reviews` | installed_at, reviewed_at, feedback_at, activated_at |
+| **Team** | `dr_photo_unified_reviews` + 1Map | activations_team, installation_team, oes_team, reviewer |
+| **Subscriber Contact** | `dr_photo_unified_reviews` | subscriber_name, subscriber_language |
+| **QA Status** | `dr_photo_unified_reviews` | photo_steps_completed, ont_serial, ups_serial |
+
+**Key Files:**
+- `pages/api/activate/activity-log.ts` - Activity log API
+- `src/modules/activate/components/ActivityTab.tsx` - Activity tab UI
+- `pages/api/activate/[dropNumber].ts` - Full DR detail with timeline
+
+---
