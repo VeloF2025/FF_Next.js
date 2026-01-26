@@ -26,6 +26,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
+// BOSS API (1Map data cached on WA Monitor service)
+const ONEMAP_HOST = 'http://100.96.203.105:8003';
+
 /**
  * Determine current state of the DR based on available data
  */
@@ -44,6 +47,64 @@ function determineState(
 }
 
 /**
+ * Build subscriber contact info from 1Map and QContact sources
+ * Returns both sources and whether they differ (to show Contact 1 / Contact 2)
+ */
+function buildSubscriberContact(
+  bossData: {
+    contact_name: string | null;
+    contact_surname: string | null;
+    contact_number: string | null;
+    contact_email: string | null;
+    language: string | null;
+  } | null,
+  maintenance: {
+    client_name: string | null;
+    client_contact: string | null;
+    client_email: string | null;
+  } | null
+): DRSummary['subscriberContact'] {
+  // Build 1Map contact (subscriber who signed up)
+  const oneMapName = bossData?.contact_name && bossData?.contact_surname
+    ? `${bossData.contact_name} ${bossData.contact_surname}`.trim()
+    : bossData?.contact_name || bossData?.contact_surname || null;
+
+  const oneMapContact = (bossData?.contact_name || bossData?.contact_number) ? {
+    name: oneMapName,
+    phone: bossData?.contact_number || null,
+    email: bossData?.contact_email || null,
+    language: bossData?.language || null,
+  } : null;
+
+  // Build QContact contact (customer who reported issue)
+  const qContactContact = maintenance?.client_name || maintenance?.client_contact ? {
+    name: maintenance.client_name || null,
+    phone: maintenance.client_contact || null,
+    email: maintenance.client_email || null,
+  } : null;
+
+  // Determine if contacts differ
+  let contactsDiffer = false;
+  if (oneMapContact && qContactContact) {
+    // Compare normalized phone numbers
+    const normalizePhone = (p: string | null) => p?.replace(/\D/g, '').slice(-10) || '';
+    const oneMapPhone = normalizePhone(oneMapContact.phone);
+    const qContactPhone = normalizePhone(qContactContact.phone);
+
+    // Differ if names are different OR phone numbers are different
+    const namesDiffer = oneMapContact.name?.toLowerCase() !== qContactContact.name?.toLowerCase();
+    const phonesDiffer = oneMapPhone !== qContactPhone && !!oneMapPhone && !!qContactPhone;
+    contactsDiffer = namesDiffer || phonesDiffer;
+  }
+
+  return {
+    oneMap: oneMapContact,
+    qContact: qContactContact,
+    contactsDiffer,
+  };
+}
+
+/**
  * Extract step coverage from VLM categorization results (preferred) or photos metadata
  */
 /**
@@ -55,6 +116,12 @@ async function fetchBossApiData(dropNumber: string): Promise<{
   signup_agent: string | null;
   ont_barcode: string | null;
   ups_serial: string | null;
+  // Subscriber contact from 1Map (added Jan 2026)
+  contact_name: string | null;
+  contact_surname: string | null;
+  contact_number: string | null;
+  contact_email: string | null;
+  language: string | null;
 } | null> {
   try {
     const response = await fetch(`${ONEMAP_HOST}/api/record/${dropNumber}`, {
@@ -74,6 +141,12 @@ async function fetchBossApiData(dropNumber: string): Promise<{
       signup_agent: data.signup_agent || null,
       ont_barcode: data.ont_barcode || null,
       ups_serial: data.ups_serial || null,
+      // Subscriber contact fields from 1Map
+      contact_name: data.contact_person_name || data.contact_name || null,
+      contact_surname: data.contact_person_surname || data.contact_surname || null,
+      contact_number: data.contact_number || data.contact_phone || null,
+      contact_email: data.email_address || data.contact_email || null,
+      language: data.language || null,
     };
   } catch (error) {
     log.warn('DRSummary', `BOSS API fetch failed for ${dropNumber}`, error);
@@ -125,7 +198,7 @@ async function handler(
     log.info('DRSummary', `Fetching summary for ${dropNumber}`);
 
     // Query BOSS API (1Map) and database tables in parallel
-    const [bossData, unifiedResult, oesResult, dropsResult, qaResult] = await Promise.all([
+    const [bossData, unifiedResult, oesResult, dropsResult, qaResult, maintenanceResult] = await Promise.all([
       // BOSS API: installer_name, signup_agent, serials from 1Map
       fetchBossApiData(dropNumber),
       // Main unified review data (including resubmission fields)
@@ -192,12 +265,27 @@ async function handler(
          LIMIT 1`,
         [dropNumber]
       ),
+
+      // Maintenance tickets (QContact client info)
+      pool.query(
+        `SELECT
+           client_name,
+           client_contact,
+           client_email,
+           address
+         FROM maintenance_tickets
+         WHERE drop_number = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [dropNumber]
+      ),
     ]);
 
     const unified = unifiedResult.rows[0];
     const oes = oesResult.rows[0];
     const drop = dropsResult.rows[0];
     const qa = qaResult.rows[0];
+    const maintenance = maintenanceResult.rows[0];
 
     // If no data found anywhere
     if (!unified && !oes && !drop && !qa) {
@@ -284,6 +372,9 @@ async function handler(
       },
 
       photoPreview,
+
+      // Subscriber contact info from 1Map and QContact (Jan 2026)
+      subscriberContact: buildSubscriberContact(bossData, maintenance),
 
       // Resubmission tracking (Jan 2026)
       submission_count: unified?.submission_count || 1,

@@ -57,6 +57,13 @@ interface OneMapRecord {
   longitude: number | null;
   last_modified_by: string | null;
   last_modified_date: string | null;
+  // Subscriber contact fields (discovered 2026-01-26)
+  contact_person_name: string | null; // First name
+  contact_person_surname: string | null; // Surname
+  contact_number: string | null; // Phone number (e.g., 0782593117)
+  email_address: string | null;
+  language: string | null;
+  survey_date: string | null;
 }
 
 interface SearchResult {

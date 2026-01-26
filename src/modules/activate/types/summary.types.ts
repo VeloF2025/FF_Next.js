@@ -55,6 +55,25 @@ export interface DRSummary {
     filename: string;
   }>;
 
+  // Subscriber contact info from multiple sources (Jan 2026)
+  subscriberContact: {
+    // From 1Map (subscriber who signed up)
+    oneMap: {
+      name: string | null; // contact_person_name + contact_person_surname
+      phone: string | null; // contact_number
+      email: string | null; // email_address
+      language: string | null;
+    } | null;
+    // From QContact/maintenance tickets (customer who reported issue)
+    qContact: {
+      name: string | null; // client_name
+      phone: string | null; // client_contact
+      email: string | null; // client_email
+    } | null;
+    // Whether contacts differ (show both)
+    contactsDiffer: boolean;
+  };
+
   // Resubmission tracking (Jan 2026)
   submission_count: number;
   is_resubmission: boolean;

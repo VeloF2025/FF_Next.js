@@ -207,6 +207,11 @@ export function DrSummaryPage({
         </div>
       </div>
 
+      {/* Subscriber Contact Card - Only show if we have contact info */}
+      {(summary.subscriberContact?.oneMap || summary.subscriberContact?.qContact) && (
+        <SubscriberContactCard subscriberContact={summary.subscriberContact} />
+      )}
+
       {/* QA Status Card - Full Width */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
@@ -366,6 +371,115 @@ export function DrSummaryPage({
           {summary.currentState === 'reviewed' ? '🔄 Re-Review' : '🧙 Start QA Review'}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Subscriber Contact Card
+ * Shows contact info from 1Map (subscriber) and QContact (customer)
+ * If contacts differ, shows both as Contact 1 and Contact 2
+ */
+function SubscriberContactCard({
+  subscriberContact,
+}: {
+  subscriberContact: DRSummary['subscriberContact'];
+}) {
+  const { oneMap, qContact, contactsDiffer } = subscriberContact;
+  const hasOneMap = oneMap && (oneMap.name || oneMap.phone);
+  const hasQContact = qContact && (qContact.name || qContact.phone);
+
+  // If contacts don't differ, show a single unified view
+  if (!contactsDiffer && hasOneMap) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+          📞 Subscriber Contact
+        </h3>
+        <ContactDetails contact={oneMap} language={oneMap.language} />
+      </div>
+    );
+  }
+
+  // Show both contacts if they differ
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+        📞 Contacts
+        {contactsDiffer && (
+          <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 text-xs rounded">
+            Different
+          </span>
+        )}
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {hasOneMap && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+            <span className="text-xs font-medium text-blue-600 dark:text-blue-400 block mb-2">
+              Contact 1 (1Map Subscriber)
+            </span>
+            <ContactDetails contact={oneMap} language={oneMap.language} />
+          </div>
+        )}
+        {hasQContact && (
+          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+            <span className="text-xs font-medium text-purple-600 dark:text-purple-400 block mb-2">
+              Contact 2 (QContact Customer)
+            </span>
+            <ContactDetails contact={qContact} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Contact Details - displays name, phone, email
+ */
+function ContactDetails({
+  contact,
+  language,
+}: {
+  contact: { name: string | null; phone: string | null; email: string | null };
+  language?: string | null;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {contact.name && (
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500 dark:text-gray-400">👤</span>
+          <span className="text-sm text-gray-900 dark:text-white font-medium">{contact.name}</span>
+        </div>
+      )}
+      {contact.phone && (
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500 dark:text-gray-400">📱</span>
+          <a
+            href={`tel:${contact.phone}`}
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono"
+          >
+            {contact.phone}
+          </a>
+        </div>
+      )}
+      {contact.email && (
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500 dark:text-gray-400">✉️</span>
+          <a
+            href={`mailto:${contact.email}`}
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            {contact.email}
+          </a>
+        </div>
+      )}
+      {language && (
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500 dark:text-gray-400">🗣️</span>
+          <span className="text-sm text-gray-600 dark:text-gray-300">{language}</span>
+        </div>
+      )}
     </div>
   );
 }
