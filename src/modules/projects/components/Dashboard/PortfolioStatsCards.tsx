@@ -6,13 +6,13 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  FolderIcon,
-  ClockIcon,
-  PlayCircleIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  DocumentTextIcon,
-} from '@heroicons/react/24/outline';
+  Folder,
+  Clock,
+  PlayCircle,
+  CheckCircle,
+  AlertTriangle,
+  FileText,
+} from 'lucide-react';
 import type { PortfolioCounts, ExpiringDocsMetrics } from './types';
 
 interface PortfolioStatsCardsProps {
@@ -40,7 +40,7 @@ export function PortfolioStatsCards({
     {
       label: 'Total Projects',
       value: counts.total,
-      icon: <FolderIcon className="w-6 h-6" />,
+      icon: <Folder className="w-6 h-6" />,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/20',
       href: '/projects?tab=all',
@@ -48,7 +48,7 @@ export function PortfolioStatsCards({
     {
       label: 'Pipeline',
       value: counts.pipeline,
-      icon: <DocumentTextIcon className="w-6 h-6" />,
+      icon: <FileText className="w-6 h-6" />,
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/20',
       href: '/pipeline',
@@ -56,7 +56,7 @@ export function PortfolioStatsCards({
     {
       label: 'Planned',
       value: counts.planned,
-      icon: <ClockIcon className="w-6 h-6" />,
+      icon: <Clock className="w-6 h-6" />,
       color: 'text-amber-400',
       bgColor: 'bg-amber-500/20',
       href: '/projects?tab=all&status=planned',
@@ -64,7 +64,7 @@ export function PortfolioStatsCards({
     {
       label: 'Active',
       value: counts.active,
-      icon: <PlayCircleIcon className="w-6 h-6" />,
+      icon: <PlayCircle className="w-6 h-6" />,
       color: 'text-green-400',
       bgColor: 'bg-green-500/20',
       href: '/projects?tab=all&status=active',
@@ -72,7 +72,7 @@ export function PortfolioStatsCards({
     {
       label: 'Completed',
       value: counts.completed,
-      icon: <CheckCircleIcon className="w-6 h-6" />,
+      icon: <CheckCircle className="w-6 h-6" />,
       color: 'text-cyan-400',
       bgColor: 'bg-cyan-500/20',
       href: '/projects?tab=all&status=completed',
@@ -80,7 +80,7 @@ export function PortfolioStatsCards({
     {
       label: 'Docs Expiring',
       value: expiringDocs.count30Days + expiringDocs.count60Days,
-      icon: <ExclamationTriangleIcon className="w-6 h-6" />,
+      icon: <AlertTriangle className="w-6 h-6" />,
       color: expiringDocs.count30Days > 0 ? 'text-red-400' : 'text-orange-400',
       bgColor: expiringDocs.count30Days > 0 ? 'bg-red-500/20' : 'bg-orange-500/20',
       href: '/projects?tab=expiring',

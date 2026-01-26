@@ -4,7 +4,6 @@
  */
 
 import React from 'react';
-import { CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import type { BudgetMetrics } from './types';
 
 interface BudgetHealthCardProps {

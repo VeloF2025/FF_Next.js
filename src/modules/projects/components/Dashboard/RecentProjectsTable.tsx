@@ -5,7 +5,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronRight } from 'lucide-react';
 import type { RecentProject } from './types';
 
 interface RecentProjectsTableProps {
@@ -90,7 +90,7 @@ export function RecentProjectsTable({ projects, isLoading = false }: RecentProje
           className="text-xs text-[var(--ff-primary)] hover:underline flex items-center gap-1"
         >
           View All
-          <ChevronRightIcon className="w-3 h-3" />
+          <ChevronRight className="w-3 h-3" />
         </Link>
       </div>
 
@@ -155,7 +155,7 @@ export function RecentProjectsTable({ projects, isLoading = false }: RecentProje
                         href={`/projects/${project.id}`}
                         className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)]"
                       >
-                        <ChevronRightIcon className="w-5 h-5" />
+                        <ChevronRight className="w-5 h-5" />
                       </Link>
                     </td>
                   </tr>

@@ -5,7 +5,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ExclamationTriangleIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { AlertTriangle, ChevronRight } from 'lucide-react';
 import type { ExpiringDocsMetrics } from './types';
 
 interface ExpiringDocsCardProps {
@@ -33,7 +33,7 @@ export function ExpiringDocsCard({ expiringDocs, isLoading = false }: ExpiringDo
         </h3>
         {hasUrgent && (
           <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30">
-            <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
+            <AlertTriangle className="w-4 h-4 text-red-500" />
             <span className="text-xs font-medium text-red-600 dark:text-red-400">
               Action Required
             </span>
@@ -98,7 +98,7 @@ export function ExpiringDocsCard({ expiringDocs, isLoading = false }: ExpiringDo
             className="flex items-center justify-center gap-1 w-full py-2 text-sm font-medium text-[var(--ff-primary)] hover:text-[var(--ff-primary-dark)] transition-colors"
           >
             View all expiring documents
-            <ChevronRightIcon className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4" />
           </Link>
         </>
       )}

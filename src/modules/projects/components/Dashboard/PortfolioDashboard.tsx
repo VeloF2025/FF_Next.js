@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ShieldCheckIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { ShieldCheck, Wrench } from 'lucide-react';
 import { PortfolioStatsCards } from './PortfolioStatsCards';
 import { BudgetHealthCard } from './BudgetHealthCard';
 import { NetworkProgressCard } from './NetworkProgressCard';
@@ -91,7 +91,7 @@ export function PortfolioDashboard({ className = '' }: PortfolioDashboardProps) 
               H&S Compliance
             </h3>
             <div className="p-2 rounded-lg bg-green-500/20">
-              <ShieldCheckIcon className="w-5 h-5 text-green-400" />
+              <ShieldCheck className="w-5 h-5 text-green-400" />
             </div>
           </div>
           {isLoading ? (
@@ -131,7 +131,7 @@ export function PortfolioDashboard({ className = '' }: PortfolioDashboardProps) 
               Maintenance
             </h3>
             <div className="p-2 rounded-lg bg-orange-500/20">
-              <WrenchScrewdriverIcon className="w-5 h-5 text-orange-400" />
+              <Wrench className="w-5 h-5 text-orange-400" />
             </div>
           </div>
           {isLoading ? (

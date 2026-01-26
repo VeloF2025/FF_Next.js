@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { SignalIcon } from '@heroicons/react/24/outline';
+import { Signal } from 'lucide-react';
 import type { NetworkProgress } from './types';
 
 interface NetworkProgressCardProps {
@@ -31,7 +31,7 @@ export function NetworkProgressCard({ network, isLoading = false }: NetworkProgr
           Network Progress
         </h3>
         <div className="p-2 rounded-lg bg-cyan-500/20">
-          <SignalIcon className="w-5 h-5 text-cyan-400" />
+          <Signal className="w-5 h-5 text-cyan-400" />
         </div>
       </div>
 
