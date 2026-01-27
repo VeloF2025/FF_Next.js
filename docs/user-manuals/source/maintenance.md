@@ -29,7 +29,6 @@ pdf_options:
         <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
       </div>
     </section>
-stylesheet: https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap
 body_class: velocity-manual
 css: |-
   /* ============================================
@@ -48,6 +47,9 @@ css: |-
     --vf-light-border: #e0e0e0;
     --vf-red-accent: #8b2346;
   }
+
+  /* === Font Import === */
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap');
 
   /* === Page & Typography === */
   body {
