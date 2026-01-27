@@ -786,16 +786,22 @@ export async function syncFiberTimeInboundTickets(
         pageSize,
       });
 
+      // QContact API returns total in pagination.count, not response.total
+      totalTickets = response.pagination?.count || response.total || 0;
+
       logger.info('Fetched cases from FiberTime QContact', {
         page: currentPage,
         count: response.results.length,
-        total: response.total,
+        total: totalTickets,
       });
 
-      totalTickets = response.total || 0;
-
-      // Process each case on this page
+      // Process each case on this page (skip Closed/Solved since API doesn't support not_equals filter)
       for (const ftCase of response.results) {
+      // Skip closed/solved tickets - we couldn't filter them via API
+      if (ftCase.status === 'Solved' || ftCase.status === 'Unsolved - No Response') {
+        stats.skipped++;
+        continue;
+      }
       stats.total_processed++;
 
       let qcontactTicket: QContactTicket;

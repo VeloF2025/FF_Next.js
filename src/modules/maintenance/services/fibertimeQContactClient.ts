@@ -65,6 +65,13 @@ export interface FiberTimeCaseResponse {
   results: FiberTimeCase[];
   total?: number;
   page?: number;
+  /** QContact API returns pagination info in this structure */
+  pagination?: {
+    count: number;
+    page: number;
+    items: number;
+    pages: number;
+  };
 }
 
 /**
@@ -534,19 +541,14 @@ export class FiberTimeQContactClient {
       },
     ];
 
-    // Optionally filter by status (exclude Closed by default to get active tickets)
+    // Optionally filter by specific status
+    // NOTE: QContact API does not support 'not_equals' operator on status field (returns 500).
+    // We fetch all tickets and filter closed ones in application code instead.
     if (options.status) {
       conditions.push({
         name: 'status',
         value: options.status,
         operator: 'equals',
-      });
-    } else {
-      // Exclude Closed tickets to get active ones first
-      conditions.push({
-        name: 'status',
-        value: 'Closed',
-        operator: 'not_equals',
       });
     }
 
