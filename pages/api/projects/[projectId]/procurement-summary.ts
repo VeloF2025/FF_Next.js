@@ -71,15 +71,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE project_id = ${projectId}
     `;
 
-    // Get GRN counts and values
+    // Get GRN counts and values (GRN links to project via purchase_orders)
     const grnStats = await sql`
       SELECT
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'pending') as pending,
-        COUNT(*) FILTER (WHERE status = 'received') as received,
-        COALESCE(SUM(total_received_value), 0) as total_value
-      FROM goods_receipt_notes
-      WHERE project_id = ${projectId}
+        COUNT(DISTINCT grn.id) as total,
+        COUNT(DISTINCT grn.id) FILTER (WHERE grn.status = 'pending') as pending,
+        COUNT(DISTINCT grn.id) FILTER (WHERE grn.status = 'received') as received,
+        COALESCE(SUM(gri.total_cost), 0) as total_value
+      FROM goods_receipt_notes grn
+      LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
+      LEFT JOIN goods_receipt_items gri ON gri.grn_id = grn.id
+      WHERE po.project_id = ${projectId}
     `;
 
     // Format response
