@@ -47,7 +47,7 @@ export const QCONTACT_TO_FIBREFLOW_STATUS: Record<string, TicketStatus> = {
   'Closed': TicketStatus.CLOSED,
   'Open': TicketStatus.OPEN,
   'Pending': TicketStatus.OPEN,
-  'Pending Company Response': TicketStatus.OPEN,
+  'Pending Company Response': TicketStatus.IN_PROGRESS, // QC UI shows this under "In Progress" column
   'Pending Customer Response': TicketStatus.OPEN,
 };
 
