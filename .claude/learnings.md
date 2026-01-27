@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-01-27: WhatsApp Bridge - Case-Sensitive Drop Number Regex
+
+**Issue:** DR469378 was submitted via WhatsApp as "Dr469378" (lowercase 'r') but never received an acknowledgment and wasn't processed.
+
+**Root Cause:** The Go WhatsApp bridge had a case-sensitivity bug in `processDropNumbers`:
+```go
+// Pattern requires uppercase DR
+var dropPattern = regexp.MustCompile(`DR\d+`)
+
+// BUG: Didn't uppercase content before matching
+dropNumbers := dropPattern.FindAllString(content, -1)  // "Dr469378" doesn't match
+if len(dropNumbers) == 0 {
+    return  // Silent return - no logging!
+}
+```
+
+**Why it was hard to find:**
+1. Log showed "🎯 Processing drop numbers from message: 'Dr469378'" - making it look like processing started
+2. No error was logged when pattern didn't match (silent `return`)
+3. The 401 error that appeared was from a DIFFERENT function (`forwardToFibreFlow`), red herring
+
+**Fix:** Uppercase content before pattern matching:
+```go
+// ✅ FIXED: Uppercase before matching
+dropNumbers := dropPattern.FindAllString(strings.ToUpper(content), -1)
+```
+
+**Prevention:**
+1. Log when early-returning due to no matches: `log.Printf("No DR patterns found in: %s", content)`
+2. Use case-insensitive regex: `(?i)DR\d+`
+3. Test with variations: "DR123", "Dr123", "dr123", "dR123"
+
+**Affected File:** `/home/louis/whatsapp-bridge-go/main.go:2561`
+
+**Recovery:** Manually process missed DRs via:
+```bash
+curl -X POST "https://dev.fibreflow.app/api/activate/process-new-dr" \
+  -H "Content-Type: application/json" \
+  -d '{"dropNumber": "DR469378", "projectName": "Mamelodi", "source": "manual_recovery"}'
+```
+
+---
+
 ## 2026-01-26: Unified Architecture - Store Data During Processing, Not During Display
 
 **Issue:** Summary page was making live API calls to BOSS API (1Map) and querying maintenance_tickets table on every page view. This was:
