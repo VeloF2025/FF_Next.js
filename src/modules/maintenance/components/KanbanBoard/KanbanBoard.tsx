@@ -22,18 +22,17 @@ interface KanbanBoardProps {
 // Database status values (from tickets_status_check constraint)
 export type DatabaseStatus = 'new' | 'triaged' | 'assigned' | 'in_progress' | 'blocked' | 'resolved' | 'closed' | 'cancelled' | 'pending_approval';
 
-// Define visible columns, their order, and WIP limits
+// Define visible columns and their order
 interface ColumnConfig {
   status: DatabaseStatus;
-  wipLimit?: number;
 }
 
 const COLUMN_CONFIG: ColumnConfig[] = [
-  { status: 'new', wipLimit: 20 },
-  { status: 'triaged', wipLimit: 15 },
-  { status: 'assigned', wipLimit: 10 },
-  { status: 'in_progress', wipLimit: 8 },
-  { status: 'blocked', wipLimit: 5 },
+  { status: 'new' },
+  { status: 'triaged' },
+  { status: 'assigned' },
+  { status: 'in_progress' },
+  { status: 'blocked' },
   { status: 'resolved' },
   { status: 'closed' },
 ];
@@ -93,17 +92,6 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     const ticket = tickets.find((t) => t.id === draggableId);
 
     if (!ticket) return;
-
-    // Check WIP limit
-    const columnConfig = COLUMN_CONFIG.find(c => c.status === newStatus);
-    if (columnConfig?.wipLimit) {
-      const currentCount = ticketsByStatus[newStatus].length;
-      if (currentCount >= columnConfig.wipLimit) {
-        setErrorMessage(`Cannot move: ${newStatus.replace('_', ' ')} column is at WIP limit (${columnConfig.wipLimit})`);
-        setTimeout(() => setErrorMessage(null), 3000);
-        return;
-      }
-    }
 
     setErrorMessage(null);
 
@@ -196,7 +184,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto pb-4">
           <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
-            {COLUMN_CONFIG.map(({ status, wipLimit }) => (
+            {COLUMN_CONFIG.map(({ status }) => (
               <Droppable key={status} droppableId={status}>
                 {(provided, snapshot) => (
                   <div
@@ -207,7 +195,6 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
                     <KanbanColumn
                       status={status}
                       tickets={ticketsByStatus[status]}
-                      wipLimit={wipLimit}
                       isDraggingOver={snapshot.isDraggingOver}
                       isUpdating={updateTicket.isPending}
                     />

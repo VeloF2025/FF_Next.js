@@ -1,11 +1,10 @@
 'use client';
 
 /**
- * KanbanColumn Component (Enhanced)
+ * KanbanColumn Component
  *
  * A status column in the Kanban board.
  * Uses Draggable from @hello-pangea/dnd with framer-motion animations.
- * Features: WIP limits, smooth animations, visual feedback.
  */
 
 import { Draggable } from '@hello-pangea/dnd';
@@ -17,7 +16,6 @@ import { KanbanCard } from './KanbanCard';
 interface KanbanColumnProps {
   status: DatabaseStatus;
   tickets: Ticket[];
-  wipLimit?: number;
   isDraggingOver?: boolean;
   isUpdating?: boolean;
 }
@@ -35,10 +33,8 @@ const statusConfig: Record<DatabaseStatus, { label: string; color: string; bgCol
   'pending_approval': { label: 'Pending Approval', color: 'text-amber-400', bgColor: 'bg-amber-500/20', borderColor: 'border-amber-500/40', glowColor: 'ring-amber-500/30' },
 };
 
-export function KanbanColumn({ status, tickets, wipLimit, isDraggingOver, isUpdating }: KanbanColumnProps) {
+export function KanbanColumn({ status, tickets, isDraggingOver, isUpdating }: KanbanColumnProps) {
   const config = statusConfig[status];
-  const isAtLimit = wipLimit !== undefined && tickets.length >= wipLimit;
-  const isOverLimit = wipLimit !== undefined && tickets.length > wipLimit;
 
   return (
     <motion.div
@@ -71,10 +67,7 @@ export function KanbanColumn({ status, tickets, wipLimit, isDraggingOver, isUpda
           <motion.span
             className={`
               text-xs font-medium px-2.5 py-1 rounded-full
-              ${isOverLimit
-                ? 'bg-red-500/20 text-red-400'
-                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-muted)]'
-              }
+              bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-muted)]
             `}
             animate={isDraggingOver ? { scale: 1.1 } : { scale: 1 }}
             transition={{ type: 'spring', stiffness: 400 }}
@@ -83,53 +76,20 @@ export function KanbanColumn({ status, tickets, wipLimit, isDraggingOver, isUpda
           </motion.span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* WIP Limit Indicator */}
-          {wipLimit !== undefined && (
-            <span
-              className={`
-                text-xs px-2 py-1 rounded-full
-                ${isAtLimit
-                  ? 'bg-yellow-500/20 text-yellow-400'
-                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-muted)]'
-                }
-              `}
+        {/* Updating Indicator */}
+        <AnimatePresence>
+          {isUpdating && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="flex items-center gap-1"
             >
-              WIP: {tickets.length}/{wipLimit}
-            </span>
+              <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div>
+            </motion.div>
           )}
-
-          {/* Updating Indicator */}
-          <AnimatePresence>
-            {isUpdating && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex items-center gap-1"
-              >
-                <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        </AnimatePresence>
       </div>
-
-      {/* WIP Warning */}
-      <AnimatePresence>
-        {isAtLimit && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-3 py-2 bg-yellow-500/10 border-b border-yellow-500/20"
-          >
-            <p className="text-xs text-yellow-400">
-              WIP limit reached! Move items before adding more.
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Cards Container */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
