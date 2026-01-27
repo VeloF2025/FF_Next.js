@@ -23,7 +23,10 @@ import {
   Upload,
   UserMinus,
   Users,
+  Building2,
 } from 'lucide-react';
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
+import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 
 type StaffStatusType = 'active' | 'inactive' | 'on_leave' | 'suspended' | 'terminated' | 'resigned' | 'retired';
 
@@ -231,77 +234,56 @@ export default function StaffDirectoryPage() {
       <ModulePage config={staffConfig} headerActions={headerActions}>
         <div className="space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">Current Staff</p>
-                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{activeStaff.length}</p>
-                  </div>
-                  <div className="bg-blue-500/20 p-3 rounded-full">
-                    <Users className="h-6 w-6 text-blue-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">Active</p>
-                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                      {staff.filter((s) => s.status === 'active').length}
-                    </p>
-                  </div>
-                  <div className="bg-green-500/20 p-3 rounded-full">
-                    <Eye className="h-6 w-6 text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">On Leave</p>
-                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                      {staff.filter((s) => s.status === 'on_leave').length}
-                    </p>
-                  </div>
-                  <div className="bg-yellow-500/20 p-3 rounded-full">
-                    <Eye className="h-6 w-6 text-yellow-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">Former</p>
-                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{formerStaff.length}</p>
-                  </div>
-                  <div className="bg-gray-500/20 p-3 rounded-full">
-                    <UserMinus className="h-6 w-6 text-gray-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">Departments</p>
-                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{departments.length}</p>
-                  </div>
-                  <div className="bg-purple-500/20 p-3 rounded-full">
-                    <Eye className="h-6 w-6 text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <StatsGrid
+            cards={[
+              {
+                title: 'Current Staff',
+                value: activeStaff.length,
+                icon: Users,
+                color: '#3B82F6',
+                subtitle: 'Active roster',
+                description: 'Staff currently employed',
+                variant: 'detailed',
+              },
+              {
+                title: 'Active',
+                value: staff.filter((s) => s.status === 'active').length,
+                icon: Eye,
+                color: '#10B981',
+                subtitle: 'On duty',
+                description: 'Staff currently working',
+                variant: 'detailed',
+              },
+              {
+                title: 'On Leave',
+                value: staff.filter((s) => s.status === 'on_leave').length,
+                icon: UserMinus,
+                color: '#F59E0B',
+                subtitle: 'Away',
+                description: 'Staff currently on leave',
+                variant: 'detailed',
+              },
+              {
+                title: 'Former',
+                value: formerStaff.length,
+                icon: UserMinus,
+                color: '#6B7280',
+                subtitle: 'Past employees',
+                description: 'Terminated, resigned, or retired',
+                variant: 'detailed',
+              },
+              {
+                title: 'Departments',
+                value: departments.length,
+                icon: Building2,
+                color: '#8B5CF6',
+                subtitle: 'Teams',
+                description: 'Unique organizational units',
+                variant: 'detailed',
+              },
+            ] as EnhancedStatCardProps[]}
+            columns={5}
+          />
 
           {/* Filters */}
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">

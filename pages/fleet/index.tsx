@@ -20,6 +20,8 @@ import {
   Clock,
 } from 'lucide-react';
 import Link from 'next/link';
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
+import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 
 interface FleetStats {
   totalVehicles: number;
@@ -45,10 +47,6 @@ interface RecentInvestigation {
 function FleetDashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div>
-        <div className="h-8 bg-[var(--ff-bg-tertiary)] rounded w-48 mb-2 animate-pulse"></div>
-        <div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-64 animate-pulse"></div>
-      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
@@ -59,39 +57,6 @@ function FleetDashboardSkeleton() {
       </div>
     </div>
   );
-}
-
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  color,
-  href,
-}: {
-  title: string;
-  value: number | string;
-  icon: React.ElementType;
-  color: string;
-  href?: string;
-}) {
-  const content = (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)] hover:border-[var(--ff-primary)] transition-colors">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-[var(--ff-text-secondary)]">{title}</p>
-          <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">{value}</p>
-        </div>
-        <div className={`p-3 rounded-lg ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-    </div>
-  );
-
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  return content;
 }
 
 function InvestigationRow({ investigation }: { investigation: RecentInvestigation }) {
@@ -231,36 +196,51 @@ export default function FleetDashboardPage() {
       <ModulePage config={fleetConfig} headerActions={headerActions}>
         <div className="space-y-6">
           {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="Total Vehicles"
-            value={stats?.totalVehicles || 0}
-            icon={Truck}
-            color="bg-blue-500"
-            href="/fleet/vehicles"
+          <StatsGrid
+            cards={[
+              {
+                title: 'Total Vehicles',
+                value: stats?.totalVehicles || 0,
+                icon: Truck,
+                color: '#3B82F6',
+                subtitle: 'Fleet size',
+                description: 'All registered vehicles',
+                route: '/fleet/vehicles',
+                variant: 'detailed',
+              },
+              {
+                title: 'Active Vehicles',
+                value: stats?.activeVehicles || 0,
+                icon: Car,
+                color: '#10B981',
+                subtitle: 'In service',
+                description: 'Currently operational vehicles',
+                route: '/fleet/vehicles?status=active',
+                variant: 'detailed',
+              },
+              {
+                title: 'Unassigned',
+                value: stats?.unassignedVehicles || 0,
+                icon: AlertTriangle,
+                color: '#F59E0B',
+                subtitle: 'Available',
+                description: 'Vehicles without assigned drivers',
+                route: '/fleet/vehicles?assigned=false',
+                variant: 'detailed',
+              },
+              {
+                title: 'Authorized Locations',
+                value: stats?.totalLocations || 0,
+                icon: MapPin,
+                color: '#8B5CF6',
+                subtitle: 'Geofences',
+                description: 'Configured geofencing zones',
+                route: '/fleet/locations',
+                variant: 'detailed',
+              },
+            ] as EnhancedStatCardProps[]}
+            columns={4}
           />
-          <StatCard
-            title="Active Vehicles"
-            value={stats?.activeVehicles || 0}
-            icon={Car}
-            color="bg-green-500"
-            href="/fleet/vehicles?status=active"
-          />
-          <StatCard
-            title="Unassigned"
-            value={stats?.unassignedVehicles || 0}
-            icon={AlertTriangle}
-            color="bg-yellow-500"
-            href="/fleet/vehicles?assigned=false"
-          />
-          <StatCard
-            title="Authorized Locations"
-            value={stats?.totalLocations || 0}
-            icon={MapPin}
-            color="bg-purple-500"
-            href="/fleet/locations"
-          />
-        </div>
 
         {/* Recent Investigations */}
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)]">

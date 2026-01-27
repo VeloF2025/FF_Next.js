@@ -23,6 +23,8 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
+import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -71,27 +73,43 @@ function HealthSafetyContent() {
           ragStatus={dashboard?.overall?.rag_status}
           projectsConfigured={dashboard?.overall?.total_projects_configured}
         />
-        <StatsCard
-          title="Open Incidents"
-          value={dashboard?.incidents?.stats?.open_incidents || 0}
-          icon={AlertTriangle}
-          color="red"
-          subtitle={`${dashboard?.incidents?.stats?.total_incidents || 0} total (12 months)`}
-        />
-        <StatsCard
-          title="Contractors Compliant"
-          value={dashboard?.contractors?.by_rag?.green || 0}
-          icon={Users}
-          color="green"
-          subtitle={`${dashboard?.contractors?.at_risk?.length || 0} at risk`}
-        />
-        <StatsCard
-          title="Overdue Audits"
-          value={dashboard?.audits?.overdue_count || 0}
-          icon={Calendar}
-          color="orange"
-          subtitle={`${dashboard?.audits?.upcoming?.length || 0} due soon`}
-        />
+        <div className="md:col-span-3">
+          <StatsGrid
+            cards={[
+              {
+                title: 'Open Incidents',
+                value: dashboard?.incidents?.stats?.open_incidents || 0,
+                icon: AlertTriangle,
+                color: '#EF4444',
+                subtitle: `${dashboard?.incidents?.stats?.total_incidents || 0} total (12 months)`,
+                description: 'Active safety incidents requiring attention',
+                route: '/projects/health-safety/incidents',
+                variant: 'detailed',
+              },
+              {
+                title: 'Contractors Compliant',
+                value: dashboard?.contractors?.by_rag?.green || 0,
+                icon: Users,
+                color: '#10B981',
+                subtitle: `${dashboard?.contractors?.at_risk?.length || 0} at risk`,
+                description: 'Contractors meeting safety requirements',
+                route: '/contractors?hs_status=compliant',
+                variant: 'detailed',
+              },
+              {
+                title: 'Overdue Audits',
+                value: dashboard?.audits?.overdue_count || 0,
+                icon: Calendar,
+                color: '#F97316',
+                subtitle: `${dashboard?.audits?.upcoming?.length || 0} due soon`,
+                description: 'Safety audits past their scheduled date',
+                route: '/projects/health-safety/checklists',
+                variant: 'detailed',
+              },
+            ] as EnhancedStatCardProps[]}
+            columns={3}
+          />
+        </div>
       </div>
 
       {/* Main Grid */}
@@ -228,42 +246,6 @@ function OverallScoreCard({
       </div>
       <div className="text-4xl font-bold mb-2">{score ?? 'N/A'}%</div>
       <p className="text-sm opacity-80">{projectsConfigured || 0} projects configured</p>
-    </div>
-  );
-}
-
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  color,
-  subtitle,
-}: {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  color: 'green' | 'red' | 'orange' | 'blue';
-  subtitle?: string;
-}) {
-  const colors = {
-    green: 'bg-green-50 dark:bg-green-900/20 text-green-600',
-    red: 'bg-red-50 dark:bg-red-900/20 text-red-600',
-    orange: 'bg-orange-50 dark:bg-orange-900/20 text-orange-600',
-    blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600',
-  };
-
-  return (
-    <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-2 rounded-lg ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-      </div>
-      <p className="text-sm text-[var(--ff-text-secondary)]">{title}</p>
-      <p className="text-3xl font-bold text-[var(--ff-text-primary)]">{value}</p>
-      {subtitle && (
-        <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{subtitle}</p>
-      )}
     </div>
   );
 }
