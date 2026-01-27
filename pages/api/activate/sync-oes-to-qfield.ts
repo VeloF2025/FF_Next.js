@@ -389,11 +389,12 @@ async function handler(
     }
 
     // Step 2: Convert to GeoJSON with labels (once for all projects)
+    // IMPORTANT: Coordinates must be numbers, not strings (GeoJSON spec requirement)
     const features: GeoJSONFeature[] = oesPoints.map(point => ({
       type: 'Feature',
       geometry: {
         type: 'Point',
-        coordinates: [point.longitude, point.latitude] // GeoJSON uses [lon, lat]
+        coordinates: [Number(point.longitude), Number(point.latitude)] // GeoJSON uses [lon, lat] as NUMBERS
       },
       properties: {
         drop_number: point.drop_number,
