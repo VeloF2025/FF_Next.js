@@ -3,7 +3,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, AuthenticatedRequest } from '@/lib/auth';
+import { poApprovalService } from '@/services/procurement/approval';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -59,7 +60,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.supplier_notes,
         po.created_by,
         po.created_at,
-        po.updated_at
+        po.updated_at,
+        po.version,
+        po.current_approval_request_id,
+        po.approved_by,
+        po.approved_at
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN projects p ON po.project_id = p.id
@@ -108,6 +113,27 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       };
     });
 
+    // Fetch history from purchase_order_history
+    const historyResult = await sql`
+      SELECT id, action, notes, created_by, created_at
+      FROM purchase_order_history
+      WHERE purchase_order_id = ${id}
+      ORDER BY created_at DESC
+    `;
+
+    // Fetch version history if version > 1
+    const versionHistory = po.version > 1
+      ? await poApprovalService.getVersionHistory(id)
+      : [];
+
+    // Get quote comparison if RFQ linked
+    let quoteComparison = null;
+    try {
+      quoteComparison = await poApprovalService.getQuoteComparisonForApproval(id);
+    } catch {
+      // Quote comparison is optional
+    }
+
     const purchaseOrder = {
       id: po.id,
       poNumber: po.po_number,
@@ -131,9 +157,23 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       createdBy: po.created_by,
       createdAt: po.created_at,
       updatedAt: po.updated_at,
+      // Versioning
+      version: po.version || 1,
+      versionHistory,
+      // Approval info
+      currentApprovalRequestId: po.current_approval_request_id,
+      approvedBy: po.approved_by,
+      approvedAt: po.approved_at,
+      // Quote comparison for approvers
+      quoteComparison,
       items,
-      // History and receipts - empty for now until tables are created
-      history: [] as { id: string; action: string; notes: string | null; createdBy: string | null; createdAt: string }[],
+      history: historyResult.map(h => ({
+        id: h.id,
+        action: h.action,
+        notes: h.notes,
+        createdBy: h.created_by,
+        createdAt: h.created_at,
+      })),
       receipts: [] as { id: string; grnNumber: string; receivedDate: string; receivedBy: string; totalItems: number }[],
     };
 
@@ -146,7 +186,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
 async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string) {
   try {
-    const { action, notes } = req.body;
+    const { action, notes, reason } = req.body;
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user?.id || 'system';
+    const userName = authReq.user?.name || 'System';
 
     if (!action) {
       return apiResponse.badRequest(res, 'Action is required');
@@ -154,7 +197,7 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
 
     // Get current PO status
     const currentPO = await sql`
-      SELECT status FROM purchase_orders WHERE id = ${id}
+      SELECT status, version FROM purchase_orders WHERE id = ${id}
     `;
 
     if (currentPO.length === 0) {
@@ -162,98 +205,122 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
     }
 
     const currentStatus = currentPO[0]!.status;
-    let newStatus: string | null = null;
-    let historyAction: string = action;
+    const currentVersion = currentPO[0]!.version || 1;
 
-    // Validate transition and determine new status
+    // Handle approval workflow actions with the approval service
     switch (action) {
-      case 'submit':
+      case 'submit': {
         if (currentStatus !== 'draft') {
           return apiResponse.badRequest(res, 'Only draft POs can be submitted');
         }
-        newStatus = 'pending_approval';
-        historyAction = 'submitted';
-        break;
 
-      case 'approve':
+        const result = await poApprovalService.submitForApproval(id, userId, userName);
+
+        log.info('PO submitted for approval', { id, autoApproved: result.autoApproved });
+
+        return apiResponse.success(res, {
+          id,
+          status: result.autoApproved ? 'approved' : 'pending_approval',
+          action: 'submitted',
+          autoApproved: result.autoApproved,
+          approvalRequest: result.approvalRequest,
+        });
+      }
+
+      case 'approve': {
         if (currentStatus !== 'pending_approval') {
           return apiResponse.badRequest(res, 'Only pending POs can be approved');
         }
-        newStatus = 'approved';
-        historyAction = 'approved';
-        break;
 
-      case 'reject':
+        await poApprovalService.approvePO(id, userId, userName, notes);
+
+        log.info('PO approved', { id, approver: userName });
+
+        return apiResponse.success(res, {
+          id,
+          status: 'approved',
+          action: 'approved',
+        });
+      }
+
+      case 'reject': {
         if (currentStatus !== 'pending_approval') {
           return apiResponse.badRequest(res, 'Only pending POs can be rejected');
         }
-        newStatus = 'draft';
-        historyAction = 'rejected';
-        break;
 
-      case 'send':
+        if (!reason && !notes) {
+          return apiResponse.badRequest(res, 'Rejection reason is required');
+        }
+
+        const result = await poApprovalService.rejectPO(id, userId, userName, reason || notes);
+
+        log.info('PO rejected', { id, rejecter: userName, newVersion: result.newVersion });
+
+        return apiResponse.success(res, {
+          id,
+          status: 'draft',
+          action: 'rejected',
+          previousVersion: currentVersion,
+          newVersion: result.newVersion,
+        });
+      }
+
+      case 'send': {
         if (currentStatus !== 'approved') {
           return apiResponse.badRequest(res, 'Only approved POs can be sent');
         }
-        newStatus = 'sent';
-        historyAction = 'sent';
-        break;
+        await updatePOStatusSimple(id, 'sent', userId, notes);
+        return apiResponse.success(res, { id, status: 'sent', action: 'sent' });
+      }
 
-      case 'acknowledge':
+      case 'acknowledge': {
         if (currentStatus !== 'sent') {
           return apiResponse.badRequest(res, 'Only sent POs can be acknowledged');
         }
-        newStatus = 'acknowledged';
-        historyAction = 'acknowledged';
-        break;
+        await updatePOStatusSimple(id, 'acknowledged', userId, notes);
+        return apiResponse.success(res, { id, status: 'acknowledged', action: 'acknowledged' });
+      }
 
-      case 'complete':
+      case 'complete': {
         if (!['acknowledged', 'partial_receipt'].includes(currentStatus)) {
           return apiResponse.badRequest(res, 'Cannot complete PO in current status');
         }
-        newStatus = 'completed';
-        historyAction = 'completed';
-        break;
+        await updatePOStatusSimple(id, 'completed', userId, notes);
+        return apiResponse.success(res, { id, status: 'completed', action: 'completed' });
+      }
 
-      case 'cancel':
+      case 'cancel': {
         if (['completed', 'cancelled', 'draft'].includes(currentStatus)) {
           return apiResponse.badRequest(res, 'Cannot cancel PO in current status');
         }
-        newStatus = 'cancelled';
-        historyAction = 'cancelled';
-        break;
+        await updatePOStatusSimple(id, 'cancelled', userId, notes);
+        return apiResponse.success(res, { id, status: 'cancelled', action: 'cancelled' });
+      }
 
       default:
         return apiResponse.badRequest(res, `Invalid action: ${action}`);
     }
-
-    // Update status
-    await sql`
-      UPDATE purchase_orders
-      SET status = ${newStatus}, updated_at = NOW()
-      WHERE id = ${id}
-    `;
-
-    // Add history event
-    await sql`
-      INSERT INTO purchase_order_history (
-        purchase_order_id, action, notes, created_at
-      ) VALUES (
-        ${id}, ${historyAction}, ${notes || null}, NOW()
-      )
-    `;
-
-    log.info('Purchase order status updated', { id, action, newStatus });
-
-    return apiResponse.success(res, {
-      id,
-      status: newStatus,
-      action: historyAction,
-    });
   } catch (error) {
     log.error('Failed to update purchase order status', error);
     return apiResponse.internalError(res, error);
   }
+}
+
+// Helper for non-approval status updates
+async function updatePOStatusSimple(poId: string, status: string, userId: string, notes?: string) {
+  await sql`
+    UPDATE purchase_orders
+    SET status = ${status}, updated_at = NOW()
+    WHERE id = ${poId}
+  `;
+
+  await sql`
+    INSERT INTO purchase_order_history (
+      purchase_order_id, action, notes, created_by, created_at
+    ) VALUES (
+      ${poId}, ${status}, ${notes || null}, ${userId}, NOW()
+    )
+  `;
 }
 
 async function handleDelete(req: NextApiRequest, res: NextApiResponse, id: string) {

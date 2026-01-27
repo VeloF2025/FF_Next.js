@@ -6,6 +6,7 @@ import { usePOData, usePOActions } from '../hooks';
 import { PODetailHeader } from './PODetailHeader';
 import { PODetailTabs } from './PODetailTabs';
 import { LoadingState, ErrorState } from './POModalStates';
+import { PORejectModal } from './PORejectModal';
 import {
   DetailsTab,
   ItemsTab,
@@ -13,6 +14,7 @@ import {
   InvoicesTab,
   HistoryTab
 } from './detail-modal-tabs';
+import type { PurchaseOrder } from '../../../../types/procurement/po.types';
 
 interface PODetailModalProps {
   poId: string;
@@ -34,9 +36,13 @@ export const PODetailModal: React.FC<PODetailModalProps> = ({
   const {
     actionLoading,
     error: actionError,
+    showRejectModal,
     handleStatusChange,
+    handleSubmitForApproval,
     handleApprove,
-    handleReject
+    handleReject,
+    handleRejectWithReason,
+    closeRejectModal
   } = usePOActions({ po, onUpdated, onReload: reload });
 
   // Show loading state
@@ -65,11 +71,12 @@ export const PODetailModal: React.FC<PODetailModalProps> = ({
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <PODetailHeader
-          po={po}
+          po={po as PurchaseOrder & { version?: number; approvedBy?: string; approvedAt?: string }}
           actionLoading={actionLoading}
           onApprove={handleApprove}
           onReject={handleReject}
           onStatusChange={handleStatusChange}
+          onSubmitForApproval={handleSubmitForApproval}
           onClose={onClose}
         />
 
@@ -85,6 +92,16 @@ export const PODetailModal: React.FC<PODetailModalProps> = ({
           {activeTab === 'history' && <HistoryTab po={po} />}
         </div>
       </div>
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <PORejectModal
+          poNumber={po.poNumber}
+          onConfirm={handleRejectWithReason}
+          onCancel={closeRejectModal}
+          loading={actionLoading === 'reject'}
+        />
+      )}
     </div>
   );
 };

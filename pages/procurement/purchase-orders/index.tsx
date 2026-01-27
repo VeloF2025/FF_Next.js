@@ -40,6 +40,7 @@ interface POListItem {
   subtotal: number;
   vatAmount: number;
   total: number;
+  version: number;
   itemCount: number;
   createdByName: string;
   createdAt: string;
@@ -278,9 +279,16 @@ export default function PurchaseOrdersPage() {
                         className="hover:bg-[var(--ff-bg-hover)] transition-colors cursor-pointer"
                       >
                         <td className="px-4 py-3">
-                          <span className="font-medium text-[var(--ff-text-primary)]">
-                            {po.poNumber}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-[var(--ff-text-primary)]">
+                              {po.poNumber}
+                            </span>
+                            {po.version > 1 && (
+                              <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded">
+                                v{po.version}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                           {po.supplierName}
@@ -295,12 +303,17 @@ export default function PurchaseOrdersPage() {
                           {formatCurrency(po.total)}
                         </td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}
-                          >
-                            <StatusIcon className="h-3 w-3" />
-                            {status.label}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}
+                            >
+                              <StatusIcon className="h-3 w-3" />
+                              {status.label}
+                            </span>
+                            {po.status === 'pending_approval' && (
+                              <span className="animate-pulse w-2 h-2 bg-amber-400 rounded-full" />
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)]">
                           {po.itemCount}
