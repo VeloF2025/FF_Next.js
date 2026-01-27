@@ -20,13 +20,13 @@ import {
   Shield,
   Upload,
   File,
-  Trash2,
   Download,
   AlertTriangle
 } from 'lucide-react';
 import { DOCUMENT_TYPE_CONFIG, type DocumentTypeValue } from '@/modules/assets/types/document';
 import { ASSET_STATUS_CONFIG } from '@/modules/assets/constants/assetStatus';
 import { CheckInButton } from './CheckInButton';
+import { DeleteDocumentButton } from './DeleteDocumentButton';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -414,6 +414,11 @@ export default async function AssetDetailPage({ params }: PageProps) {
                             <Download className="h-4 w-4" />
                           </a>
                         )}
+                        <DeleteDocumentButton
+                          assetId={id}
+                          documentId={doc.id}
+                          documentName={doc.documentName}
+                        />
                       </div>
                     </div>
                   );
