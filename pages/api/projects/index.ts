@@ -59,7 +59,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -109,7 +108,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -142,7 +140,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -174,7 +171,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -207,7 +203,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -239,7 +234,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -270,7 +264,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -302,7 +295,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -335,7 +327,6 @@ async function handler(
                 p.project_manager,
                 p.progress,
                 p.location,
-                p.total_drops,
                 p.created_at,
                 p.updated_at,
                 c.company_name as client_name
@@ -379,8 +370,7 @@ async function handler(
           end_date,
           budget,
           project_manager,
-          city,
-          province,
+          location,
         } = req.body;
 
         const projectName = project_name || name;
@@ -395,7 +385,7 @@ async function handler(
             INSERT INTO projects (
               project_code, project_name, client_id, description,
               project_type, status, priority, start_date, end_date,
-              budget, project_manager, city, province
+              budget, project_manager, location
             )
             VALUES (
               ${project_code || null},
@@ -409,8 +399,7 @@ async function handler(
               ${end_date || null},
               ${budget || null},
               ${project_manager || null},
-              ${city || null},
-              ${province || null}
+              ${location || null}
             )
             RETURNING *
           `,
