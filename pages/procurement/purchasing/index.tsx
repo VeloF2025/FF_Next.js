@@ -455,31 +455,39 @@ export default function PurchasingPage({ projectId }: PurchasingPageProps) {
 
   return (
     <AppLayout>
-      {/* Main Category Navigation - for navigating between Procurement sections */}
-      <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 pt-4">
-        <ProcurementTabs activeTab="purchasing" categoriesOnly />
-      </div>
-
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-        {/* Page Header */}
+        {/* Module Header - Constant Position */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <FileText className="h-6 w-6 text-green-500" />
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <ShoppingCart className="h-6 w-6 text-purple-500" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  Purchasing
-                </h1>
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement</h1>
                 <p className="text-sm text-[var(--ff-text-secondary)]">
-                  Manage quotes, requisitions, purchase orders, and goods receipts
+                  Manage procurement across all projects
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Tab Bar */}
+          {/* Main Category Tab Navigation - Constant Position */}
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
+            <ProcurementTabs activeTab="purchasing" categoriesOnly />
+          </div>
+        </div>
+
+        {/* Sub-page Header with Sub-tabs */}
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <div className="px-6 py-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-green-500" />
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Purchasing</h2>
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
           <div className="px-6">
             <nav className="flex gap-1" aria-label="Purchasing tabs">
               {TABS.map((tab) => {

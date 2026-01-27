@@ -21,7 +21,8 @@ import {
   ArrowRightLeft,
   RotateCcw,
   Users,
-  FileText
+  FileText,
+  ShoppingCart,
 } from 'lucide-react';
 
 type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability';
@@ -231,15 +232,40 @@ export default function FieldStockPage() {
 
   return (
     <AppLayout>
-      {/* Main Category Navigation - for navigating between Procurement sections */}
-      <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 pt-4">
-        <ProcurementTabs activeTab="inventory" categoriesOnly />
-      </div>
-
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {/* Tab Navigation */}
-          <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+        {/* Module Header - Constant Position */}
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <ShoppingCart className="h-6 w-6 text-purple-500" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement</h1>
+                <p className="text-sm text-[var(--ff-text-secondary)]">
+                  Manage procurement across all projects
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Category Tab Navigation - Constant Position */}
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
+            <ProcurementTabs activeTab="inventory" categoriesOnly />
+          </div>
+        </div>
+
+        {/* Sub-page Header */}
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <div className="px-6 py-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-blue-500" />
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Field Stock Control</h2>
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="px-6">
             <nav className="-mb-px flex space-x-4 overflow-x-auto" aria-label="Tabs">
               {tabs.map((tab) => (
                 <button
@@ -258,8 +284,10 @@ export default function FieldStockPage() {
               ))}
             </nav>
           </div>
+        </div>
 
-          {/* Tab Content */}
+        {/* Tab Content */}
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           {renderTabContent()}
         </div>
       </div>

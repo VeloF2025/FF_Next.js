@@ -242,28 +242,36 @@ export default function ProcurementReportsPage() {
 
   return (
     <AppLayout>
-      {/* Main Category Navigation */}
-      <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 pt-4">
-        <ProcurementTabs activeTab="reports" categoriesOnly />
-      </div>
-
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-        {/* Page Header */}
+        {/* Module Header - Constant Position */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <BarChart3 className="h-6 w-6 text-purple-500" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement</h1>
+                <p className="text-sm text-[var(--ff-text-secondary)]">
+                  Manage procurement across all projects
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Category Tab Navigation - Constant Position */}
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
+            <ProcurementTabs activeTab="reports" categoriesOnly />
+          </div>
+        </div>
+
+        {/* Page-specific controls */}
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <div className="px-6 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <BarChart3 className="h-6 w-6 text-purple-500" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                    Procurement Reports
-                  </h1>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">
-                    Analytics and insights for procurement operations
-                  </p>
-                </div>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-purple-500" />
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Reports</h2>
               </div>
 
               <div className="flex items-center gap-3">
