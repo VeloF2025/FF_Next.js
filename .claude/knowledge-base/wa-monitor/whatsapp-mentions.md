@@ -142,6 +142,42 @@ The bridge accepts either format for `recipient_jid`.
 
 **Fix:** Check wa-feedback-service is forwarding `recipient_jid` or `mentionJIDs[0]`
 
+## Direct Bridge API
+
+To send messages directly to the WhatsApp bridge (bypassing FibreFlow APIs):
+
+```bash
+curl -X POST "http://72.61.197.178:8083/send-message" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "group_jid": "120363408849234743@g.us",
+    "message": "Your message here",
+    "mention_jid": "141652383526991@lid"
+  }'
+```
+
+**Field Names (snake_case, NOT camelCase):**
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `group_jid` | WhatsApp group JID | `120363408849234743@g.us` |
+| `message` | Message text (bridge adds @mention prefix) | `✅ *DR123 Received!*` |
+| `mention_jid` | JID to @mention (optional) | `141652383526991@lid` |
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Message sent successfully",
+  "message_id": "3EB002F8C2BE43AE8C4296"
+}
+```
+
+**Common Mistake:** Using camelCase (`groupJid`) instead of snake_case (`group_jid`) returns:
+```json
+{"error": "Missing group_jid or message", "success": false}
+```
+
 ## Related Commits
 
 - `546f3c77` - fix(whatsapp): display user name instead of raw JID in @mentions

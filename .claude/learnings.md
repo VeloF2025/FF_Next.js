@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-01-27: WhatsApp Bridge API - Snake_case Field Names
+
+**Issue:** Direct calls to bridge `/send-message` endpoint returned `{"error": "Missing group_jid or message"}` despite sending all fields.
+
+**Root Cause:** Bridge uses **snake_case** field names, not camelCase:
+```bash
+# ❌ WRONG - camelCase
+{"groupJid": "...", "message": "...", "mentionJid": "..."}
+
+# ✅ CORRECT - snake_case
+{"group_jid": "...", "message": "...", "mention_jid": "..."}
+```
+
+**Direct Bridge API:**
+```bash
+curl -X POST "http://72.61.197.178:8083/send-message" \
+  -H "Content-Type: application/json" \
+  -d '{"group_jid": "GROUP@g.us", "message": "text", "mention_jid": "USER@lid"}'
+```
+
+**See:** `.claude/knowledge-base/wa-monitor/whatsapp-mentions.md` for full documentation.
+
+---
+
 ## 2026-01-27: WhatsApp Bridge - Case-Sensitive Drop Number Regex
 
 **Issue:** DR469378 was submitted via WhatsApp as "Dr469378" (lowercase 'r') but never received an acknowledgment and wasn't processed.
