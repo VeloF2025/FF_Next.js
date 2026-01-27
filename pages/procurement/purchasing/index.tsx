@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import { AppLayout } from '@/components/layout';
+import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import { useTabPersistence } from '@/modules/procurement/hooks';
 import {
   FileText,
@@ -454,6 +455,11 @@ export default function PurchasingPage({ projectId }: PurchasingPageProps) {
 
   return (
     <AppLayout>
+      {/* Main Category Navigation - for navigating between Procurement sections */}
+      <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 pt-4">
+        <ProcurementTabs activeTab="purchasing" categoriesOnly />
+      </div>
+
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Page Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
