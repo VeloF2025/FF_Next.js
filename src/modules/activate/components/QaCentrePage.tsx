@@ -395,7 +395,7 @@ function QaCentrePageContent() {
     clearFilters();
   };
 
-  // Export to CSV using API endpoint for full data with all fields
+  // Export to Excel using API endpoint for full data with all fields
   const handleExportExcel = useCallback(async () => {
     setIsExporting(true);
     try {
@@ -404,6 +404,9 @@ function QaCentrePageContent() {
       if (filters.dateTo) params.set('dateTo', filters.dateTo);
       if (filters.projectFilter !== 'all') params.set('project', filters.projectFilter);
       if (filters.statusFilter !== 'all') params.set('status', filters.statusFilter);
+      if (filters.qaStatusFilter !== 'all') params.set('qaStatus', filters.qaStatusFilter);
+      if (filters.serialStatusFilter !== 'all') params.set('serialStatus', filters.serialStatusFilter);
+      if (filters.resubmissionsOnly) params.set('resubmissionsOnly', 'true');
 
       const url = `/api/activate/export?${params.toString()}`;
       const response = await fetch(url);
@@ -412,17 +415,28 @@ function QaCentrePageContent() {
         throw new Error('Export failed');
       }
 
-      // Get the CSV content and trigger download
+      // Build descriptive filename with active filters
+      const parts: string[] = ['qa-centre'];
+      if (filters.projectFilter !== 'all') parts.push(filters.projectFilter.replace(/\s+/g, '-'));
+      if (filters.statusFilter !== 'all') parts.push(filters.statusFilter);
+      if (filters.qaStatusFilter !== 'all') parts.push(`qa-${filters.qaStatusFilter}`);
+      if (filters.serialStatusFilter !== 'all') parts.push(`serial-${filters.serialStatusFilter}`);
+      if (filters.resubmissionsOnly) parts.push('resubmissions');
+      if (filters.dateFrom) parts.push(filters.dateFrom);
+      if (filters.dateTo) parts.push(`to-${filters.dateTo}`);
+      if (parts.length === 1) parts.push('all');
+
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `qa-centre-export-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.xlsx`;
+      a.download = `${parts.join('-')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Export error:', err);
       alert('Failed to export data. Please try again.');
     } finally {

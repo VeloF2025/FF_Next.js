@@ -11,7 +11,9 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown } from 'lucide-react';
+import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown, Layers, Wifi, Radio, Eye, CheckCircle } from 'lucide-react';
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
+import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import type { ZoneBreakdown } from '../types/reporting.types';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import { ReportsDashboard } from './reporting/ReportsDashboard';
@@ -211,7 +213,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
     setExpandedPoles(newExpanded);
   }, [expandedPoles]);
 
-  // Export filtered data to CSV
+  // Export filtered data to Excel
   const handleExport = useCallback(async () => {
     setIsExporting(true);
     try {
@@ -220,6 +222,9 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
       if (filters.dateTo) params.set('dateTo', filters.dateTo);
       if (filters.projectFilter !== 'all') params.set('project', filters.projectFilter);
       if (filters.statusFilter !== 'all') params.set('status', filters.statusFilter);
+      if (filters.qaStatusFilter !== 'all') params.set('qaStatus', filters.qaStatusFilter);
+      if (filters.serialStatusFilter !== 'all') params.set('serialStatus', filters.serialStatusFilter);
+      if (filters.resubmissionsOnly) params.set('resubmissionsOnly', 'true');
 
       const url = `/api/activate/export?${params.toString()}`;
       const response = await fetch(url);
@@ -228,22 +233,28 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
         throw new Error('Export failed');
       }
 
-      // Get the CSV content and trigger download
+      // Build descriptive filename with active filters
+      const parts: string[] = ['activate-dashboard'];
+      if (filters.projectFilter !== 'all') parts.push(filters.projectFilter.replace(/\s+/g, '-'));
+      if (filters.statusFilter !== 'all') parts.push(filters.statusFilter);
+      if (filters.qaStatusFilter !== 'all') parts.push(`qa-${filters.qaStatusFilter}`);
+      if (filters.serialStatusFilter !== 'all') parts.push(`serial-${filters.serialStatusFilter}`);
+      if (filters.resubmissionsOnly) parts.push('resubmissions');
+      if (filters.dateFrom) parts.push(filters.dateFrom);
+      if (filters.dateTo) parts.push(`to-${filters.dateTo}`);
+      if (parts.length === 1) parts.push('all');
+
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      // Build descriptive filename with active filters
-      const filterParts: string[] = [];
-      if (filters.statusFilter !== 'all') filterParts.push(filters.statusFilter);
-      if (filters.projectFilter !== 'all') filterParts.push(filters.projectFilter.replace(/\s+/g, '-'));
-      const filterSuffix = filterParts.length > 0 ? `-${filterParts.join('-')}` : '-all';
-      a.download = `activate-export${filterSuffix}-${filters.dateFrom || 'all'}-to-${filters.dateTo || 'all'}.xlsx`;
+      a.download = `${parts.join('-')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
     } catch (err) {
+      // eslint-disable-next-line no-console
       console.error('Export error:', err);
       alert('Failed to export data. Please try again.');
     } finally {
@@ -318,60 +329,61 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
         {showTab === 'dashboard' && (
           <>
             {/* Dashboard Stats - Order: Total, Installed, Activated, Not Reviewed, Reviewed */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {/* Total Drops */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Total Drops</h3>
-                  {isLoading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-[var(--ff-primary-500)]" />}
-                </div>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-16 mt-2" />
-                ) : (
-                  <p className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">{dashboardStats.totalDrops}</p>
-                )}
-              </div>
-
-              {/* Installed - DRs from WhatsApp */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Installed</h3>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-16 mt-2" />
-                ) : (
-                  <p className="text-2xl font-bold text-blue-500 mt-1">{dashboardStats.installed}</p>
-                )}
-              </div>
-
-              {/* Activated - DRs in OES report */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Activated</h3>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-16 mt-2" />
-                ) : (
-                  <p className="text-2xl font-bold text-purple-500 mt-1">{dashboardStats.activated}</p>
-                )}
-              </div>
-
-              {/* Not Reviewed - Feedback not yet sent */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Not Reviewed</h3>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-16 mt-2" />
-                ) : (
-                  <p className="text-2xl font-bold text-yellow-500 mt-1">{dashboardStats.notReviewed}</p>
-                )}
-              </div>
-
-              {/* Reviewed - QA feedback sent */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                <h3 className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wide">Reviewed</h3>
-                {isLoading ? (
-                  <Skeleton className="h-8 w-16 mt-2" />
-                ) : (
-                  <p className="text-2xl font-bold text-green-500 mt-1">{dashboardStats.reviewed}</p>
-                )}
-              </div>
-            </div>
+            <StatsGrid
+              cards={[
+                {
+                  title: 'Total Drops',
+                  value: dashboardStats.totalDrops,
+                  icon: Layers,
+                  color: '#3B82F6',
+                  subtitle: 'All drops',
+                  description: 'Total drops across all projects',
+                  variant: 'detailed',
+                  isLoading,
+                },
+                {
+                  title: 'Installed',
+                  value: dashboardStats.installed,
+                  icon: Wifi,
+                  color: '#3B82F6',
+                  subtitle: 'From WhatsApp',
+                  description: 'DRs received via WhatsApp submissions',
+                  variant: 'detailed',
+                  isLoading,
+                },
+                {
+                  title: 'Activated',
+                  value: dashboardStats.activated,
+                  icon: Radio,
+                  color: '#8B5CF6',
+                  subtitle: 'In OES report',
+                  description: 'DRs confirmed in Nokia OES system',
+                  variant: 'detailed',
+                  isLoading,
+                },
+                {
+                  title: 'Not Reviewed',
+                  value: dashboardStats.notReviewed,
+                  icon: Eye,
+                  color: '#F59E0B',
+                  subtitle: 'Pending QA',
+                  description: 'DRs awaiting QA feedback',
+                  variant: 'detailed',
+                  isLoading,
+                },
+                {
+                  title: 'Reviewed',
+                  value: dashboardStats.reviewed,
+                  icon: CheckCircle,
+                  color: '#10B981',
+                  subtitle: 'QA complete',
+                  description: 'DRs with QA feedback sent',
+                  variant: 'detailed',
+                  isLoading,
+                },
+              ] as EnhancedStatCardProps[]}
+              columns={5}
+            />
 
             {/* Filter Panel */}
             <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">

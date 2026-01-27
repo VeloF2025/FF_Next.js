@@ -203,7 +203,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { dateFrom, dateTo, project, status, format } = req.query;
+    const { dateFrom, dateTo, project, status, qaStatus, serialStatus, resubmissionsOnly, format } = req.query;
 
     // Build filter conditions
     const conditions: string[] = [];
@@ -226,7 +226,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
-    // Status filter (complete/incomplete)
+    // Status filter (installed/activated/not_reviewed/reviewed/complete/incomplete)
     const isCompleteCondition = `
       upr.step_01_house_photo AND upr.step_02_cable_from_pole AND upr.step_03_entry_outside AND
       upr.step_04_entry_inside AND upr.step_05_wall AND upr.step_06_ont_back AND
@@ -238,6 +238,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       conditions.push(`(${isCompleteCondition})`);
     } else if (status === 'incomplete') {
       conditions.push(`NOT (${isCompleteCondition})`);
+    } else if (status === 'installed') {
+      conditions.push(`(${isCompleteCondition})`);
+    } else if (status === 'activated') {
+      conditions.push(`oes.drop_number IS NOT NULL`);
+    } else if (status === 'not_reviewed') {
+      conditions.push(`(upr.qa_decision IS NULL OR upr.qa_decision = '')`);
+    } else if (status === 'reviewed') {
+      conditions.push(`(upr.qa_decision IS NOT NULL AND upr.qa_decision != '')`);
+    }
+
+    // QA Status filter (pending/passed/failed/rework)
+    if (qaStatus && typeof qaStatus === 'string' && qaStatus !== 'all') {
+      if (qaStatus === 'pending') {
+        conditions.push(`(upr.qa_decision IS NULL OR upr.qa_decision = '')`);
+      } else {
+        conditions.push(`upr.qa_decision = $${paramIndex}`);
+        params.push(qaStatus);
+        paramIndex++;
+      }
+    }
+
+    // Serial Status filter (valid/swapped/missing/invalid)
+    if (serialStatus && typeof serialStatus === 'string' && serialStatus !== 'all') {
+      conditions.push(`upr.serial_validation_status = $${paramIndex}`);
+      params.push(serialStatus);
+      paramIndex++;
+    }
+
+    // Resubmissions only
+    if (resubmissionsOnly === 'true') {
+      conditions.push(`upr.submission_count > 1`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -313,7 +344,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Return as Excel file download (default)
     const excel = toExcel(rows);
-    const filename = `activate-export-${dateFrom || 'all'}-to-${dateTo || 'all'}.xlsx`;
+    // Build descriptive filename with active filters
+    const filenameParts: string[] = ['activate-export'];
+    if (project && project !== 'all') filenameParts.push(String(project).replace(/\s+/g, '-'));
+    if (status && status !== 'all') filenameParts.push(String(status));
+    if (qaStatus && qaStatus !== 'all') filenameParts.push(`qa-${qaStatus}`);
+    if (serialStatus && serialStatus !== 'all') filenameParts.push(`serial-${serialStatus}`);
+    if (resubmissionsOnly === 'true') filenameParts.push('resubmissions');
+    if (dateFrom) filenameParts.push(String(dateFrom));
+    if (dateTo) filenameParts.push(`to-${dateTo}`);
+    if (filenameParts.length === 1) filenameParts.push('all');
+    const filename = `${filenameParts.join('-')}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
