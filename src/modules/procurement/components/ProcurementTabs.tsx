@@ -108,9 +108,9 @@ export function ProcurementTabs({
       label: 'Sourcing',
       icon: Search,
       subTabs: [
-        { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers', path: '/suppliers' },
-        { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ', path: '/procurement/boq' },
-        { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ', path: '/procurement/rfq' },
+        { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers', path: '/procurement/sourcing?tab=suppliers' },
+        { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ', path: '/procurement/sourcing?tab=boq' },
+        { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ', path: '/procurement/sourcing?tab=rfq' },
       ]
     },
     {
