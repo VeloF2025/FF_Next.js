@@ -63,7 +63,7 @@ export default function SourcingPage({ projectId, projectName }: SourcingPagePro
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Main Category Navigation - for navigating between Procurement sections */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 pt-4">
-          <ProcurementTabs activeTab={activeTab as any} />
+          <ProcurementTabs activeTab={activeTab as any} categoriesOnly />
         </div>
 
         {/* Page Header */}

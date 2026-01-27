@@ -65,6 +65,8 @@ interface ProcurementTabsProps {
   tabBadges?: Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>;
   permissions?: ProcurementPermissions;
   isLoading?: boolean;
+  /** Only show main category tabs (Dashboard, Sourcing, etc.) - hide sub-tabs row */
+  categoriesOnly?: boolean;
 }
 
 export function ProcurementTabs({
@@ -73,7 +75,8 @@ export function ProcurementTabs({
   selectedProject: propSelectedProject,
   tabBadges: propTabBadges,
   permissions: propPermissions,
-  isLoading: propIsLoading = false
+  isLoading: propIsLoading = false,
+  categoriesOnly = false
 }: ProcurementTabsProps = {}) {
   const router = useRouter();
 
@@ -263,8 +266,8 @@ export function ProcurementTabs({
         <div className="flex-shrink-0 w-1" />
       </nav>
 
-      {/* Sub-tabs (only show if category has more than 1 sub-tab) */}
-      {currentSubTabs.length > 1 && (
+      {/* Sub-tabs (only show if category has more than 1 sub-tab and not in categoriesOnly mode) */}
+      {!categoriesOnly && currentSubTabs.length > 1 && (
         <nav
           className="flex space-x-1 overflow-x-auto scrollbar-hide bg-[var(--ff-bg-secondary)]/50 px-2 py-1"
           aria-label="Category sub-tabs"
