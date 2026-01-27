@@ -415,6 +415,8 @@ function QaCentrePageContent() {
         throw new Error('Export failed');
       }
 
+      const exportCount = response.headers.get('X-Export-Count') || '?';
+
       // Build descriptive filename with active filters
       const parts: string[] = ['qa-centre'];
       if (filters.projectFilter !== 'all') parts.push(filters.projectFilter.replace(/\s+/g, '-'));
@@ -424,7 +426,8 @@ function QaCentrePageContent() {
       if (filters.resubmissionsOnly) parts.push('resubmissions');
       if (filters.dateFrom) parts.push(filters.dateFrom);
       if (filters.dateTo) parts.push(`to-${filters.dateTo}`);
-      if (parts.length === 1) parts.push('all');
+      parts.push(`${exportCount}-records`);
+      if (parts.length === 2) parts.splice(1, 0, 'all');
 
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);

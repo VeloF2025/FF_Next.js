@@ -353,11 +353,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (resubmissionsOnly === 'true') filenameParts.push('resubmissions');
     if (dateFrom) filenameParts.push(String(dateFrom));
     if (dateTo) filenameParts.push(`to-${dateTo}`);
-    if (filenameParts.length === 1) filenameParts.push('all');
+    filenameParts.push(`${rows.length}-records`);
+    if (filenameParts.length === 2) filenameParts.splice(1, 0, 'all'); // 'all' before count
     const filename = `${filenameParts.join('-')}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Export-Count', String(rows.length));
     return res.status(200).send(excel);
   } catch (error: any) {
     log.error('ActivateExportAPI', 'Error exporting data', error);
