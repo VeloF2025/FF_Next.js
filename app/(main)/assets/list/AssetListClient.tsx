@@ -197,7 +197,11 @@ export function AssetListClient() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {assets.map((asset) => (
-                <tr key={asset.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr
+                  key={asset.id}
+                  onClick={() => router.push(`/assets/${asset.id}`)}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
@@ -235,12 +239,14 @@ export function AssetListClient() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Link
                       href={`/assets/${asset.id}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-4"
                     >
                       <Eye className="h-4 w-4 inline" />
                     </Link>
                     <Link
                       href={`/assets/${asset.id}/edit`}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                     >
                       <Edit className="h-4 w-4 inline" />

@@ -142,7 +142,8 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
             {projects?.map((project) => (
               <tr
                 key={project.id}
-                className="hover:bg-[var(--ff-bg-hover)]"
+                onClick={() => router.push(`/projects/${project.id}`)}
+                className="hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors"
               >
                 <td className="px-4 py-4 whitespace-nowrap">
                   <div>
@@ -177,14 +178,14 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">
                     <button
-                      onClick={() => router.push(`/projects/${project.id}`)}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/projects/${project.id}`); }}
                       className="text-blue-500 hover:text-blue-600"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => router.push(`/projects/${project.id}/edit`)}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/projects/${project.id}/edit`); }}
                       className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                       title="Edit"
                     >
@@ -192,7 +193,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                     </button>
                     {onDelete && (
                       <button
-                        onClick={() => onDelete(project.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(project.id); }}
                         className="text-red-500 hover:text-red-600"
                         title="Delete"
                       >

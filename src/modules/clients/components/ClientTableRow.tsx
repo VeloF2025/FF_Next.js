@@ -14,8 +14,20 @@ interface ClientTableRowProps {
 export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
   const router = useRouter();
 
+  const handleRowClick = () => {
+    router.push(`/app/clients/${client.id}`);
+  };
+
+  const handleActionClick = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation();
+    action();
+  };
+
   return (
-    <tr className="hover:bg-[var(--ff-bg-hover)] transition-colors">
+    <tr
+      onClick={handleRowClick}
+      className="hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors"
+    >
       <td className="px-4 py-4">
         <div className="flex items-center">
           <div className="h-10 w-10 bg-blue-500/20 rounded-full flex items-center justify-center text-lg">
@@ -34,6 +46,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
           <div className="flex items-center gap-2 text-xs">
             <a
               href={`mailto:${client.email}`}
+              onClick={(e) => e.stopPropagation()}
               className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
               <Mail className="h-3 w-3" />
@@ -43,6 +56,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
           <div className="flex items-center gap-2 text-xs">
             <a
               href={`tel:${client.phone}`}
+              onClick={(e) => e.stopPropagation()}
               className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
             >
               <Phone className="h-3 w-3" />
@@ -95,7 +109,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
       <td className="px-4 py-4">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.push(`/app/clients/${client.id}`)}
+            onClick={(e) => handleActionClick(e, () => router.push(`/app/clients/${client.id}`))}
             className="p-1 text-blue-400 hover:text-blue-300"
             title="View"
           >
@@ -103,7 +117,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
           </button>
           <PermissionGate permission="clients.list" action="edit">
             <button
-              onClick={() => router.push(`/app/clients/${client.id}/edit`)}
+              onClick={(e) => handleActionClick(e, () => router.push(`/app/clients/${client.id}/edit`))}
               className="p-1 text-indigo-400 hover:text-indigo-300"
               title="Edit"
             >
@@ -112,7 +126,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
           </PermissionGate>
           <PermissionGate permission="clients.list" action="delete">
             <button
-              onClick={() => onDelete(client.id!)}
+              onClick={(e) => handleActionClick(e, () => onDelete(client.id!))}
               className="p-1 text-red-400 hover:text-red-300"
               title="Delete"
             >
