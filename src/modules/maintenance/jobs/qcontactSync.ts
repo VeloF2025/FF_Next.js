@@ -192,7 +192,7 @@ async function createJobHistoryRecord(
 
   try {
     const result = await query<{ id: string }>(sql, values);
-    const job_id = result.rows[0]?.id;
+    const job_id = result[0]?.id;
 
     if (!job_id) {
       throw new Error('Failed to create job history record');
