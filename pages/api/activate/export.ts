@@ -226,44 +226,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
-    // Status filter (installed/activated/not_reviewed/reviewed/complete/incomplete)
-    const isCompleteCondition = `
-      upr.step_01_house_photo AND upr.step_02_cable_from_pole AND upr.step_03_entry_outside AND
-      upr.step_04_entry_inside AND upr.step_05_wall AND upr.step_06_ont_back AND
-      upr.step_07_power_meter AND upr.step_08_final_installation AND upr.step_09_green_lights AND
-      upr.step_10_signature
-    `;
-
-    if (status === 'complete') {
-      conditions.push(`(${isCompleteCondition})`);
-    } else if (status === 'incomplete') {
-      conditions.push(`NOT (${isCompleteCondition})`);
-    } else if (status === 'installed') {
-      conditions.push(`(${isCompleteCondition})`);
+    // Status filter - MUST match drops.ts logic exactly
+    // installed: DRs from WhatsApp that are NOT in OES activations
+    // activated: DRs that ARE in OES activations
+    // reviewed: feedback_sent = true
+    // not_reviewed: feedback_sent is null or false
+    if (status === 'installed') {
+      conditions.push(`NOT EXISTS (SELECT 1 FROM oes_activations oes2 WHERE oes2.drop_number = upr.drop_number)`);
     } else if (status === 'activated') {
-      conditions.push(`oes.drop_number IS NOT NULL`);
-    } else if (status === 'not_reviewed') {
-      conditions.push(`(upr.qa_decision IS NULL OR upr.qa_decision = '')`);
+      conditions.push(`EXISTS (SELECT 1 FROM oes_activations oes2 WHERE oes2.drop_number = upr.drop_number)`);
+    } else if (status === 'not_reviewed' || status === 'notReviewed') {
+      conditions.push(`(upr.feedback_sent IS NULL OR upr.feedback_sent = false)`);
     } else if (status === 'reviewed') {
-      conditions.push(`(upr.qa_decision IS NOT NULL AND upr.qa_decision != '')`);
+      conditions.push(`upr.feedback_sent = true`);
     }
 
-    // QA Status filter (pending/passed/failed/rework)
+    // QA Status filter - MUST match drops.ts logic exactly
+    // DB stores: PASS, FAIL, REWORK_NEEDED (not passed/failed/rework)
     if (qaStatus && typeof qaStatus === 'string' && qaStatus !== 'all') {
       if (qaStatus === 'pending') {
-        conditions.push(`(upr.qa_decision IS NULL OR upr.qa_decision = '')`);
-      } else {
-        conditions.push(`upr.qa_decision = $${paramIndex}`);
-        params.push(qaStatus);
-        paramIndex++;
+        conditions.push(`(upr.qa_decision IS NULL)`);
+      } else if (qaStatus === 'passed') {
+        conditions.push(`upr.qa_decision = 'PASS'`);
+      } else if (qaStatus === 'failed') {
+        conditions.push(`upr.qa_decision = 'FAIL'`);
+      } else if (qaStatus === 'rework') {
+        conditions.push(`upr.qa_decision = 'REWORK_NEEDED'`);
       }
     }
 
-    // Serial Status filter (valid/swapped/missing/invalid)
+    // Serial Status filter - MUST match drops.ts pattern-based logic exactly
     if (serialStatus && typeof serialStatus === 'string' && serialStatus !== 'all') {
-      conditions.push(`upr.serial_validation_status = $${paramIndex}`);
-      params.push(serialStatus);
-      paramIndex++;
+      if (serialStatus === 'valid') {
+        conditions.push(`(
+          upr.ont_serial_scanned IS NOT NULL
+          AND upr.ups_serial_scanned IS NOT NULL
+          AND (upr.ont_serial_scanned LIKE 'ALCL%' OR upr.ont_serial_scanned LIKE 'ALCB%')
+          AND upr.ups_serial_scanned LIKE 'GU18W%'
+        )`);
+      } else if (serialStatus === 'swapped') {
+        conditions.push(`(
+          (upr.ont_serial_scanned LIKE 'GU18W%')
+          OR (upr.ups_serial_scanned LIKE 'ALCL%' OR upr.ups_serial_scanned LIKE 'ALCB%')
+        )`);
+      } else if (serialStatus === 'missing') {
+        conditions.push(`(upr.ont_serial_scanned IS NULL OR upr.ups_serial_scanned IS NULL)`);
+      } else if (serialStatus === 'invalid') {
+        conditions.push(`(
+          (upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned NOT LIKE 'ALCL%' AND upr.ont_serial_scanned NOT LIKE 'ALCB%' AND upr.ont_serial_scanned NOT LIKE 'GU18W%')
+          OR (upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned NOT LIKE 'GU18W%' AND upr.ups_serial_scanned NOT LIKE 'ALCL%' AND upr.ups_serial_scanned NOT LIKE 'ALCB%')
+        )`);
+      }
     }
 
     // Resubmissions only
