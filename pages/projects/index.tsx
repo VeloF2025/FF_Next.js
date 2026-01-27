@@ -61,55 +61,64 @@ export default function ProjectsPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">
-              Projects
-            </h1>
-            <p className="text-sm text-[var(--ff-text-secondary)]">
-              Manage and track your fiber network projects
-            </p>
+      <div className="flex flex-col min-h-full bg-[var(--ff-bg-primary)]">
+        {/* Module Header - matches ModulePage pattern */}
+        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/20">
+                  <FolderKanban className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-[var(--ff-text-primary)]">
+                    Project Management
+                  </h1>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    Manage and track your fiber network projects
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/projects/new"
+                className="ff-button ff-button--primary inline-flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                New Project
+              </Link>
+            </div>
           </div>
-          <Link
-            href="/projects/new"
-            className="ff-button ff-button--primary inline-flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            New Project
-          </Link>
-        </div>
 
-        {/* Tabs */}
-        <div className="border-b border-[var(--ff-border-light)]">
-          <nav className="flex gap-1 -mb-px" aria-label="Projects navigation">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
+          {/* Tab Navigation */}
+          <div className="px-6 border-t border-[var(--ff-border-light)]">
+            <nav className="flex gap-1 -mb-px" aria-label="Projects navigation">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
 
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab)}
-                  className={`
-                    flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
-                    ${isActive
-                      ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
-                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-default)]'
-                    }
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab)}
+                    className={`
+                      flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                      ${isActive
+                        ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
+                        : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-default)]'
+                      }
+                    `}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
         </div>
 
         {/* Tab Content */}
-        <div className="min-h-[500px]">
+        <div className="p-6 min-h-[500px]">
           {activeTab === 'overview' && (
             <PortfolioDashboard />
           )}

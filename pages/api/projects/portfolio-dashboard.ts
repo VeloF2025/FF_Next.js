@@ -134,7 +134,7 @@ export default async function handler(
           COALESCE(SUM(COALESCE(committed_cost, 0)), 0)::numeric as total_committed,
           COALESCE(SUM(COALESCE(actual_cost, 0)), 0)::numeric as total_actual
         FROM projects
-          AND status IN ('active', 'in_progress', 'planning', 'planned')
+        WHERE status IN ('active', 'in_progress', 'planning', 'planned')
       `
     );
 
@@ -267,9 +267,11 @@ export default async function handler(
           c.company_name as client_name,
           p.status,
           COALESCE(p.progress, 0)::int as progress,
-          p.project_manager as manager_name
+          COALESCE(u.name, s.name, p.project_manager) as manager_name
         FROM projects p
         LEFT JOIN clients c ON p.client_id = c.id
+        LEFT JOIN users u ON p.project_manager::text = u.id::text
+        LEFT JOIN staff s ON p.project_manager::text = s.id::text
         ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC
         LIMIT 10
       `
