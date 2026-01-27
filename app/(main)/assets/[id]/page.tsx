@@ -28,6 +28,7 @@ import { DOCUMENT_TYPE_CONFIG, type DocumentTypeValue } from '@/modules/assets/t
 import { ASSET_STATUS_CONFIG } from '@/modules/assets/constants/assetStatus';
 import { CheckInButton } from './CheckInButton';
 import { DeleteDocumentButton } from './DeleteDocumentButton';
+import { DeleteAssetButton } from './DeleteAssetButton';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -192,6 +193,7 @@ export default async function AssetDetailPage({ params }: PageProps) {
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Link>
+            <DeleteAssetButton assetId={id} assetName={asset.name} />
             {asset.status === 'available' && (
               <Link
                 href={`/assets/checkout?assetId=${id}`}
