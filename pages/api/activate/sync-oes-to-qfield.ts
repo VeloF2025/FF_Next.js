@@ -1,14 +1,17 @@
 /**
  * API Route: /api/activate/sync-oes-to-qfield
  *
- * Purpose: Sync OES activation data to QFieldCloud as a labeled point layer
+ * Purpose: Sync OES activation data to QFieldCloud as a GeoJSON file
  * Method: POST
  *
  * This endpoint:
  * 1. Fetches OES data from database
  * 2. Converts to GeoJSON with drop number labels
- * 3. Uploads to QFieldCloud as "OES Report" layer
- * 4. Points appear on map with DR numbers visible
+ * 3. Uploads to QFieldCloud via /files/ API as oes_report_fibreflow.geojson
+ * 4. Syncs to all sync-enabled projects (or specific project if provided)
+ *
+ * Note: The GeoJSON file needs to be manually added as a layer in QGIS project
+ * after first sync to configure styling. Subsequent syncs update the data.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -148,91 +151,153 @@ async function qfieldApiRequest(
 }
 
 /**
- * Delete existing OES Report layer
+ * Upload file to QFieldCloud via multipart form data
+ * Uses the /files/{project_id}/{filename} endpoint
  */
-async function deleteExistingLayer(projectId: string): Promise<void> {
-  try {
-    // Get existing layers
-    const layers = await qfieldApiRequest(`/projects/${projectId}/layers/`);
-
-    // Find OES Report layer
-    const oesLayer = layers.find((l: any) =>
-      l.name === 'OES Report' || l.name === 'oes_report' || l.name.includes('OES')
-    );
-
-    if (oesLayer) {
-      log.info('OESSync', `Deleting existing OES layer: ${oesLayer.name}`);
-      await qfieldApiRequest(
-        `/projects/${projectId}/layers/${oesLayer.id}/`,
-        'DELETE'
-      );
-    }
-  } catch (error) {
-    log.warn('OESSync', 'No existing OES layer to delete', error);
-  }
-}
-
-/**
- * Create and upload OES Report layer to QFieldCloud
- */
-async function uploadOESLayer(
+async function uploadFileToQFieldCloud(
   projectId: string,
-  geojson: GeoJSONFeatureCollection
-): Promise<any> {
-  try {
-    // Create layer with GeoJSON data
-    const layerData = {
-      name: 'OES Report',
-      datasource: 'oes_report.geojson',
-      layer_type: 'vector',
-      geometry_type: 'Point',
-      crs: 'EPSG:4326',
-      style: {
-        // Style configuration for labels
-        label: {
-          enabled: true,
-          field: 'label', // Use the label field for display
-          size: 10,
-          color: '#000000',
-          halo: true,
-          halo_color: '#FFFFFF',
-          halo_size: 1
-        },
-        symbol: {
-          type: 'simple',
-          color: '#FF0000',
-          size: 6,
-          outline_color: '#000000',
-          outline_width: 1
-        }
+  filename: string,
+  content: string,
+  contentType: string = 'application/geo+json'
+): Promise<{ success: boolean; status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const boundary = `----FormBoundary${Date.now()}`;
+    const fileBuffer = Buffer.from(content, 'utf-8');
+
+    // Build multipart form data
+    const formParts: Buffer[] = [];
+
+    // File part
+    formParts.push(Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n` +
+      `Content-Type: ${contentType}\r\n\r\n`
+    ));
+    formParts.push(fileBuffer);
+    formParts.push(Buffer.from('\r\n'));
+
+    // End boundary
+    formParts.push(Buffer.from(`--${boundary}--\r\n`));
+
+    const body = Buffer.concat(formParts);
+
+    const url = new URL(`/api/v1/files/${projectId}/${filename}/`, 'https://qfield.fibreflow.app');
+
+    const options: https.RequestOptions = {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${QFIELD_API_TOKEN}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
       },
-      data: geojson
+      rejectUnauthorized: false,
+      timeout: 60000, // 60 second timeout for file upload
     };
 
-    // Upload layer
-    const result = await qfieldApiRequest(
-      `/projects/${projectId}/layers/`,
-      'POST',
-      layerData
-    );
+    const req = https.request(url, options, (res) => {
+      let responseBody = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => responseBody += chunk);
+      res.on('end', () => {
+        resolve({
+          success: res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode || 0,
+          body: responseBody,
+        });
+      });
+    });
 
-    return result;
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('QFieldCloud file upload timeout'));
+    });
+
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * Delete file from QFieldCloud
+ */
+async function deleteFileFromQFieldCloud(
+  projectId: string,
+  filename: string
+): Promise<{ success: boolean; status: number }> {
+  return new Promise((resolve) => {
+    const url = new URL(`/api/v1/files/${projectId}/${filename}/`, 'https://qfield.fibreflow.app');
+
+    const options: https.RequestOptions = {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Token ${QFIELD_API_TOKEN}`,
+      },
+      rejectUnauthorized: false,
+      timeout: 30000,
+    };
+
+    const req = https.request(url, options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        resolve({
+          success: res.statusCode !== undefined && (res.statusCode >= 200 && res.statusCode < 300 || res.statusCode === 404),
+          status: res.statusCode || 0,
+        });
+      });
+    });
+
+    req.on('error', () => resolve({ success: false, status: 0 }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ success: false, status: 0 });
+    });
+
+    req.end();
+  });
+}
+
+// OES Report filename - consistent across all projects
+const OES_REPORT_FILENAME = 'oes_report_fibreflow.geojson';
+
+/**
+ * Delete existing OES Report file from QFieldCloud
+ */
+async function deleteExistingOESFile(projectId: string): Promise<void> {
+  try {
+    const result = await deleteFileFromQFieldCloud(projectId, OES_REPORT_FILENAME);
+    if (result.success && result.status !== 404) {
+      log.info('OESSync', `Deleted existing OES file from project ${projectId}`);
+    }
   } catch (error) {
-    throw new Error(`Failed to upload OES layer: ${error}`);
+    log.warn('OESSync', 'Error deleting OES file (may not exist)', error);
   }
 }
 
 /**
- * Alternative: Upload as GeoPackage (more robust)
+ * Upload OES Report GeoJSON file to QFieldCloud
  */
-async function uploadAsGeoPackage(
+async function uploadOESFile(
   projectId: string,
-  features: OESPoint[]
-): Promise<void> {
-  // This would require creating a GeoPackage file
-  // Using ogr2ogr or similar tool
-  // For now, we'll use GeoJSON approach above
-  log.info('OESSync', 'GeoPackage upload not yet implemented, using GeoJSON');
+  geojson: GeoJSONFeatureCollection
+): Promise<{ success: boolean; message: string }> {
+  const geojsonContent = JSON.stringify(geojson, null, 2);
+
+  log.info('OESSync', `Uploading ${OES_REPORT_FILENAME} to project ${projectId} (${geojsonContent.length} bytes)`);
+
+  const result = await uploadFileToQFieldCloud(
+    projectId,
+    OES_REPORT_FILENAME,
+    geojsonContent,
+    'application/geo+json'
+  );
+
+  if (result.success) {
+    return { success: true, message: `Uploaded ${OES_REPORT_FILENAME}` };
+  } else {
+    throw new Error(`Upload failed: ${result.status} - ${result.body}`);
+  }
 }
 
 async function handler(
@@ -352,13 +417,13 @@ async function handler(
       try {
         log.info('OESSync', `Syncing to project ${pid}...`);
 
-        // Delete existing OES layer
-        await deleteExistingLayer(pid);
+        // Delete existing OES file (if any)
+        await deleteExistingOESFile(pid);
 
-        // Upload new OES layer
-        await uploadOESLayer(pid, geojson);
+        // Upload new OES GeoJSON file
+        await uploadOESFile(pid, geojson);
 
-        // Update last_synced_at
+        // Update last_synced_at in FibreFlow DB
         try {
           await pool.query(
             'UPDATE qfield_projects SET last_synced_at = NOW() WHERE qfield_project_id = $1',
@@ -366,13 +431,6 @@ async function handler(
           );
         } catch {
           log.warn('OESSync', `Failed to update last_synced_at for ${pid} (non-critical)`);
-        }
-
-        // Trigger project sync on QFieldCloud
-        try {
-          await qfieldApiRequest(`/projects/${pid}/sync/`, 'POST');
-        } catch {
-          log.warn('OESSync', `Project sync trigger failed for ${pid} (non-critical)`);
         }
 
         syncResults.push({ projectId: pid, success: true });
@@ -392,7 +450,7 @@ async function handler(
       message: `OES data synced to ${successCount}/${targetProjectIds.length} QField project(s)${failCount > 0 ? ` (${failCount} failed)` : ''}`,
       totalPoints: features.length,
       syncResults,
-      layerName: 'OES Report',
+      filename: OES_REPORT_FILENAME,
     });
 
   } catch (error) {
