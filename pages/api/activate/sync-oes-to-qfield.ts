@@ -31,20 +31,27 @@ const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'YmFcDD4fNHu5P0j2i2xCn5
 const FALLBACK_PROJECT_ID = 'ad3b1035-ddb3-42a3-8077-175f9400b38a';
 
 /**
- * Get default QField project ID from database, falling back to hardcoded value
+ * Get all sync-enabled QField project IDs from database.
+ * If a specific projectId is provided, only sync to that one.
+ * Otherwise sync to all active + sync_enabled projects.
+ * Falls back to hardcoded value if DB query fails.
  */
-async function getDefaultProjectId(): Promise<string> {
+async function getSyncTargetProjectIds(specificProjectId?: string): Promise<string[]> {
+  if (specificProjectId) {
+    return [specificProjectId];
+  }
+
   try {
     const result = await pool.query(
-      'SELECT qfield_project_id FROM qfield_projects WHERE is_default = true AND is_active = true LIMIT 1'
+      'SELECT qfield_project_id FROM qfield_projects WHERE is_active = true AND sync_enabled = true ORDER BY is_default DESC'
     );
     if (result.rows.length > 0) {
-      return result.rows[0].qfield_project_id;
+      return result.rows.map((r: any) => r.qfield_project_id);
     }
   } catch {
-    log.warn('OESSync', 'Failed to query default QField project from DB, using fallback');
+    log.warn('OESSync', 'Failed to query QField projects from DB, using fallback');
   }
-  return FALLBACK_PROJECT_ID;
+  return [FALLBACK_PROJECT_ID];
 }
 
 interface OESPoint {
@@ -237,17 +244,21 @@ async function handler(
   }
 
   try {
-    const defaultProjectId = await getDefaultProjectId();
     const {
-      projectId = defaultProjectId,
+      projectId: specificProjectId,
       reportDate,
       teamFilter,
       statusFilter = 'Active' // Only show active drops by default
     } = req.body;
 
-    log.info('OESSync', 'Starting OES to QFieldCloud sync', { projectId, reportDate, teamFilter });
+    // Get target projects: specific one if provided, otherwise all sync-enabled
+    const targetProjectIds = await getSyncTargetProjectIds(specificProjectId);
 
-    // Step 1: Fetch OES data from database
+    log.info('OESSync', `Starting OES sync to ${targetProjectIds.length} QField project(s)`, {
+      targetProjectIds, reportDate, teamFilter,
+    });
+
+    // Step 1: Fetch OES data from database (once for all projects)
     let query = `
       SELECT
         oes.drop_number,
@@ -302,7 +313,7 @@ async function handler(
       });
     }
 
-    // Step 2: Convert to GeoJSON with labels
+    // Step 2: Convert to GeoJSON with labels (once for all projects)
     const features: GeoJSONFeature[] = oesPoints.map(point => ({
       type: 'Feature',
       geometry: {
@@ -334,42 +345,54 @@ async function handler(
 
     log.info('OESSync', `Created GeoJSON with ${features.length} features`);
 
-    // Step 3: Delete existing OES layer (if any)
-    await deleteExistingLayer(projectId);
+    // Step 3: Sync to each target project
+    const syncResults: { projectId: string; success: boolean; error?: string }[] = [];
 
-    // Step 4: Upload new OES layer to QFieldCloud
-    const uploadResult = await uploadOESLayer(projectId, geojson);
+    for (const pid of targetProjectIds) {
+      try {
+        log.info('OESSync', `Syncing to project ${pid}...`);
 
-    log.info('OESSync', 'Successfully uploaded OES layer to QFieldCloud', uploadResult);
+        // Delete existing OES layer
+        await deleteExistingLayer(pid);
 
-    // Update last_synced_at in qfield_projects
-    try {
-      await pool.query(
-        'UPDATE qfield_projects SET last_synced_at = NOW() WHERE qfield_project_id = $1',
-        [projectId]
-      );
-    } catch {
-      log.warn('OESSync', 'Failed to update last_synced_at (non-critical)');
+        // Upload new OES layer
+        await uploadOESLayer(pid, geojson);
+
+        // Update last_synced_at
+        try {
+          await pool.query(
+            'UPDATE qfield_projects SET last_synced_at = NOW() WHERE qfield_project_id = $1',
+            [pid]
+          );
+        } catch {
+          log.warn('OESSync', `Failed to update last_synced_at for ${pid} (non-critical)`);
+        }
+
+        // Trigger project sync on QFieldCloud
+        try {
+          await qfieldApiRequest(`/projects/${pid}/sync/`, 'POST');
+        } catch {
+          log.warn('OESSync', `Project sync trigger failed for ${pid} (non-critical)`);
+        }
+
+        syncResults.push({ projectId: pid, success: true });
+        log.info('OESSync', `Successfully synced to project ${pid}`);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        syncResults.push({ projectId: pid, success: false, error: errorMsg });
+        log.error('OESSync', `Failed to sync to project ${pid}`, err);
+      }
     }
 
-    // Step 5: Trigger project sync (optional - ensures mobile devices get update)
-    try {
-      await qfieldApiRequest(
-        `/projects/${projectId}/sync/`,
-        'POST'
-      );
-      log.info('OESSync', 'Triggered project sync');
-    } catch (syncError) {
-      log.warn('OESSync', 'Project sync trigger failed (non-critical)', syncError);
-    }
+    const successCount = syncResults.filter(r => r.success).length;
+    const failCount = syncResults.filter(r => !r.success).length;
 
     return res.status(200).json({
-      success: true,
-      message: 'OES data successfully synced to QFieldCloud',
+      success: successCount > 0,
+      message: `OES data synced to ${successCount}/${targetProjectIds.length} QField project(s)${failCount > 0 ? ` (${failCount} failed)` : ''}`,
       totalPoints: features.length,
-      projectId,
+      syncResults,
       layerName: 'OES Report',
-      uploadResult
     });
 
   } catch (error) {
