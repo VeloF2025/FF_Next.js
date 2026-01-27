@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, Download } from 'lucide-react';
 import { useNeonProjects } from '@/hooks/neon/useNeonProjects';
 import { projectsService } from '@/services/projectsService';
 import { notificationService } from '@/services/core/NotificationService';
-import { ProjectListHeader } from './ProjectListHeader';
 import { ProjectSummaryCards } from './ProjectSummaryCards';
 import { ProjectTable } from './ProjectTable';
 
@@ -22,11 +21,11 @@ export function ProjectList() {
       project.client_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.city?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = selectedStatus.length === 0 || 
-      selectedStatus.includes(project.status);
-    
-    const matchesPriority = selectedPriority.length === 0 || 
-      selectedPriority.includes(project.priority);
+    const matchesStatus = selectedStatus.length === 0 ||
+      selectedStatus.some(s => s.toLowerCase() === (project.status || '').toLowerCase());
+
+    const matchesPriority = selectedPriority.length === 0 ||
+      selectedPriority.some(p => p.toLowerCase() === (project.priority || '').toLowerCase());
     
     return matchesSearch && matchesStatus && matchesPriority;
   });
@@ -103,13 +102,6 @@ export function ProjectList() {
 
   return (
     <div className="space-y-6">
-      <ProjectListHeader
-        onExport={handleExport}
-        projectCount={filteredProjects.length}
-        hasFilters={selectedStatus.length > 0 || selectedPriority.length > 0 || !!searchTerm}
-        filterLabel={selectedStatus.length > 0 ? selectedStatus[0] : undefined}
-      />
-
       <ProjectSummaryCards projects={projects} />
 
       {/* Search and Filters */}
@@ -144,6 +136,17 @@ export function ProjectList() {
               </span>
             )}
           </button>
+
+          {filteredProjects.length > 0 && (
+            <button
+              onClick={handleExport}
+              title={`Export ${selectedStatus.length > 0 || selectedPriority.length > 0 || searchTerm ? 'filtered' : 'all'} projects to CSV`}
+              className="flex items-center gap-2 px-4 py-2 text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </button>
+          )}
         </div>
 
         {/* Filter Options */}

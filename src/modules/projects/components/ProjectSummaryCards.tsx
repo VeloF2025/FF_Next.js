@@ -16,13 +16,23 @@ interface ProjectSummaryCardsProps {
 
 export function ProjectSummaryCards({ summary, projects = [] }: ProjectSummaryCardsProps) {
   // Calculate summary from projects if not provided
+  // Use case-insensitive matching since DB has mixed case statuses
   const calculatedSummary = summary || {
     totalProjects: projects.length,
-    activeProjects: projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'ACTIVE').length,
-    completedProjects: projects.filter(p => p.status === 'COMPLETED').length,
-    totalBudget: projects.reduce((sum, p) => sum + (Number(p.budget_allocated) || 0), 0),
-    onHoldProjects: projects.filter(p => p.status === 'ON_HOLD').length,
-    highPriorityProjects: projects.filter(p => p.priority === 'HIGH' || p.priority === 'CRITICAL').length,
+    activeProjects: projects.filter(p => {
+      const s = (p.status || '').toLowerCase();
+      return s === 'in_progress' || s === 'active';
+    }).length,
+    completedProjects: projects.filter(p => {
+      const s = (p.status || '').toLowerCase();
+      return s === 'completed' || s === 'complete';
+    }).length,
+    totalBudget: projects.reduce((sum, p) => sum + (Number(p.budget_allocated) || Number(p.budget) || 0), 0),
+    onHoldProjects: projects.filter(p => (p.status || '').toLowerCase() === 'on_hold').length,
+    highPriorityProjects: projects.filter(p => {
+      const pr = (p.priority || '').toLowerCase();
+      return pr === 'high' || pr === 'critical';
+    }).length,
   };
 
   const formatCurrency = (amount: number) => {
