@@ -30,8 +30,23 @@ interface ProjectDetailProps {
 export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const router = useRouter();
   const id = projectId;
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [tabBadges, setTabBadges] = useState<Record<string, number>>({});
+
+  // Read tab from URL query param, default to 'overview'
+  const tabFromUrl = router.query.tab as TabId | undefined;
+  const activeTab = tabFromUrl || 'overview';
+
+  // Handle tab change - update URL
+  const handleTabChange = (newTab: TabId) => {
+    router.push(
+      {
+        pathname: router.pathname,
+        query: { ...router.query, tab: newTab },
+      },
+      undefined,
+      { shallow: true }
+    );
+  };
 
   const { data: project, isLoading, error } = useProject(id!);
   const { data: hierarchy, isLoading: isHierarchyLoading } = useProjectHierarchy(id!);
@@ -93,7 +108,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       <ProjectStatusBadges project={project} />
 
-      <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} badges={tabBadges} />
+      <ProjectTabs activeTab={activeTab} onTabChange={handleTabChange} badges={tabBadges} />
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
