@@ -96,11 +96,10 @@ const targetProjectIds = await pool.query(
 
 QFieldCloud uses token-based authentication. Tokens are stored in `authentication_authtoken` table (NOT `authtoken_token`).
 
-**Current Token (expires 2026-02-26):**
+**Current Token (generated 2026-01-27):**
 ```typescript
-const QFIELD_API_TOKEN = 'l5Fy7AlTVr1JScyoQqlmo2iktKycrrTBP1SmRJuvlYyocYm1CVgunMU4h1DlvqWKlkToNpsKUQTBKUhtKgAmr1TVPSVI87GqLYWB';
+const QFIELD_API_TOKEN = 'Y0x05qOAhdHfxPgZAZ5FzM8LgOSDlne1OTEyRoO7zQjoxYbhtpTKDHJlsrZ4Q0jJ7I6JMzA3uMn01Q2vMLxB2ox6L6DT4zYxzHj8';
 // Owner: Jaun (user_id: 4)
-// Client type: qfieldsync
 ```
 
 **Generate New Token:**
