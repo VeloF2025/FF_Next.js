@@ -2138,6 +2138,188 @@ console.log('Types:', typeof first.geometry.coordinates[0], typeof first.geometr
 
 ---
 
+## VF Storage Upload Path Pattern
+**Date:** 2026-01-27
+**Severity:** HIGH
+**Context:** Asset document upload failing with 404: `Cannot POST /upload/assets/{assetId}/documents`
+
+**Problem:** VF Storage expects simple, flat category paths. Using nested paths like `assets/${assetId}/documents` causes 404 errors.
+
+**Wrong Pattern:**
+```typescript
+// ❌ Nested category path - fails with 404
+const uploadUrl = `${VF_STORAGE_URL}/upload/assets/${assetId}/documents`;
+```
+
+**Correct Pattern:**
+```typescript
+// ✅ Simple category, assetId prefixed to filename
+const category = 'documents';
+const filename = `${assetId}_${Date.now()}_${file.name}`;
+const uploadUrl = `${VF_STORAGE_URL}/upload/assets/${category}`;
+```
+
+**Key Insight:** The VF Storage service at `100.96.203.105:8091` uses flat category paths. Include identifying information (like assetId) in the filename, not the path.
+
+**Affected Files:**
+- `app/(main)/assets/[id]/documents/upload/DocumentUploadForm.tsx`
+- Reference: `src/services/storage/vfStorageAdapter.ts` for patterns
+
+---
+
+## Lucide-react File Import Shadows Browser File Constructor
+**Date:** 2026-01-27
+**Severity:** HIGH
+**Context:** Document upload throwing `TypeError: d.Z is not a constructor`
+
+**Problem:** Importing `File` from lucide-react shadows the browser's native `File` constructor, causing crashes when creating File objects.
+
+**Wrong Pattern:**
+```typescript
+// ❌ Shadows browser's File constructor
+import { File, Upload, X } from 'lucide-react';
+
+// Later in code - CRASHES
+const file = new File([blob], filename); // TypeError: File is not a constructor
+```
+
+**Correct Pattern:**
+```typescript
+// ✅ Rename the icon import
+import { File as FileIcon, Upload, X } from 'lucide-react';
+
+// Now browser File works
+const file = new File([blob], filename); // Works!
+<FileIcon className="h-4 w-4" /> // Icon also works
+```
+
+**Key Principle:** When importing icons that share names with browser globals (File, Window, Document, etc.), always alias them with `as IconName`.
+
+**Affected Files:**
+- `app/(main)/assets/[id]/documents/upload/DocumentUploadForm.tsx`
+
+---
+
+## VF Storage to Proxy URL Transformation
+**Date:** 2026-01-27
+**Severity:** MEDIUM
+**Context:** Displaying documents stored in VF Storage
+
+**Problem:** VF Storage URLs (`http://100.96.203.105:8091/...`) are internal and not accessible from the browser. They must be transformed to proxy URLs.
+
+**Pattern:**
+```typescript
+/**
+ * Transform VF Storage URL to proxy URL for browser access
+ * Input:  http://100.96.203.105:8091/uploads/assets/documents/file.pdf
+ * Output: /api/uploads/uploads/assets/documents/file.pdf
+ */
+function getProxyUrl(vfStorageUrl: string | null | undefined): string | null {
+  if (!vfStorageUrl) return null;
+  const match = vfStorageUrl.match(/100\.96\.203\.105:8091\/(.+)/);
+  if (match) return `/api/uploads/${match[1]}`;
+  return vfStorageUrl;
+}
+```
+
+**Usage for View vs Download:**
+```typescript
+// View in browser (opens in new tab)
+<a href={getProxyUrl(doc.file_url)} target="_blank">View</a>
+
+// Force download
+<a href={`${getProxyUrl(doc.file_url)}?download=true`}>Download</a>
+```
+
+**Proxy Implementation** (`pages/api/uploads/[...path].ts`):
+```typescript
+const { download } = req.query;
+const forceDownload = download === 'true' || download === '1';
+const disposition = forceDownload ? 'attachment' : 'inline';
+res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+```
+
+**Affected Files:**
+- `app/(main)/assets/[id]/page.tsx` - Document display
+- `pages/api/uploads/[...path].ts` - Proxy endpoint
+
+---
+
+## Next.js Cache Persists Despite force-dynamic
+**Date:** 2026-01-27
+**Severity:** HIGH
+**Context:** Deleted asset still showing on dashboard after deletion and server restart
+
+**Problem:** Next.js `.next` cache folder can hold stale data even when:
+- Route has `export const dynamic = 'force-dynamic'`
+- Server has been restarted with `systemctl restart`
+- Database confirms the record is deleted
+
+**Symptoms:**
+- API returns deleted record even though database has 0 rows
+- Restarting the service doesn't help
+- Only affects production/staging builds (not dev mode)
+
+**Solution:**
+```bash
+# On server, clear the .next cache and rebuild
+cd /app/directory
+rm -rf .next
+npm run build
+sudo systemctl restart fibreflow.service
+```
+
+**Key Insight:** `systemctl restart` only restarts the Node process - it doesn't clear Next.js's build cache. For persistent cache issues, delete `.next` and rebuild.
+
+**Prevention:** When debugging "stale data" issues:
+1. First check database directly: `SELECT COUNT(*) FROM table WHERE id = 'xxx'`
+2. If DB shows deleted but API returns data → cache issue
+3. Clear `.next` and rebuild
+
+---
+
+## Asset Deletion Restrictions and Double Confirmation
+**Date:** 2026-01-27
+**Severity:** MEDIUM
+**Context:** Implementing safe asset deletion
+
+**Pattern:** Assets cannot be deleted if they're currently assigned. The service validates status before deletion:
+
+```typescript
+// In assetService.delete()
+if (asset.status === 'assigned') {
+  return { success: false, error: 'Cannot delete an assigned asset. Return it first.' };
+}
+```
+
+**UI Pattern - Double Confirmation:**
+```typescript
+// First click shows "Are you sure?" state
+const [confirmDelete, setConfirmDelete] = useState(false);
+
+// Second click actually deletes
+const handleDelete = async () => {
+  if (!confirmDelete) {
+    setConfirmDelete(true);
+    return;
+  }
+  // Actually delete
+  await fetch(`/api/assets/${assetId}`, { method: 'DELETE' });
+};
+
+// Reset confirmation state if user clicks away
+useEffect(() => {
+  const timer = setTimeout(() => setConfirmDelete(false), 3000);
+  return () => clearTimeout(timer);
+}, [confirmDelete]);
+```
+
+**Affected Files:**
+- `src/modules/assets/services/assetService.ts` - Status validation
+- `app/(main)/assets/[id]/DeleteAssetButton.tsx` - Double confirmation UI
+
+---
+
 ## Export API Must Mirror Display API Filters Exactly
 **Date:** 2026-01-27
 **Severity:** HIGH
@@ -2173,5 +2355,85 @@ console.log('Types:', typeof first.geometry.coordinates[0], typeof first.geometr
 - `pages/api/activate/drops.ts` - Display API (source of truth)
 - `src/modules/activate/components/QaCentrePage.tsx` - Export button made dynamic
 - `src/modules/activate/components/DrListPage.tsx` - Dashboard (already had dynamic button)
+
+---
+
+## 2026-01-27: Dynamic Routes Catch Named Paths - Create Explicit Pages
+
+**Date:** 2026-01-27
+**Severity:** HIGH
+**Context:** Audit found `/projects/tasks`, `/projects/reports`, `/projects/progress` all showing "Project not found" errors
+
+**Problem:** The `[id]` dynamic route in `pages/projects/[id]/` was catching URL paths like "tasks", "reports", "progress" and treating them as project IDs.
+
+```
+URL: /projects/tasks
+Expected: Tasks management page
+Actual: [id] route catches "tasks" → queries for project with id="tasks" → "Project not found"
+```
+
+**Root Cause:** Next.js Pages Router priority:
+1. Exact match files (`/projects/tasks.tsx`)
+2. Dynamic routes (`/projects/[id]/index.tsx`)
+
+If no explicit file exists, the dynamic route catches EVERYTHING.
+
+**Fix Pattern:** Create explicit page files for each named route:
+
+```
+pages/projects/
+├── [id]/
+│   └── index.tsx       # Dynamic project detail (catches IDs)
+├── tasks.tsx           # ✅ EXPLICIT - prevents [id] from catching "tasks"
+├── progress.tsx        # ✅ EXPLICIT - prevents [id] from catching "progress"
+├── reports.tsx         # ✅ EXPLICIT - prevents [id] from catching "reports"
+├── list.tsx            # ✅ EXPLICIT - all projects list
+└── index.tsx           # Module landing page
+```
+
+**Redirect Pattern for Alternate URLs:**
+```typescript
+// pages/projects/daily-progress.tsx → redirects to /projects/progress
+import type { GetServerSideProps } from 'next';
+
+export default function DailyProgressRedirect() {
+  return null;
+}
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  return {
+    redirect: {
+      destination: '/projects/progress',
+      permanent: true,  // 301 for SEO
+    },
+  };
+};
+```
+
+**Prevention Checklist:**
+1. When adding tabs/links in navigation config, CREATE THE ACTUAL PAGES
+2. Check if `[id]` or `[slug]` dynamic routes exist in the parent directory
+3. If dynamic route exists, you MUST create explicit files for named routes
+4. Test all sidebar/tab links before deploying
+
+**Quick Diagnosis:**
+```bash
+# Check if named route will be caught by dynamic route
+ls pages/projects/        # See if tasks.tsx exists
+ls pages/projects/[id]/   # See if [id] directory exists
+# If [id] exists but tasks.tsx doesn't → BUG!
+```
+
+**Affected Files (Fixed):**
+- `pages/projects/tasks.tsx` - Created
+- `pages/projects/progress.tsx` - Created
+- `pages/projects/reports.tsx` - Created
+- `pages/projects/list.tsx` - Created
+- `pages/projects/daily-progress.tsx` - Created (redirect)
+- `pages/human-resources.tsx` - Created (redirect to /staff)
+
+**Reference:**
+- Commit: `fb51b13c` - fix(routing): add missing project pages and human-resources redirect
+- KB: `.claude/knowledge-base/nextjs-build-gotchas.md`
 
 ---

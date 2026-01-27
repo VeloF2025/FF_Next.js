@@ -215,3 +215,57 @@ Result: ERR_TOO_MANY_REDIRECTS
 # Check for potential circular redirects
 grep -r "redirect.*destination" pages/ | grep -E "(health-safety|incidents)"
 ```
+
+---
+
+## Dynamic Routes Catch Named Paths
+
+**Severity:** HIGH - causes "not found" errors for valid routes
+
+**Problem:** Dynamic `[id]` routes catch named URL segments when explicit files don't exist.
+
+**Example:**
+```
+pages/projects/
+├── [id]/
+│   └── index.tsx       # Dynamic route
+└── index.tsx           # Landing page
+
+# URL: /projects/tasks
+# Expected: Tasks page
+# Actual: [id] catches "tasks" → queries for project id="tasks" → "Project not found"
+```
+
+**Why This Happens:**
+Next.js route priority:
+1. Exact match files (`/projects/tasks.tsx`)
+2. Dynamic routes (`/projects/[id]/`)
+
+If no explicit file exists, dynamic route catches EVERYTHING including words like "tasks", "reports", "settings".
+
+**Quick Diagnosis:**
+```bash
+# Check for the bug pattern
+ls pages/module-name/           # Does [id] directory exist?
+ls pages/module-name/[id]/      # Yes? Then explicit files needed for named routes
+
+# If navigation config has these tabs but no explicit files → BUG:
+grep -r "path.*'/projects/" src/modules/navigation/
+```
+
+**Fix:** Create explicit page files for every named route:
+```
+pages/projects/
+├── [id]/              # Dynamic (catches UUIDs)
+├── tasks.tsx          # ✅ Explicit - "tasks" won't hit [id]
+├── reports.tsx        # ✅ Explicit - "reports" won't hit [id]
+├── progress.tsx       # ✅ Explicit - "progress" won't hit [id]
+└── index.tsx
+```
+
+**Prevention:**
+1. When adding navigation tabs, CREATE the actual page files
+2. When creating `[id]` directory, audit all sibling routes
+3. Test every sidebar/tab link before deploying
+
+**Reference:** Commit `fb51b13c` - fix(routing): add missing project pages

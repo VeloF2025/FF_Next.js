@@ -267,6 +267,42 @@ Replace sidebar sub-items with horizontal tabs at top of page:
 - Verify useModuleTabs hook is working
 - Check browser console for errors
 
+### "Not found" errors on tab click (CRITICAL)
+**Symptom:** Clicking tab shows "Project not found" or similar error.
+
+**Root Cause:** Dynamic `[id]` route is catching the named path (e.g., "tasks") as an ID.
+
+**Diagnosis:**
+```bash
+# Check if explicit page exists for the tab path
+ls pages/[module]/tasks.tsx    # Does this file exist?
+ls pages/[module]/[id]/        # Does dynamic route exist?
+# If [id] exists but tasks.tsx doesn't → BUG!
+```
+
+**Fix:** Create explicit page file for each tab:
+```typescript
+// pages/[module]/tasks.tsx
+import type { NextPage } from 'next';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { [module]Config } from '@/modules/navigation';
+
+const TasksPage: NextPage = () => {
+  return (
+    <AppLayout>
+      <ModulePage config={[module]Config}>
+        {/* Page content */}
+      </ModulePage>
+    </AppLayout>
+  );
+};
+
+export default TasksPage;
+```
+
+**Prevention:** When adding tabs to navigation config, ALWAYS create the corresponding page files.
+
 ## Reference Implementation
 
 See Maintenance module migration:
