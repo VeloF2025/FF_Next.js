@@ -92,6 +92,52 @@ const targetProjectIds = await pool.query(
 // GeoJSON built once, uploaded to each project
 ```
 
+## API Authentication
+
+QFieldCloud uses token-based authentication. Tokens are stored in `authentication_authtoken` table (NOT `authtoken_token`).
+
+**Current Token (expires 2026-02-26):**
+```typescript
+const QFIELD_API_TOKEN = 'l5Fy7AlTVr1JScyoQqlmo2iktKycrrTBP1SmRJuvlYyocYm1CVgunMU4h1DlvqWKlkToNpsKUQTBKUhtKgAmr1TVPSVI87GqLYWB';
+// Owner: Jaun (user_id: 4)
+// Client type: qfieldsync
+```
+
+**Generate New Token:**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker exec qfieldcloud-app-1 python manage.py shell -c \"
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import get_user_model
+User = get_user_model()
+user = User.objects.get(username='Jaun')
+Token.objects.filter(user=user).delete()
+token = Token.objects.create(user=user)
+print('NEW TOKEN:', token.key)
+\""
+```
+
+**API Usage:**
+```bash
+curl -s "https://qfield.fibreflow.app/api/v1/files/{project_id}/" \
+  -H "Authorization: Token {token}"
+```
+
+## File Upload (OES Sync)
+
+QFieldCloud does **NOT** have a `/layers/` API endpoint. To add GIS data:
+
+1. **Manual Method (current):** Upload GeoPackage via QFieldCloud web UI or QField mobile app
+2. **API Method:** Upload file via `/files/` endpoint
+
+```bash
+# Upload GeoPackage to project
+curl -X POST "https://qfield.fibreflow.app/api/v1/files/{project_id}/oes_data.gpkg" \
+  -H "Authorization: Token {token}" \
+  -F "file=@/path/to/oes_data.gpkg"
+```
+
+**Note:** The current `sync-oes-to-qfield.ts` API attempts to use a non-existent `/layers/` endpoint. Manual GeoPackage upload (e.g., `OES 27-01-26.gpkg`) is the working method.
+
 ## Admin Access
 
 **Django Admin:** https://qfield.fibreflow.app/admin/
@@ -138,6 +184,8 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker ps --format '{{.Names}}' |
 | `pages/api/activate/sync-oes-to-qfield.ts` | OES sync |
 | `scripts/migrations/134_qfield_projects.sql` | Registry schema |
 
-## Historical Note
+## Historical Notes
 
-**2026-01-27:** Fixed DB host from VPS (72.61.166.168) to Velocity (100.96.203.105). The VPS had a stale copy with only 17 projects. Commit: `d22fee08`
+**2026-01-27 (d22fee08):** Fixed DB host from VPS (72.61.166.168) to Velocity (100.96.203.105). The VPS had a stale copy with only 17 projects.
+
+**2026-01-27 (81174ba7):** Updated API token. Old token was expired. New token from `authentication_authtoken` table (not `authtoken_token`). Token owner: Jaun (user_id: 4).
