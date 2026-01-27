@@ -27,8 +27,25 @@ const pool = new Pool({
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
 const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'YmFcDD4fNHu5P0j2i2xCn5AVt7JjmSnJOVHntObwCHHlE35nAE0C9LuNF9N0coTk5gNLcUsvYRUb0GH0ZJT2bGcyej5Y3apeVsPS';
 
-// Default project ID - OES_Project_Progress (updated Jan 2026)
-const DEFAULT_PROJECT_ID = 'ad3b1035-ddb3-42a3-8077-175f9400b38a';
+// Fallback project ID if no default is set in DB
+const FALLBACK_PROJECT_ID = 'ad3b1035-ddb3-42a3-8077-175f9400b38a';
+
+/**
+ * Get default QField project ID from database, falling back to hardcoded value
+ */
+async function getDefaultProjectId(): Promise<string> {
+  try {
+    const result = await pool.query(
+      'SELECT qfield_project_id FROM qfield_projects WHERE is_default = true AND is_active = true LIMIT 1'
+    );
+    if (result.rows.length > 0) {
+      return result.rows[0].qfield_project_id;
+    }
+  } catch {
+    log.warn('OESSync', 'Failed to query default QField project from DB, using fallback');
+  }
+  return FALLBACK_PROJECT_ID;
+}
 
 interface OESPoint {
   drop_number: string;
@@ -220,8 +237,9 @@ async function handler(
   }
 
   try {
+    const defaultProjectId = await getDefaultProjectId();
     const {
-      projectId = DEFAULT_PROJECT_ID,
+      projectId = defaultProjectId,
       reportDate,
       teamFilter,
       statusFilter = 'Active' // Only show active drops by default
@@ -323,6 +341,16 @@ async function handler(
     const uploadResult = await uploadOESLayer(projectId, geojson);
 
     log.info('OESSync', 'Successfully uploaded OES layer to QFieldCloud', uploadResult);
+
+    // Update last_synced_at in qfield_projects
+    try {
+      await pool.query(
+        'UPDATE qfield_projects SET last_synced_at = NOW() WHERE qfield_project_id = $1',
+        [projectId]
+      );
+    } catch {
+      log.warn('OESSync', 'Failed to update last_synced_at (non-critical)');
+    }
 
     // Step 5: Trigger project sync (optional - ensures mobile devices get update)
     try {

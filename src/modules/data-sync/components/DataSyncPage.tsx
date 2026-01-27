@@ -20,12 +20,14 @@ import {
   Wrench,
   Zap,
   AlertTriangle,
+  MapPin,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
 import { MaintenanceGroup } from './groups/MaintenanceGroup';
 import { ActivateGroup } from './groups/ActivateGroup';
 import { OltReportGroup } from './groups/OltReportGroup';
+import { QFieldGroup } from './groups/QFieldGroup';
 
 // Tab group configuration
 const TAB_GROUPS: { id: TabGroupId; label: string; icon: React.ElementType; description: string }[] = [
@@ -46,6 +48,12 @@ const TAB_GROUPS: { id: TabGroupId; label: string; icon: React.ElementType; desc
     label: 'OLT Report',
     icon: AlertTriangle,
     description: 'Nokia OLT report import and 1Map serial fixes',
+  },
+  {
+    id: 'qfield',
+    label: 'QField',
+    icon: MapPin,
+    description: 'QFieldCloud projects for OES and data sync targets',
   },
 ];
 
@@ -180,6 +188,13 @@ export function DataSyncPage() {
           <OltReportGroup
             activeTab={activeTab}
             onTabChange={(tab) => handleTabChange('olt', tab)}
+          />
+        )}
+
+        {activeGroup === 'qfield' && (
+          <QFieldGroup
+            activeTab={activeTab}
+            onTabChange={(tab) => handleTabChange('qfield', tab)}
           />
         )}
       </div>

@@ -6,7 +6,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 // Tab group identifiers
-export type TabGroupId = 'maintenance' | 'activate' | 'olt';
+export type TabGroupId = 'maintenance' | 'activate' | 'olt' | 'qfield';
 
 // Individual tab within a group
 export interface Tab {
@@ -75,3 +75,32 @@ export type OltTabId =
   | 'escalations'
   | 'history'
   | 'reporting';
+
+// QField tab IDs
+export type QFieldTabId = 'projects';
+
+// QField project from DB
+export interface QFieldProject {
+  id: string;
+  qfield_project_id: string;
+  name: string;
+  description: string | null;
+  qfield_url: string | null;
+  is_active: boolean;
+  is_default: boolean;
+  sync_enabled: boolean;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+  linked_projects: { id: string; project_name: string; project_code: string }[];
+}
+
+// QFieldCloud project from discovery
+export interface QFieldCloudProject {
+  id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  already_registered: boolean;
+}
