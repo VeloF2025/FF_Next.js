@@ -101,10 +101,13 @@ Step-by-step workflows for typical tasks:
 ```
 
 ### Phase 4: Generate PDF
+
+**CRITICAL:** Must run from `docs/user-manuals/` with `--basedir .` so that `../screenshots/` relative paths resolve correctly. Without `--basedir`, images will show as broken icons in the PDF. See [md-to-pdf #70](https://github.com/simonhaenisch/md-to-pdf/issues/70).
+
 ```bash
-cd docs/user-manuals/source
-npx md-to-pdf <module>.md --pdf-options '{"format":"A4","margin":{"top":"25mm","bottom":"25mm","left":"20mm","right":"20mm"}}'
-mv <module>.pdf ../pdf/
+cd docs/user-manuals
+npx md-to-pdf source/<module>.md --basedir . --pdf-options '{"format":"A4","margin":{"top":"25mm","bottom":"25mm","left":"20mm","right":"20mm"}}'
+mv source/<module>.pdf pdf/
 ```
 
 ### Phase 5: Commit
