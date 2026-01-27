@@ -1643,3 +1643,105 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S nginx -
 - `pages/api/activate/import-oes.ts` - OES import API (has maxDuration for Vercel)
 
 ---
+
+## 2026-01-27: EnhancedStatCard Must Be Router-Agnostic (Pages + App Router)
+
+**Issue:** `EnhancedStatCard` used `useRouter` from `next/router` for navigation. This crashed with "NextRouter was not mounted" error when rendered in App Router context (e.g., Maintenance module at `app/(main)/maintenance/`).
+
+**Root Cause:** `useRouter` from `next/router` only works in Pages Router. App Router uses `useRouter` from `next/navigation` instead. Importing from the wrong package crashes.
+
+**Bad Pattern:**
+```typescript
+// ❌ Only works in Pages Router - crashes in App Router
+import { useRouter } from 'next/router';
+
+const MyComponent = ({ route }: { route?: string }) => {
+  const router = useRouter();  // 💥 "NextRouter was not mounted" in App Router
+  return <div onClick={() => router.push(route!)}>Click</div>;
+};
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Link works in BOTH Pages Router and App Router
+import Link from 'next/link';
+
+const MyComponent = ({ route, onClick }: Props) => {
+  const cardContent = <>{/* ... card body ... */}</>;
+
+  // Use Link wrapper for route navigation (universal)
+  if (route) {
+    return <Link href={route} className="block no-underline">{cardContent}</Link>;
+  }
+
+  // Use div for onClick-only or non-interactive cards
+  return <div onClick={onClick}>{cardContent}</div>;
+};
+```
+
+**Key Principles:**
+1. **Never use `useRouter` in shared components** - Use `next/link` `Link` instead
+2. **`next/link` is universal** - Works in both Pages Router and App Router
+3. **Conditional wrapper pattern** - Render `<Link>` when `route` provided, `<div>` otherwise
+4. **No `useCallback` dependency on router** - Simpler, fewer re-renders
+
+**Router Context Quick Reference:**
+| Directory | Router Type | `useRouter` import |
+|-----------|------------|-------------------|
+| `pages/` | Pages Router | `next/router` |
+| `app/` | App Router | `next/navigation` |
+| `src/components/` (shared) | **BOTH** | Use `next/link` Link only |
+
+**Affected Files:**
+- `src/components/dashboard/EnhancedStatCard.tsx` - Fixed (commit `98f82be1`)
+- All dashboards using `StatsGrid`: Fleet, Staff, H&S, Activate, Maintenance
+
+**Dashboards Now Using Unified EnhancedStatCard:**
+| Module | File | Router | Columns |
+|--------|------|--------|---------|
+| Dashboard | `pages/dashboard.tsx` | Pages | 5 |
+| Fleet | `pages/fleet/index.tsx` | Pages | 4 |
+| Staff | `pages/staff/index.tsx` | Pages | 5 |
+| H&S | `pages/projects/health-safety/index.tsx` | Pages | 3 |
+| Activate | `src/modules/activate/components/DrListPage.tsx` | Pages | 5 |
+| Maintenance | `src/modules/maintenance/components/Dashboard/TicketingDashboard.tsx` | App | 4 |
+
+---
+
+## Export API Must Mirror Display API Filters Exactly
+**Date:** 2026-01-27
+**Severity:** HIGH
+**Context:** QA Centre export returned 102 records instead of 359 for "installed" filter
+
+**Problem:** `pages/api/activate/export.ts` had completely different filter logic from `pages/api/activate/drops.ts` (the display API). Every filter type was wrong:
+
+| Filter | export.ts (WRONG) | drops.ts (CORRECT) |
+|--------|-------------------|---------------------|
+| `installed` | All 10 steps complete | `NOT EXISTS (SELECT 1 FROM oes_activations)` |
+| `activated` | LEFT JOIN IS NOT NULL | `EXISTS (SELECT 1 FROM oes_activations)` |
+| `reviewed` | `qa_decision IS NOT NULL` | `feedback_sent = true` |
+| `not_reviewed` | `qa_decision IS NULL` | `feedback_sent IS NULL OR false` |
+| QA Status | Raw values (`passed`) | DB values (`PASS`, `FAIL`, `REWORK_NEEDED`) |
+| Serial Status | `serial_validation_status` column | LIKE pattern matching (`ALCL%`, `GU18W%`) |
+
+**Root Cause:** Export API was written independently and never kept in sync with display API updates.
+
+**Fix:** Rewrote all filter conditions in `export.ts` to exactly match `drops.ts`. Added comments: `// MUST match drops.ts logic exactly`.
+
+**Prevention Rule:** When changing filter logic in `drops.ts`, ALWAYS update `export.ts` to match. Both files have comments cross-referencing each other.
+
+**Key Status Definitions (Activate Module):**
+- **installed** = DR from WhatsApp NOT yet in OES activations
+- **activated** = DR exists in `oes_activations` table
+- **reviewed** = `feedback_sent = true` (NOT qa_decision)
+- **not_reviewed** = `feedback_sent IS NULL OR false`
+- **QA Status DB values:** `PASS`, `FAIL`, `REWORK_NEEDED` (not lowercase)
+- **Serial validation:** Pattern-based LIKE matching, no dedicated status column
+
+**Affected Files:**
+- `pages/api/activate/export.ts` - Export API (FIXED)
+- `pages/api/activate/drops.ts` - Display API (source of truth)
+- `src/modules/activate/components/QaCentrePage.tsx` - Export button made dynamic
+- `src/modules/activate/components/DrListPage.tsx` - Dashboard (already had dynamic button)
+
+---

@@ -189,6 +189,120 @@ COALESCE(s.company_name, s.name, 'Unknown') as supplier_name
 
 ---
 
+## Shared Components Must Be Router-Agnostic
+
+**Symptom:** "NextRouter was not mounted" error when shared component renders in App Router context.
+
+**Root Cause:** Component uses `useRouter` from `next/router` which only works in Pages Router (`pages/`). App Router pages (`app/`) need `next/navigation`.
+
+**Bad Pattern:**
+```typescript
+// ❌ Crashes in App Router context
+import { useRouter } from 'next/router';
+
+const SharedCard = ({ route }: { route?: string }) => {
+  const router = useRouter();  // 💥 App Router crash
+  return <div onClick={() => router.push(route!)}>...</div>;
+};
+```
+
+**Good Pattern:**
+```typescript
+// ✅ next/link works in BOTH router contexts
+import Link from 'next/link';
+
+const SharedCard = ({ route, onClick }: Props) => {
+  const content = <>{/* card body */}</>;
+
+  if (route) {
+    return <Link href={route} className="block no-underline">{content}</Link>;
+  }
+  return <div onClick={onClick}>{content}</div>;
+};
+```
+
+**Rule:** Shared components in `src/components/` must NEVER import from `next/router` or `next/navigation`. Use `next/link` Link for navigation.
+
+**Reference:** `src/components/dashboard/EnhancedStatCard.tsx` - Fixed 2026-01-27 (commit `98f82be1`)
+
+---
+
+## Dashboard Stat Cards Must Use EnhancedStatCard
+
+**Standard:** ALL module dashboards must use `EnhancedStatCard` + `StatsGrid` from `@/components/dashboard/EnhancedStatCard`.
+
+**Pattern:**
+```typescript
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
+import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
+
+<StatsGrid
+  cards={[
+    {
+      title: 'Card Title',
+      value: 42,
+      icon: IconComponent,    // From lucide-react
+      color: '#3B82F6',       // Hex color for top bar + icon badge
+      subtitle: 'Short label',
+      description: 'Longer description text',
+      route: '/module/page',  // Optional navigation
+      variant: 'detailed',    // Shows subtitle + description
+    },
+  ] as EnhancedStatCardProps[]}
+  columns={4}               // 2-6 columns
+/>
+```
+
+**Card Visual Structure:**
+- Colored top bar (h-1, uses `color` prop)
+- Colored icon badge (w-12 h-12 rounded-lg, uses `color` prop)
+- Title + subtitle + value + description
+- Hover: shadow + blue border
+
+**Color Palette (commonly used):**
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Blue | `#3B82F6` | Primary/total counts |
+| Green | `#10B981` | Active/success/compliant |
+| Yellow | `#F59E0B` | Warning/pending/unassigned |
+| Red | `#EF4444` | Error/overdue/critical |
+| Purple | `#8B5CF6` | Special/locations/departments |
+| Gray | `#6B7280` | Inactive/former |
+
+**Modules using EnhancedStatCard (2026-01-27):**
+Dashboard, Fleet, Staff, H&S, Activate, Maintenance
+
+**Reference:** Commit `98f82be1` - Router-agnostic fix
+
+---
+
+## Quick Actions Position: After Header
+
+**Symptom:** Quick Action buttons are at the bottom of the page, invisible without scrolling.
+
+**Root Cause:** Quick Actions rendered after all dashboard content instead of near the top.
+
+**Pattern:** Quick Actions should appear immediately after the module header/stats, before main content.
+
+```tsx
+<ModulePage config={moduleConfig}>
+  {/* 1. Quick Actions - RIGHT AFTER HEADER */}
+  <div className="flex gap-3">
+    <Link href="/module/new" className="...">+ New Item</Link>
+  </div>
+
+  {/* 2. Stats Cards */}
+  <StatsGrid cards={[...]} columns={4} />
+
+  {/* 3. Main Content */}
+  <div>...</div>
+</ModulePage>
+```
+
+**Reference:** Commit `b62421d0` - Fixed procurement Quick Actions position
+
+---
+
 ## Audit Checklist
 
 When auditing a page, check:
@@ -203,3 +317,6 @@ When auditing a page, check:
 - [ ] Forms validate and submit
 - [ ] Modals open and close properly
 - [ ] List data displays correctly
+- [ ] Stat cards use EnhancedStatCard + StatsGrid
+- [ ] Shared components don't import from next/router
+- [ ] Quick Actions positioned after header, not at bottom
