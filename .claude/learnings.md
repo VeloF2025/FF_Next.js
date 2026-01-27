@@ -1939,6 +1939,82 @@ css: |-
 
 ---
 
+## 2026-01-27: WhatsApp Mentions - Bridge Handles Text AND Context
+
+**Issue:** WhatsApp @mentions were showing double mentions like `@~weird sis 🦋 @~weird sis 🦋 DR1862728 - FAILED` - same person tagged twice in one message.
+
+**Root Cause:** TWO systems were adding @mention text to the message:
+1. FibreFlow API (`send-feedback.ts`) was adding `@phone` to the message text
+2. WhatsApp Bridge (`whatsapp-bridge-go`) was ALSO adding `@user` prefix
+
+The bridge adds BOTH the `@user` text prefix AND the `MentionedJID` context (which tells WhatsApp to display the contact name instead of raw numbers).
+
+**Architecture Understanding:**
+
+```
+FibreFlow API                 wa-feedback-service           Unified Bridge (VPS:8083)
+send-feedback.ts         →    :8092 (Velocity)         →    whatsapp-bridge-go
+                                                              │
+                                                              ├─ Adds @user prefix
+                                                              └─ Adds MentionedJID context
+```
+
+**The bridge's message construction (Go):**
+```go
+// Bridge ALWAYS adds @user prefix when recipient_jid provided
+messageText := fmt.Sprintf("@%s %s", recipientJID.User, req.Message)
+msg := &waProto.Message{
+    ExtendedTextMessage: &waProto.ExtendedTextMessage{
+        Text: proto.String(messageText),  // Has @user prefix
+        ContextInfo: &waProto.ContextInfo{
+            MentionedJID: []string{req.RecipientJID},  // WhatsApp displays name
+        },
+    },
+}
+```
+
+**Bad Pattern (FibreFlow API):**
+```typescript
+// ❌ WRONG - Don't add @phone in FibreFlow - bridge already handles this
+const mentionParts: string[] = [];
+if (review.wa_sender_jid) {
+  mentionParts.push(`@${extractPhoneFromJid(review.wa_sender_jid)}`);
+}
+groupMessage = `${mentionParts.join(' ')} ${feedbackMessage}`;  // @phone + message
+```
+
+**Good Pattern (FibreFlow API):**
+```typescript
+// ✅ CORRECT - Just send the plain message, bridge adds @mention
+// The bridge adds @user prefix AND MentionedJID context info
+// This allows WhatsApp to display contact name instead of raw number
+const groupMessage = feedbackMessage;  // No @phone prefix!
+```
+
+**What wa-feedback-service forwards:**
+```javascript
+// Forward recipient_jid to bridge - bridge uses this for mention
+const response = await axios.post(`${bridgeUrl}/send-message`, {
+  group_jid: targetRecipient,
+  recipient_jid: mentionJid,  // Bridge needs this for @mention
+  message: fullMessage        // Plain message, no @phone prefix
+});
+```
+
+**Key Principle:** The Unified Bridge is the ONLY component that should add @mention text. FibreFlow APIs should:
+1. Send the plain message (no `@phone` prefix)
+2. Include `recipient_jid` (or `mentionJIDs`) for mention support
+3. Let the bridge handle both the text prefix AND the WhatsApp `MentionedJID` context
+
+**Affected Files:**
+- `pages/api/activate/send-feedback.ts` - Removed @phone text addition
+- `pages/api/wa-monitor-send-feedback.ts` - Added `recipient_jid` forwarding
+- `/home/louis/wa-feedback-service/wa-feedback-service.js` (Velocity) - Forwards recipient_jid to bridge
+
+**Commit:** `546f3c77` - fix(whatsapp): display user name instead of raw JID in @mentions
+
+---
+
 ## Export API Must Mirror Display API Filters Exactly
 **Date:** 2026-01-27
 **Severity:** HIGH

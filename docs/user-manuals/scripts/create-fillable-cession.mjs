@@ -278,55 +278,68 @@ async function createFillablePDF() {
 
   y -= 35;
 
-  // Pre-filled Velocity Fibre
-  page.drawText('Full Legal Name:', {
-    x: margin,
-    y: y,
-    size: 10,
-    font: font,
-    color: COLORS.body,
-  });
-  page.drawText('VELOCITY FIBRE (PTY) LTD', {
-    x: margin + 150,
-    y: y,
-    size: 10,
-    font: fontBold,
-    color: COLORS.navy,
-  });
-
-  y -= 28;
-
-  const vfFields = [
-    { name: 'vf_reg_no', label: 'Registration Number' },
-    { name: 'vf_address', label: 'Registered Address' },
-    { name: 'vf_rep_name', label: 'Represented By' },
-    { name: 'vf_rep_id', label: 'Identity Number' },
-    { name: 'vf_email', label: 'Contact Email' },
-    { name: 'vf_phone', label: 'Contact Number' },
+  // Pre-filled Velocity Fibre details (from CIPC COR14.3)
+  const vfDetails = [
+    { label: 'Full Legal Name', value: 'VELOCITY FIBRE (PTY) LTD', prefilled: true },
+    { label: 'Registration Number', value: '2025/238946/07', prefilled: true },
+    { label: 'Tax Number', value: '9055917307', prefilled: true },
+    { label: 'Registered Address', value: '26 Centenary Road, Lorraine, Gqeberha, 6070', prefilled: true },
+    { label: 'Contact Email', value: 'info@velocityfibre.co.za', prefilled: true },
+    { label: 'Contact Number', value: '041-012 5010', prefilled: true },
   ];
 
-  for (const field of vfFields) {
-    page.drawText(field.label + ':', {
+  for (const detail of vfDetails) {
+    page.drawText(detail.label + ':', {
       x: margin,
       y: y,
       size: 10,
       font: font,
       color: COLORS.body,
     });
-
-    const textField = newForm.createTextField(field.name);
-    textField.addToPage(page, {
+    page.drawText(detail.value, {
       x: margin + 150,
-      y: y - 5,
-      width: 300,
-      height: 18,
-      borderColor: COLORS.teal,
-      backgroundColor: COLORS.lightGray,
+      y: y,
+      size: 10,
+      font: detail.prefilled ? fontBold : font,
+      color: COLORS.navy,
     });
-    textField.setFontSize(10);
-
-    y -= 28;
+    y -= 22;
   }
+
+  y -= 10;
+
+  // Pre-filled signatory - MD Llewelyn Hofmeyr
+  page.drawText('Represented By:', {
+    x: margin,
+    y: y,
+    size: 10,
+    font: font,
+    color: COLORS.body,
+  });
+  page.drawText('Llewelyn Hofmeyr', {
+    x: margin + 150,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
+  });
+  y -= 22;
+
+  page.drawText('Capacity:', {
+    x: margin,
+    y: y,
+    size: 10,
+    font: font,
+    color: COLORS.body,
+  });
+  page.drawText('Managing Director', {
+    x: margin + 150,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
+  });
+  y -= 28;
 
   // ============ PAGE 3: AGREEMENT DETAILS ============
   page = newPdf.addPage([pageWidth, pageHeight]);
@@ -644,6 +657,7 @@ async function createFillablePDF() {
 
   y -= 30;
 
+  // Pre-filled VF address
   page.drawText('Physical Address:', {
     x: margin,
     y: y,
@@ -651,20 +665,23 @@ async function createFillablePDF() {
     font: font,
     color: COLORS.body,
   });
-
-  const vfPhysical = newForm.createTextField('vf_physical_address');
-  vfPhysical.addToPage(page, {
+  page.drawText('26 Centenary Road, Lorraine,', {
     x: margin + 150,
-    y: y - 20,
-    width: 320,
-    height: 40,
-    borderColor: COLORS.teal,
-    backgroundColor: COLORS.lightGray,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
   });
-  vfPhysical.enableMultiline();
-  vfPhysical.setFontSize(10);
+  y -= 15;
+  page.drawText('Gqeberha, Eastern Cape, 6070', {
+    x: margin + 150,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
+  });
 
-  y -= 60;
+  y -= 30;
 
   page.drawText('Email:', {
     x: margin,
@@ -673,17 +690,30 @@ async function createFillablePDF() {
     font: font,
     color: COLORS.body,
   });
-
-  const vfDomEmail = newForm.createTextField('vf_dom_email');
-  vfDomEmail.addToPage(page, {
+  page.drawText('info@velocityfibre.co.za', {
     x: margin + 150,
-    y: y - 5,
-    width: 320,
-    height: 18,
-    borderColor: COLORS.teal,
-    backgroundColor: COLORS.lightGray,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
   });
-  vfDomEmail.setFontSize(10);
+
+  y -= 22;
+
+  page.drawText('Phone:', {
+    x: margin,
+    y: y,
+    size: 10,
+    font: font,
+    color: COLORS.body,
+  });
+  page.drawText('041-012 5010', {
+    x: margin + 150,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
+  });
 
   // ============ PAGE 6: SIGNATURES ============
   page = newPdf.addPage([pageWidth, pageHeight]);
@@ -932,33 +962,38 @@ async function createFillablePDF() {
 
   y -= 40;
 
-  const vfSigFields = [
-    { name: 'vf_signatory_name', label: 'Name' },
-    { name: 'vf_signatory_capacity', label: 'Capacity' },
-  ];
+  // Pre-filled VF signatory details
+  page.drawText('Name:', {
+    x: margin,
+    y: y,
+    size: 10,
+    font: font,
+    color: COLORS.body,
+  });
+  page.drawText('Llewelyn Hofmeyr', {
+    x: margin + 80,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
+  });
+  y -= 22;
 
-  for (const field of vfSigFields) {
-    page.drawText(field.label + ':', {
-      x: margin,
-      y: y,
-      size: 10,
-      font: font,
-      color: COLORS.body,
-    });
-
-    const textField = newForm.createTextField(field.name);
-    textField.addToPage(page, {
-      x: margin + 80,
-      y: y - 5,
-      width: 200,
-      height: 18,
-      borderColor: COLORS.teal,
-      backgroundColor: COLORS.lightGray,
-    });
-    textField.setFontSize(10);
-
-    y -= 28;
-  }
+  page.drawText('Capacity:', {
+    x: margin,
+    y: y,
+    size: 10,
+    font: font,
+    color: COLORS.body,
+  });
+  page.drawText('Managing Director', {
+    x: margin + 80,
+    y: y,
+    size: 10,
+    font: fontBold,
+    color: COLORS.navy,
+  });
+  y -= 28;
 
   y -= 30;
 
