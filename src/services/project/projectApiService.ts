@@ -19,6 +19,7 @@ interface DbProject {
   budget?: number;
   description?: string;
   project_manager?: string;
+  project_manager_name?: string;
   team_lead?: string;
   location?: string;
   progress_percentage?: number;
@@ -75,6 +76,7 @@ function transformDbToProject(dbProject: DbProject): Project {
     budget: dbProject.budget,
     description: dbProject.description,
     projectManager: dbProject.project_manager,
+    projectManagerName: dbProject.project_manager_name,
     teamLead: dbProject.team_lead,
     location: dbProject.location,
     progressPercentage: dbProject.progress_percentage || 0,
