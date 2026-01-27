@@ -242,6 +242,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         excel: excelReviews.length,
         desktop: desktopReviews.length,
       },
+      _v: '2026-01-27-v2',
     });
   } catch (error) {
     log.error('QAReviewHistory', `Error fetching reviews for ${dropNumber}:`, error);
