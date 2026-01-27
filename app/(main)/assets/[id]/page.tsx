@@ -21,6 +21,7 @@ import {
   Upload,
   File,
   Download,
+  Eye,
   AlertTriangle
 } from 'lucide-react';
 import { DOCUMENT_TYPE_CONFIG, type DocumentTypeValue } from '@/modules/assets/types/document';
@@ -402,17 +403,26 @@ export default async function AssetDetailPage({ params }: PageProps) {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
                         {doc.fileUrl && (
-                          <a
-                            href={getProxyUrl(doc.fileUrl) || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
-                            title="View/Download"
-                          >
-                            <Download className="h-4 w-4" />
-                          </a>
+                          <>
+                            <a
+                              href={getProxyUrl(doc.fileUrl) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
+                              title="View"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </a>
+                            <a
+                              href={`${getProxyUrl(doc.fileUrl)}?download=true`}
+                              className="p-2 text-gray-400 hover:text-green-500 dark:hover:text-green-400"
+                              title="Download"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </>
                         )}
                         <DeleteDocumentButton
                           assetId={id}

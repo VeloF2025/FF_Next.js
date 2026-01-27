@@ -37,8 +37,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Get the file path from the URL
-    const { path: pathSegments } = req.query;
+    // Get the file path and download flag from the URL
+    const { path: pathSegments, download } = req.query;
+    const forceDownload = download === 'true' || download === '1';
 
     if (!pathSegments || !Array.isArray(pathSegments)) {
       return res.status(400).json({ error: 'Invalid file path' });
@@ -77,7 +78,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Extract filename for Content-Disposition
     const fileName = path.basename(filePath);
-    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    // Use 'attachment' to force download, 'inline' to view in browser
+    const disposition = forceDownload ? 'attachment' : 'inline';
+    res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
 
     // Send the file
     return res.status(200).send(fileBuffer);
