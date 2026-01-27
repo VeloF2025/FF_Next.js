@@ -8,23 +8,34 @@
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 
 let sql: NeonQueryFunction<false, false> | null = null;
+let currentDatabaseUrl: string | null = null;
 
 /**
  * Get database connection
  * Lazily initializes the connection on first use
  */
 export function getDbConnection(): NeonQueryFunction<false, false> {
-  if (sql) {
-    return sql;
-  }
-
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error('DATABASE_URL environment variable is not set');
   }
 
+  // Re-initialize if DATABASE_URL changed (useful for testing)
+  if (sql && currentDatabaseUrl === databaseUrl) {
+    return sql;
+  }
+
   sql = neon(databaseUrl);
+  currentDatabaseUrl = databaseUrl;
   return sql;
+}
+
+/**
+ * Reset database connection (for testing)
+ */
+export function resetDbConnection(): void {
+  sql = null;
+  currentDatabaseUrl = null;
 }
 
 /**
