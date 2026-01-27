@@ -7,7 +7,7 @@
  * This endpoint:
  * 1. Fetches OES data from database
  * 2. Converts to GeoJSON with drop number labels
- * 3. Uploads to QFieldCloud via /files/ API as oes_report_fibreflow.geojson
+ * 3. Uploads to QFieldCloud via /files/ API as "OES FF YYMMDD.geojson"
  * 4. Syncs to all sync-enabled projects (or specific project if provided)
  *
  * Note: The GeoJSON file needs to be manually added as a layer in QGIS project
@@ -258,15 +258,24 @@ async function deleteFileFromQFieldCloud(
   });
 }
 
-// OES Report filename - consistent across all projects
-const OES_REPORT_FILENAME = 'oes_report_fibreflow.geojson';
+/**
+ * Generate OES Report filename with date: "OES FF YYMMDD.geojson"
+ * Example: "OES FF 260127.geojson" for Jan 27, 2026
+ */
+function getOESReportFilename(): string {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `OES FF ${yy}${mm}${dd}.geojson`;
+}
 
 /**
  * Delete existing OES Report file from QFieldCloud
  */
-async function deleteExistingOESFile(projectId: string): Promise<void> {
+async function deleteExistingOESFile(projectId: string, filename: string): Promise<void> {
   try {
-    const result = await deleteFileFromQFieldCloud(projectId, OES_REPORT_FILENAME);
+    const result = await deleteFileFromQFieldCloud(projectId, filename);
     if (result.success && result.status !== 404) {
       log.info('OESSync', `Deleted existing OES file from project ${projectId}`);
     }
@@ -280,21 +289,22 @@ async function deleteExistingOESFile(projectId: string): Promise<void> {
  */
 async function uploadOESFile(
   projectId: string,
-  geojson: GeoJSONFeatureCollection
+  geojson: GeoJSONFeatureCollection,
+  filename: string
 ): Promise<{ success: boolean; message: string }> {
   const geojsonContent = JSON.stringify(geojson, null, 2);
 
-  log.info('OESSync', `Uploading ${OES_REPORT_FILENAME} to project ${projectId} (${geojsonContent.length} bytes)`);
+  log.info('OESSync', `Uploading ${filename} to project ${projectId} (${geojsonContent.length} bytes)`);
 
   const result = await uploadFileToQFieldCloud(
     projectId,
-    OES_REPORT_FILENAME,
+    filename,
     geojsonContent,
     'application/geo+json'
   );
 
   if (result.success) {
-    return { success: true, message: `Uploaded ${OES_REPORT_FILENAME}` };
+    return { success: true, message: `Uploaded ${filename}` };
   } else {
     throw new Error(`Upload failed: ${result.status} - ${result.body}`);
   }
@@ -410,6 +420,10 @@ async function handler(
 
     log.info('OESSync', `Created GeoJSON with ${features.length} features`);
 
+    // Generate filename with today's date: "OES FF YYMMDD.geojson"
+    const oesFilename = getOESReportFilename();
+    log.info('OESSync', `Using filename: ${oesFilename}`);
+
     // Step 3: Sync to each target project
     const syncResults: { projectId: string; success: boolean; error?: string }[] = [];
 
@@ -418,10 +432,10 @@ async function handler(
         log.info('OESSync', `Syncing to project ${pid}...`);
 
         // Delete existing OES file (if any)
-        await deleteExistingOESFile(pid);
+        await deleteExistingOESFile(pid, oesFilename);
 
         // Upload new OES GeoJSON file
-        await uploadOESFile(pid, geojson);
+        await uploadOESFile(pid, geojson, oesFilename);
 
         // Update last_synced_at in FibreFlow DB
         try {
@@ -450,7 +464,7 @@ async function handler(
       message: `OES data synced to ${successCount}/${targetProjectIds.length} QField project(s)${failCount > 0 ? ` (${failCount} failed)` : ''}`,
       totalPoints: features.length,
       syncResults,
-      filename: OES_REPORT_FILENAME,
+      filename: oesFilename,
     });
 
   } catch (error) {
