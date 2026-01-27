@@ -1401,6 +1401,190 @@ await pool.query(`
 
 ---
 
+## 2026-01-27: UI/UX Audit Findings - Project Pages
+
+**Context:** Comprehensive audit of project-related pages uncovered several common issues.
+
+### 1. Nested Dynamic Routes Fail in Vercel (and Self-Hosted)
+
+**Issue:** BOQ Edit button navigated to `/procurement/boq/[id]/edit` which returned 404.
+
+**Root Cause:** Next.js Pages Router doesn't reliably support deeply nested dynamic routes like `[id]/edit.tsx`.
+
+**Bad Pattern:**
+```typescript
+// ❌ Creates nested dynamic route - fails in production
+onClick={() => router.push(`/procurement/boq/${boq.id}/edit`)}
+// Requires: pages/procurement/boq/[id]/edit.tsx
+```
+
+**Good Patterns:**
+```typescript
+// ✅ Option 1: Flattened route
+onClick={() => router.push(`/procurement/boq-edit/${boq.id}`)}
+// File: pages/procurement/boq-edit/[id].tsx
+
+// ✅ Option 2: Query parameter
+onClick={() => router.push(`/procurement/boq/${boq.id}?mode=edit`)}
+// Handle edit mode in existing [id].tsx
+
+// ✅ Option 3: Modal (no navigation)
+onClick={() => setShowEditModal(true)}
+```
+
+**Quick Fix (interim):**
+```typescript
+// Show notification until proper edit is implemented
+onClick={() => notificationService.info('Editing coming soon.')}
+```
+
+**Affected Areas:** Any nested `[id]/action.tsx` patterns across the codebase.
+
+---
+
+### 2. Tab Query Params Must Be Read from Router
+
+**Issue:** Clicking tabs updated URL but page refresh didn't preserve tab selection.
+
+**Root Cause:** Tab state was managed with `useState` only, not synced with URL query params.
+
+**Bad Pattern:**
+```typescript
+// ❌ State-only tabs - lost on refresh
+const [activeTab, setActiveTab] = useState('overview');
+```
+
+**Good Pattern:**
+```typescript
+// ✅ URL-synced tabs - persists across refresh
+const tabFromUrl = router.query.tab as TabId | undefined;
+const activeTab = tabFromUrl || 'overview';
+
+const handleTabChange = (newTab: TabId) => {
+  router.push(
+    { pathname: router.pathname, query: { ...router.query, tab: newTab } },
+    undefined,
+    { shallow: true }  // Don't trigger full page reload
+  );
+};
+```
+
+**Key Points:**
+1. Read initial tab from `router.query.tab`
+2. Use `shallow: true` for client-side navigation
+3. Preserve other query params with spread (`...router.query`)
+
+---
+
+### 3. Circular Redirect Detection
+
+**Issue:** `/health-safety/incidents` redirected to `/projects/health-safety/incidents` which redirected back, causing infinite loop.
+
+**Root Cause:** Both pages were redirect stubs pointing to each other during route restructuring.
+
+**Detection:**
+- Browser shows "too many redirects" error
+- Network tab shows 301/302 loop
+
+**Fix Pattern:**
+1. Choose ONE canonical location for the page
+2. Make that location the actual page (with content)
+3. Make all other locations redirect TO it (one-way)
+
+```typescript
+// pages/health-safety/incidents/index.tsx - CANONICAL (has content)
+export default function IncidentsPage() {
+  return <IncidentsListContent />;
+}
+
+// pages/projects/health-safety/incidents/index.tsx - REDIRECT
+export const getServerSideProps: GetServerSideProps = async () => {
+  return {
+    redirect: { destination: '/health-safety/incidents', permanent: true }
+  };
+};
+export default function Redirect() { return null; }
+```
+
+---
+
+### 4. GRN Queries Need JOIN Through Purchase Orders
+
+**Issue:** Procurement summary tab failed with "column total_received_value does not exist".
+
+**Root Cause:** `goods_receipt_notes` table lacks `project_id` and `total_received_value` columns. Must JOIN through `purchase_orders` and sum from `goods_receipt_items`.
+
+**Bad Pattern:**
+```sql
+-- ❌ These columns don't exist
+SELECT project_id, total_received_value
+FROM goods_receipt_notes
+WHERE project_id = $1
+```
+
+**Good Pattern:**
+```sql
+-- ✅ JOIN through purchase_orders, sum from line items
+SELECT
+  COUNT(DISTINCT grn.id) as total,
+  COALESCE(SUM(gri.total_cost), 0) as total_value
+FROM goods_receipt_notes grn
+LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
+LEFT JOIN goods_receipt_items gri ON gri.grn_id = grn.id
+WHERE po.project_id = $1
+```
+
+**Table Relationships:**
+```
+projects → purchase_orders → goods_receipt_notes → goods_receipt_items
+           (project_id)      (purchase_order_id)    (grn_id, total_cost)
+```
+
+---
+
+### 5. API Response Array Safety
+
+**Issue:** "data.filter is not a function" when API returned unexpected format.
+
+**Root Cause:** Component assumed `data.data` was always an array, but API could return object or null.
+
+**Bad Pattern:**
+```typescript
+// ❌ Crashes if data.data is not an array
+const items = data?.data || [];
+const filtered = items.filter(item => ...);
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Explicitly check for array
+const items = Array.isArray(data?.data) ? data.data : [];
+const filtered = items.filter(item => ...);
+```
+
+**Affected Areas:** Any SWR/fetch that expects array responses.
+
+---
+
+### 6. CSS Variables for Dark Mode Consistency
+
+**Issue:** Timeline tab had white background in dark mode.
+
+**Root Cause:** Hardcoded `bg-white` instead of CSS variable.
+
+**Reference:** See "2026-01-26: CSS Variables Pattern for Component Styling" above for full pattern.
+
+**Quick Fix:**
+```tsx
+// ❌ Before
+<div className="bg-white text-gray-900">
+
+// ✅ After
+<div className="bg-[var(--ff-card-bg)] text-[var(--ff-text-primary)]">
+```
+
+---
+
 ## 2027-01-27: Nginx Proxy Timeout for Large Imports
 
 **Issue:** Large Excel imports (7000+ rows) fail with 504 Gateway Timeout. Browser shows "Unexpected token '<', "<!DOCTYPE"... is not valid JSON".

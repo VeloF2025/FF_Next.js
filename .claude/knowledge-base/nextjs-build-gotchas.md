@@ -145,3 +145,73 @@ Then parse path segments in handler:
 const { path } = req.query;
 const [a, b, c] = Array.isArray(path) ? path : [path];
 ```
+
+---
+
+## Page Routes: Nested Action Routes Don't Exist
+
+**Problem:** Button navigates to `/module/[id]/edit` but page returns 404.
+
+**Example:**
+```typescript
+// pages/procurement/boq/[id].tsx - EXISTS
+// pages/procurement/boq/[id]/edit.tsx - DOES NOT EXIST
+
+// In [id].tsx:
+onClick={() => router.push(`/procurement/boq/${boq.id}/edit`)}  // ❌ 404!
+```
+
+**Why This Fails:**
+1. Pages Router requires explicit file for each route
+2. Nested `[id]/edit.tsx` creates complex routing
+3. Build/deploy may not include these nested patterns
+
+**Solutions:**
+
+| Approach | Example | Pros | Cons |
+|----------|---------|------|------|
+| Flattened route | `boq-edit/[id].tsx` | Clear, reliable | Extra file |
+| Query param | `boq/[id]?mode=edit` | Same file handles | URL less clean |
+| Modal | `setShowEditModal(true)` | No navigation | Complex state |
+| Interim notification | `notificationService.info('Coming soon')` | Quick fix | Not functional |
+
+**Recommended Pattern:**
+```typescript
+// pages/procurement/boq/[id].tsx
+const isEditMode = router.query.mode === 'edit';
+
+// Button:
+onClick={() => router.push(`/procurement/boq/${boq.id}?mode=edit`)}
+
+// OR flattened:
+// pages/procurement/boq-edit/[id].tsx
+onClick={() => router.push(`/procurement/boq-edit/${boq.id}`)}
+```
+
+**Affected Files (audit 2026-01-27):**
+- `pages/procurement/boq/[id].tsx` - Edit button fixed with notification
+
+---
+
+## Circular Redirects During Route Restructuring
+
+**Problem:** Route A redirects to B, B redirects to A → infinite loop.
+
+**Example:**
+```
+/health-safety/incidents → redirect to /projects/health-safety/incidents
+/projects/health-safety/incidents → redirect to /health-safety/incidents
+Result: ERR_TOO_MANY_REDIRECTS
+```
+
+**Prevention Checklist:**
+1. Choose ONE canonical location
+2. Create actual page content there
+3. Make ALL other locations redirect TO it (one-way only)
+4. Test in browser before deploying
+
+**Verification:**
+```bash
+# Check for potential circular redirects
+grep -r "redirect.*destination" pages/ | grep -E "(health-safety|incidents)"
+```
