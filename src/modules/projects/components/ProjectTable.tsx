@@ -13,6 +13,23 @@ interface ProjectTableProps {
 export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTableProps) {
   const router = useRouter();
 
+  const formatLocation = (project: any) => {
+    if (project.city) {
+      return `${project.city}, ${project.province || project.state || ''}`.replace(/,\s*$/, '');
+    }
+    if (project.location) {
+      // Handle JSON location strings
+      try {
+        const loc = typeof project.location === 'string' ? JSON.parse(project.location) : project.location;
+        if (loc?.city) return `${loc.city}, ${loc.province || loc.region || ''}`.replace(/,\s*$/, '');
+      } catch {
+        // Not JSON, return as-is if it's a reasonable string
+        if (project.location.length < 100) return project.location;
+      }
+    }
+    return 'N/A';
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -32,17 +49,19 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: any = {
-      PLANNING: 'bg-blue-500/20 text-blue-400',
-      IN_PROGRESS: 'bg-green-500/20 text-green-400',
-      ON_HOLD: 'bg-yellow-500/20 text-yellow-400',
-      COMPLETED: 'bg-gray-500/20 text-gray-400',
-      CANCELLED: 'bg-red-500/20 text-red-400',
+    const statusConfig: Record<string, string> = {
+      planning: 'bg-blue-500/20 text-blue-400',
+      in_progress: 'bg-green-500/20 text-green-400',
+      active: 'bg-green-500/20 text-green-400',
+      on_hold: 'bg-yellow-500/20 text-yellow-400',
+      completed: 'bg-gray-500/20 text-gray-400',
+      cancelled: 'bg-red-500/20 text-red-400',
     };
 
+    const key = (status || '').toLowerCase();
     const displayStatus = status?.replace('_', ' ');
     return (
-      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusConfig[status] || 'bg-gray-500/20 text-gray-400'}`}>
+      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusConfig[key] || 'bg-gray-500/20 text-gray-400'}`}>
         {displayStatus}
       </span>
     );
@@ -136,7 +155,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   <div className="text-sm text-[var(--ff-text-primary)]">
-                    {project.city ? `${project.city}, ${project.state}` : project.location || 'N/A'}
+                    {formatLocation(project)}
                   </div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
