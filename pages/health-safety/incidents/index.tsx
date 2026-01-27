@@ -7,7 +7,6 @@ import type { NextPage } from 'next';
 import React, { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
@@ -27,13 +26,12 @@ import {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function IncidentsListContent() {
-  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const { data, error, isLoading } = useSWR('/api/health-safety/incidents', fetcher);
-  const incidents = data?.data || [];
+  const incidents = Array.isArray(data?.data) ? data.data : [];
 
   // Filter incidents
   const filteredIncidents = incidents.filter((incident: any) => {
