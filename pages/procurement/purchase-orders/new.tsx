@@ -242,7 +242,7 @@ export default function NewPurchaseOrderPage() {
 
           {/* Tabs */}
           <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="purchase-orders" />
+            <ProcurementTabs activeTab="purchase-orders" categoriesOnly />
           </div>
         </div>
 

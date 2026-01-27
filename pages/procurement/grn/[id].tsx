@@ -246,7 +246,7 @@ export default function GRNDetailPage() {
 
           {/* Tabs */}
           <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="grn" />
+            <ProcurementTabs activeTab="grn" categoriesOnly />
           </div>
         </div>
 

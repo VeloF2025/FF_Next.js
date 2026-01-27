@@ -255,7 +255,7 @@ export default function NewRequisitionPage() {
 
           {/* Tabs */}
           <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="requisitions" />
+            <ProcurementTabs activeTab="requisitions" categoriesOnly />
           </div>
         </div>
 
