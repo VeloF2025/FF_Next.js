@@ -20,7 +20,7 @@ Handle daily OES (Optical Equipment Supplier) report imports by:
 | **API Endpoint** | `/api/activate/import-oes` |
 | **Database Table** | `oes_activations` |
 | **Batch Table** | `oes_import_batches` |
-| **Excel Format** | Nokia OES Report (14 columns, Jan 2026+) |
+| **Excel Format** | Nokia OES Report (13 columns, Jan 2027+) |
 
 ## Slash Commands
 
@@ -149,7 +149,7 @@ Suggested Actions:
 
 ## Excel Format Reference
 
-Nokia OES Report structure (14 columns, updated Jan 2026):
+Nokia OES Report structure (13 columns, updated Jan 2027):
 
 | Column | Example | DB Field |
 |--------|---------|----------|
@@ -157,21 +157,21 @@ Nokia OES Report structure (14 columns, updated Jan 2026):
 | B: Serial Number | ALCLB48CB101 | `serial_number` |
 | C: Timestamp | 46037.48 | `activation_date` |
 | D: OLT Address | moa.olt.01:1-1-4-3 | `olt_address` |
-| E: Stack Ref. | moa | `stack_ref` ← **NEW Jan 2026** |
-| F: ONT Rx SIG (dBm) | -19.546 | `ont_rx_sig_dbm` |
-| G: Link Budget ONT→OLT | -22.8 | `link_budget_ont_olt_db` |
-| H: OLT Rx SIG (dBm) | -23.6 | `olt_rx_sig_dbm` |
-| I: Link Budget OLT→ONT | -26.9 | `link_budget_olt_ont_db` |
-| J: Status | Active | `status` |
-| K: Latitude | -26.7136357 | `latitude` |
-| L: Longitude | 27.0277261 | `longitude` |
-| M: Current ONT RX | -40 | `current_ont_rx` |
-| N: Team | moa1 | `team` |
+| E: ONT Rx SIG (dBm) | -19.546 | `ont_rx_sig_dbm` |
+| F: Link Budget ONT→OLT | -22.8 | `link_budget_ont_olt_db` |
+| G: OLT Rx SIG (dBm) | -23.6 | `olt_rx_sig_dbm` |
+| H: Link Budget OLT→ONT | -26.9 | `link_budget_olt_ont_db` |
+| I: Status | Active | `status` |
+| J: Latitude | -26.7136357 | `latitude` |
+| K: Longitude | 27.0277261 | `longitude` |
+| L: Current ONT RX | -40 | `current_ont_rx` |
+| M: Team | moa1 | `team` |
 
 **Note**: Column C timestamp is Excel serial date (days since 1900-01-01). Converted automatically.
 
 **Format Change History:**
-- Jan 2026: Added "Stack Ref." column at position E (commit `79e97a07`)
+- Jan 2027: Removed "Stack Ref." column (commit `701969e2`) - back to 13 columns
+- Jan 2026: Added "Stack Ref." column at position E (commit `79e97a07`) - 14 columns
 
 ## Database Schema
 
@@ -184,8 +184,8 @@ CREATE TABLE oes_activations (
   drop_id UUID REFERENCES drops(id),
   serial_number VARCHAR(50),
   activation_date DATE,
+  activation_datetime TIMESTAMP,  -- Full timestamp if available
   olt_address VARCHAR(100),
-  stack_ref VARCHAR(100),  -- Added Jan 2026
   ont_rx_sig_dbm DECIMAL(6,3),
   link_budget_ont_olt_db DECIMAL(6,3),
   olt_rx_sig_dbm DECIMAL(6,3),
@@ -470,6 +470,43 @@ PGPASSWORD='npg_MIUZXrg1tEY0' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neo
 **Debug**:
 Preview mode will show parsed data before import.
 
+---
+
+### ISSUE: 504 Gateway Timeout on Large Imports
+
+**Symptoms**:
+- Import error: "Unexpected token '<', "<!DOCTYPE"... is not valid JSON"
+- Browser shows `POST /api/activate/import-oes 504 (Gateway Timeout)`
+- Preview works but actual import fails
+
+**Root Cause**:
+Nginx proxy_read_timeout too low for large imports (7000+ rows). The `maxDuration` config in Next.js only works on Vercel, not self-hosted.
+
+**Fix**:
+Increase nginx proxy timeouts:
+```bash
+# Check current config
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S grep proxy_read_timeout /etc/nginx/sites-enabled/vf-fibreflow"
+
+# Add timeout settings to dev server block (if missing)
+# proxy_connect_timeout 300s;
+# proxy_send_timeout 300s;
+# proxy_read_timeout 300s;
+
+# Reload nginx
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S nginx -t && echo 'velo2026' | sudo -S systemctl reload nginx"
+```
+
+**Required Timeouts**:
+| Rows | Recommended Timeout |
+|------|---------------------|
+| <3000 | 60s (default) |
+| 3000-5000 | 120s |
+| 5000-8000 | 300s |
+| >8000 | 600s |
+
+**Note**: The dev.fibreflow.app server block needs explicit proxy timeout settings. The staging (vf.fibreflow.app) block has them.
+
 ## Auto-Activation Rules
 
 ### DO Automatically:
@@ -523,6 +560,8 @@ sleep 3 && curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
 
 | Date | Issue | Root Cause | Fix Applied |
 |------|-------|------------|-------------|
+| 2027-01-27 | Column misalignment (13 cols) | Nokia removed "Stack Ref." column | Updated parser indices (commit `701969e2`) |
+| 2027-01-27 | 504 Gateway Timeout on large imports | Nginx proxy_read_timeout too low (60s) | Increased to 300s in nginx config |
 | 2026-01-16 | Import stuck/hanging | RETURNING clause with 6000+ rows | Changed to count-based tracking |
 | 2026-01-16 | Wrong insert count (6259 New, 0 Updated) | Hardcoded `updated: 0` | Return actual counts |
 | 2026-01-16 | Port 3006 in use | Previous process still running | Use systemctl restart |

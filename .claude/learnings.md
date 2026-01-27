@@ -1400,3 +1400,62 @@ await pool.query(`
 - `pages/api/activate/[dropNumber].ts` - Full DR detail with timeline
 
 ---
+
+## 2027-01-27: Nginx Proxy Timeout for Large Imports
+
+**Issue:** Large Excel imports (7000+ rows) fail with 504 Gateway Timeout. Browser shows "Unexpected token '<', "<!DOCTYPE"... is not valid JSON".
+
+**Root Cause:** Nginx `proxy_read_timeout` defaults to 60s. Large imports take longer. The Next.js `maxDuration` config only works on Vercel, not self-hosted.
+
+**Detection:**
+```
+POST /api/activate/import-oes 504 (Gateway Timeout)
+```
+Check nginx error logs:
+```bash
+tail -20 /var/log/nginx/error.log | grep "upstream timed out"
+```
+
+**Fix:**
+Add proxy timeouts to nginx server block:
+```nginx
+server {
+    server_name dev.fibreflow.app;
+
+    # Timeout settings for large imports
+    proxy_connect_timeout 300s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+
+    location / {
+        proxy_pass http://localhost:3005;
+        # ... other settings
+    }
+}
+```
+
+Apply changes:
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S nginx -t && echo 'velo2026' | sudo -S systemctl reload nginx"
+```
+
+**Recommended Timeouts by Data Size:**
+
+| Rows | Timeout |
+|------|---------|
+| <3000 | 60s (default) |
+| 3000-5000 | 120s |
+| 5000-8000 | 300s |
+| >8000 | 600s |
+
+**Key Points:**
+1. `maxDuration` in Next.js config is Vercel-only
+2. Self-hosted needs nginx proxy timeout configuration
+3. The error "<!DOCTYPE" means HTML error page (504) was returned instead of JSON
+4. Each environment (dev, staging, production) may need separate timeout config
+
+**Affected Files:**
+- `/etc/nginx/sites-enabled/vf-fibreflow` - Nginx config on Velocity server
+- `pages/api/activate/import-oes.ts` - OES import API (has maxDuration for Vercel)
+
+---
