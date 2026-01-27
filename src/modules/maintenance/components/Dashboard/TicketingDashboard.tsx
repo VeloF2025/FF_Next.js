@@ -26,8 +26,6 @@ import {
   RefreshCw,
   TrendingUp,
 } from 'lucide-react';
-import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
-import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import { cn } from '@/lib/utils';
 import { SLAComplianceCard } from './SLAComplianceCard';
 import { WorkloadChart } from './WorkloadChart';
@@ -202,49 +200,52 @@ export function TicketingDashboard({
 
       {/* Summary Statistics Grid */}
       {summaryData && (
-        <StatsGrid
-          cards={[
-            {
-              title: 'Total Tickets',
-              value: summaryData.total_tickets,
-              icon: Activity,
-              color: '#3B82F6',
-              subtitle: 'All tickets',
-              description: 'Total maintenance tickets in system',
-              variant: 'detailed',
-            },
-            {
-              title: 'Open',
-              value: summaryData.by_status?.open || 0,
-              icon: Activity,
-              color: '#F59E0B',
-              subtitle: 'Awaiting action',
-              description: 'Tickets currently open and active',
-              variant: 'detailed',
-            },
-            {
-              title: 'Overdue',
-              value: summaryData.overdue_tickets,
-              icon: Clock,
-              color: '#EF4444',
-              subtitle: 'Past SLA',
-              description: 'Tickets exceeding response time',
-              variant: 'detailed',
-            },
-            {
-              title: 'Avg. Resolution',
-              value: summaryData.avg_resolution_hours
+        <div className={cn(
+          'grid gap-4',
+          compact ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+        )}>
+          {/* Total Tickets */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-4 h-4 text-blue-400" />
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total Tickets</p>
+            </div>
+            <p className="text-3xl font-bold text-[var(--ff-text-primary)]">{summaryData.total_tickets}</p>
+          </div>
+
+          {/* Open Tickets */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-4 h-4 text-yellow-400" />
+              <p className="text-sm text-[var(--ff-text-secondary)]">Open</p>
+            </div>
+            <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
+              {summaryData.by_status?.open || 0}
+            </p>
+          </div>
+
+          {/* Overdue Tickets */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-red-400" />
+              <p className="text-sm text-[var(--ff-text-secondary)]">Overdue</p>
+            </div>
+            <p className="text-3xl font-bold text-[var(--ff-text-primary)]">{summaryData.overdue_tickets}</p>
+          </div>
+
+          {/* Average Resolution */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="w-4 h-4 text-green-400" />
+              <p className="text-sm text-[var(--ff-text-secondary)]">Avg. Resolution</p>
+            </div>
+            <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
+              {summaryData.avg_resolution_hours
                 ? `${summaryData.avg_resolution_hours.toFixed(1)}h`
-                : 'N/A',
-              icon: TrendingUp,
-              color: '#10B981',
-              subtitle: 'Resolution time',
-              description: 'Average time to resolve tickets',
-              variant: 'detailed',
-            },
-          ] as EnhancedStatCardProps[]}
-          columns={4}
-        />
+                : 'N/A'}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Status Breakdown */}
