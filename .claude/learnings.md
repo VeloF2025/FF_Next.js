@@ -1708,6 +1708,128 @@ const MyComponent = ({ route, onClick }: Props) => {
 
 ---
 
+## 2026-01-27: QFieldCloud Database - Correct Host is Velocity Server
+
+**Issue:** QFieldCloud project discovery only returned 17 of 34 projects. Project `af058301-32d1-4bca-84f9-83b899fcbb34` (OES_Project_Progress) was missing from discover dropdown.
+
+**Root Cause:** `qfieldcloudApiService.ts` was connecting to the **VPS** (`72.61.166.168:5433`) which had a stale/incomplete copy of the QFieldCloud database (17 projects). The actual QFieldCloud instance runs on the **Velocity server** (`100.96.203.105:5433`) via Docker with all 34 projects.
+
+**Bad Pattern:**
+```typescript
+// ❌ Wrong host - VPS has stale QFieldCloud DB copy
+const qfieldPool = new Pool({
+  host: '72.61.166.168',   // VPS - old/incomplete data
+  port: 5433,
+  database: 'qfieldcloud_db',
+});
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Correct host - Velocity server runs QFieldCloud Docker
+const qfieldPool = new Pool({
+  host: '100.96.203.105',  // Velocity - actual QFieldCloud instance
+  port: 5433,
+  database: 'qfieldcloud_db',
+});
+```
+
+**QFieldCloud Infrastructure:**
+```
+Velocity Server (100.96.203.105)
+├── qfieldcloud-db-1       → PostgreSQL on port 5433 (34 projects) ✅
+├── qfieldcloud-app-1      → Django app on port 8000
+├── qfieldcloud-nginx-1    → Nginx on port 8082
+├── qfieldcloud-worker_wrapper-{1..8}  → Background workers
+├── qfieldcloud-minio-1    → S3 storage (ports 8009/8010)
+└── qfieldcloud-memcached-1
+
+VPS (72.61.166.168)
+└── PostgreSQL on port 5433 → OLD/stale QFieldCloud DB copy (17 projects) ❌
+```
+
+**Verification:**
+```bash
+# Check project count on correct host
+node -e "
+const { Pool } = require('pg');
+const pool = new Pool({ host: '100.96.203.105', port: 5433, database: 'qfieldcloud_db', user: 'qfieldcloud_db_admin', password: 'c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753' });
+pool.query('SELECT COUNT(*) FROM core_project').then(r => { console.log('Projects:', r.rows[0].count); pool.end(); });
+"
+```
+
+**Admin UI:** `https://qfield.fibreflow.app/admin/core/project/` (Django admin, shows all projects)
+
+**Affected Files:**
+- `src/modules/qfield-sync/services/qfieldcloudApiService.ts` - Fixed host (commit `d22fee08`)
+
+---
+
+## 2026-01-27: QField Dynamic Project Registry
+
+**Context:** QFieldCloud project IDs were hardcoded in env vars and constants. Now managed via a database registry with UI at `/system/data-sync?group=qfield&tab=projects`.
+
+**Database Tables:**
+```sql
+-- Project registry
+qfield_projects (
+  id UUID PRIMARY KEY,
+  qfield_project_id VARCHAR(100) NOT NULL UNIQUE,  -- QFieldCloud UUID
+  name VARCHAR(255) NOT NULL,                       -- Display name
+  description TEXT,
+  qfield_url VARCHAR(500),
+  is_active BOOLEAN DEFAULT true,
+  is_default BOOLEAN DEFAULT false,
+  sync_enabled BOOLEAN DEFAULT true,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+);
+
+-- Many-to-many link to FibreFlow projects
+qfield_project_links (
+  qfield_project_id UUID REFERENCES qfield_projects(id),
+  fibreflow_project_id UUID REFERENCES projects(id),
+  UNIQUE(qfield_project_id, fibreflow_project_id)
+);
+```
+
+**Multi-Project OES Sync:**
+```typescript
+// OES data syncs to ALL active + sync_enabled projects
+async function getSyncTargetProjectIds(): Promise<string[]> {
+  const result = await pool.query(
+    'SELECT qfield_project_id FROM qfield_projects WHERE is_active = true AND sync_enabled = true'
+  );
+  return result.rows.map(r => r.qfield_project_id);
+}
+// GeoJSON built once, uploaded to each project independently
+```
+
+**API Endpoints:**
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/qfield/projects` | List registered projects with linked FF projects |
+| `POST /api/qfield/projects` | Register new project |
+| `PUT /api/qfield/projects/[id]` | Update project settings/links |
+| `DELETE /api/qfield/projects/[id]` | Soft-delete (is_active=false) |
+| `GET /api/qfield/projects/discover` | Fetch from QFieldCloud DB, mark already registered |
+
+**Key Files:**
+- `scripts/migrations/134_qfield_projects.sql` - Schema + seed
+- `pages/api/qfield/projects.ts` - CRUD API
+- `pages/api/qfield/projects/[id].ts` - Single project API
+- `pages/api/qfield/projects/discover.ts` - QFieldCloud discovery
+- `src/modules/data-sync/components/groups/qfield/` - UI components
+- `pages/api/activate/sync-oes-to-qfield.ts` - Multi-project sync
+
+**Affected Files:**
+- Migration: `134_qfield_projects.sql` (commit `4a2ee1e2`)
+- Multi-project sync: `sync-oes-to-qfield.ts` (commit `de4f4703`)
+- DB host fix: `qfieldcloudApiService.ts` (commit `d22fee08`)
+
+---
+
 ## Export API Must Mirror Display API Filters Exactly
 **Date:** 2026-01-27
 **Severity:** HIGH
