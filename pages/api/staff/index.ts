@@ -635,11 +635,38 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         if (!req.query.id) {
           return res.status(400).json({ success: false, error: 'Staff ID required' });
         }
-        await sql`DELETE FROM staff WHERE id = ${req.query.id as string}`;
-        
+
+        const staffId = req.query.id as string;
+
+        // Clear foreign key references before deleting
+        // This allows "soft cascade" deletion without losing referential data
+        await sql`UPDATE projects SET project_manager = NULL WHERE project_manager = ${staffId}`;
+        await sql`UPDATE projects SET team_lead = NULL WHERE team_lead = ${staffId}`;
+        await sql`UPDATE staff SET reports_to = NULL WHERE reports_to = ${staffId}`;
+        await sql`UPDATE staff SET exit_processed_by = NULL WHERE exit_processed_by = ${staffId}`;
+        await sql`UPDATE staff SET bank_verified_by = NULL WHERE bank_verified_by = ${staffId}`;
+        await sql`UPDATE maintenance_tickets SET assigned_to = NULL WHERE assigned_to = ${staffId}`;
+        await sql`UPDATE action_items SET assigned_to = NULL WHERE assigned_to = ${staffId}`;
+        await sql`UPDATE fleet_vehicles SET assigned_driver_id = NULL WHERE assigned_driver_id = ${staffId}`;
+
+        // Delete related records that should be removed with the staff member
+        await sql`DELETE FROM staff_documents WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM staff_notes WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM staff_projects WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM staff_compliance_status WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM staff_audit_log WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM disciplinary_incidents WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM vehicle_assignments WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM fleet_driver_scores WHERE staff_id = ${staffId}`;
+        await sql`DELETE FROM fleet_check_reminders WHERE driver_id = ${staffId}`;
+        await sql`DELETE FROM fleet_portal_sessions WHERE driver_id = ${staffId}`;
+
+        // Now delete the staff member
+        await sql`DELETE FROM staff WHERE id = ${staffId}`;
+
         // Log successful staff deletion
-        logDelete('staff', req.query.id as string);
-        
+        logDelete('staff', staffId);
+
         res.status(200).json({ success: true, message: 'Staff member deleted successfully' });
         break;
       }
@@ -651,6 +678,19 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     console.error('API Error:', error);
     
     // Handle specific database errors
+    if (error.code === '23503') { // Foreign key constraint violation
+      const constraintMatch = error.message?.match(/constraint "([^"]+)"/);
+      const constraint = constraintMatch?.[1] || 'unknown';
+      const tableMatch = error.message?.match(/on table "([^"]+)"/);
+      const table = tableMatch?.[1] || 'another table';
+
+      return res.status(409).json({
+        success: false,
+        error: `Cannot delete: This staff member is still referenced in ${table}. Please reassign or remove those references first.`,
+        details: `Constraint: ${constraint}`
+      });
+    }
+
     if (error.code === '23505') { // Unique constraint violation
       if (error.constraint === 'staff_employee_id_unique') {
         return res.status(409).json({
