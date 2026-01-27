@@ -1,11 +1,338 @@
-# FibreFlow Maintenance Module - User Manual
-
-**Version:** 1.0
-**Last Updated:** 27 January 2026
-**Module:** Maintenance
-**Application:** FibreFlow (dev.fibreflow.app)
-
 ---
+pdf_options:
+  format: A4
+  margin:
+    top: 25mm
+    bottom: 25mm
+    left: 20mm
+    right: 20mm
+  displayHeaderFooter: true
+  headerTemplate: |-
+    <style>
+      section { width: 100%; font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 8px; color: #666; padding: 0 20mm; }
+      .header-line { border-bottom: 2px solid #219ebc; padding-bottom: 4px; display: flex; justify-content: space-between; }
+    </style>
+    <section>
+      <div class="header-line">
+        <span style="color: #023047; font-weight: 600;">VELOCITY FIBRE</span>
+        <span>FibreFlow Maintenance Module — User Manual v1.0</span>
+      </div>
+    </section>
+  footerTemplate: |-
+    <style>
+      section { width: 100%; font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif; font-size: 8px; color: #666; padding: 0 20mm; }
+      .footer-line { border-top: 1px solid #219ebc; padding-top: 4px; display: flex; justify-content: space-between; }
+    </style>
+    <section>
+      <div class="footer-line">
+        <span>Confidential — Velocity Fibre (Pty) Ltd</span>
+        <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+      </div>
+    </section>
+stylesheet: https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap
+body_class: velocity-manual
+css: |-
+  /* ============================================
+     VELOCITY FIBRE — User Manual Brand Theme
+     Colors extracted from velocityfibre.co.za
+     ============================================ */
+
+  :root {
+    --vf-navy: #023047;
+    --vf-blue: #1e73be;
+    --vf-teal: #219ebc;
+    --vf-sky: #2ea3f2;
+    --vf-dark: #0e0c19;
+    --vf-body: #3c3a47;
+    --vf-gray-bg: #f9f9f9;
+    --vf-light-border: #e0e0e0;
+    --vf-red-accent: #8b2346;
+  }
+
+  /* === Page & Typography === */
+  body {
+    font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif;
+    color: var(--vf-body);
+    line-height: 1.6;
+    font-size: 11pt;
+  }
+
+  /* === Cover Page === */
+  .cover-page {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 85vh;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .cover-page img {
+    width: 220px;
+    margin-bottom: 40px;
+  }
+
+  .cover-title {
+    font-family: 'IBM Plex Sans Condensed', Helvetica, Arial, sans-serif;
+    font-size: 36pt;
+    font-weight: 500;
+    color: var(--vf-navy);
+    margin: 0 0 8px 0;
+    line-height: 1.2;
+  }
+
+  .cover-subtitle {
+    font-size: 16pt;
+    color: var(--vf-teal);
+    font-weight: 500;
+    margin: 0 0 40px 0;
+    letter-spacing: 1px;
+  }
+
+  .cover-divider {
+    width: 80px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--vf-navy), var(--vf-teal));
+    margin: 0 auto 40px;
+    border: none;
+  }
+
+  .cover-meta {
+    font-size: 10pt;
+    color: #666;
+    line-height: 2;
+  }
+
+  .cover-meta strong {
+    color: var(--vf-navy);
+  }
+
+  .cover-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 2px solid var(--vf-teal);
+    font-size: 9pt;
+    color: #999;
+  }
+
+  /* === Headings === */
+  h1 {
+    font-family: 'IBM Plex Sans Condensed', Helvetica, Arial, sans-serif;
+    font-size: 26pt;
+    font-weight: 500;
+    color: var(--vf-navy);
+    border-bottom: 3px solid var(--vf-teal);
+    padding-bottom: 8px;
+    margin-top: 40px;
+  }
+
+  h2 {
+    font-family: 'IBM Plex Sans Condensed', Helvetica, Arial, sans-serif;
+    font-size: 18pt;
+    font-weight: 500;
+    color: var(--vf-navy);
+    border-bottom: 2px solid var(--vf-teal);
+    padding-bottom: 6px;
+    margin-top: 30px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif;
+    font-size: 13pt;
+    font-weight: 600;
+    color: var(--vf-navy);
+    margin-top: 20px;
+    page-break-after: avoid;
+  }
+
+  h4 {
+    font-family: 'IBM Plex Sans', Helvetica, Arial, sans-serif;
+    font-size: 11pt;
+    font-weight: 600;
+    color: var(--vf-teal);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* === Tables === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  thead th {
+    background-color: var(--vf-navy);
+    color: white;
+    font-weight: 600;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 9.5pt;
+  }
+
+  tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--vf-light-border);
+  }
+
+  tbody tr:nth-child(even) {
+    background-color: var(--vf-gray-bg);
+  }
+
+  tbody tr:hover {
+    background-color: #eef6fa;
+  }
+
+  /* === Blockquotes (Tips/Notes) === */
+  blockquote {
+    border-left: 4px solid var(--vf-teal);
+    background-color: #f0f9fb;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  blockquote strong {
+    color: var(--vf-navy);
+  }
+
+  /* === Code Blocks === */
+  code {
+    background-color: var(--vf-gray-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+    color: var(--vf-navy);
+  }
+
+  pre {
+    background-color: var(--vf-navy);
+    color: #e0e0e0;
+    padding: 16px;
+    border-radius: 6px;
+    font-size: 9pt;
+    overflow-x: auto;
+    page-break-inside: avoid;
+  }
+
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+  }
+
+  /* === Images (Screenshots) === */
+  img {
+    max-width: 100%;
+    border: 1px solid var(--vf-light-border);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(2, 48, 71, 0.1);
+    margin: 16px 0;
+    page-break-inside: avoid;
+  }
+
+  /* Figure captions (italics after images) */
+  img + br + em, p > em:only-child {
+    display: block;
+    text-align: center;
+    font-size: 9pt;
+    color: #666;
+    margin-top: -8px;
+    margin-bottom: 16px;
+  }
+
+  /* === Links === */
+  a {
+    color: var(--vf-blue);
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  /* === Lists === */
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 24px;
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+
+  li strong {
+    color: var(--vf-navy);
+  }
+
+  /* === Horizontal Rules === */
+  hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, var(--vf-teal), transparent);
+    margin: 30px 0;
+  }
+
+  /* === Table of Contents === */
+  h2#table-of-contents + ol,
+  h2 + ol {
+    background: var(--vf-gray-bg);
+    padding: 20px 20px 20px 40px;
+    border-radius: 6px;
+    border-left: 4px solid var(--vf-navy);
+  }
+
+  /* === Page Breaks === */
+  h2 {
+    page-break-before: auto;
+  }
+
+  /* === Strong/Bold === */
+  strong {
+    font-weight: 600;
+  }
+
+  /* === Print Optimizations === */
+  @media print {
+    body { font-size: 10.5pt; }
+    h1 { font-size: 24pt; }
+    h2 { font-size: 16pt; }
+    h3 { font-size: 12pt; }
+    img { max-height: 400px; object-fit: contain; }
+  }
+---
+
+<div class="cover-page">
+
+<img src="../assets/velocity-logo.jpg" alt="Velocity Fibre Logo" />
+
+<div class="cover-title">Maintenance Module</div>
+<div class="cover-subtitle">USER MANUAL</div>
+
+<hr class="cover-divider" />
+
+<div class="cover-meta">
+<strong>Version:</strong> 1.0<br/>
+<strong>Last Updated:</strong> 27 January 2026<br/>
+<strong>Application:</strong> FibreFlow (fibreflow.app)<br/>
+<strong>Module:</strong> Maintenance<br/>
+<strong>Classification:</strong> Internal Use
+</div>
+
+<div class="cover-footer">
+Velocity Fibre (Pty) Ltd — Connecting Communities, Empowering Futures
+</div>
+
+</div>
+
+# FibreFlow Maintenance Module
 
 ## Table of Contents
 
