@@ -562,10 +562,10 @@ function QaCentrePageContent() {
                 onClick={handleExportExcel}
                 disabled={isExporting}
                 className="px-4 py-3 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                title="Export filtered data to Excel"
+                title={`Export ${filters.statusFilter !== 'all' ? 'filtered' : 'all'} data to Excel`}
               >
                 <Download className={`h-5 w-5 ${isExporting ? 'animate-bounce' : ''}`} />
-                {isExporting ? 'Exporting...' : 'Export Excel'}
+                {isExporting ? 'Exporting...' : `Export ${filters.statusFilter !== 'all' ? filters.statusFilter.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'All'} Excel`}
               </button>
             </div>
 
