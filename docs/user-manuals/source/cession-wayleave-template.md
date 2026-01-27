@@ -301,7 +301,7 @@ css: |-
 
 Entered into by and between:
 
-**[CEDENT_NAME]** (hereinafter the "Cedent")
+**_________________** (hereinafter the "Cedent")
 
 and
 
@@ -348,13 +348,13 @@ and
 
 | Field | Value |
 |-------|-------|
-| Full Legal Name | [CEDENT_NAME] |
-| Registration Number | [CEDENT_REG_NO] |
-| Registered Address | [CEDENT_ADDRESS] |
-| Represented by | [CEDENT_REP_NAME] |
-| Identity Number | [CEDENT_REP_ID] |
-| Contact Email | [CEDENT_EMAIL] |
-| Contact Number | [CEDENT_PHONE] |
+| Full Legal Name | _________________________________________ |
+| Registration Number | _________________________________________ |
+| Registered Address | _________________________________________ |
+| Represented by | _________________________________________ |
+| Identity Number | _________________________________________ |
+| Contact Email | _________________________________________ |
+| Contact Number | _________________________________________ |
 
 ### The Cessionary
 
@@ -373,11 +373,11 @@ and
 
 | Field | Value |
 |-------|-------|
-| Agreement Date | [AGREEMENT_DATE] |
-| Original Wayleave Date | [ORIGINAL_WAYLEAVE_DATE] |
-| Wayleave Area | [WAYLEAVE_AREA] |
-| Municipality/Grantor | [MUNICIPALITY_NAME] |
-| Purchase Price | R [PURCHASE_PRICE] |
+| Agreement Date | _________________________________________ |
+| Original Wayleave Date | _________________________________________ |
+| Wayleave Area | _________________________________________ |
+| Municipality/Grantor | _________________________________________ |
+| Purchase Price | R _______________________________________ |
 
 ---
 
@@ -385,11 +385,11 @@ and
 
 > **WHEREAS:**
 >
-> 1. The Cedent is the lawful holder of a Wayleave Agreement granted by [MUNICIPALITY_NAME] ("the Grantor") on [ORIGINAL_WAYLEAVE_DATE] by way of letter attached hereto marked as <span class="annexure-ref">Annexure "A"</span>, authorising the installation, operation and maintenance of aerial and underground fibre optic infrastructure within the property or servitude area described as [WAYLEAVE_AREA] ("the Wayleave Area");
+> 1. The Cedent is the lawful holder of a Wayleave Agreement granted by _________________ ("the Grantor") on _________________ by way of letter attached hereto marked as <span class="annexure-ref">Annexure "A"</span>, authorising the installation, operation and maintenance of aerial and underground fibre optic infrastructure within the property or servitude area described as _________________ ("the Wayleave Area");
 >
 > 2. The Cedent wishes to transfer, assign, and cede all its rights, title, and interest in and to the said Wayleave Agreement to the Cessionary;
 >
-> 3. [MUNICIPALITY_NAME] has consented to this cession by way of letter dated [CONSENT_DATE], attached hereto as <span class="annexure-ref">Annexure "B"</span>;
+> 3. _________________ has consented to this cession by way of letter dated _________________, attached hereto as <span class="annexure-ref">Annexure "B"</span>;
 >
 > 4. The Parties individually record that all authorisations and consents required to enter into this Agreement have been duly obtained.
 
@@ -403,7 +403,7 @@ and
 
 3.2. The Cedent now wishes to cede, assign, and transfer all its rights, title, and interest in and to the said Wayleave Agreement to the Cessionary. The Cessionary has agreed to accept such cession, assignment, and transfer and to assume all obligations, liabilities, and responsibilities of the Cedent arising under the Wayleave Agreement from the Effective Date (as defined below).
 
-3.3. The Grantor has consented to the said cession by way of letter dated [CONSENT_DATE] attached as <span class="annexure-ref">Annexure "B"</span> and recognises the Cessionary as the new holder of the Wayleave Rights.
+3.3. The Grantor has consented to the said cession by way of letter dated _________________ attached as <span class="annexure-ref">Annexure "B"</span> and recognises the Cessionary as the new holder of the Wayleave Rights.
 
 ---
 
@@ -413,7 +413,7 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 **4.1. "Agreement"** means this Cession and Assignment of Wayleave Agreement together with all annexures attached hereto.
 
-**4.2. "Wayleave Agreement"** means the written permission or authorisation granted by the Grantor to the Cedent, dated [ORIGINAL_WAYLEAVE_DATE], under which the Cedent was permitted to install and maintain network infrastructure within the Wayleave Area.
+**4.2. "Wayleave Agreement"** means the written permission or authorisation granted by the Grantor to the Cedent, dated _________________, under which the Cedent was permitted to install and maintain network infrastructure within the Wayleave Area.
 
 **4.3. "Wayleave Rights"** means all rights, privileges, and entitlements of the Cedent under the Wayleave Agreement, including but not limited to the right to install, operate, access, maintain, upgrade, and repair telecommunications infrastructure.
 
@@ -425,9 +425,9 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 **4.7. "FNO"** means Fibre Network Operator, being a licensed telecommunications operator.
 
-**4.8. "Grantor"** means [MUNICIPALITY_NAME], being the municipality that granted the Wayleave Agreement to the Cedent.
+**4.8. "Grantor"** means _________________, being the municipality that granted the Wayleave Agreement to the Cedent.
 
-**4.9. "Wayleave Area"** means [WAYLEAVE_AREA] as described in the Wayleave Agreement.
+**4.9. "Wayleave Area"** means _________________ as described in the Wayleave Agreement.
 
 **4.10.** Any reference to one gender includes the other; any reference to the singular includes the plural and vice versa. Headings are for convenience only and do not affect interpretation.
 
@@ -437,7 +437,7 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 ### 5.1. Purchase Price and Payment
 
-5.1.1. The Cessionary shall pay to the Cedent the sum of **R [PURCHASE_PRICE]** (the "Purchase Price") as consideration for this cession.
+5.1.1. The Cessionary shall pay to the Cedent the sum of **R _________________** (the "Purchase Price") as consideration for this cession.
 
 5.1.2. Payment shall be made as follows:
 
@@ -552,7 +552,7 @@ The Cedent warrants that the Wayleave Agreement either:
 - (a) provides for automatic renewal upon expiry; or
 - (b) grants the holder an enforceable right to apply for renewal; or
 - (c) is granted in perpetuity or for an indefinite period; or
-- (d) has an initial term of not less than 15-20 years from [ORIGINAL_WAYLEAVE_DATE].
+- (d) has an initial term of not less than 15-20 years from _________________.
 
 #### 5.10.3. Long-Term Security
 
@@ -667,8 +667,8 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 | | |
 |-|-|
-| Physical Address | [CEDENT_PHYSICAL_ADDRESS] |
-| Email | [CEDENT_EMAIL] |
+| Physical Address | _________________________________________ |
+| Email | _________________________________________ |
 
 **CESSIONARY:**
 
@@ -740,7 +740,7 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 <div class="signature-block">
 
-**SIGNED** at [CEDENT_SIGNING_LOCATION] on this [DAY] day of [MONTH] 20[YEAR]
+**SIGNED** at _________________ on this _____ day of _________________ 20_____
 
 ### For and on Behalf of the Cedent:
 
@@ -749,15 +749,15 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 | | |
 |-|-|
-| Name | [CEDENT_SIGNATORY_NAME] |
-| Capacity | [CEDENT_SIGNATORY_CAPACITY] |
-| Date | [CEDENT_SIGNING_DATE] |
+| Name | _________________________________________ |
+| Capacity | _________________________________________ |
+| Date | _________________________________________ |
 
 </div>
 
 <div class="signature-block">
 
-**SIGNED** at [VF_SIGNING_LOCATION] on this [DAY] day of [MONTH] 20[YEAR]
+**SIGNED** at _________________ on this _____ day of _________________ 20_____
 
 ### For and on Behalf of Velocity Fibre (Pty) Ltd:
 
