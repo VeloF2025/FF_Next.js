@@ -284,13 +284,13 @@ css: |-
 <div class="cover-page">
   <img src="../assets/velocity-logo.jpg" alt="Velocity Fibre">
   <h1 class="cover-title">Cession of Wayleave Agreement</h1>
-  <p class="cover-subtitle">LEGAL TEMPLATE</p>
+  <p class="cover-subtitle">VELOCITY FIBRE (PTY) LTD</p>
   <hr class="cover-divider">
   <div class="cover-meta">
-    <p><strong>Document Type:</strong> Contract Template</p>
+    <p><strong>Document Type:</strong> Cession of Wayleave Agreement</p>
     <p><strong>Version:</strong> 1.0</p>
     <p><strong>Date:</strong> January 2026</p>
-    <p><strong>Classification:</strong> Confidential — Internal Use</p>
+    <p><strong>Classification:</strong> Confidential</p>
   </div>
   <div class="cover-footer">
     Velocity Fibre (Pty) Ltd — Fibre Network Operator
@@ -361,12 +361,13 @@ and
 | Field | Value |
 |-------|-------|
 | Full Legal Name | VELOCITY FIBRE (PTY) LTD |
-| Registration Number | [VF_REG_NO] |
-| Registered Address | [VF_ADDRESS] |
-| Represented by | [VF_REP_NAME] |
-| Identity Number | [VF_REP_ID] |
-| Contact Email | [VF_EMAIL] |
-| Contact Number | [VF_PHONE] |
+| Registration Number | 2025/238946/07 |
+| Tax Number | 9055917307 |
+| Registered Address | 26 Centenary Road, Lorraine, Gqeberha, 6070 |
+| Represented by | Llewelyn Hofmeyr |
+| Capacity | Managing Director |
+| Contact Email | info@velocityfibre.co.za |
+| Contact Number | 041-012 5010 |
 
 ### Agreement Details
 
@@ -673,8 +674,9 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 | | |
 |-|-|
-| Physical Address | [VF_PHYSICAL_ADDRESS] |
-| Email | [VF_EMAIL] |
+| Physical Address | 26 Centenary Road, Lorraine, Gqeberha, 6070 |
+| Email | info@velocityfibre.co.za |
+| Phone | 041-012 5010 |
 
 10.2. Any Party may change its domicilium by giving 10 (ten) business days' written notice.
 
@@ -764,9 +766,9 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 | | |
 |-|-|
-| Name | [VF_SIGNATORY_NAME] |
-| Capacity | [VF_SIGNATORY_CAPACITY] |
-| Date | [VF_SIGNING_DATE] |
+| Name | Llewelyn Hofmeyr |
+| Capacity | Managing Director |
+| Date | _________________________ |
 
 </div>
 
