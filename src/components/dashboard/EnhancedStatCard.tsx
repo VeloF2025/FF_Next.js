@@ -6,7 +6,7 @@
  */
 
 import { LucideIcon, TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-react';
-import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { memo, useCallback } from 'react';
 import { cn } from '@/utils/cn';
 
@@ -51,17 +51,12 @@ const EnhancedStatCardComponent = ({
   showTrend = true,
   formatValue,
 }: EnhancedStatCardProps) => {
-  const router = useRouter();
-
   const handleClick = useCallback(() => {
-    if (error) return; // Don't navigate if there's an error
-    
+    if (error) return;
     if (onClick) {
       onClick();
-    } else if (route) {
-      router.push(route);
     }
-  }, [onClick, route, router, error]);
+  }, [onClick, error]);
 
   // 🟢 WORKING: Format display value
   const displayValue = formatValue 
@@ -147,19 +142,18 @@ const EnhancedStatCardComponent = ({
     );
   }
 
-  // 🟢 WORKING: Main card render
-  return (
-    <div
-      className={cn(
-        'group relative overflow-hidden bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] shadow-sm',
-        'hover:shadow-md transition-all duration-200',
-        (onClick || route) && !error && 'cursor-pointer hover:border-blue-500/50',
-        variant === 'compact' && 'p-4',
-        variant !== 'compact' && 'p-6',
-        className
-      )}
-      onClick={handleClick}
-    >
+  // 🟢 WORKING: Card inner content (shared between Link and div wrappers)
+  const cardClasses = cn(
+    'group relative overflow-hidden bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] shadow-sm',
+    'hover:shadow-md transition-all duration-200',
+    (onClick || route) && !error && 'cursor-pointer hover:border-blue-500/50',
+    variant === 'compact' && 'p-4',
+    variant !== 'compact' && 'p-6',
+    className
+  );
+
+  const cardContent = (
+    <>
       {/* Top colored bar */}
       <div
         className="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
@@ -247,6 +241,22 @@ const EnhancedStatCardComponent = ({
 
       {/* Hover effect overlay */}
       <div className="absolute inset-0 bg-gradient-to-r from-transparent to-transparent group-hover:from-white/5 group-hover:to-transparent transition-all duration-200 pointer-events-none" />
+    </>
+  );
+
+  // 🟢 WORKING: Use Link for route navigation (works in both Pages & App Router)
+  if (route && !error) {
+    return (
+      <Link href={route} className={cn(cardClasses, 'block no-underline')} onClick={onClick}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  // 🟢 WORKING: Use div for onClick-only or non-interactive cards
+  return (
+    <div className={cardClasses} onClick={handleClick}>
+      {cardContent}
     </div>
   );
 };
