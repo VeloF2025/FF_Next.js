@@ -332,8 +332,9 @@ async function handler(
           );
         } else {
           // No filters - get all
-          projects = await safeArrayQuery(
-            async () => sql`
+          // DEBUG: Direct query without safeArrayQuery to see actual errors
+          try {
+            projects = await sql`
               SELECT
                 p.id,
                 p.project_code,
@@ -360,9 +361,16 @@ async function handler(
               LEFT JOIN clients c ON p.client_id = c.id
               ORDER BY p.created_at DESC
               LIMIT ${limitValue}
-            `,
-            { logError: true }
-          );
+            `;
+            log.info('Projects API - Direct query success', {
+              data: { count: projects?.length || 0 }
+            }, 'projects/index.ts');
+          } catch (queryError: any) {
+            log.error('Projects API - Query FAILED', {
+              data: { error: queryError.message, stack: queryError.stack }
+            }, 'projects/index.ts');
+            projects = [];
+          }
         }
 
         // DEBUG: Log query result
