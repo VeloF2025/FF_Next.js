@@ -178,22 +178,14 @@ async function handlePost(
       project: review.project,
     };
 
-    // Build message with @mentions for group messages
-    let groupMessage = feedbackMessage;
-    const mentionParts: string[] = [];
-    if (review.wa_sender_jid) {
-      mentionParts.push(`@${extractPhoneFromJid(review.wa_sender_jid)}`);
-    }
-    if (staffJid && staffJid !== review.wa_sender_jid) {
-      mentionParts.push(`@${extractPhoneFromJid(staffJid)}`);
-    }
-    if (mentionParts.length > 0) {
-      groupMessage = `${mentionParts.join(' ')} ${feedbackMessage}`;
-    }
+    // Note: We DON'T add @phone text to the message here
+    // The bridge adds the @mention text AND the MentionedJID context info
+    // This allows WhatsApp to display the user's name instead of raw number
+    const groupMessage = feedbackMessage;
 
     // Send to GROUP if destination is 'group' or 'both'
     if (destination === 'group' || destination === 'both') {
-      log.info(`Sending feedback to group for ${dropNumber}`, { groupId });
+      log.info(`Sending feedback to group for ${dropNumber}`, { groupId, mentionJIDs });
       sendResults.group = await sendToWhatsApp(groupId, groupMessage, replyParams);
       if (!sendResults.group.success) {
         log.error('Failed to send to group', { dropNumber, groupId });

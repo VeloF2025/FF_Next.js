@@ -14,6 +14,7 @@ import { neon } from '@neondatabase/serverless';
 import { QA_STEP_LABELS, ORDERED_STEP_KEYS } from '@/modules/wa-monitor/types/wa-monitor.types';
 import { withArcjetProtection, ajWaMonitor } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -76,8 +77,8 @@ interface WhatsAppApiResponse {
 /**
  * Send message to WhatsApp group via wa-feedback service
  * wa-feedback (8092) proxies to bridge-2 (8083) using 063 841 2276
- * Note: @mentions are not currently supported by wa-feedback, but the message
- * will be sent to the group regardless
+ * Now supports @mentions - bridge adds @user text AND MentionedJID context
+ * so WhatsApp displays the user's name instead of raw number
  */
 async function sendWhatsAppMessage(
   groupJID: string,
@@ -87,16 +88,18 @@ async function sendWhatsAppMessage(
   try {
     // wa-feedback service handles all outgoing messages
     // It proxies to bridge-2 (8083) which sends via 063 841 2276
-    const requestBody = {
+    const requestBody: Record<string, string | string[]> = {
       recipient: groupJID,
       message: message,
     };
 
-    // Log if we have recipient info (for future @mention support)
+    // Add mention support - send recipient_jid for @mention
+    // The bridge will add @user text AND MentionedJID context (shows name in WhatsApp)
     if (recipientJID && recipientJID.trim() !== '' && recipientJID !== 'Unknown') {
-      console.log(`[WA] Sending to group ${groupJID} (recipient: ${recipientJID})`);
+      requestBody.recipient_jid = recipientJID;
+      log.debug('waMonitor', { action: 'sendWhatsAppMessage', groupJID, recipientJID, hasMention: true });
     } else {
-      console.log(`[WA] Sending to group ${groupJID} (no recipient info)`);
+      log.debug('waMonitor', { action: 'sendWhatsAppMessage', groupJID, hasMention: false });
     }
 
     const response = await fetch(`${WA_FEEDBACK_URL}/send-feedback`, {
@@ -122,7 +125,7 @@ async function sendWhatsAppMessage(
       message: result.message || 'Message sent via wa-feedback (063 841 2276)'
     };
   } catch (error) {
-    console.error('WhatsApp API communication error:', error);
+    log.error('waMonitor', { action: 'sendWhatsAppMessage', error });
     return {
       success: false,
       message: `Failed to communicate with wa-feedback: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -249,23 +252,30 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    console.log(`📤 Sending feedback for ${drop.drop_number} to ${groupConfig.name} (${groupConfig.jid})`);
-
-    // Log mention status
-    if (drop.submitted_by && drop.submitted_by.trim() !== '' && drop.submitted_by !== 'Unknown') {
-      console.log(`   With @mention: ${drop.submitted_by}`);
-    } else {
-      console.log(`   Without @mention (no sender info - manually added drop)`);
-    }
+    log.debug('waMonitor', {
+      action: 'sendFeedback',
+      dropNumber: drop.drop_number,
+      group: groupConfig.name,
+      groupJID: groupConfig.jid,
+      hasMention: !!(drop.submitted_by && drop.submitted_by.trim() !== '' && drop.submitted_by !== 'Unknown'),
+      submittedBy: drop.submitted_by || 'manual'
+    });
 
     // 3. Use the custom message directly (user already generated feedback with Auto-Generate)
-    // Add blank lines at start to separate @mention from content
-    const feedbackMessage = `\n\n${message || ''}`;
+    // Note: We don't add @phone to message - bridge does that with proper MentionedJID context
+    const feedbackMessage = `${message || ''}`;
 
-    // 4. Send to WhatsApp (with or without mention depending on sender info)
+    // 4. Convert submitted_by to proper JID format if needed
+    // qa_photo_reviews stores raw LID like "169200706420977", need "169200706420977@lid"
+    let recipientJid: string | null = null;
+    if (drop.submitted_by && drop.submitted_by.trim() !== '' && drop.submitted_by !== 'Unknown') {
+      recipientJid = drop.submitted_by.includes('@') ? drop.submitted_by : `${drop.submitted_by}@lid`;
+    }
+
+    // 5. Send to WhatsApp (with mention if we have recipient JID)
     const whatsappResult = await sendWhatsAppMessage(
       groupConfig.jid,
-      drop.submitted_by,
+      recipientJid,
       feedbackMessage
     );
 
@@ -282,7 +292,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 6. Update database with feedback_sent timestamp
     await updateFeedbackSentTimestamp(dropId);
 
-    console.log(`✅ Feedback sent successfully for ${drop.drop_number}`);
+    log.debug('waMonitor', {
+      action: 'feedbackSentSuccess',
+      dropNumber: drop.drop_number,
+      project: drop.project,
+      group: groupConfig.name
+    });
 
     return res.status(200).json({
       success: true,
@@ -297,7 +312,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error) {
-    console.error('Error sending feedback:', error);
+    log.error('waMonitor', { action: 'sendFeedback', error });
     return res.status(500).json({
       success: false,
       error: {
