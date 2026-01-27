@@ -134,16 +134,31 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const hasOntSerial = !!existing.ont_serial_scanned;
     const hasUpsSerial = !!existing.ups_serial_scanned;
 
-    // Check if 1Map has more photos than we have in DB (even if data seems complete)
-    // This handles the case where photos were added to 1Map after initial sync
+    // Check if 1Map has more ACTUAL photos than we have in DB
+    // Use localCount (downloadable) not cloudCount (metadata with orphaned entries)
     const oneMapCheck = await check1MapPhotoCount(dropNumber);
-    const needsPhotoSync = oneMapCheck.cloudCount > photoCount;
+    const needsPhotoSync = oneMapCheck.localCount > photoCount;
 
     if (needsPhotoSync) {
-      log.info('EnsureData', `1Map has more photos for ${dropNumber}`, {
+      log.info('EnsureData', `1Map has more downloadable photos for ${dropNumber}`, {
         dbCount: photoCount,
-        cloudCount: oneMapCheck.cloudCount,
-        localCount: oneMapCheck.localCount,
+        availableCount: oneMapCheck.localCount,
+        cloudMetadata: oneMapCheck.cloudCount,
+        hasOrphanedMetadata: oneMapCheck.hasOrphanedMetadata,
+      });
+    }
+
+    // Log and record verification: our DB matches actual available photos
+    if (!needsPhotoSync && photoCount > 0 && oneMapCheck.localCount > 0) {
+      log.debug('EnsureData', `Photo count verified for ${dropNumber}`, {
+        dbCount: photoCount,
+        availableCount: oneMapCheck.localCount,
+        match: photoCount === oneMapCheck.localCount,
+      });
+
+      // Update verification timestamp (async, don't block response)
+      markPhotoCountVerified(dropNumber, photoCount, oneMapCheck.localCount).catch((err) => {
+        log.warn('EnsureData', `Failed to mark verification for ${dropNumber}`, { error: err });
       });
     }
 
@@ -213,11 +228,16 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 }
 
 /**
- * Check how many photos 1Map has for this DR (cloud vs local)
+ * Check how many photos 1Map has for this DR (cloud metadata vs local downloaded)
+ *
+ * IMPORTANT: Use `localCount` as source of truth for available photos.
+ * `cloudCount` (metadata) can be higher due to orphaned entries in 1Map
+ * where photo references exist but actual files return placeholder GIFs.
  */
 async function check1MapPhotoCount(dropNumber: string): Promise<{
-  cloudCount: number;
-  localCount: number;
+  cloudCount: number;  // Metadata count (may include orphaned entries)
+  localCount: number;  // Actually downloadable photos (source of truth)
+  hasOrphanedMetadata: boolean;
 }> {
   try {
     const response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
@@ -225,17 +245,30 @@ async function check1MapPhotoCount(dropNumber: string): Promise<{
     });
 
     if (!response.ok) {
-      return { cloudCount: 0, localCount: 0 };
+      return { cloudCount: 0, localCount: 0, hasOrphanedMetadata: false };
     }
 
     const data = await response.json();
+    const cloudCount = data.photo_count || 0;
+    const localCount = data.local_photos?.length || 0;
+
+    // Log if there's orphaned metadata (cloud > local means some photos aren't actually available)
+    if (cloudCount > localCount && localCount > 0) {
+      log.info('EnsureData', `Orphaned 1Map metadata detected for ${dropNumber}`, {
+        cloudMetadata: cloudCount,
+        actualPhotos: localCount,
+        orphaned: cloudCount - localCount,
+      });
+    }
+
     return {
-      cloudCount: data.photo_count || 0,
-      localCount: data.local_photos?.length || 0,
+      cloudCount,
+      localCount,
+      hasOrphanedMetadata: cloudCount > localCount,
     };
   } catch (error) {
     log.warn('EnsureData', `Failed to check 1Map photo count for ${dropNumber}`, { error });
-    return { cloudCount: 0, localCount: 0 };
+    return { cloudCount: 0, localCount: 0, hasOrphanedMetadata: false };
   }
 }
 
@@ -338,6 +371,7 @@ async function fetchAndUpdateFromOneMap(dropNumber: string, previousPhotoCount: 
 
 /**
  * Update unified table with photo and serial data
+ * Also marks photo count as verified (matching actual 1Map availability)
  */
 async function updateUnifiedTable(
   dropNumber: string,
@@ -366,9 +400,31 @@ async function updateUnifiedTable(
        ont_serial_scanned = COALESCE($3, ont_serial_scanned),
        ups_serial_scanned = COALESCE($4, ups_serial_scanned),
        photos_fetched_at = COALESCE(photos_fetched_at, NOW()),
+       photo_count_verified_at = NOW(),
+       photo_count_mismatch = FALSE,
        updated_at = NOW()
      WHERE drop_number = $5`,
     [photos.length, JSON.stringify(photos), ontSerial, upsSerial, dropNumber]
+  );
+}
+
+/**
+ * Mark photo count as verified without updating photos
+ * Used when we confirm DB count matches 1Map available count
+ */
+async function markPhotoCountVerified(
+  dropNumber: string,
+  dbCount: number,
+  availableCount: number
+): Promise<void> {
+  const mismatch = dbCount !== availableCount;
+  await pool.query(
+    `UPDATE dr_photo_unified_reviews
+     SET
+       photo_count_verified_at = NOW(),
+       photo_count_mismatch = $1
+     WHERE drop_number = $2`,
+    [mismatch, dropNumber]
   );
 }
 
