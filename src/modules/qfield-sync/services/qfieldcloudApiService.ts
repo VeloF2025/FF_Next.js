@@ -8,7 +8,7 @@ import { Pool } from 'pg';
 
 // QFieldCloud API Configuration
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
-const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'YmFcDD4fNHu5P0j2i2xCn5AVt7JjmSnJOVHntObwCHHlE35nAE0C9LuNF9N0coTk5gNLcUsvYRUb0GH0ZJT2bGcyej5Y3apeVsPS';
+const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'l5Fy7AlTVr1JScyoQqlmo2iktKycrrTBP1SmRJuvlYyocYm1CVgunMU4h1DlvqWKlkToNpsKUQTBKUhtKgAmr1TVPSVI87GqLYWB';
 
 // QFieldCloud Database Direct Access (for faster queries)
 const qfieldPool = new Pool({
