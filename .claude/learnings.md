@@ -1830,6 +1830,115 @@ async function getSyncTargetProjectIds(): Promise<string[]> {
 
 ---
 
+## 2026-01-27: PDF User Manual Generation with md-to-pdf
+
+**Context:** Creating branded user manuals for FibreFlow modules using Markdown source files.
+
+**Tool:** `md-to-pdf` (Node.js, uses Puppeteer under the hood)
+```bash
+npm install -g md-to-pdf
+```
+
+**Critical: --basedir Flag for Relative Paths:**
+```bash
+# ❌ BROKEN - relative paths like ../screenshots/... fail
+npx md-to-pdf source/maintenance.md --dest pdf/maintenance.pdf
+
+# ✅ WORKING - --basedir resolves relative paths correctly
+npx md-to-pdf source/maintenance.md --dest pdf/maintenance.pdf --basedir ..
+```
+
+**File Structure:**
+```
+docs/user-manuals/
+├── assets/
+│   └── velocity-logo.jpg       # Downloaded brand logo (37KB)
+├── screenshots/
+│   └── maintenance/            # Module-specific screenshots
+│       ├── dashboard.png
+│       ├── ticket-detail.png
+│       └── ...
+├── source/
+│   └── maintenance.md          # Markdown with YAML frontmatter
+└── pdf/
+    └── maintenance.pdf         # Generated output (1.7MB, 31 pages)
+```
+
+**YAML Frontmatter Structure for Branding:**
+```yaml
+---
+pdf_options:
+  format: A4
+  margin: { top: 25mm, bottom: 25mm, left: 20mm, right: 20mm }
+  displayHeaderFooter: true
+  headerTemplate: |-
+    <section style="font-family: 'IBM Plex Sans', sans-serif; font-size: 9px; width: 100%; margin: 0 20mm;">
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: #023047; font-weight: 600;">VELOCITY FIBRE</span>
+        <span>FibreFlow Module — User Manual v1.0</span>
+      </div>
+    </section>
+  footerTemplate: |-
+    <section style="font-family: 'IBM Plex Sans', sans-serif; font-size: 9px; width: 100%; margin: 0 20mm;">
+      <div style="display: flex; justify-content: space-between;">
+        <span>Confidential — Velocity Fibre (Pty) Ltd</span>
+        <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span>
+      </div>
+    </section>
+stylesheet: https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap
+css: |-
+  :root {
+    --vf-navy: #023047;
+    --vf-blue: #1e73be;
+    --vf-teal: #219ebc;
+    --vf-sky: #2ea3f2;
+    --vf-body: #3c3a47;
+  }
+  body { font-family: 'IBM Plex Sans', sans-serif; color: var(--vf-body); }
+  h1, h2, h3 { font-family: 'IBM Plex Sans Condensed', sans-serif; color: var(--vf-navy); }
+  /* ... full CSS theme ... */
+---
+```
+
+**Velocity Fibre Brand Colors:**
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Navy | `#023047` | Primary, headings, headers |
+| Blue | `#1e73be` | Secondary buttons |
+| Teal | `#219ebc` | Accent, table headers, highlights |
+| Sky Blue | `#2ea3f2` | Links, hover states |
+| Body Gray | `#3c3a47` | Body text |
+
+**Typography:**
+- **Body:** IBM Plex Sans (400, 500, 600, 700)
+- **Headings:** IBM Plex Sans Condensed (400, 500, 600)
+
+**Cover Page Pattern:**
+```markdown
+<!-- Cover Page -->
+<div class="cover-page">
+  <img src="../assets/velocity-logo.jpg" class="cover-logo" alt="Velocity Fibre">
+  <h1 class="cover-title">Module Name</h1>
+  <p class="cover-subtitle">User Manual</p>
+  <div class="cover-meta">
+    <p><strong>Version:</strong> 1.0</p>
+    <p><strong>Last Updated:</strong> January 2026</p>
+    <p><strong>Classification:</strong> Internal Use</p>
+  </div>
+</div>
+<div class="page-break"></div>
+```
+
+**Skill:** `/manual` - See `.claude/skills/manual.md` for full workflow.
+
+**Affected Files:**
+- `docs/user-manuals/source/maintenance.md` - Branded manual source
+- `docs/user-manuals/pdf/maintenance.pdf` - Generated PDF
+- `.claude/skills/manual.md` - Manual generation workflow
+- Commits: `3ab0c0d4` (initial), `fb349d07` (basedir fix), `4f71eb9a` (branding)
+
+---
+
 ## Export API Must Mirror Display API Filters Exactly
 **Date:** 2026-01-27
 **Severity:** HIGH
