@@ -139,8 +139,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         u.qa_decision_reasons,
         u.human_reviewer_id,
         u.human_review_completed_at,
-        u.photos_categorized,
         u.photo_count,
+        u.step_01_house_photo,
+        u.step_02_cable_from_pole,
+        u.step_03_entry_outside,
+        u.step_04_entry_inside,
+        u.step_05_wall,
+        u.step_06_ont_back,
+        u.step_07_power_meter,
+        u.step_08_final_installation,
+        u.step_09_green_lights,
+        u.step_10_signature,
         CASE
           WHEN u.qa_decision_by = 'system' THEN 'System'
           WHEN u.qa_decision_by IS NOT NULL AND u.qa_decision_by ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -155,21 +164,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     for (const row of desktopReviews) {
-      // Parse photos_categorized to get step pass/fail status
-      let stepData: Record<number, boolean> = {};
-      if (row.photos_categorized && typeof row.photos_categorized === 'object') {
-        // photos_categorized is an object with step numbers as keys
-        const categorized = row.photos_categorized as Record<string, { qa_status?: string }[]>;
-        for (const [step, photos] of Object.entries(categorized)) {
-          const stepNum = parseInt(step, 10);
-          if (!isNaN(stepNum)) {
-            // A step passes if all photos in that step passed QA
-            const allPassed = Array.isArray(photos) && photos.length > 0 &&
-              photos.every((p) => p.qa_status === 'pass');
-            stepData[stepNum] = allPassed;
-          }
-        }
-      }
+      // Use step columns directly from the query
+      const stepData: Record<number, boolean> = {
+        1: row.step_01_house_photo || false,
+        2: row.step_02_cable_from_pole || false,
+        3: row.step_03_entry_outside || false,
+        4: row.step_04_entry_inside || false,
+        5: row.step_05_wall || false,
+        6: row.step_06_ont_back || false,
+        7: row.step_07_power_meter || false,
+        8: row.step_08_final_installation || false,
+        9: row.step_09_green_lights || false,
+        10: row.step_10_signature || false,
+      };
 
       // Calculate steps passed
       const steps = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -195,16 +202,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         project: row.project,
         review_date: row.qa_decision_at || row.human_review_completed_at,
         reviewer: row.reviewer_name || 'Unknown',
-        step_01_house_photo: stepData[1] || false,
-        step_02_cable_from_pole: stepData[2] || false,
-        step_03_cable_entry_outside: stepData[3] || false,
-        step_04_cable_entry_inside: stepData[4] || false,
-        step_05_wall_installation: stepData[5] || false,
-        step_06_ont_back: stepData[6] || false,
-        step_07_power_meter: stepData[7] || false,
-        step_08_final_installation: stepData[8] || false,
-        step_09_green_lights: stepData[9] || false,
-        step_10_signature: stepData[10] || false,
+        step_01_house_photo: stepData[1],
+        step_02_cable_from_pole: stepData[2],
+        step_03_cable_entry_outside: stepData[3],
+        step_04_cable_entry_inside: stepData[4],
+        step_05_wall_installation: stepData[5],
+        step_06_ont_back: stepData[6],
+        step_07_power_meter: stepData[7],
+        step_08_final_installation: stepData[8],
+        step_09_green_lights: stepData[9],
+        step_10_signature: stepData[10],
         completed_photos: row.photo_count,
         outstanding_photos: null,
         pass_fail: passFail,
