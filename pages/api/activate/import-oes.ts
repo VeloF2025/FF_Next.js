@@ -23,11 +23,12 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Disable body parser for file uploads
+// Disable body parser for file uploads + extend timeout for large files
 export const config = {
   api: {
     bodyParser: false,
   },
+  maxDuration: 120, // 2 minutes for large OES imports (7000+ rows)
 };
 
 interface OESRow {
