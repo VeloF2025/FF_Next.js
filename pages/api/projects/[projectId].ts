@@ -53,7 +53,7 @@ async function handler(
               p.budget,
               p.actual_cost,
               p.project_manager,
-              COALESCE(s.first_name || ' ' || s.last_name, u.name, p.project_manager) as project_manager_name,
+              COALESCE(s.first_name || ' ' || s.last_name, u.first_name || ' ' || u.last_name, p.project_manager::text) as project_manager_name,
               p.progress,
               p.created_at,
               p.updated_at,

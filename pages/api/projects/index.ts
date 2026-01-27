@@ -82,6 +82,12 @@ async function handler(
         // List all projects with optional filters
         const limitValue = limitParam ? parseInt(limitParam as string, 10) : 1000;
 
+        // DEBUG: Log query parameters
+        log.info('Projects API - Query params', {
+          data: { status, clientId, search, limitValue },
+          databaseUrl: process.env.DATABASE_URL ? 'set' : 'NOT SET'
+        }, 'projects/index.ts');
+
         // Build query based on filters
         let projects;
 
@@ -358,6 +364,11 @@ async function handler(
             { logError: true }
           );
         }
+
+        // DEBUG: Log query result
+        log.info('Projects API - Query result', {
+          data: { count: projects?.length || 0, hasData: !!projects }
+        }, 'projects/index.ts');
 
         return apiResponse.success(res, projects || []);
       }
