@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, File, X, Loader2 } from 'lucide-react';
+import { Upload, File as FileIcon, X, Loader2 } from 'lucide-react';
 import { DocumentType, DOCUMENT_TYPE_CONFIG } from '@/modules/assets/types/document';
 import { toast } from 'react-hot-toast';
 
@@ -152,7 +152,7 @@ export function DocumentUploadForm({ assetId }: DocumentUploadFormProps) {
         ) : (
           <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="flex items-center space-x-3">
-              <File className="h-8 w-8 text-purple-500" />
+              <FileIcon className="h-8 w-8 text-purple-500" />
               <div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedFile.name}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
