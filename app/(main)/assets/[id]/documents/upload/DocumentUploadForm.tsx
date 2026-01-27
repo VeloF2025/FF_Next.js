@@ -65,10 +65,12 @@ export function DocumentUploadForm({ assetId }: DocumentUploadFormProps) {
 
     try {
       // Upload file to VF Storage
+      // Use simple category (not nested with assetId) - include assetId in filename prefix
       const uploadFormData = new FormData();
-      uploadFormData.append('file', selectedFile);
+      const prefixedFileName = `${assetId}_${selectedFile.name}`;
+      uploadFormData.append('file', new File([selectedFile], prefixedFileName, { type: selectedFile.type }));
       uploadFormData.append('type', 'assets');
-      uploadFormData.append('category', `${assetId}/documents`);
+      uploadFormData.append('category', 'documents');
 
       setUploadProgress(30); // Show some progress during upload
 
