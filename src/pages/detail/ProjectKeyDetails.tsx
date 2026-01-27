@@ -49,12 +49,12 @@ export function ProjectKeyDetails({ project }: ProjectKeyDetailsProps) {
           </div>
         </div>
 
-        {project.projectManager && (
+        {(project.projectManagerName || project.projectManager) && (
           <div className="flex items-center">
             <Users className="h-5 w-5 text-[var(--ff-text-tertiary)] mr-3" />
             <div>
               <p className="text-sm font-medium text-[var(--ff-text-primary)]">Project Manager</p>
-              <p className="text-sm text-[var(--ff-text-secondary)]">{project.projectManager}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">{project.projectManagerName || project.projectManager}</p>
             </div>
           </div>
         )}

@@ -37,6 +37,7 @@ export interface Project {
   actualProgress: number;
   projectManagerId?: string;
   projectManager?: string;
+  projectManagerName?: string;
   teamLeadId?: string;
   teamLead?: string;
   teamMembers?: TeamMember[];
