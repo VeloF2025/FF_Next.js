@@ -109,6 +109,21 @@ function getWarrantyStatus(warrantyEndDate: string | null | undefined): { status
   return { status: 'Active', color: 'green', daysLeft };
 }
 
+/**
+ * Convert VF Storage URL to proxy URL for browser access
+ * e.g., http://100.96.203.105:8091/assets/documents/file.pdf -> /api/uploads/assets/documents/file.pdf
+ */
+function getProxyUrl(vfStorageUrl: string | null | undefined): string | null {
+  if (!vfStorageUrl) return null;
+  // Extract path after the VF Storage base URL
+  const match = vfStorageUrl.match(/100\.96\.203\.105:8091\/(.+)/);
+  if (match) {
+    return `/api/uploads/${match[1]}`;
+  }
+  // If it's already a relative URL or different format, return as-is
+  return vfStorageUrl;
+}
+
 function getStatusBadge(status: string) {
   const config = ASSET_STATUS_CONFIG[status as keyof typeof ASSET_STATUS_CONFIG];
   if (!config) return null;
@@ -359,9 +374,20 @@ export default async function AssetDetailPage({ params }: PageProps) {
                           <File className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {doc.documentName}
-                          </p>
+                          {doc.fileUrl ? (
+                            <a
+                              href={getProxyUrl(doc.fileUrl) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline truncate block"
+                            >
+                              {doc.documentName}
+                            </a>
+                          ) : (
+                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              {doc.documentName}
+                            </p>
+                          )}
                           <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
                             <span>{typeConfig.label}</span>
                             {doc.expiryDate && (
@@ -379,11 +405,11 @@ export default async function AssetDetailPage({ params }: PageProps) {
                       <div className="flex items-center space-x-2">
                         {doc.fileUrl && (
                           <a
-                            href={doc.fileUrl}
+                            href={getProxyUrl(doc.fileUrl) || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
-                            title="Download"
+                            title="View/Download"
                           >
                             <Download className="h-4 w-4" />
                           </a>
