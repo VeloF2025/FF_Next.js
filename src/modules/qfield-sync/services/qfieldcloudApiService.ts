@@ -12,7 +12,7 @@ const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'YmFcDD4fNHu5P0j2i2xCn5
 
 // QFieldCloud Database Direct Access (for faster queries)
 const qfieldPool = new Pool({
-  host: '72.61.166.168',
+  host: '100.96.203.105',
   port: 5433,
   database: 'qfieldcloud_db',
   user: 'qfieldcloud_db_admin',
