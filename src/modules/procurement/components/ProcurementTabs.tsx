@@ -181,16 +181,9 @@ export function ProcurementTabs({
       return;
     }
 
-    // Tabs that should show inline content on the main procurement page
-    const inlineContentTabs = ['overview', 'reports'];
-
-    // Navigate directly to dedicated page for tabs with their own pages
-    if (tab.path && !inlineContentTabs.includes(tab.id)) {
-      router.push(tab.path);
-      return; // Don't update tab state - we're navigating away
-    }
-
-    // Only update tab state for inline content tabs
+    // All tabs now show inline content on the main procurement page
+    // This provides a unified experience with inline content components
+    // Users can still navigate to dedicated pages via "View All" buttons in each tab content
     onTabChange(tab.id);
   };
 
