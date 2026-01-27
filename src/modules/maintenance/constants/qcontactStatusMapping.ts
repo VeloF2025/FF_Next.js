@@ -2,11 +2,16 @@
  * QContact to FibreFlow Status Mapping
  * 🟢 WORKING: Maps QContact status values to FibreFlow ticket statuses
  *
- * QContact Statuses (discovered 2026-01-22):
- * - Closed (399 tickets)
- * - Solved (8 tickets)
- * - Assigned (4 tickets)
- * - Pending Company Response (3 tickets)
+ * QContact Statuses (verified 2026-01-27 via UI):
+ * - New (white) - newly created ticket
+ * - Assigned (green) - assigned to team/person
+ * - In Progress (orange) - actively being worked on
+ * - Escalated (red) - escalated for attention
+ * - In Review (blue) - under QA review
+ * - Reviewed (green) - QA review passed
+ * - Pending Customer (white) - waiting for customer response
+ * - Solved (white) - work completed
+ * - Unsolved - No Response (dark) - closed without resolution
  *
  * FibreFlow has 11 statuses in a kanban workflow:
  * Work Phase: open, assigned, in_progress
@@ -18,43 +23,57 @@ import { TicketStatus } from '../types/ticket';
 
 /**
  * Map QContact status string to FibreFlow TicketStatus
- * This mapping is used during sync to align ticket statuses
+ * This mapping is used during INBOUND sync to align ticket statuses
  */
 export const QCONTACT_TO_FIBREFLOW_STATUS: Record<string, TicketStatus> = {
-  // Terminal states - ticket work complete
-  'Closed': TicketStatus.CLOSED,
-  'Solved': TicketStatus.CLOSED,
-
-  // Active states - work in progress
-  'Assigned': TicketStatus.ASSIGNED,
-  'In Progress': TicketStatus.IN_PROGRESS, // If QContact uses this
-
-  // Waiting states - awaiting response
-  'Pending Company Response': TicketStatus.OPEN,
-  'Pending Customer Response': TicketStatus.OPEN, // Common variant
-  'Pending': TicketStatus.OPEN,
-  'Open': TicketStatus.OPEN,
+  // New/Open states
   'New': TicketStatus.OPEN,
+  'Pending Customer': TicketStatus.OPEN,
 
-  // QA-related (if QContact uses these)
-  'Pending Review': TicketStatus.PENDING_QA,
-  'Under Review': TicketStatus.QA_IN_PROGRESS,
+  // Active work states
+  'Assigned': TicketStatus.ASSIGNED,
+  'In Progress': TicketStatus.IN_PROGRESS,
+  'Escalated': TicketStatus.IN_PROGRESS, // Escalated = urgent in-progress
+
+  // QA states
+  'In Review': TicketStatus.PENDING_QA,
+  'Reviewed': TicketStatus.QA_APPROVED,
+
+  // Terminal states
+  'Solved': TicketStatus.CLOSED,
+  'Unsolved - No Response': TicketStatus.CANCELLED,
+
+  // Legacy/fallback mappings (for historical data)
+  'Closed': TicketStatus.CLOSED,
+  'Open': TicketStatus.OPEN,
+  'Pending': TicketStatus.OPEN,
+  'Pending Company Response': TicketStatus.OPEN,
+  'Pending Customer Response': TicketStatus.OPEN,
 };
 
 /**
  * Reverse mapping: FibreFlow status to QContact status
- * Used if we ever enable outbound sync
+ * Used for OUTBOUND sync when pushing FibreFlow changes to QContact
  */
 export const FIBREFLOW_TO_QCONTACT_STATUS: Partial<Record<TicketStatus, string>> = {
-  [TicketStatus.OPEN]: 'Open',
+  // Work phase
+  [TicketStatus.OPEN]: 'New',
   [TicketStatus.ASSIGNED]: 'Assigned',
   [TicketStatus.IN_PROGRESS]: 'In Progress',
-  [TicketStatus.PENDING_QA]: 'Pending Review',
-  [TicketStatus.QA_IN_PROGRESS]: 'Under Review',
-  [TicketStatus.QA_APPROVED]: 'Solved',
-  [TicketStatus.CLOSED]: 'Closed',
-  [TicketStatus.CANCELLED]: 'Closed',
-  // Others don't have direct QContact equivalents
+
+  // QA phase
+  [TicketStatus.PENDING_QA]: 'In Review',
+  [TicketStatus.QA_IN_PROGRESS]: 'In Review',
+  [TicketStatus.QA_REJECTED]: 'In Progress', // Rejected = back to work
+  [TicketStatus.QA_APPROVED]: 'Reviewed',
+
+  // Handover phase
+  [TicketStatus.PENDING_HANDOVER]: 'Reviewed',
+  [TicketStatus.HANDED_TO_OPS]: 'Solved',
+
+  // Terminal states
+  [TicketStatus.CLOSED]: 'Solved',
+  [TicketStatus.CANCELLED]: 'Unsolved - No Response',
 };
 
 /**

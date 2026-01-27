@@ -23,7 +23,9 @@ import {
   deleteTicket
 } from '@/modules/maintenance/services/ticketService';
 import { enrichTicketData } from '@/modules/maintenance/services/ticketEnrichmentService';
+import { syncOutboundUpdate } from '@/modules/maintenance/services/qcontactSyncOutbound';
 import type { UpdateTicketPayload } from '@/modules/maintenance/types/ticket';
+import { TicketStatus } from '@/modules/maintenance/types/ticket';
 
 const logger = createLogger('maintenance:api:tickets:id');
 
@@ -183,6 +185,21 @@ export async function PUT(
 
     if (!updatedTicket) {
       return notFoundError('Ticket', ticketId);
+    }
+
+    // Sync status changes to QContact (async, non-blocking)
+    if (body.status) {
+      syncOutboundUpdate(ticketId, { status: body.status as TicketStatus })
+        .then(result => {
+          if (result.success) {
+            logger.info('QContact outbound sync successful', { ticketId, status: body.status });
+          } else {
+            logger.warn('QContact outbound sync failed', { ticketId, error: result.error_message });
+          }
+        })
+        .catch(err => {
+          logger.error('QContact outbound sync error', { ticketId, error: err.message });
+        });
     }
 
     return NextResponse.json({

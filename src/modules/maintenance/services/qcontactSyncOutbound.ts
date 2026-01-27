@@ -24,6 +24,7 @@ import {
   SyncStatus,
   type SyncOperationResult,
 } from '../types/qcontact';
+import { mapFibreFlowStatusToQContact } from '../constants/qcontactStatusMapping';
 import { createLogger } from '@/lib/logger';
 
 // 🟢 WORKING: Logger instance for sync operations
@@ -42,43 +43,8 @@ export interface OutboundChanges {
   note?: string;
 }
 
-// ============================================================================
-// Status Mapping Functions
-// ============================================================================
-
-/**
- * Map FibreFlow status to QContact status format
- * 🟢 WORKING: Status conversion for outbound sync
- */
-function mapStatusToQContact(fibreflowStatus: TicketStatus): string {
-  // Map FibreFlow status to QContact's expected status values
-  switch (fibreflowStatus) {
-    case TicketStatus.OPEN:
-      return 'open';
-    case TicketStatus.ASSIGNED:
-      return 'assigned';
-    case TicketStatus.IN_PROGRESS:
-      return 'in_progress';
-    case TicketStatus.PENDING_QA:
-      return 'pending_qa';
-    case TicketStatus.QA_IN_PROGRESS:
-      return 'qa_in_progress';
-    case TicketStatus.QA_REJECTED:
-      return 'qa_rejected';
-    case TicketStatus.QA_APPROVED:
-      return 'qa_approved';
-    case TicketStatus.PENDING_HANDOVER:
-      return 'pending_handover';
-    case TicketStatus.HANDED_TO_OPS:
-      return 'handed_to_ops';
-    case TicketStatus.CLOSED:
-      return 'closed';
-    case TicketStatus.CANCELLED:
-      return 'cancelled';
-    default:
-      return 'open';
-  }
-}
+// Use centralized mapping from qcontactStatusMapping.ts
+const mapStatusToQContact = mapFibreFlowStatusToQContact;
 
 // ============================================================================
 // Sync Logging Functions
