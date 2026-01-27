@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { Plus, Upload, Download } from 'lucide-react';
+import { Plus, Upload, Download, Building2 } from 'lucide-react';
 import { PermissionGate } from '@/components/PermissionGate';
 import type { ClientFilter } from '@/types/client.types';
 
@@ -23,9 +23,14 @@ export function ClientListHeader({ onImport, onExport, clientCount, filter }: Cl
 
   return (
     <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)]">Client Management</h1>
-        <p className="text-[var(--ff-text-secondary)] mt-1">Manage your client relationships and information</p>
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-emerald-500/20">
+          <Building2 className="w-6 h-6 text-emerald-400" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)]">Client Management</h1>
+          <p className="text-[var(--ff-text-secondary)] mt-1">Manage your client relationships and information</p>
+        </div>
       </div>
       <div className="flex gap-3">
         <PermissionGate permission="clients.list" action="create">
