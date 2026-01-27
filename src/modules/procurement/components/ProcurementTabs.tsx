@@ -103,7 +103,7 @@ export function ProcurementTabs({
       label: 'Dashboard',
       icon: BarChart3,
       subTabs: [
-        { id: 'overview', label: 'Overview', icon: BarChart3 } // Inline content
+        { id: 'overview', label: 'Overview', icon: BarChart3, path: '/procurement' }
       ]
     },
     {
