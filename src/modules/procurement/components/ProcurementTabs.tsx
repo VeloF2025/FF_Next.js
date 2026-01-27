@@ -1,5 +1,6 @@
-// 🟢 WORKING: Two-level procurement tabs with categories and sub-tabs
-import { useState, useMemo, useEffect } from 'react';
+// 🟢 WORKING: Two-level procurement tabs with direct navigation to dedicated pages
+import { useMemo } from 'react';
+import { useRouter } from 'next/router';
 import {
   BarChart3,
   FileText,
@@ -32,6 +33,7 @@ interface SubTab {
   label: string;
   icon: any;
   permission?: string;
+  path?: string; // Direct navigation path (if different from inline)
 }
 
 interface Category {
@@ -73,6 +75,8 @@ export function ProcurementTabs({
   permissions: propPermissions,
   isLoading: propIsLoading = false
 }: ProcurementTabsProps = {}) {
+  const router = useRouter();
+
   // Try to get from context first, fallback to props
   let context: any = null;
   try {
@@ -88,13 +92,15 @@ export function ProcurementTabs({
   const isLoading = propIsLoading || context?.isLoading || false;
 
   // Define the two-level tab structure
+  // Tabs with 'path' navigate directly to dedicated pages
+  // Tabs without 'path' show inline content on /procurement
   const categories: Category[] = useMemo(() => [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: BarChart3,
       subTabs: [
-        { id: 'overview', label: 'Overview', icon: BarChart3 }
+        { id: 'overview', label: 'Overview', icon: BarChart3 } // Inline content
       ]
     },
     {
@@ -102,9 +108,9 @@ export function ProcurementTabs({
       label: 'Sourcing',
       icon: Search,
       subTabs: [
-        { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers' },
-        { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ' },
-        { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ' },
+        { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers', path: '/suppliers' },
+        { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ', path: '/procurement/boq' },
+        { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ', path: '/procurement/rfq' },
       ]
     },
     {
@@ -112,10 +118,10 @@ export function ProcurementTabs({
       label: 'Purchasing',
       icon: ShoppingBag,
       subTabs: [
-        { id: 'requisitions', label: 'Requisitions', icon: FileInput, permission: 'canViewRequisitions' },
-        { id: 'quotes', label: 'Quote Evaluation', icon: Quote, permission: 'canViewQuotes' },
-        { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, permission: 'canViewPurchaseOrders' },
-        { id: 'grn', label: 'Goods Receipt', icon: PackageCheck, permission: 'canViewGRN' },
+        { id: 'requisitions', label: 'Requisitions', icon: FileInput, permission: 'canViewRequisitions', path: '/procurement/requisitions' },
+        { id: 'quotes', label: 'Quote Evaluation', icon: Quote, permission: 'canViewQuotes', path: '/procurement/rfq?tab=quotes' },
+        { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, permission: 'canViewPurchaseOrders', path: '/procurement/purchase-orders' },
+        { id: 'grn', label: 'Goods Receipt', icon: PackageCheck, permission: 'canViewGRN', path: '/procurement/grn' },
       ]
     },
     {
@@ -123,8 +129,8 @@ export function ProcurementTabs({
       label: 'Inventory',
       icon: Boxes,
       subTabs: [
-        { id: 'stock', label: 'Stock Management', icon: Package, permission: 'canAccessStock' },
-        { id: 'field-stock', label: 'Field Stock', icon: MapPin, permission: 'canAccessFieldStock' },
+        { id: 'stock', label: 'Stock Management', icon: Package, permission: 'canAccessStock', path: '/procurement/inventory' },
+        { id: 'field-stock', label: 'Field Stock', icon: MapPin, permission: 'canAccessFieldStock', path: '/procurement/field-stock' },
       ]
     },
     {
@@ -132,7 +138,7 @@ export function ProcurementTabs({
       label: 'Reports',
       icon: ClipboardList,
       subTabs: [
-        { id: 'reports', label: 'Reports', icon: ClipboardList, permission: 'canAccessReports' }
+        { id: 'reports', label: 'Reports', icon: ClipboardList, permission: 'canAccessReports', path: '/procurement/reports' }
       ]
     }
   ], []);
@@ -152,27 +158,32 @@ export function ProcurementTabs({
   const handleCategoryClick = (category: Category) => {
     if (isLoading) return;
 
-    // If category has only one sub-tab, navigate directly to it
-    if (category.subTabs.length === 1) {
-      onTabChange(category.subTabs[0].id);
-      return;
-    }
-
-    // Otherwise, navigate to the first sub-tab of the category
+    // Find the first allowed sub-tab
     const firstAllowedSubTab = category.subTabs.find(subTab => {
       if (!subTab.permission || !permissions) return true;
       return permissions[subTab.permission as keyof ProcurementPermissions];
     });
 
     if (firstAllowedSubTab) {
-      onTabChange(firstAllowedSubTab.id);
+      // If sub-tab has a direct path, navigate to it
+      if (firstAllowedSubTab.path) {
+        router.push(firstAllowedSubTab.path);
+      } else {
+        onTabChange(firstAllowedSubTab.id);
+      }
     }
   };
 
   // Handle sub-tab click
   const handleSubTabClick = (subTab: SubTab) => {
     if (isLoading) return;
-    onTabChange(subTab.id);
+
+    // If sub-tab has a direct path, navigate to it
+    if (subTab.path) {
+      router.push(subTab.path);
+    } else {
+      onTabChange(subTab.id);
+    }
   };
 
   // Check if sub-tab has permission
