@@ -913,14 +913,16 @@ export class FiberTimeQContactClient {
     const relationships = caseDetail.relationships || {};
 
     // Extract category and subcategory from fields or flat
+    // QContact uses :: or | as separator: "Connectivity::ONT/Gizzu", "General|Maintenance"
     let category: string | null = null;
     let subcategory: string | null = null;
     const categoryStr = (fields.category as string) || caseDetail.category;
 
     if (categoryStr) {
-      const parts = categoryStr.split('::');
-      category = parts[0] || null;
-      subcategory = parts[1] || null;
+      const separator = categoryStr.includes('::') ? '::' : '|';
+      const parts = categoryStr.split(separator);
+      category = parts[0]?.trim() || null;
+      subcategory = parts[1]?.trim() || null;
     }
 
     // Get contact name from relationship or flat
@@ -1034,14 +1036,15 @@ export class FiberTimeQContactClient {
     const reference = this.extractCaseReference(ftCase.label);
 
     // Extract category and subcategory from category field
-    // e.g., "Connectivity::ONT/Gizzu" -> category: "Connectivity", subcategory: "ONT/Gizzu"
+    // QContact uses :: or | as separator: "Connectivity::ONT/Gizzu", "General|Maintenance"
     let category: string | null = null;
     let subcategory: string | null = null;
 
     if (ftCase.category) {
-      const parts = ftCase.category.split('::');
-      category = parts[0] || null;
-      subcategory = parts[1] || null;
+      const separator = ftCase.category.includes('::') ? '::' : '|';
+      const parts = ftCase.category.split(separator);
+      category = parts[0]?.trim() || null;
+      subcategory = parts[1]?.trim() || null;
     }
 
     return {

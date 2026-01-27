@@ -110,35 +110,57 @@ function mapPriority(qcontactPriority: string | null): string {
 }
 
 /**
- * Map QContact category to FibreFlow ticket type
+ * Map QContact category + subcategory to FibreFlow ticket type
  * 🟢 WORKING: Category to ticket_type conversion
- * Note: Database constraint allows: fault, maintenance, installation, query, complaint, other
+ *
+ * QContact categories (verified 2026-01-27):
+ *   Connectivity::ONT/Gizzu, Connectivity::PoorSignal, Connectivity::Laptop/Mobile/Other
+ *   Connectivity|To be determined, Connectivity|Link Light
+ *   General|Maintenance, Maintenance::PropertyDamage, Maintenance::ONTMove
+ *
+ * After split: category = parent (Connectivity, General, Maintenance)
+ *              subcategory = child (ONT/Gizzu, Maintenance, PropertyDamage)
+ *
+ * DB constraint allows: fault, fault_repair, installation, new_installation,
+ *                       modification, ont_swap, incident, other
  */
-function mapTicketType(category: string | null): string {
-  if (!category) {
-    return 'maintenance';
-  }
+function mapTicketType(category: string | null, subcategory?: string | null): string {
+  // Combine both for matching (handles cases like General + Maintenance)
+  const combined = [category, subcategory].filter(Boolean).join(' ').toLowerCase();
 
-  const categoryLower = category.toLowerCase();
-
-  // Map FiberTime categories to valid database types
-  if (categoryLower.includes('connectivity') || categoryLower.includes('fault') || categoryLower.includes('ont')) {
+  if (!combined) {
     return 'fault';
   }
-  if (categoryLower.includes('maintenance') || categoryLower.includes('follow-up') || categoryLower.includes('move')) {
-    return 'maintenance';
+
+  // Connectivity issues → fault
+  if (combined.includes('connectivity') || combined.includes('signal') || combined.includes('link light')) {
+    return 'fault';
   }
-  if (categoryLower.includes('installation') || categoryLower.includes('new')) {
+  // ONT-specific: swap or move
+  if (combined.includes('ontmove') || combined.includes('ont move')) {
+    return 'ont_swap';
+  }
+  if (combined.includes('ont')) {
+    return 'fault';
+  }
+  // Maintenance/repair work
+  if (combined.includes('maintenance') || combined.includes('follow-up') || combined.includes('repair') || combined.includes('damage')) {
+    return 'fault_repair';
+  }
+  // Installation
+  if (combined.includes('installation') || combined.includes('new install')) {
     return 'installation';
   }
-  if (categoryLower.includes('query') || categoryLower.includes('question')) {
-    return 'query';
+  // Incidents
+  if (combined.includes('incident')) {
+    return 'incident';
   }
-  if (categoryLower.includes('complaint')) {
-    return 'complaint';
+  // Bundle issues → fault
+  if (combined.includes('bundle')) {
+    return 'fault';
   }
 
-  return 'other';
+  return 'fault';
 }
 
 /**
@@ -181,7 +203,7 @@ export function mapQContactTicketToFibreFlow(
     external_id: qcontactTicket.id,
     title: qcontactTicket.title,
     description: qcontactTicket.description || undefined,
-    ticket_type: mapTicketType(qcontactTicket.category),
+    ticket_type: mapTicketType(qcontactTicket.category, qcontactTicket.subcategory),
     priority: mapPriority(qcontactTicket.priority),
     // Contact Info
     client_name: qcontactTicket.customer_name || undefined,
@@ -326,26 +348,33 @@ export async function syncSingleInboundTicket(
     const existingTicketId = await checkDuplicate(qcontactTicket.id);
 
     if (existingTicketId) {
-      // UPDATE existing ticket's status instead of skipping
+      // UPDATE existing ticket's status, type, and category instead of skipping
       const mappedStatus = mapQContactStatusToFibreFlow(qcontactTicket.status);
+      const mappedType = mapTicketType(qcontactTicket.category, qcontactTicket.subcategory);
 
       const updateSql = `
         UPDATE maintenance_tickets
-        SET status = $1, updated_at = NOW()
-        WHERE id = $2
+        SET status = $1,
+            type = $2,
+            category = $3,
+            subcategory = $4,
+            updated_at = NOW()
+        WHERE id = $5
         RETURNING id, status
       `;
 
       const updateResult = await queryOne<{ id: string; status: string }>(
         updateSql,
-        [mappedStatus, existingTicketId]
+        [mappedStatus, mappedType, qcontactTicket.category || null, qcontactTicket.subcategory || null, existingTicketId]
       );
 
-      logger.info('Updated existing ticket status', {
+      logger.info('Updated existing ticket status and category', {
         qcontactTicketId: qcontactTicket.id,
         existingTicketId,
         qcontactStatus: qcontactTicket.status,
         newStatus: mappedStatus,
+        category: qcontactTicket.category,
+        type: mappedType,
       });
 
       // Create sync log for update
@@ -398,10 +427,12 @@ export async function syncSingleInboundTicket(
         client_email,
         gps_coordinates,
         ont_serial,
+        category,
+        subcategory,
         created_by
       ) VALUES (
         'FF' || LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0'),
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
       )
       RETURNING *
     `;
@@ -424,6 +455,8 @@ export async function syncSingleInboundTicket(
       ticketPayload.client_email || null,
       ticketPayload.gps_coordinates || null,
       ticketPayload.ont_serial || null,
+      ticketPayload.category || null,
+      ticketPayload.subcategory || null,
       QCONTACT_SYSTEM_USER_ID,
     ];
 
