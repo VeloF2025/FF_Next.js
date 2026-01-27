@@ -1,6 +1,5 @@
-// 🟢 WORKING: Comprehensive procurement tabs with badges and state management
-import { useMemo } from 'react';
-import { useRouter } from 'next/router';
+// 🟢 WORKING: Two-level procurement tabs with categories and sub-tabs
+import { useState, useMemo, useEffect } from 'react';
 import {
   BarChart3,
   FileText,
@@ -13,14 +12,49 @@ import {
   ClipboardList,
   Lock,
   FileInput,
-  PackageCheck
+  PackageCheck,
+  ChevronDown,
+  Boxes,
+  ShoppingBag,
+  Search
 } from 'lucide-react';
-import type { 
-  ProcurementTab, 
-  ProcurementTabId, 
+import type {
+  ProcurementTabId,
   ProcurementPermissions
 } from '@/types/procurement/portal.types';
 import { useProcurementPortal } from '../context/ProcurementPortalProvider';
+
+// Define category structure
+type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'reports';
+
+interface SubTab {
+  id: ProcurementTabId;
+  label: string;
+  icon: any;
+  permission?: string;
+}
+
+interface Category {
+  id: CategoryId;
+  label: string;
+  icon: any;
+  subTabs: SubTab[];
+}
+
+// Map sub-tab IDs to their parent category
+const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
+  'overview': 'dashboard',
+  'suppliers': 'sourcing',
+  'boq': 'sourcing',
+  'rfq': 'sourcing',
+  'requisitions': 'purchasing',
+  'quotes': 'purchasing',
+  'purchase-orders': 'purchasing',
+  'grn': 'purchasing',
+  'stock': 'inventory',
+  'field-stock': 'inventory',
+  'reports': 'reports',
+};
 
 interface ProcurementTabsProps {
   activeTab?: ProcurementTabId;
@@ -39,8 +73,6 @@ export function ProcurementTabs({
   permissions: propPermissions,
   isLoading: propIsLoading = false
 }: ProcurementTabsProps = {}) {
-  const router = useRouter();
-
   // Try to get from context first, fallback to props
   let context: any = null;
   try {
@@ -48,165 +80,121 @@ export function ProcurementTabs({
   } catch {
     // Context not available, use props
   }
-  
+
   const activeTab = propActiveTab ?? context?.activeTab ?? 'overview';
   const onTabChange = propOnTabChange ?? context?.setActiveTab ?? (() => {});
-  const selectedProject = propSelectedProject ?? context?.project;
   const tabBadges = propTabBadges ?? context?.tabBadges ?? {};
   const permissions = propPermissions ?? context?.permissions;
   const isLoading = propIsLoading || context?.isLoading || false;
-  
-  // Define all available tabs with enhanced configuration
-  // All paths use /procurement/* (NOT /app/procurement/*) to match actual page routes
-  const allTabs: ProcurementTab[] = useMemo(() => [
+
+  // Define the two-level tab structure
+  const categories: Category[] = useMemo(() => [
     {
-      id: 'overview',
+      id: 'dashboard',
       label: 'Dashboard',
       icon: BarChart3,
-      path: '/procurement',
-      requiresProject: false
+      subTabs: [
+        { id: 'overview', label: 'Overview', icon: BarChart3 }
+      ]
     },
     {
-      id: 'requisitions',
-      label: 'Requisitions',
-      icon: FileInput,
-      path: '/procurement/requisitions',
-      requiresProject: false,
-      permission: 'canViewRequisitions'
+      id: 'sourcing',
+      label: 'Sourcing',
+      icon: Search,
+      subTabs: [
+        { id: 'suppliers', label: 'Suppliers', icon: Truck, permission: 'canViewSuppliers' },
+        { id: 'boq', label: 'BOQ', icon: FileText, permission: 'canViewBOQ' },
+        { id: 'rfq', label: 'RFQ', icon: Send, permission: 'canViewRFQ' },
+      ]
     },
     {
-      id: 'boq',
-      label: 'BOQ',
-      icon: FileText,
-      path: '/procurement/boq',
-      requiresProject: false,
-      permission: 'canViewBOQ'
+      id: 'purchasing',
+      label: 'Purchasing',
+      icon: ShoppingBag,
+      subTabs: [
+        { id: 'requisitions', label: 'Requisitions', icon: FileInput, permission: 'canViewRequisitions' },
+        { id: 'quotes', label: 'Quote Evaluation', icon: Quote, permission: 'canViewQuotes' },
+        { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, permission: 'canViewPurchaseOrders' },
+        { id: 'grn', label: 'Goods Receipt', icon: PackageCheck, permission: 'canViewGRN' },
+      ]
     },
     {
-      id: 'rfq',
-      label: 'RFQ',
-      icon: Send,
-      path: '/procurement/rfq',
-      requiresProject: false,
-      permission: 'canViewRFQ'
-    },
-    {
-      id: 'quotes',
-      label: 'Quote Evaluation',
-      icon: Quote,
-      path: '/procurement/rfq',  // Quotes are part of RFQ workflow
-      requiresProject: false,
-      permission: 'canViewQuotes'
-    },
-    {
-      id: 'purchase-orders',
-      label: 'Purchase Orders',
-      icon: ShoppingCart,
-      path: '/procurement/purchase-orders',
-      requiresProject: false,
-      permission: 'canViewPurchaseOrders'
-    },
-    {
-      id: 'grn',
-      label: 'Goods Receipt',
-      icon: PackageCheck,
-      path: '/procurement/grn',
-      requiresProject: false,
-      permission: 'canViewGRN'
-    },
-    {
-      id: 'stock',
-      label: 'Stock Movement',
-      icon: Package,
-      path: '/procurement/stock',
-      requiresProject: false,
-      permission: 'canAccessStock'
-    },
-    {
-      id: 'field-stock',
-      label: 'Field Stock',
-      icon: MapPin,
-      path: '/procurement/field-stock',
-      requiresProject: false,
-      permission: 'canAccessFieldStock'
-    },
-    {
-      id: 'suppliers',
-      label: 'Suppliers',
-      icon: Truck,
-      path: '/suppliers',  // Suppliers is at root /suppliers
-      requiresProject: false,
-      permission: 'canViewSuppliers'
+      id: 'inventory',
+      label: 'Inventory',
+      icon: Boxes,
+      subTabs: [
+        { id: 'stock', label: 'Stock Management', icon: Package, permission: 'canAccessStock' },
+        { id: 'field-stock', label: 'Field Stock', icon: MapPin, permission: 'canAccessFieldStock' },
+      ]
     },
     {
       id: 'reports',
       label: 'Reports',
       icon: ClipboardList,
-      path: '/procurement/reports',
-      requiresProject: false,
-      permission: 'canAccessReports'
+      subTabs: [
+        { id: 'reports', label: 'Reports', icon: ClipboardList, permission: 'canAccessReports' }
+      ]
     }
   ], []);
 
-  // Filter tabs based on permissions and project selection
-  const availableTabs = useMemo(() => {
-    return allTabs.filter(tab => {
-      // Always show overview/dashboard
-      if (tab.id === 'overview') return true;
-      
-      // Check if project is required and selected
-      if (tab.requiresProject && !selectedProject) return false;
-      
-      // Check permissions (only if permissions are loaded)
-      if (tab.permission && permissions) {
-        const hasPermission = permissions[tab.permission as keyof ProcurementPermissions];
-        if (!hasPermission) return false;
-      }
-      
-      return true;
-    }).map(tab => ({
-      ...tab,
-      badge: tabBadges[tab.id]
-    }));
-  }, [allTabs, selectedProject, tabBadges, permissions]);
+  // Determine active category based on active tab
+  const activeCategory = useMemo(() => {
+    return tabToCategoryMap[activeTab] || 'dashboard';
+  }, [activeTab]);
 
-  // Handle tab click with validation and navigation
-  const handleTabClick = (tab: ProcurementTab) => {
-    // Don't allow tab change if loading
+  // Get sub-tabs for current category
+  const currentSubTabs = useMemo(() => {
+    const category = categories.find(c => c.id === activeCategory);
+    return category?.subTabs || [];
+  }, [categories, activeCategory]);
+
+  // Handle main category click
+  const handleCategoryClick = (category: Category) => {
     if (isLoading) return;
 
-    // Check if project is required but not selected
-    if (tab.requiresProject && !selectedProject) {
-      // Could show a toast or modal here
+    // If category has only one sub-tab, navigate directly to it
+    if (category.subTabs.length === 1) {
+      onTabChange(category.subTabs[0].id);
       return;
     }
 
-    // All tabs now show inline content on the main procurement page
-    // This provides a unified experience with inline content components
-    // Users can still navigate to dedicated pages via "View All" buttons in each tab content
-    onTabChange(tab.id);
+    // Otherwise, navigate to the first sub-tab of the category
+    const firstAllowedSubTab = category.subTabs.find(subTab => {
+      if (!subTab.permission || !permissions) return true;
+      return permissions[subTab.permission as keyof ProcurementPermissions];
+    });
+
+    if (firstAllowedSubTab) {
+      onTabChange(firstAllowedSubTab.id);
+    }
   };
 
-  // Get tab display state
-  const getTabState = (tab: ProcurementTab) => {
-    const isActive = activeTab === tab.id;
-    const isDisabled = tab.requiresProject && !selectedProject;
-    // If permissions not loaded (undefined), allow access by default
-    // Only restrict if permissions IS loaded AND specific permission is false
-    const hasPermission = !tab.permission || !permissions || Boolean(permissions[tab.permission as keyof ProcurementPermissions]);
-
-    return {
-      isActive,
-      isDisabled,
-      hasPermission,
-      showLock: permissions !== undefined && !hasPermission
-    };
+  // Handle sub-tab click
+  const handleSubTabClick = (subTab: SubTab) => {
+    if (isLoading) return;
+    onTabChange(subTab.id);
   };
 
-  // Get badge styles based on type - dark mode compatible
+  // Check if sub-tab has permission
+  const hasPermission = (subTab: SubTab): boolean => {
+    if (!subTab.permission || !permissions) return true;
+    return Boolean(permissions[subTab.permission as keyof ProcurementPermissions]);
+  };
+
+  // Get badge for a tab
+  const getBadge = (tabId: ProcurementTabId) => tabBadges[tabId];
+
+  // Get aggregated badge count for a category
+  const getCategoryBadgeCount = (category: Category): number => {
+    return category.subTabs.reduce((sum, subTab) => {
+      const badge = tabBadges[subTab.id];
+      return sum + (badge?.count || 0);
+    }, 0);
+  };
+
+  // Get badge styles based on type
   const getBadgeStyles = (type?: 'info' | 'warning' | 'error' | 'success') => {
     const baseStyles = 'ml-2 px-2 py-0.5 text-xs font-medium rounded-full min-w-[1.5rem] text-center';
-
     switch (type) {
       case 'error':
         return `${baseStyles} bg-red-500/20 text-red-400`;
@@ -221,69 +209,96 @@ export function ProcurementTabs({
   };
 
   return (
-    <nav className="flex space-x-1 overflow-x-auto scrollbar-hide" aria-label="Procurement portal tabs">
-      {availableTabs.map((tab) => {
-        const Icon = tab.icon;
-        const { isActive, isDisabled, hasPermission, showLock } = getTabState(tab);
-        const badge = tab.badge;
-        
-        return (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab)}
-            disabled={isDisabled || isLoading || !hasPermission}
-            className={`
-              relative py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap
-              flex items-center gap-2 transition-all duration-200 min-w-fit
-              ${isActive
-                ? 'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10'
-                : isDisabled || !hasPermission
-                ? 'border-transparent text-[var(--ff-text-tertiary)] cursor-not-allowed'
-                : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
-              }
-              ${isLoading ? 'opacity-50 cursor-wait' : ''}
-              disabled:opacity-50
-            `}
-            title={
-              isDisabled 
-                ? `${tab.label} - Project required`
-                : !hasPermission 
-                ? `${tab.label} - Insufficient permissions`
-                : tab.label
-            }
-            aria-current={isActive ? 'page' : undefined}
-          >
-            {/* Icon */}
-            <div className="flex items-center gap-1">
-              <Icon className="h-4 w-4 flex-shrink-0" />
-              {showLock && <Lock className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
-            </div>
-            
-            {/* Label */}
-            <span className="truncate">{tab.label}</span>
-            
-            {/* Badge */}
-            {badge && badge.count !== undefined && badge.count > 0 && (
-              <span className={getBadgeStyles(badge.type)}>
-                {badge.count > 99 ? '99+' : badge.count}
-              </span>
-            )}
-            
-            {/* Loading indicator for active tab */}
-            {isLoading && isActive && (
-              <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-primary-200 overflow-hidden">
-                <div className="h-full bg-primary-500 animate-pulse" />
-              </div>
-            )}
-          </button>
-        );
-      })}
+    <div className="space-y-0">
+      {/* Main Category Tabs */}
+      <nav
+        className="flex space-x-1 overflow-x-auto scrollbar-hide border-b border-[var(--ff-border-light)]"
+        aria-label="Procurement categories"
+      >
+        {categories.map((category) => {
+          const Icon = category.icon;
+          const isActive = activeCategory === category.id;
+          const badgeCount = getCategoryBadgeCount(category);
 
-      {/* Mobile scroll indicator */}
-      <div className="flex-shrink-0 w-1" />
-    </nav>
+          return (
+            <button
+              key={category.id}
+              onClick={() => handleCategoryClick(category)}
+              disabled={isLoading}
+              className={`
+                relative py-3 px-5 border-b-2 font-medium text-sm whitespace-nowrap
+                flex items-center gap-2 transition-all duration-200 min-w-fit -mb-px
+                ${isActive
+                  ? 'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10'
+                  : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
+                }
+                ${isLoading ? 'opacity-50 cursor-wait' : ''}
+              `}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <Icon className="h-4 w-4 flex-shrink-0" />
+              <span>{category.label}</span>
+              {badgeCount > 0 && (
+                <span className={getBadgeStyles('info')}>
+                  {badgeCount > 99 ? '99+' : badgeCount}
+                </span>
+              )}
+              {category.subTabs.length > 1 && (
+                <ChevronDown className={`h-3 w-3 transition-transform ${isActive ? 'rotate-180' : ''}`} />
+              )}
+            </button>
+          );
+        })}
+        <div className="flex-shrink-0 w-1" />
+      </nav>
+
+      {/* Sub-tabs (only show if category has more than 1 sub-tab) */}
+      {currentSubTabs.length > 1 && (
+        <nav
+          className="flex space-x-1 overflow-x-auto scrollbar-hide bg-[var(--ff-bg-secondary)]/50 px-2 py-1"
+          aria-label="Category sub-tabs"
+        >
+          {currentSubTabs.map((subTab) => {
+            const Icon = subTab.icon;
+            const isActive = activeTab === subTab.id;
+            const allowed = hasPermission(subTab);
+            const badge = getBadge(subTab.id);
+
+            return (
+              <button
+                key={subTab.id}
+                onClick={() => handleSubTabClick(subTab)}
+                disabled={isLoading || !allowed}
+                className={`
+                  relative py-2 px-4 rounded-md font-medium text-sm whitespace-nowrap
+                  flex items-center gap-2 transition-all duration-200 min-w-fit
+                  ${isActive
+                    ? 'bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] ring-1 ring-[var(--ff-primary-500)]/30'
+                    : !allowed
+                    ? 'text-[var(--ff-text-tertiary)] cursor-not-allowed opacity-50'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
+                  }
+                  ${isLoading ? 'opacity-50 cursor-wait' : ''}
+                `}
+                title={!allowed ? `${subTab.label} - Insufficient permissions` : subTab.label}
+              >
+                <div className="flex items-center gap-1">
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  {!allowed && <Lock className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                </div>
+                <span>{subTab.label}</span>
+                {badge && badge.count !== undefined && badge.count > 0 && (
+                  <span className={getBadgeStyles(badge.type)}>
+                    {badge.count > 99 ? '99+' : badge.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+    </div>
   );
 }
 
-// Export for use in other components
 export type { ProcurementTabsProps };
