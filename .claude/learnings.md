@@ -546,38 +546,46 @@ Benefits:
 
 ---
 
-## 2026-01-26: Nokia OES Format Change - Stack Ref. Column Added
+## 2026-01-26: Nokia OES Format Changes - Track Column Alignment
 
-**Issue:** OES import preview showed wrong data - Status displayed dB values (`-26.21`), Team displayed coordinates (`-21.307682`).
+**Issue:** OES import preview shows wrong data - Status displays dB values, Team displays coordinates.
 
-**Root Cause:** Nokia changed their OES Excel report format - added "Stack Ref." column at position E (index 4), shifting all subsequent columns by 1.
+**Root Cause:** Nokia changes their OES Excel report format periodically, adding or removing columns.
 
-**Old Format (13 columns):**
+**Format History:**
+
+| Date | Columns | Change |
+|------|---------|--------|
+| Pre-Jan 2026 | 13 | Original format |
+| Jan 2026 | 14 | Added "Stack Ref." at column E |
+| Jan 2027 | 13 | Removed "Stack Ref." column |
+
+**Current Format (Jan 2027 - 13 columns):**
 ```
 A: Drop Number, B: Serial, C: Timestamp, D: OLT Address,
 E: ONT Rx SIG, F: Link Budget ONT→OLT, G: OLT Rx SIG, H: Link Budget OLT→ONT,
 I: Status, J: Latitude, K: Longitude, L: Current ONT RX, M: Team
 ```
 
-**New Format (14 columns) - Jan 2026:**
+**Detection Pattern:**
+When preview shows numeric values in text fields (Status, Team), columns are misaligned:
 ```
-A: Drop Number, B: Serial, C: Timestamp, D: OLT Address,
-E: Stack Ref. ← NEW!
-F: ONT Rx SIG, G: Link Budget ONT→OLT, H: OLT Rx SIG, I: Link Budget OLT→ONT,
-J: Status, K: Latitude, L: Longitude, M: Current ONT RX, N: Team
+Status: -26.21       ← Should be "Active" (numeric = wrong column)
+Team: -21.307682     ← Should be "moa1" (coordinate = wrong column)
 ```
 
-**Fix Applied:**
-1. Updated column indices in `parseOESExcel()` (row[4] → row[5], etc.)
-2. Added `stack_ref` field to OESRow interface
-3. Added `stack_ref VARCHAR(100)` column to `oes_activations` table
-4. Updated INSERT/UPSERT query to include `stack_ref`
+**Fix Pattern:**
+1. Check actual Excel headers with test script
+2. Update `EXPECTED_HEADERS` array (count and positions)
+3. Update column indices in row parsing
+4. Update `OESRow` interface if fields added/removed
+5. Update DB insert if schema changed
 
-**Reference:**
-- File: `pages/api/activate/import-oes.ts`
-- Commit: `79e97a07` - fix(oes-import): update parser for new Nokia OES format with Stack Ref column
+**Reference Commits:**
+- `701969e2` - Jan 2027: Removed Stack Ref (14→13 columns)
+- `79e97a07` - Jan 2026: Added Stack Ref (13→14 columns)
 
-**Lesson:** When external data sources change format, check column positions first. The preview showing numeric values in text fields is a clear sign of column misalignment.
+**Lesson:** External data sources change format without notice. Always verify column positions when import data looks wrong.
 
 ---
 
@@ -1258,6 +1266,53 @@ const veloTest = data.find(g =>
 ```
 
 **Key Principle:** WA Portal and Bridge should ALWAYS use the same database table. Changes in UI should immediately reflect in bridge behavior.
+
+---
+
+## 2026-01-27: Next.js Route Resolution - Directory Takes Precedence Over Flat File
+
+**Issue:** API endpoint `/api/qa-review-history` kept returning old code behavior despite source file being updated. Multiple clean rebuilds and service restarts didn't fix it.
+
+**Root Cause:** Next.js route resolution prioritizes `pages/api/route/index.ts` (directory) over `pages/api/route.ts` (flat file). Both files existed:
+```
+pages/api/qa-review-history.ts      ← Updated code (NOT being compiled)
+pages/api/qa-review-history/
+  └── index.ts                      ← Old code (WAS being compiled)
+```
+
+**Debugging Signs:**
+1. Source file has correct code but built `.next/server/pages/api/*.js` has old code
+2. Clean rebuild (`rm -rf .next`) doesn't fix it
+3. Cache clearing (`rm -rf node_modules/.cache`) doesn't fix it
+4. Version markers added to source never appear in API responses
+
+**Verification Commands:**
+```bash
+# Check if both directory AND flat file exist
+ls -la pages/api/route-name*
+
+# If directory exists, it takes precedence
+cat pages/api/route-name/index.ts   # This is what gets compiled
+cat pages/api/route-name.ts         # This is IGNORED
+```
+
+**Solution:**
+```bash
+# Remove the directory to allow flat file to be compiled
+rm -rf pages/api/route-name/
+
+# Then rebuild
+rm -rf .next && npm run build
+```
+
+**Prevention:**
+1. Never have both `route.ts` AND `route/index.ts` in pages/api
+2. When refactoring from directory to flat file, DELETE the directory
+3. Add version markers (`_v: '2026-01-27-v1'`) to API responses for deployment verification
+
+**Affected Files:**
+- `pages/api/qa-review-history.ts` - Fixed by removing duplicate directory
+- Commit: `ca90e61e` - fix(qa-history): remove duplicate directory causing old code to be used
 
 ---
 
