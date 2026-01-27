@@ -96,10 +96,11 @@ const targetProjectIds = await pool.query(
 
 QFieldCloud uses token-based authentication. Tokens are stored in `authentication_authtoken` table (NOT `authtoken_token`).
 
-**Current Token (generated 2026-01-27):**
+**Current Token (generated 2026-01-27, expires 2027-01-27):**
 ```typescript
-const QFIELD_API_TOKEN = 'Y0x05qOAhdHfxPgZAZ5FzM8LgOSDlne1OTEyRoO7zQjoxYbhtpTKDHJlsrZ4Q0jJ7I6JMzA3uMn01Q2vMLxB2ox6L6DT4zYxzHj8';
-// Owner: Jaun (user_id: 4)
+const QFIELD_API_TOKEN = '2VbfhkUAfPHw7s7zAtMsyRTFF0xU00JtQRKyF3vzTxZtRODF4FLbzEc91f7PRhCIQvc48WLkC3TowKruYgFHIgm9ewk1VGb0JIQp';
+// Owner: Jaun (project owner)
+// Expiry: 1 year from creation
 ```
 
 **Generate New Token:**
@@ -120,6 +121,27 @@ print('NEW TOKEN:', token.key)
 curl -s "https://qfield.fibreflow.app/api/v1/files/{project_id}/" \
   -H "Authorization: Token {token}"
 ```
+
+## GeoJSON Requirements
+
+**CRITICAL: Coordinates must be NUMBERS, not strings!**
+
+PostgreSQL returns lat/lng as strings. QGIS/QField cannot render points with string coordinates.
+
+```typescript
+// ❌ BROKEN - strings don't render
+coordinates: [point.longitude, point.latitude]  // ['18.67', '-34.00']
+
+// ✅ WORKING - explicit number conversion
+coordinates: [Number(point.longitude), Number(point.latitude)]  // [18.67, -34.00]
+```
+
+**Symptoms of string coordinates:**
+- Layer appears in QField layer list
+- Zero points render on map
+- File size is correct
+
+**OES Filename Convention:** `OES FF YYMMDD.geojson` (e.g., `OES FF 260127.geojson`)
 
 ## File Upload (OES Sync)
 
@@ -184,6 +206,10 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker ps --format '{{.Names}}' |
 | `scripts/migrations/134_qfield_projects.sql` | Registry schema |
 
 ## Historical Notes
+
+**2026-01-27 (965e918a):** Fixed GeoJSON coordinates - converted from strings to numbers. Points weren't rendering because PostgreSQL returns lat/lng as strings and GeoJSON requires numeric coordinates.
+
+**2026-01-27 (f917cb16):** Updated to long-lived API token (1 year expiry). Owner: Jaun (project owner).
 
 **2026-01-27 (d22fee08):** Fixed DB host from VPS (72.61.166.168) to Velocity (100.96.203.105). The VPS had a stale copy with only 17 projects.
 

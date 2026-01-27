@@ -2082,6 +2082,62 @@ const response = await axios.post(`${bridgeUrl}/send-message`, {
 
 ---
 
+## GeoJSON Coordinates Must Be Numbers, Not Strings
+**Date:** 2026-01-27
+**Severity:** HIGH
+**Context:** OES points uploaded to QFieldCloud were not displaying in QField despite the layer being visible
+
+**Problem:** Database queries return latitude/longitude as strings (e.g., `'18.6741775'`). When these were used directly in GeoJSON coordinate arrays, QGIS/QField couldn't render the points because GeoJSON spec requires numeric coordinates.
+
+**Symptom Detection:**
+- Layer name appears in QField layer list ✅
+- But no points render on the map ❌
+- GeoJSON file size is correct (3+ MB)
+- Downloading the file shows: `coordinates: ['18.67', '-34.00']` (strings with quotes)
+
+**Bad Pattern:**
+```typescript
+// ❌ Database returns strings - GeoJSON can't parse them
+const features = points.map(point => ({
+  type: 'Feature',
+  geometry: {
+    type: 'Point',
+    coordinates: [point.longitude, point.latitude]  // Strings! ['18.67', '-34.00']
+  },
+  properties: { ... }
+}));
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Explicitly convert to numbers
+const features = points.map(point => ({
+  type: 'Feature',
+  geometry: {
+    type: 'Point',
+    coordinates: [Number(point.longitude), Number(point.latitude)]  // Numbers! [18.67, -34.00]
+  },
+  properties: { ... }
+}));
+```
+
+**Verification:**
+```javascript
+// Check first feature coordinates after conversion
+const first = geojson.features[0];
+console.log('Coords:', first.geometry.coordinates);  // Should be [18.67, -34.00]
+console.log('Types:', typeof first.geometry.coordinates[0], typeof first.geometry.coordinates[1]);  // Should be 'number', 'number'
+```
+
+**Root Cause:** PostgreSQL's `pg` driver returns numeric columns as JavaScript strings when the precision is high or when using certain column types. Always use `Number()` or `parseFloat()` for coordinate values.
+
+**Affected Files:**
+- `pages/api/activate/sync-oes-to-qfield.ts` - Fixed (commit `965e918a`)
+
+**Key Principle:** When building GeoJSON from database queries, ALWAYS convert lat/lng to numbers. The GeoJSON specification requires coordinates to be numeric values.
+
+---
+
 ## Export API Must Mirror Display API Filters Exactly
 **Date:** 2026-01-27
 **Severity:** HIGH
