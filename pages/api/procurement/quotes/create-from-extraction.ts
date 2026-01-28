@@ -66,10 +66,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (!finalSupplierId) {
       // Generate a unique supplier code
       const supplierCode = 'SUP-SCAN-' + Date.now();
+      // Get user ID from auth context
+      const createdBy = (req as any).user?.id || 'system';
 
       // Create a new supplier from extracted data
       const newSupplier = await sql`
-        INSERT INTO suppliers (code, name, company_name, email, phone, vat_number, status)
+        INSERT INTO suppliers (code, name, company_name, email, phone, vat_number, status, created_by)
         VALUES (
           ${supplierCode},
           ${extraction.extracted_supplier_name || 'Unknown Supplier'},
@@ -77,7 +79,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ${extraction.extracted_supplier_email || null},
           ${extraction.extracted_supplier_phone || null},
           ${extraction.extracted_supplier_vat || null},
-          'active'
+          'active',
+          ${createdBy}
         )
         RETURNING id
       `;
