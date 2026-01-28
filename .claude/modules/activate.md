@@ -118,7 +118,39 @@ Visual feedback for async operations:
 - **ImportProgressOverlay**: OES/ARCH Excel imports
 - **WizardProgressOverlay**: 1Map sync + AI categorization
 
+## Enhanced Barcode Service (2026-01-28)
+
+Server-side barcode scanning with 2D support for Nokia ONT labels.
+
+**Libraries:**
+- `zxing-wasm` - 2D barcodes (Data Matrix, QR codes)
+- `Quagga2` - 1D barcode fallback (Code 128, Code 39)
+
+**Supported Formats:**
+| Format | Type | Use Case |
+|--------|------|----------|
+| DATA_MATRIX | 2D | Nokia ONT labels (primary) |
+| CODE_128 | 1D | ONT serial below Data Matrix |
+| QR_CODE | 2D | Future equipment labels |
+
+**Usage:**
+```typescript
+import { extractOntSerialEnhanced } from './enhancedBarcodeService';
+
+const result = await extractOntSerialEnhanced(base64Image);
+// { success: true, serial: 'ALCLB48AD090', format: 'DATA_MATRIX', confidence: 0.95 }
+```
+
+**Performance:**
+- Quick scan: ~150-250ms (usually sufficient)
+- Full multi-pass: ~1.5-2.5s (14 preprocessing strategies)
+
+**Files:**
+- `src/modules/activate/services/enhancedBarcodeService.ts`
+- `src/modules/activate/services/barcodeExtractionService.ts`
+
 ## Recent Changes (Jan 2026)
+- **Enhanced Barcode Service** - zxing-wasm 2D barcode support for Nokia ONT labels
 - Added progress overlays for visual feedback
 - Enhanced VLM extraction with blur detection
 - Integrated NAFNet deblurring service

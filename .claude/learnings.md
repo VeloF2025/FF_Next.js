@@ -2909,3 +2909,45 @@ Also removed the `h-32` bottom gradient that was causing unnecessary scroll spac
 **Files:** `src/components/auth/premium/PremiumLoginPage.tsx`
 
 ---
+
+## 2026-01-28: Enhanced Barcode Service - 2D Barcode Support
+
+**Context:** Nokia ONT labels have Data Matrix (2D) barcodes that contain the serial number. The existing Quagga2-based scanner only supported 1D barcodes.
+
+**Solution:** Added `zxing-wasm` for server-side 2D barcode support:
+
+```typescript
+// src/modules/activate/services/enhancedBarcodeService.ts
+import { readBarcodesFromImageData } from 'zxing-wasm/reader';
+
+const results = await readBarcodesFromImageData(imageData, {
+  tryHarder: true,
+  tryRotate: true,
+  tryInvert: true,
+  formats: ['QRCode', 'DataMatrix', 'Code128', 'Code39']
+});
+```
+
+**Key Findings:**
+1. **Data Matrix barcodes** contain encoded serial in format: `[)>...SALCLB48AD090...` - extract with regex
+2. **Code 128 barcodes** contain direct serial: `ALCLB48AD090`
+3. **Quick scan** (~150-250ms) usually sufficient - full multi-pass rarely needed
+4. **zxing-wasm** handles rotation automatically with `tryRotate: true`
+
+**Preprocessing Strategies (14 total):**
+- Phase 1: original, contrast, sharpen, rotate90/180/270, binarize, invert
+- Phase 2: clahe, adaptive, morphological, edge, clahe-90, adaptive-90
+
+**Test Results on Real Nokia Labels:**
+| Image | Serial | Format | Confidence |
+|-------|--------|--------|------------|
+| Rotated | ALCLB48AD090 | DATA_MATRIX | 95% |
+| Cropped | ALCLB48CA013 | CODE_128 | 95% |
+| Straight | ALCLB48ADE84 | DATA_MATRIX | 76.5% |
+
+**Files:** 
+- `src/modules/activate/services/enhancedBarcodeService.ts` (new)
+- `src/modules/activate/services/barcodeExtractionService.ts` (updated)
+- `scripts/test-enhanced-barcode.ts` (test script)
+
+---
