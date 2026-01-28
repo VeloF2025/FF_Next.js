@@ -368,7 +368,7 @@ async function getRfqWithItems(rfqId: string): Promise<{ rfqNumber: string; item
       SELECT
         id,
         description,
-        stock_item_code as item_code,
+        item_code,
         quantity,
         uom as unit,
         budget_price
