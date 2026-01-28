@@ -7,7 +7,7 @@
  * This endpoint:
  * 1. Fetches OES data from database
  * 2. Converts to GeoJSON with drop number labels
- * 3. Uploads to QFieldCloud via /files/ API as "OES FF DD-MM-YYYY.geojson"
+ * 3. Uploads to QFieldCloud via /files/ API as "OES FF DD-MM-YYYY.geojson" (date from import)
  * 4. Syncs to all sync-enabled projects (or specific project if provided)
  *
  * Note: The GeoJSON file needs to be manually added as a layer in QGIS project
@@ -260,13 +260,13 @@ async function deleteFileFromQFieldCloud(
 
 /**
  * Generate OES Report filename with date: "OES FF DD-MM-YYYY.geojson"
- * Example: "OES FF 28-01-2026.geojson" for Jan 28, 2026
+ * Uses the report_date from the OES import form
+ * Example: "OES FF 27-01-2026.geojson" for Jan 27, 2026
  */
-function getOESReportFilename(): string {
-  const now = new Date();
-  const yyyy = String(now.getFullYear());
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
+function getOESReportFilename(reportDate: Date): string {
+  const yyyy = String(reportDate.getFullYear());
+  const mm = String(reportDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(reportDate.getDate()).padStart(2, '0');
   return `OES FF ${dd}-${mm}-${yyyy}.geojson`;
 }
 
@@ -421,9 +421,26 @@ async function handler(
 
     log.info('OESSync', `Created GeoJSON with ${features.length} features`);
 
-    // Generate filename with today's date: "OES FF DD-MM-YYYY.geojson"
-    const oesFilename = getOESReportFilename();
-    log.info('OESSync', `Using filename: ${oesFilename}`);
+    // Get the report date for the filename
+    // Priority: 1) reportDate from request, 2) latest import batch report_date, 3) today
+    let filenameDate: Date;
+    if (reportDate) {
+      filenameDate = new Date(reportDate);
+    } else {
+      // Get latest report_date from import batches
+      const latestBatch = await pool.query(
+        'SELECT report_date FROM oes_import_batches ORDER BY imported_at DESC LIMIT 1'
+      );
+      if (latestBatch.rows[0]?.report_date) {
+        filenameDate = new Date(latestBatch.rows[0].report_date);
+      } else {
+        filenameDate = new Date();
+      }
+    }
+
+    // Generate filename with the report date: "OES FF DD-MM-YYYY.geojson"
+    const oesFilename = getOESReportFilename(filenameDate);
+    log.info('OESSync', `Using filename: ${oesFilename} (based on report date: ${filenameDate.toISOString()})`);
 
     // Step 3: Sync to each target project
     const syncResults: { projectId: string; success: boolean; error?: string }[] = [];
