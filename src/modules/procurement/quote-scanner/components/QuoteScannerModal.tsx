@@ -744,7 +744,7 @@ export function QuoteScannerModal({
               </div>
 
               {/* Line Items Preview */}
-              {result.extraction.lineItems && result.extraction.lineItems.length > 0 && (
+              {result.extraction?.lineItems && result.extraction.lineItems.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Extracted Line Items ({result.extraction.lineItems.length})
@@ -811,7 +811,7 @@ export function QuoteScannerModal({
               <p className="text-gray-500 dark:text-gray-400 mb-6">
                 {quoteCreated
                   ? 'The quote has been added to this RFQ'
-                  : `Successfully extracted ${result.extraction.lineItems?.length || 0} line items${result.matching ? ` (${result.matching.totalMatched} matched to RFQ)` : ''}`
+                  : `Successfully extracted ${result.extraction?.lineItems?.length || 0} line items${result.matching ? ` (${result.matching.totalMatched} matched to RFQ)` : ''}`
                 }
               </p>
 
@@ -821,20 +821,20 @@ export function QuoteScannerModal({
                   <div>
                     <span className="text-gray-500 dark:text-gray-400">Supplier:</span>
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {result.extraction.supplier?.name || 'Unknown'}
+                      {result.extraction?.supplier?.name || 'Unknown'}
                     </p>
                   </div>
                   <div>
                     <span className="text-gray-500 dark:text-gray-400">Quote #:</span>
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {result.extraction.quoteInfo?.quoteNumber || 'N/A'}
+                      {result.extraction?.quoteInfo?.quoteNumber || 'N/A'}
                     </p>
                   </div>
                   <div>
                     <span className="text-gray-500 dark:text-gray-400">Total:</span>
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {result.extraction.totals?.currency || 'ZAR'}{' '}
-                      {result.extraction.totals?.total?.toLocaleString() || '0'}
+                      {result.extraction?.totals?.currency || 'ZAR'}{' '}
+                      {result.extraction?.totals?.total?.toLocaleString() || '0'}
                     </p>
                   </div>
                   <div>
