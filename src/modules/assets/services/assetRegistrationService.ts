@@ -261,6 +261,20 @@ export async function registerAssetFromGrnItem(
       throw new Error(`Serial number ${input.serialNumber} already registered as ${(existing[0] as Record<string, unknown>).asset_number}`);
     }
 
+    // Generate asset_number: {CATEGORY_CODE}-{YEAR}-{SEQUENCE}
+    const categoryCode = (data.category_code as string) || 'MISC';
+    const year = new Date().getFullYear();
+    const prefix = `${categoryCode}-${year}-`;
+
+    // Get next sequence number for this category/year
+    const seqResult = await sql`
+      SELECT COUNT(*) + 1 as next_seq
+      FROM assets
+      WHERE asset_number LIKE ${prefix + '%'}
+    `;
+    const nextSeq = (seqResult[0] as Record<string, unknown>).next_seq as number;
+    const assetNumber = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+
     // Determine asset name
     const assetName = input.name ||
       (data.stock_item_name as string) ||
@@ -287,6 +301,7 @@ export async function registerAssetFromGrnItem(
     // assets.supplier_id expects UUID but GRN has integer supplier_id (type mismatch)
     const insertResult = await sql`
       INSERT INTO assets (
+        asset_number,
         category_id,
         name,
         serial_number,
@@ -307,6 +322,7 @@ export async function registerAssetFromGrnItem(
         created_by,
         created_at
       ) VALUES (
+        ${assetNumber},
         ${input.categoryId},
         ${assetName},
         ${input.serialNumber},
