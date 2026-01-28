@@ -117,6 +117,16 @@ export const CreateAssetSchema = z.object({
   notes: z.string().max(5000).optional(),
   tags: z.array(z.string().max(50)).optional(),
   primaryImageUrl: z.string().url().optional(),
+
+  // Procurement linkage (from GRN/PO workflow)
+  poId: UUIDSchema.optional(),
+  grnId: UUIDSchema.optional(),
+  grnItemId: UUIDSchema.optional(),
+  stockItemId: UUIDSchema.optional(),
+
+  // VLM extraction data (from label scanning)
+  labelImageUrl: z.string().url().optional(),
+  vlmExtractionData: z.record(z.unknown()).optional(),
 });
 
 export type CreateAssetInput = z.infer<typeof CreateAssetSchema>;
@@ -127,9 +137,22 @@ export type CreateAssetInput = z.infer<typeof CreateAssetSchema>;
  * Validates payload for updating an existing asset.
  * All fields are optional (partial update).
  */
+// Verification status enum
+const VerificationStatusSchema = z.enum(['pending', 'verified', 'mismatch']);
+
 export const UpdateAssetSchema = CreateAssetSchema.partial().extend({
   status: AssetStatusSchema.optional(),
   condition: AssetConditionSchema.optional(),
+
+  // Verification fields (from label scanning)
+  verificationStatus: VerificationStatusSchema.optional(),
+  verificationImageUrl: z.string().url().optional(),
+  verificationMismatches: z.array(z.object({
+    field: z.string(),
+    expected: z.string().nullable(),
+    found: z.string().nullable(),
+    isMatch: z.boolean(),
+  })).optional(),
 });
 
 export type UpdateAssetInput = z.infer<typeof UpdateAssetSchema>;
