@@ -125,9 +125,11 @@ async function handler(
         JOIN projects p ON p.id = d.project_id
         LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
         WHERE p.status = 'active'
+          AND d.zone_no IS NOT NULL AND d.zone_no > 0
+          AND d.pon_no IS NOT NULL AND d.pon_no > 0
           AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
         GROUP BY p.id, p.project_name, d.zone_no, d.pon_no
-        ORDER BY p.project_name, d.zone_no NULLS LAST, d.pon_no NULLS LAST
+        ORDER BY p.project_name, d.zone_no, d.pon_no
       `;
 
       const progressResult = await client.query<RawProgressRow>(progressQuery, [
@@ -136,7 +138,7 @@ async function handler(
         projectId,
       ]);
 
-      // Time series query for charts (only active projects)
+      // Time series query for charts (only active projects, exclude zone/pon = 0)
       let timeSeriesQuery = '';
       if (granularityMode === 'daily') {
         timeSeriesQuery = `
@@ -147,6 +149,8 @@ async function handler(
           JOIN drops d ON d.drop_number = oes.drop_number
           JOIN projects p ON p.id = d.project_id
           WHERE p.status = 'active'
+            AND d.zone_no IS NOT NULL AND d.zone_no > 0
+            AND d.pon_no IS NOT NULL AND d.pon_no > 0
             AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
             AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
@@ -162,6 +166,8 @@ async function handler(
           JOIN drops d ON d.drop_number = oes.drop_number
           JOIN projects p ON p.id = d.project_id
           WHERE p.status = 'active'
+            AND d.zone_no IS NOT NULL AND d.zone_no > 0
+            AND d.pon_no IS NOT NULL AND d.pon_no > 0
             AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
             AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
@@ -178,6 +184,8 @@ async function handler(
           JOIN drops d ON d.drop_number = oes.drop_number
           JOIN projects p ON p.id = d.project_id
           WHERE p.status = 'active'
+            AND d.zone_no IS NOT NULL AND d.zone_no > 0
+            AND d.pon_no IS NOT NULL AND d.pon_no > 0
             AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
             AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
