@@ -179,7 +179,7 @@ export function QuoteScannerModal({
         body: formData,
       });
 
-      setProgress(80);
+      setProgress(70);
 
       const data = await response.json();
 
@@ -187,8 +187,26 @@ export function QuoteScannerModal({
         throw new Error(data.message || data.error || 'Extraction failed');
       }
 
-      setProgress(100);
+      setProgress(85);
       setResult(data);
+
+      // Auto-create the quote from extraction
+      if (data.extractionId) {
+        const createResponse = await fetch('/api/procurement/quotes/create-from-extraction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ extractionId: data.extractionId }),
+        });
+
+        const createData = await createResponse.json();
+
+        if (createResponse.ok && createData.success) {
+          setQuoteCreated(true);
+        }
+        // Don't fail if quote creation fails - user can still see extraction
+      }
+
+      setProgress(100);
       setStep('complete');
 
       // Notify parent
@@ -468,7 +486,7 @@ export function QuoteScannerModal({
 
               {!quoteCreated && (
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Click "Create Quote" to add this quote to the RFQ
+                  Extraction complete. You can create the quote manually if needed.
                 </p>
               )}
             </div>
