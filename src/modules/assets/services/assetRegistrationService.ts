@@ -224,6 +224,7 @@ export async function registerAssetFromGrnItem(
     });
 
     // Get GRN and item details for auto-population
+    // Note: stock_items doesn't have manufacturer/model columns
     const grnData = await sql`
       SELECT
         g.id as grn_id,
@@ -236,8 +237,6 @@ export async function registerAssetFromGrnItem(
         gi.item_description,
         gi.unit_cost,
         si.name as stock_item_name,
-        si.manufacturer,
-        si.model,
         ac.id as category_id,
         ac.code as category_code
       FROM goods_receipt_notes g
