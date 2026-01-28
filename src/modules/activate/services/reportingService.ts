@@ -90,6 +90,8 @@ export async function getDailyCountsWithBreakdown(
     // Query 1: Get INSTALLED DRs with reviewed/notReviewed status
     // Uses dr_photo_unified_reviews.submitted_date (first submission date, preserved on resubmission)
     // Includes pole_no for pole-level breakdown and DR-level details
+    // CRITICAL: INNER JOIN to drops - only count DRs that exist in SOW-imported drops table
+    // DRs not in drops (like incorrect DR numbers) should NOT be counted
     const installedResult = await pool.query(
       `
       SELECT
@@ -105,7 +107,7 @@ export async function getDailyCountsWithBreakdown(
         COALESCE(upr.submitted_date, upr.created_at::DATE) as installed_at,
         upr.qa_decision
       FROM dr_photo_unified_reviews upr
-      LEFT JOIN drops d ON d.drop_number = upr.drop_number
+      INNER JOIN drops d ON d.drop_number = upr.drop_number
       WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
         AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
         AND ($3::TEXT IS NULL OR upr.project = $3)
@@ -116,20 +118,21 @@ export async function getDailyCountsWithBreakdown(
     // Query 2: Get ACTIVATED DRs from OES (independent date context)
     // Uses oes_activations.activation_date (when ONT was activated on OES)
     // Includes pole_no for pole-level breakdown
+    // CRITICAL: INNER JOIN to drops - only count DRs that exist in SOW-imported drops table
     const activatedResult = await pool.query(
       `
       SELECT DISTINCT
         oes.drop_number,
-        COALESCE(upr.project, 'Unknown') as project,
+        COALESCE(upr.project, d.project_name, 'Unknown') as project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
         d.pole_number as pole_no
       FROM oes_activations oes
+      INNER JOIN drops d ON d.drop_number = oes.drop_number
       LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
-      LEFT JOIN drops d ON d.drop_number = oes.drop_number
       WHERE oes.activation_date >= $1::DATE
         AND oes.activation_date <= $2::DATE
-        AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
+        AND ($3::TEXT IS NULL OR upr.project = $3 OR d.project_name = $3 OR upr.project IS NULL)
       `,
       [dateFrom, dateTo, project || null]
     );
@@ -871,6 +874,7 @@ export async function getTrendAnalysisReport(
     // Main aggregated query
     const result = await pool.query(
       `
+      -- CRITICAL: INNER JOIN to drops to exclude invalid DR numbers from counts
       WITH date_series AS (
         SELECT generate_series($1::DATE, $2::DATE, '1 day'::interval)::DATE as date_val
       ),
@@ -881,6 +885,7 @@ export async function getTrendAnalysisReport(
           COUNT(DISTINCT upr.drop_number) FILTER (WHERE upr.feedback_sent = true) as reviewed,
           COUNT(DISTINCT upr.drop_number) FILTER (WHERE upr.feedback_sent IS NULL OR upr.feedback_sent = false) as not_reviewed
         FROM dr_photo_unified_reviews upr
+        INNER JOIN drops d ON d.drop_number = upr.drop_number
         WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
           AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
           AND ($3::TEXT IS NULL OR upr.project = $3)
@@ -891,6 +896,7 @@ export async function getTrendAnalysisReport(
           oes.activation_date as date_val,
           COUNT(DISTINCT oes.drop_number) as activated
         FROM oes_activations oes
+        INNER JOIN drops d ON d.drop_number = oes.drop_number
         LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
         WHERE oes.activation_date >= $1::DATE
           AND oes.activation_date <= $2::DATE
@@ -919,6 +925,7 @@ export async function getTrendAnalysisReport(
 
     if (!project) {
       // Query for per-project data
+      // CRITICAL: INNER JOIN to drops to exclude invalid DR numbers
       const projectResult = await pool.query(
         `
         WITH date_series AS (
@@ -932,6 +939,7 @@ export async function getTrendAnalysisReport(
             COUNT(DISTINCT upr.drop_number) FILTER (WHERE upr.feedback_sent = true) as reviewed,
             COUNT(DISTINCT upr.drop_number) FILTER (WHERE upr.feedback_sent IS NULL OR upr.feedback_sent = false) as not_reviewed
           FROM dr_photo_unified_reviews upr
+          INNER JOIN drops d ON d.drop_number = upr.drop_number
           WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
             AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
             AND upr.project IS NOT NULL
@@ -940,13 +948,14 @@ export async function getTrendAnalysisReport(
         oes_by_project AS (
           SELECT
             oes.activation_date as date_val,
-            COALESCE(upr.project, 'Unknown') as project,
+            COALESCE(upr.project, d.project_name, 'Unknown') as project,
             COUNT(DISTINCT oes.drop_number) as activated
           FROM oes_activations oes
+          INNER JOIN drops d ON d.drop_number = oes.drop_number
           LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
           WHERE oes.activation_date >= $1::DATE
             AND oes.activation_date <= $2::DATE
-          GROUP BY oes.activation_date, COALESCE(upr.project, 'Unknown')
+          GROUP BY oes.activation_date, COALESCE(upr.project, d.project_name, 'Unknown')
         )
         SELECT
           ${dateGrouping} as label,
