@@ -4,36 +4,68 @@
 
 ---
 
-## 2026-01-28: QField OES Sync - Coordinate Source of Truth
+## 2026-01-28: QField OES Sync - Dual Layer System
 
-**Issue:** Automated OES GeoJSON layer showed dots ~200m away from manual GPKG imports in QField.
+**Context:** QField mobile app needs visual distinction between activated (OES report) and remaining (not yet activated) drops.
 
-**Root Cause:** Two different coordinate sources were being used:
-- Manual GPKG imports: use `drops` table coordinates (from Neon DB/OneMap planning)
-- Our automated sync: was using OES coordinates from Nokia Excel report
+**Architecture - Two GeoJSON Layers:**
 
-**Solution:** Changed `sync-oes-to-qfield.ts` to use `drops` table as source of truth:
+| Layer | Source Query | Color | Purpose |
+|-------|--------------|-------|---------|
+| **OES FF {date}** | `INNER JOIN oes_activations` | Orange (255,140,0) | Activated drops from OES report |
+| **Remaining Drops {date}** | `NOT EXISTS (oes_activations)` | Green (34,139,34) | Drops not yet in OES report |
 
+**Key Code - Remaining Drops Query:**
 ```typescript
-// BEFORE: Used OES coordinates (wrong)
-LEFT JOIN drops d ON oes.drop_id = d.id
-// Selected oes.latitude, oes.longitude
-
-// AFTER: Use drops table coordinates (correct)
-INNER JOIN drops d ON oes.drop_id = d.id
-// Select d.latitude, d.longitude
+const remainingQuery = `
+  SELECT d.drop_number, p.project_name, d.address, d.latitude, d.longitude
+  FROM drops d
+  LEFT JOIN projects p ON d.project_id = p.id
+  WHERE d.latitude BETWEEN ${SA_BOUNDS.minLat} AND ${SA_BOUNDS.maxLat}
+    AND d.longitude BETWEEN ${SA_BOUNDS.minLon} AND ${SA_BOUNDS.maxLon}
+    AND NOT EXISTS (
+      SELECT 1 FROM oes_activations oes WHERE oes.drop_id = d.id
+    )
+  ORDER BY d.drop_number
+`;
 ```
 
-**Additional Changes:**
-1. Removed dual-point system (`point_type: 'oes' | 'planned'`) - now single point per DR
-2. Changed QGS renderer from `categorizedSymbol` to `singleSymbol`
-3. Changed dot color to orange (`255,140,0,255`)
+**Coordinate Source of Truth:**
+- Both layers use `drops` table coordinates (from Neon DB/OneMap planning)
+- NOT OES coordinates from Nokia Excel (those were ~200m off from planning)
+
+**QGS Styling:**
+```xml
+<!-- Both layers use singleSymbol renderer with size 2 (matches manual imports) -->
+<renderer-v2 type="singleSymbol">
+  <symbol type="marker">
+    <layer class="SimpleMarker">
+      <Option name="color" value="255,140,0,255"/>  <!-- Orange for OES -->
+      <Option name="size" value="2"/>
+    </layer>
+  </symbol>
+</renderer-v2>
+```
+
+**API Response:**
+```typescript
+return res.status(200).json({
+  success: true,
+  message: `Synced ${activatedCount} activated + ${remainingCount} remaining drops`,
+  activatedCount: 7545,    // Example
+  remainingCount: 63423,   // Example
+  files: { activated: 'OES FF 28-01-2026.geojson', remaining: 'Remaining Drops 28-01-2026.geojson' },
+});
+```
 
 **Key Files:**
-- `pages/api/activate/sync-oes-to-qfield.ts` - Sync API
-- QGS project file on QFieldCloud - Styling
+- `pages/api/activate/sync-oes-to-qfield.ts` - Dual layer sync API
+- QGS project file on QFieldCloud - Layer definitions and styling
 
-**Key Insight:** When syncing GIS data, always verify coordinate sources match between automated and manual processes. The `drops` table contains planning coordinates from OneMap, which is what field teams expect to see.
+**Key Insights:**
+1. Use `NOT EXISTS` for inverse layer - more efficient than `LEFT JOIN ... WHERE NULL`
+2. Match dot size (2) with manual import layers for visual consistency
+3. Use contrasting colors (orange/green) for easy field identification
 
 ---
 
