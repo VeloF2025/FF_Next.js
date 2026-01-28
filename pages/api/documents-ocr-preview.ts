@@ -989,4 +989,4 @@ function buildTopGuesses(classification: { documentType: string; confidence: num
   return [topGuess];
 }
 
-export default withAuth(detectImageOrientation);
+export default withAuth(handler);
