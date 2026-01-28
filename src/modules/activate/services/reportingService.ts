@@ -123,7 +123,7 @@ export async function getDailyCountsWithBreakdown(
       `
       SELECT DISTINCT
         oes.drop_number,
-        COALESCE(upr.project, d.project_name, 'Unknown') as project,
+        COALESCE(upr.project, 'Unknown') as project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
         d.pole_number as pole_no
@@ -132,7 +132,7 @@ export async function getDailyCountsWithBreakdown(
       LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
       WHERE oes.activation_date >= $1::DATE
         AND oes.activation_date <= $2::DATE
-        AND ($3::TEXT IS NULL OR upr.project = $3 OR d.project_name = $3 OR upr.project IS NULL)
+        AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
       `,
       [dateFrom, dateTo, project || null]
     );
@@ -948,14 +948,14 @@ export async function getTrendAnalysisReport(
         oes_by_project AS (
           SELECT
             oes.activation_date as date_val,
-            COALESCE(upr.project, d.project_name, 'Unknown') as project,
+            COALESCE(upr.project, 'Unknown') as project,
             COUNT(DISTINCT oes.drop_number) as activated
           FROM oes_activations oes
           INNER JOIN drops d ON d.drop_number = oes.drop_number
           LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
           WHERE oes.activation_date >= $1::DATE
             AND oes.activation_date <= $2::DATE
-          GROUP BY oes.activation_date, COALESCE(upr.project, d.project_name, 'Unknown')
+          GROUP BY oes.activation_date, COALESCE(upr.project, 'Unknown')
         )
         SELECT
           ${dateGrouping} as label,
