@@ -98,6 +98,7 @@ export default function RFQDetailPage() {
   const [activeTab, setActiveTab] = useState<'items' | 'suppliers' | 'quotes'>('items');
   const [showConvertToPOModal, setShowConvertToPOModal] = useState(false);
   const [showQuoteScanner, setShowQuoteScanner] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -458,33 +459,132 @@ export default function RFQDetailPage() {
                       {rfq.quotes.length === 0 ? (
                         <p className="text-center py-8 text-[var(--ff-text-secondary)]">No quotes received yet</p>
                       ) : (
-                        rfq.quotes.map((quote) => (
-                          <div key={quote.id} className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium text-[var(--ff-text-primary)]">{quote.supplierName}</p>
-                                <p className="text-sm text-[var(--ff-text-secondary)]">
-                                  Submitted: {formatDate(quote.submittedAt)}
-                                </p>
+                        <div className="flex gap-4">
+                          {/* Quote List */}
+                          <div className={`space-y-3 ${selectedQuote ? 'w-1/2' : 'w-full'}`}>
+                            {rfq.quotes.map((quote) => (
+                              <div
+                                key={quote.id}
+                                onClick={() => setSelectedQuote(selectedQuote?.id === quote.id ? null : quote)}
+                                className={`p-4 bg-[var(--ff-bg-tertiary)] rounded-lg cursor-pointer transition-all hover:ring-2 hover:ring-blue-500/50 ${
+                                  selectedQuote?.id === quote.id ? 'ring-2 ring-blue-500' : ''
+                                }`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-medium text-[var(--ff-text-primary)]">{quote.supplierName}</p>
+                                    <p className="text-sm text-[var(--ff-text-secondary)]">
+                                      Submitted: {formatDate(quote.submittedAt)}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-lg font-bold text-[var(--ff-text-primary)]">
+                                      {formatCurrency(quote.totalAmount)}
+                                    </p>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-xs ${
+                                      quote.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
+                                      quote.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                                      'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                      {quote.status}
+                                    </span>
+                                  </div>
+                                </div>
+                                {quote.notes && (
+                                  <p className="mt-2 text-sm text-[var(--ff-text-tertiary)]">{quote.notes}</p>
+                                )}
                               </div>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-[var(--ff-text-primary)]">
-                                  {formatCurrency(quote.totalAmount)}
-                                </p>
-                                <span className={`inline-block px-2 py-0.5 rounded text-xs ${
-                                  quote.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
-                                  quote.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
-                                  'bg-yellow-500/20 text-yellow-400'
-                                }`}>
-                                  {quote.status}
-                                </span>
+                            ))}
+                          </div>
+
+                          {/* Quote Detail Panel */}
+                          {selectedQuote && (
+                            <div className="w-1/2 p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
+                              <div className="flex justify-between items-start mb-4">
+                                <h4 className="text-lg font-semibold text-[var(--ff-text-primary)]">Quote Details</h4>
+                                <button
+                                  onClick={() => setSelectedQuote(null)}
+                                  className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="text-sm text-[var(--ff-text-secondary)]">Supplier</p>
+                                  <p className="font-medium text-[var(--ff-text-primary)]">{selectedQuote.supplierName}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-[var(--ff-text-secondary)]">Total Amount</p>
+                                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+                                    {formatCurrency(selectedQuote.totalAmount)}
+                                  </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-[var(--ff-text-secondary)]">Status</p>
+                                    <span className={`inline-block px-2 py-1 rounded text-sm ${
+                                      selectedQuote.status === 'accepted' ? 'bg-green-500/20 text-green-400' :
+                                      selectedQuote.status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                                      'bg-yellow-500/20 text-yellow-400'
+                                    }`}>
+                                      {selectedQuote.status}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-[var(--ff-text-secondary)]">Submitted</p>
+                                    <p className="text-[var(--ff-text-primary)]">{formatDate(selectedQuote.submittedAt)}</p>
+                                  </div>
+                                </div>
+                                {selectedQuote.validUntil && (
+                                  <div>
+                                    <p className="text-sm text-[var(--ff-text-secondary)]">Valid Until</p>
+                                    <p className="text-[var(--ff-text-primary)]">{formatDate(selectedQuote.validUntil)}</p>
+                                  </div>
+                                )}
+                                {selectedQuote.notes && (
+                                  <div>
+                                    <p className="text-sm text-[var(--ff-text-secondary)]">Notes</p>
+                                    <p className="text-[var(--ff-text-primary)]">{selectedQuote.notes}</p>
+                                  </div>
+                                )}
+                                <div className="pt-4 border-t border-[var(--ff-border-light)] space-y-2">
+                                  <Button
+                                    variant="default"
+                                    className="w-full"
+                                    onClick={() => router.push(`/procurement/quotes/${selectedQuote.id}`)}
+                                  >
+                                    View Full Quote
+                                  </Button>
+                                  {selectedQuote.status === 'received' && (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        className="w-full text-green-500 border-green-500 hover:bg-green-500/10"
+                                        onClick={() => {
+                                          // TODO: Accept quote action
+                                          notificationService.info('Accept quote coming soon');
+                                        }}
+                                      >
+                                        Accept Quote
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        className="w-full text-red-500 border-red-500 hover:bg-red-500/10"
+                                        onClick={() => {
+                                          // TODO: Reject quote action
+                                          notificationService.info('Reject quote coming soon');
+                                        }}
+                                      >
+                                        Reject Quote
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                            {quote.notes && (
-                              <p className="mt-2 text-sm text-[var(--ff-text-tertiary)]">{quote.notes}</p>
-                            )}
-                          </div>
-                        ))
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
