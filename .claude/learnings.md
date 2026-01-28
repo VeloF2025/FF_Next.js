@@ -4,6 +4,27 @@
 
 ---
 
+## 2026-01-27: PO Approval - POStatus Enum vs Database Values
+
+**Issue:** Type errors when comparing `po.status` with strings like `'draft'` or `'pending_approval'`.
+
+**Root Cause:** Two different `POStatus` types exist:
+1. `src/types/procurement/purchase-order.types.ts` - lowercase string union: `'draft' | 'pending_approval' | ...`
+2. `src/types/procurement/po.types.ts` - UPPERCASE enum: `POStatus.DRAFT = 'DRAFT'`
+
+Database stores lowercase values, but TypeScript expects enum comparisons.
+
+**Solution:** Normalize to lowercase before comparing:
+```typescript
+const statusLower = String(po.status).toLowerCase();
+const canApprove = statusLower === 'pending_approval';
+const canEdit = statusLower === 'draft';
+```
+
+**Prevention:** When adding new status comparisons, always use lowercase string comparison to handle both enum and DB values.
+
+---
+
 ## 2026-01-27: WhatsApp Bridge API - Snake_case Field Names
 
 **Issue:** Direct calls to bridge `/send-message` endpoint returned `{"error": "Missing group_jid or message"}` despite sending all fields.

@@ -50,8 +50,26 @@ BOQ → RFQ → Quotes → Evaluation → PO → GRN → Stock
 
 ### 4. Purchase Order
 - Generate PO from awarded quote
-- Approval workflow based on limits
+- **Approval workflow** with multi-level thresholds
+- Version tracking on rejection/resubmit
 - Track delivery status
+
+#### PO Approval Workflow (Migration 136)
+```
+Draft → Submit → Pending Approval → Approved/Rejected
+                                  ↓ (if rejected)
+                              Draft (v2, v3, etc.)
+```
+
+| Level | Threshold | Approver |
+|-------|-----------|----------|
+| 1 | < R5,000 | Auto-approve |
+| 2 | R5,000 - R50,000 | `procurement_manager` role |
+| 3 | > R50,000 | `director` role |
+
+- **Escalation:** 48 hours (configurable)
+- **Versioning:** Rejected POs increment version and return to draft
+- **Quote Comparison:** Approvers see RFQ context and all quotes received
 
 ### 5. GRN (Goods Receipt Note)
 - Receive goods against PO
@@ -181,10 +199,61 @@ src/components/procurement/stock/
 4. **Permission-Based** - Access control per project
 5. **Project-Scoped** - All data tied to projectId
 
+## PO Approval Service
+
+Located at `src/services/procurement/approval/poApprovalService.ts`
+
+```typescript
+// Submit PO for approval
+poApprovalService.submitForApproval(poId, userId, userName)
+// Returns: { approvalRequest, autoApproved }
+
+// Approve PO
+poApprovalService.approvePO(poId, approverId, approverName, notes?)
+
+// Reject PO (creates new version)
+poApprovalService.rejectPO(poId, rejecterId, rejecterName, reason)
+// Returns: { newVersion }
+
+// Get approval status
+poApprovalService.getApprovalStatus(poId)
+
+// Get quote comparison for approvers
+poApprovalService.getQuoteComparisonForApproval(poId)
+
+// Check if user can approve
+poApprovalService.canUserApprove(poId, userId)
+```
+
+### PO Approval API
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/procurement/purchase-orders-approval?poId=xxx` | Get approval status |
+| GET | `/api/procurement/purchase-orders-approval?pending=true` | List pending approvals |
+| GET | `/api/procurement/purchase-orders-approval?poId=xxx&checkPermission=true` | Check if user can approve |
+
+### PO Approval Components
+
+```
+src/modules/procurement/orders/components/
+├── PODetailHeader.tsx      # Approve/Reject buttons, version banner
+├── PORejectModal.tsx       # Rejection with required reason
+└── POQuoteComparison.tsx   # RFQ/quote context for approvers
+```
+
+### Database Tables (Migration 136)
+
+| Table | Purpose |
+|-------|---------|
+| `purchase_order_versions` | Version history with rejection snapshots |
+| `purchase_orders.version` | Current version number (default 1) |
+| `purchase_orders.current_approval_request_id` | Link to active approval request |
+
 ## Gotchas
 
 ### Approval Limits
-PO approval has value-based thresholds. Check `procurement_projects` config for limits.
+PO approval has value-based thresholds configured in `approval_levels` table (not `procurement_projects`).
 
 ### Supplier Portal Separation
 Supplier-facing portal is separate context from internal management. Different permissions.
