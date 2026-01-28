@@ -2437,3 +2437,72 @@ ls pages/projects/[id]/   # See if [id] directory exists
 - KB: `.claude/knowledge-base/nextjs-build-gotchas.md`
 
 ---
+
+## 2026-01-28: API Exporting Wrong Function - Silent Complete Failure
+
+**Date:** 2026-01-28
+**Severity:** CRITICAL
+**Context:** OCR document upload was timing out for all document types
+
+**Problem:** API file was exporting a helper function instead of the handler:
+
+```typescript
+// pages/api/documents-ocr-preview.ts
+
+// Line 384-428: Helper function for orientation detection
+async function detectImageOrientation(imageUrl: string): Promise<number> { ... }
+
+// Line 580-956: The actual API handler
+async function handler(req: NextApiRequest, res: NextApiResponse) { ... }
+
+// Line 992: WRONG EXPORT!
+export default withAuth(detectImageOrientation);  // ❌ Exports helper, not handler!
+```
+
+**Symptoms:**
+- All requests to the endpoint timeout
+- No meaningful error messages
+- Endpoint appears to "work" (returns 200) but does nothing useful
+- Helper function receives wrong arguments and fails silently
+
+**Root Cause:** Copy-paste error or accidental edit changed the export from `handler` to a helper function. TypeScript doesn't catch this because both are async functions.
+
+**Fix:**
+```typescript
+// CORRECT:
+export default withAuth(handler);
+```
+
+**Prevention Checklist:**
+1. **Naming convention:** Always name the main handler `handler` (standard Next.js convention)
+2. **Export at end of file:** Keep `export default` at the very end, right after the handler
+3. **Visual check:** Before committing API changes, verify the export line
+4. **Test the endpoint:** After changes, actually call the API and verify it works
+
+**Quick Diagnosis:**
+```bash
+# Check what function is being exported
+tail -5 pages/api/your-api.ts
+
+# Should see:
+# export default withAuth(handler);
+# or
+# export default handler;
+
+# NOT:
+# export default withAuth(someHelperFunction);
+```
+
+**Why This Is Dangerous:**
+- No compile-time errors (both are valid functions)
+- No runtime errors (function executes, just wrong one)
+- Appears to work (returns HTTP response)
+- Difficult to debug (no obvious error messages)
+
+**Affected File:**
+- `pages/api/documents-ocr-preview.ts` - Was exporting `detectImageOrientation` instead of `handler`
+
+**Reference:**
+- Commit: `4af1d20b` - fix(ocr): export handler instead of detectImageOrientation
+
+---

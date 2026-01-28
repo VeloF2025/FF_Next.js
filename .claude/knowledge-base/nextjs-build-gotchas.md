@@ -218,6 +218,56 @@ grep -r "redirect.*destination" pages/ | grep -E "(health-safety|incidents)"
 
 ---
 
+## API Exporting Wrong Function
+
+**Severity:** CRITICAL - endpoint completely broken with no obvious errors
+
+**Problem:** API file exports a helper function instead of the handler.
+
+**Example:**
+```typescript
+// pages/api/my-api.ts
+
+// Helper function
+async function validateInput(data: any): Promise<boolean> { ... }
+
+// Actual handler
+async function handler(req: NextApiRequest, res: NextApiResponse) { ... }
+
+// WRONG - exports helper instead of handler!
+export default withAuth(validateInput);
+```
+
+**Symptoms:**
+- Endpoint times out or returns unexpected results
+- No compile errors, no runtime errors
+- Appears to "work" but does nothing useful
+- Very difficult to debug
+
+**Why TypeScript Doesn't Catch This:**
+- Both are async functions
+- Both are valid exports
+- Type checking passes
+
+**Quick Diagnosis:**
+```bash
+# Always check the export line
+tail -5 pages/api/your-api.ts
+
+# Should see: export default withAuth(handler);
+# NOT: export default withAuth(someHelper);
+```
+
+**Prevention:**
+1. Always name the main handler `handler`
+2. Keep export at very end of file
+3. Visual check before committing
+4. Actually test the endpoint after changes
+
+**Reference:** Commit `4af1d20b` - OCR preview was exporting `detectImageOrientation` instead of `handler`
+
+---
+
 ## Dynamic Routes Catch Named Paths
 
 **Severity:** HIGH - causes "not found" errors for valid routes
