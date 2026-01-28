@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-01-28: QField OES Sync - Coordinate Source of Truth
+
+**Issue:** Automated OES GeoJSON layer showed dots ~200m away from manual GPKG imports in QField.
+
+**Root Cause:** Two different coordinate sources were being used:
+- Manual GPKG imports: use `drops` table coordinates (from Neon DB/OneMap planning)
+- Our automated sync: was using OES coordinates from Nokia Excel report
+
+**Solution:** Changed `sync-oes-to-qfield.ts` to use `drops` table as source of truth:
+
+```typescript
+// BEFORE: Used OES coordinates (wrong)
+LEFT JOIN drops d ON oes.drop_id = d.id
+// Selected oes.latitude, oes.longitude
+
+// AFTER: Use drops table coordinates (correct)
+INNER JOIN drops d ON oes.drop_id = d.id
+// Select d.latitude, d.longitude
+```
+
+**Additional Changes:**
+1. Removed dual-point system (`point_type: 'oes' | 'planned'`) - now single point per DR
+2. Changed QGS renderer from `categorizedSymbol` to `singleSymbol`
+3. Changed dot color to orange (`255,140,0,255`)
+
+**Key Files:**
+- `pages/api/activate/sync-oes-to-qfield.ts` - Sync API
+- QGS project file on QFieldCloud - Styling
+
+**Key Insight:** When syncing GIS data, always verify coordinate sources match between automated and manual processes. The `drops` table contains planning coordinates from OneMap, which is what field teams expect to see.
+
+---
+
 ## 2026-01-28: Asset Purchase Price Validation - Zero Value Rejected
 
 **Issue:** Creating a new asset with purchase price of `0` (for donated assets) failed with 400 validation error.
