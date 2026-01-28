@@ -141,7 +141,10 @@ coordinates: [Number(point.longitude), Number(point.latitude)]  // [18.67, -34.0
 - Zero points render on map
 - File size is correct
 
-**OES Filename Convention:** `OES FF DD-MM-YYYY.geojson` (e.g., `OES FF 28-01-2026.geojson`)
+**OES Filename Convention:** `OES FF DD-MM-YYYY.geojson`
+- Date is based on `report_date` from OES import form (stored in `oes_import_batches`)
+- Example: `OES FF 27-01-2026.geojson` for data with report date Jan 27, 2026
+- NOT the upload date - the date user selects when importing OES Excel
 
 ## File Upload (OES Sync)
 
@@ -214,3 +217,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker ps --format '{{.Names}}' |
 **2026-01-27 (d22fee08):** Fixed DB host from VPS (72.61.166.168) to Velocity (100.96.203.105). The VPS had a stale copy with only 17 projects.
 
 **2026-01-27 (81174ba7):** Updated API token. Old token was expired. New token from `authentication_authtoken` table (not `authtoken_token`). Token owner: Jaun (user_id: 4).
+
+**2026-01-28 (16b3ba95):** OES filename now uses report_date from import form, not upload date. Priority: request reportDate > latest import batch report_date > today's date.
+
+**2026-01-28:** Layer styling (color, size) is stored in QGS project file. To change OES point color, download QGS, modify color value, re-upload. Current: Pink circles (255,105,180).

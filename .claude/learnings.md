@@ -2506,3 +2506,126 @@ tail -5 pages/api/your-api.ts
 - Commit: `4af1d20b` - fix(ocr): export handler instead of detectImageOrientation
 
 ---
+
+## 2026-01-28: QFieldCloud OES Sync - Filename Based on Import Report Date
+
+**Issue:** OES GeoJSON files synced to QField were named with upload date, but should use the report date selected during OES import.
+
+**Solution:** Modified `sync-oes-to-qfield.ts` to:
+1. Query latest `report_date` from `oes_import_batches` table
+2. Use that date for filename instead of `new Date()`
+
+**Filename Format:** `OES FF DD-MM-YYYY.geojson`
+- Example: `OES FF 27-01-2026.geojson` (for report dated Jan 27, 2026)
+
+**Priority for date source:**
+1. `reportDate` from API request body
+2. Latest `oes_import_batches.report_date`
+3. Fallback to current date
+
+**Code Change:**
+```typescript
+// Get the report date for the filename
+let filenameDate: Date;
+if (reportDate) {
+  filenameDate = new Date(reportDate);
+} else {
+  const latestBatch = await pool.query(
+    'SELECT report_date FROM oes_import_batches ORDER BY imported_at DESC LIMIT 1'
+  );
+  filenameDate = latestBatch.rows[0]?.report_date 
+    ? new Date(latestBatch.rows[0].report_date) 
+    : new Date();
+}
+const oesFilename = getOESReportFilename(filenameDate);
+```
+
+**Related:**
+- `pages/api/activate/sync-oes-to-qfield.ts` - Sync API
+- `oes_import_batches` table - Stores import metadata including `report_date`
+
+**Reference:**
+- Commit: `16b3ba95` - fix(qfield): use OES import report_date for filename
+
+---
+
+## 2026-01-28: QFieldCloud - Updating QGS Project Files via API
+
+**Context:** When syncing new OES data files to QFieldCloud, the QGIS project file (.qgs) must be updated to reference the new filename.
+
+**Process:**
+1. Download current QGS file via API
+2. Replace old filename references with new filename
+3. Re-upload modified QGS file
+
+**API Calls:**
+```bash
+# Download QGS
+curl -s "https://qfield.fibreflow.app/api/v1/files/{project_id}/project.qgs/" \
+  -H "Authorization: Token {token}" -o project.qgs
+
+# Modify (sed example)
+sed -i 's/OES FF 260127.geojson/OES FF 27-01-2026.geojson/g' project.qgs
+
+# Upload updated QGS
+curl -s -X POST "https://qfield.fibreflow.app/api/v1/files/{project_id}/project.qgs/" \
+  -H "Authorization: Token {token}" \
+  -F "file=@project.qgs"
+```
+
+**Note:** Layer styling (color, size) is stored in the QGS file, not the GeoJSON.
+
+---
+
+## 2026-01-28: Compliance Stats Missing Required Document - Check ALL APIs
+
+**Issue:** Employment Contract / IC Agreement was marked as required in one API but not tracked in another, causing it to never show in the "Staff with Missing Documents" list on the compliance page.
+
+**Root Cause:** Two different compliance APIs existed with different tracking logic:
+
+| API | Purpose | What it tracked |
+|-----|---------|-----------------|
+| `/api/staff/[staffId]/compliance` | Individual staff compliance tab | SA ID, Employment Contract ✓, Bank Details |
+| `/api/staff/alerts?type=compliance` | Compliance overview page | SA ID, Bank Details, DOB - **NO CONTRACT** ❌ |
+
+The individual staff compliance API correctly had `employment_contract` as required, but the overview API (`alerts.ts`) that powers `/staff/compliance` page was missing it entirely.
+
+**Symptoms:**
+- Staff detail page showed Employment Contract as required
+- But compliance overview never listed anyone as missing it
+- Compliance percentage was based on only 2 items instead of 3
+
+**Fix (commit `ada54839`):**
+```typescript
+// pages/api/staff/alerts.ts - getComplianceStats()
+
+// 1. Add contract check to verified docs query
+COUNT(DISTINCT staff_id) FILTER (
+  WHERE document_type = 'employment_contract'
+  AND verification_status = 'verified'
+) as verified_contract
+
+// 2. Add CTE to find staff without contracts
+WITH staff_contracts AS (
+  SELECT DISTINCT staff_id FROM staff_documents
+  WHERE document_type = 'employment_contract'
+    AND verification_status IN ('verified', 'pending')
+)
+...
+CASE WHEN sc.staff_id IS NULL THEN 'Contract (Employment/IC)' END
+
+// 3. Update compliance percentage (now 3 required items)
+((withVerifiedId + withVerifiedBank + withVerifiedContract) / (totalStaff * 3)) * 100
+```
+
+**Prevention Checklist:**
+1. **Audit all APIs** when adding a required document - search for all `/compliance` endpoints
+2. **Keep requirements synchronized** - use a shared constant
+3. **Test both views** - individual staff tab AND overview page
+
+**Affected Files:**
+- `pages/api/staff/alerts.ts` - Added contract tracking
+- `pages/staff/compliance.tsx` - Added Contract stat card
+- `pages/api/staff/[staffId]/compliance.ts` - Updated label to "Employment / IC Agreement"
+
+---
