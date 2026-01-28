@@ -106,6 +106,14 @@ const categories: CategoryTab[] = [
   },
 ];
 
+// Helper to format date as YYYY-MM-DD without timezone issues
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function ReportsDashboard() {
   // Get shared filters from context
   const { filters: sharedFilters, projects } = useActivateData();
@@ -160,7 +168,7 @@ export function ReportsDashboard() {
         startOfWeek.setDate(startOfWeek.getDate() + diff);
         setFilters({
           ...filters,
-          dateFrom: startOfWeek.toISOString().split('T')[0] as string,
+          dateFrom: formatLocalDate(startOfWeek),
           dateTo: todayStr,
         });
         break;
@@ -175,8 +183,8 @@ export function ReportsDashboard() {
         endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
         setFilters({
           ...filters,
-          dateFrom: startOfLastWeek.toISOString().split('T')[0] as string,
-          dateTo: endOfLastWeek.toISOString().split('T')[0] as string,
+          dateFrom: formatLocalDate(startOfLastWeek),
+          dateTo: formatLocalDate(endOfLastWeek),
         });
         break;
       }
@@ -185,27 +193,27 @@ export function ReportsDashboard() {
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         setFilters({
           ...filters,
-          dateFrom: startOfMonth.toISOString().split('T')[0] as string,
+          dateFrom: formatLocalDate(startOfMonth),
           dateTo: todayStr,
         });
         break;
       }
       case 'last7days': {
-        const last7 = new Date(todayStr);
+        const last7 = new Date(today);
         last7.setDate(last7.getDate() - 7);
         setFilters({
           ...filters,
-          dateFrom: last7.toISOString().split('T')[0] as string,
+          dateFrom: formatLocalDate(last7),
           dateTo: todayStr,
         });
         break;
       }
       case 'last30days': {
-        const last30 = new Date(todayStr);
+        const last30 = new Date(today);
         last30.setDate(last30.getDate() - 30);
         setFilters({
           ...filters,
-          dateFrom: last30.toISOString().split('T')[0] as string,
+          dateFrom: formatLocalDate(last30),
           dateTo: todayStr,
         });
         break;
@@ -229,21 +237,21 @@ export function ReportsDashboard() {
     const today = new Date(todayStr);
 
     // Last 7 days
-    const last7 = new Date(todayStr);
+    const last7 = new Date(today);
     last7.setDate(last7.getDate() - 7);
-    const last7Str = last7.toISOString().split('T')[0] as string;
+    const last7Str = formatLocalDate(last7);
 
     // Last 30 days
-    const last30 = new Date(todayStr);
+    const last30 = new Date(today);
     last30.setDate(last30.getDate() - 30);
-    const last30Str = last30.toISOString().split('T')[0] as string;
+    const last30Str = formatLocalDate(last30);
 
     // This week (Monday to today)
     const startOfWeek = new Date(today);
     const day = startOfWeek.getDay();
     const diff = day === 0 ? -6 : 1 - day;
     startOfWeek.setDate(startOfWeek.getDate() + diff);
-    const thisWeekStr = startOfWeek.toISOString().split('T')[0] as string;
+    const thisWeekStr = formatLocalDate(startOfWeek);
 
     // Last week (Monday to Sunday)
     const startOfLastWeek = new Date(today);
@@ -252,12 +260,12 @@ export function ReportsDashboard() {
     startOfLastWeek.setDate(startOfLastWeek.getDate() + diffLw);
     const endOfLastWeek = new Date(startOfLastWeek);
     endOfLastWeek.setDate(endOfLastWeek.getDate() + 6);
-    const lastWeekStartStr = startOfLastWeek.toISOString().split('T')[0] as string;
-    const lastWeekEndStr = endOfLastWeek.toISOString().split('T')[0] as string;
+    const lastWeekStartStr = formatLocalDate(startOfLastWeek);
+    const lastWeekEndStr = formatLocalDate(endOfLastWeek);
 
     // This month
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const thisMonthStr = startOfMonth.toISOString().split('T')[0] as string;
+    const thisMonthStr = formatLocalDate(startOfMonth);
 
     if (filters.dateFrom === todayStr && filters.dateTo === todayStr) return 'today';
     if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) return 'yesterday';
