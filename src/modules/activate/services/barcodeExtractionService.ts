@@ -2,7 +2,8 @@
  * Barcode Extraction Service
  *
  * Server-side barcode scanning from images using:
- * - Quagga2 for 1D barcodes (Code 128, Code 39, EAN)
+ * - Enhanced service with zxing-wasm for QR, Data Matrix, and 1D barcodes (primary)
+ * - Quagga2 for 1D barcodes as fallback
  *
  * This provides more reliable serial number extraction than VLM OCR.
  *
@@ -10,6 +11,9 @@
  */
 
 import { log } from '@/lib/logger';
+
+// Feature flag to use enhanced barcode service (with zxing-wasm 2D support)
+const USE_ENHANCED_BARCODE = process.env.USE_ENHANCED_BARCODE !== 'false'; // Enabled by default
 
 // Types for barcode results
 export type BarcodeFormat = 'CODE_128' | 'CODE_39' | 'QR_CODE' | 'DATA_MATRIX' | 'EAN_13' | 'UNKNOWN';
@@ -159,6 +163,9 @@ export async function scanBarcodeFromImage(base64Image: string): Promise<Barcode
 /**
  * Extract ONT serial from barcode in image
  * Returns null if no valid ONT serial found
+ *
+ * Uses enhanced barcode service (with 2D support) by default,
+ * falls back to Quagga2-only scanning if unavailable.
  */
 export async function extractOntSerialFromBarcode(base64Image: string): Promise<{
   success: boolean;
@@ -166,6 +173,37 @@ export async function extractOntSerialFromBarcode(base64Image: string): Promise<
   format: BarcodeFormat | null;
   confidence: number;
 }> {
+  // Try enhanced barcode service first (supports QR, Data Matrix, 2D)
+  if (USE_ENHANCED_BARCODE) {
+    try {
+      const { extractOntSerialEnhanced } = await import('./enhancedBarcodeService');
+      const enhancedResult = await extractOntSerialEnhanced(base64Image);
+
+      if (enhancedResult.success && enhancedResult.serial) {
+        log.info('BarcodeExtraction', `Enhanced scan found: ${enhancedResult.serial} (${enhancedResult.format}, ${enhancedResult.method})`);
+        return {
+          success: true,
+          serial: enhancedResult.serial,
+          format: enhancedResult.format as BarcodeFormat,
+          confidence: enhancedResult.confidence,
+        };
+      }
+
+      // Enhanced service ran but found nothing - still return (skip fallback)
+      log.debug('BarcodeExtraction', `Enhanced scan found no ONT serial (${enhancedResult.processingTimeMs}ms)`);
+      return {
+        success: false,
+        serial: null,
+        format: null,
+        confidence: 0,
+      };
+    } catch (enhancedError) {
+      log.warn('BarcodeExtraction', `Enhanced service error, falling back to Quagga: ${enhancedError}`);
+      // Fall through to legacy Quagga2 scanning
+    }
+  }
+
+  // Legacy Quagga2 scanning (1D only)
   const result = await scanBarcodeFromImage(base64Image);
 
   if (result.success && result.value) {
