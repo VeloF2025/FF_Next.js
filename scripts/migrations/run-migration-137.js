@@ -63,7 +63,7 @@ async function runMigration() {
       console.log(`Executing: ${preview}...`);
 
       try {
-        await sql(statement);
+        await sql.query(statement);
         console.log('  OK');
       } catch (error) {
         // Ignore "already exists" errors
