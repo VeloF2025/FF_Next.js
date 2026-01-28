@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-01-28: WA Bridge Disconnection - Missed DR Acknowledgments
+
+**Issue:** DR submissions (DR1738553, DR1862759) were received and stored in the database, but WhatsApp acknowledgment messages were never sent.
+
+**Root Cause:** The Go WhatsApp Bridge (VPS:8083) websocket disconnected at 05:57 UTC, but the Python WA Monitor service (which receives messages) kept running. This caused:
+- ✅ Messages received and stored in `qa_photo_reviews` and `dr_photo_unified_reviews`
+- ❌ Ack messages failed: `websocket not connected`
+
+**Architecture:**
+```
+WhatsApp Message → Python WA Monitor (stores in DB) → ✅ Works independently
+                → Go Bridge (sends acks) → ❌ Was disconnected
+```
+
+**Diagnosis:**
+```bash
+# Check bridge health
+curl -s http://72.61.197.178:8083/health | jq '.connected'
+# false = disconnected, needs restart
+
+# Check bridge logs for errors
+ssh root@72.61.197.178 "grep 'websocket not connected' /opt/whatsapp-bridge/bridge.log | tail -10"
+```
+
+**Fix:** Updated `/opt/wa-healthcheck.sh` on VPS to check actual connection status:
+```bash
+# OLD (bad) - only checked log file freshness
+local log_age=$(( $(date +%s) - $(stat -c %Y "$log_file") ))
+
+# NEW (good) - checks /health endpoint connected status
+local connected=$(curl -s http://localhost:8083/health | jq -r '.connected')
+if [ "$connected" != "true" ]; then
+    systemctl restart whatsapp-bridge
+fi
+```
+
+**Manual Ack Recovery:**
+```bash
+curl -s -X POST "http://72.61.197.178:8083/api/send" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient": "GROUP_JID@g.us",
+    "message": "📸 *DR123456 Received!*\n\n✅ Photos: X\n\n(Delayed ack)",
+    "mention_jid": "USER_JID@s.whatsapp.net"
+  }'
+```
+
+**Prevention:** Health check cron runs every 5 minutes and auto-restarts bridge when disconnected.
+
+---
+
 ## 2026-01-27: PO Approval - POStatus Enum vs Database Values
 
 **Issue:** Type errors when comparing `po.status` with strings like `'draft'` or `'pending_approval'`.

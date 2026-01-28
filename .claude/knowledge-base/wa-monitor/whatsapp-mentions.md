@@ -178,6 +178,78 @@ curl -X POST "http://72.61.197.178:8083/send-message" \
 {"error": "Missing group_jid or message", "success": false}
 ```
 
+## Bridge Health & Auto-Recovery
+
+The Go WhatsApp Bridge can disconnect from WhatsApp servers due to:
+- Network issues
+- WhatsApp server-side timeouts
+- Long idle periods
+
+### Health Check Script
+
+Location: `/opt/wa-healthcheck.sh` on VPS (72.61.197.178)
+
+Runs every 5 minutes via cron and checks:
+1. **Sender** (8081): `curl http://localhost:8081/health | jq '.connected'`
+2. **Bridge** (8083): `curl http://localhost:8083/health | jq '.connected'`
+
+If either shows `connected: false`, the service is restarted automatically.
+
+### Manual Health Check
+
+```bash
+# Check bridge status
+curl -s http://72.61.197.178:8083/health | jq '{connected, status}'
+
+# Check sender status
+curl -s http://72.61.197.178:8081/health | jq '{connected, status}'
+
+# If disconnected, restart manually
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
+```
+
+### Troubleshooting Missed Acks
+
+If DR submissions aren't getting acknowledgment messages:
+
+1. **Check bridge connection:**
+   ```bash
+   curl -s http://72.61.197.178:8083/health | jq '.connected'
+   # false = disconnected
+   ```
+
+2. **Check bridge logs:**
+   ```bash
+   ssh root@72.61.197.178 "tail -50 /opt/whatsapp-bridge/bridge.log"
+   # Look for: "websocket not connected" or "EOF" errors
+   ```
+
+3. **Restart if needed:**
+   ```bash
+   ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
+   ```
+
+4. **Send delayed acks manually:**
+   ```bash
+   curl -s -X POST "http://72.61.197.178:8083/api/send" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "recipient": "GROUP_JID@g.us",
+       "message": "📸 *DR123456 Received!*\n\n(Delayed ack)",
+       "mention_jid": "USER_JID@s.whatsapp.net"
+     }'
+   ```
+
+### Group JIDs Reference
+
+| Group | JID |
+|-------|-----|
+| Lawley | `120363418298130331@g.us` |
+| Mohadin | `120363421532174586@g.us` |
+| Mamelodi | `120363408849234743@g.us` |
+| Marketing Activations | `120363422808656601@g.us` |
+| Velo Server | `120363423864087150@g.us` |
+
 ## Related Commits
 
 - `546f3c77` - fix(whatsapp): display user name instead of raw JID in @mentions
