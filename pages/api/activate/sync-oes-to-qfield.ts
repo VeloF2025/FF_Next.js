@@ -5,13 +5,21 @@
  * Method: POST
  *
  * This endpoint:
- * 1. Fetches OES data from database
- * 2. Converts to GeoJSON with drop number labels
- * 3. Uploads to QFieldCloud via /files/ API as "OES FF DD-MM-YYYY.geojson" (date from import)
- * 4. Syncs to all sync-enabled projects (or specific project if provided)
+ * 1. Fetches OES data from database with BOTH OES and planned coordinates
+ * 2. Filters to valid South Africa bounding box coordinates
+ * 3. Creates features with point_type='oes' (from Nokia) and point_type='planned' (from SOW)
+ * 4. Uploads to QFieldCloud as "OES FF DD-MM-YYYY.geojson" (dated file, persists)
+ * 5. Syncs to all sync-enabled projects (or specific project if provided)
  *
- * Note: The GeoJSON file needs to be manually added as a layer in QGIS project
- * after first sync to configure styling. Subsequent syncs update the data.
+ * Feature Properties:
+ * - point_type: 'oes' or 'planned' - use for styling/filtering in QField
+ * - label: drop_number - use for labeling
+ *
+ * QField Styling:
+ * - Use categorized renderer on point_type field
+ * - OES points: pink circles
+ * - Planned points: blue circles
+ * - Enable labels using the 'label' field
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -57,7 +65,15 @@ async function getSyncTargetProjectIds(specificProjectId?: string): Promise<stri
   return [FALLBACK_PROJECT_ID];
 }
 
-interface OESPoint {
+// South Africa bounding box for coordinate validation
+const SA_BOUNDS = {
+  minLat: -35,
+  maxLat: -22,
+  minLon: 16,
+  maxLon: 33,
+};
+
+interface OESPointWithPlanned {
   drop_number: string;
   serial_number: string;
   activation_date: string;
@@ -65,9 +81,15 @@ interface OESPoint {
   ont_rx_sig_dbm: number;
   current_ont_rx: number;
   status: string;
-  latitude: number;
-  longitude: number;
+  // OES coordinates (from Nokia report)
+  oes_latitude: number;
+  oes_longitude: number;
+  // Planned coordinates (from drops/SOW table)
+  planned_latitude: number | null;
+  planned_longitude: number | null;
 }
+
+type PointType = 'oes' | 'planned';
 
 interface GeoJSONFeature {
   type: 'Feature';
@@ -83,6 +105,7 @@ interface GeoJSONFeature {
     ont_rx_sig_dbm: number;
     current_ont_rx: number;
     status: string;
+    point_type: PointType; // 'oes' or 'planned' - for filtering/styling in QField
     label: string; // For displaying drop number on map
   };
 }
@@ -333,7 +356,8 @@ async function handler(
       targetProjectIds, reportDate, teamFilter,
     });
 
-    // Step 1: Fetch OES data from database (once for all projects)
+    // Step 1: Fetch OES data with BOTH OES coords and planned coords from drops table
+    // Filter to South Africa bounding box to exclude invalid coordinates
     let query = `
       SELECT
         oes.drop_number,
@@ -343,13 +367,19 @@ async function handler(
         oes.ont_rx_sig_dbm,
         oes.current_ont_rx,
         oes.status,
-        oes.latitude,
-        oes.longitude
+        oes.latitude AS oes_latitude,
+        oes.longitude AS oes_longitude,
+        d.latitude AS planned_latitude,
+        d.longitude AS planned_longitude
       FROM oes_activations oes
+      LEFT JOIN drops d ON oes.drop_id = d.id
       WHERE oes.latitude IS NOT NULL
         AND oes.longitude IS NOT NULL
         AND oes.latitude != 0
         AND oes.longitude != 0
+        -- Filter to South Africa bounding box
+        AND oes.latitude BETWEEN ${SA_BOUNDS.minLat} AND ${SA_BOUNDS.maxLat}
+        AND oes.longitude BETWEEN ${SA_BOUNDS.minLon} AND ${SA_BOUNDS.maxLon}
     `;
 
     const queryParams: any[] = [];
@@ -376,9 +406,9 @@ async function handler(
     query += ' ORDER BY oes.drop_number';
 
     const result = await pool.query(query, queryParams);
-    const oesPoints: OESPoint[] = result.rows;
+    const oesPoints: OESPointWithPlanned[] = result.rows;
 
-    log.info('OESSync', `Found ${oesPoints.length} OES points with valid coordinates`);
+    log.info('OESSync', `Found ${oesPoints.length} OES points with valid SA coordinates`);
 
     if (oesPoints.length === 0) {
       return res.status(200).json({
@@ -388,25 +418,66 @@ async function handler(
       });
     }
 
-    // Step 2: Convert to GeoJSON with labels (once for all projects)
+    // Step 2: Convert to GeoJSON with BOTH OES and Planned coordinates
+    // Each DR gets two points: one at OES coords (pink), one at planned coords (blue)
     // IMPORTANT: Coordinates must be numbers, not strings (GeoJSON spec requirement)
-    const features: GeoJSONFeature[] = oesPoints.map(point => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [Number(point.longitude), Number(point.latitude)] // GeoJSON uses [lon, lat] as NUMBERS
-      },
-      properties: {
-        drop_number: point.drop_number,
-        serial_number: point.serial_number,
-        activation_date: point.activation_date,
-        team: point.team,
-        ont_rx_sig_dbm: point.ont_rx_sig_dbm || -40,
-        current_ont_rx: point.current_ont_rx || -40,
-        status: point.status,
-        label: point.drop_number // This is what will be displayed on the map
+    const features: GeoJSONFeature[] = [];
+
+    for (const point of oesPoints) {
+      // Always add OES point (from Nokia report)
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [Number(point.oes_longitude), Number(point.oes_latitude)]
+        },
+        properties: {
+          drop_number: point.drop_number,
+          serial_number: point.serial_number,
+          activation_date: point.activation_date,
+          team: point.team,
+          ont_rx_sig_dbm: point.ont_rx_sig_dbm || -40,
+          current_ont_rx: point.current_ont_rx || -40,
+          status: point.status,
+          point_type: 'oes',
+          label: point.drop_number
+        }
+      });
+
+      // Add Planned point if coordinates exist and are valid
+      if (
+        point.planned_latitude != null &&
+        point.planned_longitude != null &&
+        point.planned_latitude !== 0 &&
+        point.planned_longitude !== 0 &&
+        point.planned_latitude >= SA_BOUNDS.minLat &&
+        point.planned_latitude <= SA_BOUNDS.maxLat &&
+        point.planned_longitude >= SA_BOUNDS.minLon &&
+        point.planned_longitude <= SA_BOUNDS.maxLon
+      ) {
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [Number(point.planned_longitude), Number(point.planned_latitude)]
+          },
+          properties: {
+            drop_number: point.drop_number,
+            serial_number: point.serial_number,
+            activation_date: point.activation_date,
+            team: point.team,
+            ont_rx_sig_dbm: point.ont_rx_sig_dbm || -40,
+            current_ont_rx: point.current_ont_rx || -40,
+            status: point.status,
+            point_type: 'planned',
+            label: point.drop_number
+          }
+        });
       }
-    }));
+    }
+
+    const oesCount = features.filter(f => f.properties.point_type === 'oes').length;
+    const plannedCount = features.filter(f => f.properties.point_type === 'planned').length;
 
     const geojson: GeoJSONFeatureCollection = {
       type: 'FeatureCollection',
@@ -419,7 +490,7 @@ async function handler(
       }
     };
 
-    log.info('OESSync', `Created GeoJSON with ${features.length} features`);
+    log.info('OESSync', `Created GeoJSON with ${features.length} features (${oesCount} OES, ${plannedCount} Planned)`);
 
     // Get the report date for the filename
     // Priority: 1) reportDate from request, 2) latest import batch report_date, 3) today
@@ -481,6 +552,8 @@ async function handler(
       success: successCount > 0,
       message: `OES data synced to ${successCount}/${targetProjectIds.length} QField project(s)${failCount > 0 ? ` (${failCount} failed)` : ''}`,
       totalPoints: features.length,
+      oesPoints: oesCount,
+      plannedPoints: plannedCount,
       syncResults,
       filename: oesFilename,
     });
