@@ -63,6 +63,8 @@ export function QuoteScannerModal({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExtractQuoteResponse | null>(null);
+  const [isCreatingQuote, setIsCreatingQuote] = useState(false);
+  const [quoteCreated, setQuoteCreated] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -79,6 +81,8 @@ export function QuoteScannerModal({
       setError(null);
       setResult(null);
       setIsProcessing(false);
+      setIsCreatingQuote(false);
+      setQuoteCreated(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -219,6 +223,32 @@ export function QuoteScannerModal({
     }
     onClose();
   }, [previewUrl, onClose]);
+
+  // Handle creating quote from extraction
+  const handleCreateQuote = useCallback(async () => {
+    if (!result?.extractionId) return;
+
+    setIsCreatingQuote(true);
+    try {
+      const response = await fetch('/api/procurement/quotes/create-from-extraction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ extractionId: result.extractionId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create quote');
+      }
+
+      setQuoteCreated(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create quote');
+    } finally {
+      setIsCreatingQuote(false);
+    }
+  }, [result?.extractionId]);
 
   if (!isOpen) return null;
 
@@ -382,11 +412,13 @@ export function QuoteScannerModal({
             <div className="text-center py-8">
               <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-6" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Extraction Complete!
+                {quoteCreated ? 'Quote Created!' : 'Extraction Complete!'}
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Successfully extracted {result.extraction.lineItems?.length || 0} line items
-                {result.matching && ` (${result.matching.totalMatched} matched to RFQ)`}
+                {quoteCreated
+                  ? 'The quote has been added to this RFQ'
+                  : `Successfully extracted ${result.extraction.lineItems?.length || 0} line items${result.matching ? ` (${result.matching.totalMatched} matched to RFQ)` : ''}`
+                }
               </p>
 
               {/* Summary */}
@@ -434,9 +466,11 @@ export function QuoteScannerModal({
                 </div>
               )}
 
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Click "Done" to review and edit the extracted data
-              </p>
+              {!quoteCreated && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Click "Create Quote" to add this quote to the RFQ
+                </p>
+              )}
             </div>
           )}
 
@@ -478,7 +512,20 @@ export function QuoteScannerModal({
             </Button>
           )}
 
-          {step === 'complete' && (
+          {step === 'complete' && !quoteCreated && (
+            <Button onClick={handleCreateQuote} disabled={isCreatingQuote}>
+              {isCreatingQuote ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Quote'
+              )}
+            </Button>
+          )}
+
+          {step === 'complete' && quoteCreated && (
             <Button onClick={handleClose}>
               Done
             </Button>
