@@ -34,6 +34,7 @@ export function DepartmentDetailDrawer({
   const [report, setReport] = useState<DepartmentReportType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReportLoading, setIsReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -73,13 +74,14 @@ export function DepartmentDetailDrawer({
     if (!departmentId) return;
 
     setIsReportLoading(true);
+    setReportError(null);
     try {
       const res = await fetch(`/api/departments/${departmentId}/report`);
       if (!res.ok) throw new Error('Failed to fetch report');
       const data = await res.json();
       setReport(data.data);
-    } catch {
-      // Ignore errors - report is optional
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : 'Failed to load report');
     } finally {
       setIsReportLoading(false);
     }
@@ -334,7 +336,18 @@ export function DepartmentDetailDrawer({
                 )}
 
                 {activeTab === 'report' && (
-                  <DepartmentReport report={report!} isLoading={isReportLoading} />
+                  isReportLoading ? (
+                    <DepartmentReport report={{} as DepartmentReportType} isLoading={true} />
+                  ) : report ? (
+                    <DepartmentReport report={report} isLoading={false} />
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-red-400 mb-2">{reportError || 'Failed to load report'}</p>
+                      <Button onClick={fetchReport} variant="outline">
+                        Retry
+                      </Button>
+                    </div>
+                  )
                 )}
               </div>
             </>
