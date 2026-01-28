@@ -212,10 +212,13 @@ export function QuoteScannerModal({
 
       setProgress(70);
 
-      const data = await response.json();
+      const responseData = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || data.error || 'Extraction failed');
+      // API wraps response in data property
+      const data = responseData.data || responseData;
+
+      if (!response.ok || !responseData.success) {
+        throw new Error(data.message || responseData.error?.message || 'Extraction failed');
       }
 
       setProgress(100);
@@ -229,7 +232,7 @@ export function QuoteScannerModal({
         quoteDate: extraction.quoteInfo?.quoteDate || new Date().toISOString().split('T')[0],
         validUntil: extraction.quoteInfo?.validUntil || '',
         subtotal: extraction.totals?.subtotal?.toString() || '',
-        vatAmount: extraction.totals?.vat?.toString() || '',
+        vatAmount: extraction.totals?.vatAmount?.toString() || '',
         total: extraction.totals?.total?.toString() || '',
         currency: extraction.totals?.currency || 'ZAR',
         paymentTerms: extraction.quoteInfo?.paymentTerms || '',
