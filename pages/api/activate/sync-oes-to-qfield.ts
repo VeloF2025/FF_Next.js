@@ -7,7 +7,7 @@
  * This endpoint:
  * 1. Fetches OES data from database
  * 2. Converts to GeoJSON with drop number labels
- * 3. Uploads to QFieldCloud via /files/ API as "OES FF YYMMDD.geojson"
+ * 3. Uploads to QFieldCloud via /files/ API as "OES FF DD-MM-YYYY.geojson"
  * 4. Syncs to all sync-enabled projects (or specific project if provided)
  *
  * Note: The GeoJSON file needs to be manually added as a layer in QGIS project
@@ -259,15 +259,15 @@ async function deleteFileFromQFieldCloud(
 }
 
 /**
- * Generate OES Report filename with date: "OES FF YYMMDD.geojson"
- * Example: "OES FF 260127.geojson" for Jan 27, 2026
+ * Generate OES Report filename with date: "OES FF DD-MM-YYYY.geojson"
+ * Example: "OES FF 28-01-2026.geojson" for Jan 28, 2026
  */
 function getOESReportFilename(): string {
   const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
+  const yyyy = String(now.getFullYear());
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
-  return `OES FF ${yy}${mm}${dd}.geojson`;
+  return `OES FF ${dd}-${mm}-${yyyy}.geojson`;
 }
 
 /**
@@ -421,7 +421,7 @@ async function handler(
 
     log.info('OESSync', `Created GeoJSON with ${features.length} features`);
 
-    // Generate filename with today's date: "OES FF YYMMDD.geojson"
+    // Generate filename with today's date: "OES FF DD-MM-YYYY.geojson"
     const oesFilename = getOESReportFilename();
     log.info('OESSync', `Using filename: ${oesFilename}`);
 

@@ -141,7 +141,7 @@ coordinates: [Number(point.longitude), Number(point.latitude)]  // [18.67, -34.0
 - Zero points render on map
 - File size is correct
 
-**OES Filename Convention:** `OES FF YYMMDD.geojson` (e.g., `OES FF 260127.geojson`)
+**OES Filename Convention:** `OES FF DD-MM-YYYY.geojson` (e.g., `OES FF 28-01-2026.geojson`)
 
 ## File Upload (OES Sync)
 
