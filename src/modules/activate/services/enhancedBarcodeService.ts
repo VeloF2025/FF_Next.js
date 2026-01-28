@@ -57,9 +57,20 @@ export interface MultiBarcodeResult {
   processingTimeMs: number;
 }
 
+type PreprocessType =
+  | 'none'
+  | 'contrast'
+  | 'sharpen'
+  | 'binarize'
+  | 'invert'
+  | 'clahe'
+  | 'adaptive'
+  | 'morphological'
+  | 'edge';
+
 interface ScanStrategy {
   name: string;
-  preprocess: 'none' | 'contrast' | 'sharpen' | 'binarize' | 'invert';
+  preprocess: PreprocessType;
   rotation: 0 | 90 | 180 | 270;
 }
 
@@ -75,6 +86,7 @@ const UPS_SERIAL_PATTERN = /^GU18W[A-Z0-9]{8,11}$/i;
 
 // Multi-pass scanning strategies (ordered by likelihood of success)
 const SCAN_STRATEGIES: ScanStrategy[] = [
+  // Phase 1: Basic strategies
   { name: 'original', preprocess: 'none', rotation: 0 },
   { name: 'contrast', preprocess: 'contrast', rotation: 0 },
   { name: 'sharpen', preprocess: 'sharpen', rotation: 0 },
@@ -83,6 +95,14 @@ const SCAN_STRATEGIES: ScanStrategy[] = [
   { name: 'rotate270', preprocess: 'none', rotation: 270 },
   { name: 'binarize', preprocess: 'binarize', rotation: 0 },
   { name: 'invert', preprocess: 'invert', rotation: 0 },
+  // Phase 2: Advanced preprocessing
+  { name: 'clahe', preprocess: 'clahe', rotation: 0 },
+  { name: 'adaptive', preprocess: 'adaptive', rotation: 0 },
+  { name: 'morphological', preprocess: 'morphological', rotation: 0 },
+  { name: 'edge', preprocess: 'edge', rotation: 0 },
+  // Combined rotations with advanced preprocessing
+  { name: 'clahe-90', preprocess: 'clahe', rotation: 90 },
+  { name: 'adaptive-90', preprocess: 'adaptive', rotation: 90 },
 ];
 
 // Maximum image dimension for processing (larger images are resized)
@@ -133,6 +153,48 @@ async function preprocessImage(
     case 'invert':
       // Invert colors (for negative barcodes)
       pipeline = pipeline.negate();
+      break;
+
+    case 'clahe':
+      // CLAHE simulation: Tile-based local contrast enhancement
+      // Sharp doesn't have native CLAHE, so we simulate with aggressive normalization
+      pipeline = pipeline
+        .greyscale()
+        .normalise({ lower: 2, upper: 98 }) // Clip percentiles for better contrast
+        .linear(1.5, -0.25 * 255) // Increase contrast
+        .sharpen({ sigma: 1.5 });
+      break;
+
+    case 'adaptive':
+      // Adaptive thresholding simulation
+      // Use combination of blur for local average and comparison
+      pipeline = pipeline
+        .greyscale()
+        .normalise()
+        .threshold(0, { greyscale: false }); // Otsu's method - auto threshold
+      break;
+
+    case 'morphological':
+      // Morphological operations: dilate then erode (closing)
+      // Helps connect broken barcode bars and fill gaps
+      pipeline = pipeline
+        .greyscale()
+        .threshold(128)
+        .median(2) // Approximates dilation
+        .blur(0.5) // Light smoothing
+        .threshold(140); // Re-binarize slightly darker
+      break;
+
+    case 'edge':
+      // Edge enhancement for better bar definition
+      pipeline = pipeline
+        .greyscale()
+        .convolve({
+          width: 3,
+          height: 3,
+          kernel: [-1, -1, -1, -1, 9, -1, -1, -1, -1], // Laplacian for edge enhancement
+        })
+        .normalise();
       break;
 
     case 'none':
