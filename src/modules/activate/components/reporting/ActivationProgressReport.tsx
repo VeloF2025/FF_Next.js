@@ -161,27 +161,9 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     })).filter(project => project.zones.length > 0);
   }, [data?.hierarchy, hideZeroValues]);
 
-  // Recalculate summary when filtering
-  const filteredSummary = useMemo(() => {
-    if (!data?.summary) return null;
-    if (!hideZeroValues) return data.summary;
-
-    // Recalculate totals from filtered flat data
-    const totalScope = sortedFlat.reduce((sum, row) => sum + row.total_scope, 0);
-    const totalActivated = sortedFlat.reduce((sum, row) => sum + row.activated, 0);
-    const totalRemaining = totalScope - totalActivated;
-    const completionPercent = totalScope > 0
-      ? Math.round((totalActivated / totalScope) * 10000) / 100
-      : 0;
-
-    return {
-      ...data.summary,
-      total_scope: totalScope,
-      total_activated: totalActivated,
-      total_remaining: totalRemaining,
-      completion_percent: completionPercent,
-    };
-  }, [data?.summary, sortedFlat, hideZeroValues]);
+  // Summary always shows full totals - Hide Zero only affects displayed zones/PONs
+  // Total Scope = all DRs in scope, Activated = all activated DRs
+  const filteredSummary = data?.summary ?? null;
 
   // Handle sort click
   const handleSort = (field: SortField) => {
