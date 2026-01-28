@@ -16,7 +16,7 @@ const logger = createLogger('StaffComplianceAPI');
 // Note: Some types have alternatives (e.g., sa_id OR passport for ID requirement)
 const REQUIRED_DOCUMENTS = [
   { type: 'id_document', alternativeTypes: ['sa_id', 'passport'], label: 'ID Document / Passport', required: true },
-  { type: 'employment_contract', alternativeTypes: [], label: 'Employment Contract', required: true },
+  { type: 'employment_contract', alternativeTypes: [], label: 'Employment / IC Agreement', required: true },
   { type: 'bank_details', alternativeTypes: ['bank_statement'], label: 'Bank Confirmation Letter', required: true },
   { type: 'tax_document', alternativeTypes: [], label: 'Tax Document (IRP5/IT3a)', required: false },
   { type: 'police_clearance', alternativeTypes: [], label: 'Police Clearance', required: false },

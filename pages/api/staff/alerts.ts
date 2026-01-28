@@ -43,6 +43,7 @@ interface ComplianceStats {
   withVerifiedPassport: number;
   withVerifiedLicense: number;
   withVerifiedBankDetails: number;
+  withVerifiedContract: number;
   withDob: number;
   missingDocuments: Array<{
     staffId: string;
@@ -305,21 +306,30 @@ async function getComplianceStats(): Promise<ComplianceStats> {
       COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'sa_id' AND verification_status = 'verified') as verified_id,
       COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'passport' AND verification_status = 'verified') as verified_passport,
       COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'drivers_license' AND verification_status = 'verified') as verified_license,
-      COUNT(DISTINCT staff_id) FILTER (WHERE document_type IN ('bank_details', 'bank_statement') AND verification_status = 'verified') as verified_bank
+      COUNT(DISTINCT staff_id) FILTER (WHERE document_type IN ('bank_details', 'bank_statement') AND verification_status = 'verified') as verified_bank,
+      COUNT(DISTINCT staff_id) FILTER (WHERE document_type = 'employment_contract' AND verification_status = 'verified') as verified_contract
     FROM staff_documents
   `;
 
-  // Find staff missing key documents
+  // Find staff missing key documents (including employment contract/IC agreement)
   const missingDocs = await sql`
+    WITH staff_contracts AS (
+      SELECT DISTINCT staff_id
+      FROM staff_documents
+      WHERE document_type = 'employment_contract'
+        AND verification_status IN ('verified', 'pending')
+    )
     SELECT
       s.id,
       s.name,
       CASE WHEN s.sa_id_number IS NULL THEN 'SA ID' END as missing_id,
       CASE WHEN s.bank_account_number IS NULL THEN 'Bank Details' END as missing_bank,
-      CASE WHEN s.date_of_birth IS NULL THEN 'Date of Birth' END as missing_dob
+      CASE WHEN s.date_of_birth IS NULL THEN 'Date of Birth' END as missing_dob,
+      CASE WHEN sc.staff_id IS NULL THEN 'Contract (Employment/IC)' END as missing_contract
     FROM staff s
+    LEFT JOIN staff_contracts sc ON sc.staff_id = s.id
     WHERE (s.status = 'active' OR s.is_active = true)
-      AND (s.sa_id_number IS NULL OR s.bank_account_number IS NULL OR s.date_of_birth IS NULL)
+      AND (s.sa_id_number IS NULL OR s.bank_account_number IS NULL OR s.date_of_birth IS NULL OR sc.staff_id IS NULL)
     LIMIT 50
   `;
 
@@ -328,6 +338,7 @@ async function getComplianceStats(): Promise<ComplianceStats> {
     if (row.missing_id) missingTypes.push(row.missing_id as string);
     if (row.missing_bank) missingTypes.push(row.missing_bank as string);
     if (row.missing_dob) missingTypes.push(row.missing_dob as string);
+    if (row.missing_contract) missingTypes.push(row.missing_contract as string);
     return {
       staffId: row.id as string,
       staffName: row.name as string,
@@ -335,7 +346,7 @@ async function getComplianceStats(): Promise<ComplianceStats> {
     };
   });
 
-  // Calculate compliance percentage (staff with verified ID + bank details)
+  // Calculate compliance percentage (staff with verified ID + bank details + contract)
   const withVerifiedId = Math.max(
     parseInt(statsResult.with_id as string),
     parseInt(verifiedDocs.verified_id as string)
@@ -344,9 +355,11 @@ async function getComplianceStats(): Promise<ComplianceStats> {
     parseInt(statsResult.with_bank as string),
     parseInt(verifiedDocs.verified_bank as string)
   );
+  const withVerifiedContract = parseInt(verifiedDocs.verified_contract as string) || 0;
 
+  // Compliance is based on 3 required items: ID, Bank Details, Employment Contract
   const compliancePercentage = totalStaff > 0
-    ? Math.round(((withVerifiedId + withVerifiedBank) / (totalStaff * 2)) * 100)
+    ? Math.round(((withVerifiedId + withVerifiedBank + withVerifiedContract) / (totalStaff * 3)) * 100)
     : 0;
 
   return {
@@ -361,6 +374,7 @@ async function getComplianceStats(): Promise<ComplianceStats> {
       parseInt(verifiedDocs.verified_license as string)
     ),
     withVerifiedBankDetails: withVerifiedBank,
+    withVerifiedContract,
     withDob: parseInt(statsResult.with_dob as string),
     missingDocuments,
     compliancePercentage,

@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Users,
   FileCheck,
+  FileText,
   CreditCard,
   Calendar,
   ExternalLink,
@@ -27,6 +28,7 @@ interface ComplianceStats {
   withVerifiedPassport: number;
   withVerifiedLicense: number;
   withVerifiedBankDetails: number;
+  withVerifiedContract: number;
   withDob: number;
   missingDocuments: Array<{
     staffId: string;
@@ -158,7 +160,7 @@ export default function StaffCompliancePage() {
           </Card>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
@@ -220,6 +222,24 @@ export default function StaffCompliancePage() {
                       {compliance.withVerifiedBankDetails}
                       <span className="text-xs text-[var(--ff-text-secondary)] ml-1">
                         ({getPercentage(compliance.withVerifiedBankDetails, compliance.totalStaff)}%)
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-orange-500/20">
+                    <FileText className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">Contract</p>
+                    <p className="text-xl font-bold text-[var(--ff-text-primary)]">
+                      {compliance.withVerifiedContract || 0}
+                      <span className="text-xs text-[var(--ff-text-secondary)] ml-1">
+                        ({getPercentage(compliance.withVerifiedContract || 0, compliance.totalStaff)}%)
                       </span>
                     </p>
                   </div>
