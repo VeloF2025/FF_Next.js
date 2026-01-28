@@ -91,6 +91,12 @@ export function QuoteScannerModal({
     deliveryTerms: '',
   });
 
+  // Supplier selection state
+  const [existingSuppliers, setExistingSuppliers] = useState<Array<{ id: string; name: string; company_name: string }>>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>('new'); // 'new' or supplier ID
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  const [matchedSupplier, setMatchedSupplier] = useState<{ id: string; name: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const prevIsOpenRef = useRef(false);
@@ -215,8 +221,8 @@ export function QuoteScannerModal({
       setProgress(100);
       setResult(data);
 
-      // Populate editable data from extraction
-      const extraction = data.extraction;
+      // Populate editable data from extraction (with null safety)
+      const extraction = data.extraction || {};
       setEditableData({
         supplierName: extraction.supplier?.name || '',
         quoteNumber: extraction.quoteInfo?.quoteNumber || '',
@@ -230,7 +236,37 @@ export function QuoteScannerModal({
         deliveryTerms: extraction.quoteInfo?.deliveryTerms || '',
       });
 
-      // Go to review step instead of auto-creating
+      // Fetch suppliers and check for matches
+      setIsLoadingSuppliers(true);
+      try {
+        const suppliersRes = await fetch('/api/suppliers?limit=100&status=active');
+        if (suppliersRes.ok) {
+          const suppliersData = await suppliersRes.json();
+          const suppliers = suppliersData.data?.suppliers || suppliersData.suppliers || [];
+          setExistingSuppliers(suppliers);
+
+          // Try to find a matching supplier by name
+          const extractedName = (extraction.supplier?.name || '').toLowerCase();
+          if (extractedName) {
+            const match = suppliers.find((s: any) =>
+              s.company_name?.toLowerCase().includes(extractedName) ||
+              s.name?.toLowerCase().includes(extractedName) ||
+              extractedName.includes(s.company_name?.toLowerCase() || '') ||
+              extractedName.includes(s.name?.toLowerCase() || '')
+            );
+            if (match) {
+              setMatchedSupplier({ id: match.id, name: match.company_name || match.name });
+              setSelectedSupplierId(match.id);
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore supplier fetch errors
+      } finally {
+        setIsLoadingSuppliers(false);
+      }
+
+      // Go to review step
       setStep('review');
 
     } catch (err) {
@@ -268,8 +304,8 @@ export function QuoteScannerModal({
     if (!result?.extractionId) return;
 
     // Validate required fields
-    if (!editableData.supplierName?.trim()) {
-      setError('Supplier name is required');
+    if (selectedSupplierId === 'new' && !editableData.supplierName?.trim()) {
+      setError('Supplier name is required when creating a new supplier');
       return;
     }
     if (!editableData.total || parseFloat(editableData.total) <= 0) {
@@ -285,9 +321,11 @@ export function QuoteScannerModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           extractionId: result.extractionId,
+          // Pass existing supplier ID if selected
+          supplierId: selectedSupplierId !== 'new' ? selectedSupplierId : undefined,
           // Override with user-edited data
           overrides: {
-            supplierName: editableData.supplierName.trim(),
+            supplierName: selectedSupplierId === 'new' ? editableData.supplierName.trim() : undefined,
             quoteNumber: editableData.quoteNumber?.trim() || undefined,
             quoteDate: editableData.quoteDate || undefined,
             validUntil: editableData.validUntil || undefined,
@@ -317,7 +355,7 @@ export function QuoteScannerModal({
     } finally {
       setIsCreatingQuote(false);
     }
-  }, [result, editableData, onExtractionComplete]);
+  }, [result, editableData, selectedSupplierId, onExtractionComplete]);
 
   if (!isOpen) return null;
 
@@ -500,20 +538,88 @@ export function QuoteScannerModal({
                 </div>
               )}
 
+              {/* Supplier Selection */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                  Supplier: {editableData.supplierName || 'Not detected'}
+                </h4>
+
+                {matchedSupplier && (
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-green-100 dark:bg-green-900/30 rounded">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-700 dark:text-green-400">
+                      Found matching supplier: <strong>{matchedSupplier.name}</strong>
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="supplierChoice"
+                      value="new"
+                      checked={selectedSupplierId === 'new'}
+                      onChange={() => setSelectedSupplierId('new')}
+                      className="text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Create new supplier: <strong>{editableData.supplierName || '(enter name below)'}</strong>
+                    </span>
+                  </label>
+
+                  {existingSuppliers.length > 0 && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="supplierChoice"
+                        value="existing"
+                        checked={selectedSupplierId !== 'new'}
+                        onChange={() => setSelectedSupplierId(matchedSupplier?.id || existingSuppliers[0]?.id || 'new')}
+                        className="text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Link to existing supplier:
+                      </span>
+                      <select
+                        value={selectedSupplierId !== 'new' ? selectedSupplierId : ''}
+                        onChange={(e) => setSelectedSupplierId(e.target.value)}
+                        disabled={selectedSupplierId === 'new'}
+                        className="flex-1 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+                      >
+                        <option value="">Select supplier...</option>
+                        {existingSuppliers.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.company_name || s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+
+                {selectedSupplierId === 'new' && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      New Supplier Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={editableData.supplierName}
+                      onChange={(e) => setEditableData(prev => ({ ...prev, supplierName: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Enter supplier name"
+                    />
+                  </div>
+                )}
+
+                {isLoadingSuppliers && (
+                  <p className="text-xs text-gray-500 mt-2">Loading suppliers...</p>
+                )}
+              </div>
+
               {/* Editable Fields */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Supplier Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={editableData.supplierName}
-                    onChange={(e) => setEditableData(prev => ({ ...prev, supplierName: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="Enter supplier name"
-                  />
-                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -807,7 +913,7 @@ export function QuoteScannerModal({
               </Button>
               <Button
                 onClick={handleCreateQuote}
-                disabled={isCreatingQuote || !editableData.supplierName || !editableData.total}
+                disabled={isCreatingQuote || (selectedSupplierId === 'new' && !editableData.supplierName?.trim()) || !editableData.total}
               >
                 {isCreatingQuote ? (
                   <>
