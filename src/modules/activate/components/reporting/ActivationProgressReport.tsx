@@ -534,15 +534,18 @@ function ProgressStats({ total, activated, percent, small }: ProgressStatsProps)
       <div className={`${barWidth} h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden`}>
         <div
           className={`h-full transition-all duration-300 ${
-            percent >= 90 ? 'bg-green-500' : percent >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+            percent > 80 ? 'bg-green-500' :
+            percent >= 60 ? 'bg-blue-500' :
+            percent >= 40 ? 'bg-orange-500' : 'bg-red-500'
           }`}
           style={{ width: `${Math.min(percent, 100)}%` }}
         />
       </div>
       <span className={`${textSize} font-medium ${
-        percent >= 90 ? 'text-green-600 dark:text-green-400' :
-        percent >= 50 ? 'text-blue-600 dark:text-blue-400' :
-        'text-orange-600 dark:text-orange-400'
+        percent > 80 ? 'text-green-600 dark:text-green-400' :
+        percent >= 60 ? 'text-blue-600 dark:text-blue-400' :
+        percent >= 40 ? 'text-orange-600 dark:text-orange-400' :
+        'text-red-600 dark:text-red-400'
       }`}>
         {percent}%
       </span>
@@ -616,16 +619,18 @@ function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps)
                     <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                       <div
                         className={`h-full ${
-                          row.completion_percent >= 90 ? 'bg-green-500' :
-                          row.completion_percent >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                          row.completion_percent > 80 ? 'bg-green-500' :
+                          row.completion_percent >= 60 ? 'bg-blue-500' :
+                          row.completion_percent >= 40 ? 'bg-orange-500' : 'bg-red-500'
                         }`}
                         style={{ width: `${Math.min(row.completion_percent, 100)}%` }}
                       />
                     </div>
                     <span className={`text-sm font-medium ${
-                      row.completion_percent >= 90 ? 'text-green-600 dark:text-green-400' :
-                      row.completion_percent >= 50 ? 'text-blue-600 dark:text-blue-400' :
-                      'text-orange-600 dark:text-orange-400'
+                      row.completion_percent > 80 ? 'text-green-600 dark:text-green-400' :
+                      row.completion_percent >= 60 ? 'text-blue-600 dark:text-blue-400' :
+                      row.completion_percent >= 40 ? 'text-orange-600 dark:text-orange-400' :
+                      'text-red-600 dark:text-red-400'
                     }`}>
                       {row.completion_percent}%
                     </span>
