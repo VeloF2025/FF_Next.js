@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { AlertCircle, Clock } from 'lucide-react';
 import {
   StaffFormData,
@@ -29,6 +30,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+interface DepartmentOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface EmploymentEditSectionProps {
   formData: StaffFormData;
   handleInputChange: (field: keyof StaffFormData, value: unknown) => void;
@@ -41,6 +48,27 @@ const selectTriggerClasses = "w-full h-10 px-3 py-2 bg-[var(--ff-bg-tertiary)] t
 
 export function EmploymentEditSection({ formData, handleInputChange, toggleSkill }: EmploymentEditSectionProps) {
   const { data: staffList } = useStaff();
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(true);
+
+  // Fetch departments from database
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await fetch('/api/departments');
+        if (res.ok) {
+          const data = await res.json();
+          setDepartments(data.data || []);
+        }
+      } catch (err) {
+        // Fallback to enum if API fails
+        console.error('Failed to fetch departments:', err);
+      } finally {
+        setIsLoadingDepartments(false);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   const availablePositions = formData.department
     ? getPositionsByDepartment(formData.department)
@@ -67,16 +95,27 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
             <Select
               value={formData.department || ''}
               onValueChange={(value) => handleInputChange('department', value)}
+              disabled={isLoadingDepartments}
             >
               <SelectTrigger className={selectTriggerClasses}>
-                <SelectValue placeholder="Select Department" />
+                <SelectValue placeholder={isLoadingDepartments ? "Loading..." : "Select Department"} />
               </SelectTrigger>
               <SelectContent>
-                {Object.values(StaffDepartment).map(dept => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept}
-                  </SelectItem>
-                ))}
+                {departments.length > 0 ? (
+                  // Use database departments
+                  departments.map(dept => (
+                    <SelectItem key={dept.id} value={dept.name}>
+                      {dept.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  // Fallback to enum if no departments loaded
+                  Object.values(StaffDepartment).map(dept => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
