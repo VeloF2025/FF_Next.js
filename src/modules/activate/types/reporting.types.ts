@@ -466,7 +466,8 @@ export type ReportCategory =
   | 'swaps'
   | 'mismatches'
   | 'gaps' // Installed but Not Activated - money spent, never went live
-  | 'progress'; // Activation Progress - Project > Zone > PON tracking
+  | 'progress' // Activation Progress - Project > Zone > PON tracking
+  | 'maturity'; // Maturity Tracking - time to reach milestones, velocity, projections
 
 // ============================================================================
 // SERIAL MISMATCH TRACKING TYPES (Installation vs Activation)
@@ -1288,4 +1289,176 @@ export interface ActivationProgressResponse {
   hierarchy: ProjectProgressNode[];
   flat: FlatProgressRow[];
   time_series: ActivationTimeSeriesPoint[];
+}
+
+// ============================================================================
+// MATURITY TRACKING REPORT TYPES (Uptake Velocity & Project Timeline)
+// ============================================================================
+
+/**
+ * Milestone completion data
+ */
+export interface MilestoneData {
+  /** Milestone percentage (e.g., 25, 50, 75, 90) */
+  percent: number;
+  /** Date milestone was reached (null if not yet reached) */
+  reached_date: string | null;
+  /** Days from first activation to reach this milestone */
+  days_to_reach: number | null;
+}
+
+/**
+ * Velocity metrics for uptake analysis
+ */
+export interface VelocityMetrics {
+  /** Activations per week over last 4 weeks */
+  last_4_weeks: number;
+  /** Activations per week over last 12 weeks */
+  last_12_weeks: number;
+  /** Activations per week all-time */
+  all_time: number;
+  /** Week-over-week change percentage */
+  wow_change_percent: number;
+  /** Trend direction */
+  trend: 'accelerating' | 'steady' | 'slowing' | 'stalled';
+}
+
+/**
+ * Projection data for completion estimate
+ */
+export interface ProjectionData {
+  /** Projected completion date at current velocity */
+  projected_completion_date: string | null;
+  /** Estimated days to completion */
+  days_to_completion: number | null;
+  /** Confidence level (based on velocity stability) */
+  confidence: 'high' | 'medium' | 'low' | 'unknown';
+  /** Weekly activations needed to hit target date (if set) */
+  required_weekly_rate: number | null;
+}
+
+/**
+ * PON-level maturity data
+ */
+export interface PonMaturityNode {
+  pon_no: number;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+  first_activation_date: string | null;
+  latest_activation_date: string | null;
+  age_days: number;
+  milestones: MilestoneData[];
+}
+
+/**
+ * Zone-level maturity data
+ */
+export interface ZoneMaturityNode {
+  zone_no: number;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+  first_activation_date: string | null;
+  latest_activation_date: string | null;
+  age_days: number;
+  milestones: MilestoneData[];
+  pons: PonMaturityNode[];
+}
+
+/**
+ * Project-level maturity data
+ */
+export interface ProjectMaturityNode {
+  project_id: string;
+  project_name: string;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+  first_activation_date: string | null;
+  latest_activation_date: string | null;
+  age_days: number;
+  milestones: MilestoneData[];
+  velocity: VelocityMetrics;
+  projection: ProjectionData;
+  zones: ZoneMaturityNode[];
+}
+
+/**
+ * Flat row for maturity table view
+ */
+export interface FlatMaturityRow {
+  project_id: string;
+  project_name: string;
+  zone_no: number;
+  pon_no: number;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+  first_activation_date: string | null;
+  latest_activation_date: string | null;
+  age_days: number;
+  milestones: MilestoneData[];
+  velocity: VelocityMetrics;
+  projection: ProjectionData;
+}
+
+/**
+ * Summary statistics for maturity tracking
+ */
+export interface MaturityTrackingSummary {
+  /** Total projects tracked */
+  total_projects: number;
+  /** Total scope across all projects */
+  total_scope: number;
+  /** Total activated across all projects */
+  total_activated: number;
+  /** Total remaining across all projects */
+  total_remaining: number;
+  /** Average completion percentage */
+  avg_completion_percent: number;
+  /** Oldest project age in days */
+  oldest_project_age_days: number;
+  /** Youngest project age in days */
+  youngest_project_age_days: number;
+  /** Average age (days since first activation) */
+  avg_age_days: number;
+  /** Average days to reach 25% */
+  avg_days_to_25_percent: number | null;
+  /** Average days to reach 50% */
+  avg_days_to_50_percent: number | null;
+  /** Average days to reach 75% */
+  avg_days_to_75_percent: number | null;
+  /** Average days to reach 90% */
+  avg_days_to_90_percent: number | null;
+  /** Projects not started (0%) */
+  projects_not_started: number;
+  /** Projects in early stage (0-25%) */
+  projects_early_stage: number;
+  /** Projects in mid progress (25-75%) */
+  projects_mid_progress: number;
+  /** Projects near complete (75-99%) */
+  projects_near_complete: number;
+  /** Projects complete (100%) */
+  projects_complete: number;
+}
+
+/**
+ * API Response for maturity tracking report
+ */
+export interface MaturityTrackingResponse {
+  /** As-of date for the report */
+  as_of_date: string;
+  /** Project filter (if any) */
+  project: string | null;
+  /** Summary statistics */
+  summary: MaturityTrackingSummary;
+  /** Hierarchical project data */
+  hierarchy: ProjectMaturityNode[];
+  /** Flat table data */
+  flat: FlatMaturityRow[];
 }

@@ -27,6 +27,7 @@ import {
   FileWarning,
   CircleDollarSign,
   Target,
+  Clock,
 } from 'lucide-react';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
@@ -41,6 +42,7 @@ import { SerialSwapReports } from './SerialSwapReports';
 import { SerialMismatchReports } from './SerialMismatchReports';
 import { InstallationGapsReports } from './InstallationGapsReports';
 import { ActivationProgressReport } from './ActivationProgressReport';
+import { MaturityTrackingReport } from './MaturityTrackingReport';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -103,6 +105,12 @@ const categories: CategoryTab[] = [
     label: 'Activation Progress',
     icon: Target,
     description: 'Track activation progress by Project > Zone > PON against total scope',
+  },
+  {
+    id: 'maturity',
+    label: 'Maturity Tracking',
+    icon: Clock,
+    description: 'Time from first installation to maturity - milestones, velocity, projections',
   },
 ];
 
@@ -443,6 +451,11 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'progress' && (
           <ActivationProgressReport filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'maturity' && (
+          <MaturityTrackingReport
+            projectId={filters.project}
+          />
         )}
       </div>
     </div>
