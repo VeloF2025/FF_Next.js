@@ -3,13 +3,60 @@
  * Manage users, roles, and permissions
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Users, Shield, Key, Search, ChevronRight, ChevronDown,
   Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus, Settings,
-  Plus, Copy, Trash2, Lock
+  Plus, Copy, Trash2, Lock, XCircle, Filter, ToggleLeft, ToggleRight,
+  ShieldCheck, ShieldOff, UserCheck, UserX
 } from 'lucide-react';
 import { UserPermissionsModal } from './UserPermissionsModal';
+
+// Custom Toggle Switch Component
+function ToggleSwitch({
+  checked,
+  onChange,
+  disabled = false,
+  size = 'md',
+  activeColor = 'green',
+  label
+}: {
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+  size?: 'sm' | 'md';
+  activeColor?: 'green' | 'blue' | 'orange';
+  label?: string;
+}) {
+  const colors = {
+    green: 'bg-green-500',
+    blue: 'bg-blue-500',
+    orange: 'bg-orange-500'
+  };
+  const sizes = {
+    sm: { track: 'w-8 h-4', thumb: 'w-3 h-3', translate: 'translate-x-4' },
+    md: { track: 'w-11 h-6', thumb: 'w-5 h-5', translate: 'translate-x-5' }
+  };
+  const s = sizes[size];
+
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      disabled={disabled}
+      className={`relative inline-flex items-center ${s.track} rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[var(--ff-bg-secondary)] ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+      } ${checked ? colors[activeColor] : 'bg-gray-600'}`}
+      title={label}
+    >
+      <span
+        className={`inline-block ${s.thumb} transform rounded-full bg-white shadow-lg transition-transform duration-200 ${
+          checked ? s.translate : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  );
+}
 
 // Types
 interface UserWithRole {
@@ -71,9 +118,36 @@ export function AccessControlTab() {
   // Users state
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [provisioning, setProvisioning] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Keyboard shortcut for search (Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setSearchTerm('');
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Roles state
   const [roles, setRoles] = useState<RoleWithPermissions[]>([]);
@@ -101,7 +175,7 @@ export function AccessControlTab() {
   const fetchUsers = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (searchTerm) params.set('search', searchTerm);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       if (roleFilter) params.set('role', roleFilter);
       if (statusFilter) params.set('status', statusFilter);
 
@@ -113,7 +187,7 @@ export function AccessControlTab() {
     } catch (err) {
       setError('Failed to fetch users');
     }
-  }, [searchTerm, roleFilter, statusFilter]);
+  }, [debouncedSearch, roleFilter, statusFilter]);
 
   // Fetch roles
   const fetchRoles = useCallback(async () => {
@@ -177,6 +251,7 @@ export function AccessControlTab() {
   // Toggle user active status
   const toggleUserStatus = async (userId: string, isActive: boolean) => {
     try {
+      setUpdatingUserId(userId);
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -184,10 +259,38 @@ export function AccessControlTab() {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchUsers();
+        // Update locally for instant feedback
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: !isActive } : u));
+      } else {
+        setError(data.error?.message || 'Failed to update user status');
       }
     } catch (err) {
       setError('Failed to update user status');
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  // Quick action: Grant full access
+  const grantFullAccess = async (userId: string) => {
+    try {
+      setUpdatingUserId(userId);
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'super_admin', permissions: ['all'] }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMessage('Full access granted');
+        await fetchUsers();
+      } else {
+        setError(data.error?.message || 'Failed to grant access');
+      }
+    } catch (err) {
+      setError('Failed to grant access');
+    } finally {
+      setUpdatingUserId(null);
     }
   };
 
@@ -389,42 +492,158 @@ export function AccessControlTab() {
     }
   };
 
+  // Filter users for display
+  const filteredUsers = useMemo(() => {
+    return users;
+  }, [users]);
+
+  // Stats
+  const userStats = useMemo(() => {
+    const active = users.filter(u => u.isActive).length;
+    const inactive = users.length - active;
+    const admins = users.filter(u => u.role === 'super_admin' || u.role === 'admin').length;
+    return { total: users.length, active, inactive, admins };
+  }, [users]);
+
   // Render users tab
   const renderUsersTab = () => (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex-1 min-w-[200px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-secondary)]" />
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total Users</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{userStats.total}</p>
+            </div>
+            <Users className="w-8 h-8 text-blue-400 opacity-50" />
           </div>
         </div>
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
-        >
-          <option value="">All Roles</option>
-          {roles.map(r => (
-            <option key={r.name} value={r.name}>{r.displayName}</option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
-        >
-          <option value="">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Active</p>
+              <p className="text-2xl font-bold text-green-400">{userStats.active}</p>
+            </div>
+            <UserCheck className="w-8 h-8 text-green-400 opacity-50" />
+          </div>
+        </div>
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Inactive</p>
+              <p className="text-2xl font-bold text-red-400">{userStats.inactive}</p>
+            </div>
+            <UserX className="w-8 h-8 text-red-400 opacity-50" />
+          </div>
+        </div>
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Admins</p>
+              <p className="text-2xl font-bold text-orange-400">{userStats.admins}</p>
+            </div>
+            <ShieldCheck className="w-8 h-8 text-orange-400 opacity-50" />
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+        <div className="flex flex-wrap gap-4 items-center">
+          {/* Enhanced Search */}
+          <div className="flex-1 min-w-[300px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--ff-text-secondary)]" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search by name, email, or department... (Ctrl+K)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-10 py-3 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[var(--ff-bg-primary)] rounded"
+                >
+                  <XCircle className="w-5 h-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]" />
+                </button>
+              )}
+            </div>
+            {searchTerm && searchTerm !== debouncedSearch && (
+              <div className="mt-1 flex items-center text-xs text-[var(--ff-text-tertiary)]">
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                Searching...
+              </div>
+            )}
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+
+            {/* Role Filter */}
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] text-sm"
+            >
+              <option value="">All Roles</option>
+              {roles.map(r => (
+                <option key={r.name} value={r.name}>{r.displayName} ({r.userCount})</option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <div className="flex rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+              <button
+                onClick={() => setStatusFilter('')}
+                className={`px-3 py-2 text-sm ${statusFilter === '' ? 'bg-blue-500 text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setStatusFilter('active')}
+                className={`px-3 py-2 text-sm ${statusFilter === 'active' ? 'bg-green-500 text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setStatusFilter('inactive')}
+                className={`px-3 py-2 text-sm ${statusFilter === 'inactive' ? 'bg-red-500 text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}
+              >
+                Inactive
+              </button>
+            </div>
+
+            {/* Clear Filters */}
+            {(roleFilter || statusFilter || searchTerm) && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setRoleFilter('');
+                  setStatusFilter('');
+                }}
+                className="px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 rounded-lg"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Results info */}
+        <div className="mt-3 text-sm text-[var(--ff-text-secondary)]">
+          Showing {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+          {searchTerm && ` matching "${searchTerm}"`}
+          {roleFilter && ` with role "${roles.find(r => r.name === roleFilter)?.displayName || roleFilter}"`}
+          {statusFilter && ` (${statusFilter})`}
+        </div>
       </div>
 
       {/* Users table */}
@@ -435,77 +654,117 @@ export function AccessControlTab() {
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">User</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Role</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Department</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Active</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Last Login</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ff-border-light)]">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-[var(--ff-bg-tertiary)]">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div>
-                    <div className="font-medium text-[var(--ff-text-primary)]">{user.fullName}</div>
-                    <div className="text-sm text-[var(--ff-text-secondary)]">{user.email}</div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <select
-                    value={user.role}
-                    onChange={(e) => updateUserRole(user.id, e.target.value)}
-                    className="text-sm px-2 py-1 border border-[var(--ff-border-light)] rounded bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)]"
-                  >
-                    {roles.map(r => (
-                      <option key={r.name} value={r.name}>{r.displayName}</option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
-                  {user.department || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    user.isActive
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {user.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
-                  {user.lastLogin
-                    ? new Date(user.lastLogin).toLocaleDateString()
-                    : 'Never'
-                  }
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button
-                    onClick={() => setSelectedUserForPermissions(user)}
-                    className="text-sm px-3 py-1 rounded text-blue-400 hover:bg-blue-500/20"
-                    title="Edit user permissions"
-                  >
-                    <Settings className="w-4 h-4 inline mr-1" />
-                    Permissions
-                  </button>
-                  <button
-                    onClick={() => toggleUserStatus(user.id, user.isActive)}
-                    className={`text-sm px-3 py-1 rounded ${
-                      user.isActive
-                        ? 'text-red-400 hover:bg-red-500/20'
-                        : 'text-green-400 hover:bg-green-500/20'
-                    }`}
-                  >
-                    {user.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filteredUsers.map((user) => {
+              const isUpdating = updatingUserId === user.id;
+              const isAdmin = user.role === 'super_admin' || user.role === 'admin';
+
+              return (
+                <tr key={user.id} className={`hover:bg-[var(--ff-bg-tertiary)] ${isUpdating ? 'opacity-60' : ''}`}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium ${
+                        isAdmin ? 'bg-gradient-to-br from-orange-500 to-red-500' : 'bg-gradient-to-br from-blue-500 to-purple-500'
+                      }`}>
+                        {user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                          {user.fullName}
+                          {isAdmin && <span title="Admin"><ShieldCheck className="w-4 h-4 text-orange-400" /></span>}
+                        </div>
+                        <div className="text-sm text-[var(--ff-text-secondary)]">{user.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <select
+                      value={user.role}
+                      onChange={(e) => updateUserRole(user.id, e.target.value)}
+                      disabled={isUpdating}
+                      className={`text-sm px-3 py-2 border rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 ${
+                        user.role === 'super_admin' ? 'border-orange-500/50' :
+                        user.role === 'admin' ? 'border-blue-500/50' :
+                        user.role === 'viewer' ? 'border-gray-500/50' :
+                        'border-[var(--ff-border-light)]'
+                      }`}
+                    >
+                      {roles.map(r => (
+                        <option key={r.name} value={r.name}>{r.displayName}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
+                    {user.department || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      {isUpdating ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                      ) : (
+                        <ToggleSwitch
+                          checked={user.isActive}
+                          onChange={() => toggleUserStatus(user.id, user.isActive)}
+                          activeColor="green"
+                          label={user.isActive ? 'Click to deactivate' : 'Click to activate'}
+                        />
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
+                    {user.lastLogin
+                      ? new Date(user.lastLogin).toLocaleDateString()
+                      : <span className="text-[var(--ff-text-tertiary)]">Never</span>
+                    }
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {/* Quick Full Access Button */}
+                      {user.role !== 'super_admin' && (
+                        <button
+                          onClick={() => grantFullAccess(user.id)}
+                          disabled={isUpdating}
+                          className="text-xs px-2 py-1.5 rounded bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 disabled:opacity-50"
+                          title="Grant full access (super_admin)"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 inline mr-1" />
+                          Full Access
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setSelectedUserForPermissions(user)}
+                        disabled={isUpdating}
+                        className="text-xs px-2 py-1.5 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 disabled:opacity-50"
+                        title="Edit user permissions"
+                      >
+                        <Settings className="w-3.5 h-3.5 inline mr-1" />
+                        Permissions
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
-        {users.length === 0 && (
-          <div className="text-center py-8 text-[var(--ff-text-secondary)]">
-            No users found
+        {filteredUsers.length === 0 && (
+          <div className="text-center py-12 text-[var(--ff-text-secondary)]">
+            <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="text-lg">No users found</p>
+            {searchTerm && (
+              <p className="text-sm mt-1">
+                Try a different search term or{' '}
+                <button onClick={() => setSearchTerm('')} className="text-blue-400 hover:underline">
+                  clear the search
+                </button>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -550,7 +809,7 @@ export function AccessControlTab() {
               >
                 <div className="flex items-center gap-2">
                   {role.isSystem && (
-                    <Lock className="w-3.5 h-3.5 text-[var(--ff-text-tertiary)]" title="System role" />
+                    <span title="System role"><Lock className="w-3.5 h-3.5 text-[var(--ff-text-tertiary)]" /></span>
                   )}
                   <div
                     className="w-2 h-2 rounded-full"
