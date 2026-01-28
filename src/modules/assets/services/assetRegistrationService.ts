@@ -283,6 +283,8 @@ export async function registerAssetFromGrnItem(
     }
 
     // Insert asset with procurement linkage
+    // Note: supplier_id not set directly - supplier is linked via grn_id → goods_receipt_notes.supplier_id
+    // assets.supplier_id expects UUID but GRN has integer supplier_id (type mismatch)
     const insertResult = await sql`
       INSERT INTO assets (
         category_id,
@@ -292,7 +294,6 @@ export async function registerAssetFromGrnItem(
         model,
         purchase_date,
         purchase_price,
-        supplier_id,
         po_id,
         grn_id,
         grn_item_id,
@@ -309,11 +310,10 @@ export async function registerAssetFromGrnItem(
         ${input.categoryId},
         ${assetName},
         ${input.serialNumber},
-        ${input.manufacturer || vlmData?.manufacturer || (data.manufacturer as string | null)},
-        ${input.model || vlmData?.model || (data.model as string | null)},
+        ${input.manufacturer || vlmData?.manufacturer || null},
+        ${input.model || vlmData?.model || null},
         ${data.delivery_date as string},
         ${data.unit_cost as number | null},
-        ${data.supplier_id as number | null},
         ${data.po_id as string | null},
         ${grnId},
         ${input.grnItemId},
