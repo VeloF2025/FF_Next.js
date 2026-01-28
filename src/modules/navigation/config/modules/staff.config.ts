@@ -12,6 +12,7 @@ import {
   Cake,
   FileWarning,
   ShieldCheck,
+  Building2,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -28,6 +29,13 @@ export const staffConfig: ModuleNavigationConfig = {
       shortLabel: 'Staff',
       icon: Users,
       path: '/staff',
+    },
+    {
+      id: 'departments',
+      label: 'Departments',
+      icon: Building2,
+      path: '/staff/departments',
+      rbacKey: 'staff:departments:view',
     },
     {
       id: 'alerts',
