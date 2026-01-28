@@ -7,7 +7,7 @@
  * Status: WORKING - OCR Quote Scanner Feature
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   FileText,
   Upload,
@@ -66,6 +66,25 @@ export function QuoteScannerModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const prevIsOpenRef = useRef(false);
+
+  // Reset state when modal opens (not when it closes)
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      // Modal just opened - reset to initial state
+      setStep('upload');
+      setFile(null);
+      setPreviewUrl(null);
+      setProgress(0);
+      setError(null);
+      setResult(null);
+      setIsProcessing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Handle file selection
   const handleFileSelect = useCallback((selectedFile: File) => {
@@ -193,23 +212,22 @@ export function QuoteScannerModal({
     }
   }, []);
 
-  // Handle close
+  // Handle close - don't reset here, we reset on open
   const handleClose = useCallback(() => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
-    handleReset();
     onClose();
-  }, [previewUrl, handleReset, onClose]);
+  }, [previewUrl, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
+      {/* Backdrop - don't close during processing */}
       <div
         className="absolute inset-0 bg-black/50"
-        onClick={handleClose}
+        onClick={step === 'processing' ? undefined : handleClose}
       />
 
       {/* Modal */}
