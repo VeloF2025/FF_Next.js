@@ -510,18 +510,28 @@ export function PremiumLoginPage() {
                 </div>
               </GlassCard>
 
-              {/* Dev hint - can be removed in production */}
-              <div className="mt-4 text-center">
+              {/* Footer status */}
+              <div className="mt-4 text-center space-y-1">
                 <p className="text-xs text-slate-500">
-                  Use your staff email to sign in
+                  © 2026 FibreFlow. All rights reserved.
                 </p>
+                <div className="flex items-center justify-center gap-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    System Online
+                  </span>
+                  <span className="text-slate-600">•</span>
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3 h-3 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                    Secure Connection
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-900/80 to-transparent pointer-events-none" />
       </div>
     </>
   );

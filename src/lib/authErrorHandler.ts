@@ -32,11 +32,17 @@ export function handleAuthError(options?: {
 
   isRedirecting = true;
 
-  // Show toast notification
+  // Show toast notification - use a gentle notification for timed logout, not error
   if (options?.showToast !== false) {
-    toast.error(options?.message || 'Your session has expired. Please sign in again.', {
-      duration: 4000,
+    toast(options?.message || 'Session timed out. Redirecting to sign in...', {
+      duration: 3000,
       id: 'auth-error', // Prevent duplicate toasts
+      icon: '⏱️',
+      style: {
+        background: '#374151', // gray-700
+        color: '#f9fafb', // gray-50
+        borderRadius: '8px',
+      },
     });
   }
 
