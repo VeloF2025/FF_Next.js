@@ -3,6 +3,7 @@
  * Tabs: Suppliers | BOQ | RFQ
  */
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import { AppLayout } from '@/components/layout';
@@ -14,6 +15,7 @@ import {
   FileSpreadsheet,
   FileQuestion,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 // Content components
 import { SuppliersPage } from '@/modules/suppliers/SuppliersPage';
@@ -35,12 +37,38 @@ type TabId = typeof TABS[number]['id'];
 
 export default function SourcingPage({ projectId, projectName }: SourcingPageProps) {
   const router = useRouter();
+  const [rfqs, setRfqs] = useState<any[]>([]);
+  const [isLoadingRfqs, setIsLoadingRfqs] = useState(false);
 
   const { activeTab, changeTab, isInitialized } = useTabPersistence({
     pageKey: 'sourcing',
     defaultTab: 'suppliers',
     validTabs: TABS.map(t => t.id),
   });
+
+  // Fetch RFQs when tab becomes active
+  useEffect(() => {
+    if (activeTab === 'rfq') {
+      const fetchRfqs = async () => {
+        setIsLoadingRfqs(true);
+        try {
+          const url = projectId
+            ? `/api/procurement/rfq?projectId=${projectId}`
+            : '/api/procurement/rfq';
+          const response = await fetch(url);
+          if (response.ok) {
+            const data = await response.json();
+            setRfqs(data.data?.rfqs || data.rfqs || []);
+          }
+        } catch (error) {
+          log.error('Failed to fetch RFQs:', { data: error }, 'SourcingPage');
+        } finally {
+          setIsLoadingRfqs(false);
+        }
+      };
+      fetchRfqs();
+    }
+  }, [activeTab, projectId]);
 
   const handleCreateBOQ = () => {
     router.push('/procurement/boq/new');
@@ -144,12 +172,18 @@ export default function SourcingPage({ projectId, projectName }: SourcingPagePro
                       </p>
                     )}
                   </div>
-                  <RFQList
-                    rfqs={[]}
-                    onCreateRFQ={handleCreateRFQ}
-                    onView={handleViewRFQ}
-                    onEdit={handleEditRFQ}
-                  />
+                  {isLoadingRfqs ? (
+                    <div className="flex justify-center items-center h-64">
+                      <div className="text-[var(--ff-text-secondary)]">Loading RFQs...</div>
+                    </div>
+                  ) : (
+                    <RFQList
+                      rfqs={rfqs}
+                      onCreateRFQ={handleCreateRFQ}
+                      onView={handleViewRFQ}
+                      onEdit={handleEditRFQ}
+                    />
+                  )}
                 </div>
               )}
             </>
