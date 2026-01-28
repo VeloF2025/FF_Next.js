@@ -361,13 +361,17 @@ export function getDefaultCompliance(contractType: SAContractType): Partial<SACo
  */
 export function mapLegacyContractType(legacyType: string): SAContractType {
   const mapping: Record<string, SAContractType> = {
+    // Legacy values from old system
     permanent: SAContractType.PERMANENT,
+    'full-time': SAContractType.PERMANENT,
+    fulltime: SAContractType.PERMANENT,
     contract: SAContractType.FIXED_TERM,
+    'fixed-term': SAContractType.FIXED_TERM,
     temporary: SAContractType.TEMPORARY,
     freelance: SAContractType.INDEPENDENT_CONTRACTOR,
     consultant: SAContractType.INDEPENDENT_CONTRACTOR,
     intern: SAContractType.INTERN,
-    // New values map to themselves
+    // New SAContractType values map to themselves
     fixed_term: SAContractType.FIXED_TERM,
     part_time: SAContractType.PART_TIME,
     independent_contractor: SAContractType.INDEPENDENT_CONTRACTOR,

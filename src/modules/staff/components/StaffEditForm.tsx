@@ -11,6 +11,7 @@ import {
   Skill,
   isFormerEmployee,
 } from '@/types/staff.types';
+import { mapLegacyContractType } from '@/types/staff/compliance.types';
 import { safeToDate } from '@/utils/dateHelpers';
 import { ExitEmployeeModal, ExitFormData } from './ExitEmployeeModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -129,8 +130,14 @@ export function StaffEditForm() {
       if (staff.probationExtended !== undefined) formUpdate.probationExtended = staff.probationExtended;
       if (staff.probationExtensionReason) formUpdate.probationExtensionReason = staff.probationExtensionReason;
 
-      // SA Compliance fields
-      if (staff.saContractType) formUpdate.saContractType = staff.saContractType;
+      // SA Compliance fields - map legacy contract types to SAContractType enum
+      // Always set saContractType from contractType to ensure Select shows correct value
+      if (staff.saContractType) {
+        formUpdate.saContractType = staff.saContractType;
+      } else if (staff.contractType) {
+        // Map legacy contract types (full-time, fixed-term, etc.) to SAContractType enum values
+        formUpdate.saContractType = mapLegacyContractType(staff.contractType as string);
+      }
       if (staff.uifStatus) formUpdate.uifStatus = staff.uifStatus;
       if (staff.uifNumber) formUpdate.uifNumber = staff.uifNumber;
       if (staff.coidaStatus) formUpdate.coidaStatus = staff.coidaStatus;
