@@ -91,14 +91,17 @@ async function handler(
 
     const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
     const dateToStr = Array.isArray(dateTo) ? dateTo[0] : dateTo;
-    const projectId = project ? (Array.isArray(project) ? project[0] : project) : null;
+    const projectFilter = project ? (Array.isArray(project) ? project[0] : project) : null;
+    // Check if projectFilter is a UUID or a project name
+    const isUuid = projectFilter ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectFilter) : false;
     const viewMode = (Array.isArray(view) ? view[0] : view) as ActivationProgressView;
     const granularityMode = (Array.isArray(granularity) ? granularity[0] : granularity) as ActivationProgressGranularity;
 
     log.info('ActivationProgress', 'Fetching activation progress', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
-      project: projectId,
+      project: projectFilter,
+      isUuid,
       view: viewMode,
       granularity: granularityMode,
     });
@@ -108,6 +111,7 @@ async function handler(
     try {
       // Main query: Get scope and activation counts by project/zone/pon
       // Only include active projects
+      // Support both UUID and project name filtering
       const progressQuery = `
         SELECT
           p.id as project_id,
@@ -125,7 +129,11 @@ async function handler(
         JOIN projects p ON p.id = d.project_id
         LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
         WHERE p.status = 'active'
-          AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+          AND (
+            $3::text IS NULL
+            OR ($4::boolean = true AND d.project_id = $3::uuid)
+            OR ($4::boolean = false AND p.project_name = $3::text)
+          )
         GROUP BY p.id, p.project_name, d.zone_no, d.pon_no
         ORDER BY p.project_name, d.zone_no NULLS LAST, d.pon_no NULLS LAST
       `;
@@ -133,10 +141,12 @@ async function handler(
       const progressResult = await client.query<RawProgressRow>(progressQuery, [
         dateFromStr,
         dateToStr,
-        projectId,
+        projectFilter,
+        isUuid,
       ]);
 
       // Time series query for charts (only active projects)
+      // Support both UUID and project name filtering
       let timeSeriesQuery = '';
       if (granularityMode === 'daily') {
         timeSeriesQuery = `
@@ -149,7 +159,11 @@ async function handler(
           WHERE p.status = 'active'
             AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
-            AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+            AND (
+              $3::text IS NULL
+              OR ($4::boolean = true AND d.project_id = $3::uuid)
+              OR ($4::boolean = false AND p.project_name = $3::text)
+            )
           GROUP BY oes.activation_date
           ORDER BY oes.activation_date
         `;
@@ -164,7 +178,11 @@ async function handler(
           WHERE p.status = 'active'
             AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
-            AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+            AND (
+              $3::text IS NULL
+              OR ($4::boolean = true AND d.project_id = $3::uuid)
+              OR ($4::boolean = false AND p.project_name = $3::text)
+            )
           GROUP BY DATE_TRUNC('week', oes.activation_date)
           ORDER BY DATE_TRUNC('week', oes.activation_date)
         `;
@@ -180,7 +198,11 @@ async function handler(
           WHERE p.status = 'active'
             AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
-            AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+            AND (
+              $3::text IS NULL
+              OR ($4::boolean = true AND d.project_id = $3::uuid)
+              OR ($4::boolean = false AND p.project_name = $3::text)
+            )
           GROUP BY oes.activation_date
           ORDER BY oes.activation_date
         `;
@@ -189,7 +211,8 @@ async function handler(
       const timeSeriesResult = await client.query<RawTimeSeriesRow>(timeSeriesQuery, [
         dateFromStr,
         dateToStr,
-        projectId,
+        projectFilter,
+        isUuid,
       ]);
 
       // Build hierarchy and flat data
@@ -344,7 +367,7 @@ async function handler(
           from: dateFromStr as string,
           to: dateToStr as string,
         },
-        project: projectId,
+        project: projectFilter,
         granularity: granularityMode,
         view: viewMode,
         summary,
