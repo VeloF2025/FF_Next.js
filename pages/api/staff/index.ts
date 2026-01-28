@@ -455,6 +455,21 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         const isRehireable = updates.isRehireable ?? updates.is_rehireable ?? null;
         const exitProcessedBy = updates.exitProcessedBy || updates.exit_processed_by || null;
 
+        // Look up department_id if department name is provided
+        let departmentId: string | null | undefined = updates.departmentId ?? updates.department_id;
+        if (updates.department && departmentId === undefined) {
+          // Look up department by name to get its UUID
+          const deptResult = await sql`
+            SELECT id FROM departments
+            WHERE name = ${updates.department}
+            AND deleted_at IS NULL
+            LIMIT 1
+          `;
+          if (deptResult.length > 0) {
+            departmentId = (deptResult[0] as { id: string }).id;
+          }
+        }
+
         // Build comprehensive UPDATE query
         const updatedStaff = await sql`
           UPDATE staff
@@ -476,6 +491,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               -- Employment
               position = COALESCE(${updates.position}, position),
               department = COALESCE(${updates.department}, department),
+              department_id = CASE WHEN ${departmentId !== undefined} THEN ${departmentId}::uuid ELSE department_id END,
               status = COALESCE(${updates.status}, status),
               level = CASE WHEN ${level !== undefined} THEN ${level} ELSE level END,
               reports_to = CASE WHEN ${reportsTo !== undefined} THEN ${reportsTo}::uuid ELSE reports_to END,
