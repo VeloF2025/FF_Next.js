@@ -23,6 +23,8 @@ import {
   BarChart3,
   Target,
   ArrowUpDown,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
 import type {
   ReportFilters,
@@ -56,6 +58,9 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
   // Table sorting
   const [sortField, setSortField] = useState<SortField>('completion_percent');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  // Filter toggle - hide zone/pon = 0
+  const [hideZeroValues, setHideZeroValues] = useState(true);
 
   // Fetch data
   useEffect(() => {
@@ -114,10 +119,17 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     setExpandedZones(next);
   };
 
-  // Sorted flat data
+  // Filter and sort flat data
   const sortedFlat = useMemo(() => {
     if (!data?.flat) return [];
-    const sorted = [...data.flat];
+    let filtered = data.flat;
+
+    // Filter out zone/pon = 0 if toggle is on
+    if (hideZeroValues) {
+      filtered = filtered.filter(row => row.zone_no > 0 && row.pon_no > 0);
+    }
+
+    const sorted = [...filtered];
     sorted.sort((a, b) => {
       let aVal: string | number = a[sortField];
       let bVal: string | number = b[sortField];
@@ -130,7 +142,46 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
       return 0;
     });
     return sorted;
-  }, [data?.flat, sortField, sortDir]);
+  }, [data?.flat, sortField, sortDir, hideZeroValues]);
+
+  // Filter hierarchy data
+  const filteredHierarchy = useMemo(() => {
+    if (!data?.hierarchy) return [];
+    if (!hideZeroValues) return data.hierarchy;
+
+    return data.hierarchy.map(project => ({
+      ...project,
+      zones: project.zones
+        .filter(zone => zone.zone_no > 0)
+        .map(zone => ({
+          ...zone,
+          pons: zone.pons.filter(pon => pon.pon_no > 0),
+        }))
+        .filter(zone => zone.pons.length > 0),
+    })).filter(project => project.zones.length > 0);
+  }, [data?.hierarchy, hideZeroValues]);
+
+  // Recalculate summary when filtering
+  const filteredSummary = useMemo(() => {
+    if (!data?.summary) return null;
+    if (!hideZeroValues) return data.summary;
+
+    // Recalculate totals from filtered flat data
+    const totalScope = sortedFlat.reduce((sum, row) => sum + row.total_scope, 0);
+    const totalActivated = sortedFlat.reduce((sum, row) => sum + row.activated, 0);
+    const totalRemaining = totalScope - totalActivated;
+    const completionPercent = totalScope > 0
+      ? Math.round((totalActivated / totalScope) * 10000) / 100
+      : 0;
+
+    return {
+      ...data.summary,
+      total_scope: totalScope,
+      total_activated: totalActivated,
+      total_remaining: totalRemaining,
+      completion_percent: completionPercent,
+    };
+  }, [data?.summary, sortedFlat, hideZeroValues]);
 
   // Handle sort click
   const handleSort = (field: SortField) => {
@@ -171,7 +222,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
   }
 
   // Empty state
-  if (!data || data.hierarchy.length === 0) {
+  if (!data || filteredHierarchy.length === 0) {
     return (
       <div className="p-6">
         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
@@ -183,7 +234,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     );
   }
 
-  const { summary } = data;
+  const summary = filteredSummary || data.summary;
 
   return (
     <div className="p-6 space-y-6">
@@ -217,6 +268,20 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
             </button>
           </div>
         </div>
+
+        {/* Hide Zero Toggle */}
+        <button
+          onClick={() => setHideZeroValues(!hideZeroValues)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+            hideZeroValues
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}
+          title={hideZeroValues ? 'Showing zones/PONs with assigned values only' : 'Click to hide Zone 0 and PON 0'}
+        >
+          {hideZeroValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          {hideZeroValues ? 'Hiding Zero' : 'Show All'}
+        </button>
 
         {/* Granularity Tabs */}
         <div className="flex items-center gap-2">
@@ -275,7 +340,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
       {/* Data Display */}
       {view === 'hierarchy' ? (
         <HierarchyView
-          hierarchy={data.hierarchy}
+          hierarchy={filteredHierarchy}
           expandedProjects={expandedProjects}
           expandedZones={expandedZones}
           toggleProject={toggleProject}
