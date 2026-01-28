@@ -124,9 +124,9 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     if (!data?.flat) return [];
     let filtered = data.flat;
 
-    // Filter out zone/pon = 0 if toggle is on
+    // Filter out zone/pon = 0 AND rows with 0 activations if toggle is on
     if (hideZeroValues) {
-      filtered = filtered.filter(row => row.zone_no > 0 && row.pon_no > 0);
+      filtered = filtered.filter(row => row.zone_no > 0 && row.pon_no > 0 && row.activated > 0);
     }
 
     const sorted = [...filtered];
@@ -152,10 +152,10 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     return data.hierarchy.map(project => ({
       ...project,
       zones: project.zones
-        .filter(zone => zone.zone_no > 0)
+        .filter(zone => zone.zone_no > 0 && zone.activated > 0)
         .map(zone => ({
           ...zone,
-          pons: zone.pons.filter(pon => pon.pon_no > 0),
+          pons: zone.pons.filter(pon => pon.pon_no > 0 && pon.activated > 0),
         }))
         .filter(zone => zone.pons.length > 0),
     })).filter(project => project.zones.length > 0);
