@@ -64,10 +64,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // If still no supplier, create a placeholder or use a default
     if (!finalSupplierId) {
+      // Generate a unique supplier code
+      const supplierCode = 'SUP-SCAN-' + Date.now();
+
       // Create a new supplier from extracted data
       const newSupplier = await sql`
-        INSERT INTO suppliers (name, company_name, email, phone, vat_number, status)
+        INSERT INTO suppliers (code, name, company_name, email, phone, vat_number, status)
         VALUES (
+          ${supplierCode},
           ${extraction.extracted_supplier_name || 'Unknown Supplier'},
           ${extraction.extracted_supplier_name || 'Unknown Supplier'},
           ${extraction.extracted_supplier_email || null},
@@ -78,7 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         RETURNING id
       `;
       finalSupplierId = newSupplier[0].id;
-      log.info('[CreateQuote] Created new supplier', { supplierId: finalSupplierId });
+      log.info('[CreateQuote] Created new supplier', { supplierId: finalSupplierId, code: supplierCode });
     }
 
     // Calculate valid_until (default 30 days if not extracted)

@@ -116,7 +116,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         id: q.id,
         supplierId: q.supplier_id,
         supplierName: q.supplier_name || 'Unknown Supplier',
-        totalAmount: q.total_amount ? Number(q.total_amount) : 0,
+        totalAmount: q.total_value ? Number(q.total_value) : 0,
         status: q.status,
         validUntil: q.valid_until,
         submittedAt: q.created_at,
