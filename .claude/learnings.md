@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-01-28: Asset Purchase Price Validation - Zero Value Rejected
+
+**Issue:** Creating a new asset with purchase price of `0` (for donated assets) failed with 400 validation error.
+
+**Root Cause:** The `CreateAssetSchema` in `src/modules/assets/utils/schemas.ts` used `PositiveNumberSchema` for `purchasePrice`, which requires `> 0`. A value of `0` failed the `.positive()` validation.
+
+**File:** `src/modules/assets/utils/schemas.ts:93`
+
+**Wrong:**
+```typescript
+purchasePrice: PositiveNumberSchema.optional(),  // Requires > 0
+```
+
+**Fixed:**
+```typescript
+purchasePrice: NonNegativeNumberSchema.optional(),  // Allows >= 0
+```
+
+**Key Insight:** Assets can have zero purchase price (donated equipment, internal transfers, promotional items). Always use `NonNegativeNumberSchema` for monetary fields that can legitimately be zero.
+
+**Commit:** `72a1a6ba` - fix(assets): allow zero purchase price for donated assets
+
+---
+
+## 2026-01-28: Contract Type Persistence - Legacy Value Mapping
+
+**Issue:** Staff edit form contract type dropdown not showing correct value for existing staff; compliance labels not changing based on Employee vs IC.
+
+**Root Cause:** Database had legacy values (`full-time`, `fulltime`) that weren't mapped in `mapLegacyContractType()`. The function only mapped `permanent` but not hyphenated/concatenated variants.
+
+**Files involved:**
+- `src/types/staff/compliance.types.ts` - `mapLegacyContractType()` function
+- `src/modules/staff/components/StaffEditForm.tsx` - Form initialization
+- `pages/api/staff/[staffId]/compliance.ts` - Dynamic labels
+
+**Solution:**
+1. Added legacy mappings to `mapLegacyContractType()`:
+```typescript
+const mapping = {
+  permanent: SAContractType.PERMANENT,
+  'full-time': SAContractType.PERMANENT,  // Added
+  fulltime: SAContractType.PERMANENT,     // Added
+  'fixed-term': SAContractType.FIXED_TERM, // Added
+  // ... other mappings
+};
+```
+
+2. StaffEditForm now maps existing contract_type to saContractType on load:
+```typescript
+// In form initialization
+saContractType: existingStaff?.contract_type
+  ? mapLegacyContractType(existingStaff.contract_type)
+  : SAContractType.PERMANENT,
+```
+
+3. Compliance API dynamically sets labels based on contract type:
+```typescript
+function getRequiredDocuments(contractType: SAContractType | null) {
+  const config = contractType ? SA_CONTRACT_CONFIG[contractType] : null;
+  const isEmployee = config?.isEmployee ?? true;
+
+  return [
+    { type: 'employment_contract', label: isEmployee ? 'Employment Contract' : 'IC Agreement', required: true },
+    { type: 'tax_document', label: isEmployee ? 'Tax Document (IRP5)' : 'Tax Document (IT3a)', required: false },
+    // ...
+  ];
+}
+```
+
+**Prevention:** When adding new contract types or labels, always check `mapLegacyContractType()` for all possible DB values.
+
+**Commits:** `d8d0ded5`, `b51e34d7`
+
+---
+
 ## 2026-01-28: WA Bridge Disconnection - Missed DR Acknowledgments
 
 **Issue:** DR submissions (DR1738553, DR1862759) were received and stored in the database, but WhatsApp acknowledgment messages were never sent.
@@ -2699,5 +2774,73 @@ CASE WHEN sc.staff_id IS NULL THEN 'Contract (Employment/IC)' END
 - `pages/api/staff/alerts.ts` - Added contract tracking
 - `pages/staff/compliance.tsx` - Added Contract stat card
 - `pages/api/staff/[staffId]/compliance.ts` - Updated label to "Employment / IC Agreement"
+
+---
+
+## 2026-01-28: Session Timeout UX - Soft Notifications vs Error Toasts
+
+**Issue:** When a user's session times out automatically, a red error toast flashed briefly before redirecting to login. This felt jarring - session timeout is expected behavior, not an error.
+
+**Root Cause:** `src/lib/authErrorHandler.ts` used `toast.error()` for all 401 responses, treating expected timeouts the same as actual errors.
+
+**Solution:** Changed to a soft, neutral notification:
+
+```typescript
+// BEFORE (jarring red error)
+toast.error('Your session has expired. Please sign in again.', {
+  duration: 4000,
+  id: 'auth-error',
+});
+
+// AFTER (soft gray notification)
+toast('Session timed out. Redirecting to sign in...', {
+  duration: 3000,
+  id: 'auth-error',
+  icon: '⏱️',
+  style: {
+    background: '#374151', // gray-700
+    color: '#f9fafb',      // gray-50
+    borderRadius: '8px',
+  },
+});
+```
+
+**Key Insight:** Reserve `toast.error()` for actual errors the user should be concerned about. Expected system behaviors like session expiry should use neutral styling.
+
+**Files:** `src/lib/authErrorHandler.ts`
+
+---
+
+## 2026-01-28: Login Page Footer - Professional Status Indicators
+
+**Issue:** Login page had a dev hint ("Use your staff email to sign in") that should be replaced for production, plus excessive bottom padding causing scroll issues.
+
+**Solution:** Replaced with professional footer showing:
+1. Copyright: `© 2026 FibreFlow. All rights reserved.`
+2. System status: Green pulsing dot + "System Online"
+3. Security indicator: Lock icon + "Secure Connection"
+
+```tsx
+<div className="mt-4 text-center space-y-1">
+  <p className="text-xs text-slate-500">
+    © 2026 FibreFlow. All rights reserved.
+  </p>
+  <div className="flex items-center justify-center gap-3 text-xs text-slate-500">
+    <span className="flex items-center gap-1">
+      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+      System Online
+    </span>
+    <span className="text-slate-600">•</span>
+    <span className="flex items-center gap-1">
+      <svg>...</svg>
+      Secure Connection
+    </span>
+  </div>
+</div>
+```
+
+Also removed the `h-32` bottom gradient that was causing unnecessary scroll space.
+
+**Files:** `src/components/auth/premium/PremiumLoginPage.tsx`
 
 ---
