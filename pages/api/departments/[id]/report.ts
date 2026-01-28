@@ -61,9 +61,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // Project count
   const projectData = await sql`
-    SELECT COUNT(DISTINCT ps.project_id) as count
-    FROM project_staff ps
-    JOIN staff s ON ps.staff_id = s.id
+    SELECT COUNT(DISTINCT sp.project_id) as count
+    FROM staff_projects sp
+    JOIN staff s ON sp.staff_id = s.id
     WHERE s.department_id = ${id}
       AND s.status NOT IN ('terminated', 'resigned', 'retired')
   ` as { count: string }[];

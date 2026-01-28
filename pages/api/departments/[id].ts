@@ -72,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         s.phone,
         s.join_date as "joinDate",
         (
-          SELECT COUNT(*) FROM project_staff ps WHERE ps.staff_id = s.id
+          SELECT COUNT(*) FROM staff_projects sp WHERE sp.staff_id = s.id
         ) as "projectCount"
       FROM staff s
       WHERE s.department_id = ${id}
