@@ -107,6 +107,7 @@ async function handler(
 
     try {
       // Main query: Get scope and activation counts by project/zone/pon
+      // Only include active projects
       const progressQuery = `
         SELECT
           p.id as project_id,
@@ -123,7 +124,8 @@ async function handler(
         FROM drops d
         JOIN projects p ON p.id = d.project_id
         LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
-        WHERE ($3::uuid IS NULL OR d.project_id = $3::uuid)
+        WHERE p.status = 'active'
+          AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
         GROUP BY p.id, p.project_name, d.zone_no, d.pon_no
         ORDER BY p.project_name, d.zone_no NULLS LAST, d.pon_no NULLS LAST
       `;
@@ -134,7 +136,7 @@ async function handler(
         projectId,
       ]);
 
-      // Time series query for charts
+      // Time series query for charts (only active projects)
       let timeSeriesQuery = '';
       if (granularityMode === 'daily') {
         timeSeriesQuery = `
@@ -143,7 +145,9 @@ async function handler(
             COUNT(DISTINCT oes.drop_number)::text as activated
           FROM oes_activations oes
           JOIN drops d ON d.drop_number = oes.drop_number
-          WHERE oes.activation_date >= $1::date
+          JOIN projects p ON p.id = d.project_id
+          WHERE p.status = 'active'
+            AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
             AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
           GROUP BY oes.activation_date
@@ -156,7 +160,9 @@ async function handler(
             COUNT(DISTINCT oes.drop_number)::text as activated
           FROM oes_activations oes
           JOIN drops d ON d.drop_number = oes.drop_number
-          WHERE oes.activation_date >= $1::date
+          JOIN projects p ON p.id = d.project_id
+          WHERE p.status = 'active'
+            AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
             AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
           GROUP BY DATE_TRUNC('week', oes.activation_date)
@@ -170,7 +176,9 @@ async function handler(
             COUNT(DISTINCT oes.drop_number)::text as activated
           FROM oes_activations oes
           JOIN drops d ON d.drop_number = oes.drop_number
-          WHERE oes.activation_date >= $1::date
+          JOIN projects p ON p.id = d.project_id
+          WHERE p.status = 'active'
+            AND oes.activation_date >= $1::date
             AND oes.activation_date <= $2::date
             AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
           GROUP BY oes.activation_date
