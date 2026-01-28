@@ -1,0 +1,382 @@
+/**
+ * API Route: /api/activate/reporting/activation-progress
+ *
+ * Purpose: Track DR activation progress by Project > Zone > PON
+ * - Total scope from `drops` table (SOW import)
+ * - Activated = has OES activation date
+ * - Percentage tracking against total DRs
+ *
+ * Method: GET
+ *
+ * Query Parameters:
+ * - dateFrom (required): Start date for activation window
+ * - dateTo (required): End date for activation window
+ * - project (optional): Filter by project ID (UUID)
+ * - view (optional): 'hierarchy' | 'flat' (default: hierarchy)
+ * - granularity (optional): 'daily' | 'weekly' | 'cumulative' (default: cumulative)
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
+import { withAuth, withRole } from '@/lib/auth';
+import type {
+  ActivationProgressResponse,
+  ActivationProgressSummary,
+  ActivationProgressGranularity,
+  ActivationProgressView,
+  ProjectProgressNode,
+  ZoneProgressNode,
+  PonProgressNode,
+  FlatProgressRow,
+  ActivationTimeSeriesPoint,
+} from '@/modules/activate/types/reporting.types';
+
+// Configure Neon transport
+const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
+
+if (!useHttpTransport) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    const ws = require('ws');
+    neonConfig.webSocketConstructor = ws;
+  } catch {
+    // ws not available, will use HTTP
+  }
+}
+
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ||
+    'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
+});
+
+interface RawProgressRow {
+  project_id: string;
+  project_name: string;
+  zone_no: number | null;
+  pon_no: number | null;
+  total_scope: string;
+  activated: string;
+}
+
+interface RawTimeSeriesRow {
+  date: string;
+  activated: string;
+}
+
+async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ActivationProgressResponse | { error: string }>
+) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const {
+      dateFrom,
+      dateTo,
+      project,
+      view = 'hierarchy',
+      granularity = 'cumulative',
+    } = req.query;
+
+    // Validate required params
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({
+        error: 'Missing required parameters: dateFrom and dateTo',
+      });
+    }
+
+    const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
+    const dateToStr = Array.isArray(dateTo) ? dateTo[0] : dateTo;
+    const projectId = project ? (Array.isArray(project) ? project[0] : project) : null;
+    const viewMode = (Array.isArray(view) ? view[0] : view) as ActivationProgressView;
+    const granularityMode = (Array.isArray(granularity) ? granularity[0] : granularity) as ActivationProgressGranularity;
+
+    log.info('ActivationProgress', 'Fetching activation progress', {
+      dateFrom: dateFromStr,
+      dateTo: dateToStr,
+      project: projectId,
+      view: viewMode,
+      granularity: granularityMode,
+    });
+
+    const client = await pool.connect();
+
+    try {
+      // Main query: Get scope and activation counts by project/zone/pon
+      const progressQuery = `
+        SELECT
+          p.id as project_id,
+          p.project_name,
+          d.zone_no,
+          d.pon_no,
+          COUNT(DISTINCT d.drop_number)::text as total_scope,
+          COUNT(DISTINCT CASE
+            WHEN oes.activation_date IS NOT NULL
+              AND oes.activation_date >= $1::date
+              AND oes.activation_date <= $2::date
+            THEN d.drop_number
+          END)::text as activated
+        FROM drops d
+        JOIN projects p ON p.id = d.project_id
+        LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
+        WHERE ($3::uuid IS NULL OR d.project_id = $3::uuid)
+        GROUP BY p.id, p.project_name, d.zone_no, d.pon_no
+        ORDER BY p.project_name, d.zone_no NULLS LAST, d.pon_no NULLS LAST
+      `;
+
+      const progressResult = await client.query<RawProgressRow>(progressQuery, [
+        dateFromStr,
+        dateToStr,
+        projectId,
+      ]);
+
+      // Time series query for charts
+      let timeSeriesQuery = '';
+      if (granularityMode === 'daily') {
+        timeSeriesQuery = `
+          SELECT
+            oes.activation_date::text as date,
+            COUNT(DISTINCT oes.drop_number)::text as activated
+          FROM oes_activations oes
+          JOIN drops d ON d.drop_number = oes.drop_number
+          WHERE oes.activation_date >= $1::date
+            AND oes.activation_date <= $2::date
+            AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+          GROUP BY oes.activation_date
+          ORDER BY oes.activation_date
+        `;
+      } else if (granularityMode === 'weekly') {
+        timeSeriesQuery = `
+          SELECT
+            DATE_TRUNC('week', oes.activation_date)::date::text as date,
+            COUNT(DISTINCT oes.drop_number)::text as activated
+          FROM oes_activations oes
+          JOIN drops d ON d.drop_number = oes.drop_number
+          WHERE oes.activation_date >= $1::date
+            AND oes.activation_date <= $2::date
+            AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+          GROUP BY DATE_TRUNC('week', oes.activation_date)
+          ORDER BY DATE_TRUNC('week', oes.activation_date)
+        `;
+      } else {
+        // Cumulative - get daily and we'll accumulate in code
+        timeSeriesQuery = `
+          SELECT
+            oes.activation_date::text as date,
+            COUNT(DISTINCT oes.drop_number)::text as activated
+          FROM oes_activations oes
+          JOIN drops d ON d.drop_number = oes.drop_number
+          WHERE oes.activation_date >= $1::date
+            AND oes.activation_date <= $2::date
+            AND ($3::uuid IS NULL OR d.project_id = $3::uuid)
+          GROUP BY oes.activation_date
+          ORDER BY oes.activation_date
+        `;
+      }
+
+      const timeSeriesResult = await client.query<RawTimeSeriesRow>(timeSeriesQuery, [
+        dateFromStr,
+        dateToStr,
+        projectId,
+      ]);
+
+      // Build hierarchy and flat data
+      const projectMap = new Map<string, ProjectProgressNode>();
+      const flatRows: FlatProgressRow[] = [];
+
+      for (const row of progressResult.rows) {
+        const totalScope = parseInt(row.total_scope, 10);
+        const activated = parseInt(row.activated, 10);
+        const remaining = totalScope - activated;
+        const completionPercent = totalScope > 0 ? Math.round((activated / totalScope) * 10000) / 100 : 0;
+
+        // Add to flat rows
+        flatRows.push({
+          project_id: row.project_id,
+          project_name: row.project_name,
+          zone_no: row.zone_no ?? 0,
+          pon_no: row.pon_no ?? 0,
+          total_scope: totalScope,
+          activated,
+          remaining,
+          completion_percent: completionPercent,
+        });
+
+        // Build hierarchy
+        let projectNode = projectMap.get(row.project_id);
+        if (!projectNode) {
+          projectNode = {
+            project_id: row.project_id,
+            project_name: row.project_name,
+            total_scope: 0,
+            activated: 0,
+            remaining: 0,
+            completion_percent: 0,
+            zones: [],
+          };
+          projectMap.set(row.project_id, projectNode);
+        }
+
+        // Find or create zone
+        const zoneNo = row.zone_no ?? 0;
+        let zoneNode = projectNode.zones.find(z => z.zone_no === zoneNo);
+        if (!zoneNode) {
+          zoneNode = {
+            zone_no: zoneNo,
+            total_scope: 0,
+            activated: 0,
+            remaining: 0,
+            completion_percent: 0,
+            pons: [],
+          };
+          projectNode.zones.push(zoneNode);
+        }
+
+        // Add PON
+        const ponNode: PonProgressNode = {
+          pon_no: row.pon_no ?? 0,
+          total_scope: totalScope,
+          activated,
+          remaining,
+          completion_percent: completionPercent,
+        };
+        zoneNode.pons.push(ponNode);
+
+        // Update zone totals
+        zoneNode.total_scope += totalScope;
+        zoneNode.activated += activated;
+        zoneNode.remaining += remaining;
+
+        // Update project totals
+        projectNode.total_scope += totalScope;
+        projectNode.activated += activated;
+        projectNode.remaining += remaining;
+      }
+
+      // Calculate percentages for zones and projects
+      const hierarchy: ProjectProgressNode[] = [];
+      for (const projectNode of projectMap.values()) {
+        projectNode.completion_percent = projectNode.total_scope > 0
+          ? Math.round((projectNode.activated / projectNode.total_scope) * 10000) / 100
+          : 0;
+
+        for (const zoneNode of projectNode.zones) {
+          zoneNode.completion_percent = zoneNode.total_scope > 0
+            ? Math.round((zoneNode.activated / zoneNode.total_scope) * 10000) / 100
+            : 0;
+          // Sort PONs by pon_no
+          zoneNode.pons.sort((a, b) => a.pon_no - b.pon_no);
+        }
+        // Sort zones by zone_no
+        projectNode.zones.sort((a, b) => a.zone_no - b.zone_no);
+        hierarchy.push(projectNode);
+      }
+      // Sort projects by name
+      hierarchy.sort((a, b) => a.project_name.localeCompare(b.project_name));
+
+      // Calculate summary
+      const totalScope = hierarchy.reduce((sum, p) => sum + p.total_scope, 0);
+      const totalActivated = hierarchy.reduce((sum, p) => sum + p.activated, 0);
+      const totalRemaining = totalScope - totalActivated;
+      const completionPercent = totalScope > 0
+        ? Math.round((totalActivated / totalScope) * 10000) / 100
+        : 0;
+
+      // Calculate days in range
+      const startDate = new Date(dateFromStr as string);
+      const endDate = new Date(dateToStr as string);
+      const daysInRange = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      const activationRatePerDay = Math.round((totalActivated / daysInRange) * 100) / 100;
+
+      // Find first and last activation dates
+      const activationDates = timeSeriesResult.rows.map(r => r.date).filter(d => d);
+      const firstActivationDate = activationDates.length > 0 ? activationDates[0] : null;
+      const lastActivationDate = activationDates.length > 0 ? activationDates[activationDates.length - 1] : null;
+
+      const summary: ActivationProgressSummary = {
+        total_scope: totalScope,
+        total_activated: totalActivated,
+        total_remaining: totalRemaining,
+        completion_percent: completionPercent,
+        activation_rate_per_day: activationRatePerDay,
+        days_in_range: daysInRange,
+        first_activation_date: firstActivationDate ?? null,
+        last_activation_date: lastActivationDate ?? null,
+      };
+
+      // Build time series with cumulative if needed
+      const timeSeries: ActivationTimeSeriesPoint[] = [];
+      let cumulative = 0;
+
+      for (const row of timeSeriesResult.rows) {
+        const activated = parseInt(row.activated, 10);
+        cumulative += activated;
+
+        const point: ActivationTimeSeriesPoint = {
+          date: row.date,
+          label: granularityMode === 'weekly'
+            ? `W${getWeekNumber(new Date(row.date))}`
+            : formatDateLabel(row.date),
+          activated,
+          cumulative,
+          total_scope: totalScope,
+          completion_percent: totalScope > 0
+            ? Math.round((cumulative / totalScope) * 10000) / 100
+            : 0,
+        };
+        timeSeries.push(point);
+      }
+
+      const response: ActivationProgressResponse = {
+        date_range: {
+          from: dateFromStr as string,
+          to: dateToStr as string,
+        },
+        project: projectId,
+        granularity: granularityMode,
+        view: viewMode,
+        summary,
+        hierarchy,
+        flat: flatRows,
+        time_series: timeSeries,
+      };
+
+      log.info('ActivationProgress', 'Report generated', {
+        totalScope,
+        totalActivated,
+        completionPercent,
+        projectCount: hierarchy.length,
+      });
+
+      return res.status(200).json(response);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    log.error('ActivationProgress', 'Failed to generate report', { error });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
+  }
+}
+
+// Helper: Get ISO week number
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+// Helper: Format date label
+function formatDateLabel(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
+}
+
+export default withAuth(withRole('manager')(handler));

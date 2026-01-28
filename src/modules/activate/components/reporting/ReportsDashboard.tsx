@@ -26,6 +26,7 @@ import {
   Repeat,
   FileWarning,
   CircleDollarSign,
+  Target,
 } from 'lucide-react';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
@@ -39,6 +40,7 @@ import { OfflineDevicesReports } from './OfflineDevicesReports';
 import { SerialSwapReports } from './SerialSwapReports';
 import { SerialMismatchReports } from './SerialMismatchReports';
 import { InstallationGapsReports } from './InstallationGapsReports';
+import { ActivationProgressReport } from './ActivationProgressReport';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -95,6 +97,12 @@ const categories: CategoryTab[] = [
     label: 'Installation Gaps',
     icon: CircleDollarSign,
     description: 'Installed but not activated - money spent, work done, never went live',
+  },
+  {
+    id: 'progress',
+    label: 'Activation Progress',
+    icon: Target,
+    description: 'Track activation progress by Project > Zone > PON against total scope',
   },
 ];
 
@@ -424,6 +432,9 @@ export function ReportsDashboard() {
         )}
         {activeCategory === 'gaps' && (
           <InstallationGapsReports filters={filters} refreshKey={refreshKey} />
+        )}
+        {activeCategory === 'progress' && (
+          <ActivationProgressReport filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>

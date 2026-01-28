@@ -465,7 +465,8 @@ export type ReportCategory =
   | 'offline'
   | 'swaps'
   | 'mismatches'
-  | 'gaps'; // Installed but Not Activated - money spent, never went live
+  | 'gaps' // Installed but Not Activated - money spent, never went live
+  | 'progress'; // Activation Progress - Project > Zone > PON tracking
 
 // ============================================================================
 // SERIAL MISMATCH TRACKING TYPES (Installation vs Activation)
@@ -1180,4 +1181,111 @@ export interface OfflineDevicesReportResponse {
   page: number;
   /** Page size */
   page_size: number;
+}
+
+// ============================================================================
+// ACTIVATION PROGRESS REPORT TYPES (Project > Zone > PON tracking)
+// ============================================================================
+
+/**
+ * View mode for activation progress report
+ */
+export type ActivationProgressView = 'hierarchy' | 'flat';
+
+/**
+ * Time granularity for progress tracking
+ */
+export type ActivationProgressGranularity = 'daily' | 'weekly' | 'cumulative';
+
+/**
+ * PON-level progress data
+ */
+export interface PonProgressNode {
+  pon_no: number;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+}
+
+/**
+ * Zone-level progress data
+ */
+export interface ZoneProgressNode {
+  zone_no: number;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+  pons: PonProgressNode[];
+}
+
+/**
+ * Project-level progress data
+ */
+export interface ProjectProgressNode {
+  project_id: string;
+  project_name: string;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+  zones: ZoneProgressNode[];
+}
+
+/**
+ * Flat row for table view
+ */
+export interface FlatProgressRow {
+  project_name: string;
+  project_id: string;
+  zone_no: number;
+  pon_no: number;
+  total_scope: number;
+  activated: number;
+  remaining: number;
+  completion_percent: number;
+}
+
+/**
+ * Time series data point for charts
+ */
+export interface ActivationTimeSeriesPoint {
+  date: string;
+  label: string;
+  activated: number;
+  cumulative: number;
+  total_scope: number;
+  completion_percent: number;
+}
+
+/**
+ * Summary statistics for activation progress
+ */
+export interface ActivationProgressSummary {
+  total_scope: number;
+  total_activated: number;
+  total_remaining: number;
+  completion_percent: number;
+  activation_rate_per_day: number;
+  days_in_range: number;
+  first_activation_date: string | null;
+  last_activation_date: string | null;
+}
+
+/**
+ * API Response for activation progress report
+ */
+export interface ActivationProgressResponse {
+  date_range: {
+    from: string;
+    to: string;
+  };
+  project: string | null;
+  granularity: ActivationProgressGranularity;
+  view: ActivationProgressView;
+  summary: ActivationProgressSummary;
+  hierarchy: ProjectProgressNode[];
+  flat: FlatProgressRow[];
+  time_series: ActivationTimeSeriesPoint[];
 }
