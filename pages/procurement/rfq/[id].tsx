@@ -24,9 +24,11 @@ import {
   Mail,
   Phone,
   ShoppingCart,
+  ScanLine,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { ConvertToPOModal } from '@/components/procurement/rfq/ConvertToPOModal';
+import { QuoteScannerModal } from '@/modules/procurement/quote-scanner';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
@@ -95,6 +97,7 @@ export default function RFQDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'items' | 'suppliers' | 'quotes'>('items');
   const [showConvertToPOModal, setShowConvertToPOModal] = useState(false);
+  const [showQuoteScanner, setShowQuoteScanner] = useState(false);
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -441,6 +444,17 @@ export default function RFQDetailPage() {
                   {/* Quotes Tab */}
                   {activeTab === 'quotes' && (
                     <div className="space-y-3">
+                      {/* Scan Quote Button */}
+                      <div className="flex justify-end mb-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowQuoteScanner(true)}
+                        >
+                          <ScanLine className="h-4 w-4 mr-2" />
+                          Scan Quote Document
+                        </Button>
+                      </div>
                       {rfq.quotes.length === 0 ? (
                         <p className="text-center py-8 text-[var(--ff-text-secondary)]">No quotes received yet</p>
                       ) : (
@@ -561,6 +575,28 @@ export default function RFQDetailPage() {
           }))}
           totalValue={rfq.totalValue}
           onSuccess={handlePOCreated}
+        />
+
+        {/* Quote Scanner Modal */}
+        <QuoteScannerModal
+          isOpen={showQuoteScanner}
+          onClose={() => setShowQuoteScanner(false)}
+          projectId={rfq.projectId}
+          rfqId={rfq.id}
+          rfqNumber={rfq.rfqNumber}
+          rfqItems={rfq.items.map((item) => ({
+            id: item.id,
+            description: item.description,
+            itemCode: undefined,
+            quantity: item.quantity,
+            unit: item.unit,
+          }))}
+          onExtractionComplete={(extraction, matching, extractionId) => {
+            log.info('Quote extraction complete', { extractionId });
+            notificationService.success('Quote scanned successfully! Review the extracted data.');
+            // Refresh the page to show updated quotes if any were created
+            fetchRFQ(rfq.id);
+          }}
         />
       </div>
     </AppLayout>
