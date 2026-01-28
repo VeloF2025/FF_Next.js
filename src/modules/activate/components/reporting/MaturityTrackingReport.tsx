@@ -217,7 +217,7 @@ export function MaturityTrackingReport({ projectId, projectName }: MaturityTrack
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <SummaryCard
           label="Total Projects"
           value={summary.total_projects}
@@ -229,14 +229,27 @@ export function MaturityTrackingReport({ projectId, projectName }: MaturityTrack
           icon={<Target className="w-5 h-5" />}
         />
         <SummaryCard
-          label="Avg Project Age"
-          value={`${summary.avg_age_days} days`}
-          icon={<Clock className="w-5 h-5" />}
+          label="Avg Days to 25%"
+          value={summary.avg_days_to_25_percent !== null ? `${summary.avg_days_to_25_percent}` : '-'}
+          sublabel="milestone"
+          icon={<Gauge className="w-5 h-5 text-red-500" />}
         />
         <SummaryCard
           label="Avg Days to 50%"
           value={summary.avg_days_to_50_percent !== null ? `${summary.avg_days_to_50_percent}` : '-'}
-          icon={<Gauge className="w-5 h-5" />}
+          sublabel="milestone"
+          icon={<Gauge className="w-5 h-5 text-orange-500" />}
+        />
+        <SummaryCard
+          label="Avg Days to 75%"
+          value={summary.avg_days_to_75_percent !== null ? `${summary.avg_days_to_75_percent}` : '-'}
+          sublabel="milestone"
+          icon={<Gauge className="w-5 h-5 text-blue-500" />}
+        />
+        <SummaryCard
+          label="Avg Project Age"
+          value={`${summary.avg_age_days} days`}
+          icon={<Clock className="w-5 h-5" />}
         />
         <SummaryCard
           label="Near Complete"
