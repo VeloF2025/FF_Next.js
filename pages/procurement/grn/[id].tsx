@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { GoodsReceiptNote, GRNStatus, InspectionStatus } from '@/types/procurement/grn.types';
 import { log } from '@/lib/logger';
+import { GRNAssetRegistration } from '@/modules/procurement/components/GRNAssetRegistration';
 
 const statusConfig: Record<GRNStatus, { label: string; color: string; bgColor: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'text-gray-400', bgColor: 'bg-gray-500/20', icon: Clock },
@@ -370,6 +371,21 @@ export default function GRNDetailPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Asset Registration Panel - shown when GRN is completed */}
+              {grn.status === 'completed' && id && typeof id === 'string' && (
+                <GRNAssetRegistration
+                  grnId={id}
+                  onComplete={() => {
+                    // Refresh GRN data after asset registration
+                    fetch(`/api/procurement/grn/${id}`)
+                      .then(res => res.json())
+                      .then(data => {
+                        if (data.success) setGrn(data.data);
+                      });
+                  }}
+                />
+              )}
 
               {/* Discrepancy Notes */}
               {grn.hasDiscrepancy && grn.discrepancyNotes && (
