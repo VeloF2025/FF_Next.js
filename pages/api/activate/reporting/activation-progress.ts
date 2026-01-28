@@ -110,6 +110,8 @@ async function handler(
 
     try {
       // Main query: Get scope and activation counts by project/zone/pon
+      // Activated = has ANY OES activation date (not filtered by date range)
+      // Date range only affects time series chart, not overall progress
       // Only include active projects
       // Support both UUID and project name filtering
       const progressQuery = `
@@ -121,8 +123,6 @@ async function handler(
           COUNT(DISTINCT d.drop_number)::text as total_scope,
           COUNT(DISTINCT CASE
             WHEN oes.activation_date IS NOT NULL
-              AND oes.activation_date >= $1::date
-              AND oes.activation_date <= $2::date
             THEN d.drop_number
           END)::text as activated
         FROM drops d
@@ -130,17 +130,15 @@ async function handler(
         LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
         WHERE p.status = 'active'
           AND (
-            $3::text IS NULL
-            OR ($4::boolean = true AND d.project_id = $3::uuid)
-            OR ($4::boolean = false AND p.project_name = $3::text)
+            $1::text IS NULL
+            OR ($2::boolean = true AND d.project_id = $1::uuid)
+            OR ($2::boolean = false AND p.project_name = $1::text)
           )
         GROUP BY p.id, p.project_name, d.zone_no, d.pon_no
         ORDER BY p.project_name, d.zone_no NULLS LAST, d.pon_no NULLS LAST
       `;
 
       const progressResult = await client.query<RawProgressRow>(progressQuery, [
-        dateFromStr,
-        dateToStr,
         projectFilter,
         isUuid,
       ]);
