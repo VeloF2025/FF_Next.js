@@ -242,21 +242,33 @@ export function QuoteScannerModal({
       // Fetch suppliers and check for matches
       setIsLoadingSuppliers(true);
       try {
-        const suppliersRes = await fetch('/api/suppliers?limit=100&status=active');
+        const suppliersRes = await fetch('/api/suppliers?limit=500&status=active');
         if (suppliersRes.ok) {
           const suppliersData = await suppliersRes.json();
-          const suppliers = suppliersData.data?.suppliers || suppliersData.suppliers || [];
+          // API returns { data: [...suppliers...] } directly, not { data: { suppliers: [...] } }
+          const suppliers = Array.isArray(suppliersData.data)
+            ? suppliersData.data
+            : (suppliersData.data?.suppliers || suppliersData.suppliers || []);
           setExistingSuppliers(suppliers);
 
-          // Try to find a matching supplier by name
-          const extractedName = (extraction.supplier?.name || '').toLowerCase();
-          if (extractedName) {
-            const match = suppliers.find((s: any) =>
-              s.company_name?.toLowerCase().includes(extractedName) ||
-              s.name?.toLowerCase().includes(extractedName) ||
-              extractedName.includes(s.company_name?.toLowerCase() || '') ||
-              extractedName.includes(s.name?.toLowerCase() || '')
-            );
+          // Try to find a matching supplier by name (case-insensitive partial match)
+          const extractedName = (extraction.supplier?.name || '').toLowerCase().trim();
+          if (extractedName && suppliers.length > 0) {
+            // Extract key words from supplier name (first 2-3 words, excluding common suffixes)
+            const keyWords = extractedName
+              .replace(/\(pty\)|ltd|limited|inc|corp|cc|\./gi, '')
+              .trim()
+              .split(/\s+/)
+              .filter(w => w.length > 2)
+              .slice(0, 3);
+
+            const match = suppliers.find((s: any) => {
+              const supplierName = (s.company_name || s.name || '').toLowerCase();
+              // Check if any key word is in the supplier name or vice versa
+              return keyWords.some(word => supplierName.includes(word)) ||
+                     supplierName.split(/\s+/).some((w: string) => extractedName.includes(w) && w.length > 3);
+            });
+
             if (match) {
               setMatchedSupplier({ id: match.id, name: match.company_name || match.name });
               setSelectedSupplierId(match.id);
