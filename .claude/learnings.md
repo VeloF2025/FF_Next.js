@@ -4,6 +4,83 @@
 
 ---
 
+## 2026-01-28: Reporting - Exclude Invalid DRs with INNER JOIN
+
+**Issue:** Daily reporting counts included DRs that don't exist in the SOW-imported `drops` table (e.g., DR18628799 showing "Unknown" project and "DR_NOT_FOUND" error).
+
+**Root Cause:** Using `LEFT JOIN drops` allowed records to be counted even when the DR didn't exist in the drops table.
+
+**File:** `src/modules/activate/services/reportingService.ts`
+
+**Bad Pattern:**
+```sql
+-- ❌ Counts ALL records, even invalid DRs
+SELECT upr.drop_number, d.zone_no
+FROM dr_photo_unified_reviews upr
+LEFT JOIN drops d ON d.drop_number = upr.drop_number
+```
+
+**Good Pattern:**
+```sql
+-- ✅ Only counts DRs that exist in drops table (from SOW import)
+SELECT upr.drop_number, d.zone_no
+FROM dr_photo_unified_reviews upr
+INNER JOIN drops d ON d.drop_number = upr.drop_number
+```
+
+**Affected Queries:**
+1. Daily counts (installed DRs from WA)
+2. Daily counts (activated DRs from OES)
+3. Trend analysis CTEs (wa_counts, oes_counts)
+4. Per-project breakdown (oes_by_project)
+
+**Key Insight:** The `drops` table is the source of truth for valid DR numbers (populated from SOW imports). Any DR not in this table is either:
+- A typo in the submission
+- From a project not yet imported
+- Test/invalid data
+
+Always use `INNER JOIN drops` when counting installation/activation metrics to ensure data integrity.
+
+**Commits:**
+- `a8cae39f` - fix(reporting): exclude invalid DRs from daily counts and trend analysis
+- `9e0ce79e` - fix(reporting): remove non-existent d.project_name column references
+
+---
+
+## 2026-01-28: Drops Table Schema - No project_name Column
+
+**Issue:** SQL query failed with "column d.project_name does not exist" error.
+
+**Root Cause:** The `drops` table has `project_id` (UUID foreign key), NOT `project_name`. To get project name, you must JOIN to the `projects` table.
+
+**Bad Pattern:**
+```sql
+-- ❌ Column doesn't exist
+SELECT d.project_name FROM drops d
+```
+
+**Good Pattern:**
+```sql
+-- ✅ Join to projects table for project name
+SELECT p.project_name
+FROM drops d
+LEFT JOIN projects p ON d.project_id = p.id
+
+-- Or use dr_photo_unified_reviews which stores project name directly
+SELECT upr.project FROM dr_photo_unified_reviews upr
+```
+
+**Drops Table Key Columns:**
+- `drop_number` - DR number (e.g., DR1731166)
+- `project_id` - UUID foreign key to projects
+- `zone_no`, `pon_no`, `pole_number` - Location data
+- `latitude`, `longitude` - Coordinates (source of truth for mapping)
+- `address` - Physical address
+
+**Key Insight:** When building reporting queries, get project name from `dr_photo_unified_reviews.project` (already stored) rather than joining through `drops → projects`.
+
+---
+
 ## 2026-01-28: QField OES Sync - Dual Layer System
 
 **Context:** QField mobile app needs visual distinction between activated (OES report) and remaining (not yet activated) drops.
