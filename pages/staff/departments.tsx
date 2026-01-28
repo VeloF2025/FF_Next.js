@@ -121,12 +121,12 @@ export default function DepartmentsPage() {
     router.push(`/staff/${staffId}`);
   };
 
-  // Calculate stats
+  // Calculate stats (counts come as strings from PostgreSQL)
   const totalDepartments = departments.length;
   const activeDepartments = departments.filter((d) => d.isActive).length;
-  const totalStaff = departments.reduce((sum, d) => sum + d.staffCount, 0);
-  const activeStaff = departments.reduce((sum, d) => sum + d.activeCount, 0);
-  const onLeave = departments.reduce((sum, d) => sum + d.onLeaveCount, 0);
+  const totalStaff = departments.reduce((sum, d) => sum + Number(d.staffCount || 0), 0);
+  const activeStaff = departments.reduce((sum, d) => sum + Number(d.activeCount || 0), 0);
+  const onLeave = departments.reduce((sum, d) => sum + Number(d.onLeaveCount || 0), 0);
 
   // Header actions
   const headerActions = (
