@@ -42,7 +42,7 @@ interface QuoteScannerModalProps {
   ) => void;
 }
 
-type ModalStep = 'upload' | 'processing' | 'complete' | 'error';
+type ModalStep = 'upload' | 'processing' | 'review' | 'complete' | 'error';
 
 // ============================================================================
 // COMPONENT
@@ -65,6 +65,31 @@ export function QuoteScannerModal({
   const [result, setResult] = useState<ExtractQuoteResponse | null>(null);
   const [isCreatingQuote, setIsCreatingQuote] = useState(false);
   const [quoteCreated, setQuoteCreated] = useState(false);
+
+  // Editable extraction data for review step
+  const [editableData, setEditableData] = useState<{
+    supplierName: string;
+    quoteNumber: string;
+    quoteDate: string;
+    validUntil: string;
+    subtotal: string;
+    vatAmount: string;
+    total: string;
+    currency: string;
+    paymentTerms: string;
+    deliveryTerms: string;
+  }>({
+    supplierName: '',
+    quoteNumber: '',
+    quoteDate: '',
+    validUntil: '',
+    subtotal: '',
+    vatAmount: '',
+    total: '',
+    currency: 'ZAR',
+    paymentTerms: '',
+    deliveryTerms: '',
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -187,30 +212,26 @@ export function QuoteScannerModal({
         throw new Error(data.message || data.error || 'Extraction failed');
       }
 
-      setProgress(85);
+      setProgress(100);
       setResult(data);
 
-      // Auto-create the quote from extraction
-      if (data.extractionId) {
-        const createResponse = await fetch('/api/procurement/quotes/create-from-extraction', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ extractionId: data.extractionId }),
-        });
+      // Populate editable data from extraction
+      const extraction = data.extraction;
+      setEditableData({
+        supplierName: extraction.supplier?.name || '',
+        quoteNumber: extraction.quoteInfo?.quoteNumber || '',
+        quoteDate: extraction.quoteInfo?.quoteDate || new Date().toISOString().split('T')[0],
+        validUntil: extraction.quoteInfo?.validUntil || '',
+        subtotal: extraction.totals?.subtotal?.toString() || '',
+        vatAmount: extraction.totals?.vat?.toString() || '',
+        total: extraction.totals?.total?.toString() || '',
+        currency: extraction.totals?.currency || 'ZAR',
+        paymentTerms: extraction.quoteInfo?.paymentTerms || '',
+        deliveryTerms: extraction.quoteInfo?.deliveryTerms || '',
+      });
 
-        const createData = await createResponse.json();
-
-        if (createResponse.ok && createData.success) {
-          setQuoteCreated(true);
-        }
-        // Don't fail if quote creation fails - user can still see extraction
-      }
-
-      setProgress(100);
-      setStep('complete');
-
-      // Notify parent
-      onExtractionComplete(data.extraction, data.matching, data.extractionId);
+      // Go to review step instead of auto-creating
+      setStep('review');
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to extract quote data';
@@ -242,16 +263,42 @@ export function QuoteScannerModal({
     onClose();
   }, [previewUrl, onClose]);
 
-  // Handle creating quote from extraction
+  // Handle creating quote from extraction with user-edited data
   const handleCreateQuote = useCallback(async () => {
     if (!result?.extractionId) return;
 
+    // Validate required fields
+    if (!editableData.supplierName?.trim()) {
+      setError('Supplier name is required');
+      return;
+    }
+    if (!editableData.total || parseFloat(editableData.total) <= 0) {
+      setError('Total amount is required');
+      return;
+    }
+
     setIsCreatingQuote(true);
+    setError(null);
     try {
       const response = await fetch('/api/procurement/quotes/create-from-extraction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ extractionId: result.extractionId }),
+        body: JSON.stringify({
+          extractionId: result.extractionId,
+          // Override with user-edited data
+          overrides: {
+            supplierName: editableData.supplierName.trim(),
+            quoteNumber: editableData.quoteNumber?.trim() || undefined,
+            quoteDate: editableData.quoteDate || undefined,
+            validUntil: editableData.validUntil || undefined,
+            subtotal: editableData.subtotal ? parseFloat(editableData.subtotal) : undefined,
+            vatAmount: editableData.vatAmount ? parseFloat(editableData.vatAmount) : undefined,
+            total: parseFloat(editableData.total),
+            currency: editableData.currency || 'ZAR',
+            paymentTerms: editableData.paymentTerms?.trim() || undefined,
+            deliveryTerms: editableData.deliveryTerms?.trim() || undefined,
+          },
+        }),
       });
 
       const data = await response.json();
@@ -261,12 +308,16 @@ export function QuoteScannerModal({
       }
 
       setQuoteCreated(true);
+      setStep('complete');
+
+      // Notify parent
+      onExtractionComplete(result.extraction, result.matching, result.extractionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create quote');
     } finally {
       setIsCreatingQuote(false);
     }
-  }, [result?.extractionId]);
+  }, [result, editableData, onExtractionComplete]);
 
   if (!isOpen) return null;
 
@@ -426,6 +477,225 @@ export function QuoteScannerModal({
             </div>
           )}
 
+          {step === 'review' && result && (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Review Extracted Data
+                </h3>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Please review and correct any errors before creating the quote.
+              </p>
+
+              {/* Document Preview */}
+              {previewUrl && (
+                <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                  <img
+                    src={previewUrl}
+                    alt="Document"
+                    className="max-h-40 mx-auto rounded"
+                  />
+                </div>
+              )}
+
+              {/* Editable Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Supplier Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editableData.supplierName}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, supplierName: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Enter supplier name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Quote Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={editableData.quoteNumber}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, quoteNumber: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="QUO-001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Quote Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editableData.quoteDate}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, quoteDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Valid Until
+                  </label>
+                  <input
+                    type="date"
+                    value={editableData.validUntil}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, validUntil: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Currency
+                  </label>
+                  <select
+                    value={editableData.currency}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, currency: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="ZAR">ZAR</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="GBP">GBP</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Subtotal
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editableData.subtotal}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, subtotal: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    VAT Amount
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editableData.vatAmount}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, vatAmount: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Total *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editableData.total}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, total: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Payment Terms
+                  </label>
+                  <input
+                    type="text"
+                    value={editableData.paymentTerms}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, paymentTerms: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="e.g., Net 30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Delivery Terms
+                  </label>
+                  <input
+                    type="text"
+                    value={editableData.deliveryTerms}
+                    onChange={(e) => setEditableData(prev => ({ ...prev, deliveryTerms: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="e.g., 7-14 days"
+                  />
+                </div>
+              </div>
+
+              {/* Line Items Preview */}
+              {result.extraction.lineItems && result.extraction.lineItems.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Extracted Line Items ({result.extraction.lineItems.length})
+                  </h4>
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 max-h-40 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-gray-500 dark:text-gray-400">
+                          <th className="pb-2">Description</th>
+                          <th className="pb-2 text-right">Qty</th>
+                          <th className="pb-2 text-right">Unit Price</th>
+                          <th className="pb-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-900 dark:text-white">
+                        {result.extraction.lineItems.slice(0, 10).map((item: any, idx: number) => (
+                          <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
+                            <td className="py-1 truncate max-w-[200px]">{item.description}</td>
+                            <td className="py-1 text-right">{item.quantity}</td>
+                            <td className="py-1 text-right">{item.unitPrice?.toFixed(2)}</td>
+                            <td className="py-1 text-right">{item.totalPrice?.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {result.extraction.lineItems.length > 10 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        + {result.extraction.lineItems.length - 10} more items
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Warnings */}
+              {result.warnings && result.warnings.length > 0 && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300 mb-1">
+                    Warnings:
+                  </p>
+                  <ul className="text-xs text-yellow-700 dark:text-yellow-400 space-y-1">
+                    {result.warnings.slice(0, 3).map((w, i) => (
+                      <li key={i}>• {w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {step === 'complete' && result && (
             <div className="text-center py-8">
               <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-6" />
@@ -528,6 +798,27 @@ export function QuoteScannerModal({
                 'Extract Quote'
               )}
             </Button>
+          )}
+
+          {step === 'review' && (
+            <>
+              <Button variant="outline" onClick={handleReset}>
+                Start Over
+              </Button>
+              <Button
+                onClick={handleCreateQuote}
+                disabled={isCreatingQuote || !editableData.supplierName || !editableData.total}
+              >
+                {isCreatingQuote ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Quote'
+                )}
+              </Button>
+            </>
           )}
 
           {step === 'complete' && !quoteCreated && (

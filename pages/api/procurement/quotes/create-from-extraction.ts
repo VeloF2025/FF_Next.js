@@ -19,7 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
-  const { extractionId, supplierId } = req.body;
+  const { extractionId, supplierId, overrides } = req.body;
 
   if (!extractionId) {
     return apiResponse.validationError(res, { extractionId: 'Extraction ID is required' });
@@ -37,24 +37,38 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const extraction = extractions[0];
 
-    // Check if a quote already exists for this extraction
-    const existingQuotes = await sql`
-      SELECT id FROM quotes
-      WHERE rfq_id = ${extraction.rfq_id}
-        AND quote_number = ${extraction.extracted_quote_number}
-    `;
+    // Use overrides if provided, otherwise fall back to extraction values
+    const supplierName = overrides?.supplierName || extraction.extracted_supplier_name;
+    const quoteNumber = overrides?.quoteNumber || extraction.extracted_quote_number;
+    const quoteDate = overrides?.quoteDate || extraction.extracted_quote_date;
+    const validUntilStr = overrides?.validUntil || extraction.extracted_valid_until;
+    const total = overrides?.total ?? extraction.extracted_total ?? 0;
+    const subtotal = overrides?.subtotal ?? extraction.extracted_subtotal ?? total;
+    const vatAmount = overrides?.vatAmount ?? extraction.extracted_vat_amount ?? 0;
+    const currency = overrides?.currency || extraction.extracted_currency || 'ZAR';
+    const paymentTerms = overrides?.paymentTerms || extraction.extracted_payment_terms;
+    const deliveryTerms = overrides?.deliveryTerms || extraction.extracted_delivery_terms;
 
-    if (existingQuotes.length > 0) {
-      return apiResponse.error(res, 'DUPLICATE_QUOTE', 'A quote with this number already exists for this RFQ');
+    // Check if a quote already exists for this extraction (use actual quote number)
+    if (quoteNumber) {
+      const existingQuotes = await sql`
+        SELECT id FROM quotes
+        WHERE rfq_id = ${extraction.rfq_id}
+          AND quote_number = ${quoteNumber}
+      `;
+
+      if (existingQuotes.length > 0) {
+        return apiResponse.error(res, 'DUPLICATE_QUOTE', 'A quote with this number already exists for this RFQ');
+      }
     }
 
     // Determine supplier_id - use provided or try to match by name
     let finalSupplierId = supplierId;
-    if (!finalSupplierId && extraction.extracted_supplier_name) {
+    if (!finalSupplierId && supplierName) {
       const matchedSuppliers = await sql`
         SELECT id FROM suppliers
-        WHERE LOWER(company_name) LIKE LOWER(${'%' + extraction.extracted_supplier_name + '%'})
-           OR LOWER(name) LIKE LOWER(${'%' + extraction.extracted_supplier_name + '%'})
+        WHERE LOWER(company_name) LIKE LOWER(${'%' + supplierName + '%'})
+           OR LOWER(name) LIKE LOWER(${'%' + supplierName + '%'})
         LIMIT 1
       `;
       if (matchedSuppliers.length > 0) {
@@ -62,20 +76,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    // If still no supplier, create a placeholder or use a default
+    // If still no supplier, create a new one from the data
     if (!finalSupplierId) {
-      // Generate a unique supplier code
       const supplierCode = 'SUP-SCAN-' + Date.now();
-      // Get user ID from auth context
       const createdBy = (req as any).user?.id || 'system';
 
-      // Create a new supplier from extracted data
       const newSupplier = await sql`
         INSERT INTO suppliers (code, name, company_name, email, phone, vat_number, status, created_by)
         VALUES (
           ${supplierCode},
-          ${extraction.extracted_supplier_name || 'Unknown Supplier'},
-          ${extraction.extracted_supplier_name || 'Unknown Supplier'},
+          ${supplierName || 'Unknown Supplier'},
+          ${supplierName || 'Unknown Supplier'},
           ${extraction.extracted_supplier_email || null},
           ${extraction.extracted_supplier_phone || null},
           ${extraction.extracted_supplier_vat || null},
@@ -85,15 +96,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         RETURNING id
       `;
       finalSupplierId = newSupplier[0].id;
-      log.info('[CreateQuote] Created new supplier', { supplierId: finalSupplierId, code: supplierCode });
+      log.info('[CreateQuote] Created new supplier', { supplierId: finalSupplierId, code: supplierCode, name: supplierName });
     }
 
-    // Calculate valid_until (default 30 days if not extracted)
-    const validUntil = extraction.extracted_valid_until
-      ? new Date(extraction.extracted_valid_until)
+    // Calculate valid_until (default 30 days if not provided)
+    const validUntil = validUntilStr
+      ? new Date(validUntilStr)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // Create the quote
+    // Create the quote using user-reviewed values
+    const finalQuoteNumber = quoteNumber || 'SCAN-' + Date.now();
     const newQuote = await sql`
       INSERT INTO quotes (
         rfq_id,
@@ -115,18 +127,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ${extraction.rfq_id},
         ${finalSupplierId},
         ${extraction.project_id},
-        ${extraction.extracted_quote_number || 'SCAN-' + Date.now()},
-        ${extraction.extracted_quote_number},
+        ${finalQuoteNumber},
+        ${quoteNumber || null},
         'received',
-        ${extraction.extracted_quote_date ? new Date(extraction.extracted_quote_date) : new Date()},
+        ${quoteDate ? new Date(quoteDate) : new Date()},
         ${validUntil},
-        ${extraction.extracted_total || 0},
-        ${extraction.extracted_subtotal || extraction.extracted_total || 0},
-        ${extraction.extracted_vat_amount || 0},
-        ${extraction.extracted_currency || 'ZAR'},
-        ${extraction.extracted_payment_terms || null},
-        ${extraction.extracted_delivery_terms || null},
-        ${'Created from scanned document. Extraction ID: ' + extractionId}
+        ${total},
+        ${subtotal},
+        ${vatAmount},
+        ${currency},
+        ${paymentTerms || null},
+        ${deliveryTerms || null},
+        ${'Created from scanned document (reviewed). Extraction ID: ' + extractionId}
       )
       RETURNING id, quote_number
     `;
