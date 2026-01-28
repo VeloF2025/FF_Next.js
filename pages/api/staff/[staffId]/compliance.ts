@@ -8,21 +8,36 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { SA_CONTRACT_CONFIG, SAContractType, mapLegacyContractType } from '@/types/staff/compliance.types';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffComplianceAPI');
 
-// Required documents for full compliance
-// Note: Some types have alternatives (e.g., sa_id OR passport for ID requirement)
-const REQUIRED_DOCUMENTS = [
-  { type: 'id_document', alternativeTypes: ['sa_id', 'passport'], label: 'ID Document / Passport', required: true },
-  { type: 'employment_contract', alternativeTypes: [], label: 'Employment / IC Agreement', required: true },
-  { type: 'bank_details', alternativeTypes: ['bank_statement'], label: 'Bank Confirmation Letter', required: true },
-  { type: 'tax_document', alternativeTypes: [], label: 'Tax Document (IRP5/IT3a)', required: false },
-  { type: 'police_clearance', alternativeTypes: [], label: 'Police Clearance', required: false },
-  { type: 'drivers_license', alternativeTypes: [], label: "Driver's License", required: false },
-  { type: 'medical_certificate', alternativeTypes: [], label: 'Medical Certificate', required: false },
-] as const;
+// Get required documents based on contract type
+function getRequiredDocuments(contractType: SAContractType | null) {
+  const config = contractType ? SA_CONTRACT_CONFIG[contractType] : null;
+  const isEmployee = config?.isEmployee ?? true; // Default to employee if unknown
+
+  return [
+    { type: 'id_document', alternativeTypes: ['sa_id', 'passport'], label: 'ID Document / Passport', required: true },
+    {
+      type: 'employment_contract',
+      alternativeTypes: [],
+      label: isEmployee ? 'Employment Contract' : 'IC Agreement',
+      required: true
+    },
+    { type: 'bank_details', alternativeTypes: ['bank_statement'], label: 'Bank Confirmation Letter', required: true },
+    {
+      type: 'tax_document',
+      alternativeTypes: [],
+      label: isEmployee ? 'Tax Document (IRP5)' : 'Tax Document (IT3a)',
+      required: false
+    },
+    { type: 'police_clearance', alternativeTypes: [], label: 'Police Clearance', required: false },
+    { type: 'drivers_license', alternativeTypes: [], label: "Driver's License", required: false },
+    { type: 'medical_certificate', alternativeTypes: [], label: 'Medical Certificate', required: false },
+  ];
+}
 
 interface DocumentStatus {
   type: string;
@@ -46,6 +61,8 @@ interface ComplianceStatus {
   optionalComplete: number;
   optionalTotal: number;
   documents: DocumentStatus[];
+  contractType: SAContractType | null;
+  isEmployee: boolean;
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -57,6 +74,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     try {
+      // Fetch staff member's contract type
+      const staffResult = await sql`
+        SELECT contract_type FROM staff WHERE id = ${staffId}
+      `;
+      const staffContractType = staffResult[0]?.contract_type as string | null;
+      const contractType = staffContractType ? mapLegacyContractType(staffContractType) : null;
+
+      // Get required documents based on contract type
+      const requiredDocuments = getRequiredDocuments(contractType);
+
       // Fetch all documents for this staff member
       const documents = await sql`
         SELECT
@@ -87,7 +114,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // Build compliance status for each required document type
-      const documentStatuses: DocumentStatus[] = REQUIRED_DOCUMENTS.map(reqDoc => {
+      const documentStatuses: DocumentStatus[] = requiredDocuments.map(reqDoc => {
         // Check primary type first, then alternatives
         let doc = documentsByType.get(reqDoc.type);
         if (!doc && reqDoc.alternativeTypes.length > 0) {
@@ -143,6 +170,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Full compliance requires all required documents to be verified
       const isCompliant = requiredComplete === requiredTotal;
 
+      const config = contractType ? SA_CONTRACT_CONFIG[contractType] : null;
       const complianceStatus: ComplianceStatus = {
         isCompliant,
         requiredComplete,
@@ -150,6 +178,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         optionalComplete,
         optionalTotal,
         documents: documentStatuses,
+        contractType,
+        isEmployee: config?.isEmployee ?? true,
       };
 
       return res.status(200).json(complianceStatus);
