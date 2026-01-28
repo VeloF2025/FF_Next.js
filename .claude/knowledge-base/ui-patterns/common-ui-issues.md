@@ -303,6 +303,40 @@ Dashboard, Fleet, Staff, H&S, Activate, Maintenance
 
 ---
 
+## Toast Notification Patterns
+
+**Symptom:** Red error toast for expected behaviors like session timeout.
+
+**Rule:** Use appropriate toast types based on what happened:
+
+| Scenario | Toast Type | Example |
+|----------|------------|---------|
+| Error (user should worry) | `toast.error()` | "Failed to save changes" |
+| Success | `toast.success()` | "Changes saved" |
+| Info/Expected behavior | `toast()` with custom style | "Session timed out" |
+| Warning | `toast()` with amber style | "Low disk space" |
+
+**Session Timeout Pattern:**
+```typescript
+// ❌ BAD - treats expected behavior as error
+toast.error('Your session has expired. Please sign in again.');
+
+// ✅ GOOD - neutral notification for expected behavior
+toast('Session timed out. Redirecting to sign in...', {
+  duration: 3000,
+  icon: '⏱️',
+  style: {
+    background: '#374151', // gray-700
+    color: '#f9fafb',      // gray-50
+    borderRadius: '8px',
+  },
+});
+```
+
+**Reference:** `src/lib/authErrorHandler.ts` - Fixed 2026-01-28
+
+---
+
 ## Audit Checklist
 
 When auditing a page, check:
