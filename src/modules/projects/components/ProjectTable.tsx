@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, TrendingUp, AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface ProjectTableProps {
   projects: any[] | undefined;
@@ -82,6 +82,59 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
     );
   };
 
+  const getBudgetHealthBadge = (project: any) => {
+    const health = project.budget_health || 'not_set';
+    const utilization = project.budget_utilization || 0;
+    const hasBudget = project.budget_total || project.budget;
+
+    if (!hasBudget) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-gray-500/20 text-gray-400">
+          No budget
+        </span>
+      );
+    }
+
+    const healthConfig: Record<string, { bg: string; icon: React.ReactNode; label: string }> = {
+      healthy: {
+        bg: 'bg-green-500/20 text-green-400',
+        icon: <TrendingUp className="w-3 h-3" />,
+        label: 'Healthy',
+      },
+      warning: {
+        bg: 'bg-yellow-500/20 text-yellow-400',
+        icon: <AlertTriangle className="w-3 h-3" />,
+        label: 'Warning',
+      },
+      critical: {
+        bg: 'bg-red-500/20 text-red-400',
+        icon: <AlertCircle className="w-3 h-3" />,
+        label: 'Critical',
+      },
+      not_set: {
+        bg: 'bg-gray-500/20 text-gray-400',
+        icon: null,
+        label: 'Not set',
+      },
+    };
+
+    const config = healthConfig[health] || healthConfig.not_set;
+
+    return (
+      <div className="flex flex-col gap-1">
+        <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg}`}>
+          {config.icon}
+          {config.label}
+        </span>
+        {utilization > 0 && (
+          <span className="text-xs text-[var(--ff-text-tertiary)]">
+            {utilization}% used
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
@@ -109,6 +162,9 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Budget
               </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                Health
+              </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                 Actions
               </th>
@@ -117,7 +173,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
           <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
             {isLoading && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
+                <td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   Loading projects...
                 </td>
               </tr>
@@ -125,7 +181,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
 
             {error && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-red-600">
+                <td colSpan={9} className="px-4 py-8 text-center text-red-600">
                   Error loading projects: {error.message}
                 </td>
               </tr>
@@ -133,7 +189,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
 
             {projects && projects.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
+                <td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-secondary)]">
                   No projects found
                 </td>
               </tr>
@@ -172,8 +228,16 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-[var(--ff-text-primary)]">
-                    {formatCurrency(Number(project.budget_allocated || project.budget))}
+                    {formatCurrency(Number(project.budget_total || project.budget_allocated || project.budget))}
                   </div>
+                  {project.budget_actual > 0 && (
+                    <div className="text-xs text-[var(--ff-text-secondary)]">
+                      Spent: {formatCurrency(Number(project.budget_actual))}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap">
+                  {getBudgetHealthBadge(project)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-2">

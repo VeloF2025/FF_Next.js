@@ -67,7 +67,17 @@ export interface TabConfig {
 }
 
 /**
- * Get tab configuration
+ * Grouped tab configuration for Project Detail
+ * Groups: Overview, Work, Contracts, Planning, Operations, Finance
+ */
+export interface TabGroup {
+  id: string;
+  label: string;
+  tabs: TabConfig[];
+}
+
+/**
+ * Get flat tab configuration (legacy support)
  * Sprint 1: Added Team, Procurement, Maintenance tabs
  */
 export const getTabConfig = (): TabConfig[] => [
@@ -81,4 +91,52 @@ export const getTabConfig = (): TabConfig[] => [
   { id: 'timeline', label: 'Timeline' },
   { id: 'budget', label: 'Budget' },
   { id: 'hs', label: 'Health & Safety' },
+];
+
+/**
+ * Get grouped tab configuration for Project Detail
+ * Organizes tabs into logical groups for better navigation
+ */
+export const getGroupedTabConfig = (): TabGroup[] => [
+  {
+    id: 'overview',
+    label: 'Overview',
+    tabs: [{ id: 'overview', label: 'Overview' }],
+  },
+  {
+    id: 'work',
+    label: 'Work',
+    tabs: [
+      { id: 'sow', label: 'SOW/Contractors' },
+      { id: 'boq', label: 'BOQ/Materials' },
+      { id: 'team', label: 'Team' },
+    ],
+  },
+  {
+    id: 'contracts',
+    label: 'Contracts',
+    tabs: [{ id: 'agreements', label: 'Agreements' }],
+  },
+  {
+    id: 'planning',
+    label: 'Planning',
+    tabs: [
+      { id: 'timeline', label: 'Timeline' },
+      { id: 'hierarchy', label: 'Hierarchy' },
+    ],
+  },
+  {
+    id: 'operations',
+    label: 'Operations',
+    tabs: [
+      { id: 'procurement', label: 'Procurement' },
+      { id: 'maintenance', label: 'Maintenance' },
+      { id: 'hs', label: 'Health & Safety' },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    tabs: [{ id: 'budget', label: 'Budget' }],
+  },
 ];

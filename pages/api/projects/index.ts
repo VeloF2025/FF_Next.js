@@ -332,9 +332,19 @@ async function handler(
                 p.location,
                 p.created_at,
                 p.updated_at,
-                c.company_name as client_name
+                c.company_name as client_name,
+                -- Budget health fields
+                p.budget_status,
+                p.budget_health,
+                p.budget_utilization,
+                -- Budget summary from project_budgets
+                pb.total_budget as budget_total,
+                pb.committed_amount as budget_committed,
+                pb.actual_amount as budget_actual,
+                pb.available_budget as budget_available
               FROM projects p
               LEFT JOIN clients c ON p.client_id = c.id
+              LEFT JOIN project_budgets pb ON pb.project_id = p.id
               ORDER BY p.created_at DESC
               LIMIT ${limitValue}
             `;

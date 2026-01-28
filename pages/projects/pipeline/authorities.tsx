@@ -5,11 +5,10 @@
 
 import type { NextPage } from 'next';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ModulePage } from '@/components/module-page';
+import { projectsConfig } from '@/modules/navigation';
 import {
-  ArrowLeft,
-  Building,
   Plus,
   Search,
   Edit,
@@ -238,45 +237,28 @@ const AuthoritiesPage: NextPage = () => {
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/projects/pipeline"
-                className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] flex items-center gap-2">
-                  <Building className="w-7 h-7 text-[var(--ff-accent)]" />
-                  Service Authorities
-                </h1>
-                <p className="text-[var(--ff-text-secondary)] mt-1">
-                  Manage authority contacts for approval processes
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={loadAuthorities}
-                className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={openCreateModal}
-                className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Add Authority
-              </button>
-            </div>
+      <ModulePage
+        config={projectsConfig}
+        headerActions={
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadAuthorities}
+              className="p-2 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Add Authority
+            </button>
           </div>
-
+        }
+      >
+        <div className="max-w-7xl mx-auto">
           {/* Filters */}
           <div className="flex items-center gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
@@ -485,9 +467,8 @@ const AuthoritiesPage: NextPage = () => {
             )}
           </div>
         </div>
-      </div>
 
-      {/* Create/Edit Modal */}
+        {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -700,6 +681,7 @@ const AuthoritiesPage: NextPage = () => {
           </div>
         </div>
       )}
+      </ModulePage>
     </AppLayout>
   );
 };

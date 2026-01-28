@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
 import { ProjectHSTab } from '@/modules/health-safety/components';
+import BOQList from '@/components/procurement/boq/BOQList';
 
 // Import split components
 import { ProjectInfoCard } from './detail/ProjectInfoCard';
@@ -147,6 +148,18 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'sow' && (
         <EnhancedSOWDisplay projectId={id!} projectName={project.name} />
+      )}
+
+      {activeTab === 'boq' && (
+        <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+          <div className="p-4 border-b border-[var(--ff-border-light)]">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Bill of Quantities</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+              Materials and equipment allocated to this project from BOQ imports
+            </p>
+          </div>
+          <BOQList projectId={id} />
+        </div>
       )}
 
       {activeTab === 'agreements' && (
