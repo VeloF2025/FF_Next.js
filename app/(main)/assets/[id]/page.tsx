@@ -22,13 +22,17 @@ import {
   File,
   Download,
   Eye,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingCart,
+  Truck,
+  ExternalLink,
 } from 'lucide-react';
 import { DOCUMENT_TYPE_CONFIG, type DocumentTypeValue } from '@/modules/assets/types/document';
 import { ASSET_STATUS_CONFIG } from '@/modules/assets/constants/assetStatus';
 import { CheckInButton } from './CheckInButton';
 import { DeleteDocumentButton } from './DeleteDocumentButton';
 import { DeleteAssetButton } from './DeleteAssetButton';
+import { AssetVerificationSection } from './AssetVerificationSection';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -582,6 +586,60 @@ export default async function AssetDetailPage({ params }: PageProps) {
               </div>
             </dl>
           </div>
+
+          {/* Verification Section */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900/50 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+              <Shield className="h-5 w-5 mr-2 text-purple-500" />
+              Label Verification
+            </h2>
+            <AssetVerificationSection
+              assetId={id}
+              verificationStatus={asset.verificationStatus || null}
+              verifiedAt={asset.verifiedAt?.toISOString() || null}
+              verifiedBy={asset.verifiedBy || null}
+            />
+          </div>
+
+          {/* Procurement Links */}
+          {(asset.poId || asset.grnId) && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-900/50 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <ShoppingCart className="h-5 w-5 mr-2 text-blue-500" />
+                Procurement
+              </h2>
+              <dl className="space-y-3">
+                {asset.poNumber && (
+                  <div>
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Purchase Order</dt>
+                    <dd className="text-sm font-medium">
+                      <Link
+                        href={`/procurement/purchase-orders/${asset.poId}`}
+                        className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        {asset.poNumber}
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </dd>
+                  </div>
+                )}
+                {asset.grnNumber && (
+                  <div>
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Goods Receipt</dt>
+                    <dd className="text-sm font-medium">
+                      <Link
+                        href={`/procurement/grn/${asset.grnId}`}
+                        className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        {asset.grnNumber}
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
 
           {/* Notes */}
           {asset.notes && (

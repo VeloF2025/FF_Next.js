@@ -102,6 +102,33 @@ export interface Asset {
   primaryImageUrl?: string;
   imageUrls?: string[];
 
+  // Procurement Links (Sprint 4)
+  poId?: string;
+  poNumber?: string;
+  grnId?: string;
+  grnNumber?: string;
+  stockItemId?: string;
+
+  // VLM Extraction (Sprint 4)
+  labelImageUrl?: string;
+  vlmExtractedAt?: Date;
+  vlmExtractionData?: Record<string, unknown>;
+
+  // Verification (Sprint 4)
+  verificationStatus?: 'verified' | 'mismatch' | 'pending';
+  verifiedAt?: Date;
+  verifiedBy?: string;
+  verificationImageUrl?: string;
+  verificationMismatches?: Array<{
+    field: string;
+    expected: string | null;
+    found: string | null;
+  }>;
+
+  // Odoo Sync (Sprint 3)
+  odooProductId?: number;
+  odooVehicleId?: number;
+
   // Audit
   createdAt: Date;
   updatedAt: Date;

@@ -88,6 +88,26 @@ function transformRow(row: Record<string, unknown>): Asset {
     tags: row.tags as string[],
     primaryImageUrl: row.primary_image_url as string | undefined,
     imageUrls: row.image_urls as string[],
+    // Procurement Links (Sprint 4)
+    poId: row.po_id as string | undefined,
+    poNumber: row.po_number as string | undefined,
+    grnId: row.grn_id as string | undefined,
+    grnNumber: row.grn_number as string | undefined,
+    stockItemId: row.stock_item_id as string | undefined,
+    // VLM Extraction
+    labelImageUrl: row.label_image_url as string | undefined,
+    vlmExtractedAt: row.vlm_extracted_at ? new Date(row.vlm_extracted_at as string) : undefined,
+    vlmExtractionData: row.vlm_extraction_data as Record<string, unknown> | undefined,
+    // Verification
+    verificationStatus: row.verification_status as Asset['verificationStatus'],
+    verifiedAt: row.verified_at ? new Date(row.verified_at as string) : undefined,
+    verifiedBy: row.verified_by as string | undefined,
+    verificationImageUrl: row.verification_image_url as string | undefined,
+    verificationMismatches: row.verification_mismatches as Asset['verificationMismatches'],
+    // Odoo Sync
+    odooProductId: row.odoo_product_id as number | undefined,
+    odooVehicleId: row.odoo_vehicle_id as number | undefined,
+    // Audit
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
     createdBy: row.created_by as string,
@@ -201,7 +221,14 @@ export const assetService = {
     try {
       const sql = getDbConnection();
       const [row] = await sql`
-        SELECT * FROM assets WHERE id = ${id}
+        SELECT
+          a.*,
+          po.po_number,
+          grn.grn_number
+        FROM assets a
+        LEFT JOIN purchase_orders po ON a.po_id = po.id
+        LEFT JOIN goods_receipt_notes grn ON a.grn_id = grn.id
+        WHERE a.id = ${id}
       `;
 
       return {
