@@ -1,22 +1,15 @@
 /**
  * API Route: /api/activate/sync-oes-to-qfield
  *
- * Purpose: Sync OES activation data to QFieldCloud as a GeoJSON file
+ * Purpose: Sync OES activation data AND remaining drops to QFieldCloud as GeoJSON files
  * Method: POST
  *
- * This endpoint:
- * 1. Fetches OES activations joined with drops table (source of truth for coordinates)
- * 2. Uses drops table coordinates (from Neon DB) - matches manual QGIS import
- * 3. Filters to valid South Africa bounding box coordinates
- * 4. Uploads to QFieldCloud as "OES FF DD-MM-YYYY.geojson" (dated file, persists)
- * 5. Syncs to all sync-enabled projects (or specific project if provided)
+ * This endpoint creates TWO layers:
+ * 1. OES FF DD-MM-YYYY.geojson - Activated drops (in oes_activations) - ORANGE dots
+ * 2. Remaining Drops DD-MM-YYYY.geojson - Unactivated drops (NOT in oes_activations) - GREEN dots
  *
  * Coordinate Source: drops table (Neon DB) - NOT OES/Nokia coordinates
- * This ensures our layer matches the manual GPKG imports which also use drops coords.
- *
- * QField Styling:
- * - Pink circles for OES activation points
- * - Enable labels using the 'label' field (drop_number)
+ * This ensures our layers match the manual GPKG imports which also use drops coords.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -79,6 +72,14 @@ interface OESPoint {
   current_ont_rx: number;
   status: string;
   // Coordinates from drops table (source of truth)
+  latitude: number;
+  longitude: number;
+}
+
+interface RemainingDrop {
+  drop_number: string;
+  project_name: string | null;
+  address: string | null;
   latitude: number;
   longitude: number;
 }
@@ -285,6 +286,16 @@ function getOESReportFilename(reportDate: Date): string {
 }
 
 /**
+ * Generate Remaining Drops filename with date: "Remaining Drops DD-MM-YYYY.geojson"
+ */
+function getRemainingDropsFilename(reportDate: Date): string {
+  const yyyy = String(reportDate.getFullYear());
+  const mm = String(reportDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(reportDate.getDate()).padStart(2, '0');
+  return `Remaining Drops ${dd}-${mm}-${yyyy}.geojson`;
+}
+
+/**
  * Delete existing OES Report file from QFieldCloud
  */
 async function deleteExistingOESFile(projectId: string, filename: string): Promise<void> {
@@ -457,22 +468,85 @@ async function handler(
       }
     }
 
-    // Generate filename with the report date: "OES FF DD-MM-YYYY.geojson"
+    // Generate filenames with the report date
     const oesFilename = getOESReportFilename(filenameDate);
-    log.info('OESSync', `Using filename: ${oesFilename} (based on report date: ${filenameDate.toISOString()})`);
+    const remainingFilename = getRemainingDropsFilename(filenameDate);
+    log.info('OESSync', `Using filenames: ${oesFilename}, ${remainingFilename}`);
 
-    // Step 3: Sync to each target project
+    // Step 3: Fetch REMAINING drops (drops NOT in oes_activations)
+    const remainingQuery = `
+      SELECT
+        d.drop_number,
+        p.project_name,
+        d.address,
+        d.latitude,
+        d.longitude
+      FROM drops d
+      LEFT JOIN projects p ON d.project_id = p.id
+      WHERE d.latitude IS NOT NULL
+        AND d.longitude IS NOT NULL
+        AND d.latitude != 0
+        AND d.longitude != 0
+        AND d.latitude BETWEEN ${SA_BOUNDS.minLat} AND ${SA_BOUNDS.maxLat}
+        AND d.longitude BETWEEN ${SA_BOUNDS.minLon} AND ${SA_BOUNDS.maxLon}
+        AND NOT EXISTS (
+          SELECT 1 FROM oes_activations oes
+          WHERE oes.drop_id = d.id
+        )
+      ORDER BY d.drop_number
+    `;
+
+    const remainingResult = await pool.query(remainingQuery);
+    const remainingDrops: RemainingDrop[] = remainingResult.rows;
+
+    log.info('OESSync', `Found ${remainingDrops.length} remaining (unactivated) drops`);
+
+    // Convert remaining drops to GeoJSON
+    const remainingFeatures: GeoJSONFeature[] = remainingDrops.map(drop => ({
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [Number(drop.longitude), Number(drop.latitude)] as [number, number]
+      },
+      properties: {
+        drop_number: drop.drop_number,
+        serial_number: '',
+        activation_date: '',
+        team: drop.project_name || 'Unknown',
+        ont_rx_sig_dbm: 0,
+        current_ont_rx: 0,
+        status: 'Pending',
+        label: drop.drop_number
+      }
+    }));
+
+    const remainingGeojson: GeoJSONFeatureCollection = {
+      type: 'FeatureCollection',
+      features: remainingFeatures,
+      crs: {
+        type: 'name',
+        properties: {
+          name: 'EPSG:4326'
+        }
+      }
+    };
+
+    // Step 4: Sync both files to each target project
     const syncResults: { projectId: string; success: boolean; error?: string }[] = [];
 
     for (const pid of targetProjectIds) {
       try {
         log.info('OESSync', `Syncing to project ${pid}...`);
 
-        // Delete existing OES file (if any)
+        // Delete existing files (if any)
         await deleteExistingOESFile(pid, oesFilename);
+        await deleteExistingOESFile(pid, remainingFilename);
 
-        // Upload new OES GeoJSON file
+        // Upload OES GeoJSON file (activated drops - orange)
         await uploadOESFile(pid, geojson, oesFilename);
+
+        // Upload Remaining Drops GeoJSON file (unactivated - green)
+        await uploadOESFile(pid, remainingGeojson, remainingFilename);
 
         // Update last_synced_at in FibreFlow DB
         try {
@@ -498,10 +572,15 @@ async function handler(
 
     return res.status(200).json({
       success: successCount > 0,
-      message: `OES data synced to ${successCount}/${targetProjectIds.length} QField project(s)${failCount > 0 ? ` (${failCount} failed)` : ''}`,
-      totalPoints: features.length,
+      message: `Synced ${features.length} activated + ${remainingFeatures.length} remaining drops to ${successCount}/${targetProjectIds.length} project(s)`,
+      activatedCount: features.length,
+      remainingCount: remainingFeatures.length,
+      totalPoints: features.length + remainingFeatures.length,
       syncResults,
-      filename: oesFilename,
+      files: {
+        activated: oesFilename,
+        remaining: remainingFilename,
+      },
     });
 
   } catch (error) {
