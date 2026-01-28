@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { assignmentService } from '@/modules/assets/services';
 
 interface RouteParams {
@@ -46,6 +47,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    // Revalidate asset pages (checkin changes assigned → available counts)
+    revalidatePath('/assets');
+    revalidatePath('/assets/list');
+    revalidatePath(`/assets/${assetId}`);
 
     return NextResponse.json({
       data: result.data,

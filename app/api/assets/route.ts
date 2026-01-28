@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { assetService } from '@/modules/assets/services';
 import { AssetFilterSchema, CreateAssetSchema } from '@/modules/assets/utils/schemas';
 import { log } from '@/lib/logger';
@@ -86,6 +87,10 @@ export async function POST(req: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    // Revalidate asset pages (new asset affects counts)
+    revalidatePath('/assets');
+    revalidatePath('/assets/list');
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error) {

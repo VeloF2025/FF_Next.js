@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { assignmentService } from '@/modules/assets/services';
 import { CheckoutAssetSchema } from '@/modules/assets/utils/schemas';
 
@@ -41,6 +42,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       }
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    // Revalidate asset pages (checkout changes available → assigned counts)
+    revalidatePath('/assets');
+    revalidatePath('/assets/list');
+    revalidatePath(`/assets/${id}`);
 
     return NextResponse.json({ data: result.data }, { status: 201 });
   } catch (error) {

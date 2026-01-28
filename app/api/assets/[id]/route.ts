@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { assetService } from '@/modules/assets/services';
 import { UpdateAssetSchema } from '@/modules/assets/utils/schemas';
 
@@ -67,6 +68,11 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
+    // Revalidate asset pages (status changes affect counts)
+    revalidatePath('/assets');
+    revalidatePath('/assets/list');
+    revalidatePath(`/assets/${id}`);
+
     return NextResponse.json({ data: result.data });
   } catch (error) {
     console.error('Error updating asset:', error);
@@ -91,6 +97,10 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
       }
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+
+    // Revalidate asset pages to update counts
+    revalidatePath('/assets');
+    revalidatePath('/assets/list');
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
