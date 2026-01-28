@@ -3028,3 +3028,116 @@ const results = await readBarcodesFromImageData(imageData, {
 - `scripts/test-enhanced-barcode.ts` (test script)
 
 ---
+
+## 2026-01-28: VS Code OOM Crashes During Deployments
+
+**Issue:** VS Code crashes with V8 OOM (Out of Memory) error when deploying to multiple servers. Crash dumps show:
+```
+OOM error in V8: MarkCompactCollector: young object promotion failed
+Scavenge 3340.9 (3409.0) -> 3338.2 (3406.4) MB... allocation failure
+```
+
+**Root Cause:**
+1. Project has **43,638 TypeScript files** (39K in node_modules)
+2. Deployment triggers git operations → file change events
+3. TypeScript server tries to re-index during heavy I/O
+4. V8 heap exhausts at ~3.3GB
+
+**Why Settings Didn't Work Initially:**
+- `argv.json` with `--max-old-space-size` only affects main Electron process
+- **Extension host** (where TS server runs) is a separate Node process
+- Extension host needs `NODE_OPTIONS` environment variable
+
+**Solution - Three Parts:**
+
+1. **argv.json** (main process):
+```json
+{
+  "js-flags": "--max-old-space-size=16384",
+  "disable-hardware-acceleration": false
+}
+```
+
+2. **~/.bashrc** (terminal launches):
+```bash
+export NODE_OPTIONS="--max-old-space-size=16384"
+```
+
+3. **~/.local/share/applications/code.desktop** (GUI launches):
+```ini
+Exec=env NODE_OPTIONS="--max-old-space-size=16384" /usr/share/code/code %F
+```
+
+4. **VS Code settings** (efficiency):
+```json
+{
+  "extensions.experimental.affinity": {
+    "vscode.git": 1,
+    "vscode.github": 1,
+    "anthropic.claude-code": 2
+  },
+  "typescript.tsserver.watchOptions": {
+    "watchFile": "useFsEventsOnParentDirectory",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "dynamicPriority"
+  }
+}
+```
+
+**Key Insight:** Extension affinity separates extensions into different processes - if one crashes, others survive. TypeScript watch options use efficient OS-native file events instead of polling.
+
+**Files:** 
+- `~/.config/Code/argv.json`
+- `~/.config/Code/User/settings.json`
+- `~/.local/share/applications/code.desktop`
+- `~/.bashrc`
+
+---
+
+## 2026-01-28: Access Control UX Improvements
+
+**Issue:** Access Control tab had poor search UX and clunky toggle controls for managing user permissions.
+
+**Improvements Made:**
+
+1. **Enhanced Search:**
+   - Debounced input (300ms) with loading indicator
+   - Keyboard shortcut: `Ctrl+K` to focus, `Escape` to clear
+   - Clear button (X) when text present
+   - Results count shown below search
+
+2. **Stats Dashboard:**
+```tsx
+<div className="grid grid-cols-4 gap-4">
+  <StatCard label="Total Users" value={total} icon={Users} color="blue" />
+  <StatCard label="Active" value={active} icon={UserCheck} color="green" />
+  <StatCard label="Inactive" value={inactive} icon={UserX} color="red" />
+  <StatCard label="Admins" value={admins} icon={ShieldCheck} color="orange" />
+</div>
+```
+
+3. **Toggle Switches for Status:**
+```tsx
+// Custom ToggleSwitch component
+<ToggleSwitch
+  checked={user.isActive}
+  onChange={() => toggleUserStatus(user.id, user.isActive)}
+  activeColor="green"
+  label={user.isActive ? 'Click to deactivate' : 'Click to activate'}
+/>
+```
+
+4. **Quick Actions:**
+   - "Full Access" button grants super_admin with one click
+   - Loading spinner per-user during updates
+   - Instant local state update for responsiveness
+
+5. **Visual Improvements:**
+   - User avatars with gradient colors (orange for admins)
+   - Admin badge icon (ShieldCheck) next to admin names
+   - Role dropdown with colored borders by role level
+   - Status filter as button group instead of dropdown
+
+**Files:** `src/components/settings/AccessControlTab.tsx`
+
+---
