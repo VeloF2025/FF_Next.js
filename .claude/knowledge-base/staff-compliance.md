@@ -21,13 +21,21 @@ Staff compliance tracks whether employees/contractors have uploaded and verified
 
 As of 2026-01-28, these documents are **required** for compliance:
 
-| Document Type | DB Value | Label | Notes |
-|---------------|----------|-------|-------|
-| SA ID / Passport | `sa_id`, `passport` | ID Document / Passport | Either satisfies requirement |
-| Employment / IC Agreement | `employment_contract` | Employment / IC Agreement | Covers both employee contracts and IC agreements |
-| Bank Confirmation | `bank_details`, `bank_statement` | Bank Confirmation Letter | Either satisfies requirement |
+| Document Type | DB Value | Label (Employee) | Label (Contractor) |
+|---------------|----------|------------------|-------------------|
+| SA ID / Passport | `sa_id`, `passport` | ID Document / Passport | ID Document / Passport |
+| Contract | `employment_contract` | **Employment Contract** | **IC Agreement** |
+| Bank Confirmation | `bank_details`, `bank_statement` | Bank Confirmation Letter | Bank Confirmation Letter |
 
-**Optional documents:** tax_document, police_clearance, drivers_license, medical_certificate
+**Optional documents (dynamic labels):**
+| Document Type | DB Value | Label (Employee) | Label (Contractor) |
+|---------------|----------|------------------|-------------------|
+| Tax Document | `tax_document` | Tax Document (IRP5) | Tax Document (IT3a) |
+| Police Clearance | `police_clearance` | Police Clearance | Police Clearance |
+| Driver's License | `drivers_license` | Driver's License | Driver's License |
+| Medical Certificate | `medical_certificate` | Medical Certificate | Medical Certificate |
+
+**Note:** Labels change dynamically based on staff's `contract_type` field.
 
 ---
 
@@ -63,7 +71,7 @@ interface ComplianceStats {
 
 ### GET /api/staff/[staffId]/compliance
 
-Returns document status for a single staff member.
+Returns document status for a single staff member with **dynamic labels** based on contract type.
 
 **Response:**
 ```typescript
@@ -74,6 +82,8 @@ interface ComplianceStatus {
   optionalComplete: number;
   optionalTotal: number;
   documents: DocumentStatus[];
+  contractType: SAContractType | null;  // Added 2026-01-28
+  isEmployee: boolean;                   // Added 2026-01-28
 }
 
 interface DocumentStatus {
@@ -114,6 +124,46 @@ updated_at TIMESTAMP
 
 ---
 
+## Contract Type Handling
+
+The compliance API dynamically determines labels based on staff's `contract_type` field.
+
+### SAContractType Enum
+
+```typescript
+enum SAContractType {
+  PERMANENT = 'permanent',           // Employee
+  FIXED_TERM = 'fixed_term',         // Employee
+  PART_TIME = 'part_time',           // Employee
+  TEMPORARY = 'temporary',           // Employee
+  INDEPENDENT_CONTRACTOR = 'independent_contractor',  // NOT Employee
+  INTERN = 'intern',                 // Employee
+}
+```
+
+### Legacy Value Mapping
+
+Database may contain legacy values. `mapLegacyContractType()` handles conversion:
+
+| DB Value | Maps To | isEmployee |
+|----------|---------|------------|
+| `permanent` | PERMANENT | ✅ true |
+| `full-time` | PERMANENT | ✅ true |
+| `fulltime` | PERMANENT | ✅ true |
+| `fixed-term` | FIXED_TERM | ✅ true |
+| `fixed_term` | FIXED_TERM | ✅ true |
+| `contract` | FIXED_TERM | ✅ true |
+| `part_time` | PART_TIME | ✅ true |
+| `temporary` | TEMPORARY | ✅ true |
+| `independent_contractor` | INDEPENDENT_CONTRACTOR | ❌ false |
+| `freelance` | INDEPENDENT_CONTRACTOR | ❌ false |
+| `consultant` | INDEPENDENT_CONTRACTOR | ❌ false |
+| `intern` | INTERN | ✅ true |
+
+**Location:** `src/types/staff/compliance.types.ts`
+
+---
+
 ## Common Issues
 
 ### Document Not Showing as Required
@@ -122,14 +172,34 @@ updated_at TIMESTAMP
 
 **Checklist:**
 1. Check `/api/staff/alerts.ts` - Is document type in the query?
-2. Check `/api/staff/[staffId]/compliance.ts` - Is it in REQUIRED_DOCUMENTS array?
+2. Check `/api/staff/[staffId]/compliance.ts` - Is it in `getRequiredDocuments()` array?
 3. Check document_type value matches exactly (case-sensitive)
+
+### Wrong Label Showing (Employee vs IC)
+
+**Symptom:** Shows "Employment Contract" for independent contractor or "IC Agreement" for employee.
+
+**Checklist:**
+1. Check staff's `contract_type` in database
+2. Verify `mapLegacyContractType()` handles the DB value
+3. Check `SA_CONTRACT_CONFIG[contractType].isEmployee` returns correct value
+
+### Contract Type Dropdown Not Persisting
+
+**Symptom:** Staff edit form contract type dropdown shows wrong value or resets.
+
+**Fix:** Ensure `StaffEditForm` maps `contract_type` to `saContractType` on initialization:
+```typescript
+saContractType: existingStaff?.contract_type
+  ? mapLegacyContractType(existingStaff.contract_type)
+  : SAContractType.PERMANENT
+```
 
 ### Employee vs IC Agreement
 
-Both use `document_type = 'employment_contract'`. The label "Employment / IC Agreement" clarifies this covers:
-- Employment contracts (for employees)
-- Independent Contractor agreements (for contractors)
+Both use `document_type = 'employment_contract'`. The label changes dynamically:
+- **Employees** (isEmployee=true): Shows "Employment Contract"
+- **Contractors** (isEmployee=false): Shows "IC Agreement"
 
 ---
 
@@ -138,13 +208,20 @@ Both use `document_type = 'employment_contract'`. The label "Employment / IC Agr
 | File | Purpose |
 |------|---------|
 | `pages/api/staff/alerts.ts` | Overview compliance stats API |
-| `pages/api/staff/[staffId]/compliance.ts` | Individual compliance API |
+| `pages/api/staff/[staffId]/compliance.ts` | Individual compliance API (dynamic labels) |
 | `pages/staff/compliance.tsx` | Compliance overview page |
 | `src/modules/staff/components/tabs/ComplianceTab.tsx` | Individual compliance UI |
+| `src/modules/staff/components/StaffEditForm.tsx` | Staff edit form (contract type dropdown) |
+| `src/types/staff/compliance.types.ts` | SAContractType enum, mapLegacyContractType() |
 | `src/types/staff-document.types.ts` | Document type definitions |
 
 ---
 
 ## Changelog
 
+- **2026-01-28:** Dynamic compliance labels based on Employee vs IC (commits `d8d0ded5`, `b51e34d7`)
+  - API now returns `contractType` and `isEmployee` fields
+  - Labels change: "Employment Contract" vs "IC Agreement", "Tax Document (IRP5)" vs "Tax Document (IT3a)"
+  - Added legacy contract type mappings: `full-time`, `fulltime`, `fixed-term`
+  - Fixed StaffEditForm to map existing contract_type on load
 - **2026-01-28:** Added `employment_contract` tracking to overview compliance stats (commit `ada54839`)
