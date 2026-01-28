@@ -90,7 +90,7 @@ export const CreateAssetSchema = z.object({
 
   // Purchase & Warranty
   purchaseDate: DateStringSchema.optional(),
-  purchasePrice: PositiveNumberSchema.optional(),
+  purchasePrice: NonNegativeNumberSchema.optional(),
   currency: z.string().length(3).optional(),
   supplierId: UUIDSchema.optional(),
   warrantyEndDate: DateStringSchema.optional(),
