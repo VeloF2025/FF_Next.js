@@ -324,7 +324,48 @@ export function getPositionsByDepartment(department: string): string[] {
     ],
   };
 
-  const deptPositions = departmentPositions[department] || [];
+  // Aliases: map DB department names to enum keys when they differ
+  const DEPARTMENT_ALIASES: Record<string, string> = {
+    'Administration': StaffDepartment.ADMIN,
+    'Field Operations': StaffDepartment.OPERATIONS,
+    'HR': StaffDepartment.HR,
+    'IT': StaffDepartment.IT_DATA,
+    // DB-only departments mapped to closest enum positions
+    'Executive': '__executive__',
+    'Management': '__management__',
+    'Project Management': '__project_management__',
+  };
+
+  // Positions for DB-only departments (no enum equivalent)
+  const dbOnlyPositions: Record<string, string[]> = {
+    '__executive__': [
+      StaffPosition.MD,
+      StaffPosition.CCSO,
+      StaffPosition.BDO,
+    ],
+    '__management__': [
+      StaffPosition.PROJECT_MANAGER,
+      StaffPosition.REGIONAL_PROJECT_MANAGER,
+      StaffPosition.SITE_MANAGER,
+    ],
+    '__project_management__': [
+      StaffPosition.PROJECT_MANAGER,
+      StaffPosition.OPTICAL_PROJECT_MANAGER,
+      StaffPosition.REGIONAL_PROJECT_MANAGER,
+      StaffPosition.SITE_MANAGER,
+      StaffPosition.SENIOR_PLANNER,
+      StaffPosition.PLANNER,
+    ],
+  };
+
+  // Try exact match first, then alias lookup
+  const resolvedKey = departmentPositions[department]
+    ? department
+    : DEPARTMENT_ALIASES[department] || department;
+
+  const deptPositions = departmentPositions[resolvedKey]
+    || dbOnlyPositions[resolvedKey]
+    || [];
 
   // Append common positions (deduplicated)
   const allPositions = [...deptPositions];
