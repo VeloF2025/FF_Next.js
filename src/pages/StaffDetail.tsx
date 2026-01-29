@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
+import { formatLabel } from '@/lib/utils';
 
 export function StaffDetail() {
   const navigate = useNavigate();
@@ -160,7 +161,7 @@ export function StaffDetail() {
               <div>
                 <p className="text-sm text-gray-500">Department</p>
                 <p className="font-medium">
-                  {staff.department ? staff.department.replace('_', ' ').charAt(0).toUpperCase() + staff.department.slice(1) : 'N/A'}
+                  {formatLabel(staff.department, 'N/A')}
                 </p>
               </div>
 

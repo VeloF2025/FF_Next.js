@@ -8,6 +8,7 @@ import {
   StaffStatus,
   Skill,
 } from '@/types/staff.types';
+import { formatLabel } from '@/lib/utils';
 import {
   StaffPosition,
   StaffDepartment,
@@ -190,7 +191,7 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
               <SelectContent>
                 {Object.values(StaffStatus).map(status => (
                   <SelectItem key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                    {formatLabel(status)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -478,7 +479,7 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
                   : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]'
               }`}
             >
-              {skill.replace(/_/g, ' ')}
+              {formatLabel(skill)}
             </button>
           ))}
         </div>

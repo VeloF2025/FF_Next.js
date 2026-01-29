@@ -1,4 +1,5 @@
 import { StaffFormData, Skill } from '@/types/staff.types';
+import { formatLabel } from '@/lib/utils';
 
 interface SkillsSectionProps {
   formData: StaffFormData;
@@ -27,7 +28,7 @@ export function SkillsSection({ formData, toggleSkill, handleInputChange }: Skil
                 className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500 bg-[var(--ff-bg-tertiary)]"
               />
               <span className="text-sm text-[var(--ff-text-secondary)]">
-                {skill.replace('_', ' ').charAt(0).toUpperCase() + skill.slice(1)}
+                {formatLabel(skill)}
               </span>
             </label>
           ))}

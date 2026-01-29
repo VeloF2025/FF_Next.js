@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, Users, ChevronRight } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
+import { formatLabel } from '@/lib/utils';
 import { DepartmentForm } from './DepartmentForm';
 import { DepartmentReport } from './DepartmentReport';
 import type {
@@ -318,7 +319,7 @@ export function DepartmentDetailDrawer({
                               className={getStatusColor(member.status)}
                               variant="secondary"
                             >
-                              {member.status.replace('_', ' ')}
+                              {formatLabel(member.status)}
                             </Badge>
                             <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
                           </div>

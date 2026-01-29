@@ -3,6 +3,7 @@
  * Displays table of top performing staff members with their metrics
  */
 
+import { formatLabel } from '@/lib/utils';
 
 interface TopPerformer {
   id: string;
@@ -67,7 +68,7 @@ export function TopPerformersTable({ topPerformers }: TopPerformersTableProps) {
                 </td>
                 <td className="py-3">
                   <span className="text-sm text-[var(--ff-text-secondary)] capitalize">
-                    {staff.department.replace('_', ' ')}
+                    {formatLabel(staff.department)}
                   </span>
                 </td>
                 <td className="py-3">

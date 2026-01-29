@@ -3,6 +3,7 @@
  * Displays top skills in the workforce as badges
  */
 
+import { formatLabel } from '@/lib/utils';
 
 interface Skill {
   skill: string;
@@ -27,7 +28,7 @@ export function SkillsOverview({ topSkills }: SkillsOverviewProps) {
             key={skill.skill}
             className="px-3 py-1 text-sm font-medium bg-blue-500/20 text-blue-400 rounded-full"
           >
-            {skill.skill.replace('_', ' ')} ({skill.count})
+            {formatLabel(skill.skill)} ({skill.count})
           </span>
         ))}
       </div>

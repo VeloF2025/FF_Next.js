@@ -5,6 +5,7 @@
 import { Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import type { StaffMember } from '@/types/staff.types';
 import { PermissionGate } from '@/components/PermissionGate';
+import { formatLabel } from '@/lib/utils';
 
 interface StaffTableProps {
   staff: StaffMember[];
@@ -95,7 +96,7 @@ export function StaffTable({ staff, onView, onEdit, onDelete }: StaffTableProps)
                   <div className="text-sm text-[var(--ff-text-primary)]">{member.position || '-'}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-[var(--ff-text-primary)]">{member.department || '-'}</div>
+                  <div className="text-sm text-[var(--ff-text-primary)]">{formatLabel(member.department)}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
@@ -126,7 +127,7 @@ export function StaffTable({ staff, onView, onEdit, onDelete }: StaffTableProps)
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                     getStatusColor(member.status || 'inactive')
                   }`}>
-                    {(member.status || 'inactive').replace('_', ' ')}
+                    {formatLabel(member.status || 'inactive')}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]">

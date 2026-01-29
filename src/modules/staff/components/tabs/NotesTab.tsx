@@ -28,6 +28,7 @@ import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 import type { StaffMember } from '@/types/staff';
+import { formatLabel } from '@/lib/utils';
 
 interface StaffNote {
   id: string;
@@ -89,8 +90,8 @@ function generateContractSummary(staff: StaffMember, contractMetadata?: Record<s
   const variables: Record<string, string> = {
     employeeName: staff.name || 'N/A',
     saIdNumber: staff.saIdNumber || 'N/A',
-    position: staff.position?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'N/A',
-    department: staff.department?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'N/A',
+    position: formatLabel(staff.position, 'N/A'),
+    department: formatLabel(staff.department, 'N/A'),
     startDate: formatDateStr(staff.startDate),
     employmentType: contractMetadata?.employmentType || 'Permanent',
     companyName: contractMetadata?.companyName || 'Velocity Fibre (Pty) Ltd',

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { GitBranch } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatLabel } from '@/lib/utils';
 
 interface StaffMember {
   id: string;
@@ -184,7 +185,7 @@ function HierarchyNode({ person, level }: HierarchyNodeProps) {
             )}
           </div>
           <div className="text-sm text-[var(--ff-text-secondary)]">
-            {person.position} • {person.department?.replace('_', ' ')}
+            {person.position} • {formatLabel(person.department)}
           </div>
           {hasChildren && (
             <div className="text-xs text-[var(--ff-text-tertiary)] mt-1">

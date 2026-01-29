@@ -4,6 +4,7 @@
 
 import { Search } from 'lucide-react';
 import type { StaffFilter, Department, StaffStatus, StaffLevel } from '@/types/staff.types';
+import { formatLabel } from '@/lib/utils';
 
 interface StaffFiltersProps {
   searchTerm: string;
@@ -61,7 +62,7 @@ export function StaffFilters({
             <option value="">All Statuses</option>
             {statuses.map(status => (
               <option key={status} value={status}>
-                {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {formatLabel(status)}
               </option>
             ))}
           </select>

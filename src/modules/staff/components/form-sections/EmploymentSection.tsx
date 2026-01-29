@@ -5,6 +5,7 @@ import {
   StaffStatus,
   ContractType
 } from '@/types/staff.types';
+import { formatLabel } from '@/lib/utils';
 import {
   StaffPosition,
   StaffDepartment,
@@ -157,7 +158,7 @@ export function EmploymentSection({ formData, handleInputChange }: EmploymentSec
             <SelectContent>
               {Object.values(StaffStatus).map(status => (
                 <SelectItem key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                  {formatLabel(status)}
                 </SelectItem>
               ))}
             </SelectContent>

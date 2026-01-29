@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import type { StaffMember } from '@/types/staff';
 import { useState, useRef } from 'react';
+import { formatLabel } from '@/lib/utils';
 
 interface OverviewTabProps {
   staff: StaffMember;
@@ -95,13 +96,8 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
     }
   };
 
-  const formatPosition = (position: string): string => {
-    return position?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'N/A';
-  };
-
-  const formatDepartment = (department: string): string => {
-    return department?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'N/A';
-  };
+  const formatPosition = (position: string): string => formatLabel(position, 'N/A');
+  const formatDepartment = (department: string): string => formatLabel(department, 'N/A');
 
   return (
     <div className="space-y-6">
@@ -110,7 +106,7 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Employment Details</h2>
           <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(staff.status)}`}>
-            {staff.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
+            {formatLabel(staff.status, 'UNKNOWN').toUpperCase()}
           </span>
         </div>
         <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">

@@ -26,6 +26,7 @@ import {
 import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
+import { formatLabel } from '@/lib/utils';
 
 interface AuditEntry {
   id: string;
@@ -275,7 +276,7 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
                           )}
                           {entry.details.documentType && !entry.details.syncedFields && (
                             <p className="text-[var(--ff-text-primary)]">
-                              <span className="text-[var(--ff-text-secondary)]">Document:</span> {(entry.details.documentType as string).replace(/_/g, ' ')}
+                              <span className="text-[var(--ff-text-secondary)]">Document:</span> {formatLabel(entry.details.documentType as string)}
                             </p>
                           )}
                         </div>

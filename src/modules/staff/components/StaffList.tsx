@@ -15,6 +15,7 @@ import { StaffFilters } from './StaffFilters';
 import { StaffTable } from './StaffTable';
 import { StaffFilter, StaffMember, StaffSummary } from '@/types/staff.types';
 import { log } from '@/lib/logger';
+import { formatLabel } from '@/lib/utils';
 
 export function StaffList() {
   const router = useRouter();
@@ -65,7 +66,7 @@ export function StaffList() {
         'Email': member.email,
         'Phone': member.phone,
         'Position': member.position || '',
-        'Department': member.department || '',
+        'Department': formatLabel(member.department, ''),
         'Status': member.status || '',
         'Start Date': member.startDate || '',
         'Project Count': member.currentProjectCount || 0

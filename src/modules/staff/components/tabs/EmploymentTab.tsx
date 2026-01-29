@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { safeToDate } from '@/utils/dateHelpers';
 import type { StaffMember } from '@/types/staff';
 import { SA_CONTRACT_TYPE_LABELS } from '@/types/staff/compliance.types';
+import { formatLabel } from '@/lib/utils';
 
 interface EmploymentTabProps {
   staff: StaffMember;
@@ -31,7 +32,7 @@ export function EmploymentTab({ staff }: EmploymentTabProps) {
 
   const contractTypeLabel = staff.saContractType
     ? SA_CONTRACT_TYPE_LABELS[staff.saContractType] || staff.saContractType
-    : staff.contractType?.replace('_', ' ') || 'Not specified';
+    : formatLabel(staff.contractType, 'Not specified');
 
   return (
     <div className="space-y-6">
@@ -50,7 +51,7 @@ export function EmploymentTab({ staff }: EmploymentTabProps) {
           <div>
             <p className="text-sm text-[var(--ff-text-secondary)]">Department</p>
             <p className="font-medium text-[var(--ff-text-primary)]">
-              {staff.department?.replace('_', ' ') || 'Not specified'}
+              {formatLabel(staff.department, 'Not specified')}
             </p>
           </div>
 
@@ -64,7 +65,7 @@ export function EmploymentTab({ staff }: EmploymentTabProps) {
           <div>
             <p className="text-sm text-[var(--ff-text-secondary)]">Level</p>
             <p className="font-medium text-[var(--ff-text-primary)]">
-              {staff.level?.replace('_', ' ') || 'Not specified'}
+              {formatLabel(staff.level, 'Not specified')}
             </p>
           </div>
 
@@ -210,7 +211,7 @@ export function EmploymentTab({ staff }: EmploymentTabProps) {
                 className="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-500/20 text-blue-400 rounded-full"
               >
                 <Award className="w-3 h-3 mr-1" />
-                {skill?.replace(/_/g, ' ') || skill}
+                {formatLabel(skill)}
               </span>
             ))}
           </div>

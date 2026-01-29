@@ -4,6 +4,7 @@
  */
 
 import { PieChart } from 'lucide-react';
+import { formatLabel } from '@/lib/utils';
 
 interface DepartmentDistributionProps {
   staffByDepartment: Record<string, number>;
@@ -24,7 +25,7 @@ export function DepartmentDistribution({ staffByDepartment, totalStaff }: Depart
             <div key={dept}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-[var(--ff-text-secondary)] capitalize">
-                  {dept.replace('_', ' ')}
+                  {formatLabel(dept)}
                 </span>
                 <span className="text-sm font-medium text-[var(--ff-text-primary)]">
                   {count} ({percentage.toFixed(1)}%)
