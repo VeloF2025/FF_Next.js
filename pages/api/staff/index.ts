@@ -462,7 +462,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           const deptResult = await sql`
             SELECT id FROM departments
             WHERE name = ${updates.department}
-            AND deleted_at IS NULL
+            AND is_active = true
             LIMIT 1
           `;
           if (deptResult.length > 0) {
