@@ -721,6 +721,12 @@ class POApprovalService {
 
   /**
    * Check if user can approve a PO
+   *
+   * Approval check order:
+   * 1. super_admin and admin can always approve
+   * 2. If level has approver_user_id set, check specific user
+   * 3. If level has approver_role set, check user's role
+   * 4. Otherwise deny
    */
   async canUserApprove(poId: string, userId: string): Promise<boolean> {
     try {
@@ -732,6 +738,20 @@ class POApprovalService {
         return false;
       }
 
+      // Get user role
+      const userResult = await sql`
+        SELECT role FROM users WHERE id = ${userId}
+      `;
+
+      if (userResult.length === 0) return false;
+
+      const userRole = userResult[0]!.role;
+
+      // Super admin and admin can always approve
+      if (userRole === 'super_admin' || userRole === 'admin') {
+        return true;
+      }
+
       const totalAmount = parseFloat(poResult[0]!.total_amount) || 0;
       const level = await this.getApprovalLevelForAmount(totalAmount);
 
@@ -739,20 +759,17 @@ class POApprovalService {
         return false;
       }
 
-      // Check based on approver type
-      if (level.approverType === 'user') {
+      // Check specific user assignment first
+      if (level.approverType === 'user' && level.approverUserId) {
         return level.approverUserId === userId;
       }
 
+      // Check role-based assignment
       if (level.approverType === 'role' && level.approverRole) {
-        const userResult = await sql`
-          SELECT role FROM users WHERE id = ${userId}
-        `;
-        return userResult.length > 0 && userResult[0]!.role === level.approverRole;
+        return userRole === level.approverRole;
       }
 
-      // For other types, allow for now (TODO: implement full check)
-      return true;
+      return false;
     } catch (error) {
       log.error('Failed to check approval permission', { poId, userId, error });
       return false;

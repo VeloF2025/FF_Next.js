@@ -19,32 +19,78 @@ export default withAuth(withErrorHandler(async (
   const { userId } = getAuth(req);
 
   try {
-    // Get pending approval requests
-    // In a real system, this would filter by assigned_to or by user's role
-    const requests = await sql`
-      SELECT
-        ar.*,
-        aw.name as workflow_name,
-        al.name as level_name,
-        al.level_number
-      FROM approval_requests ar
-      JOIN approval_workflows aw ON ar.workflow_id = aw.id
-      JOIN approval_levels al ON ar.level_id = al.id
-      WHERE ar.status = 'pending'
-      ORDER BY ar.is_overdue DESC, ar.requested_at DESC
-      LIMIT 50
+    // Get current user's role
+    const userResult = await sql`
+      SELECT role FROM users WHERE id = ${userId}
     `;
+    const userRole = userResult.length > 0 ? (userResult[0] as Record<string, unknown>).role as string : 'viewer';
+    const isAdmin = userRole === 'super_admin' || userRole === 'admin';
 
-    // Get counts by type
-    const counts = await sql`
-      SELECT
-        ar.document_type,
-        COUNT(*)::int as count,
-        COUNT(CASE WHEN ar.is_overdue THEN 1 END)::int as overdue_count
-      FROM approval_requests ar
-      WHERE ar.status = 'pending'
-      GROUP BY ar.document_type
-    `;
+    // Get pending approval requests filtered by user's permissions
+    // Admins/super_admins see all, others see only levels matching their role or user ID
+    const requests = isAdmin
+      ? await sql`
+          SELECT
+            ar.*,
+            aw.name as workflow_name,
+            al.name as level_name,
+            al.level_number,
+            al.approver_type,
+            al.approver_user_id,
+            al.approver_role
+          FROM approval_requests ar
+          JOIN approval_workflows aw ON ar.workflow_id = aw.id
+          JOIN approval_levels al ON ar.level_id = al.id
+          WHERE ar.status = 'pending'
+          ORDER BY ar.is_overdue DESC, ar.requested_at DESC
+          LIMIT 50
+        `
+      : await sql`
+          SELECT
+            ar.*,
+            aw.name as workflow_name,
+            al.name as level_name,
+            al.level_number,
+            al.approver_type,
+            al.approver_user_id,
+            al.approver_role
+          FROM approval_requests ar
+          JOIN approval_workflows aw ON ar.workflow_id = aw.id
+          JOIN approval_levels al ON ar.level_id = al.id
+          WHERE ar.status = 'pending'
+            AND (
+              al.approver_user_id = ${userId}
+              OR al.approver_role = ${userRole}
+            )
+          ORDER BY ar.is_overdue DESC, ar.requested_at DESC
+          LIMIT 50
+        `;
+
+    // Get counts by type (same filter logic)
+    const counts = isAdmin
+      ? await sql`
+          SELECT
+            ar.document_type,
+            COUNT(*)::int as count,
+            COUNT(CASE WHEN ar.is_overdue THEN 1 END)::int as overdue_count
+          FROM approval_requests ar
+          WHERE ar.status = 'pending'
+          GROUP BY ar.document_type
+        `
+      : await sql`
+          SELECT
+            ar.document_type,
+            COUNT(*)::int as count,
+            COUNT(CASE WHEN ar.is_overdue THEN 1 END)::int as overdue_count
+          FROM approval_requests ar
+          JOIN approval_levels al ON ar.level_id = al.id
+          WHERE ar.status = 'pending'
+            AND (
+              al.approver_user_id = ${userId}
+              OR al.approver_role = ${userRole}
+            )
+          GROUP BY ar.document_type
+        `;
 
     // Transform to approval tasks
     const tasks: MyApprovalTask[] = requests.map((r: Record<string, unknown>) => ({
@@ -67,9 +113,8 @@ export default withAuth(withErrorHandler(async (
       isOverdue: r.is_overdue as boolean,
       reminderCount: r.reminder_count as number,
 
-      // Everyone can approve in this simplified version
-      canApprove: true,
-      canReject: true,
+      canApprove: isAdmin || (r.approver_user_id === userId) || (r.approver_role === userRole),
+      canReject: isAdmin || (r.approver_user_id === userId) || (r.approver_role === userRole),
       canDelegate: false,
       canEscalate: false,
     }));
