@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
+import { formatLabel } from '@/lib/utils';
 
 type StaffStatusType = 'active' | 'inactive' | 'on_leave' | 'suspended' | 'terminated' | 'resigned' | 'retired';
 
@@ -166,7 +167,7 @@ export default function StaffDirectoryPage() {
       resigned: 'Resigned',
       retired: 'Retired',
     };
-    return labels[status] || status.replace('_', ' ');
+    return labels[status] || formatLabel(status);
   };
 
   const filteredStaff = staff.filter((member) => {
@@ -308,7 +309,7 @@ export default function StaffDirectoryPage() {
                 <option value="all">All Departments</option>
                 {departments.map((dept) => (
                   <option key={dept} value={dept}>
-                    {dept}
+                    {formatLabel(dept)}
                   </option>
                 ))}
               </select>
@@ -403,7 +404,7 @@ export default function StaffDirectoryPage() {
                           <div className="text-sm text-[var(--ff-text-primary)]">{member.position || '-'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-[var(--ff-text-primary)]">{member.department || '-'}</div>
+                          <div className="text-sm text-[var(--ff-text-primary)]">{formatLabel(member.department)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-2">
