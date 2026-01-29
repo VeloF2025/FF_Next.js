@@ -4,7 +4,7 @@
  * Provides tab-based navigation for the Procurement module:
  * - Dashboard: Overview with workflow stepper
  * - Sourcing: Suppliers, BOQ, RFQ
- * - Purchasing: Quotes, Requisitions, POs, GRN
+ * - Purchasing: Requisitions, Quotes, POs, GRN
  * - Inventory: Stock management
  * - Financial: Budget and cost tracking
  * - Approvals: Approval workflow

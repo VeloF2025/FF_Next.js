@@ -13,6 +13,7 @@ export type ProcurementTabId =
   | 'stock'
   | 'field-stock'
   | 'suppliers'
+  | 'approvals'
   | 'reports';
 
 export interface ProcurementTab {

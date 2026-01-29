@@ -64,6 +64,7 @@ export default function ProcurementPage({
     stock: {},
     'field-stock': {},
     suppliers: {},
+    approvals: {},
     reports: {}
   });
   

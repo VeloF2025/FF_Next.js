@@ -17,7 +17,8 @@ import {
   ChevronDown,
   Boxes,
   ShoppingBag,
-  Search
+  Search,
+  CheckCircle
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -26,7 +27,7 @@ import type {
 import { useProcurementPortal } from '../context/ProcurementPortalProvider';
 
 // Define category structure
-type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'reports';
+type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'approvals' | 'reports';
 
 interface SubTab {
   id: ProcurementTabId;
@@ -55,6 +56,7 @@ const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'grn': 'purchasing',
   'stock': 'inventory',
   'field-stock': 'inventory',
+  'approvals': 'approvals',
   'reports': 'reports',
 };
 
@@ -134,6 +136,14 @@ export function ProcurementTabs({
       subTabs: [
         { id: 'stock', label: 'Stock Management', icon: Package, permission: 'canAccessStock', path: '/procurement/inventory' },
         { id: 'field-stock', label: 'Field Stock', icon: MapPin, permission: 'canAccessFieldStock', path: '/procurement/field-stock' },
+      ]
+    },
+    {
+      id: 'approvals',
+      label: 'Approvals',
+      icon: CheckCircle,
+      subTabs: [
+        { id: 'approvals', label: 'Approvals', icon: CheckCircle, path: '/procurement/approvals' }
       ]
     },
     {

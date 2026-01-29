@@ -1,6 +1,6 @@
 /**
  * Purchasing Page - Unified tab interface for transaction workflow
- * Tabs: Quotes | Requisitions | Purchase Orders | GRN
+ * Tabs: Requisitions | Quotes | Purchase Orders | GRN
  */
 
 import { useState, useEffect } from 'react';
@@ -37,8 +37,8 @@ interface PurchasingPageProps {
 }
 
 const TABS = [
-  { id: 'quotes', label: 'Quotes', icon: Scale },
   { id: 'requisitions', label: 'Requisitions', icon: ClipboardList },
+  { id: 'quotes', label: 'Quotes', icon: Scale },
   { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart },
   { id: 'grn', label: 'GRN', icon: PackageCheck },
 ] as const;
@@ -449,7 +449,7 @@ function GRNTabContent() {
 export default function PurchasingPage({ projectId }: PurchasingPageProps) {
   const { activeTab, changeTab, isInitialized } = useTabPersistence({
     pageKey: 'purchasing',
-    defaultTab: 'quotes',
+    defaultTab: 'requisitions',
     validTabs: TABS.map(t => t.id),
   });
 
