@@ -44,8 +44,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       meta: { limit, type: typeFilter, total: entries.length },
     });
   } catch (error) {
-    log.error('Failed to fetch sync history', { error });
-    return res.status(500).json({ success: false, error: 'Failed to fetch history' });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    log.error('Failed to fetch sync history', { error: errMsg, stack: errStack });
+    return res.status(500).json({ success: false, error: 'Failed to fetch history', debug: errMsg });
   }
 }
 
