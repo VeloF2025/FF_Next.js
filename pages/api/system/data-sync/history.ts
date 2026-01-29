@@ -172,7 +172,7 @@ async function fetchHistory(
     LIMIT ${limit}
   `;
 
-  const results = await rawSql(fullQuery) as Record<string, unknown>[];
+  const results = await rawSql.query(fullQuery) as Record<string, unknown>[];
 
   return results.map((row) => ({
     id: row.id as string,
