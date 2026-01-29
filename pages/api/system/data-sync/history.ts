@@ -12,11 +12,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { createLoggedSql } from '@/lib/db-logger';
+import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import type { SyncHistoryEntry, SyncOperationType } from '@/modules/data-sync/types';
 
-const sql = createLoggedSql(process.env.DATABASE_URL!);
+const rawSql = neon(process.env.DATABASE_URL!);
 
 const VALID_TYPES: SyncOperationType[] = [
   'oes_import',
@@ -170,17 +170,17 @@ async function fetchHistory(
     LIMIT ${limit}
   `;
 
-  const results = (await sql.unsafe(fullQuery)) as unknown as Record<string, unknown>[];
+  const results = await rawSql(fullQuery) as Record<string, unknown>[];
 
   return results.map((row) => ({
     id: row.id as string,
     operation_type: row.operation_type as SyncOperationType,
     status: row.status as SyncHistoryEntry['status'],
-    started_at: row.started_at ? (row.started_at as Date).toISOString() : new Date().toISOString(),
-    completed_at: row.completed_at ? (row.completed_at as Date).toISOString() : null,
+    started_at: row.started_at ? String(row.started_at) : new Date().toISOString(),
+    completed_at: row.completed_at ? String(row.completed_at) : null,
     duration_seconds: row.duration_seconds ? Number(row.duration_seconds) : null,
     summary: row.summary as string,
-    details: (row.details || {}) as Record<string, unknown>,
+    details: (typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {}) as Record<string, unknown>,
     error_message: (row.error_message as string) || null,
     triggered_by: (row.triggered_by as string) || null,
   }));
