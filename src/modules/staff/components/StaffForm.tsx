@@ -11,6 +11,7 @@ import {
   Skill,
   isFormerEmployee,
 } from '@/types/staff.types';
+import { getPositionsByDepartment } from '@/types/staff-hierarchy.types';
 import { safeToDate } from '@/utils/dateHelpers';
 import {
   PersonalInfoSection,
@@ -124,6 +125,18 @@ export function StaffForm() {
   };
 
   const handleInputChange = (field: keyof StaffFormData, value: any) => {
+    // Clear position when department changes if current position doesn't belong to new department
+    if (field === 'department') {
+      const newDept = value as string;
+      const validPositions = getPositionsByDepartment(newDept);
+      setFormData(prev => ({
+        ...prev,
+        department: newDept,
+        position: validPositions.includes(prev.position || '') ? prev.position : '',
+      }));
+      return;
+    }
+
     // Intercept status changes to exit statuses
     if (field === 'status') {
       const newStatus = value as StaffStatus;

@@ -189,6 +189,14 @@ export function getPositionLevel(position: string): number {
   return levelMap[position] || 8;
 }
 
+// Common positions available in every department
+const COMMON_POSITIONS: string[] = [
+  StaffPosition.TEAM_LEAD,
+  StaffPosition.GENERAL_WORKER,
+  StaffPosition.INTERN,
+  StaffPosition.OTHER,
+];
+
 // Get all positions for a specific department
 export function getPositionsByDepartment(department: string): string[] {
   const departmentPositions: Record<string, string[]> = {
@@ -206,6 +214,7 @@ export function getPositionsByDepartment(department: string): string[] {
       StaffPosition.CABLE_JOINTER,
     ],
     [StaffDepartment.SERVICE_DELIVERY]: [
+      StaffPosition.PROJECT_MANAGER,
       StaffPosition.ADMIN,
       StaffPosition.ADMIN_ASSISTANT,
       StaffPosition.DATA_CAPTURER,
@@ -223,6 +232,8 @@ export function getPositionsByDepartment(department: string): string[] {
     ],
     [StaffDepartment.PROCUREMENT]: [
       StaffPosition.HEAD_OF_PROCUREMENT,
+      StaffPosition.ADMIN,
+      StaffPosition.ADMIN_ASSISTANT,
     ],
     [StaffDepartment.SHEQ]: [
       StaffPosition.SHEQ_MANAGER,
@@ -232,9 +243,11 @@ export function getPositionsByDepartment(department: string): string[] {
     [StaffDepartment.IT_DATA]: [
       StaffPosition.DATA_MANAGER,
       StaffPosition.NETWORK_ENGINEER,
+      StaffPosition.DATA_CAPTURER,
     ],
     [StaffDepartment.COMMERCIAL_STRATEGY]: [
       StaffPosition.CCSO,
+      StaffPosition.PROJECT_MANAGER,
     ],
     [StaffDepartment.FINANCE]: [
       StaffPosition.FINANCIAL_MANAGER,
@@ -259,7 +272,67 @@ export function getPositionsByDepartment(department: string): string[] {
       StaffPosition.LOGISTICS_COORDINATOR,
       StaffPosition.DRIVER,
     ],
+    [StaffDepartment.NETWORK_OPERATIONS]: [
+      StaffPosition.NETWORK_ENGINEER,
+      StaffPosition.SENIOR_TECHNICIAN,
+      StaffPosition.TECHNICIAN,
+      StaffPosition.FIELD_TECHNICIAN,
+    ],
+    [StaffDepartment.ENGINEERING]: [
+      StaffPosition.NETWORK_ENGINEER,
+      StaffPosition.SENIOR_TECHNICIAN,
+      StaffPosition.TECHNICIAN,
+      StaffPosition.PROJECT_MANAGER,
+    ],
+    [StaffDepartment.INSTALLATION]: [
+      StaffPosition.FIELD_TECHNICIAN,
+      StaffPosition.CABLE_JOINTER,
+      StaffPosition.FIBRE_SPLICER,
+      StaffPosition.SENIOR_TECHNICIAN,
+      StaffPosition.TECHNICIAN,
+      StaffPosition.SITE_MANAGER,
+    ],
+    [StaffDepartment.MAINTENANCE]: [
+      StaffPosition.FIELD_TECHNICIAN,
+      StaffPosition.SENIOR_TECHNICIAN,
+      StaffPosition.TECHNICIAN,
+      StaffPosition.SITE_MANAGER,
+    ],
+    [StaffDepartment.QUALITY_ASSURANCE]: [
+      StaffPosition.QUALITY_INSPECTOR,
+      StaffPosition.SHEQ_MANAGER,
+    ],
+    [StaffDepartment.TECHNICAL_SUPPORT]: [
+      StaffPosition.TECHNICIAN,
+      StaffPosition.SENIOR_TECHNICIAN,
+      StaffPosition.NETWORK_ENGINEER,
+    ],
+    [StaffDepartment.SALES]: [
+      StaffPosition.BDO,
+      StaffPosition.CLO,
+      StaffPosition.PROJECT_MANAGER,
+    ],
+    [StaffDepartment.CUSTOMER_SERVICE]: [
+      StaffPosition.CLO,
+      StaffPosition.ADMIN,
+      StaffPosition.ADMIN_ASSISTANT,
+    ],
+    [StaffDepartment.SAFETY]: [
+      StaffPosition.SAFETY_OFFICER,
+      StaffPosition.SHEQ_MANAGER,
+      StaffPosition.QUALITY_INSPECTOR,
+    ],
   };
 
-  return departmentPositions[department] || [];
+  const deptPositions = departmentPositions[department] || [];
+
+  // Append common positions (deduplicated)
+  const allPositions = [...deptPositions];
+  for (const pos of COMMON_POSITIONS) {
+    if (!allPositions.includes(pos)) {
+      allPositions.push(pos);
+    }
+  }
+
+  return allPositions;
 }

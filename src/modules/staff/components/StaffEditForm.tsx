@@ -12,6 +12,7 @@ import {
   isFormerEmployee,
 } from '@/types/staff.types';
 import { mapLegacyContractType } from '@/types/staff/compliance.types';
+import { getPositionsByDepartment } from '@/types/staff-hierarchy.types';
 import { safeToDate } from '@/utils/dateHelpers';
 import { ExitEmployeeModal, ExitFormData } from './ExitEmployeeModal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -186,6 +187,19 @@ export function StaffEditForm() {
         setShowExitModal(true);
         return;
       }
+    }
+
+    // Clear position when department changes if current position doesn't belong to new department
+    if (field === 'department') {
+      const newDept = value as string;
+      const validPositions = getPositionsByDepartment(newDept);
+      setFormData(prev => ({
+        ...prev,
+        department: newDept,
+        // Reset position if it's not valid for the new department
+        position: validPositions.includes(prev.position || '') ? prev.position : '',
+      }));
+      return;
     }
 
     // Sync SA ID Number between Overview (saIdNumber) and Compliance (idNumber)

@@ -71,9 +71,14 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
     fetchDepartments();
   }, []);
 
-  const availablePositions = formData.department
+  const departmentPositions = formData.department
     ? getPositionsByDepartment(formData.department)
     : Object.values(StaffPosition);
+
+  // Include current position in the list if it's not already there (preserves existing data)
+  const availablePositions = formData.position && !departmentPositions.includes(formData.position)
+    ? [formData.position, ...departmentPositions]
+    : departmentPositions;
 
   const potentialManagers = staffList?.filter(staff =>
     staff.id !== formData.id &&
