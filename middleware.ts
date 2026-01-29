@@ -15,15 +15,27 @@ function edgeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, da
     ...data
   };
 
-  // Edge Runtime limitation: Only stdout/stderr available
-  // Using structured JSON logging for production parsing
-  if (process.env.NODE_ENV === 'development') {
-    // Development: human-readable format to stderr
-    const formattedData = data ? ` ${JSON.stringify(data)}` : '';
-    process.stderr.write(`[${timestamp}] ${level.toUpperCase()}: ${message}${formattedData}\n`);
-  } else {
-    // Production: structured JSON to stdout for log aggregation
-    process.stdout.write(JSON.stringify(logEntry) + '\n');
+  // Edge Runtime limitation: process.stdout/stderr may not exist
+  // Fall back to console methods which are always available in Edge
+  try {
+    if (process.env.NODE_ENV === 'development') {
+      const formattedData = data ? ` ${JSON.stringify(data)}` : '';
+      if (typeof process?.stderr?.write === 'function') {
+        process.stderr.write(`[${timestamp}] ${level.toUpperCase()}: ${message}${formattedData}\n`);
+      } else {
+        // eslint-disable-next-line no-console -- Edge Runtime fallback
+        console.error(`[${timestamp}] ${level.toUpperCase()}: ${message}${formattedData}`);
+      }
+    } else {
+      if (typeof process?.stdout?.write === 'function') {
+        process.stdout.write(JSON.stringify(logEntry) + '\n');
+      } else {
+        // eslint-disable-next-line no-console -- Edge Runtime fallback
+        console.log(JSON.stringify(logEntry));
+      }
+    }
+  } catch {
+    // Silent fallback - never crash middleware on logging
   }
 }
 

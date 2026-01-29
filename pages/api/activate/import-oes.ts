@@ -635,9 +635,9 @@ async function handler(
             log.info('OESImport', 'QField sync webhook responded', result);
 
             // The webhook triggers sync in background, so we need to poll for completion
-            // Poll the status endpoint for up to 60 seconds
-            const maxWaitMs = 60000;
-            const pollIntervalMs = 3000;
+            // Sync typically takes ~90s (2 projects), poll for up to 3 minutes
+            const maxWaitMs = 180000;
+            const pollIntervalMs = 5000;
             const startTime = Date.now();
 
             while (Date.now() - startTime < maxWaitMs) {
