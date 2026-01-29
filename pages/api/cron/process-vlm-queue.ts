@@ -9,8 +9,8 @@
  * - Photos exist (photo_count > 0)
  * - But VLM extraction hasn't run (vlm_power_meter_dbm IS NULL, etc.)
  *
- * Run schedule: Every 10 minutes (via vercel.json)
- * Limit: Processes up to 5 DRs per run to stay within timeout
+ * Run schedule: Every 5 minutes (via vercel.json)
+ * Limit: Processes up to 20 DRs per run with 3 concurrent workers
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -286,9 +286,10 @@ export default async function handler(
     }
   }
 
-  const limit = Number(req.query.limit) || Number(req.body?.limit) || 10;
+  const limit = Number(req.query.limit) || Number(req.body?.limit) || 20;
+  const concurrency = Number(req.query.concurrency) || Number(req.body?.concurrency) || 3;
 
-  log.info('ProcessVlmQueue', `Starting VLM queue processing (limit: ${limit})`);
+  log.info('ProcessVlmQueue', `Starting VLM queue processing (limit: ${limit}, concurrency: ${concurrency})`);
 
   try {
     // Find DRs that need VLM processing:
@@ -322,24 +323,43 @@ export default async function handler(
       });
     }
 
-    log.info('ProcessVlmQueue', `Found ${pendingDRs.length} DRs to process`);
+    log.info('ProcessVlmQueue', `Found ${pendingDRs.length} DRs to process (${concurrency} concurrent)`);
 
     const results: ProcessResult[] = [];
     let succeeded = 0;
     let failed = 0;
 
-    for (const row of pendingDRs) {
-      const result = await processVlmForDr(row.drop_number);
-      results.push(result);
+    // Process DRs in parallel batches of `concurrency`
+    for (let i = 0; i < pendingDRs.length; i += concurrency) {
+      const batch = pendingDRs.slice(i, i + concurrency);
+      const batchResults = await Promise.allSettled(
+        batch.map((row) => processVlmForDr(row.drop_number))
+      );
 
-      if (result.success) {
-        succeeded++;
-      } else {
-        failed++;
+      for (const settled of batchResults) {
+        if (settled.status === 'fulfilled') {
+          results.push(settled.value);
+          if (settled.value.success) succeeded++;
+          else failed++;
+        } else {
+          failed++;
+          results.push({
+            dropNumber: 'unknown',
+            success: false,
+            categorized: false,
+            extracted: false,
+            powerMeter: null,
+            ontSerial: null,
+            drNumber: null,
+            error: settled.reason?.message || 'Promise rejected',
+          });
+        }
       }
 
-      // Delay between DRs to avoid overwhelming VLM
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Brief pause between batches to let VLM breathe
+      if (i + concurrency < pendingDRs.length) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
 
     log.info('ProcessVlmQueue', `Completed: ${succeeded}/${pendingDRs.length} succeeded`, {

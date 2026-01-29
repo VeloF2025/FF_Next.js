@@ -10,6 +10,9 @@
     "pages/api/**/*.js": {
       "maxDuration": 30
     },
+    "pages/api/cron/process-vlm-queue.ts": {
+      "maxDuration": 60
+    },
     "app/api/**/*.ts": {
       "maxDuration": 30
     },
@@ -36,7 +39,7 @@
     },
     {
       "path": "/api/cron/process-vlm-queue",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }
