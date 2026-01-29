@@ -23,8 +23,9 @@
 ## Database
 
 ### Tables
-- `staff` - Main staff table
+- `staff` - Main staff table (`department` VARCHAR, `department_id` UUID FK, `position` VARCHAR)
 - `staff_documents` - Staff documentation
+- `departments` - Department lookup table (`is_active` boolean, NOT `deleted_at`)
 
 ### Key Queries
 - Select staff with CONCAT(first_name, last_name) as name
@@ -69,18 +70,23 @@ importFromExcel(file, overwriteExisting)
 - `StaffListHeader` - Header with actions
 - `StaffFilters` - Search and filter UI
 - `StaffDetail` - Detail view
-- `StaffForm` - Create/edit form
+- `StaffForm` - Create form (interceptor for dept→position clearing)
+- `StaffEditForm` - Tabbed edit form (Overview/Employment/Compliance)
 - `StaffImport` - Import dialog
 - `StaffImportAdvanced` - Advanced import with progress
 - `StaffAnalytics` - Dashboard with metrics
 
-### Form Sections
+### Edit Form Sections (`edit-sections/`)
+- `OverviewEditSection` - Personal info, contact, address, identity docs (Next of Kin hidden)
+- `EmploymentEditSection` - Department/position dropdowns, contract, skills
+- `ComplianceEditSection` - SA compliance fields (UIF, COIDA, tax)
+
+### Create Form Sections
 - PersonalInfoSection
 - EmploymentSection
-- ContactSection
+- EmergencyContactSection
 - SkillsSection
 - AvailabilitySection
-- DocumentsSection
 
 ### Analytics Components
 - StaffKeyMetrics
@@ -113,3 +119,8 @@ importFromExcel(file, overwriteExisting)
 - **Cascade Check**: DELETE operation cascades may need checking
 - **Import Testing**: Import overwrite logic needs detailed testing
 - **Legacy Analytics**: StaffAnalytics marked as legacy with deprecation notice
+- **Department names mismatch**: DB names (e.g., "Field Operations") differ from `StaffDepartment` enum ("Operations"). Resolved via `DEPARTMENT_ALIASES` in `staff-hierarchy.types.ts`
+- **departments table uses `is_active`**: NOT `deleted_at` — never use soft-delete queries against this table
+- **SA ID Number dual fields**: `saIdNumber` (Overview) and `idNumber` (Compliance) sync bidirectionally in `StaffEditForm.handleInputChange`
+- **Position dropdown**: Uses `getPositionsByDepartment()` from `staff-hierarchy.types.ts` — must include current position as fallback option for legacy data
+- **Department stored twice**: As display name in `department` VARCHAR + UUID in `department_id` FK. API resolves name→UUID on save

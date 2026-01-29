@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-01-29: Staff Department-Position Alignment & Persistence
+
+**Problem:** Department and Position dropdowns were misaligned — selecting a department didn't filter positions. Position disappeared after save because the detail view couldn't display values not in the options list.
+
+**Root Causes:**
+1. `getPositionsByDepartment()` in `src/types/staff-hierarchy.types.ts` had incomplete mappings — only covered ~5 of 21 departments
+2. DB department names (e.g., "Field Operations", "Administration") differ from `StaffDepartment` enum values (e.g., "Operations", "Admin") — no alias mapping existed
+3. No interceptor in `handleInputChange` to clear position when department changes
+4. Staff API `pages/api/staff/index.ts` had `AND deleted_at IS NULL` but departments table uses `is_active` boolean column
+
+**Fixes (3 commits):**
+1. `617562af` — Complete department-to-position mappings for all 21 departments + position clearing interceptor + current position fallback in dropdown
+2. `ec96c7e0` — `DEPARTMENT_ALIASES` map for DB↔enum mismatches + `dbOnlyPositions` for Executive/Management/Project Management
+3. `67385961` — Changed `deleted_at IS NULL` → `is_active = true` in department lookup query
+
+**Key Architecture:**
+- **Department dropdown**: Populated from `departments` table (18 active rows with `is_active=true`)
+- **Position dropdown**: Populated from `getPositionsByDepartment()` function in `staff-hierarchy.types.ts`
+- **DB schema**: `departments` table has `id, name, code, description, manager_id, is_active, created_at, updated_at` — NO `deleted_at` column
+- **Staff table**: `department` VARCHAR(100) stores display name + `department_id` UUID FK
+- **Position**: Stored as display name string in `position` VARCHAR(100) — no FK constraints
+- **Alias mapping**: DB names like "Field Operations" → enum `StaffDepartment.OPERATIONS`, "HR" → `StaffDepartment.HR`, "IT" → `StaffDepartment.IT_DATA`
+- **DB-only departments**: Executive, Management, Project Management have no enum equivalent — handled via `dbOnlyPositions` map
+
+**Key Files:**
+- `src/types/staff-hierarchy.types.ts` — Position/department enums + `getPositionsByDepartment()` with aliases
+- `src/modules/staff/components/StaffEditForm.tsx` — Department change interceptor in `handleInputChange`
+- `src/modules/staff/components/StaffForm.tsx` — Same interceptor for create form
+- `src/modules/staff/components/edit-sections/EmploymentEditSection.tsx` — Department/position dropdowns
+- `pages/api/staff/index.ts` — PUT handler with department→UUID lookup (line ~465)
+
+---
+
+## 2026-01-29: Staff UI Polish (formatLabel, Next of Kin, SA ID Sync)
+
+**formatLabel fix:** Snake_case values like `field_operations` displayed raw in UI. Applied `formatLabel()` utility across staff directory page (`pages/staff/index.tsx`) and all detail/edit components to show "Field Operations" instead.
+
+**Next of Kin hidden:** Section removed from edit form (`OverviewEditSection.tsx`) per user request — data fields still exist in DB/types but UI section hidden.
+
+**SA ID Number sync:** Two separate fields (`saIdNumber` on Overview tab, `idNumber` on Compliance tab) now sync bidirectionally via `handleInputChange` interceptor in `StaffEditForm.tsx`. On load, both fields are set to whichever has a value.
+
+---
+
 ## 2026-01-29: Input Leap (iLeap) KVM Troubleshooting
 
 **Problem:** Input Leap keyboard/mouse sharing wasn't running.
