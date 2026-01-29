@@ -449,6 +449,184 @@ export async function removeUserPermissionOverride(
 }
 
 // =====================================================
+// Batch Operations
+// =====================================================
+
+/**
+ * Batch update all permissions for a role (replace all)
+ * Deletes existing role_permissions and inserts new ones in a transaction
+ */
+export async function batchUpdateRolePermissions(
+  role: string,
+  permissions: Array<{ key: string; actions: PermissionActions }>
+): Promise<number> {
+  // Delete all existing permissions for this role
+  await sql`DELETE FROM role_permissions WHERE role = ${role}`;
+
+  // Insert new permissions
+  let inserted = 0;
+  for (const perm of permissions) {
+    // Only insert if at least one action is true
+    const hasAnyAction = perm.actions.view || perm.actions.create || perm.actions.edit || perm.actions.delete;
+    if (hasAnyAction) {
+      await sql`
+        INSERT INTO role_permissions (role, permission_key, actions)
+        VALUES (${role}, ${perm.key}, ${JSON.stringify(perm.actions)}::jsonb)
+      `;
+      inserted++;
+    }
+  }
+
+  return inserted;
+}
+
+/**
+ * Batch set user permissions by computing overrides from desired state.
+ * Compares desired effective permissions against role defaults.
+ * If desired differs from role default, creates a 'grant' override
+ * with the full desired actions (grant type replaces role defaults entirely).
+ * If desired matches role default, no override is needed.
+ */
+export async function batchSetUserPermissions(
+  userId: string,
+  desiredPermissions: Array<{ key: string; actions: PermissionActions }>,
+  grantedBy: string
+): Promise<{ overridesCreated: number; overridesRemoved: number }> {
+  // Get user's role
+  const userResult = await sql`SELECT role FROM users WHERE id = ${userId}`;
+  if (userResult.length === 0) throw new Error('User not found');
+  const userRole = userResult[0].role;
+
+  // Get role-based permissions
+  const rolePerms = await getRolePermissions(userRole);
+  const rolePermMap = new Map(
+    rolePerms.map(rp => [rp.permissionKey, rp.actions])
+  );
+
+  // Count existing overrides before clearing
+  const existingCount = await sql`
+    SELECT COUNT(*)::int as count FROM user_permission_overrides WHERE user_id = ${userId}
+  `;
+  const removedCount = existingCount[0]?.count || 0;
+
+  // Delete all existing overrides for this user
+  await sql`DELETE FROM user_permission_overrides WHERE user_id = ${userId}`;
+
+  let overridesCreated = 0;
+
+  for (const desired of desiredPermissions) {
+    const roleDefault = rolePermMap.get(desired.key) || {
+      view: false, create: false, edit: false, delete: false,
+    };
+
+    // Check if desired differs from role default
+    const differs = (
+      desired.actions.view !== roleDefault.view ||
+      desired.actions.create !== roleDefault.create ||
+      desired.actions.edit !== roleDefault.edit ||
+      desired.actions.delete !== roleDefault.delete
+    );
+
+    if (differs) {
+      // Grant type with full desired actions replaces role defaults entirely
+      // in the getUserEffectivePermissions SQL resolution
+      await sql`
+        INSERT INTO user_permission_overrides
+          (user_id, permission_key, override_type, actions, granted_by, reason)
+        VALUES (
+          ${userId}, ${desired.key}, 'grant',
+          ${JSON.stringify(desired.actions)}::jsonb,
+          ${grantedBy}, 'Batch permission update'
+        )
+      `;
+      overridesCreated++;
+    }
+    // No override needed if desired === role default
+  }
+
+  return { overridesCreated, overridesRemoved: removedCount };
+}
+
+/**
+ * Create a role from a user's effective permissions
+ */
+export async function createRoleFromUserPermissions(
+  userId: string,
+  roleName: string,
+  displayName: string,
+  description: string | null,
+  createdBy: string
+): Promise<{ roleId: string; permissionCount: number }> {
+  // Get user's effective permissions
+  const effectivePerms = await getUserEffectivePermissions(userId);
+
+  // Create the role
+  const newRole = await sql`
+    INSERT INTO custom_roles (name, display_name, description, color, is_system, created_by)
+    VALUES (${roleName}, ${displayName}, ${description}, '#6b7280', FALSE, ${createdBy})
+    RETURNING id
+  `;
+
+  const roleId = newRole[0].id;
+
+  // Insert permissions that have at least one action enabled
+  let count = 0;
+  for (const perm of effectivePerms) {
+    const hasAny = perm.canView || perm.canCreate || perm.canEdit || perm.canDelete;
+    if (hasAny) {
+      const actions = {
+        view: perm.canView,
+        create: perm.canCreate,
+        edit: perm.canEdit,
+        delete: perm.canDelete,
+      };
+      await sql`
+        INSERT INTO role_permissions (role, permission_key, actions)
+        VALUES (${roleName}, ${perm.permissionKey}, ${JSON.stringify(actions)}::jsonb)
+      `;
+      count++;
+    }
+  }
+
+  return { roleId, permissionCount: count };
+}
+
+/**
+ * Update an existing role's permissions from a user's effective permissions
+ */
+export async function updateRoleFromUserPermissions(
+  userId: string,
+  targetRole: string
+): Promise<{ permissionCount: number }> {
+  // Get user's effective permissions
+  const effectivePerms = await getUserEffectivePermissions(userId);
+
+  // Delete existing permissions for this role
+  await sql`DELETE FROM role_permissions WHERE role = ${targetRole}`;
+
+  // Insert new permissions
+  let count = 0;
+  for (const perm of effectivePerms) {
+    const hasAny = perm.canView || perm.canCreate || perm.canEdit || perm.canDelete;
+    if (hasAny) {
+      const actions = {
+        view: perm.canView,
+        create: perm.canCreate,
+        edit: perm.canEdit,
+        delete: perm.canDelete,
+      };
+      await sql`
+        INSERT INTO role_permissions (role, permission_key, actions)
+        VALUES (${targetRole}, ${perm.permissionKey}, ${JSON.stringify(actions)}::jsonb)
+      `;
+      count++;
+    }
+  }
+
+  return { permissionCount: count };
+}
+
+// =====================================================
 // Helper functions for common checks
 // =====================================================
 

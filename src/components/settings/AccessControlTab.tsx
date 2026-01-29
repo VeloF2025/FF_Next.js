@@ -8,7 +8,7 @@ import {
   Users, Shield, Key, Search, ChevronRight, ChevronDown,
   Check, X, AlertCircle, Loader2, RefreshCw, UserCog, UserPlus, Settings,
   Plus, Copy, Trash2, Lock, XCircle, Filter, ToggleLeft, ToggleRight,
-  ShieldCheck, ShieldOff, UserCheck, UserX
+  ShieldCheck, ShieldOff, UserCheck, UserX, Save, RotateCcw
 } from 'lucide-react';
 import { UserPermissionsModal } from './UserPermissionsModal';
 
@@ -107,6 +107,8 @@ interface PermissionNode {
   children?: PermissionNode[];
 }
 
+type ActionFlags = { view: boolean; create: boolean; edit: boolean; delete: boolean };
+
 type SubTab = 'users' | 'roles' | 'permissions';
 
 export function AccessControlTab() {
@@ -159,7 +161,6 @@ export function AccessControlTab() {
 
   // Modal state
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserWithRole | null>(null);
-  const [savingRolePermission, setSavingRolePermission] = useState<string | null>(null);
 
   // Role management state
   const [showCreateRoleModal, setShowCreateRoleModal] = useState(false);
@@ -170,6 +171,180 @@ export function AccessControlTab() {
   const [newRoleDisplayName, setNewRoleDisplayName] = useState('');
   const [newRoleDescription, setNewRoleDescription] = useState('');
   const [savingRole, setSavingRole] = useState(false);
+
+  // Roles tab batch editing state
+  const [localRolePerms, setLocalRolePerms] = useState<Map<string, ActionFlags>>(new Map());
+  const [serverRolePerms, setServerRolePerms] = useState<Map<string, ActionFlags>>(new Map());
+  const [roleExpandedModules, setRoleExpandedModules] = useState<Set<string>>(new Set());
+  const [roleSearchTerm, setRoleSearchTerm] = useState('');
+  const [savingRoleBatch, setSavingRoleBatch] = useState(false);
+
+  // Flatten permission tree into list of all permission keys
+  const allFlatPermissions = useMemo(() => {
+    const result: { key: string; label: string; type: string }[] = [];
+    const flatten = (nodes: PermissionNode[]) => {
+      for (const node of nodes) {
+        result.push({ key: node.key, label: node.label, type: node.type });
+        if (node.children) flatten(node.children);
+      }
+    };
+    flatten(permissionTree);
+    return result;
+  }, [permissionTree]);
+
+  // Build grouped view for roles tab (top-level modules with flattened children)
+  const roleGroupedPermissions = useMemo(() => {
+    return permissionTree.map(module => {
+      const children: { key: string; label: string; type: string; indent: number }[] = [];
+      const flattenChildren = (nodes: PermissionNode[], indent: number) => {
+        for (const node of nodes) {
+          children.push({ key: node.key, label: node.label, type: node.type, indent });
+          if (node.children) flattenChildren(node.children, indent + 1);
+        }
+      };
+      if (module.children) flattenChildren(module.children, 1);
+      return { moduleKey: module.key, moduleLabel: module.label, children };
+    });
+  }, [permissionTree]);
+
+  // Filter role groups by search term
+  const filteredRoleGroups = useMemo(() => {
+    if (!roleSearchTerm) return roleGroupedPermissions;
+    const term = roleSearchTerm.toLowerCase();
+    return roleGroupedPermissions
+      .map(group => ({
+        ...group,
+        children: group.children.filter(c =>
+          c.label.toLowerCase().includes(term) || c.key.toLowerCase().includes(term)
+        ),
+      }))
+      .filter(group =>
+        group.moduleLabel.toLowerCase().includes(term) ||
+        group.moduleKey.toLowerCase().includes(term) ||
+        group.children.length > 0
+      );
+  }, [roleGroupedPermissions, roleSearchTerm]);
+
+  // Sync local role permissions when selected role changes
+  useEffect(() => {
+    if (!selectedRole || allFlatPermissions.length === 0) return;
+    const currentRole = roles.find(r => r.name === selectedRole);
+    if (!currentRole) return;
+
+    const rolePermMap = new Map<string, ActionFlags>();
+    for (const perm of currentRole.permissions) {
+      rolePermMap.set(perm.key, { ...perm.actions });
+    }
+
+    const fullMap = new Map<string, ActionFlags>();
+    for (const perm of allFlatPermissions) {
+      fullMap.set(perm.key, rolePermMap.get(perm.key) || { view: false, create: false, edit: false, delete: false });
+    }
+
+    setLocalRolePerms(new Map(fullMap));
+    setServerRolePerms(new Map(fullMap));
+    setRoleSearchTerm('');
+  }, [selectedRole, roles, allFlatPermissions]);
+
+  // Compute role change count
+  const roleChangeCount = useMemo(() => {
+    let count = 0;
+    for (const [key, local] of localRolePerms) {
+      const server = serverRolePerms.get(key);
+      if (!server) continue;
+      if (local.view !== server.view || local.create !== server.create ||
+          local.edit !== server.edit || local.delete !== server.delete) {
+        count++;
+      }
+    }
+    return count;
+  }, [localRolePerms, serverRolePerms]);
+
+  // Toggle single action for role permission
+  const toggleRolePermAction = (permKey: string, action: keyof ActionFlags) => {
+    setLocalRolePerms(prev => {
+      const next = new Map(prev);
+      const current = next.get(permKey);
+      if (current) {
+        next.set(permKey, { ...current, [action]: !current[action] });
+      }
+      return next;
+    });
+  };
+
+  // Toggle all actions for a single role permission
+  const toggleRolePermAll = (permKey: string) => {
+    setLocalRolePerms(prev => {
+      const next = new Map(prev);
+      const current = next.get(permKey);
+      if (current) {
+        const allEnabled = current.view && current.create && current.edit && current.delete;
+        const newVal = !allEnabled;
+        next.set(permKey, { view: newVal, create: newVal, edit: newVal, delete: newVal });
+      }
+      return next;
+    });
+  };
+
+  // Toggle all permissions in a module
+  const toggleRoleModule = (moduleKey: string, enable: boolean) => {
+    setLocalRolePerms(prev => {
+      const next = new Map(prev);
+      for (const perm of allFlatPermissions) {
+        if (perm.key === moduleKey || perm.key.startsWith(moduleKey + '.')) {
+          next.set(perm.key, { view: enable, create: enable, edit: enable, delete: enable });
+        }
+      }
+      return next;
+    });
+  };
+
+  // Toggle role module expand/collapse
+  const toggleRoleModuleExpand = (key: string) => {
+    setRoleExpandedModules(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Save role permissions batch
+  const saveRoleChanges = async () => {
+    if (!selectedRole) return;
+    try {
+      setSavingRoleBatch(true);
+      setError(null);
+
+      const permissions = allFlatPermissions.map(p => ({
+        key: p.key,
+        actions: localRolePerms.get(p.key) || { view: false, create: false, edit: false, delete: false },
+      }));
+
+      const res = await fetch(`/api/admin/roles/${selectedRole}/permissions-batch`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error?.message || 'Failed to save role permissions');
+      }
+
+      setSuccessMessage(`Role permissions saved (${data.data.permissionsSet} permissions set)`);
+      await fetchRoles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save role permissions');
+    } finally {
+      setSavingRoleBatch(false);
+    }
+  };
+
+  // Discard role changes
+  const discardRoleChanges = () => {
+    setLocalRolePerms(new Map(serverRolePerms));
+  };
 
   // Fetch users
   const fetchUsers = useCallback(async () => {
@@ -291,44 +466,6 @@ export function AccessControlTab() {
       setError('Failed to grant access');
     } finally {
       setUpdatingUserId(null);
-    }
-  };
-
-  // Update role permission template
-  const updateRolePermission = async (
-    role: string,
-    permissionKey: string,
-    action: 'view' | 'create' | 'edit' | 'delete',
-    currentValue: boolean
-  ) => {
-    try {
-      setSavingRolePermission(`${role}:${permissionKey}:${action}`);
-      setError(null);
-
-      // Get current actions for this permission
-      const currentRole = roles.find(r => r.name === role);
-      const currentPerm = currentRole?.permissions.find(p => p.key === permissionKey);
-      const currentActions = currentPerm?.actions || { view: false, create: false, edit: false, delete: false };
-
-      // Toggle the action
-      const newActions = { ...currentActions, [action]: !currentValue };
-
-      const res = await fetch(`/api/admin/roles/${role}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissionKey, actions: newActions }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        await fetchRoles();
-      } else {
-        setError(data.error?.message || 'Failed to update role permission');
-      }
-    } catch (err) {
-      setError('Failed to update role permission');
-    } finally {
-      setSavingRolePermission(null);
     }
   };
 
@@ -771,9 +908,68 @@ export function AccessControlTab() {
     </div>
   );
 
+  // Render a single role permission row in the grid
+  const renderRolePermRow = (key: string, label: string, type: string, indent: number) => {
+    const local = localRolePerms.get(key);
+    const server = serverRolePerms.get(key);
+    if (!local) return null;
+
+    const isChanged = server && (
+      local.view !== server.view || local.create !== server.create ||
+      local.edit !== server.edit || local.delete !== server.delete
+    );
+    const isSA = selectedRole === 'super_admin';
+
+    const renderCheck = (action: keyof ActionFlags) => {
+      const checked = local[action];
+      const changed = server && checked !== server[action];
+      return (
+        <button
+          onClick={() => !isSA && toggleRolePermAction(key, action)}
+          disabled={isSA || savingRoleBatch}
+          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+            checked ? 'bg-green-500 border-green-500' : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
+          } ${changed ? 'ring-2 ring-yellow-400/50' : ''} ${
+            isSA ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'
+          }`}
+          title={`${action}: ${checked ? 'Enabled' : 'Disabled'}${changed ? ' (unsaved)' : ''}`}
+        >
+          {checked && <Check className="w-3 h-3 text-white" />}
+        </button>
+      );
+    };
+
+    return (
+      <div
+        key={key}
+        className={`grid grid-cols-6 gap-2 items-center px-4 py-2 border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] ${
+          isChanged ? 'bg-yellow-500/5' : ''
+        }`}
+        style={{ paddingLeft: `${1 + indent * 1.5}rem` }}
+      >
+        <div className="col-span-2 min-w-0">
+          <button
+            onClick={() => !isSA && toggleRolePermAll(key)}
+            className="font-medium text-sm text-[var(--ff-text-primary)] hover:underline truncate block"
+            title="Toggle all actions"
+          >
+            {label}
+          </button>
+          <div className="text-xs text-[var(--ff-text-tertiary)] truncate">{key}</div>
+        </div>
+        <div className="flex justify-center">{renderCheck('view')}</div>
+        <div className="flex justify-center">{renderCheck('create')}</div>
+        <div className="flex justify-center">{renderCheck('edit')}</div>
+        <div className="flex justify-center">{renderCheck('delete')}</div>
+      </div>
+    );
+  };
+
   // Render roles tab
   const renderRolesTab = () => {
     const currentRole = roles.find(r => r.name === selectedRole);
+    const isSuperAdmin = selectedRole === 'super_admin';
+    const hasRoleChanges = roleChangeCount > 0;
 
     return (
       <div className="grid grid-cols-4 gap-6">
@@ -853,102 +1049,151 @@ export function AccessControlTab() {
         </div>
 
         {/* Role permissions */}
-        <div className="col-span-3 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+        <div className="col-span-3 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg flex flex-col max-h-[70vh]">
           {currentRole ? (
             <>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{currentRole.displayName}</h3>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">
-                    {currentRole.permissions.length} permissions assigned
-                    {selectedRole === 'super_admin' && (
-                      <span className="ml-2 text-yellow-400">(Super Admin has all permissions - not editable)</span>
-                    )}
-                  </p>
+              {/* Header with save/discard */}
+              <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">{currentRole.displayName}</h3>
+                    <p className="text-sm text-[var(--ff-text-secondary)]">
+                      {allFlatPermissions.length} total permissions
+                      {isSuperAdmin && (
+                        <span className="ml-2 text-yellow-400">(Super Admin - all access, not editable)</span>
+                      )}
+                    </p>
+                  </div>
+                  {!isSuperAdmin && (
+                    <div className="flex items-center gap-3">
+                      {hasRoleChanges && (
+                        <span className="text-sm text-yellow-400">
+                          {roleChangeCount} changed
+                        </span>
+                      )}
+                      <button
+                        onClick={discardRoleChanges}
+                        disabled={!hasRoleChanges || savingRoleBatch}
+                        className="flex items-center px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg disabled:opacity-30"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        Discard
+                      </button>
+                      <button
+                        onClick={saveRoleChanges}
+                        disabled={!hasRoleChanges || savingRoleBatch}
+                        className="flex items-center px-3 py-1.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {savingRoleBatch ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        {savingRoleBatch ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                  <input
+                    type="text"
+                    placeholder="Search permissions..."
+                    value={roleSearchTerm}
+                    onChange={(e) => setRoleSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] text-sm"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="grid grid-cols-5 gap-2 text-xs font-medium text-[var(--ff-text-secondary)] uppercase pb-2 border-b border-[var(--ff-border-light)]">
-                  <div className="col-span-2">Permission</div>
-                  <div className="text-center">View</div>
-                  <div className="text-center">Create</div>
-                  <div className="text-center">Edit</div>
-                </div>
+              {/* Permissions grid */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-2">
+                  {filteredRoleGroups.map((group) => {
+                    const allGroupKeys = [group.moduleKey, ...group.children.map(c => c.key)];
+                    const moduleHasChanges = allGroupKeys.some(key => {
+                      const local = localRolePerms.get(key);
+                      const server = serverRolePerms.get(key);
+                      return local && server && (
+                        local.view !== server.view || local.create !== server.create ||
+                        local.edit !== server.edit || local.delete !== server.delete
+                      );
+                    });
 
-                {currentRole.permissions.slice(0, 20).map((perm) => {
-                  const isSuperAdmin = selectedRole === 'super_admin';
-                  const isSaving = (action: string) => savingRolePermission === `${selectedRole}:${perm.key}:${action}`;
+                    return (
+                      <div key={group.moduleKey} className={`border rounded-lg overflow-hidden ${
+                        moduleHasChanges ? 'border-yellow-500/30' : 'border-[var(--ff-border-light)]'
+                      }`}>
+                        {/* Module header */}
+                        <div className="flex items-center justify-between bg-[var(--ff-bg-tertiary)]">
+                          <button
+                            onClick={() => toggleRoleModuleExpand(group.moduleKey)}
+                            className="flex-1 flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--ff-bg-secondary)] text-left"
+                          >
+                            {roleExpandedModules.has(group.moduleKey) ? (
+                              <ChevronDown className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                            )}
+                            <span className="font-medium text-sm text-[var(--ff-text-primary)]">
+                              {group.moduleLabel}
+                            </span>
+                            {moduleHasChanges && (
+                              <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">Modified</span>
+                            )}
+                            <span className="text-xs text-[var(--ff-text-tertiary)]">
+                              {group.children.length + 1} permissions
+                            </span>
+                          </button>
+                          {!isSuperAdmin && (
+                            <div className="flex items-center gap-1 pr-3">
+                              <button
+                                onClick={() => toggleRoleModule(group.moduleKey, true)}
+                                disabled={savingRoleBatch}
+                                className="text-xs px-2 py-1 rounded bg-green-500/20 text-green-400 hover:bg-green-500/30 disabled:opacity-50"
+                                title="Enable all permissions for this module"
+                              >All</button>
+                              <button
+                                onClick={() => toggleRoleModule(group.moduleKey, false)}
+                                disabled={savingRoleBatch}
+                                className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 disabled:opacity-50"
+                                title="Disable all permissions for this module"
+                              >None</button>
+                            </div>
+                          )}
+                        </div>
 
-                  return (
-                    <div key={perm.key} className="grid grid-cols-5 gap-2 items-center py-2 border-b border-[var(--ff-border-light)]">
-                      <div className="col-span-2">
-                        <div className="font-medium text-sm text-[var(--ff-text-primary)]">{perm.label}</div>
-                        <div className="text-xs text-[var(--ff-text-tertiary)]">{perm.key}</div>
+                        {/* Permission rows */}
+                        {roleExpandedModules.has(group.moduleKey) && (
+                          <div className="bg-[var(--ff-bg-secondary)]">
+                            {/* Column headers */}
+                            <div className="grid grid-cols-6 gap-2 px-4 py-1.5 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase border-b border-[var(--ff-border-light)]">
+                              <div className="col-span-2">Permission</div>
+                              <div className="text-center">View</div>
+                              <div className="text-center">Create</div>
+                              <div className="text-center">Edit</div>
+                              <div className="text-center">Delete</div>
+                            </div>
+                            {/* Module row */}
+                            {renderRolePermRow(group.moduleKey, group.moduleLabel, 'module', 0)}
+                            {/* Child rows */}
+                            {group.children.map(child =>
+                              renderRolePermRow(child.key, child.label, child.type, child.indent)
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => !isSuperAdmin && updateRolePermission(selectedRole!, perm.key, 'view', perm.actions.view)}
-                          disabled={isSuperAdmin || isSaving('view')}
-                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                            perm.actions.view
-                              ? 'bg-green-500 border-green-500'
-                              : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
-                          } ${isSuperAdmin ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'}`}
-                          title={isSuperAdmin ? 'Cannot edit super_admin permissions' : `Toggle view permission`}
-                        >
-                          {isSaving('view') ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-white" />
-                          ) : perm.actions.view ? (
-                            <Check className="w-3 h-3 text-white" />
-                          ) : null}
-                        </button>
-                      </div>
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => !isSuperAdmin && updateRolePermission(selectedRole!, perm.key, 'create', perm.actions.create)}
-                          disabled={isSuperAdmin || isSaving('create')}
-                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                            perm.actions.create
-                              ? 'bg-green-500 border-green-500'
-                              : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
-                          } ${isSuperAdmin ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'}`}
-                          title={isSuperAdmin ? 'Cannot edit super_admin permissions' : `Toggle create permission`}
-                        >
-                          {isSaving('create') ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-white" />
-                          ) : perm.actions.create ? (
-                            <Check className="w-3 h-3 text-white" />
-                          ) : null}
-                        </button>
-                      </div>
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => !isSuperAdmin && updateRolePermission(selectedRole!, perm.key, 'edit', perm.actions.edit)}
-                          disabled={isSuperAdmin || isSaving('edit')}
-                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                            perm.actions.edit
-                              ? 'bg-green-500 border-green-500'
-                              : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]'
-                          } ${isSuperAdmin ? 'cursor-not-allowed opacity-60' : 'hover:opacity-80'}`}
-                          title={isSuperAdmin ? 'Cannot edit super_admin permissions' : `Toggle edit permission`}
-                        >
-                          {isSaving('edit') ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-white" />
-                          ) : perm.actions.edit ? (
-                            <Check className="w-3 h-3 text-white" />
-                          ) : null}
-                        </button>
-                      </div>
+                    );
+                  })}
+
+                  {filteredRoleGroups.length === 0 && (
+                    <div className="text-center py-8 text-[var(--ff-text-secondary)]">
+                      No permissions found matching your search
                     </div>
-                  );
-                })}
-
-                {currentRole.permissions.length > 20 && (
-                  <div className="text-center text-sm text-[var(--ff-text-secondary)] py-2">
-                    +{currentRole.permissions.length - 20} more permissions
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </>
           ) : (
