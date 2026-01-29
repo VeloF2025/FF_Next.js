@@ -57,6 +57,13 @@ interface OneMapRecordResponse {
   ups_serial?: string | null;
 }
 
+interface DropsTableRecord {
+  drop_number: string;
+  pole_number: string | null;
+  project_name: string | null;
+  project_id: string | null;
+}
+
 /**
  * Extract ONT serial from barcode scan data
  * Barcode format: (S)SERIAL(23S)CODE(20S)CODE(U)user(P)pass(ID)id(KY)key(N)model
@@ -113,6 +120,94 @@ async function checkExistingSubmission(dropNumber: string): Promise<ExistingSubm
     log.warn('DrAcknowledgment', `Failed to check existing submission for ${dropNumber}`, { error });
     return null;
   }
+}
+
+/**
+ * Check if DR exists in our drops table (imported from OES)
+ * Fallback when DR not found in 1Map - means DR is valid but sign-up not yet in 1Map
+ */
+async function checkDropsTable(dropNumber: string): Promise<DropsTableRecord | null> {
+  try {
+    const result = await pool.query(
+      `SELECT d.drop_number, d.pole_number, d.project_id, p.project_name
+       FROM drops d
+       LEFT JOIN projects p ON d.project_id = p.id
+       WHERE d.drop_number = $1
+       LIMIT 1`,
+      [dropNumber]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Failed to check drops table for ${dropNumber}`, { error });
+    return null;
+  }
+}
+
+/**
+ * Update onemap_status in dr_photo_unified_reviews
+ * Creates record if not exists (UPSERT)
+ */
+async function updateOneMapStatus(
+  dropNumber: string,
+  status: 'found' | 'not_found' | 'resolved'
+): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO dr_photo_unified_reviews (drop_number, onemap_status, onemap_checked_at, created_at, updated_at)
+       VALUES ($1, $2, NOW(), NOW(), NOW())
+       ON CONFLICT (drop_number) DO UPDATE SET
+         onemap_status = $2,
+         onemap_checked_at = NOW(),
+         updated_at = NOW()`,
+      [dropNumber, status]
+    );
+    log.info('DrAcknowledgment', `Set onemap_status=${status} for ${dropNumber}`);
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Failed to update onemap_status for ${dropNumber}`, { error });
+  }
+}
+
+/**
+ * Generate warning acknowledgment for DRs in drops table but NOT in 1Map
+ * Warns that home sign-up hasn't been completed
+ */
+function generateNotOnOneMapMessage(
+  dropNumber: string,
+  dropsRecord: DropsTableRecord,
+  waPhotoCheck: WAPhotoCheck
+): { message: string; swapped: boolean; swapDetails: string | null } {
+  const lines: string[] = [];
+
+  lines.push(`⚠️ *${dropNumber} Received - NOT ON 1MAP*`);
+  lines.push('');
+  lines.push('It looks like the home sign-up for this DR has not been completed.');
+  lines.push('Please check that first.');
+  lines.push('');
+
+  // Project info if available
+  if (dropsRecord.project_name) {
+    lines.push(`📍 Project: ${dropsRecord.project_name}`);
+  }
+  if (dropsRecord.pole_number) {
+    lines.push(`📍 Pole: ${dropsRecord.pole_number}`);
+  }
+  lines.push('');
+
+  // WA serial photo check
+  if (waPhotoCheck.hasPhoto) {
+    lines.push(`📷 Serial photo: ✅ Received`);
+  } else {
+    lines.push('📷 Serial photo: ❌ Not received');
+  }
+  lines.push('');
+
+  lines.push('⚠️ This DR will be tracked and checked again once 1Map is updated.');
+
+  return {
+    message: lines.join('\n'),
+    swapped: false,
+    swapDetails: null,
+  };
 }
 
 /**
@@ -443,6 +538,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     // Generate appropriate message based on whether this is a resubmission
     let ackResult: { message: string; swapped: boolean; swapDetails: string | null };
+    let notOnOneMap = false;
 
     if (isResubmission && found) {
       // Resubmission - use special template and mark for rework
@@ -456,15 +552,41 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       );
       // Mark for QA re-review and reset workflow
       await markForRework(dropNumber, photoCount);
+      // Track 1Map status
+      await updateOneMapStatus(dropNumber, 'found');
+    } else if (!found) {
+      // DR not in 1Map - check drops table as fallback
+      const dropsRecord = await checkDropsTable(dropNumber);
+
+      if (dropsRecord) {
+        // DR exists in our drops table but NOT in 1Map
+        // Send warning ack about home sign-up not complete
+        notOnOneMap = true;
+        ackResult = generateNotOnOneMapMessage(dropNumber, dropsRecord, waPhotoCheck);
+        log.warn('DrAcknowledgment', `DR ${dropNumber} found in drops but NOT in 1Map`, {
+          project: dropsRecord.project_name,
+          pole: dropsRecord.pole_number,
+        });
+        // Track as not_found in 1Map
+        await updateOneMapStatus(dropNumber, 'not_found');
+      } else {
+        // DR not in 1Map AND not in drops - truly unknown
+        ackResult = generateAckMessage(dropNumber, false, photoCount, ontSerial, upsSerial, waPhotoCheck);
+        log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map or drops - no ack`);
+      }
     } else {
-      // Normal first submission
+      // Normal first submission found in 1Map
       ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck);
+      // Track 1Map status
+      await updateOneMapStatus(dropNumber, 'found');
     }
 
     const duration = Date.now() - startTime;
 
-    if (!found) {
-      log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map - returning empty message (no ack will be sent)`);
+    if (!found && !notOnOneMap) {
+      log.info('DrAcknowledgment', `DR ${dropNumber} not found anywhere - no ack sent`);
+    } else if (notOnOneMap) {
+      log.info('DrAcknowledgment', `DR ${dropNumber} NOT ON 1MAP - warning ack sent in ${duration}ms`);
     } else if (isResubmission) {
       log.info('DrAcknowledgment', `Resubmission acknowledgment ready for ${dropNumber}`, {
         submissionNumber,
@@ -486,13 +608,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     return apiResponse.success(res, {
       dropNumber,
-      found,
+      found: found || notOnOneMap,
       photoCount,
       ontSerial,
       upsSerial,
       message: ackResult.message,
       serialsSwapped: ackResult.swapped,
       swapDetails: ackResult.swapDetails,
+      // 1Map status
+      notOnOneMap,
       // Resubmission info
       isResubmission,
       submissionNumber,
