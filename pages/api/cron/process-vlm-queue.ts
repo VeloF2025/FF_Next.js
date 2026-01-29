@@ -252,6 +252,22 @@ async function processVlmForDr(dropNumber: string): Promise<ProcessResult> {
         ontSerial: result.ontSerial,
         drNumber: result.drNumber,
       });
+    } else {
+      // No step 6/7/9 photos found — mark as done so cron doesn't re-process
+      log.info('ProcessVlmQueue', `No step 6/7/9 photos for ${dropNumber}, marking extraction complete`);
+      await pool.query(
+        `UPDATE dr_photo_unified_reviews SET
+           data_validation_completed = true,
+           data_validation_completed_at = NOW(),
+           vlm_power_meter_status = 'no_photo',
+           serial_validation_status = 'no_photo',
+           qa_phase = 'final_decision',
+           overall_status = 'NEEDS_REVIEW',
+           updated_at = NOW()
+         WHERE drop_number = $1`,
+        [dropNumber]
+      );
+      result.extracted = false;
     }
 
     result.success = true;
@@ -303,11 +319,12 @@ export default async function handler(
            -- Uncategorized: need full pipeline
            (vlm_categorization_status IS NULL OR vlm_categorization_status = 'pending')
            OR
-           -- Categorized but missing extraction data
+           -- Categorized but missing extraction data (and not already marked as no-photo)
            (vlm_categorization_status IN ('categorized', 'approved')
             AND vlm_power_meter_dbm IS NULL
             AND vlm_ont_serial_step6 IS NULL
-            AND vlm_ont_serial_step9 IS NULL)
+            AND vlm_ont_serial_step9 IS NULL
+            AND (data_validation_completed IS NULL OR data_validation_completed = false))
          )
        ORDER BY
          -- Prioritize already-categorized (extraction-only = faster)
