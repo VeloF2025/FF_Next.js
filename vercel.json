@@ -20,5 +20,26 @@
       "maxDuration": 30
     }
   },
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron/sync-action-items",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/qcontact-sync-cron",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-onemap-serials",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-onemap-data",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/process-vlm-queue",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }
