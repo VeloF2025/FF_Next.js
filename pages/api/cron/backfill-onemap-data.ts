@@ -234,12 +234,11 @@ export default async function handler(
         break;
 
       case 'missing_serials':
-        // DRs with photos but no serials
+        // DRs missing serials (regardless of photo count - serials come from 1Map API)
         query = `
           SELECT drop_number
           FROM dr_photo_unified_reviews
-          WHERE photo_count > 0
-            AND (ont_serial_scanned IS NULL AND ups_serial_scanned IS NULL)
+          WHERE (ont_serial_scanned IS NULL OR ont_serial_scanned = '')
             AND created_at > NOW() - INTERVAL '30 days'
           ORDER BY created_at DESC
           LIMIT $1

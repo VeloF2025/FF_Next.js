@@ -663,11 +663,16 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     if (photos.length === 0) {
       log.warn('ProcessNewDr', `No photos found for ${dropNumber}`);
 
+      // Still capture serials from 1Map even when no photos found
       await pool.query(
         `UPDATE dr_photo_unified_reviews
-         SET photo_count = 0, photo_source = 'onemap', updated_at = NOW()
+         SET photo_count = 0,
+             photo_source = 'onemap',
+             ont_serial_scanned = COALESCE($2, ont_serial_scanned),
+             ups_serial_scanned = COALESCE($3, ups_serial_scanned),
+             updated_at = NOW()
          WHERE drop_number = $1`,
-        [dropNumber]
+        [dropNumber, ont_barcode, ups_serial]
       );
 
       return apiResponse.success(res, {
