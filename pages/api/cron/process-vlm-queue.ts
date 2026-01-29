@@ -293,18 +293,26 @@ export default async function handler(
 
   try {
     // Find DRs that need VLM processing:
-    // - Have photos (photo_count > 0)
-    // - Not yet categorized (excludes already-processed DRs without extractable photos)
-    // - Don't have VLM extraction data yet
+    // 1. Uncategorized DRs (need full pipeline: categorize + extract)
+    // 2. Categorized but not extracted (need extraction only - faster)
     const pendingResult = await pool.query(
       `SELECT drop_number
        FROM dr_photo_unified_reviews
        WHERE photo_count > 0
-         AND (vlm_categorization_status IS NULL OR vlm_categorization_status = 'pending')
-         AND vlm_power_meter_dbm IS NULL
-         AND vlm_ont_serial_step6 IS NULL
-         AND vlm_ont_serial_step9 IS NULL
-       ORDER BY created_at DESC
+         AND (
+           -- Uncategorized: need full pipeline
+           (vlm_categorization_status IS NULL OR vlm_categorization_status = 'pending')
+           OR
+           -- Categorized but missing extraction data
+           (vlm_categorization_status IN ('categorized', 'approved')
+            AND vlm_power_meter_dbm IS NULL
+            AND vlm_ont_serial_step6 IS NULL
+            AND vlm_ont_serial_step9 IS NULL)
+         )
+       ORDER BY
+         -- Prioritize already-categorized (extraction-only = faster)
+         CASE WHEN vlm_categorization_status IN ('categorized', 'approved') THEN 0 ELSE 1 END,
+         created_at DESC
        LIMIT $1`,
       [limit]
     );
