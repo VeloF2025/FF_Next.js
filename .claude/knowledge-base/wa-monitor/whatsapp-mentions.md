@@ -152,7 +152,7 @@ curl -X POST "http://72.61.197.178:8083/send-message" \
   -d '{
     "group_jid": "120363408849234743@g.us",
     "message": "Your message here",
-    "mention_jid": "141652383526991@lid"
+    "recipient_jid": "141652383526991@lid"
   }'
 ```
 
@@ -162,7 +162,9 @@ curl -X POST "http://72.61.197.178:8083/send-message" \
 |-------|-------------|---------|
 | `group_jid` | WhatsApp group JID | `120363408849234743@g.us` |
 | `message` | Message text (bridge adds @mention prefix) | `✅ *DR123 Received!*` |
-| `mention_jid` | JID to @mention (optional) | `141652383526991@lid` |
+| `recipient_jid` | JID to @mention (optional) | `141652383526991@lid` |
+
+> **IMPORTANT:** The field is `recipient_jid`, NOT `mention_jid`. Using `mention_jid` sends the message but without the @tag.
 
 **Response:**
 ```json
