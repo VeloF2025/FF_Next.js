@@ -191,58 +191,6 @@ export function OverviewEditSection({ formData, handleInputChange }: OverviewEdi
         </div>
       </div>
 
-      {/* Next of Kin */}
-      <div>
-        <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Next of Kin</h2>
-        <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClasses}>Name</label>
-              <input
-                type="text"
-                value={formData.nextOfKinName || ''}
-                onChange={(e) => handleInputChange('nextOfKinName', e.target.value)}
-                className={inputClasses}
-                placeholder="Next of kin name"
-              />
-            </div>
-
-            <div>
-              <label className={labelClasses}>Relationship</label>
-              <input
-                type="text"
-                value={formData.nextOfKinRelationship || ''}
-                onChange={(e) => handleInputChange('nextOfKinRelationship', e.target.value)}
-                className={inputClasses}
-                placeholder="e.g., Spouse, Parent, Sibling"
-              />
-            </div>
-
-            <div>
-              <label className={labelClasses}>Phone</label>
-              <input
-                type="tel"
-                value={formData.nextOfKinPhone || ''}
-                onChange={(e) => handleInputChange('nextOfKinPhone', e.target.value)}
-                className={inputClasses}
-                placeholder="Next of kin phone"
-              />
-            </div>
-
-            <div>
-              <label className={labelClasses}>Address</label>
-              <input
-                type="text"
-                value={formData.nextOfKinAddress || ''}
-                onChange={(e) => handleInputChange('nextOfKinAddress', e.target.value)}
-                className={inputClasses}
-                placeholder="Next of kin address"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Identity Documents */}
       <div>
         <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Identity Documents</h2>

@@ -149,6 +149,15 @@ export function StaffEditForm() {
       if (staff.workPermitNumber) formUpdate.workPermitNumber = staff.workPermitNumber;
       if (staff.workPermitExpiry) formUpdate.workPermitExpiry = safeToDate(staff.workPermitExpiry);
 
+      // Sync SA ID numbers: ensure both fields have the same value on load
+      const saId = formUpdate.saIdNumber || staff.saIdNumber;
+      const id = formUpdate.idNumber || staff.idNumber;
+      const syncedId = saId || id;
+      if (syncedId) {
+        formUpdate.saIdNumber = syncedId;
+        formUpdate.idNumber = syncedId;
+      }
+
       setFormData(prevData => ({ ...prevData, ...formUpdate }));
     }
   }, [staff]);
@@ -177,6 +186,16 @@ export function StaffEditForm() {
         setShowExitModal(true);
         return;
       }
+    }
+
+    // Sync SA ID Number between Overview (saIdNumber) and Compliance (idNumber)
+    if (field === 'saIdNumber') {
+      setFormData(prev => ({ ...prev, saIdNumber: value as string, idNumber: value as string }));
+      return;
+    }
+    if (field === 'idNumber') {
+      setFormData(prev => ({ ...prev, idNumber: value as string, saIdNumber: value as string }));
+      return;
     }
 
     setFormData(prev => ({ ...prev, [field]: value }));
