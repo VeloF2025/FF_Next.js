@@ -41,7 +41,8 @@ export class EmailNotificationService {
         return await this.sendViaAWSSES(payload);
       } else {
         // Development mode - just log
-        console.log('Email Notification (Dev Mode):', {
+        log.debug('emailNotification', {
+          action: 'devModeSkip',
           to: payload.recipientEmail,
           subject: payload.subject,
           message: payload.message

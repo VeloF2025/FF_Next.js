@@ -165,6 +165,7 @@ css: |-
     border-collapse: collapse;
     margin: 16px 0;
     font-size: 10pt;
+    page-break-inside: avoid;
   }
 
   th {
@@ -268,6 +269,104 @@ css: |-
     padding: 12px 16px;
     margin: 16px 0;
     font-style: italic;
+    page-break-inside: avoid;
+  }
+
+  /* === Page Break Controls === */
+  h1 + *, h2 + *, h3 + *, h4 + * {
+    page-break-before: avoid;
+  }
+
+  /* Keep party sections together */
+  h3 + table {
+    page-break-before: avoid;
+  }
+
+  /* Prevent orphaned section headers at bottom of page */
+  /* Use wrapper technique: heading + first content stay together */
+  h2 {
+    break-inside: avoid;
+    break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Force major numbered sections to start on new page if near bottom */
+  h2::after {
+    content: "";
+    display: block;
+    height: 150px; /* Ensures enough space for content or forces page break */
+    margin-bottom: -150px;
+  }
+
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Keep blockquotes (recitals) with preceding heading */
+  blockquote {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  /* === Parties Page (Page 2) === */
+  .parties-page {
+    page-break-after: always;
+    text-align: center;
+  }
+
+  .parties-page h2 {
+    margin-top: 0;
+    font-size: 13pt;
+    margin-bottom: 8px;
+  }
+
+  .parties-page h3 {
+    font-size: 10pt;
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+
+  .parties-page table {
+    font-size: 9pt;
+    margin: 6px auto;
+    width: 85%;
+  }
+
+  .parties-page th,
+  .parties-page td {
+    padding: 5px 8px;
+    text-align: left;
+  }
+
+  /* Smaller Agreement Details table */
+  .agreement-details-small table {
+    font-size: 8.5pt;
+    margin-top: 8px;
+  }
+
+  .agreement-details-small th,
+  .agreement-details-small td {
+    padding: 4px 8px;
+  }
+
+  .agreement-details-small h3 {
+    font-size: 9pt;
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+
+  /* === Index Page === */
+  .index-page {
+    page-break-after: always;
+  }
+
+  .index-page .toc {
+    font-size: 9.5pt;
+  }
+
+  .index-page .toc-item {
+    padding: 3px 0;
   }
 
   /* === Print Optimization === */
@@ -297,19 +396,55 @@ css: |-
   </div>
 </div>
 
-# Cession of Wayleave Agreement
+<!-- Page 2: Parties -->
+<div class="parties-page">
 
-Entered into by and between:
+## Cession of Wayleave Agreement
 
-**_________________** (hereinafter the "Cedent")
+*Agreement entered into between the Cedent and the Cessionary (hereinafter collectively referred to as "the Parties")*
 
-and
+### The Cedent
 
-**VELOCITY FIBRE (PTY) LTD** (hereinafter the "Cessionary")
+| Field | Value |
+|-------|-------|
+| Full Legal Name | _________________________________________ |
+| Registration Number | _________________________________________ |
+| Registered Address | _________________________________________ |
+| Represented by | _________________________________________ |
+| Identity Number | _________________________________________ |
+| Contact Email | _________________________________________ |
+| Contact Number | _________________________________________ |
 
-(hereinafter collectively referred to as "the Parties")
+### The Cessionary
 
----
+| Field | Value |
+|-------|-------|
+| Full Legal Name | VELOCITY FIBRE (PTY) LTD |
+| Registration Number | 2025/238946/07 |
+| Tax Number | 9055917307 |
+| Registered Address | 26 Centenary Road, Lorraine, Gqeberha, 6070 |
+| Represented by | Llewelyn Hofmeyr |
+| Capacity | Managing Director |
+| Contact Email | info@velocityfibre.co.za |
+| Contact Number | 041-012 5010 |
+
+<div class="agreement-details-small">
+
+### Agreement Details
+
+| Field | Value |
+|-------|-------|
+| Agreement Date | _________________________________________ |
+| Original Wayleave Date | _________________________________________ |
+| Wayleave Area | _________________________________________ |
+| Municipality/Grantor | _________________________________________ |
+| Purchase Price | R _______________________________________ |
+
+</div>
+</div>
+
+<!-- Page 3: Index -->
+<div class="index-page">
 
 ## Index
 
@@ -340,56 +475,17 @@ and
 <div class="toc-item">Annexure G — Municipal Contact List</div>
 </div>
 
----
-
-## 1. Parties and Agreement Details
-
-### The Cedent
-
-| Field | Value |
-|-------|-------|
-| Full Legal Name | _________________________________________ |
-| Registration Number | _________________________________________ |
-| Registered Address | _________________________________________ |
-| Represented by | _________________________________________ |
-| Identity Number | _________________________________________ |
-| Contact Email | _________________________________________ |
-| Contact Number | _________________________________________ |
-
-### The Cessionary
-
-| Field | Value |
-|-------|-------|
-| Full Legal Name | VELOCITY FIBRE (PTY) LTD |
-| Registration Number | 2025/238946/07 |
-| Tax Number | 9055917307 |
-| Registered Address | 26 Centenary Road, Lorraine, Gqeberha, 6070 |
-| Represented by | Llewelyn Hofmeyr |
-| Capacity | Managing Director |
-| Contact Email | info@velocityfibre.co.za |
-| Contact Number | 041-012 5010 |
-
-### Agreement Details
-
-| Field | Value |
-|-------|-------|
-| Agreement Date | _________________________________________ |
-| Original Wayleave Date | _________________________________________ |
-| Wayleave Area | _________________________________________ |
-| Municipality/Grantor | _________________________________________ |
-| Purchase Price | R _______________________________________ |
-
----
+</div>
 
 ## 2. Recitals
 
 > **WHEREAS:**
 >
-> 1. The Cedent is the lawful holder of a Wayleave Agreement granted by _________________ ("the Grantor") on _________________ by way of letter attached hereto marked as <span class="annexure-ref">Annexure "A"</span>, authorising the installation, operation and maintenance of aerial and underground fibre optic infrastructure within the property or servitude area described as _________________ ("the Wayleave Area");
+> 1. The Cedent is the lawful holder of a Wayleave Agreement granted by _________________________________ ("the Grantor") on _________________________ by way of letter attached hereto marked as <span class="annexure-ref">Annexure "A"</span>, authorising the installation, operation and maintenance of aerial and underground fibre optic infrastructure within the property or servitude area described as _________________________________ ("the Wayleave Area");
 >
 > 2. The Cedent wishes to transfer, assign, and cede all its rights, title, and interest in and to the said Wayleave Agreement to the Cessionary;
 >
-> 3. _________________ has consented to this cession by way of letter dated _________________, attached hereto as <span class="annexure-ref">Annexure "B"</span>;
+> 3. _________________________________ has consented to this cession by way of letter dated _________________________, attached hereto as <span class="annexure-ref">Annexure "B"</span>;
 >
 > 4. The Parties individually record that all authorisations and consents required to enter into this Agreement have been duly obtained.
 
@@ -403,7 +499,7 @@ and
 
 3.2. The Cedent now wishes to cede, assign, and transfer all its rights, title, and interest in and to the said Wayleave Agreement to the Cessionary. The Cessionary has agreed to accept such cession, assignment, and transfer and to assume all obligations, liabilities, and responsibilities of the Cedent arising under the Wayleave Agreement from the Effective Date (as defined below).
 
-3.3. The Grantor has consented to the said cession by way of letter dated _________________ attached as <span class="annexure-ref">Annexure "B"</span> and recognises the Cessionary as the new holder of the Wayleave Rights.
+3.3. The Grantor has consented to the said cession by way of letter dated _________________________ attached as <span class="annexure-ref">Annexure "B"</span> and recognises the Cessionary as the new holder of the Wayleave Rights.
 
 ---
 
@@ -413,7 +509,7 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 **4.1. "Agreement"** means this Cession and Assignment of Wayleave Agreement together with all annexures attached hereto.
 
-**4.2. "Wayleave Agreement"** means the written permission or authorisation granted by the Grantor to the Cedent, dated _________________, under which the Cedent was permitted to install and maintain network infrastructure within the Wayleave Area.
+**4.2. "Wayleave Agreement"** means the written permission or authorisation granted by the Grantor to the Cedent, dated _________________________, under which the Cedent was permitted to install and maintain network infrastructure within the Wayleave Area.
 
 **4.3. "Wayleave Rights"** means all rights, privileges, and entitlements of the Cedent under the Wayleave Agreement, including but not limited to the right to install, operate, access, maintain, upgrade, and repair telecommunications infrastructure.
 
@@ -425,9 +521,9 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 **4.7. "FNO"** means Fibre Network Operator, being a licensed telecommunications operator.
 
-**4.8. "Grantor"** means _________________, being the municipality that granted the Wayleave Agreement to the Cedent.
+**4.8. "Grantor"** means _________________________________________, being the municipality that granted the Wayleave Agreement to the Cedent.
 
-**4.9. "Wayleave Area"** means _________________ as described in the Wayleave Agreement.
+**4.9. "Wayleave Area"** means _________________________________________ as described in the Wayleave Agreement.
 
 **4.10.** Any reference to one gender includes the other; any reference to the singular includes the plural and vice versa. Headings are for convenience only and do not affect interpretation.
 
@@ -437,12 +533,12 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 ### 5.1. Purchase Price and Payment
 
-5.1.1. The Cessionary shall pay to the Cedent the sum of **R _________________** (the "Purchase Price") as consideration for this cession.
+5.1.1. The Cessionary shall pay to the Cedent the sum of **R ___________________________** (the "Purchase Price") as consideration for this cession.
 
 5.1.2. Payment shall be made as follows:
 
-- **Deposit:** R [DEPOSIT_AMOUNT] within [DEPOSIT_DAYS] days of signature
-- **Balance:** R [BALANCE_AMOUNT] on the Effective Date
+- **Deposit:** R __________________ within _______ days of signature
+- **Balance:** R __________________ on the Effective Date
 
 5.1.3. The Purchase Price is conditional upon:
 
@@ -454,9 +550,9 @@ Unless otherwise stated, or the context otherwise requires, the words and expres
 
 | Bank Details | |
 |--------------|---|
-| Bank | [BANK_NAME] |
-| Account | [ACCOUNT_NUMBER] |
-| Branch | [BRANCH_CODE] |
+| Bank | _________________________________________ |
+| Account | _________________________________________ |
+| Branch | _________________________________________ |
 
 ### 5.2. Cession of Wayleave
 
@@ -544,7 +640,7 @@ The Cedent has installed infrastructure as described in <span class="annexure-re
 
 - The Cedent warrants that as at the Effective Date, the Wayleave Agreement has a remaining validity period of not less than **12 (twelve) months**.
 - The Wayleave Agreement will not expire, lapse, or require renewal within 12 (twelve) months of the Effective Date.
-- If the Wayleave Agreement is subject to periodic renewal, the next renewal date is not earlier than [RENEWAL_DATE] which is at least 12 months from the anticipated Effective Date.
+- If the Wayleave Agreement is subject to periodic renewal, the next renewal date is not earlier than _________________________ which is at least 12 months from the anticipated Effective Date.
 
 #### 5.10.2. Automatic Renewal or Extension Rights
 
@@ -552,7 +648,7 @@ The Cedent warrants that the Wayleave Agreement either:
 - (a) provides for automatic renewal upon expiry; or
 - (b) grants the holder an enforceable right to apply for renewal; or
 - (c) is granted in perpetuity or for an indefinite period; or
-- (d) has an initial term of not less than 15-20 years from _________________.
+- (d) has an initial term of not less than 15-20 years from _________________________.
 
 #### 5.10.3. Long-Term Security
 
@@ -740,7 +836,7 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 <div class="signature-block">
 
-**SIGNED** at _________________ on this _____ day of _________________ 20_____
+**SIGNED** at __________________________ on this _______ day of __________________________ 20______
 
 ### For and on Behalf of the Cedent:
 
@@ -757,7 +853,7 @@ Any breach of this clause shall entitle the Cessionary to urgent interdict, dama
 
 <div class="signature-block">
 
-**SIGNED** at _________________ on this _____ day of _________________ 20_____
+**SIGNED** at __________________________ on this _______ day of __________________________ 20______
 
 ### For and on Behalf of Velocity Fibre (Pty) Ltd:
 

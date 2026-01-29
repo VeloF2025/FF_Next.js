@@ -5,6 +5,8 @@
  * Defines alert rules and thresholds for system monitoring
  */
 
+import { log } from '@/lib/logger';
+
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 export type AlertChannel = 'email' | 'slack' | 'log';
 
@@ -281,7 +283,8 @@ export async function sendAlert(alert: Alert, channels: AlertChannel[]): Promise
  */
 async function sendEmailAlert(alert: Alert): Promise<void> {
   // In production, integrate with email service (SendGrid, AWS SES, etc.)
-  console.log('[EMAIL ALERT]', {
+  log.info('alerts', {
+    action: 'sendEmailAlert',
     to: process.env.ALERT_EMAIL || 'ops@example.com',
     subject: `[${alert.severity.toUpperCase()}] ${alert.ruleName}`,
     body: alert.message,
@@ -304,7 +307,7 @@ async function sendSlackAlert(alert: Alert): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
   if (!webhookUrl) {
-    console.log('[SLACK ALERT] No webhook configured:', alert);
+    log.warn('alerts', { action: 'sendSlackAlert', message: 'No webhook configured', alert });
     return;
   }
 
@@ -327,7 +330,7 @@ async function sendSlackAlert(alert: Alert): Promise<void> {
       }),
     });
   } catch (error) {
-    console.error('Failed to send Slack alert:', error);
+    log.error('alerts', { action: 'sendSlackAlert', error });
   }
 }
 
@@ -335,8 +338,9 @@ async function sendSlackAlert(alert: Alert): Promise<void> {
  * Log alert
  */
 async function logAlert(alert: Alert): Promise<void> {
-  const logLevel = alert.severity === 'critical' ? 'error' : alert.severity === 'warning' ? 'warn' : 'info';
-  console[logLevel]('[ALERT]', {
+  const logFn = alert.severity === 'critical' ? log.error : alert.severity === 'warning' ? log.warn : log.info;
+  logFn('alerts', {
+    action: 'alert',
     id: alert.id,
     rule: alert.ruleName,
     severity: alert.severity,
@@ -361,5 +365,5 @@ export function getAlertHistory(): Alert[] {
  */
 export async function acknowledgeAlert(alertId: string): Promise<void> {
   // In production, update alert status in database
-  console.log('[ALERT] Acknowledged:', alertId);
+  log.info('alerts', { action: 'acknowledgeAlert', alertId });
 }

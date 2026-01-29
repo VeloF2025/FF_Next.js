@@ -9,6 +9,7 @@ import { Server as NetServer } from 'http';
 import { Socket } from 'net';
 import { neon } from '@neondatabase/serverless';
 import pg from 'pg';
+import { log } from '@/lib/logger';
 
 const { Pool } = pg;
 
@@ -44,8 +45,8 @@ export default async function handler(
   }
 
   if (!res.socket.server.io) {
-    console.log('Initializing Socket.IO server...');
-    
+    log.debug('websocket', { action: 'initialize', message: 'Initializing Socket.IO server' });
+
     const io = new SocketIOServer(res.socket.server as any, {
       path: '/api/ws',
       cors: {
@@ -92,14 +93,14 @@ export default async function handler(
           io.to(entityRoom).emit('entity_change', event);
           io.to(specificRoom).emit('entity_change', event);
         } catch (error) {
-          console.error('Error parsing notification payload:', error);
+          log.error('websocket', { action: 'parse_notification', error });
         }
       }
     });
 
     // Handle Socket.IO connections
     io.on('connection', (socket) => {
-      console.log('Client connected:', socket.id);
+      log.debug('websocket', { action: 'client_connected', socketId: socket.id });
 
       // Handle subscriptions
       socket.on('subscribe', async (data) => {
@@ -133,7 +134,7 @@ export default async function handler(
               });
             }
           } catch (error) {
-            console.error('Error fetching initial data:', error);
+            log.error('websocket', { action: 'fetch_initial_data', entityType, entityId, error });
           }
         }
       });
@@ -161,8 +162,8 @@ export default async function handler(
 
       // Handle disconnect
       socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-        
+        log.debug('websocket', { action: 'client_disconnected', socketId: socket.id });
+
         // Clean up subscriptions
         subscriptions.forEach((subs, room) => {
           subs.delete(socket.id);
@@ -193,7 +194,7 @@ export default async function handler(
       });
     });
 
-    console.log('Socket.IO server initialized');
+    log.debug('websocket', { action: 'initialized', message: 'Socket.IO server initialized' });
   }
 
   res.socket.end();

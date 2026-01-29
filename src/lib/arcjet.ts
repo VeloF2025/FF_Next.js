@@ -13,12 +13,13 @@
  */
 
 import arcjet, { detectBot, fixedWindow, shield } from "@arcjet/next";
+import { log } from "@/lib/logger";
 
 // Get API key from environment
 const ARCJET_KEY = process.env.ARCJET_KEY!;
 
 if (!ARCJET_KEY) {
-  console.warn('⚠️  ARCJET_KEY not found in environment variables. Arcjet protection disabled.');
+  log.warn('arcjet', { action: 'init', message: 'ARCJET_KEY not found in environment variables. Arcjet protection disabled.' });
 }
 
 /**
@@ -149,7 +150,7 @@ export function withArcjetProtection(
   return async (req: any, res: any) => {
     // Skip protection if Arcjet not configured
     if (!ARCJET_KEY) {
-      console.warn('⚠️  Arcjet protection skipped - ARCJET_KEY not configured');
+      log.warn('arcjet', { action: 'protect', message: 'Arcjet protection skipped - ARCJET_KEY not configured' });
       return handler(req, res);
     }
 
@@ -157,10 +158,11 @@ export function withArcjetProtection(
     const decision = await protection.protect(req);
 
     // Log decision for monitoring
-    console.log('Arcjet decision:', {
+    log.debug('arcjet', {
+      action: 'decision',
       id: decision.id,
       conclusion: decision.conclusion,
-      reason: decision.reason,
+      reason: decision.reason.toString(),
       ip: decision.ip,
     });
 

@@ -31,6 +31,7 @@ import {
     Check,
     Copy,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface MeetingRoomProps {
     roomName: string;
@@ -61,7 +62,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (error) {
-            console.error('Failed to copy:', error);
+            log.error('MeetingRoom', { action: 'copyLink', error });
         }
     };
 
@@ -76,7 +77,7 @@ export function MeetingRoom({ roomName, token, serverUrl, onDisconnect }: Meetin
                 });
             } catch (error) {
                 // User cancelled or share failed
-                console.log('Share cancelled or failed');
+                log.debug('MeetingRoom', { action: 'share', message: 'Share cancelled or failed' });
             }
         } else {
             // Fallback: show modal with copy option

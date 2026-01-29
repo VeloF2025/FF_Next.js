@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
 
 interface ManualDREntryProps {
   onDRsAdded?: (count: number) => void;
@@ -87,8 +88,13 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
           const isResubmission = responseData.isResubmission || false;
           const prevSub = responseData.previousSubmission;
 
-          // Debug logging
-          console.log('ManualDREntry response:', { dropNumber, isResubmission, submissionCount: responseData.submissionCount, responseData });
+          log.debug('ManualDREntry', {
+            action: 'processDR',
+            dropNumber,
+            isResubmission,
+            submissionCount: responseData.submissionCount,
+            responseData
+          });
 
           let message = `${responseData.photosDownloaded} photos, ${responseData.categorizationStatus}`;
           if (isResubmission && prevSub) {

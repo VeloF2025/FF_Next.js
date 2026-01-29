@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { syncFirefliesToNeon } from '@/services/fireflies/firefliesService';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -24,12 +25,16 @@ export default async function handler(
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    console.error('CRON_SECRET not configured');
+    log.error('cronTask', { action: 'meetings-sync', error: 'CRON_SECRET not configured' });
     return res.status(500).json({ error: 'Server misconfiguration' });
   }
 
   if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
-    console.warn('Unauthorized cron attempt', { ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress });
+    log.error('cronTask', {
+      action: 'meetings-sync',
+      error: 'Unauthorized cron attempt',
+      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress
+    });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -40,9 +45,9 @@ export default async function handler(
       return res.status(500).json({ error: 'FIREFLIES_API_KEY not configured' });
     }
 
-    console.log('[CRON] Starting Fireflies sync...', new Date().toISOString());
+    log.debug('cronTask', { action: 'meetings-sync', step: 'start', timestamp: new Date().toISOString() });
     const count = await syncFirefliesToNeon(apiKey, sql);
-    console.log(`[CRON] Synced ${count} meetings from Fireflies`);
+    log.debug('cronTask', { action: 'meetings-sync', step: 'complete', syncedCount: count });
 
     return res.status(200).json({
       success: true,
@@ -51,7 +56,7 @@ export default async function handler(
       message: `Synced ${count} meetings from Fireflies`
     });
   } catch (error: any) {
-    console.error('[CRON] Error syncing from Fireflies:', error);
+    log.error('cronTask', { action: 'meetings-sync', error: error.message });
     return res.status(500).json({
       success: false,
       error: error.message,

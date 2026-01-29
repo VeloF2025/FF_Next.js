@@ -10,6 +10,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
@@ -30,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const storagePath = pathSegments.join('/');
     const storageUrl = `${VF_STORAGE_URL}/${storagePath}`;
 
-    console.log(`[Document Proxy] Fetching: ${storageUrl}`);
+    log.debug('documentProxy', { action: 'fetch', storageUrl });
 
     // Fetch from storage API
     const response = await fetch(storageUrl);
@@ -64,7 +65,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.send(Buffer.from(buffer));
 
   } catch (error) {
-    console.error('[Document Proxy] Error:', error);
+    log.error('documentProxy', { action: 'fetch', error });
     res.status(500).json({
       error: 'Failed to fetch document',
       details: error instanceof Error ? error.message : 'Unknown error'

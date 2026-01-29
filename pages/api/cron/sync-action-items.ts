@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 
 /**
  * Vercel Cron Job: Sync Action Items from Fireflies Meetings
@@ -22,12 +23,12 @@ export default async function handler(
   // In production, verify the cron secret
   if (process.env.NODE_ENV === 'production' && cronSecret) {
     if (authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[Cron] Unauthorized request');
+      log.error('cronTask', { action: 'sync-action-items', error: 'Unauthorized request' });
       return res.status(401).json({ error: 'Unauthorized' });
     }
   }
 
-  console.log('[Cron] Starting scheduled sync...');
+  log.debug('cronTask', { action: 'sync-action-items', step: 'start' });
 
   try {
     const baseUrl = process.env.VERCEL_URL
@@ -35,7 +36,7 @@ export default async function handler(
       : 'http://localhost:3005';
 
     // STEP 1: Sync meetings from Fireflies API
-    console.log('[Cron] Step 1: Syncing meetings from Fireflies...');
+    log.debug('cronTask', { action: 'sync-action-items', step: 'sync-meetings', baseUrl });
     const meetingsResponse = await fetch(`${baseUrl}/api/meetings?action=sync`, {
       method: 'POST',
       headers: {
@@ -46,7 +47,7 @@ export default async function handler(
     const meetingsResult = await meetingsResponse.json();
 
     if (!meetingsResponse.ok) {
-      console.error('[Cron] Meetings sync failed:', meetingsResult);
+      log.error('cronTask', { action: 'sync-action-items', step: 'sync-meetings', error: meetingsResult });
       return res.status(500).json({
         success: false,
         error: 'Meetings sync failed',
@@ -54,10 +55,10 @@ export default async function handler(
       });
     }
 
-    console.log(`[Cron] Synced ${meetingsResult.synced} meetings from Fireflies`);
+    log.debug('cronTask', { action: 'sync-action-items', step: 'sync-meetings', synced: meetingsResult.synced });
 
     // STEP 2: Extract action items from meetings
-    console.log('[Cron] Step 2: Extracting action items...');
+    log.debug('cronTask', { action: 'sync-action-items', step: 'extract-action-items' });
     const actionItemsResponse = await fetch(`${baseUrl}/api/action-items/extract-all`, {
       method: 'POST',
       headers: {
@@ -68,7 +69,7 @@ export default async function handler(
     const actionItemsResult = await actionItemsResponse.json();
 
     if (!actionItemsResponse.ok) {
-      console.error('[Cron] Action items extraction failed:', actionItemsResult);
+      log.error('cronTask', { action: 'sync-action-items', step: 'extract-action-items', error: actionItemsResult });
       return res.status(500).json({
         success: false,
         error: 'Action items extraction failed',
@@ -76,7 +77,7 @@ export default async function handler(
       });
     }
 
-    console.log('[Cron] Sync complete');
+    log.debug('cronTask', { action: 'sync-action-items', step: 'complete', actionItemsCount: actionItemsResult.data?.length });
 
     return res.status(200).json({
       success: true,
@@ -88,7 +89,7 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[Cron] Fatal error:', error);
+    log.error('cronTask', { action: 'sync-action-items', error: error.message });
     return res.status(500).json({
       success: false,
       error: error.message,

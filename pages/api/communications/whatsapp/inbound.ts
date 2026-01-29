@@ -10,6 +10,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -96,7 +97,12 @@ async function handler(
       ]
     );
 
-    console.log(`[WA Inbound] Message from ${body.sender_jid} in ${projectName}: ${body.message_content.substring(0, 50)}...`);
+    log.debug('waInbound', {
+      action: 'messageReceived',
+      senderJid: body.sender_jid,
+      projectName,
+      messagePreview: body.message_content.substring(0, 50)
+    });
 
     return res.status(200).json({
       success: true,
@@ -108,7 +114,7 @@ async function handler(
     });
 
   } catch (error) {
-    console.error('[WA Inbound API] Error:', error);
+    log.error('waInbound', { action: 'messageReceive', error });
     return apiResponse.internalError(res, error);
   }
 }

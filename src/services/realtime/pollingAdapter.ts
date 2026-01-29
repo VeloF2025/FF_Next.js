@@ -5,6 +5,7 @@
 
 import { EventEmitter } from 'events';
 import type { EntityType, RealtimeEvent } from './websocketService';
+import { log } from '@/lib/logger';
 
 export interface PollingConfig {
   pollInterval?: number;
@@ -44,7 +45,7 @@ class PollingAdapter extends EventEmitter {
       this.poll();
     }, this.config.pollInterval);
     
-    console.log('Polling adapter started');
+    log.debug('pollingAdapter', { action: 'started' });
     this.emit('connected');
   }
 
@@ -60,7 +61,7 @@ class PollingAdapter extends EventEmitter {
     this.isPolling = false;
     this.subscriptions.clear();
     
-    console.log('Polling adapter stopped');
+    log.debug('pollingAdapter', { action: 'stopped' });
     this.emit('disconnected');
   }
 
@@ -106,7 +107,7 @@ class PollingAdapter extends EventEmitter {
       this.lastChecked = new Date(data.lastChecked);
       
     } catch (error) {
-      console.error('Polling error:', error);
+      log.error('pollingAdapter', { action: 'poll', error });
       this.emit('error', error);
     }
   }

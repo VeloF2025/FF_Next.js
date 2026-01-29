@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 // BOSS VPS API base URL (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 
@@ -15,7 +16,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
-        console.log(`[DR Sessions] Fetching from BOSS VPS: ${BOSS_API_URL}/api/photos`);
+        log.debug('drSessions', { action: 'fetch', url: `${BOSS_API_URL}/api/photos` });
 
         // Fetch photos from BOSS VPS API
         const response = await fetch(`${BOSS_API_URL}/api/photos`, {
@@ -28,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         const data = await response.json();
-        console.log(`[DR Sessions] Received ${data.total_drs} DRs from BOSS VPS`);
+        log.debug('drSessions', { action: 'fetchComplete', totalDrs: data.total_drs });
 
         // Transform BOSS API response to DR sessions format
         const sessions = (data.drs || []).map((dr: any) => {
@@ -58,7 +59,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         return res.status(200).json(sessions);
     } catch (error) {
-        console.error('[DR Sessions] Error fetching from BOSS VPS:', error);
+        log.error('drSessions', { action: 'fetch', error });
         return res.status(502).json({
             error: 'Failed to fetch DR sessions from BOSS VPS',
             message: error instanceof Error ? error.message : 'Unknown error',

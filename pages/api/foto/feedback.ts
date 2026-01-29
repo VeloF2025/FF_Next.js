@@ -15,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR, markFeedbackSent, getDropSubmitterPhone } from '@/modules/photo-review/services/fotoDbService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
+import { log } from '@/lib/logger';
 
 // Project WhatsApp group mappings (same as wa-monitor)
 const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {
@@ -51,7 +52,11 @@ async function sendWhatsAppFeedback(drNumber: string, message: string, project?:
 
   // If project is "Unknown" or not in mapping, use Velo Test as fallback
   if (projectKey === 'Unknown' || !PROJECT_GROUPS[projectKey]) {
-    console.log(`[WhatsApp] Project "${projectKey}" not mapped, using Velo Test as default`);
+    log.debug('fotoApi', {
+      action: 'whatsappProjectFallback',
+      originalProject: projectKey,
+      fallbackProject: 'Velo Test'
+    });
     projectKey = 'Velo Test';
   }
 
@@ -64,9 +69,17 @@ async function sendWhatsAppFeedback(drNumber: string, message: string, project?:
   // Log recipient info for debugging (wa-feedback doesn't support @mentions yet)
   const submitterPhone = await getDropSubmitterPhone(drNumber);
   if (submitterPhone) {
-    console.log(`[WhatsApp] Sending to ${projectKey} group (submitter: ${submitterPhone})`);
+    log.debug('fotoApi', {
+      action: 'whatsappSendPrepare',
+      project: projectKey,
+      submitterPhone
+    });
   } else {
-    console.log(`[WhatsApp] Sending to ${projectKey} group (no submitter phone)`);
+    log.debug('fotoApi', {
+      action: 'whatsappSendPrepare',
+      project: projectKey,
+      submitterPhone: 'none'
+    });
   }
 
   // Use wa-feedback service for all outgoing messages
@@ -89,7 +102,11 @@ async function sendWhatsAppFeedback(drNumber: string, message: string, project?:
     throw new Error(`Failed to send WhatsApp message: ${result.message || 'Unknown error'}`);
   }
 
-  console.log(`[WhatsApp] Message sent via wa-feedback (063 841 2276) to ${projectKey} group`);
+  log.debug('fotoApi', {
+    action: 'whatsappMessageSent',
+    project: projectKey,
+    sender: '063 841 2276'
+  });
 }
 
 async function handler(
@@ -161,28 +178,43 @@ async function handler(
 
     if (USE_WHATSAPP) {
       try {
-        console.log(`[WhatsApp] Sending feedback for ${sanitizedDr} to project: ${evaluationProject || 'Velo Test (default)'}...`);
+        log.debug('fotoApi', {
+          action: 'sendWhatsappFeedback',
+          drNumber: sanitizedDr,
+          project: evaluationProject || 'Velo Test (default)'
+        });
         await sendWhatsAppFeedback(sanitizedDr, message, evaluationProject);
-        console.log(`[WhatsApp] Feedback sent successfully to ${evaluationProject || 'Velo Test'} group`);
+        log.debug('fotoApi', {
+          action: 'whatsappFeedbackSuccess',
+          drNumber: sanitizedDr,
+          project: evaluationProject || 'Velo Test'
+        });
       } catch (error) {
-        console.error(`[WhatsApp] Failed to send feedback:`, error);
+        log.error('fotoApi', {
+          action: 'whatsappFeedbackFailed',
+          drNumber: sanitizedDr,
+          error
+        });
         // Don't fail the request if WhatsApp fails - still update database
         // This allows the system to work even if WhatsApp service is down
       }
     } else {
-      console.log(`[MOCK] WhatsApp feedback for ${sanitizedDr}:`);
-      console.log(message);
+      log.debug('fotoApi', {
+        action: 'mockWhatsappFeedback',
+        drNumber: sanitizedDr,
+        message
+      });
     }
 
     // Update feedback_sent flag in database (only if we have an evaluation)
-    let feedbackStatus = { feedback_sent: true, feedback_sent_at: new Date() };
+    let feedbackStatus = { feedback_sent: true, feedback_sent_at: new Date() as Date };
 
     if (!customMessage) {
       // Only update database if we're using an evaluation from DB
       const updatedEvaluation = await markFeedbackSent(sanitizedDr);
       feedbackStatus = {
         feedback_sent: updatedEvaluation.feedback_sent,
-        feedback_sent_at: updatedEvaluation.feedback_sent_at
+        feedback_sent_at: updatedEvaluation.feedback_sent_at || new Date()
       };
     }
 
@@ -198,7 +230,7 @@ async function handler(
       },
     });
   } catch (error) {
-    console.error('Error sending feedback:', error);
+    log.error('fotoApi', { action: 'feedbackError', error });
     return res.status(500).json({
       error: 'Failed to send feedback',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -234,4 +266,4 @@ function formatFeedbackMessage(evaluation: any): string {
   return message;
 }
 
-export default withAuth(sendWhatsAppFeedback);
+export default withAuth(handler);

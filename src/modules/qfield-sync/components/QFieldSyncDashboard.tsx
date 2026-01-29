@@ -25,6 +25,7 @@ import { SyncConfigModal } from './SyncConfigModal';
 import { FiberCableDataViewer } from './FiberCableDataViewer';
 import { FieldInstallationsViewer } from './FieldInstallationsViewer';
 import { useQFieldSync } from '../hooks/useQFieldSync';
+import { log } from '@/lib/logger';
 
 export function QFieldSyncDashboard() {
   const {
@@ -56,7 +57,7 @@ export function QFieldSyncDashboard() {
     try {
       await startSync('fiber_cables', 'bidirectional');
     } catch (err) {
-      console.error('Failed to start sync:', err);
+      log.error('QFieldSyncDashboard', { action: 'startSync', error: err });
     }
   };
 
@@ -291,7 +292,7 @@ export function QFieldSyncDashboard() {
           config={dashboardData?.config}
           onClose={() => setShowConfig(false)}
           onSave={(config) => {
-            console.log('Saving config:', config);
+            log.debug('QFieldSyncDashboard', { action: 'saveConfig', config });
             setShowConfig(false);
           }}
         />

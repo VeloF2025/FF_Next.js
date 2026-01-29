@@ -25,72 +25,6 @@ interface ExecutionLogsProps {
   maxHeight?: string;
 }
 
-// Mock execution logs - in real implementation, this would come from API
-const mockExecutionLogs: WorkflowExecutionLog[] = [
-  {
-    id: '1',
-    projectWorkflowId: '1',
-    phaseId: 'phase-1',
-    stepId: 'step-1',
-    action: 'started',
-    actorId: 'user-1',
-    actorName: 'John Smith',
-    previousStatus: 'pending',
-    newStatus: 'active',
-    duration: 0,
-    notes: 'Project workflow initiated',
-    attachments: [],
-    metadata: {},
-    timestamp: '2024-01-15T09:00:00Z'
-  },
-  {
-    id: '2',
-    projectWorkflowId: '1',
-    phaseId: 'phase-1',
-    action: 'completed',
-    actorId: 'user-2',
-    actorName: 'Sarah Johnson',
-    previousStatus: 'active',
-    newStatus: 'completed',
-    duration: 480,
-    notes: 'Site survey completed successfully. All measurements documented.',
-    attachments: ['survey-report.pdf', 'site-photos.zip'],
-    metadata: { completionRate: 100, qualityScore: 95 },
-    timestamp: '2024-01-18T17:30:00Z'
-  },
-  {
-    id: '3',
-    projectWorkflowId: '1',
-    phaseId: 'phase-2',
-    action: 'started',
-    actorId: 'user-3',
-    actorName: 'Mike Davis',
-    previousStatus: 'pending',
-    newStatus: 'active',
-    duration: 0,
-    notes: 'Design phase initiated. Reviewing site survey data.',
-    attachments: [],
-    metadata: {},
-    timestamp: '2024-01-19T08:15:00Z'
-  },
-  {
-    id: '4',
-    projectWorkflowId: '1',
-    phaseId: 'phase-2',
-    stepId: 'step-3',
-    action: 'updated',
-    actorId: 'user-3',
-    actorName: 'Mike Davis',
-    previousStatus: 'active',
-    newStatus: 'active',
-    duration: 180,
-    notes: 'Design revisions requested by client. Updating fiber route plan.',
-    attachments: ['revised-design-v2.dwg'],
-    metadata: { revisionNumber: 2 },
-    timestamp: '2024-01-22T14:20:00Z'
-  }
-];
-
 export function ExecutionLogs({ 
   workflowId, 
   workflow, 
@@ -110,19 +44,12 @@ export function ExecutionLogs({
   const loadLogs = async () => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Filter logs by workflow if specified
-      const filteredLogs = workflowId 
-        ? mockExecutionLogs.filter(log => log.projectWorkflowId === workflowId)
-        : mockExecutionLogs;
-        
-      setLogs(filteredLogs.sort((a, b) => 
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      ));
+      // TODO: Replace with real API call when workflow_execution_logs table exists
+      // For now, return empty array - no fake data in production
+      log.debug('ExecutionLogs', { action: 'loadLogs', workflowId });
+      setLogs([]);
     } catch (error) {
-      log.error('Error loading execution logs:', { data: error }, 'ExecutionLogs');
+      log.error('ExecutionLogs', { action: 'loadLogs', error });
     } finally {
       setLoading(false);
     }

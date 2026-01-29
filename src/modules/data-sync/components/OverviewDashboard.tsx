@@ -59,6 +59,14 @@ const CATEGORY_CARDS: {
     color: 'text-red-400',
     bgColor: 'bg-red-500/10',
   },
+  {
+    id: 'history',
+    label: 'History',
+    icon: Clock,
+    description: 'Unified timeline of all sync and import operations with status tracking',
+    color: 'text-cyan-400',
+    bgColor: 'bg-cyan-500/10',
+  },
 ];
 
 export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
@@ -168,6 +176,10 @@ export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
             icon: CheckCircle,
           },
         ];
+      case 'history':
+        return [
+          { label: 'View All', value: 'Timeline', icon: Clock },
+        ];
       default:
         return [];
     }
@@ -252,7 +264,7 @@ export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
       {/* Category Cards */}
       <div>
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Sync Categories</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {CATEGORY_CARDS.map((card) => {
             const Icon = card.icon;
             const cardStats = getStatsForCategory(card.id);
@@ -347,6 +359,13 @@ export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
           >
             <Wrench className="w-4 h-4 text-red-400" />
             Fix OLT Mismatches
+          </button>
+          <button
+            onClick={() => onGroupSelect('history')}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+          >
+            <Clock className="w-4 h-4 text-cyan-400" />
+            View History
           </button>
         </div>
       </div>

@@ -6,6 +6,7 @@
 import { io, Socket } from 'socket.io-client';
 import { EventEmitter } from 'events';
 import type { EntityType, EventType, RealtimeEvent } from './websocketService';
+import { log } from '@/lib/logger';
 
 export interface SocketIOConfig {
   url?: string;
@@ -50,7 +51,7 @@ class SocketIOAdapter extends EventEmitter {
       });
 
       this.socket.on('connect', () => {
-        console.log('Socket.IO connected');
+        log.debug('socketIOAdapter', { action: 'connected' });
         this.emit('connected');
         
         // Re-subscribe to all active subscriptions
@@ -59,12 +60,12 @@ class SocketIOAdapter extends EventEmitter {
       });
 
       this.socket.on('disconnect', (reason) => {
-        console.log('Socket.IO disconnected:', reason);
+        log.debug('socketIOAdapter', { action: 'disconnected', reason });
         this.emit('disconnected', { reason });
       });
 
       this.socket.on('connect_error', (error) => {
-        console.error('Socket.IO connection error:', error);
+        log.error('socketIOAdapter', { action: 'connectionError', error });
         this.emit('error', error);
         reject(error);
       });

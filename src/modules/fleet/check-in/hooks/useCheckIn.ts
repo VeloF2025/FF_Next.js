@@ -17,6 +17,7 @@ import type {
   WEEKLY_REQUIRED_PHOTOS,
 } from '../../types/check-in.types';
 import { offlineStorage } from '../utils/offlineStorage';
+import { log } from '@/lib/logger';
 
 // Import the required photo configs
 const DAILY_PHOTOS = [
@@ -594,13 +595,26 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
                     expectedPlate: vehicleRegistration,
                   }),
                 })
-                  .then(r => r.ok ? console.log(`VLM persisted for ${type}`) : console.error(`VLM persist failed for ${type}: ${r.status}`))
-                  .catch(e => console.error(`VLM persist error for ${type}:`, e));
+                  .then(r => {
+                    if (r.ok) {
+                      log.debug('useCheckIn', { action: 'vlmPersisted', photoType: type });
+                    } else {
+                      log.error('useCheckIn', { action: 'vlmPersistFailed', photoType: type, status: r.status });
+                    }
+                  })
+                  .catch(e => log.error('useCheckIn', { action: 'vlmPersistError', photoType: type, error: e }));
               } else {
-                console.warn(`No base64 data for ${type} photo, skipping VLM persist`);
+                log.debug('useCheckIn', { action: 'skipVlmPersist', photoType: type, reason: 'noBase64Data' });
               }
             } else {
-              console.warn(`Skipping VLM persist for ${type}: vlmType=${photoConfig?.vlmType}, photoId=${photoId}, hasDataUrl=${!!photo.dataUrl}`);
+              log.debug('useCheckIn', {
+                action: 'skipVlmPersist',
+                photoType: type,
+                reason: 'missingRequirements',
+                vlmType: photoConfig?.vlmType,
+                photoId,
+                hasDataUrl: !!photo.dataUrl
+              });
             }
           }
         }
@@ -664,7 +678,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
           }
         }
       } catch (err) {
-        console.error('Failed to fetch last readings:', err);
+        log.error('useCheckIn', { action: 'fetchLastReadings', error: err });
       } finally {
         setIsLoadingLastReadings(false);
       }

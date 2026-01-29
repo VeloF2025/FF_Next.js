@@ -14,6 +14,7 @@ import {
   QFieldSyncDashboardData,
   SyncDirection,
 } from '../types/qfield-sync.types';
+import { log } from '@/lib/logger';
 
 class QFieldSyncApiService {
   /**
@@ -211,7 +212,7 @@ class QFieldSyncApiService {
   ): WebSocket | null {
     // Check if we're in a browser environment
     if (typeof window === 'undefined') {
-      console.warn('WebSocket not available in server-side rendering');
+      log.debug('qfieldSyncApiService', { action: 'connectWebSocket', status: 'unavailable', message: 'WebSocket not available in server-side rendering' });
       return null;
     }
 
@@ -221,19 +222,19 @@ class QFieldSyncApiService {
       const ws = new WebSocket(`${protocol}//${host}/ws/qfield-sync`);
 
       ws.onmessage = onMessage;
-      ws.onerror = onError || console.error;
+      ws.onerror = onError || ((error) => log.error('qfieldSyncApiService', { action: 'websocketDefaultError', error }));
 
       ws.onopen = () => {
-        console.log('QField Sync WebSocket connected');
+        log.debug('qfieldSyncApiService', { action: 'websocketOpen', status: 'connected' });
       };
 
       ws.onclose = () => {
-        console.log('QField Sync WebSocket disconnected');
+        log.debug('qfieldSyncApiService', { action: 'websocketClose', status: 'disconnected' });
       };
 
       return ws;
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
+      log.error('qfieldSyncApiService', { action: 'websocketCreate', error });
       return null;
     }
   }

@@ -21,6 +21,7 @@ import {
   Zap,
   AlertTriangle,
   MapPin,
+  Clock,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
@@ -28,6 +29,7 @@ import { MaintenanceGroup } from './groups/MaintenanceGroup';
 import { ActivateGroup } from './groups/ActivateGroup';
 import { OltReportGroup } from './groups/OltReportGroup';
 import { QFieldGroup } from './groups/QFieldGroup';
+import { HistoryGroup } from './groups/HistoryGroup';
 
 // Tab group configuration
 const TAB_GROUPS: { id: TabGroupId; label: string; icon: React.ElementType; description: string }[] = [
@@ -54,6 +56,12 @@ const TAB_GROUPS: { id: TabGroupId; label: string; icon: React.ElementType; desc
     label: 'QField',
     icon: MapPin,
     description: 'QFieldCloud projects for OES and data sync targets',
+  },
+  {
+    id: 'history',
+    label: 'History',
+    icon: Clock,
+    description: 'Unified timeline of all sync and import operations',
   },
 ];
 
@@ -195,6 +203,13 @@ export function DataSyncPage() {
           <QFieldGroup
             activeTab={activeTab}
             onTabChange={(tab) => handleTabChange('qfield', tab)}
+          />
+        )}
+
+        {activeGroup === 'history' && (
+          <HistoryGroup
+            activeTab={activeTab}
+            onTabChange={(tab) => handleTabChange('history', tab)}
           />
         )}
       </div>

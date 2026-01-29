@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 // Database connection - initialized lazily at runtime
 function getDbConnection() {
@@ -104,7 +105,7 @@ async function getDailyDropsForDate(date: string): Promise<Array<{ date: string;
       count: parseInt(row.count, 10),
     }));
   } catch (error) {
-    console.error('Error getting daily drops for date:', error);
+    log.error('waMonitor', { action: 'getDailyDropsForDate', date, error });
     throw new Error('Failed to get daily drops for date');
   }
 }
@@ -163,7 +164,7 @@ async function retryWithBackoff<T>(
       }
 
       const delay = baseDelay * Math.pow(2, attempt);
-      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms...`);
+      log.debug('waMonitor', { action: 'retryWithBackoff', attempt: attempt + 1, maxRetries, delay });
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -233,10 +234,10 @@ async function syncToSharePoint(
     try {
       await writeRowWithRetry(accessToken, config, rowNum, drop);
       succeeded++;
-      console.log(`✅ Wrote ${drop.project}: ${drop.count} drops to row ${rowNum}`);
+      log.debug('waMonitor', { action: 'writeRowSuccess', project: drop.project, count: drop.count, rowNum });
     } catch (error: any) {
       failed++;
-      console.error(`❌ Failed to write ${drop.project} to row ${rowNum}:`, error.message);
+      log.error('waMonitor', { action: 'writeRowFailed', project: drop.project, rowNum, error });
     }
 
     if (i < drops.length - 1) {
@@ -259,7 +260,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     yesterday.setDate(yesterday.getDate() - 1);
     const dateToTest = testDate || yesterday.toISOString().split('T')[0];
 
-    console.log(`🧪 Testing SharePoint sync for date: ${dateToTest}`);
+    log.debug('waMonitor', { action: 'testSharePointSync', testDate: dateToTest });
 
     // Get SharePoint configuration
     const config = getSharePointConfig();
@@ -300,7 +301,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error in test sync:', error);
+    log.error('waMonitor', { action: 'testSharePointSync', error });
     return apiResponse.internalError(res, error, 'Test sync failed');
   }
 }

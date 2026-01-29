@@ -5,6 +5,8 @@
  * Can integrate with Sentry or use custom endpoint
  */
 
+import { log } from '@/lib/logger';
+
 // Error severity levels
 export type ErrorSeverity = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 
@@ -66,7 +68,8 @@ export function initErrorTracking(options?: {
   window.addEventListener('error', handleGlobalError);
   window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
-  console.log('[ErrorTracking] Initialized', {
+  log.debug('errorTracking', {
+    action: 'initialized',
     enabled: config.enabled,
     sampleRate: config.sampleRate,
   });
@@ -108,7 +111,11 @@ export function captureException(
 ): void {
   // Don't track in development unless explicitly enabled
   if (!config.enabled && process.env.NODE_ENV !== 'production') {
-    console.error('[ErrorTracking]', error, options);
+    log.error('errorTracking', {
+      action: 'captureException',
+      error: error instanceof Error ? error.message : error,
+      options,
+    });
     return;
   }
 
@@ -128,7 +135,10 @@ export function captureException(
 
   // Log in development
   if (process.env.NODE_ENV === 'development') {
-    console.error('[ErrorTracking] Captured:', transformedEvent);
+    log.error('errorTracking', {
+      action: 'captured',
+      event: transformedEvent,
+    });
   }
 }
 

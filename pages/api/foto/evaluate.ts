@@ -25,6 +25,7 @@ import {
   BossEvaluationError,
 } from '@/modules/photo-review/services/fotoBossService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
+import { log } from '@/lib/logger';
 
 // Feature flags
 const USE_BOSS_PRIMARY = process.env.USE_BOSS_PRIMARY !== 'false'; // Default: true (BOSS is primary)
@@ -42,7 +43,7 @@ async function handler(
   try {
     const { dr_number } = req.body;
 
-    console.log('[evaluate API] Received request for DR:', dr_number);
+    log.debug('fotoApi', { action: 'evaluateRequest', drNumber: dr_number });
 
     // Validate DR number format and check for SQL injection
     const validation = validateDrNumber(dr_number);
@@ -63,16 +64,16 @@ async function handler(
 
     // Hybrid Strategy: BOSS (fast) > VLM (re-evaluation) > Python > Mock
     if (USE_BOSS_PRIMARY && !forceVlm) {
-      console.log('[evaluate API] Checking BOSS API for existing evaluation');
+      log.debug('fotoApi', { action: 'evaluateCheckBoss', drNumber: sanitizedDr });
       try {
         const bossEval = await fetchBossEvaluation(sanitizedDr);
 
         if (bossEval) {
           evaluation = bossEval;
           evaluationMethod = 'boss';
-          console.log('[evaluate API] Using BOSS evaluation (already completed)');
+          log.debug('fotoApi', { action: 'evaluateUseBoss', drNumber: sanitizedDr });
         } else {
-          console.log('[evaluate API] No BOSS evaluation found, falling back to VLM');
+          log.debug('fotoApi', { action: 'evaluateBossNotFound', drNumber: sanitizedDr, fallback: 'VLM' });
           // No BOSS evaluation yet, use VLM
           if (USE_VLM_BACKEND) {
             evaluation = await executeVlmEvaluation(sanitizedDr);
@@ -83,7 +84,7 @@ async function handler(
           }
         }
       } catch (error) {
-        console.warn('[evaluate API] BOSS fetch failed, falling back to VLM:', error);
+        log.error('fotoApi', { action: 'evaluateBossFailed', drNumber: sanitizedDr, fallback: 'VLM', error });
         // BOSS failed, try VLM
         if (USE_VLM_BACKEND) {
           evaluation = await executeVlmEvaluation(sanitizedDr);
@@ -93,26 +94,28 @@ async function handler(
         }
       }
     } else if (USE_VLM_BACKEND) {
-      console.log('[evaluate API] Using VLM backend for evaluation (force_vlm or BOSS disabled)');
+      log.debug('fotoApi', { action: 'evaluateUseVlm', drNumber: sanitizedDr, forceVlm });
       try {
         evaluation = await executeVlmEvaluation(sanitizedDr);
         evaluationMethod = forceVlm ? 'vlm-reeval' : 'vlm';
-        console.log('[evaluate API] VLM evaluation successful');
+        log.debug('fotoApi', { action: 'evaluateVlmSuccess', drNumber: sanitizedDr });
       } catch (error) {
         if (error instanceof VlmEvaluationError) {
-          console.error('[evaluate API] VLM evaluation error:', {
-            message: error.message,
+          log.error('fotoApi', {
+            action: 'evaluateVlmError',
+            drNumber: sanitizedDr,
+            error: error.message,
             code: error.code,
-            details: error.details,
+            details: error.details
           });
 
           // If VLM fails and Python is enabled, fallback to Python
           if (USE_PYTHON_BACKEND) {
-            console.log('[evaluate API] Falling back to Python backend');
+            log.debug('fotoApi', { action: 'evaluateFallbackPython', drNumber: sanitizedDr });
             try {
               evaluation = await executePythonEvaluation(sanitizedDr);
               evaluationMethod = 'python-fallback';
-              console.log('[evaluate API] Python fallback successful');
+              log.debug('fotoApi', { action: 'evaluatePythonSuccess', drNumber: sanitizedDr });
             } catch (pythonError) {
               // Both failed - return VLM error (primary method)
               return res.status(500).json({
@@ -137,17 +140,19 @@ async function handler(
         }
       }
     } else if (USE_PYTHON_BACKEND) {
-      console.log('[evaluate API] Using Python backend for evaluation');
+      log.debug('fotoApi', { action: 'evaluateUsePython', drNumber: sanitizedDr });
       try {
         evaluation = await executePythonEvaluation(sanitizedDr);
         evaluationMethod = 'python';
-        console.log('[evaluate API] Python evaluation successful');
+        log.debug('fotoApi', { action: 'evaluatePythonSuccess', drNumber: sanitizedDr });
       } catch (error) {
         if (error instanceof PythonEvaluationError) {
-          console.error('[evaluate API] Python evaluation error:', {
-            message: error.message,
+          log.error('fotoApi', {
+            action: 'evaluatePythonError',
+            drNumber: sanitizedDr,
+            error: error.message,
             code: error.code,
-            stderr: error.stderr,
+            stderr: error.stderr
           });
 
           return res.status(500).json({
@@ -160,14 +165,14 @@ async function handler(
         throw error;
       }
     } else {
-      console.log('[evaluate API] Using mock evaluation data (all backends disabled)');
+      log.debug('fotoApi', { action: 'evaluateUseMock', drNumber: sanitizedDr });
       evaluation = generateMockEvaluation(sanitizedDr);
     }
 
     // Save to database
-    console.log('[evaluate API] Saving evaluation for DR:', sanitizedDr);
+    log.debug('fotoApi', { action: 'saveEvaluation', drNumber: sanitizedDr });
     const savedEvaluation = await saveEvaluation(evaluation);
-    console.log('[evaluate API] Saved successfully:', savedEvaluation.dr_number);
+    log.debug('fotoApi', { action: 'saveEvaluationSuccess', drNumber: savedEvaluation.dr_number });
 
     return res.status(200).json({
       success: true,
@@ -189,7 +194,7 @@ async function handler(
                     : 'Mock evaluation completed (all backends disabled)',
     });
   } catch (error) {
-    console.error('Error evaluating DR:', error);
+    log.error('fotoApi', { action: 'evaluateError', error });
     return res.status(500).json({
       error: 'Failed to evaluate DR',
       message: error instanceof Error ? error.message : 'Unknown error',

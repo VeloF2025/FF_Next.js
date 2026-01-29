@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 
 /**
  * Vercel Cron Job: Process OneMap Serial Sync Queue
@@ -28,12 +29,12 @@ export default async function handler(
   // In production, verify the cron secret
   if (process.env.NODE_ENV === 'production' && cronSecret) {
     if (authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[Cron:OneMap] Unauthorized request');
+      log.error('cronTask', { action: 'sync-onemap-serials', error: 'Unauthorized request' });
       return res.status(401).json({ error: 'Unauthorized' });
     }
   }
 
-  console.log('[Cron:OneMap] Processing sync queue...');
+  log.debug('cronTask', { action: 'sync-onemap-serials', step: 'start' });
 
   try {
     const baseUrl = process.env.VERCEL_URL
@@ -54,7 +55,7 @@ export default async function handler(
     const result = await response.json();
 
     if (!response.ok) {
-      console.error('[Cron:OneMap] Queue processing failed:', result);
+      log.error('cronTask', { action: 'sync-onemap-serials', error: result });
       return res.status(500).json({
         success: false,
         error: 'Queue processing failed',
@@ -62,7 +63,13 @@ export default async function handler(
       });
     }
 
-    console.log(`[Cron:OneMap] Processed ${result.data.processed} items: ${result.data.succeeded} succeeded, ${result.data.failed} failed`);
+    log.debug('cronTask', {
+      action: 'sync-onemap-serials',
+      step: 'complete',
+      processed: result.data.processed,
+      succeeded: result.data.succeeded,
+      failed: result.data.failed
+    });
 
     return res.status(200).json({
       success: true,
@@ -71,7 +78,7 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error('[Cron:OneMap] Fatal error:', error);
+    log.error('cronTask', { action: 'sync-onemap-serials', error: error.message });
     return res.status(500).json({
       success: false,
       error: error.message,

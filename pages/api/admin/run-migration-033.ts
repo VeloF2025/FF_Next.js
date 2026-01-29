@@ -9,6 +9,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -18,7 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    console.log('Running migration 033...');
+    log.debug('migration', { action: 'run-migration-033', step: 'start' });
 
     // Create sync queue table
     await sql`
@@ -37,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     await sql`CREATE INDEX IF NOT EXISTS idx_onemap_sync_queue_status ON onemap_sync_queue(status)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_onemap_sync_queue_created_at ON onemap_sync_queue(created_at)`;
 
-    console.log('✓ Created onemap_sync_queue table');
+    log.debug('migration', { action: 'run-migration-033', step: 'table-created' });
 
     // Create trigger function
     await sql`
@@ -57,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       $$ LANGUAGE plpgsql
     `;
 
-    console.log('✓ Created auto_sync_onemap_serials() function');
+    log.debug('migration', { action: 'run-migration-033', step: 'function-created' });
 
     // Create trigger
     await sql`DROP TRIGGER IF EXISTS trigger_auto_sync_onemap_serials ON qa_photo_reviews`;
@@ -68,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         EXECUTE FUNCTION auto_sync_onemap_serials()
     `;
 
-    console.log('✓ Created trigger on qa_photo_reviews');
+    log.debug('migration', { action: 'run-migration-033', step: 'trigger-created' });
 
     return res.status(200).json({
       success: true,
@@ -80,7 +81,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       },
     });
   } catch (error) {
-    console.error('Migration failed:', error);
+    log.error('migration', {
+      action: 'run-migration-033',
+      error: error instanceof Error ? error.message : 'Migration failed'
+    });
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Migration failed',

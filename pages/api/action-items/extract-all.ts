@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import {
   parseFirefliesActionItems,
   findAssigneeEmail,
@@ -26,7 +27,7 @@ async function handler(
   }
 
   try {
-    console.log('[Extract All] Starting bulk extraction...');
+    log.debug('actionItemsExtractAll', { action: 'start' });
 
     // Find all meetings with action items
     const meetings = await sql`
@@ -37,7 +38,7 @@ async function handler(
       AND summary->>'action_items' != ''
     `;
 
-    console.log(`[Extract All] Found ${meetings.length} meetings with action items`);
+    log.debug('actionItemsExtractAll', { action: 'foundMeetings', count: meetings.length });
 
     let extracted = 0;
     let skipped = 0;
@@ -92,9 +93,9 @@ async function handler(
           extracted++;
         }
 
-        console.log(`[Extract All] ✅ ${meeting.title}: ${parsedItems.length} items`);
+        log.debug('actionItemsExtractAll', { action: 'extractedMeeting', meetingTitle: meeting.title, itemCount: parsedItems.length });
       } catch (error: any) {
-        console.error(`[Extract All] ❌ ${meeting.title}:`, error.message);
+        log.error('actionItemsExtractAll', { action: 'extractMeeting', meetingTitle: meeting.title, error });
         errors.push({
           meeting_id: meeting.id,
           title: meeting.title,
@@ -111,7 +112,7 @@ async function handler(
       error_details: errors,
     };
 
-    console.log('[Extract All] Complete:', result);
+    log.debug('actionItemsExtractAll', { action: 'complete', result });
 
     return apiResponse.success(
       res,
@@ -119,7 +120,7 @@ async function handler(
       `Extracted ${extracted} action items from ${meetings.length - skipped - errors.length} meetings`
     );
   } catch (error: any) {
-    console.error('[Extract All] Fatal error:', error);
+    log.error('actionItemsExtractAll', { action: 'fatal', error });
     return apiResponse.internalError(res, error);
   }
 }

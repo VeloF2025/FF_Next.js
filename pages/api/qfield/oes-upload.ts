@@ -10,6 +10,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { log } from '@/lib/logger';
 
 const execAsync = promisify(exec);
 
@@ -76,8 +77,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const targetFilename = `oes_report_latest.${originalExt}`;
     const targetPath = `${VPS_OES_PATH}/data/oes_reports/${targetFilename}`;
 
-    console.log(`Uploading file to VPS: ${targetPath}`);
-    console.log(`File size: ${(file.size / 1024).toFixed(2)} KB`);
+    log.info('api/qfield/oes-upload', {
+      action: 'uploadFile',
+      targetPath,
+      fileSizeKB: (file.size / 1024).toFixed(2)
+    });
 
     // Upload file to VPS via SCP
     const scpCommand = `scp -i "${SSH_KEY_PATH}" -o StrictHostKeyChecking=no "${tempFilePath}" "${VPS_USER}@${VPS_HOST}:${targetPath}"`;
@@ -86,13 +90,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { stdout, stderr } = await execAsync(scpCommand);
 
       if (stderr && !stderr.includes('Warning')) {
-        console.error('SCP stderr:', stderr);
+        log.error('api/qfield/oes-upload', { action: 'scpStderr', stderr });
       }
 
-      console.log('File uploaded successfully');
+      log.info('api/qfield/oes-upload', { action: 'uploadSuccess', filename: targetFilename });
 
     } catch (scpError: any) {
-      console.error('SCP error:', scpError);
+      log.error('api/qfield/oes-upload', { action: 'scpError', error: scpError.message });
       throw new Error(`Failed to upload file to VPS: ${scpError.message}`);
     }
 
@@ -110,14 +114,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('OES upload error:', error);
+    log.error('api/qfield/oes-upload', { action: 'uploadError', error: error.message });
 
     // Clean up temp file on error
     if (tempFilePath) {
       try {
         await fs.promises.unlink(tempFilePath);
       } catch (e) {
-        console.error('Failed to clean up temp file:', e);
+        log.error('api/qfield/oes-upload', { action: 'cleanupError', error: e instanceof Error ? e.message : String(e) });
       }
     }
 

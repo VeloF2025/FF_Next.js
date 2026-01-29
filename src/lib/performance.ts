@@ -12,6 +12,7 @@
  */
 
 import type { NextWebVitalsMetric } from 'next/app';
+import { log } from '@/lib/logger';
 
 // Performance thresholds (in milliseconds or score)
 export const THRESHOLDS = {
@@ -42,7 +43,7 @@ function getRating(
 async function sendToAnalytics(metric: WebVitalsMetric): Promise<void> {
   // Only send in production
   if (process.env.NODE_ENV !== 'production') {
-    console.log('[Performance]', metric);
+    log.debug('performance', { action: 'web-vitals-metric', metric });
     return;
   }
 
@@ -64,7 +65,7 @@ async function sendToAnalytics(metric: WebVitalsMetric): Promise<void> {
     });
   } catch (error) {
     // Silently fail - performance tracking shouldn't break the app
-    console.warn('[Performance] Failed to send metric:', error);
+    log.error('performance', { action: 'send-metric-failed', error });
   }
 }
 
@@ -127,11 +128,12 @@ export function reportWebVitals(metric: NextWebVitalsMetric): void {
 
   // Log poor metrics in development
   if (process.env.NODE_ENV === 'development' && extendedMetric.rating === 'poor') {
-    console.warn(
-      `[Performance] Poor ${metric.name}:`,
-      `${metric.value.toFixed(2)}ms`,
-      `(threshold: ${getThreshold(metric.name)}ms)`
-    );
+    log.error('performance', {
+      action: 'poor-metric',
+      metricName: metric.name,
+      value: `${metric.value.toFixed(2)}ms`,
+      threshold: `${getThreshold(metric.name)}ms`,
+    });
   }
 }
 
@@ -180,12 +182,16 @@ export const performanceMetrics = {
 
       // Log in development
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Performance] ${name}:`, `${measure.duration.toFixed(2)}ms`);
+        log.debug('performance', {
+          action: 'custom-measure',
+          name,
+          duration: `${measure.duration.toFixed(2)}ms`,
+        });
       }
 
       return measure.duration;
     } catch (error) {
-      console.warn(`[Performance] Failed to measure ${name}:`, error);
+      log.error('performance', { action: 'measure-failed', name, error });
       return null;
     }
   },

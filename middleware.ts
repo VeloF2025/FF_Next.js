@@ -2,20 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // TODO: Re-enable Clerk middleware when ready for production
 
-// Simple edge-compatible logging
-function edgeLog(level: string, message: string, data?: any) {
+// Edge-compatible structured logging
+// Note: Edge Runtime doesn't support file I/O, so we use stdout/stderr
+// This is the ONLY acceptable use of console methods in Edge Runtime
+function edgeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, data?: any) {
   const timestamp = new Date().toISOString();
-  const log = {
+  const logEntry = {
     timestamp,
-    level,
+    level: level.toUpperCase(),
+    component: 'middleware',
     message,
     ...data
   };
 
+  // Edge Runtime limitation: Only stdout/stderr available
+  // Using structured JSON logging for production parsing
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[${timestamp}] ${level.toUpperCase()}: ${message}`, data || '');
+    // Development: human-readable format to stderr
+    const formattedData = data ? ` ${JSON.stringify(data)}` : '';
+    process.stderr.write(`[${timestamp}] ${level.toUpperCase()}: ${message}${formattedData}\n`);
   } else {
-    console.log(JSON.stringify(log));
+    // Production: structured JSON to stdout for log aggregation
+    process.stdout.write(JSON.stringify(logEntry) + '\n');
   }
 }
 

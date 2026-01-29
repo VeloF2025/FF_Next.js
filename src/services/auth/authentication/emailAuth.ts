@@ -8,6 +8,7 @@ import { authConfig } from '@/config/auth.config';
 import { LoginCredentials, RegisterCredentials, PasswordResetRequest, User } from '@/types/auth.types';
 import { createUserProfile, getUserProfile, updateLastLogin } from '../userService';
 import { AuthUser } from '../authHelpers';
+import { log } from '@/lib/logger';
 
 export class EmailAuthentication {
   /**
@@ -15,7 +16,7 @@ export class EmailAuthentication {
    */
   async signInWithEmail(email: string, password: string): Promise<AuthUser> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock email sign in:', email);
+      log.debug('emailAuth', { message: '🔧 DEV MODE: Mock email sign in', email });
       const mockUser = await clerkAuth.signInWithEmailAndPassword(email, password);
       return {
         id: mockUser.id,
@@ -41,7 +42,7 @@ export class EmailAuthentication {
   async signInWithEmailEnhanced(credentials: LoginCredentials): Promise<User> {
     try {
       if (authConfig.isDevMode) {
-        console.log('🔧 DEV MODE: Mock enhanced email sign in:', credentials.email);
+        log.debug('emailAuth', { message: '🔧 DEV MODE: Mock enhanced email sign in', email: credentials.email });
         const mockUser = await clerkAuth.signInWithEmailAndPassword(credentials.email, credentials.password);
         return {
           uid: mockUser.id,
@@ -67,7 +68,7 @@ export class EmailAuthentication {
       const user = await getUserProfile({ uid: clerkUser.id } as any);
       return user;
     } catch (error: unknown) {
-      console.error('Email sign in error:', error);
+      log.error('emailAuth', { message: 'Email sign in error', error });
       throw error;
     }
   }
@@ -77,7 +78,7 @@ export class EmailAuthentication {
    */
   async signUp(email: string, password: string, displayName?: string): Promise<AuthUser> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock email sign up:', email);
+      log.debug('emailAuth', { message: '🔧 DEV MODE: Mock email sign up', email });
       const mockUser = await clerkAuth.createUserWithEmailAndPassword(email, password, displayName);
       return {
         id: mockUser.id,
@@ -102,7 +103,7 @@ export class EmailAuthentication {
   async registerWithEmail(credentials: RegisterCredentials): Promise<User> {
     try {
       if (authConfig.isDevMode) {
-        console.log('🔧 DEV MODE: Mock registration:', credentials.email);
+        log.debug('emailAuth', { message: '🔧 DEV MODE: Mock registration', email: credentials.email });
         const displayName = `${credentials.firstName} ${credentials.lastName}`.trim();
         const mockUser = await clerkAuth.createUserWithEmailAndPassword(
           credentials.email,
@@ -135,7 +136,7 @@ export class EmailAuthentication {
 
       return user;
     } catch (error: unknown) {
-      console.error('Registration error:', error);
+      log.error('emailAuth', { message: 'Registration error', error });
       throw error;
     }
   }
@@ -145,13 +146,13 @@ export class EmailAuthentication {
    */
   async resetPassword(email: string): Promise<void> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock password reset for:', email);
+      log.debug('emailAuth', { message: '🔧 DEV MODE: Mock password reset for', email });
       return;
     }
-    
+
     // In production, Clerk handles password reset through their UI
-    console.log('Password reset requested for:', email);
-    console.log('Clerk will handle this through their hosted UI');
+    log.debug('emailAuth', { message: 'Password reset requested for', email });
+    log.debug('emailAuth', { message: 'Clerk will handle this through their hosted UI' });
   }
 
   /**
@@ -159,13 +160,13 @@ export class EmailAuthentication {
    */
   async resetPasswordEnhanced(request: PasswordResetRequest): Promise<void> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock password reset for:', request.email);
+      log.debug('emailAuth', { message: '🔧 DEV MODE: Mock password reset for', email: request.email });
       return;
     }
 
     // In production, Clerk handles password reset through their UI
-    console.log('Password reset requested for:', request.email);
-    console.log('Clerk will handle this through their hosted UI');
+    log.debug('emailAuth', { message: 'Password reset requested for', email: request.email });
+    log.debug('emailAuth', { message: 'Clerk will handle this through their hosted UI' });
   }
 
   /**
@@ -173,12 +174,12 @@ export class EmailAuthentication {
    */
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock password change');
+      log.debug('emailAuth', { message: '🔧 DEV MODE: Mock password change' });
       return;
     }
 
     // In production, Clerk handles password changes through their UI
-    console.log('Password change requested');
-    console.log('Clerk will handle this through their user profile UI');
+    log.debug('emailAuth', { message: 'Password change requested' });
+    log.debug('emailAuth', { message: 'Clerk will handle this through their user profile UI' });
   }
 }

@@ -4,6 +4,115 @@
 
 ---
 
+## 2026-01-29: Input Leap (iLeap) KVM Troubleshooting
+
+**Problem:** Input Leap keyboard/mouse sharing wasn't running.
+
+**Root Causes:**
+1. User service was **disabled** — not set to auto-start
+2. `DISPLAY=:0` was wrong — hein's session runs on `:1`, velo on `:2`
+
+**Fix:**
+- Changed `DISPLAY=:0` → `DISPLAY=:1` in `/home/hein/.config/systemd/user/input-leap.service`
+- Enabled with `systemctl --user enable --now input-leap.service`
+
+**Key Facts:**
+- Server IP: `192.168.1.47` (MAC: `ac:b4:80:d9:bc:c6`)
+- Server **blocks ICMP/ping** — don't rely on ping to check connectivity
+- Use `nc -w 2 192.168.1.47 24800` to verify server is reachable
+- Port: 24800 (Barrier/Input Leap default)
+- Binary: `/usr/local/bin/input-leapc`
+- Smart client script: `/usr/local/bin/input-leap-smart-client.sh` (auto-detects display)
+- System service: `/etc/systemd/system/input-leap-client.service` (disabled, uses smart script)
+- User service: `/home/hein/.config/systemd/user/input-leap.service` (enabled, hardcodes display)
+- Desktop autostart: `/home/hein/.config/autostart/input-leap.desktop`
+
+**Display Mapping:** `who` output shows which display each user owns (hein=`:1`, velo=`:2`)
+
+---
+
+## 2026-01-29: QField OES Sync - Multi-Project + 2-Layer Redesign
+
+**Multi-Project Support:** Syncs to ALL `is_active=true AND sync_enabled=true` projects from `qfield_projects` table. Falls back to hardcoded project ID if DB query fails.
+
+**Current sync-enabled projects:**
+- `af058301-32d1-4bca-84f9-83b899fcbb34` (Production, `is_default=true`)
+- `e849b878-f8a8-4f84-a3f1-9fbd051686c0` (Test Project)
+
+**2-Layer Redesign (was 3 layers):**
+
+| Layer | Color | Data | Records |
+|-------|-------|------|---------|
+| `OES FF DDMMYYYY All` | Green | All activated DRs (drops table coords) | ~7,662 |
+| `FF Remaining DRs DDMMYYYY` | Orange | ALL drops NOT in `oes_activations` | ~63,306 |
+
+**Removed:** "Actual" layer (OES Excel GPS), "Missing from OES" layer (only QA'd DRs not in OES).
+
+**Other changes:**
+- Circle size: 3mm → 1.5mm
+- Date format: `DD-MM-YY` → `DDMMYYYY` (e.g., `29012026`)
+- GPKG filename: `OES FF DDMMYYYY.gpkg`
+- QFieldCloud `admin` user must be a collaborator on target projects
+
+**To add a new sync target:** Insert into `qfield_projects` table with `sync_enabled=true`.
+
+---
+
+## 2026-01-29: QFieldCloud - Docker Image Pull Failure Breaks process_projectfile
+
+**Issue:** After OES import, QField sync uploaded files successfully but `process_projectfile` and `package` jobs failed with:
+```
+404 Client Error for http+docker://localhost/v1.50/images/create?tag=latest&fromImage=qfieldcloud-qgis: Not Found
+("pull access denied for qfieldcloud-qgis, repository does not exist or may require 'docker login'")
+```
+
+**Root Cause:** The QFieldCloud worker_wrapper spawns `qfieldcloud-qgis` Docker containers for QGIS processing. The Docker SDK calls `images.pull()` before creating the container. Since `qfieldcloud-qgis` is a locally-built image (not on Docker Hub), the pull fails with 404. The image existed locally but became stale/unresolvable after some time.
+
+**Symptoms:**
+- OES import shows "QField sync triggered but confirmation timed out"
+- Sync service status shows `last_error` with Docker pull error
+- `process_projectfile` jobs in QFieldCloud DB show `status=failed`
+- Files ARE uploaded to QFieldCloud (GPKG + QGS) but not processed
+
+**Diagnosis Steps:**
+```bash
+# Check sync service status (port 8095)
+curl -s http://100.96.203.105:8095/status | jq .
+
+# Check recent jobs in QFieldCloud
+docker exec qfieldcloud-app-1 python manage.py shell -c "
+from qfieldcloud.core.models import Job
+for j in Job.objects.filter(type='process_projectfile').order_by('-created_at')[:10]:
+    print(f'{j.created_at} | {j.status} | {j.project.name}')
+"
+
+# Verify qgis image exists locally
+docker images | grep qfieldcloud-qgis
+```
+
+**Fix:**
+```bash
+# 1. Rebuild the qgis image
+cd /opt/qfieldcloud && sudo docker-compose build qgis
+
+# 2. Restart all worker wrappers
+sudo docker-compose restart worker_wrapper
+
+# 3. Re-trigger the sync
+curl -s -X POST http://100.96.203.105:8095/sync/oes \
+  -H "Content-Type: application/json" \
+  -d '{"reportDate": "2026-01-29"}'
+```
+
+**Prevention:** If `process_projectfile` jobs start failing, first check `docker images | grep qgis` and rebuild if needed. This may happen periodically when Docker's image cache becomes stale.
+
+**Key Files:**
+- `/opt/qfieldcloud/docker-compose.yml` - QFieldCloud stack (qgis service definition)
+- `/opt/qfield-sync/sync_oes_db_to_qfield.py` - Python sync script (triggers jobs)
+- Sync service: `http://100.96.203.105:8095/status`
+
+---
+
 ## 2026-01-28: Reporting - Exclude Invalid DRs with INNER JOIN
 
 **Issue:** Daily reporting counts included DRs that don't exist in the SOW-imported `drops` table (e.g., DR18628799 showing "Unknown" project and "DR_NOT_FOUND" error).

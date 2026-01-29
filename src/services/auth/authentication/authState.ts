@@ -7,6 +7,7 @@ import { authConfig } from '@/config/auth.config';
 import { User } from '@/types/auth.types';
 import { getUserProfile } from '../userService';
 import { AuthUser } from '../authHelpers';
+import { log } from '@/lib/logger';
 
 // Mock AuthUser for dev mode compatibility
 const createMockAuthUser = (user: User): AuthUser => ({
@@ -26,13 +27,13 @@ export class AuthState {
    */
   onAuthStateChanged(callback: (user: AuthUser | null) => void): () => void {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Setting up mock auth state listener');
+      log.debug('authState', { message: 'DEV MODE: Setting up mock auth state listener' });
       // In dev mode, immediately call callback with mock user
       setTimeout(() => {
         const mockUser = authConfig.devUser;
         callback(createMockAuthUser(mockUser));
       }, 100);
-      
+
       // Return cleanup function
       return () => {
         this.authStateListeners.delete(callback);
@@ -70,12 +71,12 @@ export class AuthState {
    */
   onAuthStateChangedEnhanced(callback: (user: User | null) => void): () => void {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Setting up mock enhanced auth state listener');
+      log.debug('authState', { message: 'DEV MODE: Setting up mock enhanced auth state listener' });
       // In dev mode, immediately call callback with mock user
       setTimeout(() => {
         callback(authConfig.devUser);
       }, 100);
-      
+
       // Return cleanup function
       return () => {
         this.enhancedAuthStateListeners.delete(callback);

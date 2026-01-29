@@ -6,7 +6,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 // Tab group identifiers
-export type TabGroupId = 'maintenance' | 'activate' | 'olt' | 'qfield';
+export type TabGroupId = 'maintenance' | 'activate' | 'olt' | 'qfield' | 'history';
 
 // Individual tab within a group
 export interface Tab {
@@ -78,6 +78,31 @@ export type OltTabId =
 
 // QField tab IDs
 export type QFieldTabId = 'projects';
+
+// History tab IDs
+export type HistoryTabId = 'timeline';
+
+// Sync operation type for history
+export type SyncOperationType =
+  | 'oes_import'
+  | 'arch_import'
+  | 'qcontact_sync'
+  | 'qfield_sync'
+  | 'olt_import';
+
+// Unified sync history entry (from UNION query)
+export interface SyncHistoryEntry {
+  id: string;
+  operation_type: SyncOperationType;
+  status: 'running' | 'success' | 'partial' | 'failed';
+  started_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  summary: string; // human-readable summary
+  details: Record<string, unknown>;
+  error_message: string | null;
+  triggered_by: string | null;
+}
 
 // QField project from DB
 export interface QFieldProject {

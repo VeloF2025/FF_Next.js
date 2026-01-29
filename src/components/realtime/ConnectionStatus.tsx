@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { socketIOAdapter } from '@/services/realtime/socketIOAdapter';
 import { pollingAdapter } from '@/services/realtime/pollingAdapter';
 import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 export interface ConnectionStatusProps {
   mode?: 'websocket' | 'polling' | 'auto';
@@ -70,7 +71,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
       
       // If WebSocket fails in auto mode, try polling
       if (mode === 'auto' && adapter === socketIOAdapter) {
-        console.log('WebSocket failed, switching to polling mode');
+        log.debug('ConnectionStatus', { action: 'websocketFailed', message: 'Switching to polling mode' });
         adapter = pollingAdapter;
         pollingAdapter.start();
         setConnectionMode('polling');

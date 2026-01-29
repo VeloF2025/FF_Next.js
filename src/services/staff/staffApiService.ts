@@ -312,7 +312,7 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
     notes: staff.notes,
     reports_to: staff.reportsTo,
     hourly_rate: staff.hourlyRate,
-    contract_type: staff.contractType as string,
+    contract_type: (staff.saContractType || staff.contractType) as string,
     working_hours: staff.workingHours,
     available_weekends: staff.availableWeekends,
     available_nights: staff.availableNights,
@@ -363,6 +363,7 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
   if ('benefitsPackage' in staff) (result as any).benefitsPackage = staff.benefitsPackage;
   if ('bio' in staff) result.bio = staff.bio;
   if ('specializations' in staff) (result as any).specializations = staff.specializations;
+  if ('saContractType' in staff) (result as any).saContractType = staff.saContractType;
 
   // Exit fields
   if ('exitType' in staff) (result as any).exitType = staff.exitType;

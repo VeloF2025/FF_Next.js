@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { spawn } from 'child_process';
+import { log } from '@/lib/logger';
 
 // VPS Configuration - Updated Jan 2026 to use Velocity Server
 const VPS_HOST = process.env.VPS_HOST || '100.96.203.105';
@@ -27,7 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'projectId is required' });
     }
 
-    console.log('Starting OES sync on VPS for project:', projectId);
+    log.info('api/qfield/oes-sync', { action: 'startSync', projectId });
 
     // Set headers for Server-Sent Events (SSE)
     res.setHeader('Content-Type', 'text/event-stream');
@@ -61,7 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       lines.forEach((line: string) => {
         const cleanLine = line.trim();
         if (cleanLine) {
-          console.log('VPS:', cleanLine);
+          log.debug('api/qfield/oes-sync', { action: 'vpsOutput', message: cleanLine });
 
           res.write(`data: ${JSON.stringify({
             type: 'log',
@@ -82,7 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       lines.forEach((line: string) => {
         const cleanLine = line.trim();
         if (cleanLine) {
-          console.error('VPS Error:', cleanLine);
+          log.error('api/qfield/oes-sync', { action: 'vpsError', message: cleanLine });
 
           res.write(`data: ${JSON.stringify({
             type: 'error',
@@ -97,7 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Handle process completion
     ssh.on('close', (code) => {
-      console.log(`SSH process exited with code ${code}`);
+      log.info('api/qfield/oes-sync', { action: 'sshClose', exitCode: code });
 
       // Parse stats from output
       const stats = parseStats(fullOutput);
@@ -115,7 +116,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Handle process errors
     ssh.on('error', (error) => {
-      console.error('SSH error:', error);
+      log.error('api/qfield/oes-sync', { action: 'sshError', error: error.message });
 
       res.write(`data: ${JSON.stringify({
         type: 'error',
@@ -134,7 +135,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('OES sync error:', error);
+    log.error('api/qfield/oes-sync', { action: 'syncError', error: error.message });
 
     res.write(`data: ${JSON.stringify({
       type: 'error',

@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Plus, FileText, RefreshCw } from 'lucide-react';
+import { Plus, FileText, RefreshCw, FileDown, Loader2 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument } from '@/types/contractor-document.types';
 import { DocumentCard } from './DocumentCard';
@@ -22,6 +22,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
   const [error, setError] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Fetch documents
   const fetchDocuments = async () => {
@@ -115,6 +116,48 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
     }
   };
 
+  // Handle generate Master Build Agreement
+  const handleGenerateAgreement = async () => {
+    try {
+      setIsGenerating(true);
+
+      const response = await fetch('/api/documents/generate-master-build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractorId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate document');
+      }
+
+      // Get the filename from content-disposition header
+      const contentDisposition = response.headers.get('content-disposition');
+      const filenameMatch = contentDisposition?.match(/filename="([^"]+)"/);
+      const filename = filenameMatch?.[1] || 'master-build-agreement.docx';
+
+      // Download the file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      notificationService.success('Master Build Agreement generated');
+    } catch (err: unknown) {
+      console.error('Generate error:', err);
+      const message = err instanceof Error ? err.message : 'Failed to generate document';
+      notificationService.error(message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Group documents by status for better organization
   const groupedDocuments = {
     approved: documents.filter(d => d.status === 'approved'),
@@ -146,6 +189,21 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
             title="Refresh documents"
           >
             <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+
+          {/* Generate Agreement Button */}
+          <button
+            onClick={handleGenerateAgreement}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            title="Generate Master Build Agreement"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {isGenerating ? 'Generating...' : 'Generate Agreement'}
           </button>
 
           {/* Upload Button */}

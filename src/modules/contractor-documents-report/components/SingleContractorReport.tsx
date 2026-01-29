@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { FileText, Download, Printer, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 import { useContractorDocumentReport } from '../hooks/useDocumentReport';
 import {
@@ -66,7 +67,7 @@ export default function SingleContractorReport({
 
   const handleUploadDocument = (docType: string) => {
     // Navigate to upload page or open upload modal
-    console.log('Upload document:', docType);
+    log.debug('SingleContractorReport', { action: 'uploadDocument', docType, status: 'notImplemented' });
     // TODO: Implement upload flow
   };
 
@@ -89,7 +90,7 @@ export default function SingleContractorReport({
       window.URL.revokeObjectURL(url);
       notificationService.success('CSV exported successfully');
     } catch (error) {
-      console.error('CSV export failed:', error);
+      log.error('SingleContractorReport', { action: 'exportCSV', error, contractorId });
       notificationService.error('Failed to export CSV');
     }
   };

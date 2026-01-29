@@ -275,7 +275,7 @@ export async function syncSite(
       },
     });
 
-    console.log(''); // New line after progress
+    // Progress complete for this site
     result.recordsFetched = records.length;
 
     if (dryRun) {

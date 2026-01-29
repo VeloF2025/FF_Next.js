@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { generateResetToken } from '@/lib/auth';
 import logger from '@/lib/logger';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -38,10 +39,12 @@ async function sendResetEmail(
 
   if (!SMTP_ENABLED) {
     // In development, log the full link
-    console.log('\n========================================');
-    console.log('PASSWORD RESET LINK (dev mode):');
-    console.log(resetLink);
-    console.log('========================================\n');
+    log.debug('forgot-password', {
+      action: 'devModeResetLink',
+      email,
+      resetLink,
+      message: 'Password reset link generated in dev mode'
+    });
     return true;
   }
 

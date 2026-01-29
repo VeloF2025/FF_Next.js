@@ -6,6 +6,8 @@
  * Reduces database load by caching frequently accessed data
  */
 
+import { log } from '@/lib/logger';
+
 interface CacheEntry<T> {
   value: T;
   timestamp: number;
@@ -271,14 +273,16 @@ class QueryCacheManager {
   printStats(): void {
     const stats = this.getAllStats();
 
-    console.log('\n=== Query Cache Statistics ===\n');
+    log.debug('queryCache', { message: 'Query Cache Statistics', stats });
 
     for (const [namespace, stat] of Object.entries(stats)) {
-      console.log(`${namespace}:`);
-      console.log(`  Hits: ${stat.hits}`);
-      console.log(`  Misses: ${stat.misses}`);
-      console.log(`  Hit Rate: ${(stat.hitRate * 100).toFixed(2)}%`);
-      console.log(`  Size: ${stat.size} entries\n`);
+      log.debug('queryCache', {
+        namespace,
+        hits: stat.hits,
+        misses: stat.misses,
+        hitRate: `${(stat.hitRate * 100).toFixed(2)}%`,
+        size: `${stat.size} entries`,
+      });
     }
   }
 
@@ -404,7 +408,10 @@ export function initializeCaches(): void {
   // SOW - low frequency, 5 min TTL
   queryCache.getCache(CacheNamespaces.SOW, 50, 5 * 60 * 1000);
 
-  console.log('[Query Cache] Initialized with', queryCache.getAllStats());
+  log.debug('queryCache', {
+    message: 'Query Cache initialized',
+    stats: queryCache.getAllStats()
+  });
 }
 
 /**

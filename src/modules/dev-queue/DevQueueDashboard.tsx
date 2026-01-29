@@ -14,6 +14,7 @@ import { AddDevQueueItemModal } from './components/AddDevQueueItemModal';
 import { AttachmentsModal } from './components/AttachmentsModal';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { log } from '@/lib/logger';
 import type { DevQueueItem } from './types/devQueue';
 // AppLayout removed - handled by page wrapper
 
@@ -68,7 +69,7 @@ export function DevQueueDashboard() {
 
   const handleExport = () => {
     // TODO: Implement export functionality
-    console.log('Export devQueue data');
+    log.debug('DevQueueDashboard', { action: 'export', message: 'Export devQueue data functionality not yet implemented' });
   };
 
   if (loading && !board.columns.length) {

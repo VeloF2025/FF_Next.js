@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import { FileText, Search, Download, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { log } from '@/lib/logger';
 import { useAllContractorsSummary } from '../hooks/useDocumentReport';
 import { CompletionProgressBar } from './index';
 import { getComplianceLevel } from '../utils/completenessCalculator';
@@ -51,7 +52,7 @@ export default function AllContractorsSummary() {
 
   const handleExportAll = () => {
     // TODO: Implement export all to CSV
-    console.log('Export all contractors to CSV');
+    log.debug('AllContractorsSummary', { action: 'exportAllContractors', status: 'notImplemented' });
   };
 
   return (

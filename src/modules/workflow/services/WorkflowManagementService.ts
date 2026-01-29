@@ -1,6 +1,8 @@
 /**
  * WorkflowManagementService - Core service for workflow template management
- * Temporary mock implementation until database schema is ready
+ *
+ * NOTE: Database schema not yet implemented. All operations return empty results.
+ * When workflow_templates table is created, connect this service to real database.
  */
 
 import type {
@@ -20,76 +22,23 @@ import type {
   BulkUpdateOrderRequest,
   WorkflowValidationResult,
 } from '../types/workflow.types';
+import { log } from '@/lib/logger';
 
 export class WorkflowManagementService {
   /**
-   * MOCK DATA - Replace with real database calls when schema is ready
+   * In-memory storage for templates created during session.
+   * TODO: Replace with database calls when workflow_templates table exists.
    */
-  private mockTemplates: WorkflowTemplate[] = [
-    {
-      id: '1',
-      name: 'Standard Project Workflow',
-      description: 'Default workflow for standard telecommunications projects',
-      category: 'telecommunications' as any,
-      type: 'default',
-      status: 'active',
-      version: '1.0',
-      isDefault: true,
-      isSystem: false,
-      tags: ['standard', 'telecom'],
-      metadata: { complexity: 'medium', industry: 'telecommunications' },
-      createdBy: 'system',
-      updatedBy: 'system',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      projectCount: 15
-    },
-    {
-      id: '2',
-      name: 'Emergency Response Workflow',
-      description: 'Rapid deployment workflow for emergency situations',
-      category: 'emergency' as any,
-      type: 'custom',
-      status: 'active',
-      version: '2.1',
-      isDefault: false,
-      isSystem: false,
-      tags: ['emergency', 'rapid'],
-      metadata: { complexity: 'high', industry: 'emergency' },
-      createdBy: 'admin',
-      updatedBy: 'admin',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      projectCount: 8
-    },
-    {
-      id: '3',
-      name: 'Maintenance Workflow',
-      description: 'Standard maintenance and repair workflow',
-      category: 'maintenance' as any,
-      type: 'default',
-      status: 'active',
-      version: '1.2',
-      isDefault: false,
-      isSystem: true,
-      tags: ['maintenance', 'repair'],
-      metadata: { complexity: 'low', industry: 'telecommunications' },
-      createdBy: 'system',
-      updatedBy: 'system',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      projectCount: 22
-    }
-  ];
+  private templates: WorkflowTemplate[] = [];
 
   /**
    * WORKFLOW TEMPLATE OPERATIONS
    */
   async getTemplates(query: WorkflowTemplateQuery = {}): Promise<{ templates: WorkflowTemplate[]; total: number }> {
-    // Simulate async operation
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // TODO: Replace with database query when schema is ready
+    log.debug('WorkflowManagementService', { action: 'getTemplates', query });
 
-    let filtered = [...this.mockTemplates];
+    let filtered = [...this.templates];
 
     // Apply filters
     if (query.category) {
@@ -138,13 +87,12 @@ export class WorkflowManagementService {
   }
 
   async getTemplateById(id: string): Promise<WorkflowTemplate | null> {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    return this.mockTemplates.find(t => t.id === id) || null;
+    // TODO: Replace with database query when schema is ready
+    return this.templates.find(t => t.id === id) || null;
   }
 
   async createTemplate(request: CreateWorkflowTemplateRequest, userId: string): Promise<WorkflowTemplate> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
+    // TODO: Replace with database INSERT when schema is ready
     const newTemplate: WorkflowTemplate = {
       id: crypto.randomUUID(),
       name: request.name,
@@ -164,14 +112,14 @@ export class WorkflowManagementService {
       projectCount: 0
     };
 
-    this.mockTemplates.push(newTemplate);
+    this.templates.push(newTemplate);
+    log.info('WorkflowManagementService', { action: 'createTemplate', templateId: newTemplate.id });
     return newTemplate;
   }
 
   async updateTemplate(id: string, request: UpdateWorkflowTemplateRequest, userId: string): Promise<WorkflowTemplate> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    const template = this.mockTemplates.find(t => t.id === id);
+    // TODO: Replace with database UPDATE when schema is ready
+    const template = this.templates.find(t => t.id === id);
     if (!template) {
       throw new Error('Template not found');
     }
@@ -182,15 +130,16 @@ export class WorkflowManagementService {
       updatedAt: new Date().toISOString()
     });
 
+    log.info('WorkflowManagementService', { action: 'updateTemplate', templateId: id });
     return template;
   }
 
   async deleteTemplate(id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    const index = this.mockTemplates.findIndex(t => t.id === id);
+    // TODO: Replace with database DELETE when schema is ready
+    const index = this.templates.findIndex(t => t.id === id);
     if (index > -1) {
-      this.mockTemplates.splice(index, 1);
+      this.templates.splice(index, 1);
+      log.info('WorkflowManagementService', { action: 'deleteTemplate', templateId: id });
     }
   }
 
@@ -214,52 +163,14 @@ export class WorkflowManagementService {
    * WORKFLOW PHASE OPERATIONS
    */
   async getPhases(templateId: string): Promise<WorkflowPhase[]> {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    // Return mock phases
-    return [
-      {
-        id: `${templateId}-phase-1`,
-        workflowTemplateId: templateId,
-        name: 'Planning',
-        description: 'Initial project planning and setup',
-        orderIndex: 0,
-        color: '#3B82F6',
-        icon: 'Planning',
-        estimatedDuration: 7,
-        requiredRoles: ['project-manager', 'engineer'],
-        dependencies: [],
-        completionCriteria: ['Project scope defined', 'Resources allocated'],
-        isOptional: false,
-        isParallel: false,
-        metadata: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      {
-        id: `${templateId}-phase-2`,
-        workflowTemplateId: templateId,
-        name: 'Execution',
-        description: 'Project implementation and delivery',
-        orderIndex: 1,
-        color: '#10B981',
-        icon: 'Build',
-        estimatedDuration: 21,
-        requiredRoles: ['engineer', 'technician'],
-        dependencies: [`${templateId}-phase-1`],
-        completionCriteria: ['All deliverables completed', 'Quality checks passed'],
-        isOptional: false,
-        isParallel: false,
-        metadata: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+    // TODO: Replace with database query when workflow_phases table exists
+    log.debug('WorkflowManagementService', { action: 'getPhases', templateId });
+    return []; // No phases until database schema is implemented
   }
 
   async createPhase(request: CreateWorkflowPhaseRequest): Promise<WorkflowPhase> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
+    // TODO: Replace with database INSERT when workflow_phases table exists
+    log.info('WorkflowManagementService', { action: 'createPhase', templateId: request.workflowTemplateId });
     return {
       id: crypto.randomUUID(),
       workflowTemplateId: request.workflowTemplateId,
@@ -281,53 +192,30 @@ export class WorkflowManagementService {
   }
 
   async updatePhase(id: string, request: UpdateWorkflowPhaseRequest): Promise<WorkflowPhase> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Mock implementation - would update in database
+    // TODO: Replace with database UPDATE when workflow_phases table exists
+    log.info('WorkflowManagementService', { action: 'updatePhase', phaseId: id });
     const phase = await this.createPhase({
-      workflowTemplateId: 'mock',
-      name: 'Updated Phase',
-      orderIndex: 0,
+      workflowTemplateId: request.workflowTemplateId || '',
+      name: request.name || 'Updated Phase',
+      orderIndex: request.orderIndex || 0,
       ...request
     } as CreateWorkflowPhaseRequest);
 
     return { ...phase, id };
   }
 
-  async deletePhase(_id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    // Mock implementation
+  async deletePhase(id: string): Promise<void> {
+    // TODO: Replace with database DELETE when workflow_phases table exists
+    log.info('WorkflowManagementService', { action: 'deletePhase', phaseId: id });
   }
 
   /**
    * WORKFLOW STEP OPERATIONS
    */
   async getSteps(phaseId: string): Promise<WorkflowStep[]> {
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    return [
-      {
-        id: `${phaseId}-step-1`,
-        workflowPhaseId: phaseId,
-        name: 'Initial Setup',
-        description: 'Set up project environment and tools',
-        orderIndex: 0,
-        stepType: 'task',
-        estimatedDuration: 4,
-        assigneeRole: 'engineer',
-        dependencies: [],
-        preconditions: ['Project approved'],
-        postconditions: ['Environment ready'],
-        instructions: 'Follow setup guide',
-        resources: ['Setup guide', 'Tools'],
-        validation: ['Environment test passed'],
-        isRequired: true,
-        isAutomated: false,
-        metadata: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+    // TODO: Replace with database query when workflow_steps table exists
+    log.debug('WorkflowManagementService', { action: 'getSteps', phaseId });
+    return []; // No steps until database schema is implemented
   }
 
   async createStep(request: CreateWorkflowStepRequest): Promise<WorkflowStep> {
@@ -359,49 +247,30 @@ export class WorkflowManagementService {
   }
 
   async updateStep(id: string, request: UpdateWorkflowStepRequest): Promise<WorkflowStep> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
+    // TODO: Replace with database UPDATE when workflow_steps table exists
+    log.info('WorkflowManagementService', { action: 'updateStep', stepId: id });
     const step = await this.createStep({
-      workflowPhaseId: 'mock',
-      name: 'Updated Step',
-      orderIndex: 0,
+      workflowPhaseId: request.workflowPhaseId || '',
+      name: request.name || 'Updated Step',
+      orderIndex: request.orderIndex || 0,
       ...request
     } as CreateWorkflowStepRequest);
 
     return { ...step, id };
   }
 
-  async deleteStep(_id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 100));
+  async deleteStep(id: string): Promise<void> {
+    // TODO: Replace with database DELETE when workflow_steps table exists
+    log.info('WorkflowManagementService', { action: 'deleteStep', stepId: id });
   }
 
   /**
    * WORKFLOW TASK OPERATIONS
    */
   async getTasks(stepId: string): Promise<WorkflowTask[]> {
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    return [
-      {
-        id: `${stepId}-task-1`,
-        workflowStepId: stepId,
-        name: 'Configure Environment',
-        description: 'Set up development environment',
-        orderIndex: 0,
-        priority: 'medium',
-        estimatedHours: 2,
-        skillsRequired: ['DevOps', 'Configuration'],
-        tools: ['Docker', 'CLI'],
-        deliverables: ['Environment config'],
-        acceptanceCriteria: ['Environment passes health check'],
-        isOptional: false,
-        canBeParallel: false,
-        tags: ['setup', 'environment'],
-        metadata: {},
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ];
+    // TODO: Replace with database query when workflow_tasks table exists
+    log.debug('WorkflowManagementService', { action: 'getTasks', stepId });
+    return []; // No tasks until database schema is implemented
   }
 
   async createTask(request: CreateWorkflowTaskRequest): Promise<WorkflowTask> {
@@ -429,51 +298,54 @@ export class WorkflowManagementService {
   }
 
   async updateTask(id: string, request: UpdateWorkflowTaskRequest): Promise<WorkflowTask> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-
+    // TODO: Replace with database UPDATE when workflow_tasks table exists
+    log.info('WorkflowManagementService', { action: 'updateTask', taskId: id });
     const task = await this.createTask({
-      workflowStepId: 'mock',
-      name: 'Updated Task',
-      orderIndex: 0,
+      workflowStepId: request.workflowStepId || '',
+      name: request.name || 'Updated Task',
+      orderIndex: request.orderIndex || 0,
       ...request
     } as CreateWorkflowTaskRequest);
 
     return { ...task, id };
   }
 
-  async deleteTask(_id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 100));
+  async deleteTask(id: string): Promise<void> {
+    // TODO: Replace with database DELETE when workflow_tasks table exists
+    log.info('WorkflowManagementService', { action: 'deleteTask', taskId: id });
   }
 
   /**
    * VALIDATION AND UTILITY METHODS
    */
   async validateTemplate(templateId: string): Promise<WorkflowValidationResult> {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // TODO: Implement real validation logic when database schema exists
+    log.debug('WorkflowManagementService', { action: 'validateTemplate', templateId });
+
+    const template = await this.getTemplateById(templateId);
+    if (!template) {
+      return {
+        isValid: false,
+        errors: [{ type: 'missing', level: 'template', itemId: templateId, message: 'Template not found' }],
+        warnings: []
+      };
+    }
 
     return {
       isValid: true,
       errors: [],
-      warnings: [
-        {
-          type: 'performance',
-          level: 'template',
-          itemId: templateId,
-          message: 'Template has no estimated durations for some phases',
-          suggestion: 'Add duration estimates for better project planning'
-        }
-      ]
+      warnings: []
     };
   }
 
-  async bulkUpdateOrder(_items: BulkUpdateOrderRequest): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    // Mock implementation
+  async bulkUpdateOrder(items: BulkUpdateOrderRequest): Promise<void> {
+    // TODO: Replace with database UPDATE when schema exists
+    log.info('WorkflowManagementService', { action: 'bulkUpdateOrder', itemCount: items.items?.length || 0 });
   }
 
-  async bulkDelete(_ids: string[]): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    // Mock implementation
+  async bulkDelete(ids: string[]): Promise<void> {
+    // TODO: Replace with database DELETE when schema exists
+    log.info('WorkflowManagementService', { action: 'bulkDelete', idCount: ids.length });
   }
 }
 

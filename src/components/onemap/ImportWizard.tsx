@@ -205,7 +205,6 @@ export const ImportWizard: React.FC = () => {
             
             <button
               onClick={() => {
-                console.log('CLI Command: node scripts/conservative-lawley-import.js');
                 notificationService.info('Run this command in terminal: node scripts/conservative-lawley-import.js');
               }}
               className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"

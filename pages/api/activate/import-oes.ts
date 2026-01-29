@@ -713,6 +713,30 @@ async function handler(
         };
       }
 
+      // === LOG QField SYNC TO DATA_SYNC_OPERATIONS ===
+      try {
+        const syncDuration = qfieldSyncStatus.success
+          ? ((Date.now() - new Date(batchResult.rows[0]?.id ? Date.now() : 0).getTime()) / 1000)
+          : null;
+        await pool.query(
+          `INSERT INTO data_sync_operations (operation_type, status, started_at, completed_at, duration_seconds, details, error_message, triggered_by, source_batch_id)
+           VALUES ('qfield_sync', $1, NOW() - INTERVAL '1 minute', NOW(), $2, $3, $4, 'oes_import_webhook', $5)`,
+          [
+            qfieldSyncStatus.success ? 'success' : 'failed',
+            syncDuration,
+            JSON.stringify({
+              projects_synced: qfieldSyncStatus.recordCount ? '2' : '0',
+              total_records: String(qfieldSyncStatus.recordCount || 0),
+              message: qfieldSyncStatus.message,
+            }),
+            qfieldSyncStatus.success ? null : qfieldSyncStatus.message,
+            batchId,
+          ]
+        );
+      } catch (logErr) {
+        log.warn('OESImport', 'Failed to log QField sync to data_sync_operations', logErr);
+      }
+
       // === SHAREPOINT FOLDER VERIFICATION (Fire-and-forget) ===
       // Ensure folders exist for all matched DRs after OES import
       if (process.env.SHAREPOINT_DR_SYNC_ENABLED === 'true' && matched > 0) {

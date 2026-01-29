@@ -8,6 +8,7 @@ import { authConfig } from '@/config/auth.config';
 import { User } from '@/types/auth.types';
 import { getUserProfile, updateLastLogin } from '../userService';
 import { AuthUser, handleAuthError } from '../authHelpers';
+import { log } from '@/lib/logger';
 
 // Mock AuthUser for dev mode compatibility
 const createMockAuthUser = (user: User): AuthUser => ({
@@ -28,7 +29,7 @@ export class GoogleAuthentication {
    */
   async signInWithGoogle(): Promise<AuthUser> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock Google sign in');
+      log.debug('googleAuth', { message: 'DEV MODE: Mock Google sign in' });
       const mockUser = authConfig.devUser;
       await updateLastLogin(mockUser.id);
       return createMockAuthUser(mockUser);
@@ -50,7 +51,7 @@ export class GoogleAuthentication {
    */
   async signInWithGoogleEnhanced(rememberMe = false): Promise<User> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock Google sign in (enhanced)');
+      log.debug('googleAuth', { message: 'DEV MODE: Mock Google sign in (enhanced)' });
       const user = authConfig.devUser;
       await updateLastLogin(user.id);
       return user;

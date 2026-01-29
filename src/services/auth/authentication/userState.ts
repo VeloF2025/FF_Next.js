@@ -8,6 +8,7 @@ import { authConfig } from '@/config/auth.config';
 import { User } from '@/types/auth.types';
 import { getUserProfile, getUserFromFirestore } from '../userService';
 import { AuthUser } from '../authHelpers';
+import { log } from '@/lib/logger';
 
 // Mock AuthUser for dev mode compatibility
 const createMockAuthUser = (user: User): AuthUser => ({
@@ -24,7 +25,7 @@ export class UserState {
    */
   async signOut(): Promise<void> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock sign out');
+      log.debug('userState', { message: 'DEV MODE: Mock sign out' });
       return;
     }
 
@@ -55,7 +56,7 @@ export class UserState {
    */
   async getCurrentUserEnhanced(): Promise<User | null> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Returning mock user (enhanced)');
+      log.debug('userState', { message: 'DEV MODE: Returning mock user (enhanced)' });
       return authConfig.devUser;
     }
 
@@ -118,7 +119,7 @@ export class UserState {
    */
   async updateUserProfile(updates: { displayName?: string; photoURL?: string }): Promise<void> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock profile update:', updates);
+      log.debug('userState', { message: 'DEV MODE: Mock profile update', updates });
       return;
     }
 
@@ -139,7 +140,7 @@ export class UserState {
    */
   async sendEmailVerification(): Promise<void> {
     if (authConfig.isDevMode) {
-      console.log('🔧 DEV MODE: Mock email verification sent');
+      log.debug('userState', { message: 'DEV MODE: Mock email verification sent' });
       return;
     }
 

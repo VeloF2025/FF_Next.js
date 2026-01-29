@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import { NeonPoleData, NeonDropData, NeonFibreData } from '@/services/sow/types';
+import { log } from '@/lib/logger';
 
 export const sowApi = {
   /**
@@ -29,7 +30,7 @@ export const sowApi = {
     }
     
     // Large dataset, upload in chunks
-    console.log(`Uploading ${poles.length} poles in chunks of ${CHUNK_SIZE}`);
+    log.debug('sowApi', { message: `Uploading ${poles.length} poles in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
     const allErrors: any[] = [];
@@ -38,9 +39,9 @@ export const sowApi = {
       const chunk = poles.slice(i, i + CHUNK_SIZE);
       const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
       const totalChunks = Math.ceil(poles.length / CHUNK_SIZE);
-      
-      console.log(`Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} poles)`);
-      
+
+      log.debug('sowApi', { message: `Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} poles)` });
+
       try {
         const result = await this._uploadPolesChunk(projectId, chunk);
         totalInserted += result.inserted || 0;
@@ -49,7 +50,7 @@ export const sowApi = {
           allErrors.push(...result.errors);
         }
       } catch (error) {
-        console.error(`Chunk ${chunkNumber} failed:`, error);
+        log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
         throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
       }
       
@@ -79,21 +80,21 @@ export const sowApi = {
       },
       body: JSON.stringify({ projectId, poles }),
     });
-    
+
     // Check if response is OK and is JSON
     if (!response.ok) {
       const text = await response.text();
-      console.error('Upload poles failed:', response.status, text);
+      log.error('sowApi', { message: 'Upload poles failed', status: response.status, text });
       throw new Error(`Upload failed: ${response.status} - ${text.substring(0, 100)}`);
     }
-    
+
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
-      console.error('Non-JSON response:', text.substring(0, 200));
+      log.error('sowApi', { message: 'Non-JSON response', text: text.substring(0, 200) });
       throw new Error('Server returned non-JSON response');
     }
-    
+
     return response.json();
   },
 
@@ -118,7 +119,7 @@ export const sowApi = {
     }
     
     // Large dataset, upload in chunks
-    console.log(`Uploading ${drops.length} drops in chunks of ${CHUNK_SIZE}`);
+    log.debug('sowApi', { message: `Uploading ${drops.length} drops in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
     const allErrors: any[] = [];
@@ -127,9 +128,9 @@ export const sowApi = {
       const chunk = drops.slice(i, i + CHUNK_SIZE);
       const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
       const totalChunks = Math.ceil(drops.length / CHUNK_SIZE);
-      
-      console.log(`Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} drops)`);
-      
+
+      log.debug('sowApi', { message: `Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} drops)` });
+
       try {
         const result = await this._uploadDropsChunk(projectId, chunk);
         totalInserted += result.inserted || 0;
@@ -138,7 +139,7 @@ export const sowApi = {
           allErrors.push(...result.errors);
         }
       } catch (error) {
-        console.error(`Chunk ${chunkNumber} failed:`, error);
+        log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
         throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
       }
       
@@ -168,21 +169,21 @@ export const sowApi = {
       },
       body: JSON.stringify({ projectId, drops }),
     });
-    
+
     // Check if response is OK and is JSON
     if (!response.ok) {
       const text = await response.text();
-      console.error('Upload drops failed:', response.status, text);
+      log.error('sowApi', { message: 'Upload drops failed', status: response.status, text });
       throw new Error(`Upload failed: ${response.status} - ${text.substring(0, 100)}`);
     }
-    
+
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
-      console.error('Non-JSON response:', text.substring(0, 200));
+      log.error('sowApi', { message: 'Non-JSON response', text: text.substring(0, 200) });
       throw new Error('Server returned non-JSON response');
     }
-    
+
     return response.json();
   },
 
@@ -207,7 +208,7 @@ export const sowApi = {
     }
     
     // Large dataset, upload in chunks
-    console.log(`Uploading ${fibres.length} fibre records in chunks of ${CHUNK_SIZE}`);
+    log.debug('sowApi', { message: `Uploading ${fibres.length} fibre records in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
     const allErrors: any[] = [];
@@ -216,9 +217,9 @@ export const sowApi = {
       const chunk = fibres.slice(i, i + CHUNK_SIZE);
       const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
       const totalChunks = Math.ceil(fibres.length / CHUNK_SIZE);
-      
-      console.log(`Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} fibre records)`);
-      
+
+      log.debug('sowApi', { message: `Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} fibre records)` });
+
       try {
         const result = await this._uploadFibreChunk(projectId, chunk);
         totalInserted += result.inserted || 0;
@@ -227,7 +228,7 @@ export const sowApi = {
           allErrors.push(...result.errors);
         }
       } catch (error) {
-        console.error(`Chunk ${chunkNumber} failed:`, error);
+        log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
         throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
       }
       
@@ -257,13 +258,13 @@ export const sowApi = {
       },
       body: JSON.stringify({ projectId, fibres }),
     });
-    
+
     if (!response.ok) {
       const text = await response.text();
-      console.error('Upload fibre failed:', response.status, text);
+      log.error('sowApi', { message: 'Upload fibre failed', status: response.status, text });
       throw new Error(`Upload failed: ${response.status} - ${text.substring(0, 100)}`);
     }
-    
+
     return response.json();
   },
 

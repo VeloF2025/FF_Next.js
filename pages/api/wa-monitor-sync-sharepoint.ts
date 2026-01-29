@@ -13,6 +13,7 @@ import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import { getDailyDropsPerProject } from '@/modules/wa-monitor/services/waMonitorService';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 // Database connection - initialized lazily at runtime
 function getDbConnection() {
@@ -123,7 +124,7 @@ async function getNextRow(config: SharePointConfig): Promise<number> {
 
     return row.last_row_written + 1;
   } catch (error) {
-    console.error('Error getting next row from database:', error);
+    log.error('waMonitor', { action: 'getNextRow', error });
     throw new Error('Failed to get next row number');
   }
 }
@@ -142,7 +143,7 @@ async function updateLastRow(worksheetName: string, lastRow: number, syncDate: s
       WHERE sheet_name = ${worksheetName}
     `;
   } catch (error) {
-    console.error('Error updating last row in database:', error);
+    log.error('waMonitor', { action: 'updateLastRow', worksheetName, lastRow, error });
     // Don't throw - this is not critical, we can continue
   }
 }
@@ -170,7 +171,7 @@ async function retryWithBackoff<T>(
 
       // Exponential backoff: 1s, 2s, 4s
       const delay = baseDelay * Math.pow(2, attempt);
-      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms...`);
+      log.debug('waMonitor', { action: 'retryWithBackoff', attempt: attempt + 1, maxRetries, delay });
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -245,10 +246,10 @@ async function syncToSharePoint(
       await writeRowWithRetry(accessToken, config, rowNum, drop);
       succeeded++;
       lastWrittenRow = rowNum;
-      console.log(`✅ Wrote ${drop.project}: ${drop.count} drops to row ${rowNum}`);
+      log.debug('waMonitor', { action: 'writeRowSuccess', project: drop.project, count: drop.count, rowNum });
     } catch (error: any) {
       failed++;
-      console.error(`❌ Failed to write ${drop.project} to row ${rowNum}:`, error.message);
+      log.error('waMonitor', { action: 'writeRowFailed', project: drop.project, rowNum, error });
     }
 
     // Rate limiting - wait 1s between writes
@@ -260,7 +261,7 @@ async function syncToSharePoint(
   // Update database with last row written (for next sync)
   if (succeeded > 0) {
     await updateLastRow(config.worksheetName, lastWrittenRow, syncDate);
-    console.log(`📊 Updated database: last row = ${lastWrittenRow}`);
+    log.debug('waMonitor', { action: 'updateLastRowSuccess', worksheetName: config.worksheetName, lastWrittenRow, syncDate });
   }
 
   return { succeeded, failed };
@@ -317,7 +318,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error syncing to SharePoint:', error);
+    log.error('waMonitor', { action: 'syncToSharePoint', error });
     return apiResponse.internalError(res, error, 'Failed to sync to SharePoint');
   }
 }

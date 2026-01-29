@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import type { DropRecord, Photo } from '@/modules/photo-review/types';
 import { Pool } from 'pg';
+import { log } from '@/lib/logger';
 
 // Create database connection
 const pool = new Pool({
@@ -67,7 +68,7 @@ async function handler(
   try {
     const { project, dr_number } = req.query;
 
-    console.log(`[FOTO API] Fetching photos from BOSS VPS: ${BOSS_API_URL}/api/photos`);
+    log.debug('fotoApi', { action: 'fetchPhotos', source: 'BOSS_VPS', url: `${BOSS_API_URL}/api/photos` });
 
     // Fetch photos from BOSS VPS API
     const response = await fetch(`${BOSS_API_URL}/api/photos`, {
@@ -83,7 +84,12 @@ async function handler(
 
     const data = await response.json();
 
-    console.log(`[FOTO API] Received ${data.total_drs} DRs with ${data.total_photos} photos from BOSS VPS`);
+    log.debug('fotoApi', {
+      action: 'photosReceived',
+      totalDrs: data.total_drs,
+      totalPhotos: data.total_photos,
+      source: 'BOSS_VPS'
+    });
 
     // Fetch evaluation data from database
     const evaluationQuery = `
@@ -103,7 +109,10 @@ async function handler(
       evaluationResult.rows.map((row: any) => [row.dr_number, row])
     );
 
-    console.log(`[FOTO API] Found ${evaluationResult.rows.length} evaluations in database`);
+    log.debug('fotoApi', {
+      action: 'evaluationsFetched',
+      evaluationsFound: evaluationResult.rows.length
+    });
 
     // Transform BOSS API response to our DropRecord format
     const dropRecords: DropRecord[] = (data.drs || []).map((dr: any) => {
@@ -167,14 +176,17 @@ async function handler(
       return a.dr_number.localeCompare(b.dr_number);
     });
 
-    console.log(`[FOTO API] Returning ${filteredRecords.length} DRs after filtering and sorting`);
+    log.debug('fotoApi', {
+      action: 'photosFiltered',
+      recordsReturned: filteredRecords.length
+    });
 
     return res.status(200).json({
       success: true,
       data: filteredRecords,
     });
   } catch (error) {
-    console.error('[FOTO API] Error fetching photos from BOSS VPS:', error);
+    log.error('fotoApi', { action: 'fetchPhotos', error });
     return res.status(500).json({
       error: 'Failed to fetch photos',
       message: error instanceof Error ? error.message : 'Unknown error',

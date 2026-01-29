@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import * as XLSX from 'xlsx';
 import { processPoles, processDrops, processFibre } from '../../../src/services/sow/processor/dataProcessors';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -84,7 +85,12 @@ async function handler(
     }
 
     // Insert data into database
-    console.log(`Inserting ${processedData.length} ${dataType} records for project ${projectId}`);
+    log.info('api/sow/import', {
+      action: 'insertData',
+      recordCount: processedData.length,
+      dataType,
+      projectId
+    });
 
     // Create tables if they don't exist
     if (dataType === 'fibre') {
@@ -171,10 +177,13 @@ async function handler(
     });
 
   } catch (error) {
-    console.error('SOW import error:', error);
-    return res.status(500).json({ 
+    log.error('api/sow/import', {
+      action: 'importError',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to import SOW data' 
+      error: error instanceof Error ? error.message : 'Failed to import SOW data'
     });
   }
 }

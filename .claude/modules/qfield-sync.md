@@ -130,33 +130,50 @@ dashboardData, currentJob, syncHistory, isLoading, error
 
 ### Server-Side Sync Script
 Location: `/opt/qfield-sync/sync_oes_db_to_qfield.py`
+Webhook server: `/opt/qfield-sync/sync_server.py` (port 8095)
 
 **Key Functions:**
+- `fetch_sync_target_projects()` - Queries Neon `qfield_projects` table for active+sync_enabled projects
+- `fetch_oes_data()` - Returns dict with `all_activated` and `remaining` coordinate lists
+- `create_gpkg()` - Creates GeoPackage with 2 tables (all + remaining)
+- `upload_to_qfieldcloud()` - Uploads GPKG + QGS to a single project, triggers jobs
+- `set_renderer(maplayer, color)` - Sets 1.5mm circle renderer with specified RGBA color
 - `add_pole_nr_labeling(maplayer)` - Adds DR number labels using `Pole Nr` field
-- `set_renderer(maplayer, color)` - Sets single-symbol renderer with specified color
 - `is_valid_sa_coordinate(lat, lon)` - Filters coordinates outside South Africa bounds
-- `fetch_oes_data()` - Returns dict with 'actual' and 'planned' coordinate lists
-- `create_gpkg_with_two_tables()` - Creates GeoPackage with both actual and planned tables
 
-**Sync Target:** `Test_Project__Automations` (`e849b878-f8a8-4f84-a3f1-9fbd051686c0`)
+**Multi-Project Sync:** Syncs to ALL projects with `is_active=true AND sync_enabled=true` in `qfield_projects` table.
 
-### Dual-Layer Feature (Jan 24, 2026)
+**Sync-enabled projects:**
+- `af058301-32d1-4bca-84f9-83b899fcbb34` (Production - OES & Project Progress, `is_default=true`)
+- `e849b878-f8a8-4f84-a3f1-9fbd051686c0` (Test Project Automations)
 
-The sync now creates **two layers** for GPS discrepancy detection:
+**IMPORTANT:** QFieldCloud `admin` user must be added as a collaborator on target projects.
 
-| Layer | Color | Source | Purpose |
-|-------|-------|--------|---------|
-| `OES DD-MM-YY Actual` | 🔵 Blue | OES Excel GPS (`oes_latitude`, `oes_longitude`) | Where technician actually was |
-| `OES DD-MM-YY Planned` | 🟢 Green | Drops table (`planned_latitude`, `planned_longitude`) | Where drop was planned |
+### Two-Layer Structure (Jan 29, 2026)
 
-**Visual Comparison:** Offset between blue and green dots indicates GPS discrepancy.
+| Layer | Color | Source | Records | Purpose |
+|-------|-------|--------|---------|---------|
+| `OES FF DDMMYYYY All` | 🟢 Green | `v_qfield_oes_activations` (planned coords) | ~7,662 | All activated DRs |
+| `FF Remaining DRs DDMMYYYY` | 🟠 Orange | `drops` NOT IN `oes_activations` | ~63,306 | Unactivated drops |
+
+**Circle size:** 1.5mm
+**Date format:** `DDMMYYYY` (e.g., `29012026`)
+**GPKG filename:** `OES FF DDMMYYYY.gpkg`
+
+### Webhook Trigger
+
+The OES import (`pages/api/activate/import-oes.ts`) triggers the webhook:
+```
+POST http://100.96.203.105:8095/sync/oes
+Body: { "reportDate": "YYYY-MM-DD", "batchId": "...", "totalRows": N }
+```
 
 ### Database View
 
 The `v_qfield_oes_activations` view includes:
 - `oes_latitude`, `oes_longitude` - Actual GPS from OES Excel
 - `planned_latitude`, `planned_longitude` - Planned GPS from drops table
-- `distance_meters` - Calculated distance between actual and planned (approximate)
+- `distance_meters` - Calculated distance between actual and planned
 
 ### South Africa Bounds Filtering
 
@@ -164,47 +181,10 @@ Coordinates outside these bounds are filtered out:
 - Latitude: -35.0 to -22.0
 - Longitude: 16.0 to 33.0
 
-This removes bad GPS data (e.g., coordinates in Iraq, Nepal, Indonesia).
-
-### OES Database Sync (ff_oes_activations)
-
-**Script:** `/opt/qfield-sync/sync_oes_to_qfield.py`
-
-Syncs OES activation data from FibreFlow Neon DB to QFieldCloud PostgreSQL's `ff_oes_activations` table.
-
-```bash
-# Run full sync (truncate + insert)
-cd /opt/qfield-sync && source venv/bin/activate
-python3 sync_oes_to_qfield.py --full
-
-# Delta sync (upsert only changed)
-python3 sync_oes_to_qfield.py
-```
-
-**Column Mapping (CRITICAL):**
-| Source (Neon view) | Target (QFieldCloud) |
-|--------------------|---------------------|
-| `oes_latitude` | `latitude` |
-| `oes_longitude` | `longitude` |
-
-The view `v_qfield_oes_activations` uses `oes_latitude`/`oes_longitude`, but the target table uses `latitude`/`longitude`. **Fixed 2026-01-24.**
-
-**Data Sources:**
-- `oes_activations` table: All OES Excel imports (historical + daily)
-- Initial bulk import (2026-01-15): ~6,259 records (back to July 2025)
-- Daily imports: ~150 records/day
-- Total: 7,285+ records
-
-**OES Count Discrepancy Explained:**
-- QField dashboard shows `ff_oes_activations` count (QFieldCloud DB)
-- OES Excel report only shows recent activations
-- Database contains historical archive going back to July 2025
-
 ### Troubleshooting
+- **Sync timed out:** Check `/var/log/qfield-oes-sync.log` and `curl http://100.96.203.105:8095/status`
+- **FileTransferStatus.FAILED:** Check admin is collaborator on the target project
+- **process_projectfile failed:** Rebuild Docker image: `cd /opt/qfieldcloud && sudo docker-compose build qgis`, restart workers
 - **DR numbers not showing:** Check labeling uses `Pole Nr` field
-- **Showing planned/wip/live/issue:** Renderer using categories - should be `singleSymbol`
-- **Blue dots outside project:** Check OES Excel GPS data quality
-- **Green dots missing:** Drop not matched or has no coordinates
-- **OES count mismatch:** Run `python3 sync_oes_to_qfield.py --full` on Velocity
-- **Column error in sync:** Check SELECT uses `oes_latitude`, INSERT uses `latitude`
+- **Dots outside SA:** SA bounds filter should catch these; check raw GPS data
 - **Run `/Qfield` skill** for full management commands

@@ -13,6 +13,7 @@ import { fetchAllDrops, sendFeedbackToWhatsApp, fetchDailyDropsPerProject } from
 import { downloadCSV } from '../utils/waMonitorHelpers';
 import { QaReviewCard } from './QaReviewCard';
 import { WaMonitorFilters, type FilterState } from './WaMonitorFilters';
+import { log } from '@/lib/logger';
 import type { QaReviewDrop, WaMonitorSummary, DailyDropsPerProject } from '../types/wa-monitor.types';
 
 const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
@@ -70,7 +71,7 @@ export function WaMonitorDashboard() {
       setDailyDrops(dailyDropsData);
       setLastRefresh(new Date());
     } catch (err) {
-      console.error('Error fetching drops:', err);
+      log.error('WaMonitorDashboard', { action: 'fetchData', error: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch drops');
     } finally {
       if (showLoading) setLoading(false);
@@ -134,7 +135,7 @@ export function WaMonitorDashboard() {
       // Refresh data
       await fetchData(false);
     } catch (error) {
-      console.error('Error updating drop:', error);
+      log.error('WaMonitorDashboard', { action: 'updateDrop', dropId, error });
       throw error;
     }
   };
@@ -149,12 +150,12 @@ export function WaMonitorDashboard() {
         throw new Error(result.message || 'Failed to send feedback');
       }
 
-      console.log('✅ Feedback sent:', result.message);
+      log.debug('WaMonitorDashboard', { action: 'sendFeedback', dropId, dropNumber, message: result.message });
 
       // Refresh data to show updated feedback_sent timestamp
       await fetchData(false);
     } catch (error) {
-      console.error('Error sending feedback:', error);
+      log.error('WaMonitorDashboard', { action: 'sendFeedback', dropId, dropNumber, error });
       throw error;
     }
   };

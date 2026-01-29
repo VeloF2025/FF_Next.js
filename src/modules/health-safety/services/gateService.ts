@@ -33,7 +33,7 @@ export async function checkContractorGate(contractorId: number): Promise<GateChe
   const warnings: string[] = [];
 
   // Get or create compliance record
-  let compliance = await getOrCreateCompliance(contractorId);
+  const compliance = await getOrCreateCompliance(contractorId);
 
   // Get documents
   const documents = await getContractorDocuments(contractorId);

@@ -16,6 +16,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { autoProcessDropsBatch, type AutoProcessorStats } from '@/modules/photo-review/services/autoEvaluator';
+import { log } from '@/lib/logger';
 
 // ==================== CONFIGURATION ====================
 
@@ -88,7 +89,7 @@ async function getNewDropsForEvaluation(limit: number = 10): Promise<Array<{
       submitted_by: row.submitted_by,
     }));
   } catch (error) {
-    console.error('[AUTO-PROCESS] Error fetching new drops:', error);
+    log.error('fotoApi', { action: 'fetchNewDrops', error });
     throw new Error('Failed to fetch new drops from database');
   }
 }
@@ -126,10 +127,10 @@ async function saveProcessingState(stats: AutoProcessorStats): Promise<void> {
         updated_at = NOW()
     `;
 
-    console.log('[AUTO-PROCESS] State saved:', stats);
+    log.debug('fotoApi', { action: 'saveProcessingState', stats });
   } catch (error) {
     // Don't fail the process if state saving fails
-    console.error('[AUTO-PROCESS] Failed to save state (non-critical):', error);
+    log.error('fotoApi', { action: 'saveProcessingState', error, severity: 'non-critical' });
   }
 }
 
@@ -172,14 +173,14 @@ async function handler(
     }
   }
 
-  console.log('[AUTO-PROCESS] Starting auto-evaluation run...');
+  log.debug('fotoApi', { action: 'autoProcessStart' });
 
   try {
     // 1. Get new drops that need evaluation
     const newDrops = await getNewDropsForEvaluation(CONFIG.MAX_DROPS_PER_RUN);
 
     if (newDrops.length === 0) {
-      console.log('[AUTO-PROCESS] No new drops to process');
+      log.debug('fotoApi', { action: 'autoProcess', result: 'no_new_drops' });
       return res.status(200).json({
         success: true,
         message: 'No new drops to process',
@@ -192,9 +193,11 @@ async function handler(
       });
     }
 
-    console.log(`[AUTO-PROCESS] Found ${newDrops.length} new drops to process:`,
-      newDrops.map(d => d.drop_number).join(', ')
-    );
+    log.debug('fotoApi', {
+      action: 'autoProcess',
+      dropsFound: newDrops.length,
+      dropNumbers: newDrops.map(d => d.drop_number).join(', ')
+    });
 
     // 2. Process drops in batch
     const stats = await autoProcessDropsBatch(newDrops);
@@ -207,9 +210,12 @@ async function handler(
       ? Math.round((stats.successful / stats.total_processed) * 100)
       : 0;
 
-    console.log(
-      `[AUTO-PROCESS] ✅ Run complete: ${stats.successful}/${stats.total_processed} successful (${successRate}%)`
-    );
+    log.debug('fotoApi', {
+      action: 'autoProcessComplete',
+      successful: stats.successful,
+      totalProcessed: stats.total_processed,
+      successRate: `${successRate}%`
+    });
 
     return res.status(200).json({
       success: true,
@@ -222,7 +228,7 @@ async function handler(
     });
 
   } catch (error) {
-    console.error('[AUTO-PROCESS] ❌ Error in auto-process:', error);
+    log.error('fotoApi', { action: 'autoProcessFailed', error });
 
     // Log error to state table
     try {
@@ -234,7 +240,7 @@ async function handler(
         errors: [error instanceof Error ? error.message : 'Unknown error'],
       });
     } catch (stateError) {
-      console.error('[AUTO-PROCESS] Failed to save error state:', stateError);
+      log.error('fotoApi', { action: 'saveErrorState', error: stateError });
     }
 
     return res.status(500).json({
@@ -244,4 +250,4 @@ async function handler(
   }
 }
 
-export default withAuth(getNewDropsForEvaluation);
+export default withAuth(handler);

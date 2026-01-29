@@ -2,6 +2,7 @@
 // Handle LiveKit server events
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { WebhookReceiver } from 'livekit-server-sdk';
 import { neon } from '@neondatabase/serverless';
@@ -45,7 +46,11 @@ async function handler(
         const receiver = new WebhookReceiver(LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
         const event = await receiver.receive(rawBody, authHeader);
 
-        console.log('LiveKit webhook event:', event.event);
+        log.debug('livekit-webhooks', {
+            action: 'webhookReceived',
+            eventType: event.event,
+            roomName: event.room?.name
+        });
 
         // Handle different event types
         switch (event.event) {
@@ -70,11 +75,19 @@ async function handler(
                 break;
 
             case 'participant_joined':
-                console.log(`Participant ${event.participant?.name} joined room ${event.room?.name}`);
+                log.debug('livekit-webhooks', {
+                    action: 'participantJoined',
+                    participantName: event.participant?.name,
+                    roomName: event.room?.name
+                });
                 break;
 
             case 'participant_left':
-                console.log(`Participant ${event.participant?.name} left room ${event.room?.name}`);
+                log.debug('livekit-webhooks', {
+                    action: 'participantLeft',
+                    participantName: event.participant?.name,
+                    roomName: event.room?.name
+                });
                 break;
 
             case 'egress_ended':
@@ -96,12 +109,15 @@ async function handler(
                 break;
 
             default:
-                console.log('Unhandled event:', event.event);
+                log.debug('livekit-webhooks', {
+                    action: 'unhandledEvent',
+                    eventType: event.event
+                });
         }
 
         return res.status(200).json({ received: true });
     } catch (error: any) {
-        console.error('Webhook error:', error);
+        log.error('livekit-webhooks', { action: 'processWebhook', error });
         return res.status(400).json({ error: error.message });
     }
 }

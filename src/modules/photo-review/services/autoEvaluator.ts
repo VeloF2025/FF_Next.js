@@ -13,6 +13,7 @@
 import { fetchDrPhotos, executeVlmEvaluation } from './fotoVlmService';
 import { saveEvaluation, getEvaluationByDR } from './fotoDbService';
 import { QA_STEPS } from './fotoVlmService';
+import { log } from '@/lib/logger';
 
 // ==================== TYPES ====================
 
@@ -72,7 +73,7 @@ async function isAlreadyEvaluated(drNumber: string): Promise<boolean> {
     const existing = await getEvaluationByDR(drNumber);
     return existing !== null;
   } catch (error) {
-    console.error(`Error checking if ${drNumber} is evaluated:`, error);
+    log.error('autoEvaluator', { message: `Error checking if ${drNumber} is evaluated`, error });
     return false; // Assume not evaluated on error (will be caught later)
   }
 }
@@ -87,7 +88,7 @@ async function sendAutoFeedback(
 ): Promise<boolean> {
   try {
     if (CONFIG.DRY_RUN) {
-      console.log(`[DRY RUN] Would send feedback for ${drNumber} to project: ${project}`);
+      log.debug('autoEvaluator', { message: `[DRY RUN] Would send feedback for ${drNumber} to project: ${project}` });
       return true;
     }
 
@@ -112,10 +113,10 @@ async function sendAutoFeedback(
     }
 
     const result = await response.json();
-    console.log(`[AUTO] Feedback sent for ${drNumber}:`, result.message);
+    log.debug('autoEvaluator', { message: `[AUTO] Feedback sent for ${drNumber}`, result: result.message });
     return true;
   } catch (error) {
-    console.error(`[AUTO] Failed to send feedback for ${drNumber}:`, error);
+    log.error('autoEvaluator', { message: `[AUTO] Failed to send feedback for ${drNumber}`, error });
     return false;
   }
 }
@@ -135,13 +136,13 @@ export async function autoEvaluateDrop(
 ): Promise<AutoEvaluationResult> {
   const startTime = Date.now();
 
-  console.log(`[AUTO] Starting evaluation for ${drNumber} (project: ${project || 'Unknown'})`);
+  log.debug('autoEvaluator', { message: `[AUTO] Starting evaluation for ${drNumber}`, project: project || 'Unknown' });
 
   try {
     // 1. Check if already evaluated (prevent duplicates)
     const alreadyEvaluated = await isAlreadyEvaluated(drNumber);
     if (alreadyEvaluated) {
-      console.log(`[AUTO] Skipping ${drNumber} - already evaluated`);
+      log.debug('autoEvaluator', { message: `[AUTO] Skipping ${drNumber} - already evaluated` });
       return {
         dr_number: drNumber,
         success: false,
@@ -150,11 +151,11 @@ export async function autoEvaluateDrop(
     }
 
     // 2. Fetch photos from BOSS VPS API
-    console.log(`[AUTO] Fetching photos for ${drNumber}...`);
+    log.debug('autoEvaluator', { message: `[AUTO] Fetching photos for ${drNumber}...` });
     const photos = await fetchDrPhotos(drNumber);
 
     if (!photos || photos.length === 0) {
-      console.log(`[AUTO] No photos found for ${drNumber}, skipping`);
+      log.debug('autoEvaluator', { message: `[AUTO] No photos found for ${drNumber}, skipping` });
       return {
         dr_number: drNumber,
         success: false,
@@ -164,9 +165,11 @@ export async function autoEvaluateDrop(
     }
 
     if (photos.length < CONFIG.MIN_PHOTOS_REQUIRED) {
-      console.log(
-        `[AUTO] Only ${photos.length} photos for ${drNumber}, skipping (min: ${CONFIG.MIN_PHOTOS_REQUIRED})`
-      );
+      log.debug('autoEvaluator', {
+        message: `[AUTO] Only ${photos.length} photos for ${drNumber}, skipping`,
+        photos_count: photos.length,
+        min_required: CONFIG.MIN_PHOTOS_REQUIRED
+      });
       return {
         dr_number: drNumber,
         success: false,
@@ -175,31 +178,34 @@ export async function autoEvaluateDrop(
       };
     }
 
-    console.log(`[AUTO] Found ${photos.length} photos for ${drNumber}`);
+    log.debug('autoEvaluator', { message: `[AUTO] Found ${photos.length} photos for ${drNumber}`, photos_count: photos.length });
 
     // 3. Run VLM evaluation (smart batch processing)
-    console.log(`[AUTO] Running VLM evaluation for ${drNumber}...`);
+    log.debug('autoEvaluator', { message: `[AUTO] Running VLM evaluation for ${drNumber}...` });
     const evaluation = await executeVlmEvaluation(drNumber, photos, QA_STEPS);
 
     // 4. Save to database
-    console.log(`[AUTO] Saving evaluation for ${drNumber}...`);
+    log.debug('autoEvaluator', { message: `[AUTO] Saving evaluation for ${drNumber}...` });
     const saved = await saveEvaluation(evaluation);
 
     // 5. Send WhatsApp feedback (only if AUTO_SEND_FEEDBACK is enabled)
     let feedbackSent = false;
     if (CONFIG.AUTO_SEND_FEEDBACK) {
-      console.log(`[AUTO] Sending feedback for ${drNumber}...`);
+      log.debug('autoEvaluator', { message: `[AUTO] Sending feedback for ${drNumber}...` });
       feedbackSent = await sendAutoFeedback(drNumber, project);
     } else {
-      console.log(`[AUTO] Feedback NOT sent for ${drNumber} - requires human approval`);
+      log.debug('autoEvaluator', { message: `[AUTO] Feedback NOT sent for ${drNumber} - requires human approval` });
       // Human agent will review and send feedback manually via UI
     }
 
     const processingTime = Date.now() - startTime;
 
-    console.log(
-      `[AUTO] ✅ Completed ${drNumber} in ${processingTime}ms (${evaluation.passed_steps}/${evaluation.total_steps} passed)`
-    );
+    log.debug('autoEvaluator', {
+      message: `[AUTO] Completed ${drNumber}`,
+      processing_time_ms: processingTime,
+      passed_steps: evaluation.passed_steps,
+      total_steps: evaluation.total_steps
+    });
 
     return {
       dr_number: drNumber,
@@ -211,7 +217,11 @@ export async function autoEvaluateDrop(
     };
   } catch (error) {
     const processingTime = Date.now() - startTime;
-    console.error(`[AUTO] ❌ Failed to evaluate ${drNumber}:`, error);
+    log.error('autoEvaluator', {
+      message: `[AUTO] Failed to evaluate ${drNumber}`,
+      error,
+      processing_time_ms: processingTime
+    });
 
     return {
       dr_number: drNumber,
@@ -239,19 +249,22 @@ export async function autoEvaluateDropWithRetry(
     return await autoEvaluateDrop(drNumber, project);
   } catch (error) {
     if (retryCount < CONFIG.MAX_RETRIES) {
-      console.error(
-        `[AUTO] Retry ${retryCount + 1}/${CONFIG.MAX_RETRIES} for ${drNumber} after error:`,
-        error
-      );
+      log.error('autoEvaluator', {
+        message: `[AUTO] Retry ${retryCount + 1}/${CONFIG.MAX_RETRIES} for ${drNumber}`,
+        error,
+        retry_count: retryCount + 1,
+        max_retries: CONFIG.MAX_RETRIES
+      });
       await sleep(CONFIG.RETRY_DELAY_MS);
       return autoEvaluateDropWithRetry(drNumber, project, retryCount + 1);
     }
 
     // Max retries exceeded
-    console.error(
-      `[AUTO] ❌ Failed ${drNumber} after ${CONFIG.MAX_RETRIES} retries:`,
-      error
-    );
+    log.error('autoEvaluator', {
+      message: `[AUTO] Failed ${drNumber} after ${CONFIG.MAX_RETRIES} retries`,
+      error,
+      max_retries: CONFIG.MAX_RETRIES
+    });
 
     return {
       dr_number: drNumber,
@@ -273,7 +286,7 @@ export async function autoEvaluateDropWithRetry(
 export async function autoProcessDropsBatch(
   drops: Array<{ drop_number: string; project?: string }>
 ): Promise<AutoProcessorStats> {
-  console.log(`[AUTO] Processing batch of ${drops.length} drops...`);
+  log.debug('autoEvaluator', { message: `[AUTO] Processing batch of ${drops.length} drops...`, batch_size: drops.length });
 
   const stats: AutoProcessorStats = {
     total_processed: 0,
@@ -287,9 +300,10 @@ export async function autoProcessDropsBatch(
   for (let i = 0; i < drops.length; i += CONFIG.MAX_CONCURRENT_EVALUATIONS) {
     const batch = drops.slice(i, i + CONFIG.MAX_CONCURRENT_EVALUATIONS);
 
-    console.log(
-      `[AUTO] Processing batch ${Math.floor(i / CONFIG.MAX_CONCURRENT_EVALUATIONS) + 1}/${Math.ceil(drops.length / CONFIG.MAX_CONCURRENT_EVALUATIONS)} (${batch.length} drops)...`
-    );
+    log.debug('autoEvaluator', {
+      message: `[AUTO] Processing batch ${Math.floor(i / CONFIG.MAX_CONCURRENT_EVALUATIONS) + 1}/${Math.ceil(drops.length / CONFIG.MAX_CONCURRENT_EVALUATIONS)}`,
+      batch_size: batch.length
+    });
 
     // Process batch concurrently
     const results = await Promise.all(
@@ -316,11 +330,11 @@ export async function autoProcessDropsBatch(
 
     // Rate limiting delay between batches
     if (i + CONFIG.MAX_CONCURRENT_EVALUATIONS < drops.length) {
-      console.log('[AUTO] Waiting 5 seconds before next batch...');
+      log.debug('autoEvaluator', { message: '[AUTO] Waiting 5 seconds before next batch...' });
       await sleep(5000);
     }
   }
 
-  console.log(`[AUTO] Batch processing complete:`, stats);
+  log.debug('autoEvaluator', { message: '[AUTO] Batch processing complete', stats });
   return stats;
 }

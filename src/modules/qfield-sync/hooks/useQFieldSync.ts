@@ -11,6 +11,7 @@ import {
   SyncDirection,
 } from '../types/qfield-sync.types';
 import { qfieldSyncApiService } from '../services/qfieldSyncApiService';
+import { log } from '@/lib/logger';
 
 interface UseQFieldSyncReturn {
   dashboardData: QFieldSyncDashboardData | null;
@@ -40,7 +41,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
       setDashboardData(data);
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
+      log.error('useQFieldSync', { action: 'fetchDashboardData', error: err });
       setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data');
     }
   }, []);
@@ -58,7 +59,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
         setCurrentJob(null);
       }
     } catch (err) {
-      console.error('Failed to fetch current job:', err);
+      log.error('useQFieldSync', { action: 'fetchCurrentJob', error: err });
     }
   }, []);
 
@@ -71,7 +72,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
         errors: job.errors || []
       })));
     } catch (err) {
-      console.error('Failed to fetch sync history:', err);
+      log.error('useQFieldSync', { action: 'fetchSyncHistory', error: err });
     }
   }, []);
 
@@ -103,7 +104,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
         fetchSyncHistory();
       }, 1000);
     } catch (err) {
-      console.error('Failed to start sync:', err);
+      log.error('useQFieldSync', { action: 'startSync', type, direction, error: err });
       setError(err instanceof Error ? err.message : 'Failed to start sync');
       throw err;
     }
@@ -116,7 +117,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
       setCurrentJob(null);
       refreshData();
     } catch (err) {
-      console.error('Failed to cancel sync:', err);
+      log.error('useQFieldSync', { action: 'cancelSync', error: err });
       setError(err instanceof Error ? err.message : 'Failed to cancel sync');
       throw err;
     }
@@ -143,7 +144,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
         });
       }
     } catch (err) {
-      console.error('Failed to resolve conflict:', err);
+      log.error('useQFieldSync', { action: 'resolveConflict', conflictId, resolution, error: err });
       setError(err instanceof Error ? err.message : 'Failed to resolve conflict');
       throw err;
     }
@@ -160,7 +161,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
         });
       }
     } catch (err) {
-      console.error('Failed to update config:', err);
+      log.error('useQFieldSync', { action: 'updateConfig', error: err });
       setError(err instanceof Error ? err.message : 'Failed to update configuration');
       throw err;
     }
@@ -172,7 +173,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
     const ENABLE_WEBSOCKET = false;
 
     if (!ENABLE_WEBSOCKET) {
-      console.log('WebSocket disabled - using polling for updates');
+      log.debug('useQFieldSync', { action: 'websocketCheck', status: 'disabled', message: 'Using polling for updates' });
       return;
     }
 
@@ -182,7 +183,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
           (event) => {
             try {
               const data = JSON.parse(event.data);
-              console.log('WebSocket message:', data);
+              log.debug('useQFieldSync', { action: 'websocketMessage', messageType: data.type, data });
 
               switch (data.type) {
                 case 'sync_started':
@@ -211,11 +212,11 @@ export function useQFieldSync(): UseQFieldSyncReturn {
                   break;
               }
             } catch (parseError) {
-              console.error('Failed to parse WebSocket message:', parseError);
+              log.error('useQFieldSync', { action: 'websocketMessageParse', error: parseError });
             }
           },
           (error) => {
-            console.error('WebSocket error:', error);
+            log.error('useQFieldSync', { action: 'websocketError', error });
           }
         );
 
@@ -223,7 +224,7 @@ export function useQFieldSync(): UseQFieldSyncReturn {
           wsRef.current = ws;
         }
       } catch (err) {
-        console.error('Failed to connect WebSocket:', err);
+        log.error('useQFieldSync', { action: 'websocketConnect', error: err });
       }
     };
 

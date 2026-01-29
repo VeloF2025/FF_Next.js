@@ -3,6 +3,7 @@
  * Core business logic for QFieldCloud synchronization
  */
 
+import { log } from '@/lib/logger';
 import {
   QFieldProject,
   QFieldFiberCable,
@@ -191,7 +192,7 @@ export class QFieldSyncService {
   private async syncFibreFlowToQField(job: SyncJob): Promise<void> {
     // Implementation for reverse sync
     // Similar structure to syncQFieldToFibreFlow but in reverse
-    console.log('Syncing from FibreFlow to QField...');
+    log.debug('qfieldSyncService', { message: 'Syncing from FibreFlow to QField' });
     // TODO: Implement reverse sync logic
   }
 
@@ -303,17 +304,17 @@ export class QFieldSyncService {
    * Placeholder sync methods for other data types
    */
   private async syncPoles(job: SyncJob, direction: SyncDirection): Promise<void> {
-    console.log('Syncing poles...');
+    log.debug('qfieldSyncService', { message: 'Syncing poles' });
     // TODO: Implement pole sync logic
   }
 
   private async syncSpliceClosures(job: SyncJob, direction: SyncDirection): Promise<void> {
-    console.log('Syncing splice closures...');
+    log.debug('qfieldSyncService', { message: 'Syncing splice closures' });
     // TODO: Implement splice closure sync logic
   }
 
   private async syncTestPoints(job: SyncJob, direction: SyncDirection): Promise<void> {
-    console.log('Syncing test points...');
+    log.debug('qfieldSyncService', { message: 'Syncing test points' });
     // TODO: Implement test point sync logic
   }
 
@@ -360,29 +361,29 @@ export class QFieldSyncService {
    */
   private async fetchQFieldFiberCables(): Promise<QFieldFiberCable[]> {
     // TODO: Implement actual API call to QFieldCloud
-    console.log('Fetching fiber cables from QFieldCloud...');
+    log.debug('qfieldSyncService', { message: 'Fetching fiber cables from QFieldCloud' });
     return [];
   }
 
   private async fetchFibreFlowRecord(cableId: string): Promise<any | null> {
     // TODO: Implement actual database query
-    console.log(`Fetching FibreFlow record for cable ${cableId}...`);
+    log.debug('qfieldSyncService', { message: 'Fetching FibreFlow record for cable', cableId });
     return null;
   }
 
   private async updateFibreFlowRecord(cableId: string, data: any): Promise<void> {
     // TODO: Implement actual database update
-    console.log(`Updating FibreFlow record for cable ${cableId}...`);
+    log.debug('qfieldSyncService', { message: 'Updating FibreFlow record for cable', cableId });
   }
 
   private async createFibreFlowRecord(data: any): Promise<void> {
     // TODO: Implement actual database insert
-    console.log('Creating new FibreFlow record...');
+    log.debug('qfieldSyncService', { message: 'Creating new FibreFlow record' });
   }
 
   private async storeConflicts(conflicts: SyncConflict[]): Promise<void> {
     // TODO: Implement conflict storage
-    console.log(`Storing ${conflicts.length} conflicts for resolution...`);
+    log.debug('qfieldSyncService', { message: 'Storing conflicts for resolution', conflictCount: conflicts.length });
   }
 
   /**

@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { log } from '@/lib/logger';
 
 export type EntityType = 'project' | 'client' | 'staff' | 'procurement' | 'sow';
 export type EventType = 'added' | 'modified' | 'removed';
@@ -81,7 +82,7 @@ class WebSocketService extends EventEmitter {
         this.ws = new WebSocket(this.config.url);
 
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
+          log.debug('websocketService', { action: 'connected' });
           this.isConnecting = false;
           this.reconnectAttempts = 0;
           this.emit('connected');
@@ -95,19 +96,19 @@ class WebSocketService extends EventEmitter {
             const message = JSON.parse(event.data);
             this.handleMessage(message);
           } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
+            log.error('websocketService', { action: 'parseMessage', error });
           }
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          log.error('websocketService', { action: 'error', error });
           this.isConnecting = false;
           this.emit('error', error);
           reject(error);
         };
 
         this.ws.onclose = (event) => {
-          console.log('WebSocket disconnected', event.code, event.reason);
+          log.debug('websocketService', { action: 'disconnected', code: event.code, reason: event.reason });
           this.isConnecting = false;
           this.stopHeartbeat();
           this.emit('disconnected', { code: event.code, reason: event.reason });
@@ -253,7 +254,7 @@ class WebSocketService extends EventEmitter {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      log.error('websocketService', { action: 'reconnectFailed', message: 'Max reconnection attempts reached' });
       this.emit('reconnect_failed');
       return;
     }
@@ -264,11 +265,11 @@ class WebSocketService extends EventEmitter {
     );
 
     this.reconnectAttempts++;
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+    log.debug('websocketService', { action: 'reconnecting', delay, attempt: this.reconnectAttempts });
 
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(error => {
-        console.error('Reconnection failed:', error);
+        log.error('websocketService', { action: 'reconnectAttemptFailed', error });
       });
     }, delay);
   }

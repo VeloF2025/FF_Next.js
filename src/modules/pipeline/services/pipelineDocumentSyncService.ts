@@ -5,6 +5,7 @@
 
 import { sql } from '@/lib/neon';
 import FormData from 'form-data';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // Configuration
@@ -237,9 +238,9 @@ export async function syncDocumentsFromSmartsheet(
 
   try {
     // 1. Fetch all attachments from Smartsheet
-    console.log('Fetching attachments from Smartsheet...');
+    log.debug('pipelineDocumentSyncService', { action: 'fetchingAttachments' });
     const attachments = await fetchAllAttachments();
-    console.log(`Found ${attachments.length} attachments`);
+    log.debug('pipelineDocumentSyncService', { action: 'attachmentsFound', count: attachments.length });
 
     // Apply limit if specified
     const toProcess = options.limit ? attachments.slice(0, options.limit) : attachments;
@@ -250,7 +251,7 @@ export async function syncDocumentsFromSmartsheet(
     `) as { id: string; smartsheet_id: string }[];
 
     const projectMap = new Map(projects.map(p => [p.smartsheet_id, p.id]));
-    console.log(`Loaded ${projects.length} projects with Smartsheet IDs`);
+    log.debug('pipelineDocumentSyncService', { action: 'projectsLoaded', count: projects.length });
 
     // 3. Get approval types mapping
     const approvalTypes = (await sql`

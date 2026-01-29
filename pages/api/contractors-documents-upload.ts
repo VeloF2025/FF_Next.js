@@ -15,6 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import formidable from 'formidable';
 import fs from 'fs';
+import { log } from '@/lib/logger';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
@@ -167,7 +168,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Document upload error:', errorMessage);
+    log.error('contractors-documents-upload', { action: 'uploadDocument', error, errorMessage });
 
     // Cleanup: Remove uploaded file from VF Storage if DB insert failed
     if (uploadedToStorage && storagePath) {
@@ -177,10 +178,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (pathParts.length >= 3) {
           const filename = pathParts[pathParts.length - 1];
           await vfStorage.deleteFile('contractors', 'documents', filename);
-          console.log('Cleaned up VF Storage file after error:', storagePath);
+          log.debug('contractors-documents-upload', {
+            action: 'cleanupStorage',
+            storagePath,
+            message: 'Cleaned up VF Storage file after error'
+          });
         }
       } catch (cleanupError) {
-        console.error('Failed to cleanup VF Storage file:', cleanupError);
+        log.error('contractors-documents-upload', {
+          action: 'cleanupStorage',
+          error: cleanupError,
+          storagePath
+        });
       }
     }
 

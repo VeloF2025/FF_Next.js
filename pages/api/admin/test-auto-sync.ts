@@ -9,6 +9,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -20,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const testDropNumber = req.body.dropNumber || 'DR9999999';
 
   try {
-    console.log(`\n🧪 Testing auto-sync trigger for ${testDropNumber}...\n`);
+    log.debug('adminTest', { action: 'test-auto-sync', dropNumber: testDropNumber });
 
     // Step 1: Check if drop already exists
     const existing = await sql`
@@ -28,13 +29,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (existing.length > 0) {
-      console.log(`Drop ${testDropNumber} already exists, deleting for fresh test...`);
+      log.debug('adminTest', { action: 'test-auto-sync', step: 'cleanup', dropNumber: testDropNumber });
       await sql`DELETE FROM qa_photo_reviews WHERE drop_number = ${testDropNumber}`;
       await sql`DELETE FROM onemap_sync_queue WHERE drop_number = ${testDropNumber}`;
     }
 
     // Step 2: Insert new drop (triggers auto_sync_onemap_serials)
-    console.log(`Inserting drop ${testDropNumber}...`);
+    log.debug('adminTest', { action: 'test-auto-sync', step: 'insert-drop', dropNumber: testDropNumber });
     await sql`
       INSERT INTO qa_photo_reviews (
         drop_number,
@@ -51,17 +52,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       )
     `;
 
-    console.log('✓ Drop inserted');
+    log.debug('adminTest', { action: 'test-auto-sync', step: 'drop-inserted', dropNumber: testDropNumber });
 
     // Step 3: Check if trigger added it to sync queue
-    console.log('Checking sync queue...');
+    log.debug('adminTest', { action: 'test-auto-sync', step: 'check-queue' });
     const queueItems = await sql`
       SELECT * FROM onemap_sync_queue
       WHERE drop_number = ${testDropNumber}
     `;
 
     if (queueItems.length > 0) {
-      console.log('✓ Drop automatically added to sync queue!');
+      log.debug('adminTest', {
+        action: 'test-auto-sync',
+        step: 'success',
+        dropNumber: testDropNumber,
+        queueItemId: queueItems[0].id
+      });
 
       return res.status(200).json({
         success: true,
@@ -85,7 +91,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
   } catch (error) {
-    console.error('Test failed:', error);
+    log.error('adminTest', {
+      action: 'test-auto-sync',
+      error: error instanceof Error ? error.message : 'Test failed'
+    });
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Test failed',

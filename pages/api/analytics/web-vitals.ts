@@ -5,7 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-
+import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 interface WebVitalsMetric {
   id: string;
@@ -24,7 +24,8 @@ interface WebVitalsMetric {
 function storeMetric(metric: WebVitalsMetric): void {
   // In development, just log
   if (process.env.NODE_ENV === 'development') {
-    console.log('[Web Vitals]', {
+    log.debug('web-vitals', {
+      action: 'metricReceived',
       metric: metric.name,
       value: `${metric.value.toFixed(2)}ms`,
       rating: metric.rating,
@@ -97,7 +98,7 @@ async function handler(
     // Return success (keep response minimal)
     res.status(200).json({ received: true });
   } catch (error) {
-    console.error('[Web Vitals API] Error:', error);
+    log.error('web-vitals', { action: 'handleMetric', error });
     res.status(500).json({ error: 'Internal server error' });
   }
 }

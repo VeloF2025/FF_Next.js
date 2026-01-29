@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 // BOSS VPS API for photos (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 // VLM API for evaluation
@@ -67,7 +68,7 @@ async function handlePhotos(req: NextApiRequest, res: NextApiResponse, drNumber:
     }
 
     try {
-        console.log(`[DR Photos] Fetching ${drNumber} from BOSS VPS`);
+        log.debug('drPhotos', { action: 'fetch', drNumber });
 
         const response = await fetch(`${BOSS_API_URL}/api/photos`, {
             headers: { 'Content-Type': 'application/json' },
@@ -102,7 +103,7 @@ async function handlePhotos(req: NextApiRequest, res: NextApiResponse, drNumber:
 
         return res.status(200).json({ dr_number: drNumber, photos });
     } catch (error) {
-        console.error('[DR Photos] Error:', error);
+        log.error('drPhotos', { action: 'fetch', drNumber, error });
         return res.status(502).json({
             error: 'Failed to fetch photos from BOSS VPS',
             message: error instanceof Error ? error.message : 'Unknown error',
@@ -126,7 +127,7 @@ async function handleEvaluate(req: NextApiRequest, res: NextApiResponse, drNumbe
             return res.status(404).json({ error: `No photos found for DR ${drNumber}` });
         }
 
-        console.log(`[DR Evaluate] Evaluating ${drData.photos.length} photos for ${drNumber}`);
+        log.debug('drEvaluate', { action: 'start', drNumber, photoCount: drData.photos.length });
 
         // Evaluate each photo with VLM
         const evaluations = await Promise.all(
@@ -160,7 +161,7 @@ async function handleEvaluate(req: NextApiRequest, res: NextApiResponse, drNumbe
                         fibertime_compliance: evalData.evaluation?.fibertime_compliance,
                     };
                 } catch (err) {
-                    console.error(`[DR Evaluate] Error evaluating step ${stepInfo.step}:`, err);
+                    log.error('drEvaluate', { action: 'evaluateStep', drNumber, step: stepInfo.step, error: err });
                     return {
                         step_number: stepInfo.step,
                         accepted: null,
@@ -188,7 +189,7 @@ async function handleEvaluate(req: NextApiRequest, res: NextApiResponse, drNumbe
             evaluated_at: new Date().toISOString(),
         });
     } catch (error) {
-        console.error('[DR Evaluate] Error:', error);
+        log.error('drEvaluate', { action: 'evaluate', drNumber, error });
         return res.status(502).json({
             error: 'Evaluation failed',
             message: error instanceof Error ? error.message : 'Unknown error',

@@ -7,15 +7,17 @@ import {
   Users,
   FileText,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 
-import type { 
-  WorkflowTemplate, 
+import type {
+  WorkflowTemplate,
   CreateProjectWorkflowRequest,
   Project,
   StaffMember
 } from '../../types/workflow.types';
+import { log } from '@/lib/logger';
 
 interface WorkflowAssignmentModalProps {
   isOpen: boolean;
@@ -25,66 +27,24 @@ interface WorkflowAssignmentModalProps {
   onAssign: (workflowData: CreateProjectWorkflowRequest) => void;
 }
 
-// Mock data - in real implementation, these would come from API
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Fiber Installation - Downtown',
-    description: 'High-priority fiber installation project',
-    status: 'active',
-    clientId: 'client-1',
-    projectManagerId: 'pm-1',
-    startDate: '2024-01-15',
-    endDate: '2024-06-30'
-  },
-  {
-    id: '2', 
-    name: 'Network Upgrade - Residential Area',
-    description: 'Upgrading existing network infrastructure',
-    status: 'planning',
-    clientId: 'client-2',
-    projectManagerId: 'pm-2',
-    startDate: '2024-02-01',
-    endDate: '2024-08-15'
-  }
-];
-
-const mockStaffMembers: StaffMember[] = [
-  {
-    id: '1',
-    name: 'John Smith',
-    email: 'john@example.com',
-    department: 'Engineering',
-    position: 'Project Manager'
-  },
-  {
-    id: '2',
-    name: 'Sarah Johnson',
-    email: 'sarah@example.com',
-    department: 'Engineering', 
-    position: 'Senior Engineer'
-  },
-  {
-    id: '3',
-    name: 'Mike Davis',
-    email: 'mike@example.com',
-    department: 'Installation',
-    position: 'Lead Technician'
-  }
-];
-
-export function WorkflowAssignmentModal({ 
-  isOpen, 
-  onClose, 
-  projectId, 
-  templates, 
-  onAssign 
+export function WorkflowAssignmentModal({
+  isOpen,
+  onClose,
+  projectId,
+  templates,
+  onAssign
 }: WorkflowAssignmentModalProps) {
   const [step, setStep] = useState<'project' | 'template' | 'details'>('project');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
+  // Data from APIs
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+
   // Form state
   const [workflowName, setWorkflowName] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -93,14 +53,72 @@ export function WorkflowAssignmentModal({
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
 
+  // Fetch projects from real API
+  useEffect(() => {
+    if (isOpen && step === 'project') {
+      setLoadingProjects(true);
+      fetch('/api/projects')
+        .then(res => res.json())
+        .then(data => {
+          if (data.data) {
+            setProjects(data.data.map((p: { id: string; project_name: string; description?: string; status?: string; start_date?: string; end_date?: string }) => ({
+              id: p.id,
+              name: p.project_name,
+              description: p.description || '',
+              status: p.status || 'active',
+              startDate: p.start_date || '',
+              endDate: p.end_date || ''
+            })));
+          }
+        })
+        .catch(err => log.error('WorkflowAssignmentModal', { action: 'fetchProjects', error: err }))
+        .finally(() => setLoadingProjects(false));
+    }
+  }, [isOpen, step]);
+
+  // Fetch staff from real API
+  useEffect(() => {
+    if (isOpen && step === 'details') {
+      setLoadingStaff(true);
+      fetch('/api/staff')
+        .then(res => res.json())
+        .then(data => {
+          if (data.data) {
+            setStaffMembers(data.data.map((s: { id: string; first_name?: string; last_name?: string; email?: string; department?: string; position?: string }) => ({
+              id: s.id,
+              name: `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'Unknown',
+              email: s.email || '',
+              department: s.department || '',
+              position: s.position || ''
+            })));
+          }
+        })
+        .catch(err => log.error('WorkflowAssignmentModal', { action: 'fetchStaff', error: err }))
+        .finally(() => setLoadingStaff(false));
+    }
+  }, [isOpen, step]);
+
   useEffect(() => {
     if (isOpen) {
       if (projectId) {
-        const project = mockProjects.find(p => p.id === projectId);
-        if (project) {
-          setSelectedProject(project);
-          setStep('template');
-        }
+        // Fetch the specific project
+        fetch(`/api/projects/${projectId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.data) {
+              const p = data.data;
+              setSelectedProject({
+                id: p.id,
+                name: p.project_name,
+                description: p.description || '',
+                status: p.status || 'active',
+                startDate: p.start_date || '',
+                endDate: p.end_date || ''
+              });
+              setStep('template');
+            }
+          })
+          .catch(err => log.error('WorkflowAssignmentModal', { action: 'fetchProject', error: err }));
       } else {
         setStep('project');
       }
@@ -134,7 +152,7 @@ export function WorkflowAssignmentModal({
     template.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredProjects = mockProjects.filter(project =>
+  const filteredProjects = projects.filter(project =>
     project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     project.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -410,7 +428,7 @@ export function WorkflowAssignmentModal({
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     >
                       <option value="">Select project manager</option>
-                      {mockStaffMembers.map(member => (
+                      {staffMembers.map(member => (
                         <option key={member.id} value={member.id}>
                           {member.name} - {member.position}
                         </option>
@@ -439,24 +457,33 @@ export function WorkflowAssignmentModal({
                       Team Members
                     </label>
                     <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 space-y-2">
-                      {mockStaffMembers.map(member => (
-                        <label key={member.id} className="flex items-center space-x-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={teamMembers.includes(member.id)}
-                            onChange={() => toggleTeamMember(member.id)}
-                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                          />
-                          <div className="flex-1">
-                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {member.name}
-                            </span>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                              {member.position}
-                            </span>
-                          </div>
-                        </label>
-                      ))}
+                      {loadingStaff ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                          <span className="ml-2 text-sm text-gray-500">Loading staff...</span>
+                        </div>
+                      ) : staffMembers.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-4">No staff members available</p>
+                      ) : (
+                        staffMembers.map(member => (
+                          <label key={member.id} className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={teamMembers.includes(member.id)}
+                              onChange={() => toggleTeamMember(member.id)}
+                              className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {member.name}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                {member.position}
+                              </span>
+                            </div>
+                          </label>
+                        ))
+                      )}
                     </div>
                   </div>
 

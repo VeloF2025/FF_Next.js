@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -50,7 +51,10 @@ async function handler(
         data: poles
       });
     } catch (error) {
-      console.error('Error fetching poles:', error);
+      log.error('api/sow/poles', {
+        action: 'fetchError',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch poles data'
@@ -197,7 +201,11 @@ async function handler(
       totalInserted += batch.length;
     }
 
-    console.log(`Successfully inserted ${totalInserted} poles for project ${projectId}`);
+    log.info('api/sow/poles', {
+      action: 'insertSuccess',
+      totalInserted,
+      projectId
+    });
 
     return res.status(200).json({
       success: true,
@@ -209,7 +217,10 @@ async function handler(
     });
 
     } catch (error) {
-      console.error('Poles upload error:', error);
+      log.error('api/sow/poles', {
+        action: 'uploadError',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to upload poles data'

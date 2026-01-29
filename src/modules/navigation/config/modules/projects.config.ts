@@ -1,9 +1,14 @@
 /**
  * Projects Module Navigation Config
- * Tab configuration for the Projects module
+ * Tab configuration for the Projects module with hierarchical sub-tabs
  *
- * Consolidates: Pipeline, Tasks, Daily Progress, Health & Safety
- * Keeps separate: Clients, Contractors (different entities)
+ * Structure:
+ * - Dashboard: Portfolio overview
+ * - Projects: All/Active/Completed/New
+ * - Pipeline: Overview/Authorities/Alerts
+ * - Execution: Daily Progress/Tasks/Reports
+ * - H&S: Dashboard/Incidents/Checklists
+ * - Reports: Analytics
  */
 
 import {
@@ -13,6 +18,17 @@ import {
   CheckCircle,
   BarChart3,
   Shield,
+  ListFilter,
+  Play,
+  CheckCheck,
+  Plus,
+  Building2,
+  AlertTriangle,
+  Calendar,
+  ListTodo,
+  FileText,
+  AlertCircle,
+  ClipboardCheck,
 } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
@@ -26,16 +42,42 @@ export const projectsConfig: ModuleNavigationConfig = {
     {
       id: 'dashboard',
       label: 'Dashboard',
-      shortLabel: 'Dash',
+      shortLabel: 'Home',
       icon: LayoutDashboard,
       path: '/projects',
     },
     {
-      id: 'list',
-      label: 'Project List',
+      id: 'projects',
+      label: 'Projects',
       shortLabel: 'List',
       icon: FolderKanban,
       path: '/projects/list',
+      subTabs: [
+        {
+          id: 'all',
+          label: 'All Projects',
+          icon: ListFilter,
+          path: '/projects/list',
+        },
+        {
+          id: 'active',
+          label: 'Active',
+          icon: Play,
+          path: '/projects/list?status=active',
+        },
+        {
+          id: 'completed',
+          label: 'Completed',
+          icon: CheckCheck,
+          path: '/projects/list?status=completed',
+        },
+        {
+          id: 'new',
+          label: '+ New Project',
+          icon: Plus,
+          path: '/projects/new',
+        },
+      ],
     },
     {
       id: 'pipeline',
@@ -44,22 +86,54 @@ export const projectsConfig: ModuleNavigationConfig = {
       icon: GitBranch,
       path: '/projects/pipeline',
       rbacKey: 'projects:pipeline:view',
+      subTabs: [
+        {
+          id: 'overview',
+          label: 'Overview',
+          icon: GitBranch,
+          path: '/projects/pipeline',
+        },
+        {
+          id: 'authorities',
+          label: 'Authorities',
+          icon: Building2,
+          path: '/projects/pipeline/authorities',
+        },
+        {
+          id: 'alerts',
+          label: 'Alerts',
+          icon: AlertTriangle,
+          path: '/projects/pipeline/alerts',
+        },
+      ],
     },
     {
-      id: 'tasks',
-      label: 'Tasks',
-      shortLabel: 'Tasks',
-      icon: CheckCircle,
-      path: '/projects/tasks',
-      rbacKey: 'projects:tasks:view',
-    },
-    {
-      id: 'progress',
-      label: 'Daily Progress',
-      shortLabel: 'Progress',
+      id: 'execution',
+      label: 'Execution',
+      shortLabel: 'Exec',
       icon: BarChart3,
       path: '/projects/progress',
       rbacKey: 'projects:progress:view',
+      subTabs: [
+        {
+          id: 'progress-reports',
+          label: 'Progress Reports',
+          icon: FileText,
+          path: '/projects/progress',
+        },
+        {
+          id: 'tasks',
+          label: 'Tasks',
+          icon: ListTodo,
+          path: '/projects/tasks',
+        },
+        {
+          id: 'reports',
+          label: 'Progress Reports',
+          icon: FileText,
+          path: '/projects/progress',
+        },
+      ],
     },
     {
       id: 'health-safety',
@@ -68,6 +142,34 @@ export const projectsConfig: ModuleNavigationConfig = {
       icon: Shield,
       path: '/projects/health-safety',
       rbacKey: 'projects:health-safety:view',
+      subTabs: [
+        {
+          id: 'hs-dashboard',
+          label: 'Dashboard',
+          icon: Shield,
+          path: '/projects/health-safety',
+        },
+        {
+          id: 'incidents',
+          label: 'Incidents',
+          icon: AlertCircle,
+          path: '/projects/health-safety/incidents',
+        },
+        {
+          id: 'checklists',
+          label: 'Checklists',
+          icon: ClipboardCheck,
+          path: '/projects/health-safety/checklists',
+        },
+      ],
+    },
+    {
+      id: 'reports',
+      label: 'Reports',
+      shortLabel: 'Reports',
+      icon: BarChart3,
+      path: '/projects/reports',
+      rbacKey: 'projects:reports:view',
     },
   ],
 };
