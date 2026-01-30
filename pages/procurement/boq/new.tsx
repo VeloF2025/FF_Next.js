@@ -258,6 +258,7 @@ export default function NewBOQPage() {
                   createBudgetItems={true}
                   createMaterials={true}
                   projectId={selectedProjectId}
+                  title={title || undefined}
                 />
               )}
             </div>

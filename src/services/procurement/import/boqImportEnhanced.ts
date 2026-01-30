@@ -38,6 +38,7 @@ export interface ImportOptions {
   projectId: string;
   boqId?: string;
   userId?: string;
+  title?: string;
   createBudgetItems?: boolean;
   createMaterials?: boolean;
   dryRun?: boolean;
@@ -133,7 +134,7 @@ export class BOQImportEnhanced {
     await this.categoryMapper.initialize();
 
     // Get or create BOQ
-    const boqId = options.boqId || await this.createBoq(options.projectId, options.userId);
+    const boqId = options.boqId || await this.createBoq(options.projectId, options.userId, options.title);
     result.boqId = boqId;
 
     // Get or create project budget
@@ -318,7 +319,7 @@ export class BOQImportEnhanced {
   /**
    * Create a new BOQ record
    */
-  private async createBoq(projectId: string, userId?: string): Promise<string> {
+  private async createBoq(projectId: string, userId?: string, title?: string): Promise<string> {
     // Auto-increment version if one already exists for this project
     const existing = await this.sql`
       SELECT version FROM boqs
@@ -343,7 +344,7 @@ export class BOQImportEnhanced {
       ) VALUES (
         ${projectId},
         ${version},
-        ${`BOQ Import ${new Date().toISOString().split('T')[0]}`},
+        ${title || `BOQ Import ${new Date().toISOString().split('T')[0]}`},
         ${'Imported from Excel'},
         'draft',
         ${userId || 'system'}

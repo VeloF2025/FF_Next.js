@@ -40,6 +40,8 @@ interface BOQUploadProps {
   createMaterials?: boolean;
   /** Explicit project ID — overrides context when provided */
   projectId?: string;
+  /** BOQ title — passed to import service */
+  title?: string;
 }
 
 interface UploadState {
@@ -80,6 +82,7 @@ export default function BOQUpload({
   createBudgetItems = true,
   createMaterials = true,
   projectId: propProjectId,
+  title: propTitle,
 }: BOQUploadProps) {
   const { context } = useProcurementContext();
   // Use explicit projectId prop, falling back to context
@@ -259,19 +262,47 @@ export default function BOQUpload({
       formData.append('headerRow', String(state.detection.headerRow));
       formData.append('createBudgetItems', String(createBudgetItems));
       formData.append('createMaterials', String(createMaterials));
+      if (propTitle) {
+        formData.append('title', propTitle);
+      }
 
       if (saveTemplate) {
         formData.append('saveAsTemplate', JSON.stringify(saveTemplate));
       }
 
-      const response = await fetch('/api/procurement/boq/import-mapped', {
-        method: 'POST',
-        body: formData,
-      });
+      // Use AbortController with 2-minute timeout to handle Cloudflare 524 timeouts gracefully
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
+      let response: Response;
+      try {
+        response = await fetch('/api/procurement/boq/import-mapped', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+          throw new Error(
+            'Import timed out. For large files (200+ rows), the import may still be processing in the background. ' +
+            'Check the BOQ list in a few minutes to see if it completed.'
+          );
+        }
+        throw fetchError;
+      }
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
       if (!response.ok) {
+        // Cloudflare 524 timeout
+        if (response.status === 524) {
+          throw new Error(
+            'Server processing timed out. The import may still be running in the background. ' +
+            'Check the BOQ list in a few minutes.'
+          );
+        }
         throw new Error(data.error?.message || 'Import failed');
       }
 

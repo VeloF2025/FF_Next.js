@@ -51,6 +51,8 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
         status: b.status || 'draft',
         fileName: b.file_name || b.title || 'Unknown',
         itemCount: b.item_count || b.items_count || 0,
+        mappedItems: b.mapped_items_count || 0,
+        unmappedItems: b.unmapped_items_count || 0,
         totalEstimatedValue: Number(b.total_estimated_value) || 0,
         mappingStatus: b.mapping_status || 'pending',
         uploadedBy: b.uploaded_by || 'System',

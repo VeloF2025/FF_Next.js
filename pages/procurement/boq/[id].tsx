@@ -224,9 +224,9 @@ export default function BOQDetailPage() {
                   <Download className="h-4 w-4 mr-1" />
                   Download
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => notificationService.info('BOQ editing coming soon. For now, create a new BOQ or delete and recreate.')}>
+                <Button variant="outline" size="sm" onClick={() => router.push(`/procurement/boq/new?projectId=${boq.projectId}`)}>
                   <Edit2 className="h-4 w-4 mr-1" />
-                  Edit
+                  New Version
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-400 hover:text-red-300">
                   <Trash2 className="h-4 w-4 mr-1" />

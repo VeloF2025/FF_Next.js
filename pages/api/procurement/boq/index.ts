@@ -41,9 +41,11 @@ export default withAuth(withErrorHandler(async (
       } else {
         // Get all BOQs with their items count
         const boqWithCount = await sql`
-          SELECT 
+          SELECT
             b.*,
-            COUNT(bi.id)::int as items_count
+            COUNT(bi.id)::int as items_count,
+            COUNT(CASE WHEN bi.mapping_status = 'mapped' THEN 1 END)::int as mapped_items_count,
+            COUNT(CASE WHEN bi.mapping_status = 'pending' OR bi.mapping_status IS NULL THEN 1 END)::int as unmapped_items_count
           FROM boqs b
           LEFT JOIN boq_items bi ON b.id = bi.boq_id
           GROUP BY b.id

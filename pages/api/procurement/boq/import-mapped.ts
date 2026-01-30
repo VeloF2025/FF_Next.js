@@ -9,7 +9,11 @@ import { neon } from '@neondatabase/serverless';
 import { BOQImportEnhanced, type BOQRow } from '@/services/procurement/import/boqImportEnhanced';
 import type { ColumnMapping, BOQTargetField } from '@/types/procurement/boq.types';
 
-export const config = { api: { bodyParser: false } };
+export const config = {
+  api: { bodyParser: false },
+  // Allow up to 120s for large BOQ imports (250+ rows with material matching)
+  maxDuration: 120,
+};
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -37,6 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const createBudgetItems = (Array.isArray(fields.createBudgetItems) ? fields.createBudgetItems[0] : fields.createBudgetItems) === 'true';
     const createMaterials = (Array.isArray(fields.createMaterials) ? fields.createMaterials[0] : fields.createMaterials) === 'true';
     const saveAsTemplateJson = Array.isArray(fields.saveAsTemplate) ? fields.saveAsTemplate[0] : fields.saveAsTemplate;
+    const boqTitle = Array.isArray(fields.title) ? fields.title[0] : fields.title;
 
     if (!projectId || !columnMappingJson || !sheetName || isNaN(headerRow)) {
       return apiResponse.badRequest(res, 'Missing required fields: projectId, columnMapping, sheetName, headerRow');
@@ -121,6 +126,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const importService = new BOQImportEnhanced(process.env.DATABASE_URL!);
     const result = await importService.processRows(boqRows, {
       projectId: projectId as string,
+      title: boqTitle as string | undefined,
       createBudgetItems,
       createMaterials,
     });

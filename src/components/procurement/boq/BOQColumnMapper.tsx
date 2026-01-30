@@ -101,13 +101,13 @@ export default function BOQColumnMapper({
   };
 
   return (
-    <div style={{ border: '1px solid var(--ff-border-light, #e5e7eb)', borderRadius: 8, padding: 20, background: 'var(--ff-bg-card, #fff)' }}>
+    <div style={{ border: '1px solid var(--ff-border-light)', borderRadius: 8, padding: 20, background: 'var(--ff-bg-secondary)' }}>
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: 'var(--ff-text-primary, #111)' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: 'var(--ff-text-primary)' }}>
           Column Mapping Review
         </h3>
-        <div style={{ display: 'flex', gap: 12, fontSize: 13, color: 'var(--ff-text-secondary, #666)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 13, color: 'var(--ff-text-secondary)', flexWrap: 'wrap' }}>
           <span>Sheet: <strong>&quot;{detection.sheetName}&quot;</strong></span>
           <span>Header Row: <strong>{detection.headerRow + 1}</strong></span>
           <span>Mapped: <strong>{mappedCount}/{mapping.length}</strong></span>
@@ -129,7 +129,7 @@ export default function BOQColumnMapper({
       <div style={{ overflowX: 'auto', marginBottom: 16 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '2px solid var(--ff-border-light, #e5e7eb)' }}>
+            <tr style={{ borderBottom: '2px solid var(--ff-border-light)' }}>
               <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600 }}>Source Header</th>
               <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 600 }}>Map To</th>
               <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: 600, width: 60 }}>Conf</th>
@@ -140,7 +140,7 @@ export default function BOQColumnMapper({
             {mapping.map(m => {
               const badge = getConfidenceBadge(m.confidence, m.targetField);
               return (
-                <tr key={m.sourceIndex} style={{ borderBottom: '1px solid var(--ff-border-light, #e5e7eb)' }}>
+                <tr key={m.sourceIndex} style={{ borderBottom: '1px solid var(--ff-border-light)' }}>
                   <td style={{ padding: '8px 12px', fontWeight: 500 }}>{m.sourceHeader}</td>
                   <td style={{ padding: '8px 12px' }}>
                     <select
@@ -155,10 +155,11 @@ export default function BOQColumnMapper({
                       style={{
                         padding: '4px 8px',
                         borderRadius: 4,
-                        border: '1px solid var(--ff-border-light, #d1d5db)',
+                        border: '1px solid var(--ff-border-light)',
                         fontSize: 13,
-                        background: 'var(--ff-bg-input, #fff)',
-                        color: 'var(--ff-text-primary, #111)',
+                        background: 'var(--ff-bg-tertiary)',
+                        color: 'var(--ff-text-primary)',
+                        colorScheme: 'dark light',
                         width: '100%',
                         maxWidth: 180,
                       }}
@@ -180,7 +181,7 @@ export default function BOQColumnMapper({
                       {badge.text}
                     </span>
                   </td>
-                  <td style={{ padding: '8px 12px', color: 'var(--ff-text-secondary, #888)', fontSize: 12, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '8px 12px', color: 'var(--ff-text-secondary)', fontSize: 12, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {getSampleData(m.sourceIndex)}
                   </td>
                 </tr>
@@ -191,7 +192,7 @@ export default function BOQColumnMapper({
       </div>
 
       {/* Save as Template */}
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--ff-bg-subtle, #f9fafb)', borderRadius: 6 }}>
+      <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--ff-bg-tertiary)', borderRadius: 6 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
           <input
             type="checkbox"
@@ -213,10 +214,10 @@ export default function BOQColumnMapper({
                 flex: 1,
                 padding: '6px 10px',
                 borderRadius: 4,
-                border: '1px solid var(--ff-border-light, #d1d5db)',
+                border: '1px solid var(--ff-border-light)',
                 fontSize: 13,
-                background: 'var(--ff-bg-input, #fff)',
-                color: 'var(--ff-text-primary, #111)',
+                background: 'var(--ff-bg-tertiary)',
+                color: 'var(--ff-text-primary)',
               }}
             />
             <input
@@ -229,10 +230,10 @@ export default function BOQColumnMapper({
                 flex: 1,
                 padding: '6px 10px',
                 borderRadius: 4,
-                border: '1px solid var(--ff-border-light, #d1d5db)',
+                border: '1px solid var(--ff-border-light)',
                 fontSize: 13,
-                background: 'var(--ff-bg-input, #fff)',
-                color: 'var(--ff-text-primary, #111)',
+                background: 'var(--ff-bg-tertiary)',
+                color: 'var(--ff-text-primary)',
               }}
             />
           </div>
@@ -248,9 +249,9 @@ export default function BOQColumnMapper({
           style={{
             padding: '8px 16px',
             borderRadius: 6,
-            border: '1px solid var(--ff-border-light, #d1d5db)',
-            background: 'var(--ff-bg-card, #fff)',
-            color: 'var(--ff-text-secondary, #666)',
+            border: '1px solid var(--ff-border-light)',
+            background: 'var(--ff-bg-secondary)',
+            color: 'var(--ff-text-secondary)',
             fontSize: 13,
             cursor: isImporting ? 'not-allowed' : 'pointer',
           }}
