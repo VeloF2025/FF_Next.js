@@ -45,11 +45,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.error(res, 'Invalid file upload', 400);
     }
 
-    log('info', 'Processing BOQ file for column detection', {
-      filename: uploadedFile.originalFilename,
-      size: uploadedFile.size,
-      mimetype: uploadedFile.mimetype,
-    });
+    log.info('Processing BOQ file for column detection', {
+      data: {
+        filename: uploadedFile.originalFilename,
+        size: uploadedFile.size,
+        mimetype: uploadedFile.mimetype,
+      }
+    }, 'boq-detect-columns');
 
     // Read file into buffer
     const fileBuffer = fs.readFileSync(uploadedFile.filepath);
@@ -64,14 +66,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Clean up temporary file
     fs.unlinkSync(uploadedFile.filepath);
 
-    log('info', 'Column detection completed', {
-      mappedColumns: result.mapping.filter((m: { targetField: string | null }) => m.targetField !== null).length,
-      confidence: result.overallConfidence,
-    });
+    log.info('Column detection completed', {
+      data: {
+        mappedColumns: result.mapping.filter((m: { targetField: string | null }) => m.targetField !== null).length,
+        confidence: result.overallConfidence,
+      }
+    }, 'boq-detect-columns');
 
     return apiResponse.success(res, result);
   } catch (error) {
-    log('error', 'Column detection failed', { error });
+    log.error('Column detection failed', { data: error }, 'boq-detect-columns');
     return apiResponse.error(
       res,
       error instanceof Error ? error.message : 'Column detection failed',

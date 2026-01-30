@@ -24,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, templates);
     } catch (error) {
-      log('error', 'Failed to fetch BOQ column templates', { error: String(error) });
+      log.error('Failed to fetch BOQ column templates', { data: { error: String(error) } }, 'boq-import');
       return apiResponse.internalError(res, error, 'Failed to fetch templates');
     }
   }
@@ -59,11 +59,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       const template = result[0];
-      log('info', 'BOQ column template created', { templateId: template?.id, name });
+      log.info('BOQ column template created', { data: { templateId: template?.id, name } }, 'boq-import');
 
       return apiResponse.created(res, template, 'Template created successfully');
     } catch (error) {
-      log('error', 'Failed to create BOQ column template', { error: String(error) });
+      log.error('Failed to create BOQ column template', { data: { error: String(error) } }, 'boq-import');
       return apiResponse.internalError(res, error, 'Failed to create template');
     }
   }
@@ -86,10 +86,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.notFound(res, 'Template', id);
       }
 
-      log('info', 'BOQ column template deleted', { templateId: id });
+      log.info('BOQ column template deleted', { data: { templateId: id } }, 'boq-import');
       return apiResponse.success(res, { id, name: result[0]?.name });
     } catch (error) {
-      log('error', 'Failed to delete BOQ column template', { error: String(error) });
+      log.error('Failed to delete BOQ column template', { data: { error: String(error) } }, 'boq-import');
       return apiResponse.internalError(res, error, 'Failed to delete template');
     }
   }

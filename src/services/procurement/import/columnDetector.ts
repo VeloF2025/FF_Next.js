@@ -221,7 +221,7 @@ export async function checkSavedTemplates(
 
     return null;
   } catch (error) {
-    log('error', 'Failed to check saved templates', { error: String(error) });
+    log.error('Failed to check saved templates', { data: { error: String(error) } }, 'boq-import');
     return null;
   }
 }

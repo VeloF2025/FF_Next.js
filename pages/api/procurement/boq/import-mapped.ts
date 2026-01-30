@@ -109,11 +109,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    log('info', 'Parsed BOQ rows for mapped import', {
-      totalRows: data.length,
-      validRows: boqRows.length,
-      mappedFields: fieldMap.size,
-    });
+    log.info('Parsed BOQ rows for mapped import', {
+      data: {
+        totalRows: data.length,
+        validRows: boqRows.length,
+        mappedFields: fieldMap.size,
+      }
+    }, 'boq-import');
 
     // Process import using enhanced service
     const importService = new BOQImportEnhanced(process.env.DATABASE_URL!);
@@ -167,9 +169,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             0
           )
         `;
-        log('info', 'Saved BOQ column template', { name: saveAsTemplate.name });
+        log.info('Saved BOQ column template', { data: { name: saveAsTemplate.name } }, 'boq-import');
       } catch (error) {
-        log('warn', 'Failed to save template', { error: String(error) });
+        log.warn('Failed to save template', { data: { error: String(error) } }, 'boq-import');
       }
     }
 
@@ -181,7 +183,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       stockItemsMatched,
     });
   } catch (error) {
-    log('error', 'BOQ mapped import failed', { error: String(error) });
+    log.error('BOQ mapped import failed', { data: { error: String(error) } }, 'boq-import');
     return apiResponse.internalError(res, error, 'Failed to import BOQ');
   }
 }
