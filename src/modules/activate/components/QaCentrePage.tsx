@@ -770,11 +770,16 @@ function QaCentrePageContent() {
               {/* Table Rows */}
               <div className="grid gap-1">
                 {filteredDrops.map((drop) => {
-                  // Format dates (YYYY-MM-DD standard)
+                  // Format dates (YYYY-MM-DD in local timezone, NOT UTC)
+                  // PostgreSQL date columns arrive as midnight SAST = 22:00 UTC prev day
+                  // Using toISOString() would show the UTC date (wrong day)
                   const formatDate = (dateStr: string | null) => {
                     if (!dateStr) return '-';
                     const date = new Date(dateStr);
-                    return date.toISOString().split('T')[0];
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
                   };
 
                   // Format time (HH:MM)

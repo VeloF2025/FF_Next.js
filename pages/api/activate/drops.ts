@@ -173,14 +173,15 @@ async function getPaginatedDrops(
   }
 
   // Date filters - use submitted_date (WhatsApp submission date)
-  // Don't fall back to created_at since OES-only records are already excluded
+  // Fall back to created_at::DATE for records where dr-acknowledgment created
+  // the record before process-new-dr could set submitted_date
   if (filters?.dateFrom) {
-    conditions.push(`u.submitted_date >= $${paramIndex}::DATE`);
+    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) >= $${paramIndex}::DATE`);
     params.push(filters.dateFrom);
     paramIndex++;
   }
   if (filters?.dateTo) {
-    conditions.push(`u.submitted_date <= $${paramIndex}::DATE`);
+    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) <= $${paramIndex}::DATE`);
     params.push(filters.dateTo);
     paramIndex++;
   }
@@ -437,10 +438,11 @@ async function calculateSummary(filters?: {
   };
 
   // Conditions for dr_photo_unified_reviews (INSTALLED)
-  // IMPORTANT: Use submitted_date directly, NOT created_at fallback for INSTALLED count
-  // OES-only records have submitted_date = NULL and should NOT be counted as "installed"
+  // Use COALESCE: submitted_date preferred, fall back to created_at::DATE
+  // for records created by dr-acknowledgment before process-new-dr sets submitted_date
+  // OES-only records are excluded separately by the is_oes_only filter
   const unifiedCond = buildConditions(
-    'submitted_date',
+    'COALESCE(submitted_date, created_at::DATE)',
     'project'
   );
   // Conditions for OES activations (ACTIVATED - independent date context)

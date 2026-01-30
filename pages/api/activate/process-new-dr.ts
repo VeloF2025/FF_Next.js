@@ -487,29 +487,33 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           createdAt: existingUnified.created_at,
         });
 
-        // Still update contact info and WA context (non-destructive)
+        // Still update contact info, WA context, and submitted_date if missing (non-destructive)
+        // submitted_date may be NULL if dr-acknowledgment created the record first
         await pool.query(
           `UPDATE dr_photo_unified_reviews
            SET
-             wa_message_id = COALESCE($2, wa_message_id),
-             wa_sender_jid = COALESCE($3, wa_sender_jid),
-             wa_original_text = COALESCE($4, wa_original_text),
-             wa_group_jid = COALESCE($5, wa_group_jid),
-             wa_received_at = CASE WHEN $2 IS NOT NULL THEN NOW() ELSE wa_received_at END,
-             sender_phone = COALESCE($6, sender_phone),
-             subscriber_name = COALESCE($7, subscriber_name),
-             subscriber_phone = COALESCE($8, subscriber_phone),
-             subscriber_email = COALESCE($9, subscriber_email),
-             subscriber_language = COALESCE($10, subscriber_language),
-             signup_agent = COALESCE($11, signup_agent),
-             installer_name = COALESCE($12, installer_name),
-             qcontact_name = COALESCE($13, qcontact_name),
-             qcontact_phone = COALESCE($14, qcontact_phone),
-             qcontact_email = COALESCE($15, qcontact_email),
+             submitted_date = COALESCE(submitted_date, $2::DATE),
+             wa_message_id = COALESCE($3, wa_message_id),
+             wa_sender_jid = COALESCE($4, wa_sender_jid),
+             wa_original_text = COALESCE($5, wa_original_text),
+             wa_group_jid = COALESCE($6, wa_group_jid),
+             wa_received_at = CASE WHEN $3 IS NOT NULL THEN NOW() ELSE wa_received_at END,
+             sender_phone = COALESCE($7, sender_phone),
+             is_oes_only = FALSE,
+             subscriber_name = COALESCE($8, subscriber_name),
+             subscriber_phone = COALESCE($9, subscriber_phone),
+             subscriber_email = COALESCE($10, subscriber_email),
+             subscriber_language = COALESCE($11, subscriber_language),
+             signup_agent = COALESCE($12, signup_agent),
+             installer_name = COALESCE($13, installer_name),
+             qcontact_name = COALESCE($14, qcontact_name),
+             qcontact_phone = COALESCE($15, qcontact_phone),
+             qcontact_email = COALESCE($16, qcontact_email),
              updated_at = NOW()
            WHERE drop_number = $1`,
           [
             dropNumber,
+            submittedDateStr,
             waMessageId || null,
             waSenderJid || null,
             waOriginalText || null,
@@ -553,6 +557,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
              submission_history = $2,
              last_resubmitted_at = NOW(),
              resubmitted_by = 'manual_entry',
+           submitted_date = COALESCE(submitted_date, $19::DATE),
            project = COALESCE($3, project),
            wa_message_id = COALESCE($5, wa_message_id),
            wa_sender_jid = COALESCE($6, wa_sender_jid),
@@ -593,6 +598,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           qContactInfo?.qcontact_phone || null,
           qContactInfo?.qcontact_email || null,
           resolvedSenderPhone,
+          submittedDateStr,
         ]
       );
 
