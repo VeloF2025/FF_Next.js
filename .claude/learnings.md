@@ -3384,3 +3384,74 @@ UI Import → import-oes.ts → fire-and-forget POST :8095/sync/oes
 **Rebuild command:** `cd /opt/qfieldcloud && docker-compose build qgis`
 
 ---
+
+## 2026-01-30: Serial Audit — DRs Without ONT Barcode Data
+
+**Context:** During the 1Map serial backfill (4,893 DRs), we identified DRs in `dr_photo_unified_reviews` that have no `ont_serial_scanned` (1Map barcode) and no `onemap_ont_serial`. These are DRs where the installer never scanned the ONT barcode sticker in 1Map.
+
+**Analysis performed (production DB):**
+- 236 total DRs with no barcode (excluding OES-only, test projects, non-production DR numbers)
+- 92 had photos, 144 had no photos
+
+**92 DRs with photos — serial source breakdown:**
+
+| Source | Count | Notes |
+|--------|-------|-------|
+| OES serial (Nokia) | 28 | Finish point known from activation |
+| VLM extracted from step 6/9 | 2 | DR1751092, DR1858326 |
+| ONT photo exists (can run VLM) | 1 | DR1857412 |
+| qa_photo_reviews / drops / OLT report | 0 | No cross-reference hits |
+| **Truly unresolved** | **61** | No serial from any source |
+
+**61 unresolved by project:**
+- Mohadin: 43 DRs
+- Lawley: 11 DRs
+- Mamelodi: 4 DRs
+- Marketing Activations: 3 DRs
+
+**Why these 61 can't be resolved from existing data:**
+1. All 61 have VLM categorization completed (`categorized` or `approved`)
+2. Zero have WhatsApp photos (`wa_photo_count = 0`) — all photos sourced from 1Map
+3. All 135 photos across 61 DRs are 1Map standard types: `ph_prop` (property), `ph_sign` (signature)
+4. Zero non-1Map photos exist — recategorization will NOT discover hidden ONT photos
+5. No ONT-related photo types (`ph_bl`, `ph_ont`) present in any of the 61
+
+**Photo count distribution (61 DRs):**
+- 2 photos: ~54 DRs (property + signature only)
+- 3 photos: ~5 DRs
+- 1 photo: ~2 DRs
+
+**Action taken:**
+- Excel exported to `~/Downloads/Unresolved_DRs_No_Serial_2026-01-30.xlsx` (Summary + per-project sheets)
+- WhatsApp message sent to Velo Server group with clickable links to each DR's QA Centre page
+- URL pattern: `https://app.fibreflow.app/activate/qa-centre/{DR}`
+
+**Resolution path for 61 unresolved:**
+1. Wait for future OES report (if activated on Nokia)
+2. Field team scans ONT barcode via WhatsApp serial submission
+3. Accept as data gaps in audit trail
+
+**Key query pattern for finding these DRs:**
+```sql
+SELECT r.drop_number, r.project, r.photo_count
+FROM dr_photo_unified_reviews r
+WHERE (r.ont_serial_scanned IS NULL OR r.ont_serial_scanned = '')
+  AND (r.onemap_ont_serial IS NULL OR r.onemap_ont_serial = '')
+  AND (r.oes_serial IS NULL OR r.oes_serial = '')
+  AND (r.vlm_ont_serial_step6 IS NULL OR r.vlm_ont_serial_step6 = '')
+  AND r.drop_number ~ '^DR[0-9]{6,7}$'
+  AND r.project NOT ILIKE '%test%'
+  AND r.is_oes_only IS NOT TRUE
+  AND r.photo_count > 0
+ORDER BY r.project, r.drop_number;
+```
+
+**WA bridge endpoint for group messages:**
+```bash
+curl -s http://72.61.197.178:8083/send-message -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"group_jid":"120363423864087150@g.us","message":"text"}'
+```
+Note: The feedback proxy (`:8092/send`) does NOT work for sending. Use bridge directly at `:8083/send-message`.
+
+---
