@@ -15,6 +15,7 @@ import { Pool } from 'pg';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { fetchPhotosWithRetry } from '@/modules/activate/services/photoFetchService';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -792,6 +793,99 @@ async function syncMissingFromQaPhotoReviews(): Promise<number> {
 
 
 /**
+ * Self-healing: process orphaned DRs where dr-acknowledgment created a shell record
+ * but process-new-dr never ran (Go Bridge dropped the second call).
+ *
+ * These records have photo_count=0, no wa_message_id, and exist in wa_monitor_drops.
+ * We fetch their photos and serials from BOSS/1Map and update the unified table.
+ *
+ * Runs fire-and-forget: the page returns immediately while this processes in background.
+ * Max 5 DRs per page load to avoid overloading BOSS API.
+ */
+function processOrphanedRecordsInBackground(): void {
+  // Fire and forget — don't await
+  (async () => {
+    try {
+      const result = await pool.query(`
+        SELECT u.drop_number, w.project, w.sender_phone
+        FROM dr_photo_unified_reviews u
+        INNER JOIN wa_monitor_drops w ON w.drop_number = u.drop_number
+        WHERE u.photo_count = 0
+          AND (u.is_oes_only = FALSE OR u.is_oes_only IS NULL)
+          AND u.wa_message_id IS NULL
+          AND u.created_at > NOW() - INTERVAL '48 hours'
+        ORDER BY u.created_at DESC
+        LIMIT 5
+      `);
+
+      if (result.rows.length === 0) return;
+
+      log.info('DropsAPI', `Self-healing: processing ${result.rows.length} orphaned DRs`, {
+        dropNumbers: result.rows.map((r: any) => r.drop_number),
+      });
+
+      // Process sequentially to avoid overwhelming BOSS API
+      for (const row of result.rows) {
+        try {
+          const fetchResult = await fetchPhotosWithRetry(row.drop_number, {
+            maxRetries: 2,
+            initialDelayMs: 1000,
+          });
+
+          const { photos, ont_barcode, ups_serial } = fetchResult;
+
+          if (photos.length > 0) {
+            const photosMetadata = photos.map((p: any) => ({
+              filename: p.filename,
+              url: p.url,
+              step: null,
+              original_type: p.original_type,
+            }));
+
+            await pool.query(
+              `UPDATE dr_photo_unified_reviews
+               SET photo_source = 'onemap',
+                   photo_count = $1,
+                   photos_metadata = $2,
+                   ont_serial_scanned = COALESCE($3, ont_serial_scanned),
+                   ups_serial_scanned = COALESCE($4, ups_serial_scanned),
+                   submitted_date = COALESCE(submitted_date, CURRENT_DATE),
+                   project = COALESCE($5, project),
+                   sender_phone = COALESCE($6, sender_phone),
+                   updated_at = NOW()
+               WHERE drop_number = $7`,
+              [photos.length, JSON.stringify(photosMetadata), ont_barcode, ups_serial,
+               row.project, row.sender_phone, row.drop_number]
+            );
+
+            log.info('DropsAPI', `Self-healed ${row.drop_number}: ${photos.length} photos, ont=${ont_barcode || 'N/A'}, ups=${ups_serial || 'N/A'}`);
+          } else {
+            // Still set serials and metadata even with 0 photos
+            await pool.query(
+              `UPDATE dr_photo_unified_reviews
+               SET ont_serial_scanned = COALESCE($2, ont_serial_scanned),
+                   ups_serial_scanned = COALESCE($3, ups_serial_scanned),
+                   submitted_date = COALESCE(submitted_date, CURRENT_DATE),
+                   project = COALESCE($4, project),
+                   sender_phone = COALESCE($5, sender_phone),
+                   updated_at = NOW()
+               WHERE drop_number = $1`,
+              [row.drop_number, ont_barcode, ups_serial, row.project, row.sender_phone]
+            );
+
+            log.warn('DropsAPI', `Self-heal ${row.drop_number}: 0 photos from BOSS, set metadata only`);
+          }
+        } catch (drError) {
+          log.error('DropsAPI', `Self-heal failed for ${row.drop_number}`, drError);
+        }
+      }
+    } catch (error) {
+      log.error('DropsAPI', 'Self-healing orphan detection failed', error);
+    }
+  })();
+}
+
+/**
  * Get all active projects for the filter dropdown
  * Returns projects that have WhatsApp group mappings (active projects)
  */
@@ -889,6 +983,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       page: currentPage,
       totalCount: result.pagination.totalCount,
     });
+
+    // Fire-and-forget: process orphaned DRs in background AFTER response
+    // These are records where dr-acknowledgment ran but process-new-dr was dropped
+    // by the Go Bridge. We fetch their photos/serials from BOSS/1Map.
+    // Data appears on next page refresh.
+    processOrphanedRecordsInBackground();
 
     return res.status(200).json({
       success: true,
