@@ -790,49 +790,6 @@ async function syncMissingFromQaPhotoReviews(): Promise<number> {
   }
 }
 
-/**
- * Backfill orphaned unified records that were created by dr-acknowledgment
- * but never processed by process-new-dr (Go Bridge dropped the second call).
- *
- * These records have:
- *   - submitted_date IS NULL
- *   - project IS NULL
- *   - is_oes_only IS NULL or FALSE
- *   - BUT exist in qa_photo_reviews/wa_monitor_drops (real WA submissions)
- *
- * Self-healing: runs on every page load alongside syncMissingFromQaPhotoReviews.
- */
-async function backfillOrphanedRecords(): Promise<number> {
-  try {
-    // Update unified records that have NULL submitted_date but exist in wa_monitor_drops
-    // wa_monitor_drops is the most reliable source (always populated by WA Monitor Python)
-    const result = await pool.query(`
-      UPDATE dr_photo_unified_reviews u
-      SET
-        submitted_date = COALESCE(u.submitted_date, w.created_at::DATE),
-        project = COALESCE(u.project, w.project),
-        sender_phone = COALESCE(u.sender_phone, w.sender_phone),
-        updated_at = NOW()
-      FROM wa_monitor_drops w
-      WHERE w.drop_number = u.drop_number
-        AND u.submitted_date IS NULL
-        AND (u.is_oes_only = FALSE OR u.is_oes_only IS NULL)
-        AND u.created_at > NOW() - INTERVAL '7 days'
-      RETURNING u.drop_number
-    `);
-
-    if (result.rowCount && result.rowCount > 0) {
-      log.info('DropsAPI', `Backfilled ${result.rowCount} orphaned records from wa_monitor_drops`, {
-        dropNumbers: result.rows.map((r: any) => r.drop_number),
-      });
-    }
-
-    return result.rowCount || 0;
-  } catch (error) {
-    log.error('DropsAPI', 'Error backfilling orphaned records', error);
-    return 0;
-  }
-}
 
 /**
  * Get all active projects for the filter dropdown
@@ -916,13 +873,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const searchTerm = search && typeof search === 'string' ? search : undefined;
 
-    // Auto-sync and backfill BEFORE querying to ensure accurate results:
-    // 1. Create missing unified records from qa_photo_reviews (webhook failure)
-    // 2. Backfill orphaned records where dr-acknowledgment ran but process-new-dr didn't
-    await Promise.all([
-      syncMissingFromQaPhotoReviews(),
-      backfillOrphanedRecords(),
-    ]);
+    // Auto-sync BEFORE querying to ensure accurate results:
+    // Create missing unified records from qa_photo_reviews (webhook failure)
+    await syncMissingFromQaPhotoReviews();
 
     // Run all queries in parallel for faster response
     const [result, summary, projectStats, activeProjects] = await Promise.all([
