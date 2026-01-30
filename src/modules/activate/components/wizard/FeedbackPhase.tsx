@@ -272,7 +272,9 @@ export function FeedbackPhase({
         setSent(true);
         log.info('FeedbackPhase', `Feedback sent for ${dropNumber}`);
       } else {
-        throw new Error(data.error || 'Failed to send feedback');
+        // API returns { success: false, error: { code, message } }
+        const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || 'Failed to send feedback';
+        throw new Error(errorMsg);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send feedback';

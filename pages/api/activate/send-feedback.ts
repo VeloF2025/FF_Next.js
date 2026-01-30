@@ -124,11 +124,29 @@ async function handlePost(
       log.info(`Auto-generated feedback message for ${dropNumber}`);
     }
 
-    // 4. Get WhatsApp group ID for project
-    const groupId = getWhatsAppGroupId(review.project);
+    // 4. Resolve project name - fallback to drops table if null
+    let projectName = review.project || project;
+    if (!projectName) {
+      const fallback = await pool.query(
+        `SELECT p.project_name FROM drops d JOIN projects p ON d.project_id = p.id WHERE d.drop_number = $1`,
+        [dropNumber]
+      );
+      if (fallback.rows[0]?.project_name) {
+        projectName = fallback.rows[0].project_name;
+        // Backfill the unified review so this doesn't happen again
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews SET project = $1, updated_at = NOW() WHERE drop_number = $2 AND project IS NULL`,
+          [projectName, dropNumber]
+        );
+        log.info(`Backfilled project for ${dropNumber}: ${projectName}`);
+      }
+    }
+
+    // Get WhatsApp group ID for project
+    const groupId = getWhatsAppGroupId(projectName || '');
 
     if (!groupId) {
-      return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${review.project}`);
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, `No WhatsApp group configured for project: ${projectName || 'unknown'}`);
     }
 
     // 5. Get staff WhatsApp ID if staffId provided
