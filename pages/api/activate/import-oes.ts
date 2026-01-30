@@ -703,12 +703,10 @@ async function handler(
 
       log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, existingUpdated: existingToUpdate.length, serialSwapsDetected, errors: errors.length });
 
-      // Trigger QField sync and WAIT for confirmation - Updated Jan 2026
-      // IMPORTANT: Only show success confirmation after actual confirmation received
-      let qfieldSyncStatus: { success: boolean; message: string; recordCount?: number } = {
-        success: false,
-        message: 'QField sync not attempted'
-      };
+      // === QField Sync (fire-and-forget) ===
+      // Trigger QField sync but DON'T wait for completion - prevents Cloudflare 524 timeout
+      // QField sync takes ~90s and can be monitored via /system/data-sync
+      let qfieldSyncTriggered = false;
 
       try {
         const syncPayload = {
@@ -717,136 +715,58 @@ async function handler(
           imported: inserted + updated,
           matched: matched,
           timestamp: new Date().toISOString(),
-          reportDate: reportDate || new Date().toISOString().split('T')[0] // Pass user-selected date for layer naming
+          reportDate: reportDate || new Date().toISOString().split('T')[0]
         };
 
-        log.info('OESImport', 'Triggering QField sync webhook (awaiting confirmation)', syncPayload);
+        log.info('OESImport', 'Triggering QField sync webhook (fire-and-forget)', syncPayload);
 
+        // Fire-and-forget with short timeout - just confirm webhook received
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s to confirm receipt
 
-        try {
-          const response = await fetch('http://100.96.203.105:8095/sync/oes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(syncPayload),
-            signal: controller.signal
-          });
+        fetch('http://100.96.203.105:8095/sync/oes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syncPayload),
+          signal: controller.signal
+        })
+        .then(async (response) => {
           clearTimeout(timeoutId);
-
           if (response.ok) {
             const result = await response.json();
-            log.info('OESImport', 'QField sync webhook responded', result);
-
-            // The webhook triggers sync in background, so we need to poll for completion
-            // Sync typically takes ~90s (2 projects), poll for up to 3 minutes
-            const maxWaitMs = 180000;
-            const pollIntervalMs = 5000;
-            const startTime = Date.now();
-
-            while (Date.now() - startTime < maxWaitMs) {
-              await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-
-              try {
-                const statusResponse = await fetch('http://100.96.203.105:8095/status');
-                if (statusResponse.ok) {
-                  const status = await statusResponse.json();
-                  log.info('OESImport', 'QField sync status poll', status);
-
-                  // Check if sync completed (last_sync updated recently)
-                  if (status.last_sync) {
-                    const lastSyncTime = new Date(status.last_sync).getTime();
-                    const syncStartTime = new Date(syncPayload.timestamp).getTime();
-
-                    // If last_sync is after our sync started, it's done
-                    if (lastSyncTime >= syncStartTime - 5000) {
-                      // Check last_error (null = success) and last_count (not last_status/last_record_count)
-                      const syncSuccess = status.last_error === null && !status.is_running;
-                      qfieldSyncStatus = {
-                        success: syncSuccess,
-                        message: syncSuccess
-                          ? `Synced ${status.last_count || 0} records to ${status.last_projects || 0} QFieldCloud projects`
-                          : status.last_error || 'Sync completed with issues',
-                        recordCount: status.last_count,
-                        projectCount: status.last_projects
-                      };
-                      log.info('OESImport', 'QField sync confirmed complete', qfieldSyncStatus);
-                      break;
-                    }
-                  }
-                }
-              } catch (pollError) {
-                log.warn('OESImport', 'QField status poll failed', pollError);
-              }
-            }
-
-            // If we timed out waiting, still mark as triggered
-            if (!qfieldSyncStatus.success && qfieldSyncStatus.message === 'QField sync not attempted') {
-              qfieldSyncStatus = {
-                success: false,
-                message: 'QField sync triggered but confirmation timed out - check QField app'
-              };
-            }
+            log.info('OESImport', 'QField sync webhook accepted', result);
           } else {
-            qfieldSyncStatus = {
-              success: false,
-              message: `QField sync webhook returned ${response.status}`
-            };
-            log.warn('OESImport', qfieldSyncStatus.message);
+            log.warn('OESImport', `QField sync webhook returned ${response.status}`);
           }
-        } catch (fetchError: unknown) {
+
+          // Log to data_sync_operations
+          try {
+            await pool.query(
+              `INSERT INTO data_sync_operations (operation_type, status, started_at, details, triggered_by, source_batch_id)
+               VALUES ('qfield_sync', 'running', NOW(), $1, 'oes_import_webhook', $2)`,
+              [
+                JSON.stringify({ message: 'Sync triggered, running in background', total_records: String(oesRows.length) }),
+                batchId,
+              ]
+            );
+          } catch (logErr) {
+            log.warn('OESImport', 'Failed to log QField sync to data_sync_operations', logErr);
+          }
+        })
+        .catch((fetchError: unknown) => {
           clearTimeout(timeoutId);
           const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-          if (errorMessage.includes('aborted')) {
-            qfieldSyncStatus = {
-              success: false,
-              message: 'QField sync timed out after 2 minutes'
-            };
-          } else {
-            qfieldSyncStatus = {
-              success: false,
-              message: `QField sync failed: ${errorMessage}`
-            };
-          }
-          log.warn('OESImport', 'QField sync webhook failed', errorMessage);
-        }
-      } catch (error) {
-        log.error('OESImport', 'Failed to call QField sync webhook', error);
-        qfieldSyncStatus = {
-          success: false,
-          message: 'QField sync failed unexpectedly'
-        };
-      }
+          log.warn('OESImport', 'QField sync webhook failed (non-blocking)', errorMessage);
+        });
 
-      // === LOG QField SYNC TO DATA_SYNC_OPERATIONS ===
-      try {
-        const syncDuration = qfieldSyncStatus.success
-          ? ((Date.now() - new Date(batchResult.rows[0]?.id ? Date.now() : 0).getTime()) / 1000)
-          : null;
-        await pool.query(
-          `INSERT INTO data_sync_operations (operation_type, status, started_at, completed_at, duration_seconds, details, error_message, triggered_by, source_batch_id)
-           VALUES ('qfield_sync', $1, NOW() - INTERVAL '1 minute', NOW(), $2, $3, $4, 'oes_import_webhook', $5)`,
-          [
-            qfieldSyncStatus.success ? 'success' : 'failed',
-            syncDuration,
-            JSON.stringify({
-              projects_synced: String(qfieldSyncStatus.projectCount || 0),
-              total_records: String(qfieldSyncStatus.recordCount || 0),
-              message: qfieldSyncStatus.message,
-            }),
-            qfieldSyncStatus.success ? null : qfieldSyncStatus.message,
-            batchId,
-          ]
-        );
-      } catch (logErr) {
-        log.warn('OESImport', 'Failed to log QField sync to data_sync_operations', logErr);
+        qfieldSyncTriggered = true;
+      } catch (error) {
+        log.error('OESImport', 'Failed to trigger QField sync webhook', error);
       }
 
       // === SHAREPOINT FOLDER VERIFICATION (Fire-and-forget) ===
-      // Ensure folders exist for all matched DRs after OES import
       if (process.env.SHAREPOINT_DR_SYNC_ENABLED === 'true' && matched > 0) {
         try {
-          // Get list of matched DR numbers for folder verification
           const matchedDrNumbers = oesRows
             .filter(row => dropsMap.has(row.drop_number))
             .map(row => row.drop_number);
@@ -860,7 +780,7 @@ async function handler(
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 action: 'verify_folders',
-                dropNumbers: matchedDrNumbers.slice(0, 100) // Limit to first 100
+                dropNumbers: matchedDrNumbers.slice(0, 100)
               })
             })
             .then(async (response) => {
@@ -880,7 +800,6 @@ async function handler(
             });
           }
         } catch (error) {
-          // Non-blocking - don't fail import if SharePoint sync fails
           log.error('OESImport', 'Failed to trigger SharePoint folder verification', error);
         }
       }
@@ -896,9 +815,13 @@ async function handler(
         serialSwapsDetected,
         errors,
         batchId,
-        // Confirmation statuses - only true when actually confirmed
-        dbSyncConfirmed: true, // DB insert/update completed if we got here
-        qfieldSyncStatus,
+        dbSyncConfirmed: true,
+        qfieldSyncStatus: {
+          success: qfieldSyncTriggered,
+          message: qfieldSyncTriggered
+            ? 'QField sync triggered (running in background - check Data Sync page for status)'
+            : 'QField sync not triggered',
+        },
       });
     }
 
