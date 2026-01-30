@@ -447,10 +447,14 @@ function QaCentrePageContent() {
     }
   }, [filters]);
 
-  // Format phone number for display
+  // Format sender phone/LID for display
   const formatAgent = (phone: string | null) => {
-    if (!phone) return 'Unknown';
-    return phone.replace(/^27/, '0');
+    if (!phone) return null; // No WA submission
+    // Regular SA phone number (starts with 27, 11-12 digits)
+    if (/^27\d{9,10}$/.test(phone)) return phone.replace(/^27/, '0');
+    // LID format (long numeric) - show truncated
+    if (phone.length > 10) return phone.slice(-8) + '…';
+    return phone;
   };
 
   // Skeleton component
@@ -874,7 +878,7 @@ function QaCentrePageContent() {
                       {/* Row 2: Tech ID | Photos | WA Time | [empty] | [empty] | [RIGHT: ONT serial | UPS serial] */}
                       <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
                         <span className="font-medium text-gray-600 dark:text-gray-300 truncate">
-                          {formatAgent(drop.senderPhone)}
+                          {formatAgent(drop.senderPhone) || '–'}
                         </span>
                         <span className="font-medium text-gray-600 dark:text-gray-300">
                           📷 {drop.photoCount || 0}
