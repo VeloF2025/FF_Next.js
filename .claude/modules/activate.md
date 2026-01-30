@@ -95,15 +95,32 @@ src/modules/activate/
 | `/api/activate/refresh` | POST | Manual data refresh from BOSS API |
 | `/api/activate/health-check` | GET | 5-service health |
 
-## Serial Swap Detection
-Detects when ONT and UPS serials are in wrong fields:
+## Serial Tracking & Swap Detection
 
+### Serial Data Sources
+| Column | Source | Meaning |
+|--------|--------|---------|
+| `ont_serial_scanned` | 1Map / WA photos | Physical scan at install (NEVER overwrite with OES) |
+| `oes_serial` | OES Nokia import | Active on network (SOURCE OF TRUTH) |
+| `vlm_ont_serial_step6/9` | VLM AI | Extracted from photos (supplementary) |
+
+### Device Patterns
 | Device | Pattern | Example |
 |--------|---------|---------|
 | Nokia ONT | `ALCL*` or `ALCB*` | `ALCLB48CC3CA` |
 | Gizzu UPS | `GU18W*` | `GU18W12V2508057584` |
 
-**Flow**: First WA response detects → QA Wizard Phase 4 shows warning → Auto-ticket created
+### OES Import Swap Detection (2026-01-29)
+OES import (`import-oes.ts` Step 7) always updates `oes_serial` and detects:
+- **OES_SERIAL_CHANGED**: OES serial differs from previous import (ONT replacement on network)
+- **SERIAL_MISMATCH_DETECTED**: OES serial differs from `ont_serial_scanned` (swap or scan error)
+
+Sets `serial_swap_detected`, `serial_swap_detected_at`, `serial_swap_details` on DR record.
+All events logged to `dr_activity_log` for forensic searching.
+
+**Flow**: 1Map scan → OES import detects mismatch → Activity log → QA Wizard Phase 4 warning
+
+**Deep reference:** `.claude/knowledge-base/activate/serial-audit-tracking.md`
 
 ## Pages
 | Page | Path | Purpose |
@@ -150,6 +167,7 @@ const result = await extractOntSerialEnhanced(base64Image);
 - `src/modules/activate/services/barcodeExtractionService.ts`
 
 ## Recent Changes (Jan 2026)
+- **Serial Audit System** (2026-01-29) - Comprehensive backfill from 1Map, OES swap detection, activity logging
 - **Enhanced Barcode Service** - zxing-wasm 2D barcode support for Nokia ONT labels
 - Added progress overlays for visual feedback
 - Enhanced VLM extraction with blur detection

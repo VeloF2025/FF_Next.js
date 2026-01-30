@@ -3293,3 +3293,44 @@ Exec=env NODE_OPTIONS="--max-old-space-size=16384" /usr/share/code/code %F
 **Files:** `src/components/settings/AccessControlTab.tsx`
 
 ---
+
+## 2026-01-30: Serial Audit - Comprehensive Backfill & Swap Detection
+
+**Problem:** 27% of DRs (5,248/8,205) were missing `ont_serial_scanned` in `dr_photo_unified_reviews`, and OES import silently ignored serial changes using `COALESCE`.
+
+**Root Causes (2 bugs):**
+1. `process-new-dr.ts` (line ~665): Early return when `photos.length === 0` discarded serials from BOSS API. Fix: Added `COALESCE($2, ont_serial_scanned)` to the zero-photos UPDATE.
+2. `backfill-onemap-data.ts` (line ~237): `missing_serials` query had `photo_count > 0` filter, excluding DRs without photos from serial backfill. Fix: Changed to `ont_serial_scanned IS NULL OR ont_serial_scanned = ''`.
+
+**Serial Data Hierarchy:**
+- `ont_serial_scanned` = 1Map / WA group photo scan (install-time physical data)
+- `oes_serial` = OES Nokia report (currently active on network, SOURCE OF TRUTH)
+- `vlm_ont_serial_step6/9` = VLM AI extraction (supplementary)
+- **Never overwrite ont_serial_scanned with OES data** - they track different things
+
+**OES Import Fix (`import-oes.ts` Step 7):**
+- Removed `COALESCE(u.oes_serial, data.serial)` - always update `oes_serial` (it's source of truth)
+- Added pre-fetch of existing serials for comparison
+- Detects `OES_SERIAL_CHANGED` (old vs new OES) and `SERIAL_MISMATCH_DETECTED` (OES vs scanned)
+- Sets `serial_swap_detected`, `serial_swap_detected_at`, `serial_swap_details` flags
+- Logs to `dr_activity_log` for forensic searching
+
+**Backfill Results:**
+- 4,893 DRs backfilled from 1Map (BOSS API at 100.96.203.105:8003)
+- 355 still missing (245 not in 1Map, 110 no barcode data)
+- 125 existing ONT-vs-OES mismatches found and logged
+
+**Activity Log Events:**
+- `SERIAL_BACKFILL` - 1Map backfill with source data
+- `SERIAL_MISMATCH` - Baseline audit mismatch
+- `SERIAL_MISMATCH_DETECTED` - OES import mismatch
+- `OES_SERIAL_CHANGED` - OES serial changed between imports
+
+**Deep reference:** `.claude/knowledge-base/activate/serial-audit-tracking.md`
+
+**Key Files:**
+- `pages/api/activate/process-new-dr.ts` - Fixed zero-photos serial capture
+- `pages/api/cron/backfill-onemap-data.ts` - Fixed serial backfill query
+- `pages/api/activate/import-oes.ts` - OES swap detection rewrite
+
+---
