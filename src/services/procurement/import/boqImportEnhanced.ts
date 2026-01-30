@@ -322,12 +322,14 @@ export class BOQImportEnhanced {
     const result = await this.sql`
       INSERT INTO boqs (
         project_id,
+        version,
         title,
         description,
         status,
         uploaded_by
       ) VALUES (
         ${projectId},
+        ${'1.0'},
         ${`BOQ Import ${new Date().toISOString().split('T')[0]}`},
         ${'Imported from Excel'},
         'draft',
