@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Download,
@@ -61,6 +62,7 @@ interface QuoteStats {
 
 
 const QuoteEvaluationPage: React.FC = () => {
+  const navigate = useNavigate();
   const [evaluations, setEvaluations] = useState<QuoteEvaluation[]>([]);
   const [stats, setStats] = useState<QuoteStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,32 +79,48 @@ const QuoteEvaluationPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      // 🟢 WORKING: Empty states - no mock data. Connect to real quote evaluation service when available.
-      // TODO: Replace with actual service calls when quote evaluation system is implemented
-      
-      // Empty arrays - shows "No evaluations found" etc. in UI
-      const evaluations: QuoteEvaluation[] = [];
-      
-      const stats: QuoteStats = {
-        total: 0,
-        pending: 0,
-        inProgress: 0,
-        completed: 0,
-        awarded: 0,
-        totalValue: 0,
-        averageEvaluationTime: 0
+
+      const params = new URLSearchParams();
+      if (selectedStatus) params.set('status', selectedStatus);
+      if (searchTerm) params.set('search', searchTerm);
+
+      const response = await fetch(`/api/procurement/quote-evaluations?${params}`);
+      if (!response.ok) throw new Error('Failed to load evaluation data');
+
+      const result = await response.json();
+      const data = result.data || result;
+
+      const loadedEvaluations: QuoteEvaluation[] = (data.evaluations || []).map((e: Record<string, unknown>) => ({
+        id: e.id as string,
+        rfqId: e.rfqId as string,
+        rfqTitle: e.rfqTitle as string,
+        status: e.status as QuoteEvaluation['status'],
+        totalQuotes: (e.totalQuotes as number) || 0,
+        evaluatedQuotes: (e.evaluatedQuotes as number) || 0,
+        lowestBid: (e.lowestBid as number) || 0,
+        averageBid: (e.averageBid as number) || 0,
+        highestBid: (e.highestBid as number) || 0,
+        currency: (e.currency as string) || 'ZAR',
+        deadline: new Date(e.deadline as string || Date.now()),
+        createdDate: new Date(e.createdDate as string || Date.now()),
+        evaluatedBy: (e.evaluatedBy as string[]) || [],
+        evaluationCriteria: [],
+      }));
+
+      const loadedStats: QuoteStats = {
+        total: data.stats?.total || 0,
+        pending: data.stats?.pending || 0,
+        inProgress: data.stats?.inProgress || 0,
+        completed: data.stats?.completed || 0,
+        awarded: data.stats?.awarded || 0,
+        totalValue: data.stats?.totalValue || 0,
+        averageEvaluationTime: data.stats?.averageEvaluationTime || 0,
       };
 
-      // Future implementation would be:
-      // const evaluations = await quoteEvaluationService.getEvaluations();
-      // const stats = await quoteEvaluationService.getEvaluationStats();
-
-      setEvaluations(evaluations);
-      setStats(stats);
+      setEvaluations(loadedEvaluations);
+      setStats(loadedStats);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load evaluation data');
-      // Ensure empty states on error
       setEvaluations([]);
       setStats({
         total: 0,
@@ -133,6 +151,32 @@ const QuoteEvaluationPage: React.FC = () => {
   const handleStatusFilter = (status: string) => {
     setSelectedStatus(status);
   };
+
+  const handleViewEvaluation = useCallback((rfqId: string) => {
+    navigate(`/app/procurement/rfq/${rfqId}`);
+  }, [navigate]);
+
+  const handleExportCSV = useCallback(() => {
+    if (evaluations.length === 0) return;
+    const headers = ['RFQ Title', 'Status', 'Total Quotes', 'Lowest Bid', 'Average Bid', 'Highest Bid', 'Deadline'];
+    const rows = evaluations.map(e => [
+      e.rfqTitle,
+      e.status,
+      e.totalQuotes,
+      e.lowestBid,
+      e.averageBid,
+      e.highestBid,
+      formatDate(e.deadline),
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quote-evaluations-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [evaluations]);
 
 
 
@@ -249,17 +293,17 @@ const QuoteEvaluationPage: React.FC = () => {
         <StandardActionButtons
           id={evaluation.id}
           module="quotes"
-          onView={() => {}} // TODO: Implement view
-          onEdit={() => {}} // TODO: Implement edit
+          onView={() => handleViewEvaluation(evaluation.rfqId)}
+          onEdit={() => handleViewEvaluation(evaluation.rfqId)}
           showDelete={false}
           moreActions={[
             ...(evaluation.status === 'COMPLETED' ? [{
               label: 'Award',
-              onClick: () => {} // TODO: Implement award
+              onClick: () => handleViewEvaluation(evaluation.rfqId)
             }] : []),
             {
-              label: 'Export', 
-              onClick: () => {} // TODO: Implement export
+              label: 'Export',
+              onClick: handleExportCSV
             }
           ]}
         />
@@ -337,7 +381,7 @@ const QuoteEvaluationPage: React.FC = () => {
             variant="outline"
             size="sm"
             icon={<BarChart3 className="h-4 w-4" />}
-            onClick={() => {}} // TODO: Implement analytics
+            onClick={() => navigate('/app/procurement/reports')}
           >
             Analytics
           </VelocityButton>
@@ -345,16 +389,16 @@ const QuoteEvaluationPage: React.FC = () => {
             variant="outline"
             size="sm"
             icon={<Download className="h-4 w-4" />}
-            onClick={() => {}} // TODO: Implement export
+            onClick={handleExportCSV}
           >
             Export Report
           </VelocityButton>
           <VelocityButton
             size="sm"
             icon={<Plus className="h-4 w-4" />}
-            onClick={() => {}} // TODO: Implement create
+            onClick={() => navigate('/app/procurement/rfq')}
           >
-            New Evaluation
+            New RFQ
           </VelocityButton>
         </div>
       </div>

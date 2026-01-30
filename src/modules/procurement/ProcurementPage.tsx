@@ -75,56 +75,74 @@ export function ProcurementPage() {
   const permissions = useProcurementPermissions(selectedProject?.id);
 
   /**
-   * Load aggregate metrics for "All Projects" view
+   * Load aggregate metrics for "All Projects" view from real API
    */
   const loadAggregateMetrics = async (): Promise<void> => {
     try {
-      // TODO: Replace with actual API call
-      const mockAggregateMetrics: AggregateProjectMetrics = {
-        totalProjects: 12,
-        totalBOQValue: 2450000,
-        totalActiveRFQs: 18,
-        totalPurchaseOrders: 42,
-        totalStockItems: 1250,
-        totalSuppliers: 28,
-        averageCostSavings: 12.5,
-        averageCycleDays: 14.5,
-        averageSupplierOTIF: 92,
-        criticalAlerts: 8,
-        pendingApprovals: 15
+      const response = await fetch('/api/procurement/aggregate-metrics');
+      if (!response.ok) throw new Error('Failed to fetch aggregate metrics');
+      const result = await response.json();
+      const data = result.data || result;
+      const m = data.metrics || {};
+
+      const realMetrics: AggregateProjectMetrics = {
+        totalProjects: m.totalProjects || 0,
+        totalBOQValue: m.totalBOQValue || 0,
+        totalActiveRFQs: m.totalActiveRFQs || 0,
+        totalPurchaseOrders: m.totalPurchaseOrders || 0,
+        totalStockItems: m.totalStockItems || 0,
+        totalSuppliers: m.totalSuppliers || 0,
+        averageCostSavings: 0,
+        averageCycleDays: 0,
+        averageSupplierOTIF: 0,
+        criticalAlerts: m.lowStockItems || 0,
+        pendingApprovals: m.pendingApprovals || 0,
       };
 
-      const mockProjectSummaries: ProjectSummary[] = [
-        {
-          id: '1',
-          name: 'Johannesburg Fiber Rollout',
-          code: 'JHB-2024-001',
-          status: 'active',
-          boqValue: 850000,
-          activeRFQs: 5,
-          completionPercentage: 68,
-          lastActivity: '2 hours ago',
-          alertCount: 2
-        },
-        {
-          id: '2',
-          name: 'Cape Town Metro Network',
-          code: 'CPT-2024-002',
-          status: 'active',
-          boqValue: 720000,
-          activeRFQs: 3,
-          completionPercentage: 45,
-          lastActivity: '4 hours ago',
-          alertCount: 1
-        },
-        // Add more mock data as needed
-      ];
+      const summaries: ProjectSummary[] = (data.projectSummaries || []).map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        name: p.name as string,
+        code: p.code as string,
+        status: p.status as string,
+        boqValue: Number(p.boqValue || 0),
+        activeRFQs: Number(p.activeRFQs || 0),
+        pendingPOs: Number(p.pendingPOs || 0),
+        stockAlerts: Number(p.stockAlerts || 0),
+        completionPercentage: Number(p.completionPercentage || 0),
+      }));
 
-      setAggregateMetrics(mockAggregateMetrics);
-      setProjectSummaries(mockProjectSummaries);
+      setAggregateMetrics(realMetrics);
+      setProjectSummaries(summaries);
     } catch (error) {
       log.error('Error loading aggregate metrics:', { data: error }, 'ProcurementPage');
       setError('Failed to load aggregate data');
+    }
+  };
+
+  /**
+   * Load tab badge counts from API
+   */
+  const loadTabBadges = async (projectId?: string): Promise<void> => {
+    try {
+      const url = projectId
+        ? `/api/procurement/tab-badges?projectId=${projectId}`
+        : '/api/procurement/tab-badges';
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const result = await response.json();
+      const badges = result.data || result;
+
+      setTabBadges(prev => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(badges).map(([key, val]) => [
+            key,
+            val as { count?: number; type?: string }
+          ])
+        )
+      }));
+    } catch (error) {
+      log.error('Error loading tab badges:', { data: error }, 'ProcurementPage');
     }
   };
 
@@ -204,10 +222,18 @@ export function ProcurementPage() {
       // Check if project is required and selected
       if (tab.requiresProject && !selectedProject) return false;
       
-      // Check permissions (simplified - would integrate with real auth)
+      // Check permissions using real RBAC
       if (tab.permission) {
-        // Mock permission check - replace with real implementation
-        return true; // For now, allow all tabs
+        switch (tab.permission) {
+          case 'buyer':
+            return permissions.canViewBOQ || permissions.canViewRFQ || permissions.canViewPurchaseOrders;
+          case 'store-controller':
+            return permissions.canAccessStock;
+          case 'viewer':
+            return permissions.canAccessReports;
+          default:
+            return true;
+        }
       }
       
       return true;
@@ -273,8 +299,9 @@ export function ProcurementPage() {
       if (viewMode === 'all') {
         await loadAggregateMetrics();
       }
-      // TODO: Add single project data refresh logic
-      return Promise.resolve();
+      if (selectedProject) {
+        await loadTabBadges(selectedProject.id);
+      }
     }
   };
 
@@ -344,14 +371,8 @@ export function ProcurementPage() {
       // Load aggregate metrics for all projects view
       loadAggregateMetrics();
     } else if (selectedProject) {
-      // Load project-specific data and update badges
-      setTabBadges(prev => ({
-        ...prev,
-        boq: { count: 3, type: 'info' },
-        rfq: { count: 2, type: 'warning' },
-        quotes: { count: 1, type: 'success' },
-        stock: { count: 5, type: 'error' }
-      }));
+      // Load project-specific badge counts from API
+      loadTabBadges(selectedProject.id);
     } else {
       // Clear badges when no project selected
       setTabBadges({

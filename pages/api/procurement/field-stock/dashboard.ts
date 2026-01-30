@@ -96,6 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Alert stats
       sql`
         SELECT
+          (SELECT COUNT(*) FROM stock_items WHERE quantity <= min_stock_level AND min_stock_level > 0) as low_stock,
           (SELECT COUNT(*) FROM stock_returns WHERE status = 'pending') as pending_returns,
           (SELECT COUNT(*) FROM contractor_stock_accountability WHERE is_blocked = true) as blocked_contractors
       `,

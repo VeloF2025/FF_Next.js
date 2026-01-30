@@ -144,7 +144,25 @@ export function ProcurementDashboard() {
             {
               label: 'Export Report',
               icon: Download as React.ComponentType<{ className?: string; }>,
-              onClick: () => {/* TODO: Implement export procurement report */},
+              onClick: () => {
+                // Export procurement stats as CSV
+                const headers = ['Metric', 'Value'];
+                const rows = [
+                  ['BOQs Active', stats.boqsActive || 0],
+                  ['RFQs Active', stats.rfqsActive || 0],
+                  ['Suppliers Active', stats.supplierActive || 0],
+                  ['Budget Utilization', stats.budgetUtilization || 0],
+                  ['Open Issues', stats.openIssues || 0],
+                ];
+                const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `procurement-report-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              },
               variant: 'secondary'
             },
             {
