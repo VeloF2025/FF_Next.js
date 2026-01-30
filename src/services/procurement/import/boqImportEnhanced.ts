@@ -193,7 +193,7 @@ export class BOQImportEnhanced {
 
         // Create BOQ item
         if (!options.dryRun) {
-          const boqItemId = await this.createBoqItem(boqId, row, matchResult, budgetCategoryCode);
+          const boqItemId = await this.createBoqItem(boqId, options.projectId, row, matchResult, budgetCategoryCode);
 
           // Create budget item if enabled
           if (options.createBudgetItems && projectBudgetId && row.quantity && row.itemRate) {
@@ -345,6 +345,7 @@ export class BOQImportEnhanced {
    */
   private async createBoqItem(
     boqId: string,
+    projectId: string,
     row: BOQRow,
     matchResult: MaterialMatchResult,
     budgetCategoryCode: FiberBudgetCategoryCode
@@ -359,23 +360,25 @@ export class BOQImportEnhanced {
     const result = await this.sql`
       INSERT INTO boq_items (
         boq_id,
-        item_number,
+        project_id,
+        line_number,
         description,
-        unit,
+        uom,
         quantity,
-        rate,
-        amount,
+        unit_price,
+        total_price,
         category,
         material_catalog_id,
         item_code,
         budget_category_id,
         mapping_confidence,
-        is_mapped
+        mapping_status
       ) VALUES (
         ${boqId},
-        ${row.itemNo?.toString() || null},
+        ${projectId},
+        ${row.itemNo || 0},
         ${row.description},
-        ${row.uom || null},
+        ${row.uom || 'unit'},
         ${row.quantity || 0},
         ${row.itemRate || 0},
         ${(row.quantity || 0) * (row.itemRate || 0)},
@@ -384,7 +387,7 @@ export class BOQImportEnhanced {
         ${row.itemCode || null},
         ${categoryResult[0]?.id || null},
         ${matchResult.matchConfidence * 100},
-        ${matchResult.matchedMaterial ? true : false}
+        ${matchResult.matchedMaterial ? 'mapped' : 'pending'}
       )
       RETURNING id
     `;
