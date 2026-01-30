@@ -4,6 +4,79 @@
 
 ---
 
+## 2026-01-30: QA Centre — Typo DR Filtering & Self-Healing Photo Fetch
+
+**Problem 1 — Typo DRs polluting QA Centre list:**
+WhatsApp installers occasionally send mistyped DR numbers (e.g., `DR18633092` instead of `DR1863309`, `DR173622` instead of `DR1736220`). These typos create records in `dr_photo_unified_reviews` via the Go Bridge, but have 0 photos and no valid data. They inflate the "Installed" count and clutter the list.
+
+**Fix — EXISTS filter against drops table (commit `d95ea2b7`):**
+The `drops` table (populated from SOW imports) is the canonical source of valid DR numbers. Added `EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)` to **4 query locations** in `pages/api/activate/drops.ts`:
+1. `getPaginatedDrops()` — base WHERE conditions (line ~167)
+2. `calculateSummary()` — installed count query (line ~486)
+3. `getProjectStats()` — per-project counts (line ~621)
+4. `processOrphanedRecordsInBackground()` — orphan detection (line ~822)
+
+**Critical:** All 4 locations must stay in sync. If you add the filter to the list query but not the summary, counts won't match the visible rows.
+
+**Known typo DRs (as of 2026-01-30):** DR18633092, DR173622, DR2750491, DR18663403, DR17385904, DR736188, DR18563323, DR18628799
+
+**Problem 2 — Go Bridge dropping ~20% of process-new-dr calls:**
+The Go Bridge calls two endpoints sequentially: `dr-acknowledgment.ts` then `process-new-dr.ts`. Approximately 20-40% of `process-new-dr` calls get dropped, leaving "shell" records with 0 photos, no `wa_message_id`, and no WA context.
+
+**Fix — Self-healing `processOrphanedRecordsInBackground()` (commit `13c11713`):**
+Fire-and-forget function that runs on each QA Centre page load:
+- Detects orphaned DRs: `photo_count = 0`, `wa_message_id IS NULL`, created in last 48 hours, exists in drops table
+- Fetches photos from BOSS API (`http://100.96.203.105:8003/api/record/{DR}`)
+- Triggers VLM categorization pipeline
+- Max 5 DRs per page load to avoid blocking
+
+**Problem 3 — backfillOrphanedRecords caused "0 photos" display (commit `6ef2eb12` reverted it):**
+An earlier attempt (`backfillOrphanedRecords`) created unified records for WA-submitted DRs that had `wa_monitor_drops` entries but no unified record. However, it created records with `photo_count = 0` because it didn't fetch photos from BOSS API — just created empty shells. This made previously-working DRs show "0 photos". Reverted and replaced with `processOrphanedRecordsInBackground` which actually fetches photos.
+
+**DR Submission Pipeline — Full Data Flow:**
+```
+WhatsApp Group → Go Bridge → dr-acknowledgment.ts (shell record)
+                           → process-new-dr.ts (full record with photos)
+                                    ↓ (if dropped)
+                           → processOrphanedRecordsInBackground() (self-healing)
+                                    ↓
+                           → BOSS API → photos → VLM pipeline
+```
+
+**Reconciliation Pattern — WA Bridge vs Neon DB:**
+When verifying DR counts, cross-reference 3 sources:
+1. **WA Bridge SQLite** (`/opt/whatsapp-bridge/store/messages.db`) — raw WhatsApp messages
+2. **Neon `wa_monitor_drops`** — Go Bridge creates these
+3. **Neon `dr_photo_unified_reviews`** — processing pipeline creates these
+
+Expected relationships:
+- WA Bridge >= wa_monitor_drops (bridge stores all messages; Go Bridge may not create wa_monitor_drops for all)
+- wa_monitor_drops >= unified_reviews created today (some may be resubmissions with older unified records)
+- Valid DRs = those that `EXISTS` in `drops` table (canonical source from SOW imports)
+- Typo DRs exist in unified but are filtered by EXISTS — they still take up space but don't show in UI
+
+**Verification queries:**
+```sql
+-- Count valid DRs in QA Centre for today
+SELECT COUNT(*) FROM dr_photo_unified_reviews
+WHERE created_at::date = CURRENT_DATE
+  AND (is_oes_only = FALSE OR is_oes_only IS NULL)
+  AND EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = dr_photo_unified_reviews.drop_number);
+
+-- Find typo DRs (in unified but not in drops)
+SELECT drop_number FROM dr_photo_unified_reviews u
+WHERE NOT EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)
+  AND (u.is_oes_only = FALSE OR u.is_oes_only IS NULL);
+```
+
+**Key Files:**
+- `pages/api/activate/drops.ts` — Main QA Centre API with all 4 EXISTS filters
+- `pages/api/activate/process-new-dr.ts` — Go Bridge entry point for WA submissions
+- `pages/api/activate/dr-acknowledgment.ts` — Go Bridge shell record creator
+- `src/modules/activate/services/photoFetchService.ts` — BOSS API photo fetching
+
+---
+
 ## 2026-01-30: QA Centre — DR Acknowledgment Race Condition & Data Completeness
 
 **Problem:** Three regressions on QA Centre page:

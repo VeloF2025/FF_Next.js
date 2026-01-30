@@ -167,6 +167,8 @@ const result = await extractOntSerialEnhanced(base64Image);
 - `src/modules/activate/services/barcodeExtractionService.ts`
 
 ## Recent Changes (Jan 2026)
+- **Typo DR Filtering** (2026-01-30) - `drops.ts` filters out invalid/typo DRs using `EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)` in **4 query locations**: `getPaginatedDrops`, `calculateSummary`, `getProjectStats`, `processOrphanedRecordsInBackground`. The `drops` table (SOW imports) is the canonical source of valid DRs. All 4 must stay in sync.
+- **Self-Healing Photo Fetch** (2026-01-30) - `processOrphanedRecordsInBackground()` in `drops.ts` detects orphaned DRs (photo_count=0, no wa_message_id, <48h old, in drops table) and fetches photos from BOSS API on each page load (max 5). Fixes Go Bridge dropping ~20% of `process-new-dr` calls.
 - **DR Acknowledgment Race Condition Fix** (2026-01-30) - Three code paths in process-new-dr.ts: idempotency guard (<60s), first WA submission (no WA context), genuine resubmission (has WA context). Post-deploy straggler DR1735961 required manual backfill (processed during deployment window). After deploying race condition fixes, always check for DRs processed in the deployment window. See KB: `dr-acknowledgment-race-condition.md`.
 - **LATERAL JOIN Fix** (2026-01-30) - drops.ts uses `LEFT JOIN LATERAL ... LIMIT 1` for `drops` and `maintenance_tickets` to prevent row multiplication. `oes_activations` safe with regular JOIN.
 - **Serial Audit System** (2026-01-29) - Comprehensive backfill from 1Map, OES swap detection, activity logging
@@ -212,6 +214,25 @@ const result = await extractOntSerialEnhanced(base64Image);
 | `ensure-data.ts` | ✅ YES - once when opening QA Wizard |
 | `dr-acknowledgment.ts` | ✅ YES - DR submission (before record exists) |
 | `refresh.ts` POST | ✅ YES - user-initiated manual refresh |
+| `processOrphanedRecordsInBackground()` | ✅ YES - self-healing for orphaned DRs |
+
+**Typo DR Filtering (CRITICAL — 4 locations must stay in sync):**
+All queries that count or list DRs for the QA Centre MUST include:
+```sql
+EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)
+```
+Locations in `pages/api/activate/drops.ts`:
+1. `getPaginatedDrops()` base conditions
+2. `calculateSummary()` installed count
+3. `getProjectStats()` per-project counts
+4. `processOrphanedRecordsInBackground()` orphan detection
+
+**Self-Healing Pipeline:**
+`processOrphanedRecordsInBackground()` runs on each page load (fire-and-forget):
+- Detects: `photo_count=0 AND wa_message_id IS NULL AND created_at > NOW()-48h AND EXISTS in drops`
+- Fetches photos from BOSS API, triggers VLM categorization
+- Max 5 per load to avoid blocking
+- Fixes Go Bridge dropping ~20% of `process-new-dr` calls
 | `photo/[...path].ts` | ✅ YES - photo serving (proxy) |
 
 **Manual Refresh:**
