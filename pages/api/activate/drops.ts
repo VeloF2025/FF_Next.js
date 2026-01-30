@@ -172,16 +172,16 @@ async function getPaginatedDrops(
     paramIndex++;
   }
 
-  // Date filters - use submitted_date directly (WhatsApp submission date)
-  // Records without submitted_date are bare placeholders (dr-acknowledgment/ensure-data)
-  // and should NOT appear in the DR list
+  // Date filters - use submitted_date (WhatsApp submission date)
+  // Fall back to created_at::DATE for records where dr-acknowledgment created
+  // the record before process-new-dr could set submitted_date
   if (filters?.dateFrom) {
-    conditions.push(`u.submitted_date >= $${paramIndex}::DATE`);
+    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) >= $${paramIndex}::DATE`);
     params.push(filters.dateFrom);
     paramIndex++;
   }
   if (filters?.dateTo) {
-    conditions.push(`u.submitted_date <= $${paramIndex}::DATE`);
+    conditions.push(`COALESCE(u.submitted_date, u.created_at::DATE) <= $${paramIndex}::DATE`);
     params.push(filters.dateTo);
     paramIndex++;
   }
@@ -455,10 +455,11 @@ async function calculateSummary(filters?: {
   };
 
   // Conditions for dr_photo_unified_reviews (INSTALLED)
-  // Use submitted_date directly - records without submitted_date are bare placeholders
-  // (created by dr-acknowledgment/ensure-data) and should NOT count as installed
+  // Use COALESCE: submitted_date preferred, fall back to created_at::DATE
+  // for records created by dr-acknowledgment before process-new-dr sets submitted_date
+  // OES-only records are excluded separately by the is_oes_only filter
   const unifiedCond = buildConditions(
-    'submitted_date',
+    'COALESCE(submitted_date, created_at::DATE)',
     'project'
   );
   // Conditions for OES activations (ACTIVATED - independent date context)
@@ -508,8 +509,8 @@ async function calculateSummary(filters?: {
       AND NOT EXISTS (
         SELECT 1 FROM dr_photo_unified_reviews upr
         WHERE upr.drop_number = oes.drop_number
-          AND upr.submitted_date >= $1::DATE
-          AND upr.submitted_date <= $2::DATE
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
           ${filters?.project && filters.project !== 'all' ? 'AND upr.project = $3' : ''}
       )
       ${filters?.project && filters.project !== 'all' ? 'AND p.project_name = $3' : ''}
@@ -651,8 +652,8 @@ async function getProjectStats(filters?: {
       AND NOT EXISTS (
         SELECT 1 FROM dr_photo_unified_reviews upr2
         WHERE upr2.drop_number = oes.drop_number
-          AND upr2.submitted_date >= $1::DATE
-          AND upr2.submitted_date <= $2::DATE
+          AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) <= $2::DATE
           ${filters?.project && filters.project !== 'all' ? 'AND upr2.project = $3' : ''}
       )
       ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3 OR (upr.project IS NULL AND p.project_name IS NULL))' : ''}
