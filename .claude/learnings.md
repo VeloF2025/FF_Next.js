@@ -62,6 +62,8 @@ LEFT JOIN LATERAL (
 
 **Backfills Applied:** 7 false resubmissions reset, 4 NULL submitted_dates, 2 NULL sender_phones, 37 NULL projects
 
+**Post-deployment straggler:** DR1735961 was processed at 14:40 SAST — 3 minutes before the production deployment completed. It hit the old code and was falsely classified as resubmission #2. Manually backfilled `submission_count` to 1. Lesson: always check for stragglers processed in the deployment window.
+
 **Key Insight — Multiple unified record creators:**
 Records in `dr_photo_unified_reviews` can be created by ANY of these paths:
 - `process-new-dr.ts` (WA submission — 2 INSERT paths)

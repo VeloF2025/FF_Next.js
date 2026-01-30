@@ -167,7 +167,7 @@ const result = await extractOntSerialEnhanced(base64Image);
 - `src/modules/activate/services/barcodeExtractionService.ts`
 
 ## Recent Changes (Jan 2026)
-- **DR Acknowledgment Race Condition Fix** (2026-01-30) - Three code paths in process-new-dr.ts: idempotency guard (<60s), first WA submission (no WA context), genuine resubmission (has WA context). See learnings.md.
+- **DR Acknowledgment Race Condition Fix** (2026-01-30) - Three code paths in process-new-dr.ts: idempotency guard (<60s), first WA submission (no WA context), genuine resubmission (has WA context). Post-deploy straggler DR1735961 required manual backfill (processed during deployment window). After deploying race condition fixes, always check for DRs processed in the deployment window. See KB: `dr-acknowledgment-race-condition.md`.
 - **LATERAL JOIN Fix** (2026-01-30) - drops.ts uses `LEFT JOIN LATERAL ... LIMIT 1` for `drops` and `maintenance_tickets` to prevent row multiplication. `oes_activations` safe with regular JOIN.
 - **Serial Audit System** (2026-01-29) - Comprehensive backfill from 1Map, OES swap detection, activity logging
 - **Enhanced Barcode Service** - zxing-wasm 2D barcode support for Nokia ONT labels

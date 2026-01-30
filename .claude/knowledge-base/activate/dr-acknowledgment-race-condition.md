@@ -107,6 +107,23 @@ Records in `dr_photo_unified_reviews` can be created by:
 - `pages/api/activate/drops.ts` — LATERAL JOINs query (lines 264-294)
 - `pages/api/activate/ensure-data.ts` — Creates records when QA Wizard opens
 
+## Post-Deployment Stragglers
+
+After deploying the fix, DR1735961 was processed at 14:40 SAST — **3 minutes before** the production deployment completed (~14:43 SAST). It hit the old code and was falsely classified as resubmission #2. Required manual backfill of `submission_count` to 1.
+
+**Lesson:** When deploying fixes for race conditions, always check for DRs processed in the deployment window (between the last commit and the service restart). Query:
+
+```sql
+SELECT drop_number, submission_count, created_at, wa_received_at
+FROM dr_photo_unified_reviews
+WHERE submission_count > 1
+  AND created_at > NOW() - INTERVAL '1 hour'
+  AND drop_number NOT IN (
+    SELECT drop_number FROM wa_monitor_drops
+    GROUP BY drop_number HAVING COUNT(*) > 1
+  );
+```
+
 ## Commits
 
 - `37e97952` — Add project and sender_phone to all process-new-dr paths
