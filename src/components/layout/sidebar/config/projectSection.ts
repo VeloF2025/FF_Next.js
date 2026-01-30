@@ -6,8 +6,6 @@ import {
   FolderKanban,
   Building2,
   Briefcase,
-  GitBranch,
-  ShieldCheck,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -24,22 +22,7 @@ export const projectSection: NavSection = {
       permissions: [],
       rbacKey: 'projects.list',
     },
-    {
-      to: '/pipeline',
-      icon: GitBranch,
-      label: 'Pipeline',
-      shortLabel: 'Pipeline',
-      permissions: [],
-      rbacKey: 'pipeline.list',
-    },
-    {
-      to: '/health-safety',
-      icon: ShieldCheck,
-      label: 'Health & Safety',
-      shortLabel: 'H&S',
-      permissions: [],
-      rbacKey: 'health-safety.list',
-    },
+    // Pipeline and Health & Safety are now tabs within /projects
     {
       to: '/clients',
       icon: Building2,
