@@ -166,6 +166,10 @@ async function getPaginatedDrops(
   // ALWAYS exclude OES-only records from the list (they have no WhatsApp submission)
   conditions.push('(u.is_oes_only = FALSE OR u.is_oes_only IS NULL)');
 
+  // Exclude typo/invalid DRs — only show DRs that exist in the drops table (canonical source)
+  // Typo submissions (e.g. DR18633092 instead of DR1863309) won't match any drops record
+  conditions.push('EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)');
+
   // Search filter
   if (searchTerm) {
     conditions.push(`(u.drop_number ILIKE $${paramIndex} OR u.project ILIKE $${paramIndex})`);
@@ -480,6 +484,7 @@ async function calculateSummary(filters?: {
       COUNT(*) FILTER (WHERE vlm_categorization_status = 'failed') as vlm_failed
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
+      AND EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = dr_photo_unified_reviews.drop_number)
   `;
 
   // Query 2: ACTIVATED - DRs in OES filtered by OES activation_date (independent)
@@ -615,6 +620,7 @@ async function getProjectStats(filters?: {
       COUNT(*) FILTER (WHERE feedback_sent = true) as reviewed
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
+      AND EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = dr_photo_unified_reviews.drop_number)
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
@@ -814,6 +820,7 @@ function processOrphanedRecordsInBackground(): void {
           AND (u.is_oes_only = FALSE OR u.is_oes_only IS NULL)
           AND u.wa_message_id IS NULL
           AND u.created_at > NOW() - INTERVAL '48 hours'
+          AND EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)
         ORDER BY u.created_at DESC
         LIMIT 5
       `);
