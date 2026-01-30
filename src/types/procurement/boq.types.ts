@@ -251,6 +251,91 @@ export interface BOQStats {
   averageValue: number;
 }
 
+// ============= BOQ Column Detection Types =============
+
+/** Target fields that can be mapped from BOQ columns */
+export type BOQTargetField =
+  | 'itemNo'
+  | 'uom'
+  | 'itemCategory'
+  | 'description'
+  | 'quantity'
+  | 'itemCode'
+  | 'itemRate'
+  | 'photonicsRef'
+  | 'supplier'
+  | 'leadTime'
+  | 'totalCost';
+
+/** A single column mapping: source header → target field */
+export interface ColumnMapping {
+  sourceIndex: number;
+  sourceHeader: string;
+  targetField: BOQTargetField | null;
+  confidence: number; // 0-1
+  detectionMethod: 'keyword' | 'pattern' | 'template' | 'manual';
+}
+
+/** Result from column detection */
+export interface ColumnDetectionResult {
+  mapping: ColumnMapping[];
+  overallConfidence: number;
+  sheetName: string;
+  headerRow: number;
+  headers: string[];
+  sampleRows: unknown[][];
+  templateMatch?: {
+    id: string;
+    name: string;
+    supplierName?: string;
+  };
+}
+
+/** Saved column mapping template */
+export interface BOQColumnTemplate {
+  id: string;
+  name: string;
+  supplierName?: string;
+  headers: string[];
+  columnMapping: Record<string, BOQTargetField>;
+  sheetName?: string;
+  headerRow: number;
+  skipRows: number[];
+  usageCount: number;
+  lastUsedAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Options for import with dynamic mapping */
+export interface MappedImportOptions {
+  projectId: string;
+  boqId?: string;
+  userId?: string;
+  createBudgetItems?: boolean;
+  createMaterials?: boolean;
+  dryRun?: boolean;
+  columnMapping: ColumnMapping[];
+  sheetName: string;
+  headerRow: number;
+  saveAsTemplate?: {
+    name: string;
+    supplierName?: string;
+  };
+}
+
+/** Stock item match result */
+export interface StockItemMatch {
+  stockItemId: string;
+  itemCode: string;
+  name: string;
+  category: string;
+  qtyAvailable: number;
+  matchType: 'exact_code' | 'fuzzy_name';
+  confidence: number;
+}
+
 // Type exports that match Drizzle inferred types
 export type { BOQ as DrizzleBOQ, NewBOQ as NewDrizzleBOQ } from '../../lib/neon/schema';
 export type { BOQItem as DrizzleBOQItem, NewBOQItem as NewDrizzleBOQItem } from '../../lib/neon/schema';

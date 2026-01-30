@@ -1,6 +1,7 @@
 /**
  * BOQ Upload Component
- * Handles Excel/CSV file upload with drag-drop interface and progress tracking
+ * Handles Excel/CSV file upload with smart column detection and mapping review.
+ * Flow: Upload → Detect Columns → Review Mapping → Import
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -8,11 +9,13 @@ import { validateFile } from '@/lib/utils/excelParser';
 import { BOQImportService, ImportJob, ImportConfig } from '@/services/procurement/boqImportService';
 import { useProcurementContext } from '@/hooks/procurement/useProcurementContext';
 import { notificationService } from '@/services/core/NotificationService';
+import type { ColumnMapping, ColumnDetectionResult } from '@/types/procurement/boq.types';
 
 // Import split components
 import { BOQUploadDropzone } from './upload/BOQUploadDropzone';
 import { BOQUploadConfig } from './upload/BOQUploadConfig';
 import { BOQUploadProgress } from './upload/BOQUploadProgress';
+import BOQColumnMapper from './BOQColumnMapper';
 
 interface EnhancedImportResult {
   boqId: string;
@@ -22,6 +25,7 @@ interface EnhancedImportResult {
   materialsCreated?: number;
   budgetItemsCreated?: number;
   totalBudgetAmount?: number;
+  stockItemsMatched?: number;
 }
 
 interface BOQUploadProps {
@@ -40,16 +44,19 @@ interface UploadState {
   file: File | null;
   job: ImportJob | null;
   isUploading: boolean;
+  isDetecting: boolean;
   progress: number;
   stage: string;
   message: string;
   config: Partial<ImportConfig>;
+  detection: ColumnDetectionResult | null;
 }
 
 const INITIAL_STATE: UploadState = {
   file: null,
   job: null,
   isUploading: false,
+  isDetecting: false,
   progress: 0,
   stage: '',
   message: '',
@@ -59,7 +66,8 @@ const INITIAL_STATE: UploadState = {
     minMappingConfidence: 0.8,
     createNewItems: false,
     duplicateHandling: 'skip'
-  }
+  },
+  detection: null,
 };
 
 export default function BOQUpload({
@@ -87,7 +95,7 @@ export default function BOQUpload({
       return;
     }
 
-    setState(prev => ({ ...prev, file }));
+    setState(prev => ({ ...prev, file, detection: null }));
   }, [onUploadError]);
 
   const handleConfigChange = (newConfig: Partial<ImportConfig>) => {
@@ -97,22 +105,25 @@ export default function BOQUpload({
     }));
   };
 
+  /**
+   * Start import: detect columns first when enhanced import is enabled
+   */
   const startUpload = async () => {
     if (!state.file || !context) {
       notificationService.error('Please select a file and ensure project context is available');
       return;
     }
 
+    // Enhanced import: detect columns first
+    if (enableEnhancedImport) {
+      await detectColumns();
+      return;
+    }
+
+    // Legacy import path (unchanged)
     setState(prev => ({ ...prev, isUploading: true, progress: 0, stage: 'Starting...', message: '' }));
 
     try {
-      // Use enhanced import if enabled
-      if (enableEnhancedImport) {
-        await startEnhancedUpload();
-        return;
-      }
-
-      // Legacy import using local service
       const boqId = context.projectId || `temp-${Date.now()}`;
 
       const job = await boqImportService.startImport(
@@ -171,25 +182,75 @@ export default function BOQUpload({
   };
 
   /**
-   * Enhanced upload using server-side API with material matching
+   * Step 1: Detect columns from uploaded file
    */
-  const startEnhancedUpload = async () => {
-    if (!state.file || !context?.projectId) {
-      notificationService.error('Please select a file and ensure project context is available');
-      setState(prev => ({ ...prev, isUploading: false }));
-      return;
-    }
+  const detectColumns = async () => {
+    if (!state.file) return;
 
-    setState(prev => ({ ...prev, stage: 'Uploading file...', progress: 10 }));
+    setState(prev => ({ ...prev, isDetecting: true, stage: 'Analyzing columns...' }));
+
+    try {
+      const formData = new FormData();
+      formData.append('file', state.file);
+
+      const response = await fetch('/api/procurement/boq/detect-columns', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Column detection failed');
+      }
+
+      const detection: ColumnDetectionResult = data.data;
+
+      setState(prev => ({
+        ...prev,
+        isDetecting: false,
+        detection,
+      }));
+
+      if (detection.templateMatch) {
+        notificationService.info(
+          `Matched template "${detection.templateMatch.name}"${detection.templateMatch.supplierName ? ` (${detection.templateMatch.supplierName})` : ''}`
+        );
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Column detection failed';
+      notificationService.error(errorMessage);
+      onUploadError?.(errorMessage);
+      setState(prev => ({ ...prev, isDetecting: false }));
+    }
+  };
+
+  /**
+   * Step 2: User confirmed mapping → import with mapped columns
+   */
+  const handleMappingConfirm = async (
+    confirmedMapping: ColumnMapping[],
+    saveTemplate?: { name: string; supplierName?: string }
+  ) => {
+    if (!state.file || !context?.projectId || !state.detection) return;
+
+    setState(prev => ({ ...prev, isUploading: true, stage: 'Importing...', progress: 30 }));
 
     try {
       const formData = new FormData();
       formData.append('file', state.file);
       formData.append('projectId', context.projectId);
+      formData.append('columnMapping', JSON.stringify(confirmedMapping));
+      formData.append('sheetName', state.detection.sheetName);
+      formData.append('headerRow', String(state.detection.headerRow));
       formData.append('createBudgetItems', String(createBudgetItems));
       formData.append('createMaterials', String(createMaterials));
 
-      const response = await fetch('/api/procurement/boq/import-enhanced', {
+      if (saveTemplate) {
+        formData.append('saveAsTemplate', JSON.stringify(saveTemplate));
+      }
+
+      const response = await fetch('/api/procurement/boq/import-mapped', {
         method: 'POST',
         body: formData,
       });
@@ -202,13 +263,15 @@ export default function BOQUpload({
 
       const result = data.data;
 
-      // Show success with enhanced details
+      // Build success message
       const details = [];
-      if (result.materialsCreated > 0) details.push(`${result.materialsCreated} materials added`);
+      if (result.materialsMatched > 0) details.push(`${result.materialsMatched} materials matched`);
+      if (result.materialsCreated > 0) details.push(`${result.materialsCreated} new materials`);
       if (result.budgetItemsCreated > 0) details.push(`${result.budgetItemsCreated} budget items`);
+      if (result.stockItemsMatched > 0) details.push(`${result.stockItemsMatched} stock items linked`);
 
       notificationService.success(
-        `BOQ imported! ${result.itemsProcessed} items processed${details.length ? ` (${details.join(', ')})` : ''}`
+        `BOQ imported! ${result.itemsProcessed} items${details.length ? ` (${details.join(', ')})` : ''}`
       );
 
       onUploadComplete?.({
@@ -219,15 +282,20 @@ export default function BOQUpload({
         materialsCreated: result.materialsCreated,
         budgetItemsCreated: result.budgetItemsCreated,
         totalBudgetAmount: result.totalBudgetAmount,
+        stockItemsMatched: result.stockItemsMatched,
       });
 
       setState(INITIAL_STATE);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Enhanced import failed';
+      const errorMessage = error instanceof Error ? error.message : 'Import failed';
       notificationService.error(errorMessage);
       onUploadError?.(errorMessage);
       setState(prev => ({ ...prev, isUploading: false }));
     }
+  };
+
+  const handleMappingCancel = () => {
+    setState(prev => ({ ...prev, detection: null }));
   };
 
   const cancelUpload = () => {
@@ -239,21 +307,35 @@ export default function BOQUpload({
   };
 
   const handleFileRemove = () => {
-    setState(prev => ({ ...prev, file: null }));
+    setState(prev => ({ ...prev, file: null, detection: null }));
   };
+
+  // Show column mapper when detection is ready
+  if (state.detection && !state.isUploading) {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <BOQColumnMapper
+          detection={state.detection}
+          onConfirm={handleMappingConfirm}
+          onCancel={handleMappingCancel}
+          isImporting={state.isUploading}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Upload Area */}
       <BOQUploadDropzone
         file={state.file}
-        isUploading={state.isUploading}
+        isUploading={state.isUploading || state.isDetecting}
         onFileSelect={handleFileSelect}
         onFileRemove={handleFileRemove}
       />
 
       {/* Advanced Configuration */}
-      {state.file && !state.isUploading && (
+      {state.file && !state.isUploading && !state.isDetecting && (
         <BOQUploadConfig
           config={state.config}
           showAdvanced={showAdvanced}
@@ -262,19 +344,19 @@ export default function BOQUpload({
         />
       )}
 
-      {/* Upload Progress */}
-      {state.isUploading && (
+      {/* Upload/Detection Progress */}
+      {(state.isUploading || state.isDetecting) && (
         <BOQUploadProgress
           job={state.job}
-          progress={state.progress}
+          progress={state.isDetecting ? 50 : state.progress}
           stage={state.stage}
-          message={state.message}
+          message={state.isDetecting ? 'Analyzing file structure and detecting columns...' : state.message}
           onCancel={cancelUpload}
         />
       )}
 
       {/* Upload Button */}
-      {state.file && !state.isUploading && (
+      {state.file && !state.isUploading && !state.isDetecting && (
         <div className="flex justify-end space-x-3">
           <button
             onClick={handleFileRemove}
@@ -286,7 +368,7 @@ export default function BOQUpload({
             onClick={startUpload}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
           >
-            Start Import
+            {enableEnhancedImport ? 'Detect Columns & Import' : 'Start Import'}
           </button>
         </div>
       )}
