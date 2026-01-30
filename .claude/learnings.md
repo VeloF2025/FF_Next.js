@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-01-30: Procurement Module — Mock Data Elimination
+
+**Problem:** Procurement module had mock/placeholder data throughout: hardcoded aggregate metrics, fake tab badges, empty onClick handlers, permissions always returning `true` with role `'admin'`, and QuoteEvaluationPage returning empty arrays.
+
+**Solution:** Created 3 new API endpoints and rewrote 5 existing files:
+
+**New APIs:**
+- `pages/api/procurement/aggregate-metrics.ts` — Real DB queries for projects, BOQs, RFQs, POs, stock, suppliers; returns `{ metrics, projectSummaries }`
+- `pages/api/procurement/tab-badges.ts` — Real counts per tab (BOQ drafts, open RFQs, pending POs, low stock); supports optional `?projectId=` filter
+- `pages/api/procurement/quote-evaluations.ts` — Derives evaluation state from RFQ status + quote presence; statuses: PENDING/IN_PROGRESS/COMPLETED/AWARDED
+
+**Key Rewrites:**
+- `useProcurementPermissions.ts` — Real AuthContext RBAC using `hasPermission()` + `hasAnyRole()`. Maps `UserRole` → procurement capabilities. Approval limits: admin=1M, manager=500K, supervisor=100K. Differentiates no-project (view-only) vs project-selected (full RBAC).
+- `ProcurementPage.tsx` — `loadAggregateMetrics()` and `loadTabBadges()` now call real APIs. Tab filtering uses real permission checks.
+- `QuoteEvaluationPage.tsx` — 7 empty onClick handlers wired: view/edit/award → navigate to RFQ, export → CSV download, analytics → reports page.
+- `ProcurementDashboard.tsx` — Export Report button generates CSV from real stats.
+- `field-stock/dashboard.ts` — Fixed `low_stock` query (was hardcoded `0`, now queries `stock_items WHERE quantity <= min_stock_level`).
+
+**Key Pattern — Procurement Permission Mapping:**
+```typescript
+// AuthContext roles → procurement capabilities
+SUPER_ADMIN/ADMIN → all permissions, approvalLimit: 1_000_000
+PROJECT_MANAGER → most permissions, approvalLimit: 500_000
+SITE_SUPERVISOR → stock access + create GRN/requisitions, approvalLimit: 100_000
+FIELD_TECHNICIAN → field stock access only
+CONTRACTOR → field stock access only
+// No projectId → view-only permissions (tabs visible, no create/edit)
+```
+
+**Commit:** `2db4f38d` — Deployed to all environments.
+
+---
+
 ## 2026-01-29: Staff Department-Position Alignment & Persistence
 
 **Problem:** Department and Position dropdowns were misaligned — selecting a department didn't filter positions. Position disappeared after save because the detail view couldn't display values not in the options list.

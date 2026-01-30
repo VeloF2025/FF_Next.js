@@ -138,3 +138,35 @@ FibreFlow GRN Confirm ─────────► stock_movements (source_typ
 | `POST /api/procurement/grn-confirm` | Confirm GRN, create movement, update stock |
 | `GET/POST /api/odoo/sync/stock-movements` | Sync Odoo pickings to FibreFlow |
 | `GET /api/procurement/stock` | Stock items + recent movements |
+| `GET /api/procurement/aggregate-metrics` | Dashboard metrics + per-project summaries |
+| `GET /api/procurement/tab-badges?projectId=` | Real badge counts per tab |
+| `GET /api/procurement/quote-evaluations` | RFQ + quote evaluation state |
+
+## Permissions (RBAC)
+
+Procurement uses real AuthContext RBAC via `useProcurementPermissions(projectId?)` hook.
+
+**Role → Capability Mapping:**
+| Role | Approval Limit | Key Capabilities |
+|------|---------------|------------------|
+| SUPER_ADMIN/ADMIN | R1,000,000 | All permissions |
+| PROJECT_MANAGER | R500,000 | Most permissions, approve orders |
+| SITE_SUPERVISOR | R100,000 | Stock access, create GRN/requisitions |
+| FIELD_TECHNICIAN | R0 | Field stock access only |
+| CONTRACTOR | R0 | Field stock access only |
+
+**No projectId selected** → View-only permissions (tabs visible, no create/edit actions).
+
+**Key permission flags:** `canViewBOQ`, `canEditBOQ`, `canViewRFQ`, `canCreateRFQ`, `canViewQuotes`, `canEvaluateQuotes`, `canViewPurchaseOrders`, `canCreatePurchaseOrders`, `canAccessStock`, `canManageStock`, `canAccessFieldStock`, `canManageFieldStock`, `canApproveOrders`, `canAccessReports`, `canViewSuppliers`, `canEditSuppliers`, `canManageSuppliers`, `canViewRequisitions`, `canCreateRequisitions`, `canApproveRequisitions`, `canViewGRN`, `canCreateGRN`.
+
+## Field Stock (Sub-Module)
+
+Fully built infrastructure — DB tables, API endpoints, hooks, UI all wired to real data.
+
+**DB Tables:** `stock_locations`, `stock_items`, `stock_serials`, `stock_pickings`, `stock_picking_items`, `stock_consumptions`, `stock_returns`, `contractor_stock_accountability`
+
+**Migrations:** 027-031 (core tables), 107 (setup views/functions)
+
+**API Endpoints:** `/api/procurement/field-stock/dashboard`, `/locations`, `/serials`, `/consumptions`, `/pickings`, `/returns`, `/accountability`
+
+**Dashboard alerts:** `low_stock` queries `stock_items WHERE quantity <= min_stock_level`
