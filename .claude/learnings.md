@@ -4,6 +4,53 @@
 
 ---
 
+## 2026-01-30: VLM Categorization — Full Backlog Cleared (7,638 DRs)
+
+**Problem:** ~7,600 DRs with photos needed VLM categorization + data extraction. The cron job (`process-vlm-queue.ts`) was processing ~53/hour sequentially — ETA 3+ days.
+
+**Optimizations Applied:**
+1. **Parallelized processing** — Changed from sequential `for` loop to `Promise.allSettled` batches of 3 concurrent DRs. ~3x throughput per batch.
+2. **Increased limits** — Default limit 10→20, cron frequency `*/10`→`*/5` minutes, maxDuration 30s→60s.
+3. **Bumped VLM server** — `--max-num-seqs` 4→8 in `/etc/systemd/system/vllm-qwen.service`.
+4. **Background burst script** — `/tmp/vlm-burst.sh` continuously calls the endpoint (limit=6, concurrency=3) with 5s sleep between rounds. Runs until backlog is cleared.
+5. **NVIDIA driver update** — 580.95.05→580.126.09, gave ~20x speedup for extraction-only DRs.
+
+**Bugs Fixed:**
+- **Infinite reprocessing loop** — 1,352 DRs categorized but without step 6/7/9 photos were re-queued forever. Fix: added else branch marking them `data_validation_completed=true, vlm_power_meter_status='no_photo', overall_status='NEEDS_REVIEW'`. Added `data_validation_completed IS NULL OR data_validation_completed = false` filter to cron query.
+- **varchar overflow** — `overall_status` was varchar(10), `NEEDS_REVIEW` is 12 chars. Widened to varchar(30). Required dropping/recreating views `v_dr_installation_status` and `v_foto_ai_reviews`.
+- **Burst script fragility** — Script exited on single timeout (JSON parse returned 0). Fixed with resilient mode: needs 5 consecutive zeros with 30s retry between each before stopping.
+
+**Key Files:**
+- `pages/api/cron/process-vlm-queue.ts` — Parallel processing, priority ordering, loop fix
+- `/etc/systemd/system/vllm-qwen.service` — max-num-seqs=8
+- `/tmp/vlm-burst.sh` — Resilient burst script template
+
+**Final Result:** 7,638 categorized, 2 failed (photos unfetchable), 0 remaining. Completed overnight.
+
+**Key Pattern — Resilient Burst Script:**
+```bash
+# Track consecutive zeros to distinguish timeout from truly done
+ZERO_COUNT=0; MAX_RETRIES=5
+if [ "$P" = "0" ]; then
+  ZERO_COUNT=$((ZERO_COUNT + 1))
+  if [ "$ZERO_COUNT" -ge "$MAX_RETRIES" ]; then break; fi
+  sleep 30  # Wait before retry
+else
+  ZERO_COUNT=0  # Reset on success
+  sleep 5
+fi
+```
+
+**Key Pattern — VLM Cron Priority Ordering:**
+```sql
+-- Process extraction-only DRs first (already categorized, just need data)
+ORDER BY
+  CASE WHEN vlm_categorization_status IN ('categorized','approved') THEN 0 ELSE 1 END,
+  created_at DESC
+```
+
+---
+
 ## 2026-01-30: Procurement Module — Mock Data Elimination
 
 **Problem:** Procurement module had mock/placeholder data throughout: hardcoded aggregate metrics, fake tab badges, empty onClick handlers, permissions always returning `true` with role `'admin'`, and QuoteEvaluationPage returning empty arrays.
