@@ -38,6 +38,8 @@ interface BOQUploadProps {
   createBudgetItems?: boolean;
   /** Create new materials in catalog when using enhanced import (default: true) */
   createMaterials?: boolean;
+  /** Explicit project ID — overrides context when provided */
+  projectId?: string;
 }
 
 interface UploadState {
@@ -77,8 +79,11 @@ export default function BOQUpload({
   enableEnhancedImport = false,
   createBudgetItems = true,
   createMaterials = true,
+  projectId: propProjectId,
 }: BOQUploadProps) {
   const { context } = useProcurementContext();
+  // Use explicit projectId prop, falling back to context
+  const effectiveProjectId = propProjectId || context?.projectId;
   const [state, setState] = useState<UploadState>(INITIAL_STATE);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -109,14 +114,20 @@ export default function BOQUpload({
    * Start import: detect columns first when enhanced import is enabled
    */
   const startUpload = async () => {
-    if (!state.file || !context) {
-      notificationService.error('Please select a file and ensure project context is available');
+    if (!state.file) {
+      notificationService.error('Please select a file');
       return;
     }
 
-    // Enhanced import: detect columns first
+    // Enhanced import: detect columns first (doesn't need project context yet)
     if (enableEnhancedImport) {
       await detectColumns();
+      return;
+    }
+
+    // Legacy import requires project context
+    if (!effectiveProjectId) {
+      notificationService.error('Please select a project');
       return;
     }
 
@@ -124,7 +135,7 @@ export default function BOQUpload({
     setState(prev => ({ ...prev, isUploading: true, progress: 0, stage: 'Starting...', message: '' }));
 
     try {
-      const boqId = context.projectId || `temp-${Date.now()}`;
+      const boqId = effectiveProjectId || `temp-${Date.now()}`;
 
       const job = await boqImportService.startImport(
         boqId,
@@ -232,14 +243,17 @@ export default function BOQUpload({
     confirmedMapping: ColumnMapping[],
     saveTemplate?: { name: string; supplierName?: string }
   ) => {
-    if (!state.file || !context?.projectId || !state.detection) return;
+    if (!state.file || !effectiveProjectId || !state.detection) {
+      notificationService.error('Missing file, project, or column detection data');
+      return;
+    }
 
     setState(prev => ({ ...prev, isUploading: true, stage: 'Importing...', progress: 30 }));
 
     try {
       const formData = new FormData();
       formData.append('file', state.file);
-      formData.append('projectId', context.projectId);
+      formData.append('projectId', effectiveProjectId);
       formData.append('columnMapping', JSON.stringify(confirmedMapping));
       formData.append('sheetName', state.detection.sheetName);
       formData.append('headerRow', String(state.detection.headerRow));
