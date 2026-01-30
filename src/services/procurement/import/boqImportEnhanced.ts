@@ -322,10 +322,10 @@ export class BOQImportEnhanced {
     const result = await this.sql`
       INSERT INTO boqs (
         project_id,
-        name,
+        title,
         description,
         status,
-        created_by
+        uploaded_by
       ) VALUES (
         ${projectId},
         ${`BOQ Import ${new Date().toISOString().split('T')[0]}`},
