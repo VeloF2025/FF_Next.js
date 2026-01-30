@@ -257,6 +257,7 @@ export default function NewBOQPage() {
                   enableEnhancedImport={true}
                   createBudgetItems={true}
                   createMaterials={true}
+                  projectId={selectedProjectId}
                 />
               )}
             </div>
