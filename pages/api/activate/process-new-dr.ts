@@ -487,33 +487,35 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           createdAt: existingUnified.created_at,
         });
 
-        // Still update contact info, WA context, and submitted_date if missing (non-destructive)
-        // submitted_date may be NULL if dr-acknowledgment created the record first
+        // Still update contact info, WA context, project, and submitted_date if missing (non-destructive)
+        // submitted_date and project may be NULL if dr-acknowledgment created the record first
         await pool.query(
           `UPDATE dr_photo_unified_reviews
            SET
              submitted_date = COALESCE(submitted_date, $2::DATE),
-             wa_message_id = COALESCE($3, wa_message_id),
-             wa_sender_jid = COALESCE($4, wa_sender_jid),
-             wa_original_text = COALESCE($5, wa_original_text),
-             wa_group_jid = COALESCE($6, wa_group_jid),
-             wa_received_at = CASE WHEN $3 IS NOT NULL THEN NOW() ELSE wa_received_at END,
-             sender_phone = COALESCE($7, sender_phone),
+             project = COALESCE($3, project),
+             wa_message_id = COALESCE($4, wa_message_id),
+             wa_sender_jid = COALESCE($5, wa_sender_jid),
+             wa_original_text = COALESCE($6, wa_original_text),
+             wa_group_jid = COALESCE($7, wa_group_jid),
+             wa_received_at = CASE WHEN $4 IS NOT NULL THEN NOW() ELSE wa_received_at END,
+             sender_phone = COALESCE($8, sender_phone),
              is_oes_only = FALSE,
-             subscriber_name = COALESCE($8, subscriber_name),
-             subscriber_phone = COALESCE($9, subscriber_phone),
-             subscriber_email = COALESCE($10, subscriber_email),
-             subscriber_language = COALESCE($11, subscriber_language),
-             signup_agent = COALESCE($12, signup_agent),
-             installer_name = COALESCE($13, installer_name),
-             qcontact_name = COALESCE($14, qcontact_name),
-             qcontact_phone = COALESCE($15, qcontact_phone),
-             qcontact_email = COALESCE($16, qcontact_email),
+             subscriber_name = COALESCE($9, subscriber_name),
+             subscriber_phone = COALESCE($10, subscriber_phone),
+             subscriber_email = COALESCE($11, subscriber_email),
+             subscriber_language = COALESCE($12, subscriber_language),
+             signup_agent = COALESCE($13, signup_agent),
+             installer_name = COALESCE($14, installer_name),
+             qcontact_name = COALESCE($15, qcontact_name),
+             qcontact_phone = COALESCE($16, qcontact_phone),
+             qcontact_email = COALESCE($17, qcontact_email),
              updated_at = NOW()
            WHERE drop_number = $1`,
           [
             dropNumber,
             submittedDateStr,
+            project || expectedProject || null,
             waMessageId || null,
             waSenderJid || null,
             waOriginalText || null,
@@ -680,19 +682,20 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // UNIFIED ARCHITECTURE: Store contact info during processing
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
-           drop_number, project, submission_count, submitted_date,
+           drop_number, project, submission_count, submitted_date, sender_phone,
            wa_message_id, wa_sender_jid, wa_original_text, wa_group_jid, wa_received_at,
            created_at, updated_at, is_oes_only,
            subscriber_name, subscriber_phone, subscriber_email, subscriber_language,
            signup_agent, installer_name,
            qcontact_name, qcontact_phone, qcontact_email
          )
-         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, NOW(), NOW(), NOW(), FALSE,
-           $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+         VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW(), FALSE,
+           $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
         [
           dropNumber,
           project || null,
           submittedDateStr,
+          resolvedSenderPhone,
           waMessageId || null,
           waSenderJid || null,
           waOriginalText || null,
