@@ -3334,3 +3334,53 @@ Exec=env NODE_OPTIONS="--max-old-space-size=16384" /usr/share/code/code %F
 - `pages/api/activate/import-oes.ts` - OES swap detection rewrite
 
 ---
+
+## 2026-01-30: QFieldCloud Docker Image Self-Healing Fix
+
+**Problem:** OES import from UI triggers QField sync, but `process_projectfile` jobs fail with `404 Client Error for qfieldcloud-qgis` because the Docker image periodically disappears (~every 24h). No container permanently uses the 2.7GB locally-built image, so something (likely Docker storage cleanup) removes it.
+
+**Investigation:**
+- `qfieldcloud-qgis` is a locally-built image (`docker-compose build qgis` in `/opt/qfieldcloud`), NOT from Docker Hub
+- `worker_wrapper` containers spawn ephemeral containers from it per job — no persistent container keeps the image "in use"
+- Existing `check_qgis_image.sh` cron ran every 6h but gaps allowed failures between checks
+- Monitor log showed image disappearing Jan 28 06:00, Jan 29 06:00, and again by Jan 30 05:43
+- No explicit `docker prune` or `docker rmi` found in any script, cron, or systemd timer
+- Exact deletion cause unknown but pattern is consistent (~daily)
+
+**Three-layered fix:**
+
+1. **Self-healing sync server** (`/opt/qfield-sync/sync_server.py` v2.3 → v2.4):
+   - `ensure_qgis_image()` pre-flight check before every sync
+   - If missing: restore from backup (`docker load`) → fallback rebuild (`docker-compose build qgis`) → restart `worker_wrapper`
+   - All automatic, no manual intervention needed
+
+2. **Monitoring cron** (`check_qgis_image.sh`):
+   - Increased frequency from `0 */6 * * *` (every 6h) to `0 * * * *` (every 1h)
+
+3. **Observability** (health/status endpoints):
+   - `/health` now reports `qgis_image: "present"/"MISSING"` and `last_image_restore`
+   - `/status` includes same fields for monitoring
+
+**Full OES→QField chain:**
+```
+UI Import → import-oes.ts → fire-and-forget POST :8095/sync/oes
+  → sync_server.py run_sync()
+    → ensure_qgis_image() ← NEW: self-heals Docker image
+    → sync_oes_db_to_qfield.py
+      → Fetch data from Neon DB
+      → Generate GPKG (activated + remaining layers)
+      → Upload GPKG + QGS to QFieldCloud via SDK
+      → Trigger process_projectfile job ← needs qfieldcloud-qgis image
+      → Trigger package job
+```
+
+**Key files:**
+- `/opt/qfield-sync/sync_server.py` - Self-healing sync server v2.4
+- `/opt/qfield-sync/sync_oes_db_to_qfield.py` - GPKG generation & upload
+- `/home/velo/check_qgis_image.sh` - Backup monitoring (now hourly)
+- `/home/velo/qfield-backups/qfieldcloud-qgis-20260113-1034.tar.gz` - Image backup for restore
+
+**Backup image location:** `/home/velo/qfield-backups/qfieldcloud-qgis-20260113-1034.tar.gz`
+**Rebuild command:** `cd /opt/qfieldcloud && docker-compose build qgis`
+
+---
