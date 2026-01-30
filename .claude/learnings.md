@@ -4,6 +4,76 @@
 
 ---
 
+## 2026-01-30: QA Centre — DR Acknowledgment Race Condition & Data Completeness
+
+**Problem:** Three regressions on QA Centre page:
+1. Projects showing "Unknown" and sender phone missing for many DRs
+2. Row duplication ("Showing 72 of 69 drops") — some DRs appearing multiple times
+3. False resubmission classification — DRs marked as resubmission #2 when only submitted once
+
+**Root Cause — dr-acknowledgment race condition:**
+
+The Go WhatsApp Bridge calls two endpoints in sequence:
+1. `dr-acknowledgment.ts` → Creates unified record with just `drop_number` + `onemap_status` (no project, sender_phone, submitted_date, or WA context)
+2. `process-new-dr.ts` → Processes the actual WA submission
+
+Three failure modes:
+- **Idempotency guard gap**: The UPDATE path (record < 60s old) was missing `project` field
+- **Brand new DR INSERT gap**: Was missing `sender_phone` column
+- **False resubmission**: When dr-acknowledgment creates a record and the WA submission arrives >60s later, the code treated it as a genuine resubmission because it only checked record age, not whether the record had WA context
+
+**Fix — Three code paths in process-new-dr.ts:**
+
+| Path | Condition | Action |
+|------|-----------|--------|
+| Idempotency guard | Record < 60s old | Update fields, keep count |
+| **First WA submission** (NEW) | Record has NO `wa_message_id` AND NO `wa_received_at` | Update fields, keep count |
+| Genuine resubmission | Record has WA context already | Increment count, save snapshot |
+
+**Fix — LEFT JOIN row multiplication:**
+
+`drops` table can have duplicate entries per DR (e.g., DR1753212 had 4 rows with different project_ids). Regular `LEFT JOIN drops d ON d.drop_number = u.drop_number` multiplied unified rows.
+
+**Pattern — Always use LATERAL for tables with potential duplicates:**
+```sql
+-- BAD: Regular LEFT JOIN multiplies rows
+LEFT JOIN drops d ON d.drop_number = u.drop_number
+LEFT JOIN projects p ON p.id = d.project_id
+
+-- GOOD: LATERAL with LIMIT 1 prevents multiplication
+LEFT JOIN LATERAL (
+  SELECT p.project_name FROM drops d
+  JOIN projects p ON p.id = d.project_id
+  WHERE d.drop_number = u.drop_number
+  LIMIT 1
+) dp ON true
+```
+
+**Note:** `oes_activations` is safe with regular LEFT JOIN (no duplicates). `maintenance_tickets` CAN have multiple per DR (legitimate — multiple issues), so use LATERAL with `ORDER BY created_at DESC LIMIT 1` to get latest.
+
+**Commits:**
+- `37e97952` — Add project and sender_phone to all process-new-dr paths
+- `b3e9cdf3` — Prevent row duplication from LEFT JOINs in drops query
+- `cf8beb04` — Prevent false resubmission when dr-acknowledgment creates record first
+
+**Key Files:**
+- `pages/api/activate/process-new-dr.ts` — Three code paths (lines 484-612)
+- `pages/api/activate/drops.ts` — LATERAL JOINs (lines 264-294)
+
+**Backfills Applied:** 7 false resubmissions reset, 4 NULL submitted_dates, 2 NULL sender_phones, 37 NULL projects
+
+**Key Insight — Multiple unified record creators:**
+Records in `dr_photo_unified_reviews` can be created by ANY of these paths:
+- `process-new-dr.ts` (WA submission — 2 INSERT paths)
+- `dr-acknowledgment.ts` (Go Bridge — 2 INSERTs)
+- `ensure-data.ts` (QA Wizard open)
+- `drops.ts:syncMissingFromQaPhotoReviews()` (legacy backfill)
+- `import-oes.ts` (OES Excel import)
+
+All code paths must handle the case where another path created the record first.
+
+---
+
 ## 2026-01-30: VLM Categorization — Full Backlog Cleared (7,638 DRs)
 
 **Problem:** ~7,600 DRs with photos needed VLM categorization + data extraction. The cron job (`process-vlm-queue.ts`) was processing ~53/hour sequentially — ETA 3+ days.

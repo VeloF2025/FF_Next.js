@@ -167,6 +167,8 @@ const result = await extractOntSerialEnhanced(base64Image);
 - `src/modules/activate/services/barcodeExtractionService.ts`
 
 ## Recent Changes (Jan 2026)
+- **DR Acknowledgment Race Condition Fix** (2026-01-30) - Three code paths in process-new-dr.ts: idempotency guard (<60s), first WA submission (no WA context), genuine resubmission (has WA context). See learnings.md.
+- **LATERAL JOIN Fix** (2026-01-30) - drops.ts uses `LEFT JOIN LATERAL ... LIMIT 1` for `drops` and `maintenance_tickets` to prevent row multiplication. `oes_activations` safe with regular JOIN.
 - **Serial Audit System** (2026-01-29) - Comprehensive backfill from 1Map, OES swap detection, activity logging
 - **Enhanced Barcode Service** - zxing-wasm 2D barcode support for Nokia ONT labels
 - Added progress overlays for visual feedback
@@ -185,6 +187,22 @@ const result = await extractOntSerialEnhanced(base64Image);
 - Subscriber contact (subscriber_name, subscriber_phone, subscriber_email)
 - QContact info (qcontact_name, qcontact_phone)
 - Installer/signup agent info
+- Project name (from drops table via `expectedProject`)
+- Sender phone (from wa_monitor_drops)
+
+**process-new-dr.ts — Three Code Paths for Existing Records:**
+| Path | Condition | Action |
+|------|-----------|--------|
+| Idempotency guard | Record < 60s old | Update fields, keep count |
+| First WA submission | No `wa_message_id` / `wa_received_at` | Update fields, keep count |
+| Genuine resubmission | Has WA context | Increment count, save snapshot |
+
+**Multiple Record Creators (all must handle pre-existing records):**
+- `process-new-dr.ts` (WA submission)
+- `dr-acknowledgment.ts` (Go Bridge)
+- `ensure-data.ts` (QA Wizard open)
+- `import-oes.ts` (OES Excel import)
+- `drops.ts:syncMissingFromQaPhotoReviews()` (legacy backfill)
 
 **BOSS API (port 8003) Usage:**
 | When | Allowed? |
