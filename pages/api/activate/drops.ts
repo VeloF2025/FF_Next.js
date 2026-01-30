@@ -263,7 +263,7 @@ async function getPaginatedDrops(
   const countQuery = `SELECT COUNT(*) FROM dr_photo_unified_reviews u ${whereClause}`;
   const dataQuery = `
     SELECT u.*,
-      COALESCE(u.project, p.project_name) as project,
+      COALESCE(u.project, dp.project_name) as project,
       COALESCE(u.sender_phone, wmd.sender_phone) as sender_phone,
       u.qa_phase,
       u.qa_decision,
@@ -279,15 +279,23 @@ async function getPaginatedDrops(
       mt.id IS NOT NULL as has_maintenance_ticket,
       mt.ticket_uid as maintenance_ticket_uid
     FROM dr_photo_unified_reviews u
-    LEFT JOIN drops d ON d.drop_number = u.drop_number
-    LEFT JOIN projects p ON p.id = d.project_id
+    LEFT JOIN LATERAL (
+      SELECT p.project_name FROM drops d
+      JOIN projects p ON p.id = d.project_id
+      WHERE d.drop_number = u.drop_number
+      LIMIT 1
+    ) dp ON true
     LEFT JOIN LATERAL (
       SELECT sender_phone FROM wa_monitor_drops
       WHERE drop_number = u.drop_number AND sender_phone IS NOT NULL
       ORDER BY created_at DESC LIMIT 1
     ) wmd ON true
     LEFT JOIN oes_activations oes ON oes.drop_number = u.drop_number
-    LEFT JOIN maintenance_tickets mt ON mt.dr_number = u.drop_number
+    LEFT JOIN LATERAL (
+      SELECT id, ticket_uid FROM maintenance_tickets
+      WHERE dr_number = u.drop_number
+      ORDER BY created_at DESC LIMIT 1
+    ) mt ON true
     ${whereClause}
     ORDER BY u.created_at DESC
     LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
