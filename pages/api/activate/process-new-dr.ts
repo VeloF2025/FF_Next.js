@@ -442,6 +442,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const existingUnified = await checkExistingUnifiedRecord(dropNumber);
     const existingQA = await checkExistingQARecord(dropNumber, project);
 
+    // Resolve sender_phone: body > qa_photo_reviews > wa_monitor_drops
+    let resolvedSenderPhone = senderPhone || existingQA?.sender_phone || null;
+    if (!resolvedSenderPhone) {
+      const waDropResult = await pool.query(
+        `SELECT sender_phone FROM wa_monitor_drops WHERE drop_number = $1 AND sender_phone IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
+        [dropNumber]
+      );
+      if (waDropResult.rows[0]?.sender_phone) {
+        resolvedSenderPhone = waDropResult.rows[0].sender_phone;
+        log.info('ProcessNewDr', `Resolved sender_phone from wa_monitor_drops for ${dropNumber}: ${resolvedSenderPhone}`);
+      }
+    }
+
     let isResubmission = false;
     let submissionCount = 1;
     let previousSubmission: PreviousSubmission | null = null;
@@ -492,6 +505,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            wa_group_jid = COALESCE($8, wa_group_jid),
            wa_received_at = CASE WHEN $5 IS NOT NULL THEN NOW() ELSE wa_received_at END,
            is_oes_only = FALSE,
+           sender_phone = COALESCE($18, sender_phone),
            -- Contact info from BOSS API (1Map)
            subscriber_name = COALESCE($9, subscriber_name),
            subscriber_phone = COALESCE($10, subscriber_phone),
@@ -523,6 +537,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           qContactInfo?.qcontact_name || null,
           qContactInfo?.qcontact_phone || null,
           qContactInfo?.qcontact_email || null,
+          resolvedSenderPhone,
         ]
       );
 
@@ -560,7 +575,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           dropNumber,
           project || existingQA.project,
           qaSubmittedDateStr, // Use WhatsApp message date instead of user-provided date
-          existingQA.sender_phone || senderPhone || null, // Copy sender phone from WA Monitor
+          resolvedSenderPhone, // Resolved from body > qa_photo_reviews > wa_monitor_drops
           waMessageId || null, // WhatsApp message context for reply threading
           waSenderJid || null,
           waOriginalText || null,
@@ -570,7 +585,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             submission_number: 0,
             snapshot_at: existingQA.created_at,
             whatsapp_message_date: existingQA.whatsapp_message_date,
-            sender_phone: existingQA.sender_phone || null,
+            sender_phone: resolvedSenderPhone,
             photo_count: 0,
             photos_metadata: [],
             vlm_categorization_status: null,
