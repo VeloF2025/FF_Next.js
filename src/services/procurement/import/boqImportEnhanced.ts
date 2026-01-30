@@ -319,6 +319,19 @@ export class BOQImportEnhanced {
    * Create a new BOQ record
    */
   private async createBoq(projectId: string, userId?: string): Promise<string> {
+    // Auto-increment version if one already exists for this project
+    const existing = await this.sql`
+      SELECT version FROM boqs
+      WHERE project_id = ${projectId}
+      ORDER BY version DESC
+      LIMIT 1
+    `;
+    let version = '1.0';
+    if (existing.length > 0) {
+      const lastVersion = parseFloat(existing[0].version) || 1.0;
+      version = (lastVersion + 1.0).toFixed(1);
+    }
+
     const result = await this.sql`
       INSERT INTO boqs (
         project_id,
@@ -329,7 +342,7 @@ export class BOQImportEnhanced {
         uploaded_by
       ) VALUES (
         ${projectId},
-        ${'1.0'},
+        ${version},
         ${`BOQ Import ${new Date().toISOString().split('T')[0]}`},
         ${'Imported from Excel'},
         'draft',
