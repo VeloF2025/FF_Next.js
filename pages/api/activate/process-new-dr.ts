@@ -475,29 +475,84 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     });
 
     if (existingUnified) {
-      // DR exists in unified table - this is a resubmission
-      isResubmission = true;
-      submissionCount = (existingUnified.submission_count || 1) + 1;
+      // === IDEMPOTENCY GUARD ===
+      // If unified record was created < 60 seconds ago, this is a duplicate call, NOT a real resubmission.
+      // The Go bridge and WA Monitor can both call process-new-dr for the same DR within 1-3 seconds.
+      const createdAt = new Date(existingUnified.created_at).getTime();
+      const ageSeconds = (Date.now() - createdAt) / 1000;
 
-      // Create snapshot of current state before overwriting
-      previousSubmission = createSubmissionSnapshot(existingUnified, existingUnified.submission_count || 1);
+      if (ageSeconds < 60) {
+        log.info('ProcessNewDr', `Idempotency guard: ${dropNumber} unified record is only ${ageSeconds.toFixed(1)}s old - skipping resubmission increment`, {
+          submissionCount: existingUnified.submission_count,
+          createdAt: existingUnified.created_at,
+        });
 
-      // Append to submission history
-      const currentHistory = existingUnified.submission_history || [];
-      const updatedHistory = [...currentHistory, previousSubmission];
+        // Still update contact info and WA context (non-destructive)
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET
+             wa_message_id = COALESCE($2, wa_message_id),
+             wa_sender_jid = COALESCE($3, wa_sender_jid),
+             wa_original_text = COALESCE($4, wa_original_text),
+             wa_group_jid = COALESCE($5, wa_group_jid),
+             wa_received_at = CASE WHEN $2 IS NOT NULL THEN NOW() ELSE wa_received_at END,
+             sender_phone = COALESCE($6, sender_phone),
+             subscriber_name = COALESCE($7, subscriber_name),
+             subscriber_phone = COALESCE($8, subscriber_phone),
+             subscriber_email = COALESCE($9, subscriber_email),
+             subscriber_language = COALESCE($10, subscriber_language),
+             signup_agent = COALESCE($11, signup_agent),
+             installer_name = COALESCE($12, installer_name),
+             qcontact_name = COALESCE($13, qcontact_name),
+             qcontact_phone = COALESCE($14, qcontact_phone),
+             qcontact_email = COALESCE($15, qcontact_email),
+             updated_at = NOW()
+           WHERE drop_number = $1`,
+          [
+            dropNumber,
+            waMessageId || null,
+            waSenderJid || null,
+            waOriginalText || null,
+            waGroupJid || null,
+            resolvedSenderPhone,
+            subscriberContact?.subscriber_name || null,
+            subscriberContact?.subscriber_phone || null,
+            subscriberContact?.subscriber_email || null,
+            subscriberContact?.subscriber_language || null,
+            subscriberContact?.signup_agent || null,
+            subscriberContact?.installer_name || null,
+            qContactInfo?.qcontact_name || null,
+            qContactInfo?.qcontact_phone || null,
+            qContactInfo?.qcontact_email || null,
+          ]
+        );
 
-      // Update record with new submission info and preserved history
-      // Note: submitted_date is preserved from original submission, not overwritten
-      // WhatsApp context is updated for resubmission to enable reply threading on new feedback
-      // Clear is_oes_only flag since this is now a real submission
-      // UNIFIED ARCHITECTURE: Store contact info during processing
-      await pool.query(
-        `UPDATE dr_photo_unified_reviews
-         SET
-           submission_count = $1,
-           submission_history = $2,
-           last_resubmitted_at = NOW(),
-           resubmitted_by = 'manual_entry',
+        // Use existing values - NOT a resubmission
+        submissionCount = existingUnified.submission_count || 1;
+      } else {
+        // Genuine resubmission (record is older than 60 seconds)
+        isResubmission = true;
+        submissionCount = (existingUnified.submission_count || 1) + 1;
+
+        // Create snapshot of current state before overwriting
+        previousSubmission = createSubmissionSnapshot(existingUnified, existingUnified.submission_count || 1);
+
+        // Append to submission history
+        const currentHistory = existingUnified.submission_history || [];
+        const updatedHistory = [...currentHistory, previousSubmission];
+
+        // Update record with new submission info and preserved history
+        // Note: submitted_date is preserved from original submission, not overwritten
+        // WhatsApp context is updated for resubmission to enable reply threading on new feedback
+        // Clear is_oes_only flag since this is now a real submission
+        // UNIFIED ARCHITECTURE: Store contact info during processing
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET
+             submission_count = $1,
+             submission_history = $2,
+             last_resubmitted_at = NOW(),
+             resubmitted_by = 'manual_entry',
            project = COALESCE($3, project),
            wa_message_id = COALESCE($5, wa_message_id),
            wa_sender_jid = COALESCE($6, wa_sender_jid),
@@ -546,6 +601,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         previousPhotoCount: previousSubmission.photo_count,
         hadFeedback: previousSubmission.feedback_sent,
       });
+      } // end genuine resubmission else block
     } else if (existingQA) {
       // DR exists in QA table but not unified - create unified record noting the QA reference
       // Use whatsapp_message_date if available (actual WhatsApp submission time)
@@ -609,7 +665,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         ]
       );
 
-      isResubmission = true;
+      // Not a resubmission - this is the first time creating a unified record
+      // (QA record existed but unified didn't, which is normal flow)
+      isResubmission = false;
       submissionCount = 1;
     } else {
       // Brand new DR - create fresh record with WhatsApp message context for reply threading
