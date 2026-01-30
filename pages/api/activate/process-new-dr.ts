@@ -535,8 +535,64 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
         // Use existing values - NOT a resubmission
         submissionCount = existingUnified.submission_count || 1;
+      } else if (!existingUnified.wa_message_id && !existingUnified.wa_received_at) {
+        // Record exists but has NO WhatsApp context — created by dr-acknowledgment or OES import.
+        // This is the FIRST real WA submission, NOT a resubmission.
+        log.info('ProcessNewDr', `First WA submission for pre-existing record ${dropNumber}`, {
+          ageSeconds: ageSeconds.toFixed(1),
+          createdBy: existingUnified.onemap_status ? 'dr-acknowledgment' : 'oes-import',
+          submissionCount: existingUnified.submission_count,
+        });
+
+        // Update with WA context, submitted_date, project, contact info (same as idempotency guard)
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET
+             submitted_date = COALESCE(submitted_date, $2::DATE),
+             project = COALESCE($3, project),
+             wa_message_id = COALESCE($4, wa_message_id),
+             wa_sender_jid = COALESCE($5, wa_sender_jid),
+             wa_original_text = COALESCE($6, wa_original_text),
+             wa_group_jid = COALESCE($7, wa_group_jid),
+             wa_received_at = CASE WHEN $4 IS NOT NULL THEN NOW() ELSE wa_received_at END,
+             sender_phone = COALESCE($8, sender_phone),
+             is_oes_only = FALSE,
+             subscriber_name = COALESCE($9, subscriber_name),
+             subscriber_phone = COALESCE($10, subscriber_phone),
+             subscriber_email = COALESCE($11, subscriber_email),
+             subscriber_language = COALESCE($12, subscriber_language),
+             signup_agent = COALESCE($13, signup_agent),
+             installer_name = COALESCE($14, installer_name),
+             qcontact_name = COALESCE($15, qcontact_name),
+             qcontact_phone = COALESCE($16, qcontact_phone),
+             qcontact_email = COALESCE($17, qcontact_email),
+             updated_at = NOW()
+           WHERE drop_number = $1`,
+          [
+            dropNumber,
+            submittedDateStr,
+            project || expectedProject || null,
+            waMessageId || null,
+            waSenderJid || null,
+            waOriginalText || null,
+            waGroupJid || null,
+            resolvedSenderPhone,
+            subscriberContact?.subscriber_name || null,
+            subscriberContact?.subscriber_phone || null,
+            subscriberContact?.subscriber_email || null,
+            subscriberContact?.subscriber_language || null,
+            subscriberContact?.signup_agent || null,
+            subscriberContact?.installer_name || null,
+            qContactInfo?.qcontact_name || null,
+            qContactInfo?.qcontact_phone || null,
+            qContactInfo?.qcontact_email || null,
+          ]
+        );
+
+        // Keep existing submission_count (should be 1) - NOT a resubmission
+        submissionCount = existingUnified.submission_count || 1;
       } else {
-        // Genuine resubmission (record is older than 60 seconds)
+        // Genuine resubmission: record has WA context from a previous submission
         isResubmission = true;
         submissionCount = (existingUnified.submission_count || 1) + 1;
 
