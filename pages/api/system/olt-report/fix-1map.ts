@@ -161,6 +161,8 @@ async function fixSingleDR(
       );
 
       // Log to activity log with appropriate message
+      const ontOldValue = 'ont' in result ? result.ont.oldValue : result.oldValue;
+
       if (alreadyCorrect) {
         await logActivity(
           drNumber,
@@ -182,7 +184,6 @@ async function fixSingleDR(
           currentSerial: correctSerial,
         });
       } else {
-        const ontOldValue = 'ont' in result ? result.ont.oldValue : result.oldValue;
         let details = `1Map ONT serial updated: ${ontOldValue || 'EMPTY'} → ${correctSerial}`;
         if (hasUpsSerial && 'ups' in result && result.ups.updated) {
           details += ` | UPS serial updated: ${result.ups.oldValue || 'EMPTY'} → ${result.ups.newValue}`;
@@ -211,6 +212,43 @@ async function fixSingleDR(
           ontNewValue: correctSerial,
           upsUpdated: hasUpsSerial && 'ups' in result ? result.ups.updated : false,
         });
+      }
+
+      // Record in serial_change_history for DR Review Serial History tab
+      const propId = 'propId' in result ? result.propId : null;
+      await client.query(
+        `INSERT INTO serial_change_history
+         (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
+         VALUES ($1, 'ont_serial', $2, $3, 'olt_report_fix', $4, $5, $6)`,
+        [
+          drNumber,
+          ontOldValue || null,
+          correctSerial,
+          alreadyCorrect ? 'verification' : 'data_fix',
+          userId || 'system',
+          JSON.stringify({
+            propId,
+            source: 'olt_report',
+            fix_type: alreadyCorrect ? 'already_correct' : 'onemap_fix_success',
+            wrong_onemap_serial: wrongSerial || null,
+          }),
+        ]
+      );
+
+      // If UPS serial was also updated, record that too
+      if (hasUpsSerial && 'ups' in result && result.ups.updated) {
+        await client.query(
+          `INSERT INTO serial_change_history
+           (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
+           VALUES ($1, 'ups_serial', $2, $3, 'olt_report_fix', 'swap_correction', $4, $5)`,
+          [
+            drNumber,
+            result.ups.oldValue || null,
+            result.ups.newValue,
+            userId || 'system',
+            JSON.stringify({ propId, source: 'olt_report', fix_type: 'ups_swap_correction' }),
+          ]
+        );
       }
 
       return {
