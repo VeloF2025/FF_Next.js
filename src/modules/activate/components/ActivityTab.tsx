@@ -719,12 +719,12 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                             </span>
                           </div>
                           {/* Value Change */}
-                          <div className="mt-2 flex items-center gap-2 text-sm font-mono">
-                            <span className="text-gray-500 dark:text-gray-400 truncate max-w-[120px]" title={entry.old_value || 'null'}>
+                          <div className="mt-2 flex items-baseline gap-2 text-sm font-mono flex-wrap">
+                            <span className="text-gray-500 dark:text-gray-400 break-all" title={entry.old_value || 'null'}>
                               {entry.old_value || '(empty)'}
                             </span>
-                            <span className={isOnt ? 'text-orange-500' : 'text-purple-500'}>→</span>
-                            <span className="font-medium text-gray-900 dark:text-white truncate max-w-[120px]" title={entry.new_value || 'null'}>
+                            <span className={`shrink-0 ${isOnt ? 'text-orange-500' : 'text-purple-500'}`}>→</span>
+                            <span className="font-medium text-gray-900 dark:text-white break-all" title={entry.new_value || 'null'}>
                               {entry.new_value || '(empty)'}
                             </span>
                           </div>
