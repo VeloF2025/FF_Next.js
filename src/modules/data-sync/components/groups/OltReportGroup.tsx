@@ -362,12 +362,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       });
 
       const data = await res.json();
+      // apiResponse.success wraps as { success, data: { stats, ... } }
+      const result = data.data || data;
       if (data.success) {
-        setUploadResult({ success: true, stats: data.stats });
+        setUploadResult({ success: true, stats: result.stats });
         fetchStats();
         setSelectedFile(null);
       } else {
-        setError(data.error || 'Import failed');
+        setError(data.error || result.error || 'Import failed');
       }
     } catch {
       setError('Import failed');
