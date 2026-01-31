@@ -66,6 +66,7 @@ return res.json({
 1. `node_modules/.cache` contains stale webpack artifacts
 2. `.next` folder has corrupted chunks
 3. TypeScript compilation caching issues
+4. `.next` directory permission issues on Velocity server (different users running build)
 
 **Nuclear Option:**
 ```bash
@@ -73,10 +74,20 @@ rm -rf .next node_modules/.cache
 npm run build
 ```
 
+**Velocity Server (permissions issue):**
+```bash
+echo 'velo2026' | sudo -S rm -rf .next
+echo 'velo2026' | sudo -S chown -R velo:velo .
+mkdir -p .next
+npm run build
+```
+
 **When to Suspect Cache Issues:**
 - Build succeeds but behavior doesn't match source
 - TypeScript errors appear that shouldn't exist
 - Chunks reference deleted files
+- `ENOENT: no such file or directory` errors during build on server
+- `Build directory is not writeable` errors
 
 ---
 

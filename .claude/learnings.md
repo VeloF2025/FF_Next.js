@@ -4,6 +4,76 @@
 
 ---
 
+## 2026-01-31: Performance Optimization — next.config.js & API Query Parallelization
+
+**Problem — App-wide slowness (client-side loading + API response times):**
+Multiple performance issues compounding: suboptimal Next.js config blocking script optimization, API routes running 10+ DB queries sequentially, and excessive HTTP chunk requests.
+
+**Root Cause 1 — `disableOptimizedLoading: true` in next.config.js:**
+This flag was blocking Next.js from optimizing how scripts load. Removing it let Next.js apply its default script optimization strategy.
+
+**Root Cause 2 — `optimizePackageImports` only covering 2 packages:**
+Only `@tanstack/react-query` and `react-icons` were listed. Added `lucide-react`, `date-fns`, `zod`, `react-hot-toast`, `@heroicons/react` — these are large packages where tree-shaking via barrel optimization matters.
+
+**Root Cause 3 — Custom `splitChunks` creating per-npm-package chunks:**
+A custom webpack config was creating individual chunks for every npm package (`npm.packagename.hash.js`). This caused excessive HTTP requests on page load. Removed it to let Next.js defaults handle splitting (which is well-optimized).
+
+**Result:** `_app` chunk reduced from 52K → 30.8K (40% reduction). Commit `7a775992`.
+
+**Root Cause 4 — Sequential `await` in API routes:**
+Multiple API routes had 10+ fully independent DB queries running sequentially with individual `await` statements. Each query adds ~100-200ms of network round-trip to Neon.
+
+**Fix — Promise.all for independent queries (commits `7a775992`, `f2de1714`, `fca9bdaf`):**
+```typescript
+// BEFORE: ~1.2s for 3 queries
+const a = await sql`...`;
+const b = await sql`...`;
+const c = await sql`...`;
+
+// AFTER: ~473ms (2.6x faster)
+const [a, b, c] = await Promise.all([
+  sql`...`,
+  sql`...`,
+  sql`...`,
+]);
+```
+
+**Routes parallelized:**
+| Route | Sequential Queries | Pattern |
+|-------|-------------------|---------|
+| `procurement/metrics/aggregate.ts` | 10 → 1 batch | All independent |
+| `projects/[projectId]/procurement-summary.ts` | 4 → 1 batch | After projectExists check |
+| `health-safety/dashboard.ts` | 12 → 2 batches | Batch 1: 10 independent, Batch 2: 2 conditional |
+| `system/stats.ts` | 9 → 1 batch | Includes getTodayStats (3 internal) |
+
+**Two-batch pattern for conditional queries:**
+When some queries depend on results of others (e.g., check if table exists before querying it), use two Promise.all batches:
+```typescript
+// Batch 1: Independent queries + condition check
+const [tableExists, ...otherResults] = await Promise.all([...]);
+
+// Batch 2: Conditional queries
+if (tableExists[0]?.exists) {
+  const [conditionalA, conditionalB] = await Promise.all([...]);
+}
+```
+
+**Neon serverless tagged templates work in Promise.all:**
+Dynamic SQL fragments like `${project_id ? sql\`AND ...\` : sql\`\`}` work correctly inside Promise.all — no special handling needed.
+
+**Barrel import analysis (diminishing returns):**
+Investigated 138 `export *` across 50+ files. Findings:
+- Production builds already tree-shake unused exports from barrels
+- Most "worst offender" barrels (49, 33, 28 re-exports) have 0 imports — dead code
+- The one used barrel (`src/components/ui/index.ts`, 25 exports) is imported by 19 files
+- Refactoring 19 files for marginal production gain not worth the risk
+- Barrel cleanup mainly improves dev mode HMR speed, not production
+
+**Dev server deployment gotcha — `.next` directory permissions:**
+When deploying to the Velocity server, `rm -rf .next` sometimes fails silently or creates permission issues. Use `sudo rm -rf .next` and `chown -R velo:velo .` before building.
+
+---
+
 ## 2026-01-30: QA Centre — Typo DR Filtering & Self-Healing Photo Fetch
 
 **Problem 1 — Typo DRs polluting QA Centre list:**
