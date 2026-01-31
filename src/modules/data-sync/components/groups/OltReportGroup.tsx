@@ -442,7 +442,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
   };
 
-  // Handle bulk fix
+  // Handle bulk fix - process in batches of 5 to avoid Cloudflare 524 timeout
   const handleBulkFix = async () => {
     const selectedRecords = records.filter(
       (r) => selectedIds.has(r.id) && r.olt_serial
@@ -453,48 +453,67 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     setBulkFixResult(null);
     setError(null);
 
+    const BATCH_SIZE = 5;
+    let totalSuccess = 0;
+    let totalFail = 0;
+    const allErrors: Record<string, string> = {};
+
     try {
-      const res = await fetch('/api/system/olt-report/fix-1map', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bulk: true,
-          items: selectedRecords.map((r) => ({
-            drNumber: r.drop_number,
-            correctSerial: r.olt_serial,
-            wrongSerial: r.wrong_onemap_serial,
-          })),
-        }),
-      });
+      for (let i = 0; i < selectedRecords.length; i += BATCH_SIZE) {
+        const batch = selectedRecords.slice(i, i + BATCH_SIZE);
 
-      const data = await res.json();
-      const result = data.data || data;
-
-      if (result.bulk) {
+        // Update progress display
         setBulkFixResult({
-          total: result.total,
-          successCount: result.successCount,
-          failCount: result.failCount,
+          total: selectedRecords.length,
+          successCount: totalSuccess,
+          failCount: totalFail,
         });
-        // Show per-record errors from bulk results
-        if (result.results) {
-          const errors: Record<string, string> = {};
-          for (const r of result.results) {
-            if (!r.success && r.error) {
-              const rec = records.find((rec) => rec.drop_number === r.drNumber);
-              if (rec) errors[rec.id] = r.error;
+
+        const res = await fetch('/api/system/olt-report/fix-1map', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bulk: true,
+            items: batch.map((r) => ({
+              drNumber: r.drop_number,
+              correctSerial: r.olt_serial,
+              wrongSerial: r.wrong_onemap_serial,
+            })),
+          }),
+        });
+
+        const data = await res.json();
+        const result = data.data || data;
+
+        if (result.bulk) {
+          totalSuccess += result.successCount || 0;
+          totalFail += result.failCount || 0;
+          // Collect per-record errors
+          if (result.results) {
+            for (const r of result.results) {
+              if (!r.success && r.error) {
+                const rec = records.find((rec) => rec.drop_number === r.drNumber);
+                if (rec) allErrors[rec.id] = r.error;
+              }
             }
           }
-          setFixErrors(errors);
+        } else {
+          // Entire batch failed
+          totalFail += batch.length;
         }
-        setSelectedIds(new Set());
-        fetchRecords('pending');
-        fetchStats();
-      } else {
-        setError(data.error?.message || 'Bulk fix failed');
       }
+
+      setBulkFixResult({
+        total: selectedRecords.length,
+        successCount: totalSuccess,
+        failCount: totalFail,
+      });
+      setFixErrors(allErrors);
+      setSelectedIds(new Set());
+      fetchRecords('pending');
+      fetchStats();
     } catch {
-      setError('Bulk fix failed');
+      setError(`Bulk fix failed after ${totalSuccess} of ${selectedRecords.length} records`);
     } finally {
       setBulkFixing(false);
     }
@@ -863,6 +882,11 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                     <span className="text-green-400">{bulkFixResult.successCount} fixed</span>
                     {bulkFixResult.failCount > 0 && (
                       <span className="text-red-400 ml-2">{bulkFixResult.failCount} failed</span>
+                    )}
+                    {bulkFixing && (
+                      <span className="text-[var(--ff-text-secondary)] ml-2">
+                        ({bulkFixResult.successCount + bulkFixResult.failCount}/{bulkFixResult.total})
+                      </span>
                     )}
                   </span>
                 )}
