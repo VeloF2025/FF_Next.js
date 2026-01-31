@@ -120,6 +120,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   // Data state
   const [records, setRecords] = useState<OltRecord[]>([]);
   const [imports, setImports] = useState<ImportRecord[]>([]);
+  const [fixHistory, setFixHistory] = useState<OltRecord[]>([]);
   const [stats, setStats] = useState<Stats>({
     pending: 0,
     needs_investigation: 0,
@@ -135,6 +136,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   // Fix state
   const [fixing, setFixing] = useState<string | null>(null);
+  const [fixErrors, setFixErrors] = useState<Record<string, string>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkFixing, setBulkFixing] = useState(false);
   const [bulkFixResult, setBulkFixResult] = useState<{
@@ -258,14 +260,22 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     [page]
   );
 
-  // Fetch imports history
+  // Fetch imports history + recent fixes
   const fetchImports = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/system/olt-report/imports');
-      if (res.ok) {
-        const data = await res.json();
+      const [importsRes, fixesRes] = await Promise.all([
+        fetch('/api/system/olt-report/imports'),
+        fetch('/api/system/olt-report/records?status=fixed&page=1&pageSize=50'),
+      ]);
+      if (importsRes.ok) {
+        const data = await importsRes.json();
         setImports(data.data?.imports || data.imports || []);
+      }
+      if (fixesRes.ok) {
+        const data = await fixesRes.json();
+        const fixedRecords = data.data?.records || data.records || [];
+        setFixHistory(fixedRecords);
       }
     } catch {
       // Silently fail
@@ -321,6 +331,11 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   // Load data based on current tab
   useEffect(() => {
+    // Clear stale fix state on tab change
+    setBulkFixResult(null);
+    setFixErrors({});
+    setSelectedIds(new Set());
+
     fetchStats();
     if (currentTab === 'pending') {
       fetchRecords('pending');
@@ -383,6 +398,9 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     if (!record.olt_serial) return;
 
     setFixing(record.id);
+    // Clear any previous error for this record
+    setFixErrors((prev) => { const n = { ...prev }; delete n[record.id]; return n; });
+
     try {
       const res = await fetch('/api/system/olt-report/fix-1map', {
         method: 'POST',
@@ -395,7 +413,11 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       });
 
       const data = await res.json();
-      if (data.success || data.data?.success) {
+      // apiResponse.success() wraps as { success: true, data: { success, ... } }
+      const result = data.data || data;
+
+      if (result.success) {
+        // Actual fix succeeded - refresh lists
         fetchRecords('pending');
         fetchStats();
         setSelectedIds((prev) => {
@@ -404,10 +426,17 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           return next;
         });
       } else {
-        setError(data.error?.message || data.error || 'Fix failed');
+        // Fix failed - show error on the record row
+        const errorMsg = result.error || 'Fix failed';
+        setFixErrors((prev) => ({ ...prev, [record.id]: errorMsg }));
+        // If record moved to investigate/not_found, refresh
+        if (errorMsg.includes('not found') || errorMsg.includes('Not found')) {
+          fetchRecords('pending');
+          fetchStats();
+        }
       }
     } catch {
-      setError('Fix failed');
+      setFixErrors((prev) => ({ ...prev, [record.id]: 'Network error - try again' }));
     } finally {
       setFixing(null);
     }
@@ -447,6 +476,17 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           successCount: result.successCount,
           failCount: result.failCount,
         });
+        // Show per-record errors from bulk results
+        if (result.results) {
+          const errors: Record<string, string> = {};
+          for (const r of result.results) {
+            if (!r.success && r.error) {
+              const rec = records.find((rec) => rec.drop_number === r.drNumber);
+              if (rec) errors[rec.id] = r.error;
+            }
+          }
+          setFixErrors(errors);
+        }
         setSelectedIds(new Set());
         fetchRecords('pending');
         fetchStats();
@@ -965,18 +1005,25 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                             <ExternalLink className="w-4 h-4" />
                           </a>
                           {currentTab === 'pending' && record.olt_serial && (
-                            <button
-                              onClick={() => handleFix(record)}
-                              disabled={fixing === record.id || bulkFixing}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50"
-                            >
-                              {fixing === record.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Wrench className="w-3 h-3" />
+                            <div className="flex flex-col items-end gap-1">
+                              <button
+                                onClick={() => handleFix(record)}
+                                disabled={fixing === record.id || bulkFixing}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-[var(--ff-accent)] text-white text-xs rounded hover:bg-[var(--ff-accent)]/80 disabled:opacity-50"
+                              >
+                                {fixing === record.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Wrench className="w-3 h-3" />
+                                )}
+                                Fix
+                              </button>
+                              {fixErrors[record.id] && (
+                                <span className="text-[10px] text-red-400 max-w-[160px] text-right leading-tight">
+                                  {fixErrors[record.id]}
+                                </span>
                               )}
-                              Fix
-                            </button>
+                            </div>
                           )}
                           {currentTab === 'investigate' && (
                             <>
@@ -1035,60 +1082,145 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       )}
 
       {currentTab === 'history' && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
+        <div className="space-y-6">
+          {/* Import History */}
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+            <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
+              <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Import History</h3>
             </div>
-          ) : imports.length === 0 ? (
-            <div className="text-center py-12 text-[var(--ff-text-tertiary)]">
-              No imports yet
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-                    <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                      Filename
-                    </th>
-                    <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                      Project
-                    </th>
-                    <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                      Total
-                    </th>
-                    <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                      Mismatches
-                    </th>
-                    <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                      Imported
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {imports.map((imp) => (
-                    <tr
-                      key={imp.id}
-                      className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]"
-                    >
-                      <td className="py-3 px-4 text-[var(--ff-text-primary)]">{imp.filename}</td>
-                      <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
-                        {imp.project || '-'}
-                      </td>
-                      <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">
-                        {imp.total_records}
-                      </td>
-                      <td className="py-3 px-4 text-right text-amber-400">{imp.mismatch_count}</td>
-                      <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
-                        {new Date(imp.imported_at).toLocaleString()}
-                      </td>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
+              </div>
+            ) : imports.length === 0 ? (
+              <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">
+                No imports yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Filename
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Project
+                      </th>
+                      <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Total
+                      </th>
+                      <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Mismatches
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Imported
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {imports.map((imp) => (
+                      <tr
+                        key={imp.id}
+                        className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]"
+                      >
+                        <td className="py-3 px-4 text-[var(--ff-text-primary)]">{imp.filename}</td>
+                        <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                          {imp.project || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">
+                          {imp.total_records}
+                        </td>
+                        <td className="py-3 px-4 text-right text-amber-400">{imp.mismatch_count}</td>
+                        <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                          {new Date(imp.imported_at).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Fix Activity */}
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+            <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
+              <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">
+                Recent Fixes ({fixHistory.length})
+              </h3>
             </div>
-          )}
+            {fixHistory.length === 0 ? (
+              <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">
+                No fixes recorded yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        DR Number
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        OLT Serial
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Result
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Old Value
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Fixed At
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fixHistory.map((record) => {
+                      let oldVal = '-';
+                      try {
+                        const parsed = record.fix_old_value ? JSON.parse(record.fix_old_value) : null;
+                        oldVal = parsed?.ont_old || '-';
+                      } catch { oldVal = record.fix_old_value || '-'; }
+                      return (
+                        <tr
+                          key={record.id}
+                          className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]"
+                        >
+                          <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">
+                            {record.drop_number}
+                          </td>
+                          <td className="py-3 px-4 text-green-400 font-mono text-xs">
+                            {record.olt_serial || '-'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              record.fix_result === 'success'
+                                ? 'bg-green-500/20 text-green-400'
+                                : record.fix_result === 'already_correct'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : 'bg-amber-500/20 text-amber-400'
+                            }`}>
+                              {record.fix_result === 'already_correct' ? 'verified' : record.fix_result || 'fixed'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-red-400 font-mono text-xs">
+                            {oldVal}
+                          </td>
+                          <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                            {record.fix_attempted_at
+                              ? new Date(record.fix_attempted_at).toLocaleString()
+                              : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
