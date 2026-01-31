@@ -53,7 +53,8 @@ export type ActivityEventType =
   | 'SERIAL_CONFIRMED'
   | 'SERIAL_VERIFIED'
   | 'INVESTIGATE'
-  | 'MANUAL_SERIAL_EDIT';
+  | 'MANUAL_SERIAL_EDIT'
+  | 'SERIAL_VERIFICATION_COMPUTED';
 
 /**
  * Serial change source types
@@ -250,6 +251,11 @@ const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: string; i
     title: 'Needs Investigation',
     icon: '🔎',
     iconColor: 'text-orange-500',
+  },
+  SERIAL_VERIFICATION_COMPUTED: {
+    title: 'Serial Verification Updated',
+    icon: '🔒',
+    iconColor: 'text-blue-500',
   },
 };
 
@@ -476,6 +482,28 @@ export async function getActivityTimeline(
         break;
       case 'INSTALLATION_MISMATCH':
         description = data.details ? String(data.details) : '1Map serial differs from OES activated serial';
+        break;
+      case 'SERIAL_VERIFICATION_COMPUTED':
+        description = data.details ? String(data.details) : `Verification: ${data.status || 'computed'}`;
+        break;
+      case 'WA_PHOTO_VLM_PROCESSED':
+        description = data.match_status === 'match'
+          ? `Serial confirmed from photo (${data.confidence || 0}% confidence)`
+          : data.match_status === 'mismatch'
+            ? `Serial MISMATCH detected from photo vs 1Map`
+            : `Serial extracted from WA photo (${data.confidence || 0}% confidence)`;
+        break;
+      case 'SERIAL_CONFIRMED':
+        description = data.details ? String(data.details) : 'Serial confirmed from multiple sources';
+        break;
+      case 'SERIAL_VERIFIED':
+        description = data.details ? String(data.details) : '1Map serial verified correct';
+        break;
+      case 'INVESTIGATE':
+        description = data.details ? String(data.details) : 'Needs manual investigation';
+        break;
+      case 'MANUAL_SERIAL_EDIT':
+        description = data.details ? String(data.details) : 'Serial manually edited';
         break;
       default:
         description = JSON.stringify(data).slice(0, 100);
@@ -1275,23 +1303,49 @@ export async function getSerialHistory(
 
 /**
  * Log WA photo VLM processing result
+ *
+ * Accepts an object parameter matching the actual caller in process-wa-photo-vlm.ts
  */
 export async function logWaPhotoVlmProcessed(
   drNumber: string,
-  photoId: string,
-  extractedOnt: string | null,
-  extractedUps: string | null,
-  confidence: number,
-  matchStatus: 'match' | 'mismatch' | 'partial'
+  data: {
+    photoId: string;
+    filename?: string;
+    ontExtracted: string | null;
+    upsExtracted: string | null;
+    confidence: number;
+    onemapOnt?: string | null;
+    onemapUps?: string | null;
+  }
 ): Promise<string> {
+  // Determine match status by comparing extracted vs onemap serials
+  let matchStatus: 'match' | 'mismatch' | 'partial' | 'no_data' = 'no_data';
+  const ontMatch = data.ontExtracted && data.onemapOnt
+    ? data.ontExtracted.toUpperCase() === data.onemapOnt.toUpperCase()
+    : null;
+  const upsMatch = data.upsExtracted && data.onemapUps
+    ? data.upsExtracted.toUpperCase() === data.onemapUps.toUpperCase()
+    : null;
+
+  if (ontMatch === true && (upsMatch === true || upsMatch === null)) {
+    matchStatus = 'match';
+  } else if (ontMatch === false || upsMatch === false) {
+    matchStatus = 'mismatch';
+  } else if (ontMatch === true || upsMatch === true) {
+    matchStatus = 'partial';
+  }
+
   return logActivity(
     drNumber,
     'WA_PHOTO_VLM_PROCESSED',
     {
-      photo_id: photoId,
-      extracted_ont: extractedOnt,
-      extracted_ups: extractedUps,
-      confidence,
+      photo_id: data.photoId,
+      filename: data.filename,
+      extracted_ont: data.ontExtracted,
+      extracted_ups: data.upsExtracted,
+      confidence: data.confidence,
+      onemap_ont: data.onemapOnt,
+      onemap_ups: data.onemapUps,
       match_status: matchStatus,
     },
     'vlm'

@@ -26,6 +26,7 @@ import {
   PhotoInput,
 } from '@/modules/activate/services/categorizationVlmService';
 import { fetchPhotosWithRetry } from '@/modules/activate/services/photoFetchService';
+import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 import {
   isSharePointDrSyncEnabled,
   getSharePointDrConfig,
@@ -813,6 +814,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         [dropNumber, ont_barcode, ups_serial]
       );
 
+      // Fire-and-forget: Compute 4-way serial verification badge
+      computeAndPersistVerification(dropNumber).catch(err =>
+        log.error('ProcessNewDr', `Serial verification failed for ${dropNumber}`, err)
+      );
+
       return apiResponse.success(res, {
         dropNumber,
         photosDownloaded: 0,
@@ -898,6 +904,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         processingTimeMs: Date.now() - startTime,
       });
 
+      // Fire-and-forget: Compute 4-way serial verification badge
+      computeAndPersistVerification(dropNumber).catch(err =>
+        log.error('ProcessNewDr', `Serial verification failed for ${dropNumber}`, err)
+      );
+
       return apiResponse.success(res, {
         dropNumber,
         photosDownloaded: photos.length,
@@ -925,6 +936,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            updated_at = NOW()
          WHERE drop_number = $2`,
         [errorMessage, dropNumber]
+      );
+
+      // Fire-and-forget: Compute 4-way serial verification badge (serials available regardless of categorization)
+      computeAndPersistVerification(dropNumber).catch(err =>
+        log.error('ProcessNewDr', `Serial verification failed for ${dropNumber}`, err)
       );
 
       return apiResponse.success(res, {

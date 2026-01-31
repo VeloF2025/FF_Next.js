@@ -17,6 +17,10 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 // NOTE: No withAuth - this endpoint is called by Go WhatsApp Bridge without credentials
 import { log } from '@/lib/logger';
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial } from '@/modules/activate/services/qaAutoFailService';
+import { extractWaPhotoSerials, waitForWaPhotos } from '@/modules/activate/services/serialVerificationService';
+
+// Vercel: Allow up to 30s for delayed VLM serial extraction
+export const config = { maxDuration: 30 };
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -364,6 +368,13 @@ function generateResubmissionAckMessage(
 }
 
 /**
+ * Normalize serial for comparison (case-insensitive, trimmed)
+ */
+function normalizeForCompare(serial: string): string {
+  return serial.trim().toUpperCase();
+}
+
+/**
  * Generate WhatsApp acknowledgment message
  * Returns empty string if DR not found - Go bridge will skip sending
  *
@@ -376,7 +387,8 @@ function generateAckMessage(
   photoCount: number,
   ontSerial: string | null,
   upsSerial: string | null,
-  waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 }
+  waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 },
+  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number }
 ): { message: string; swapped: boolean; swapDetails: string | null } {
   // If DR not found in 1Map, return empty string
   // Go bridge checks for empty message and won't send anything
@@ -425,22 +437,50 @@ function generateAckMessage(
     lines.push('Please send ONT & UPS sticker photo with DR');
   }
 
-  // Serial status (with swap consideration)
+  // Serial status (with swap consideration and VLM photo comparison)
   if (swapCheck.swapped) {
     // Already warned above, just show the raw values
     lines.push(`⚠️ ONT field: ${ontSerial || 'Not scanned'}`);
     lines.push(`⚠️ UPS field: ${upsSerial || 'Not scanned'}`);
+    // Show VLM serials for reference even when swapped
+    if (vlmResult?.ontSerial || vlmResult?.upsSerial) {
+      lines.push('');
+      lines.push(`📷 Photo serials: ONT=${vlmResult.ontSerial || '?'} UPS=${vlmResult.upsSerial || '?'}`);
+    }
   } else {
-    // Normal display
-    const ontLine = ontSerial
-      ? `✅ ONT Serial: ${ontSerial}`
-      : `⚠️ ONT Serial: Not scanned - please upload to 1Map`;
-    lines.push(ontLine);
+    // ONT Serial with VLM sticker comparison
+    if (ontSerial) {
+      lines.push(`🔌 ONT Serial: ${ontSerial}`);
+      if (vlmResult?.ontSerial) {
+        if (normalizeForCompare(ontSerial) === normalizeForCompare(vlmResult.ontSerial)) {
+          lines.push(`   📷 Sticker: ✅ Match`);
+        } else {
+          lines.push(`   📷 Sticker: ⚠️ ${vlmResult.ontSerial}`);
+        }
+      }
+    } else {
+      lines.push(`⚠️ ONT Serial: Not scanned - please upload to 1Map`);
+      if (vlmResult?.ontSerial) {
+        lines.push(`   📷 Photo shows: ${vlmResult.ontSerial}`);
+      }
+    }
 
-    const upsLine = upsSerial
-      ? `✅ UPS Serial: ${upsSerial}`
-      : `⚠️ UPS Serial: Not scanned - please upload to 1Map`;
-    lines.push(upsLine);
+    // UPS Serial with VLM sticker comparison
+    if (upsSerial) {
+      lines.push(`🔋 UPS Serial: ${upsSerial}`);
+      if (vlmResult?.upsSerial) {
+        if (normalizeForCompare(upsSerial) === normalizeForCompare(vlmResult.upsSerial)) {
+          lines.push(`   📷 Sticker: ✅ Match`);
+        } else {
+          lines.push(`   📷 Sticker: ⚠️ ${vlmResult.upsSerial}`);
+        }
+      }
+    } else {
+      lines.push(`⚠️ UPS Serial: Not scanned - please upload to 1Map`);
+      if (vlmResult?.upsSerial) {
+        lines.push(`   📷 Photo shows: ${vlmResult.upsSerial}`);
+      }
+    }
   }
 
   lines.push('');
@@ -543,12 +583,56 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Continue with found=false - don't fail the request
     }
 
-    // Check for WhatsApp serial photos (sent with DR submission)
-    const waPhotoCheck = await checkWAPhotos(dropNumber);
-    if (waPhotoCheck.hasPhoto) {
-      log.info('DrAcknowledgment', `WA serial photo received for ${dropNumber}`, {
-        waPhotoCount: waPhotoCheck.photoCount,
+    // Poll for WhatsApp serial photos and run VLM serial extraction
+    // Race condition: Go Bridge creates wa_photos records asynchronously
+    let waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 };
+    let vlmResult: { ontSerial: string | null; upsSerial: string | null; confidence: number } | undefined;
+
+    try {
+      // Poll for wa_photos (Go Bridge creates them in parallel with this call)
+      const photosReady = await waitForWaPhotos(dropNumber, 10000, 2000);
+
+      if (photosReady) {
+        waPhotoCheck = await checkWAPhotos(dropNumber);
+        log.info('DrAcknowledgment', `WA photos found for ${dropNumber}, running VLM extraction`, {
+          waPhotoCount: waPhotoCheck.photoCount,
+        });
+
+        // Run VLM serial extraction from sticker photo
+        const extraction = await extractWaPhotoSerials(dropNumber, {
+          force: false,
+          timeoutMs: 8000,
+        });
+
+        if (extraction.bestOnt || extraction.bestUps) {
+          vlmResult = {
+            ontSerial: extraction.bestOnt?.serial || null,
+            upsSerial: extraction.bestUps?.serial || null,
+            confidence: Math.max(
+              extraction.bestOnt?.confidence || 0,
+              extraction.bestUps?.confidence || 0
+            ),
+          };
+          log.info('DrAcknowledgment', `VLM serial extraction completed for ${dropNumber}`, {
+            ontExtracted: vlmResult.ontSerial,
+            upsExtracted: vlmResult.upsSerial,
+            confidence: vlmResult.confidence,
+            photosProcessed: extraction.photosProcessed,
+          });
+        } else {
+          log.info('DrAcknowledgment', `VLM found no serials in ${extraction.photosProcessed} photos for ${dropNumber}`);
+        }
+      } else {
+        // No photos appeared within timeout
+        waPhotoCheck = await checkWAPhotos(dropNumber);
+        log.info('DrAcknowledgment', `No WA photos appeared for ${dropNumber} within timeout`);
+      }
+    } catch (vlmError) {
+      // VLM failure is non-critical - fall back to 1Map serials only
+      log.warn('DrAcknowledgment', `VLM extraction failed for ${dropNumber} - using 1Map only`, {
+        error: vlmError instanceof Error ? vlmError.message : String(vlmError),
       });
+      waPhotoCheck = await checkWAPhotos(dropNumber);
     }
 
     // Generate appropriate message based on whether this is a resubmission
@@ -586,12 +670,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         await updateOneMapStatus(dropNumber, 'not_found');
       } else {
         // DR not in 1Map AND not in drops - truly unknown
-        ackResult = generateAckMessage(dropNumber, false, photoCount, ontSerial, upsSerial, waPhotoCheck);
+        ackResult = generateAckMessage(dropNumber, false, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult);
         log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map or drops - no ack`);
       }
     } else {
       // Normal first submission found in 1Map
-      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck);
+      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult);
       // Track 1Map status
       await updateOneMapStatus(dropNumber, 'found');
     }
@@ -641,6 +725,17 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         received: waPhotoCheck.hasPhoto,
         count: waPhotoCheck.photoCount,
       },
+      vlmSerialCheck: vlmResult ? {
+        ontSerial: vlmResult.ontSerial,
+        upsSerial: vlmResult.upsSerial,
+        confidence: vlmResult.confidence,
+        ontMatch: ontSerial && vlmResult.ontSerial
+          ? normalizeForCompare(ontSerial) === normalizeForCompare(vlmResult.ontSerial)
+          : null,
+        upsMatch: upsSerial && vlmResult.upsSerial
+          ? normalizeForCompare(upsSerial) === normalizeForCompare(vlmResult.upsSerial)
+          : null,
+      } : null,
     });
   } catch (error) {
     log.error('DrAcknowledgment', 'Error generating acknowledgment', { error });

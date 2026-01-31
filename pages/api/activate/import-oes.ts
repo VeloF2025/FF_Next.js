@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import fs from 'fs';
 import { log } from '@/lib/logger';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -802,6 +803,28 @@ async function handler(
         } catch (error) {
           log.error('OESImport', 'Failed to trigger SharePoint folder verification', error);
         }
+      }
+
+      // === SERIAL VERIFICATION RECOMPUTATION (Fire-and-forget) ===
+      // OES is the source of truth for serial numbers. When OES data changes,
+      // recompute 4-way verification badges for all affected DRs.
+      const affectedDRs = [...new Set(oesRows.map(row => row.drop_number))];
+      if (affectedDRs.length > 0) {
+        log.info('OESImport', `Recomputing serial verification for ${affectedDRs.length} DRs`);
+        const BATCH_SIZE = 50;
+        (async () => {
+          let recomputed = 0;
+          for (let i = 0; i < affectedDRs.length; i += BATCH_SIZE) {
+            const batch = affectedDRs.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+              batch.map(dr => computeAndPersistVerification(dr))
+            );
+            recomputed += results.filter(r => r.status === 'fulfilled').length;
+          }
+          log.info('OESImport', `Serial verification recomputed for ${recomputed}/${affectedDRs.length} DRs`);
+        })().catch(err => {
+          log.error('OESImport', 'Serial verification batch recomputation failed', err);
+        });
       }
 
       return res.status(200).json({
