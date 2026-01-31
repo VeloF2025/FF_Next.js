@@ -101,10 +101,12 @@ Groups are managed via the FibreFlow WA Portal UI (`/communications/whatsapp` �
 | Lawley Maintenance | maintenance | Lawley | `120363423947610853@g.us` |
 | Velo Server | admin | - | `120363423864087150@g.us` |
 
-**Group Types:**
-- `dr_submission` - DR photo submissions → processed and acknowledged
-- `maintenance` - Maintenance photos → 👍 reaction on success, ❌ on failure
-- `admin` - Commands only (for wa-command-bot)
+**Group Types (business terminology → code type):**
+- `dr_submission` (**"Activations" groups**) — The ONLY groups for 1st DR submissions (new installations). Triggers `dr-acknowledgment` + `process-new-dr` flow. Receives detailed text acknowledgments.
+- `maintenance` (**"Non-invoicable" groups**) — Maintenance/follow-up photos only. Does NOT trigger DR submission processing. Receives emoji reactions (👍 success, ❌ failure).
+- `admin` — Commands only (for wa-command-bot: `!status`, `!restart`, etc.)
+
+**Critical:** When debugging DR submission issues (false resubmissions, missing acks), only Activations (`dr_submission`) groups are relevant. Non-invoicable (`maintenance`) groups are a completely separate flow.
 
 ### WhatsApp Command Bot (VPS Port 8086)
 

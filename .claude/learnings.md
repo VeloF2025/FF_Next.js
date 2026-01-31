@@ -55,6 +55,11 @@ WHERE submission_count > 1 AND qa_decision IS NULL AND feedback_message IS NULL;
 
 **KB:** `.claude/knowledge-base/activate/dr-acknowledgment-race-condition.md` (updated)
 
+**Important domain context — WhatsApp group types and DR submissions:**
+- **Activations groups** (`dr_submission` type) = The ONLY groups for 1st DR submissions (new installations). These trigger `dr-acknowledgment` + `process-new-dr` flow and receive detailed text acknowledgments.
+- **Non-invoicable groups** (`maintenance` type) = Maintenance/follow-up photos only. These do NOT trigger DR submission processing — they receive emoji reactions (👍/❌) instead.
+- When debugging false resubmissions, only DRs from Activations groups are relevant.
+
 ---
 
 ## 2026-01-31: Performance Optimization — next.config.js & API Query Parallelization
