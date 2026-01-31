@@ -682,6 +682,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       });
 
       // UNIFIED ARCHITECTURE: Store contact info during processing
+      // UPSERT: dr-acknowledgment may have created a bare record concurrently (race condition)
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date, sender_phone,
@@ -691,7 +692,29 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            signup_agent, installer_name,
            qcontact_name, qcontact_phone, qcontact_email
          ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10, FALSE,
-           $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+           $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         ON CONFLICT (drop_number) DO UPDATE SET
+           project = COALESCE(EXCLUDED.project, dr_photo_unified_reviews.project),
+           submission_count = COALESCE(dr_photo_unified_reviews.submission_count, 1),
+           submitted_date = COALESCE(EXCLUDED.submitted_date, dr_photo_unified_reviews.submitted_date),
+           sender_phone = COALESCE(EXCLUDED.sender_phone, dr_photo_unified_reviews.sender_phone),
+           wa_message_id = COALESCE(EXCLUDED.wa_message_id, dr_photo_unified_reviews.wa_message_id),
+           wa_sender_jid = COALESCE(EXCLUDED.wa_sender_jid, dr_photo_unified_reviews.wa_sender_jid),
+           wa_original_text = COALESCE(EXCLUDED.wa_original_text, dr_photo_unified_reviews.wa_original_text),
+           wa_group_jid = COALESCE(EXCLUDED.wa_group_jid, dr_photo_unified_reviews.wa_group_jid),
+           wa_received_at = CASE WHEN EXCLUDED.wa_message_id IS NOT NULL THEN NOW() ELSE dr_photo_unified_reviews.wa_received_at END,
+           submission_history = COALESCE(EXCLUDED.submission_history, dr_photo_unified_reviews.submission_history),
+           is_oes_only = FALSE,
+           subscriber_name = COALESCE(EXCLUDED.subscriber_name, dr_photo_unified_reviews.subscriber_name),
+           subscriber_phone = COALESCE(EXCLUDED.subscriber_phone, dr_photo_unified_reviews.subscriber_phone),
+           subscriber_email = COALESCE(EXCLUDED.subscriber_email, dr_photo_unified_reviews.subscriber_email),
+           subscriber_language = COALESCE(EXCLUDED.subscriber_language, dr_photo_unified_reviews.subscriber_language),
+           signup_agent = COALESCE(EXCLUDED.signup_agent, dr_photo_unified_reviews.signup_agent),
+           installer_name = COALESCE(EXCLUDED.installer_name, dr_photo_unified_reviews.installer_name),
+           qcontact_name = COALESCE(EXCLUDED.qcontact_name, dr_photo_unified_reviews.qcontact_name),
+           qcontact_phone = COALESCE(EXCLUDED.qcontact_phone, dr_photo_unified_reviews.qcontact_phone),
+           qcontact_email = COALESCE(EXCLUDED.qcontact_email, dr_photo_unified_reviews.qcontact_email),
+           updated_at = NOW()`,
         [
           dropNumber,
           project || existingQA.project,
@@ -737,6 +760,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     } else {
       // Brand new DR - create fresh record with WhatsApp message context for reply threading
       // UNIFIED ARCHITECTURE: Store contact info during processing
+      // UPSERT: dr-acknowledgment, ensure-data, or import-oes may have created a record concurrently
       await pool.query(
         `INSERT INTO dr_photo_unified_reviews (
            drop_number, project, submission_count, submitted_date, sender_phone,
@@ -747,7 +771,28 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            qcontact_name, qcontact_phone, qcontact_email
          )
          VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW(), FALSE,
-           $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+           $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         ON CONFLICT (drop_number) DO UPDATE SET
+           project = COALESCE(EXCLUDED.project, dr_photo_unified_reviews.project),
+           submission_count = COALESCE(dr_photo_unified_reviews.submission_count, 1),
+           submitted_date = COALESCE(EXCLUDED.submitted_date, dr_photo_unified_reviews.submitted_date),
+           sender_phone = COALESCE(EXCLUDED.sender_phone, dr_photo_unified_reviews.sender_phone),
+           wa_message_id = COALESCE(EXCLUDED.wa_message_id, dr_photo_unified_reviews.wa_message_id),
+           wa_sender_jid = COALESCE(EXCLUDED.wa_sender_jid, dr_photo_unified_reviews.wa_sender_jid),
+           wa_original_text = COALESCE(EXCLUDED.wa_original_text, dr_photo_unified_reviews.wa_original_text),
+           wa_group_jid = COALESCE(EXCLUDED.wa_group_jid, dr_photo_unified_reviews.wa_group_jid),
+           wa_received_at = CASE WHEN EXCLUDED.wa_message_id IS NOT NULL THEN NOW() ELSE dr_photo_unified_reviews.wa_received_at END,
+           is_oes_only = FALSE,
+           subscriber_name = COALESCE(EXCLUDED.subscriber_name, dr_photo_unified_reviews.subscriber_name),
+           subscriber_phone = COALESCE(EXCLUDED.subscriber_phone, dr_photo_unified_reviews.subscriber_phone),
+           subscriber_email = COALESCE(EXCLUDED.subscriber_email, dr_photo_unified_reviews.subscriber_email),
+           subscriber_language = COALESCE(EXCLUDED.subscriber_language, dr_photo_unified_reviews.subscriber_language),
+           signup_agent = COALESCE(EXCLUDED.signup_agent, dr_photo_unified_reviews.signup_agent),
+           installer_name = COALESCE(EXCLUDED.installer_name, dr_photo_unified_reviews.installer_name),
+           qcontact_name = COALESCE(EXCLUDED.qcontact_name, dr_photo_unified_reviews.qcontact_name),
+           qcontact_phone = COALESCE(EXCLUDED.qcontact_phone, dr_photo_unified_reviews.qcontact_phone),
+           qcontact_email = COALESCE(EXCLUDED.qcontact_email, dr_photo_unified_reviews.qcontact_email),
+           updated_at = NOW()`,
         [
           dropNumber,
           project || null,
@@ -770,7 +815,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           qContactInfo?.qcontact_email || null,
         ]
       );
-      log.info('ProcessNewDr', `Created new record for ${dropNumber}`, {
+      log.info('ProcessNewDr', `Created/updated record for ${dropNumber}`, {
         hasWaContext: !!(waMessageId && waSenderJid),
         hasContactInfo: !!(subscriberContact || qContactInfo),
       });

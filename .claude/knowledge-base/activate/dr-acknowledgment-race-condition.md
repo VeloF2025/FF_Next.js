@@ -165,6 +165,38 @@ WHERE submission_count > 1
   AND feedback_message IS NULL;
 ```
 
+## Failure Mode 4: INSERT Duplicate Key (TOCTOU Race)
+
+When `process-new-dr` SELECT finds no existing unified record, but `dr-acknowledgment` creates one between the SELECT and the INSERT, the plain INSERT crashes with:
+```
+duplicate key value violates unique constraint "dr_photo_unified_reviews_drop_number_key"
+```
+
+This caused 147 bridge 500 errors (Jan 23-31, 2026). Photos were still populated by the `processOrphanedRecordsInBackground()` self-healing function in `drops.ts`.
+
+**Fix:** Changed both INSERT statements (lines 686 and 741) to `INSERT ... ON CONFLICT (drop_number) DO UPDATE SET` (UPSERT) with COALESCE to avoid overwriting existing data.
+
+**Rule:** EVERY INSERT into `dr_photo_unified_reviews` MUST use `ON CONFLICT DO UPDATE` because multiple concurrent creators exist. Plain INSERT will eventually crash.
+
+## Self-Healing: processOrphanedRecordsInBackground()
+
+`drops.ts` (line 811) has a fire-and-forget self-healing function that runs on every QA Centre page load. It:
+1. Finds DRs with `photo_count=0`, no `wa_message_id`, created in last 48 hours
+2. Fetches photos from BOSS/1Map API
+3. Updates `photo_source='onemap'` and `photo_count`
+
+This is why DRs still have photos despite `process-new-dr` returning 500.
+
+## Bridge Architecture (Go WhatsApp Bridge)
+
+The Go Bridge at `/opt/whatsapp-bridge/whatsapp-bridge` on VPS (72.61.197.178) calls **staging** (`vf.fibreflow.app`), not production:
+- `FIBREFLOW_API_URL = "https://vf.fibreflow.app/api/activate/process-new-dr"`
+- `FIBREFLOW_ACK_API_URL = "https://vf.fibreflow.app/api/activate/dr-acknowledgment"`
+
+Bridge also writes directly to Neon DB (`qa_photo_reviews` table) via non-pooler connection.
+
+Both `syncToFibreFlow` and `sendDRAcknowledgment` run as goroutines (fire-and-forget).
+
 ## Commits
 
 - `37e97952` — Add project and sender_phone to all process-new-dr paths
