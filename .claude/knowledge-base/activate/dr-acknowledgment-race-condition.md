@@ -189,13 +189,33 @@ This is why DRs still have photos despite `process-new-dr` returning 500.
 
 ## Bridge Architecture (Go WhatsApp Bridge)
 
-The Go Bridge at `/opt/whatsapp-bridge/whatsapp-bridge` on VPS (72.61.197.178) calls **staging** (`vf.fibreflow.app`), not production:
-- `FIBREFLOW_API_URL = "https://vf.fibreflow.app/api/activate/process-new-dr"`
-- `FIBREFLOW_ACK_API_URL = "https://vf.fibreflow.app/api/activate/dr-acknowledgment"`
+The Go Bridge at `/opt/whatsapp-bridge/whatsapp-bridge` on VPS (72.61.197.178) calls **production** (`app.fibreflow.app`) via env var:
+
+```go
+var fibreflowBaseURL = getEnvOrDefault("FIBREFLOW_URL", "https://app.fibreflow.app")
+var FIBREFLOW_API_URL = fibreflowBaseURL + "/api/activate/process-new-dr"
+var FIBREFLOW_ACK_API_URL = fibreflowBaseURL + "/api/activate/dr-acknowledgment"
+var MAINTENANCE_WA_API_URL = fibreflowBaseURL + "/api/maintenance/wa-message"
+```
+
+The systemd service sets `Environment=FIBREFLOW_URL=https://app.fibreflow.app`.
+
+**Note (2026-01-31):** Previously the URLs were hardcoded `const` pointing to staging (`vf.fibreflow.app`). The env var `FIBREFLOW_URL` existed in systemd but was never read by the Go code. Fixed by replacing consts with vars using `getEnvOrDefault()`.
 
 Bridge also writes directly to Neon DB (`qa_photo_reviews` table) via non-pooler connection.
 
 Both `syncToFibreFlow` and `sendDRAcknowledgment` run as goroutines (fire-and-forget).
+
+### Maintenance Group Routing (2026-01-31)
+
+The bridge routes messages differently by group type:
+- **`dr_submission`** groups → `processDropNumbers()` + `sendDRAcknowledgment()` + `syncToFibreFlow()`
+- **`maintenance`** groups → `forwardToMaintenanceAPI()` only (skips DR processing)
+- **`admin`** groups → Command bot only
+
+`processDropNumbers()` receives a `groupType` parameter and returns early for maintenance groups. This prevents activation-style ack messages from being sent to maintenance groups.
+
+The maintenance API endpoint (`/api/maintenance/wa-message`) uses bridge secret authentication (`fibreflow-bridge-2026`) instead of `withAuth` since the bridge has no user session.
 
 ## Commits
 
@@ -203,3 +223,5 @@ Both `syncToFibreFlow` and `sendDRAcknowledgment` run as goroutines (fire-and-fo
 - `b3e9cdf3` — Prevent row duplication from LEFT JOINs in drops query
 - `cf8beb04` — Prevent false resubmission when dr-acknowledgment creates record first (process-new-dr)
 - `841531b5` — Fix false resubmission in dr-acknowledgment.ts itself (114 DRs fixed)
+- `05aac8a8` — Convert process-new-dr INSERTs to UPSERTs (147 bridge 500s)
+- `b58ee477` — Replace withAuth with bridge secret for maintenance WA message endpoint

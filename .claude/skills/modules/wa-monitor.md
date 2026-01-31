@@ -315,6 +315,43 @@ Fix: Ensure all API endpoints are deployed
 - `pages/api/communications/whatsapp/phones/`
 - `pages/api/communications/whatsapp/services/[service]/`
 
+### Trigger 10: Maintenance Group Routing Issues (Jan 2026)
+
+**Keywords**:
+- "maintenance group"
+- "non-invoicable"
+- "ack in maintenance"
+- "wrong group message"
+- "maintenance photos"
+
+**Automatic Actions**:
+1. Check if `processDropNumbers` is skipping maintenance groups in bridge logs
+2. Check `/api/maintenance/wa-message` endpoint health
+3. Verify bridge secret authentication
+4. Check maintenance group JIDs match DB
+
+**Response Template**:
+```
+🔧 Maintenance Group Routing Check:
+
+Bridge routing:
+  dr_submission → processDropNumbers + ack + sync ✅/❌
+  maintenance → forwardToMaintenanceAPI only ✅/❌
+
+Maintenance API: /api/maintenance/wa-message
+  Auth: Bridge secret ✅/❌
+  Known groups: Mohadin (120363424360693693), Lawley (120363423947610853)
+
+Bridge logs (maintenance skip):
+[Check for "Skipping DR processing in maintenance group" in logs]
+
+If acks appearing in maintenance groups:
+  1. Check bridge binary has groupType parameter in processDropNumbers
+  2. Recompile and redeploy bridge (see KB: bridge-configuration.md)
+```
+
+**KB Reference:** `.claude/knowledge-base/wa-monitor/bridge-configuration.md`
+
 ## Auto-Activation Rules
 
 ### DO Automatically (No User Confirmation Needed):

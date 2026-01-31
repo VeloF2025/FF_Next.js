@@ -47,6 +47,19 @@
 ## API Endpoints
 All under `/api/maintenance/*` namespace
 
+### WhatsApp Message Ingestion
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/maintenance/wa-message` | Bridge secret | Receives WhatsApp messages from Go Bridge for maintenance groups |
+
+**Auth pattern:** Uses shared bridge secret (`fibreflow-bridge-2026`) in request body, NOT `withAuth`. Bridge has no user session.
+
+**Known maintenance group JIDs:**
+- `120363424360693693@g.us` — Mohadin Maintenance
+- `120363423947610853@g.us` — Lawley Maintenance
+
+Messages from unknown group JIDs are rejected with 400.
+
 ## Services
 
 ### ticketService
@@ -177,3 +190,5 @@ useAssignment()
 - **Billing Impact**: Guarantee classification affects billing determination
 - **Server/Client Split**: Service exports are server-only; client exports in client.ts
 - **Custom DB Utility**: Uses custom db.ts utility, not an ORM
+- **WA Message Auth**: `/api/maintenance/wa-message` uses bridge secret, NOT `withAuth` — the Go Bridge has no user session. Adding `withAuth` will cause 401 errors
+- **Maintenance vs Activation Groups**: Maintenance groups (Non-invoicable) must NOT receive DR submission ack messages. The bridge skips `processDropNumbers()` for maintenance groups. Only `forwardToMaintenanceAPI()` runs

@@ -3808,3 +3808,95 @@ curl -s http://72.61.197.178:8083/send-message -X POST \
 Note: The feedback proxy (`:8092/send`) does NOT work for sending. Use bridge directly at `:8083/send-message`.
 
 ---
+
+## 2026-01-31: Go WhatsApp Bridge — URL Configuration & Maintenance Group Routing
+
+### Bridge URL Configuration (was hardcoded to staging)
+
+**Problem — Bridge was calling staging instead of production:**
+The Go bridge binary had hardcoded `const` URLs pointing to `vf.fibreflow.app` (staging). The systemd service file had `Environment=FIBREFLOW_URL=https://app.fibreflow.app` but the Go code never called `os.Getenv("FIBREFLOW_URL")`, so the env var was dead/unused.
+
+**Evidence (before fix):**
+- Binary strings: `vf.fibreflow.app` = 4 occurrences, `app.fibreflow.app` = 0
+- Staging DB: 122 duplicate key errors in `process-new-dr` (bridge traffic)
+- Production DB: 0 duplicate key errors (no bridge traffic)
+- Source code: All 4 URLs hardcoded as `const` with no `os.Getenv` call
+
+**Fix — Changed consts to vars using env var with production default:**
+```go
+func getEnvOrDefault(key, defaultVal string) string {
+    if val := os.Getenv(key); val != "" {
+        return val
+    }
+    return defaultVal
+}
+
+var fibreflowBaseURL = getEnvOrDefault("FIBREFLOW_URL", "https://app.fibreflow.app")
+var FIBREFLOW_API_URL = fibreflowBaseURL + "/api/activate/process-new-dr"
+var FIBREFLOW_ACK_API_URL = fibreflowBaseURL + "/api/activate/dr-acknowledgment"
+var MAINTENANCE_WA_API_URL = fibreflowBaseURL + "/api/maintenance/wa-message"
+// Also: apiURL for /api/communications/whatsapp/inbound
+```
+
+**Key lesson — Verify env vars are actually READ by the binary:**
+Just because a systemd service sets `Environment=FOO=bar` does NOT mean the binary uses it. Always check the source code for `os.Getenv("FOO")`. The binary strings command (`strings binary | grep pattern`) is a reliable way to verify what URLs are compiled into a Go binary.
+
+### Maintenance Group Routing Fix
+
+**Problem — Activation ack messages sent to maintenance groups:**
+The `processDropNumbers()` function in the bridge was called for ALL group types (including maintenance) because it ran BEFORE the `handleMessage` function checked the group type. This caused activation-style "DR1234567 Received!" ack messages to appear in maintenance WhatsApp groups.
+
+**Fix — Pass groupType to processDropNumbers and skip for maintenance:**
+```go
+// Added groupType parameter to function signature
+func processDropNumbers(..., groupType string) {
+    // Skip DR submission processing for maintenance groups
+    if groupType == "maintenance" {
+        fmt.Printf("Skipping DR processing in maintenance group: %s\n", chatJID)
+        return
+    }
+    // ... rest of DR processing
+}
+```
+
+**Maintenance API auth fix (wa-message.ts):**
+The endpoint used `withAuth(handler)` but the bridge has no user session (it's a server-to-server call). Replaced with bridge secret validation (`fibreflow-bridge-2026`), matching the same pattern used by `/api/communications/whatsapp/inbound`.
+
+### SCP Relay Pattern for Bridge Deployment
+
+**Problem — Velocity server can't SSH to VPS directly (and vice versa).**
+
+The bridge source is on Velocity (`/home/louis/whatsapp-bridge-go/`), compiled there, but deployed to VPS (`/opt/whatsapp-bridge/`). The two servers can't reach each other via SSH.
+
+**Solution — Use local machine as relay:**
+```bash
+# Compile on Velocity
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && go build -o whatsapp-bridge ."
+
+# Copy to local machine
+sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
+
+# Copy to VPS
+scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
+
+# Restart on VPS
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
+```
+
+### Shell Escaping in Go Source Editing
+
+**Problem — sed and Python heredocs lose quotes when editing Go source via SSH:**
+Multiple attempts to edit `main.go` via sed, Python heredocs, and cat heredocs all failed due to bash escaping stripping double quotes from Go string literals.
+
+**Solution — Base64-encoded Python scripts:**
+```bash
+# Encode the Python fix script
+cat /tmp/fix.py | base64 > /tmp/fix.b64
+
+# Execute on remote server
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo '$(cat /tmp/fix.b64)' | base64 -d | python3"
+```
+
+This bypasses all intermediate shell escaping issues.
+
+---

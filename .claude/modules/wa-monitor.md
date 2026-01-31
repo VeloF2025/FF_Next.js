@@ -230,7 +230,10 @@ Steps are stored as `step_01` through `step_12` boolean columns in database.
 - **Unified Phone Number**: All messages (acks + feedback) come from 082 418 9511
 - **Message Deletion**: Messages can be deleted within 1 hour via `/delete-message`
 - **Ack Filter**: Bridge skips messages containing "Received!" to prevent infinite loop
-- **Bridge Group Tracking**: Groups must be in `main.go` PROJECTS map - SQLite chats table alone is NOT enough
+- **Bridge Group Tracking**: Groups must be in `main.go` PROJECTS map AND `wa_monitored_groups` DB table. SQLite chats table alone is NOT enough
+- **Bridge URL Configuration**: Bridge URLs are driven by `FIBREFLOW_URL` env var (default: `app.fibreflow.app`). Set in systemd `whatsapp-bridge.service`. Previously hardcoded to staging — fixed 2026-01-31
+- **Maintenance Group Routing**: `processDropNumbers()` skips maintenance groups entirely — only `forwardToMaintenanceAPI()` runs. This prevents activation ack messages in maintenance groups
+- **Maintenance API Auth**: `/api/maintenance/wa-message` uses bridge secret (`fibreflow-bridge-2026`), NOT `withAuth`. Bridge has no user session
 - **Command Bot Polling**: Bot polls SQLite every 2 seconds, only processes `!` or `/` prefixed messages
 
 ## Quick Commands
@@ -242,24 +245,31 @@ ssh velo@100.96.203.105  # Password: velo2026
 
 ### Service Management
 ```bash
-# Check services
-echo 'velo2026' | sudo -S systemctl status whatsapp-sender.service whatsapp-bridge.service
+# Bridge on VPS (72.61.197.178)
+ssh root@72.61.197.178
+systemctl status whatsapp-bridge
+systemctl restart whatsapp-bridge
+tail -f /opt/whatsapp-bridge/bridge.log
 
-# Restart services
-echo 'velo2026' | sudo -S systemctl restart whatsapp-sender.service whatsapp-bridge.service
+# Bridge source on Velocity (100.96.203.105)
+sshpass -p 'velo2026' ssh velo@100.96.203.105
+cd /home/louis/whatsapp-bridge-go
+# Edit main.go, then compile:
+go build -o whatsapp-bridge .
 
-# View logs
-tail -f /home/louis/whatsapp-sender/sender.log
-tail -f /home/louis/whatsapp-bridge-go/bridge.log
+# Deploy binary (relay via local machine — servers can't SSH to each other)
+sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/
+scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
 
 ### Delete Sent Messages
 ```bash
-# List recent deletable messages
-curl http://localhost:8081/list-recent
+# List recent deletable messages (use bridge port 8083)
+curl http://72.61.197.178:8083/list-recent
 
 # Delete specific message
-curl -X POST http://localhost:8081/delete-message \
+curl -X POST http://72.61.197.178:8083/delete-message \
   -H "Content-Type: application/json" \
   -d '{"message_id":"3EB0xxx","group_jid":"120363408849234743@g.us"}'
 ```
