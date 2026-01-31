@@ -124,7 +124,7 @@ async function getActivateStats() {
     const pendingResult = await sql`
       SELECT COUNT(*) as count
       FROM dr_photo_unified_reviews
-      WHERE final_status = 'pending'
+      WHERE overall_status = 'pending'
     `;
     const pendingReview = parseInt(pendingResult[0]?.count || '0', 10);
 
@@ -153,7 +153,7 @@ async function getOltStats() {
         COUNT(*) FILTER (WHERE fix_status = 'pending' OR fix_status IS NULL) as pending,
         COUNT(*) FILTER (WHERE fix_status = 'needs_investigation') as needs_investigation,
         COUNT(*) FILTER (WHERE fix_status = 'escalated') as escalated,
-        COUNT(*) FILTER (WHERE fix_status = 'fixed' AND onemap_fix_at >= NOW() - INTERVAL '7 days') as fixed_this_week,
+        COUNT(*) FILTER (WHERE fix_status = 'fixed' AND fix_attempted_at >= NOW() - INTERVAL '7 days') as fixed_this_week,
         COUNT(*) as total
       FROM olt_mismatch_records
     `;
