@@ -16,13 +16,16 @@ import {
   type IncomingWAMessage,
   type ProcessedMessage,
 } from '@/modules/maintenance/services/waMaintenanceProcessor';
-import { withAuth } from '@/lib/auth';
-
 const logger = createLogger('api:maintenance:wa-message');
 
-// Expected group JID for validation
-const EXPECTED_GROUP_JID =
-  process.env.MAINTENANCE_WA_GROUP_JID || '120363424360693693@g.us';
+// Shared secret for Bridge authentication (same as whatsapp/inbound)
+const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET || 'fibreflow-bridge-2026';
+
+// Known maintenance group JIDs
+const MAINTENANCE_GROUP_JIDS = new Set([
+  '120363424360693693@g.us', // Mohadin Maintenance
+  '120363423947610853@g.us', // Lawley Maintenance
+]);
 
 interface ApiResponse {
   success: boolean;
@@ -43,7 +46,16 @@ async function handler(
   }
 
   try {
-    const body = req.body as IncomingWAMessage;
+    const body = req.body as IncomingWAMessage & { secret?: string };
+
+    // Validate bridge secret
+    if (body.secret !== BRIDGE_SECRET) {
+      logger.warn('Invalid or missing bridge secret');
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: invalid bridge secret',
+      });
+    }
 
     // Validate required fields
     if (!body.message_id) {
@@ -78,15 +90,15 @@ async function handler(
       });
     }
 
-    // Validate group JID
-    if (body.group_jid !== EXPECTED_GROUP_JID) {
+    // Validate group JID is a known maintenance group
+    if (!MAINTENANCE_GROUP_JIDS.has(body.group_jid)) {
       logger.warn(
-        { received: body.group_jid, expected: EXPECTED_GROUP_JID },
-        'Message from unexpected group'
+        { received: body.group_jid },
+        'Message from unknown maintenance group'
       );
       return res.status(400).json({
         success: false,
-        error: `Unexpected group: ${body.group_jid}`,
+        error: `Unknown maintenance group: ${body.group_jid}`,
       });
     }
 
@@ -141,4 +153,6 @@ export const config = {
   },
 };
 
-export default withAuth(handler);
+// NOTE: No withAuth - this endpoint is called by Go WhatsApp Bridge
+// Authentication is via shared bridge secret in the request body
+export default handler;
