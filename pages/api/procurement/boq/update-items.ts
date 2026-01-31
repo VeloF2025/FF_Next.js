@@ -63,22 +63,24 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
 
       // Detect changes per field
       if (item.quantity != null && Number(item.quantity) !== Number(current.quantity)) {
+        const oldQty = parseFloat(String(current.quantity));
         allChanges.push({
           boqItemId: item.id,
           field: 'quantity',
-          oldValue: String(current.quantity),
+          oldValue: String(oldQty),
           newValue: String(item.quantity),
-          summary: `${itemLabel}: quantity ${current.quantity} → ${item.quantity}`,
+          summary: `${itemLabel}: quantity ${oldQty} → ${item.quantity}`,
         });
       }
 
       if (item.unitPrice != null && Number(item.unitPrice) !== Number(current.unit_price)) {
+        const oldPrice = parseFloat(String(current.unit_price));
         allChanges.push({
           boqItemId: item.id,
           field: 'unit_price',
-          oldValue: String(current.unit_price),
+          oldValue: String(oldPrice),
           newValue: String(item.unitPrice),
-          summary: `${itemLabel}: unit price ${current.unit_price} → ${item.unitPrice}`,
+          summary: `${itemLabel}: unit price ${oldPrice} → ${item.unitPrice}`,
         });
       }
 

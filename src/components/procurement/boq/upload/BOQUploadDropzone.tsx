@@ -12,11 +12,11 @@ interface BOQUploadDropzoneProps {
   onFileRemove: () => void;
 }
 
-export function BOQUploadDropzone({ 
-  file, 
-  isUploading, 
-  onFileSelect, 
-  onFileRemove 
+export function BOQUploadDropzone({
+  file,
+  isUploading,
+  onFileSelect,
+  onFileRemove
 }: BOQUploadDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop: (acceptedFiles) => {
@@ -47,24 +47,24 @@ export function BOQUploadDropzone({
       {...getRootProps()}
       className={`
         relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-        ${isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300'}
-        ${isDragReject ? 'border-red-400 bg-red-50' : ''}
-        ${isUploading ? 'pointer-events-none opacity-50' : 'hover:border-gray-400'}
+        ${isDragActive ? 'border-blue-400 bg-blue-500/10' : 'border-[var(--ff-border-light)]'}
+        ${isDragReject ? 'border-red-400 bg-red-500/10' : ''}
+        ${isUploading ? 'pointer-events-none opacity-50' : 'hover:border-blue-400/50'}
       `}
     >
       <input {...getInputProps()} />
-      
+
       {!file ? (
         <div className="space-y-4">
-          <Upload className="mx-auto h-12 w-12 text-gray-400" />
+          <Upload className="mx-auto h-12 w-12 text-[var(--ff-text-secondary)]" />
           <div>
-            <p className="text-lg font-medium text-gray-900">
+            <p className="text-lg font-medium text-[var(--ff-text-primary)]">
               {isDragActive ? 'Drop your BOQ file here' : 'Upload BOQ File'}
             </p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
               Drag and drop your Excel (.xlsx, .xls) or CSV file here, or click to browse
             </p>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-[var(--ff-text-secondary)] mt-2">
               Maximum file size: 50MB
             </p>
           </div>
@@ -72,10 +72,10 @@ export function BOQUploadDropzone({
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-center space-x-3">
-            <FileSpreadsheet className="h-8 w-8 text-green-600" />
+            <FileSpreadsheet className="h-8 w-8 text-green-500" />
             <div className="text-left">
-              <p className="font-medium text-gray-900">{file.name}</p>
-              <p className="text-sm text-gray-500">{formatFileSize(file.size)}</p>
+              <p className="font-medium text-[var(--ff-text-primary)]">{file.name}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">{formatFileSize(file.size)}</p>
             </div>
             {!isUploading && (
               <button
@@ -83,9 +83,9 @@ export function BOQUploadDropzone({
                   e.stopPropagation();
                   onFileRemove();
                 }}
-                className="p-1 rounded-full hover:bg-gray-100"
+                className="p-1 rounded-full hover:bg-[var(--ff-bg-hover)]"
               >
-                <X className="h-4 w-4 text-gray-500" />
+                <X className="h-4 w-4 text-[var(--ff-text-secondary)]" />
               </button>
             )}
           </div>

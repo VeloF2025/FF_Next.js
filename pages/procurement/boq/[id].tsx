@@ -94,6 +94,15 @@ const formatDateTime = (dateStr: string | null | undefined) => {
   return date.toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+/** Strip trailing zeros from numeric change values (e.g. "5.0000" → "5") */
+const formatChangeValue = (value: string, field: string) => {
+  if (['quantity', 'unit_price', 'total_price'].includes(field)) {
+    const num = parseFloat(value);
+    if (!isNaN(num)) return String(num);
+  }
+  return value;
+};
+
 export default function BOQDetailPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -473,14 +482,14 @@ export default function BOQDetailPage() {
                 <table className="w-full">
                   <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-12">#</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-44">Code</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Description</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-28">Category</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-20">Qty</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-16">UOM</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-28">Unit Price</th>
-                      <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-32">Total</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-12">#</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-44">Code</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider">Description</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-36">Category</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-20">Qty</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-16">UOM</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-28">Unit Price</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-32">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ff-border-light)]">
@@ -506,7 +515,7 @@ export default function BOQDetailPage() {
                               <span className="truncate block max-w-md" title={item.description}>{item.description}</span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-xs text-[var(--ff-text-secondary)] truncate max-w-[112px]" title={item.category}>
+                          <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)] truncate max-w-[144px]" title={item.category}>
                             {item.category || '-'}
                           </td>
                           <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)] text-right">
@@ -521,7 +530,7 @@ export default function BOQDetailPage() {
                               item.quantity
                             )}
                           </td>
-                          <td className="px-3 py-2 text-xs text-[var(--ff-text-secondary)]">
+                          <td className="px-3 py-2 text-sm text-[var(--ff-text-secondary)]">
                             {item.uom || 'Each'}
                           </td>
                           <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)] text-right">
@@ -607,11 +616,11 @@ export default function BOQDetailPage() {
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs">
                             <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-mono truncate max-w-[200px]" title={change.oldValue}>
-                              {change.oldValue}
+                              {formatChangeValue(change.oldValue, change.fieldChanged)}
                             </span>
                             <ArrowRight className="h-3 w-3 text-[var(--ff-text-secondary)] flex-shrink-0" />
                             <span className="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-mono truncate max-w-[200px]" title={change.newValue}>
-                              {change.newValue}
+                              {formatChangeValue(change.newValue, change.fieldChanged)}
                             </span>
                           </div>
                         </div>
@@ -634,9 +643,9 @@ export default function BOQDetailPage() {
 function StatCard({ icon: Icon, label, value }: { icon: typeof Package; label: string; value: string }) {
   return (
     <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-      <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
-        <Icon className="h-4 w-4" />
-        <span className="text-xs">{label}</span>
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="h-4 w-4 text-blue-400" />
+        <span className="text-sm text-[var(--ff-text-secondary)]">{label}</span>
       </div>
       <p className="text-lg font-semibold text-[var(--ff-text-primary)] truncate">{value}</p>
     </div>

@@ -405,7 +405,7 @@ export default function BOQUpload({
         <div className="flex justify-end space-x-3">
           <button
             onClick={handleFileRemove}
-            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+            className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] rounded-md hover:bg-[var(--ff-bg-hover)]"
           >
             Cancel
           </button>
