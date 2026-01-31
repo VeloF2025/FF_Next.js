@@ -1,9 +1,10 @@
 /**
  * Stock Item Matcher Service
- * Matches BOQ items to internal stock items using a 3-stage pipeline:
+ * Matches BOQ items to internal stock items using a 4-stage pipeline:
  * 1. Supplier code lookup (exact match via supplier_item_codes table)
- * 2. Fuzzy description + category match (keyword overlap + Levenshtein)
- * 3. Unmatched (left for manual mapping)
+ * 2. Fiber domain match (category + parameter matching for fiber BOQ items)
+ * 3. Fuzzy description + category match (keyword overlap + Levenshtein)
+ * 4. Unmatched (left for manual mapping)
  *
  * Note: Stock items often have technical codes as names (e.g. CAB-AER-SM-10.4-48F)
  * with empty descriptions, while BOQ items have natural language descriptions.
@@ -13,13 +14,14 @@
 import { neon } from '@neondatabase/serverless';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import { log } from '@/lib/logger';
+import { fiberDomainMatch } from './fiberDomainMatcher';
 
 // Match thresholds
 const SUPPLIER_CODE_CONFIDENCE = 1.0;
 const FUZZY_THRESHOLD = 0.55; // Lower than MaterialMatcher (0.85) because stock names are technical codes
 const CATEGORY_BOOST = 0.15; // Bonus when categories match
 
-export type StockMatchMethod = 'supplier_code' | 'fuzzy_description' | 'exact_code' | 'manual' | 'none';
+export type StockMatchMethod = 'supplier_code' | 'fuzzy_description' | 'exact_code' | 'category_rule' | 'manual' | 'none';
 
 export interface StockItem {
   id: string;
@@ -90,6 +92,7 @@ export class StockMatcher {
       byMethod: {
         supplier_code: matched.filter(r => r.matchMethod === 'supplier_code').length,
         exact_code: matched.filter(r => r.matchMethod === 'exact_code').length,
+        category_rule: matched.filter(r => r.matchMethod === 'category_rule').length,
         fuzzy_description: matched.filter(r => r.matchMethod === 'fuzzy_description').length,
       },
     });
@@ -151,7 +154,21 @@ export class StockMatcher {
       }
     }
 
-    // Stage 2: Fuzzy description + category matching
+    // Stage 2: Fiber domain match (category + parameter matching)
+    const domainResult = fiberDomainMatch(
+      { description: boqItem.description, category: boqItem.category, itemCode: boqItem.itemCode },
+      stockItems
+    );
+    if (domainResult) {
+      return {
+        ...baseResult,
+        stockItem: domainResult.stockItem,
+        matchMethod: 'category_rule',
+        matchConfidence: domainResult.score,
+      };
+    }
+
+    // Stage 3: Fuzzy description + category matching
     const boqKeywords = TextProcessor.extractKeywords(boqItem.description);
     const boqCategoryNorm = boqItem.category
       ? boqItem.category.toLowerCase().trim()
@@ -205,7 +222,7 @@ export class StockMatcher {
       };
     }
 
-    // Stage 3: No match — return with top alternatives for manual review
+    // Stage 4: No match — return with top alternatives for manual review
     return {
       ...baseResult,
       alternatives: candidates.slice(0, 5),
