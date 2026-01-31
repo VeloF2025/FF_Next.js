@@ -1,35 +1,28 @@
 /**
  * BOQ Detail Page
- * View and manage a specific Bill of Quantities
+ * View, edit, and manage a specific Bill of Quantities
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
 import {
-  ArrowLeft,
-  FileText,
-  Calendar,
-  Package,
-  Edit2,
-  Trash2,
-  Download,
-  Loader2,
-  XCircle,
-  CheckCircle,
-  Clock,
-  User,
+  ArrowLeft, FileText, Calendar, Package, Edit2, Save, X,
+  Trash2, Download, Loader2, XCircle, CheckCircle, Clock,
+  User, Upload, ChevronDown, Eye, EyeOff,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
+import * as XLSX from 'xlsx';
 
 interface BOQItem {
   id: string;
+  lineNumber: number;
   itemCode: string;
   description: string;
   quantity: number;
-  unit: string;
+  uom: string;
   unitPrice: number;
   totalPrice: number;
   category: string;
@@ -52,6 +45,16 @@ interface BOQDetail {
   items?: BOQItem[];
 }
 
+interface VersionInfo {
+  id: string;
+  version: string;
+  title: string;
+  status: string;
+  itemCount: number;
+  totalValue: number;
+  createdAt: string;
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
   uploaded: { label: 'Uploaded', color: 'bg-blue-500/20 text-blue-400', icon: FileText },
@@ -61,6 +64,16 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   archived: { label: 'Archived', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
 };
 
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(value);
+
 export default function BOQDetailPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -69,6 +82,14 @@ export default function BOQDetailPage() {
   const [items, setItems] = useState<BOQItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Feature states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedItems, setEditedItems] = useState<Map<string, Partial<BOQItem>>>(new Map());
+  const [isSaving, setIsSaving] = useState(false);
+  const [hideZeros, setHideZeros] = useState(false);
+  const [versions, setVersions] = useState<VersionInfo[]>([]);
+  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -80,17 +101,17 @@ export default function BOQDetailPage() {
     try {
       setIsLoading(true);
       setError(null);
-
-      // Fetch BOQ details
       const response = await fetch(`/api/procurement/boq/${boqId}`);
       const data = await response.json();
 
       if (data.success !== false && data.id) {
         setBoq(data);
         setItems(data.items || []);
+        fetchVersions(data.projectId);
       } else if (data.boq) {
         setBoq(data.boq);
         setItems(data.items || []);
+        if (data.boq.projectId) fetchVersions(data.boq.projectId);
       } else {
         setError(data.error?.message || 'Failed to load BOQ');
       }
@@ -102,58 +123,131 @@ export default function BOQDetailPage() {
     }
   };
 
-  const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('en-ZA', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
+  const fetchVersions = async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/procurement/boq/versions?projectId=${projectId}`);
+      const data = await res.json();
+      if (data.data?.versions) setVersions(data.data.versions);
+    } catch (err) {
+      log.error('Failed to fetch versions', err);
+    }
+  };
+
+  // Filtered items based on hideZeros toggle
+  const displayItems = useMemo(() => {
+    if (!hideZeros) return items;
+    return items.filter(item => item.quantity !== 0 || item.totalPrice !== 0);
+  }, [items, hideZeros]);
+
+  const totalValue = useMemo(() =>
+    displayItems.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0),
+    [displayItems]
+  );
+
+  // Edit handlers
+  const startEditing = () => {
+    setIsEditing(true);
+    setEditedItems(new Map());
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditedItems(new Map());
+  };
+
+  const updateItem = (itemId: string, field: keyof BOQItem, value: string | number) => {
+    setEditedItems(prev => {
+      const updated = new Map(prev);
+      const existing = updated.get(itemId) || {};
+      updated.set(itemId, { ...existing, [field]: value });
+      return updated;
     });
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-ZA', {
-      style: 'currency',
-      currency: 'ZAR',
-      minimumFractionDigits: 2,
-    }).format(value);
+  const getEditValue = (item: BOQItem, field: keyof BOQItem) => {
+    const edited = editedItems.get(item.id);
+    if (edited && field in edited) return edited[field as keyof typeof edited];
+    return item[field];
   };
+
+  const saveEdits = async () => {
+    if (!boq || editedItems.size === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updates = Array.from(editedItems.entries()).map(([itemId, changes]) => ({
+        id: itemId,
+        ...changes,
+      }));
+
+      const res = await fetch('/api/procurement/boq/update-items', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boqId: boq.id, items: updates }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        notificationService.success(`${updates.length} items updated`);
+        setIsEditing(false);
+        setEditedItems(new Map());
+        if (id && typeof id === 'string') fetchBOQ(id);
+      } else {
+        notificationService.error(data.error?.message || 'Failed to save changes');
+      }
+    } catch (err) {
+      notificationService.error('Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Excel download
+  const handleExcelDownload = useCallback(() => {
+    if (!boq || items.length === 0) return;
+
+    const wsData = items.map((item, idx) => ({
+      '#': item.lineNumber || idx + 1,
+      'Code': item.itemCode || '',
+      'Description': item.description,
+      'Category': item.category || '',
+      'Qty': item.quantity,
+      'UOM': item.uom || 'Each',
+      'Unit Price': item.unitPrice || 0,
+      'Total': item.totalPrice || (item.quantity * (item.unitPrice || 0)),
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(wsData);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 5 }, { wch: 25 }, { wch: 50 }, { wch: 20 },
+      { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 14 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'BOQ Items');
+    const fileName = `${boq.title || 'BOQ'}_v${boq.version}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    notificationService.success('Excel file downloaded');
+  }, [boq, items]);
 
   const handleDelete = async () => {
     if (!boq) return;
     if (!confirm('Are you sure you want to delete this BOQ? This action cannot be undone.')) return;
-
     try {
-      const response = await fetch(`/api/procurement/boq/${boq.id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-
+      const res = await fetch(`/api/procurement/boq/${boq.id}`, { method: 'DELETE' });
+      const data = await res.json();
       if (data.success !== false) {
         notificationService.success('BOQ deleted successfully');
         router.push('/procurement/boq');
       } else {
         notificationService.error(data.error?.message || 'Failed to delete BOQ');
       }
-    } catch (err) {
-      notificationService.error('Failed to delete BOQ');
-    }
-  };
-
-  const handleDownload = () => {
-    if (!boq) return;
-    const blob = new Blob([JSON.stringify({ boq, items }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${boq.fileName || boq.title || 'boq'}_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    notificationService.success('BOQ downloaded');
+    } catch { notificationService.error('Failed to delete BOQ'); }
   };
 
   if (isLoading) {
@@ -172,12 +266,8 @@ export default function BOQDetailPage() {
         <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
           <div className="text-center">
             <XCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">
-              {error || 'BOQ not found'}
-            </h2>
-            <Button onClick={() => router.push('/procurement/boq')}>
-              Back to BOQ List
-            </Button>
+            <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">{error || 'BOQ not found'}</h2>
+            <Button onClick={() => router.push('/procurement/boq')}>Back to BOQ List</Button>
           </div>
         </div>
       </AppLayout>
@@ -186,6 +276,7 @@ export default function BOQDetailPage() {
 
   const status = statusConfig[boq.status] || statusConfig.draft;
   const StatusIcon = status.icon;
+  const hiddenCount = items.length - displayItems.length;
 
   return (
     <AppLayout>
@@ -213,20 +304,44 @@ export default function BOQDetailPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-sm text-[var(--ff-text-secondary)]">
-                  <span>Version: {boq.version}</span>
+                  {/* Version dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowVersionDropdown(!showVersionDropdown)}
+                      className="flex items-center gap-1 hover:text-[var(--ff-text-primary)]"
+                    >
+                      Version: {boq.version}
+                      {versions.length > 1 && <ChevronDown className="h-3 w-3" />}
+                    </button>
+                    {showVersionDropdown && versions.length > 1 && (
+                      <div className="absolute top-full left-0 mt-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-lg z-10 min-w-[200px]">
+                        {versions.map(v => (
+                          <button
+                            key={v.id}
+                            onClick={() => {
+                              setShowVersionDropdown(false);
+                              if (v.id !== boq.id) router.push(`/procurement/boq/${v.id}`);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--ff-bg-hover)] flex items-center justify-between ${
+                              v.id === boq.id ? 'text-blue-400 font-medium' : 'text-[var(--ff-text-primary)]'
+                            }`}
+                          >
+                            <span>v{v.version} - {v.title}</span>
+                            {v.id === boq.id && <span className="text-xs text-blue-400">(current)</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <span>|</span>
                   <span>{items.length} items</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleDownload}>
-                  <Download className="h-4 w-4 mr-1" />
-                  Download
-                </Button>
                 <Button variant="outline" size="sm" onClick={() => router.push(`/procurement/boq/new?projectId=${boq.projectId}`)}>
-                  <Edit2 className="h-4 w-4 mr-1" />
-                  New Version
+                  <Upload className="h-4 w-4 mr-1" />
+                  Upload New Version
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleDelete} className="text-red-400 hover:text-red-300">
                   <Trash2 className="h-4 w-4 mr-1" />
@@ -237,151 +352,200 @@ export default function BOQDetailPage() {
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6">
+        <div className="p-6 space-y-6">
+          {/* Top: Overview Cards + Summary Sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Content - Items Table */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Overview Cards */}
+            <div className="lg:col-span-2">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
-                    <Package className="h-4 w-4" />
-                    <span className="text-xs">Items</span>
-                  </div>
-                  <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    {items.length}
-                  </p>
-                </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
-                    <FileText className="h-4 w-4" />
-                    <span className="text-xs">Total Value</span>
-                  </div>
-                  <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    {formatCurrency(items.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0))}
-                  </p>
-                </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
-                    <Calendar className="h-4 w-4" />
-                    <span className="text-xs">Created</span>
-                  </div>
-                  <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    {formatDate(boq.createdAt)}
-                  </p>
-                </div>
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
-                    <User className="h-4 w-4" />
-                    <span className="text-xs">Uploaded By</span>
-                  </div>
-                  <p className="text-lg font-semibold text-[var(--ff-text-primary)] truncate">
-                    {boq.uploadedBy || 'System'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Description */}
-              {boq.description && (
-                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
-                  <h3 className="text-sm font-medium text-[var(--ff-text-secondary)] mb-2">Description</h3>
-                  <p className="text-[var(--ff-text-primary)]">{boq.description}</p>
-                </div>
-              )}
-
-              {/* Items Table */}
-              <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-                <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                    Items ({items.length})
-                  </h3>
-                </div>
-                <div className="overflow-x-auto">
-                  {items.length === 0 ? (
-                    <p className="text-center py-8 text-[var(--ff-text-secondary)]">No items in this BOQ</p>
-                  ) : (
-                    <table className="w-full">
-                      <thead className="bg-[var(--ff-bg-tertiary)]">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Code</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Description</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Category</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Qty</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Unit Price</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--ff-border-light)]">
-                        {items.map((item, index) => (
-                          <tr key={item.id || index} className="hover:bg-[var(--ff-bg-hover)]">
-                            <td className="px-4 py-3 text-sm text-[var(--ff-text-primary)] font-mono">
-                              {item.itemCode || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-[var(--ff-text-primary)]">
-                              {item.description}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">
-                              {item.category || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-[var(--ff-text-primary)] text-right">
-                              {item.quantity} {item.unit}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-[var(--ff-text-primary)] text-right">
-                              {formatCurrency(item.unitPrice || 0)}
-                            </td>
-                            <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)] text-right">
-                              {formatCurrency(item.totalPrice || (item.quantity * (item.unitPrice || 0)))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-[var(--ff-bg-tertiary)]">
-                        <tr>
-                          <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-[var(--ff-text-primary)] text-right">
-                            Total:
-                          </td>
-                          <td className="px-4 py-3 text-sm font-bold text-[var(--ff-text-primary)] text-right">
-                            {formatCurrency(items.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0))}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  )}
-                </div>
+                <StatCard icon={Package} label="Items" value={String(items.length)} />
+                <StatCard icon={FileText} label="Total Value" value={formatCurrency(totalValue)} />
+                <StatCard icon={Calendar} label="Created" value={formatDate(boq.createdAt)} />
+                <StatCard icon={User} label="Uploaded By" value={boq.uploadedBy || 'System'} />
               </div>
             </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Summary */}
+            <div>
               <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Summary</h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-[var(--ff-text-secondary)]">Status</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${status.color}`}>
-                      {status.label}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--ff-text-secondary)]">Mapping Status</span>
-                    <span className="text-[var(--ff-text-primary)]">{boq.mappingStatus || 'Pending'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--ff-text-secondary)]">Version</span>
-                    <span className="text-[var(--ff-text-primary)]">{boq.version}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[var(--ff-text-secondary)]">Last Updated</span>
-                    <span className="text-[var(--ff-text-primary)]">{formatDate(boq.updatedAt)}</span>
-                  </div>
+                  <SummaryRow label="Status" value={<span className={`px-2 py-1 rounded text-xs font-medium ${status.color}`}>{status.label}</span>} />
+                  <SummaryRow label="Mapping Status" value={boq.mappingStatus || 'Pending'} />
+                  <SummaryRow label="Version" value={boq.version} />
+                  <SummaryRow label="Versions" value={`${versions.length} total`} />
+                  <SummaryRow label="Last Updated" value={formatDate(boq.updatedAt)} />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Items Table - Full Width */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+            {/* Toolbar */}
+            <div className="px-6 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-4">
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                  Items ({displayItems.length}{hiddenCount > 0 ? ` of ${items.length}` : ''})
+                </h3>
+                <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hideZeros}
+                    onChange={(e) => setHideZeros(e.target.checked)}
+                    className="rounded border-gray-500 bg-transparent text-blue-500 focus:ring-blue-500"
+                  />
+                  {hideZeros ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  Hide zero values
+                  {hiddenCount > 0 && <span className="text-xs text-yellow-400">({hiddenCount} hidden)</span>}
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                {isEditing ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={cancelEditing} disabled={isSaving}>
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveEdits} disabled={isSaving || editedItems.size === 0}>
+                      {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                      Save ({editedItems.size})
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" onClick={startEditing}>
+                      <Edit2 className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExcelDownload}>
+                      <Download className="h-4 w-4 mr-1" />
+                      Excel
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              {displayItems.length === 0 ? (
+                <p className="text-center py-8 text-[var(--ff-text-secondary)]">
+                  {hideZeros ? 'All items have zero values. Uncheck "Hide zero values" to see them.' : 'No items in this BOQ'}
+                </p>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-[var(--ff-bg-tertiary)]">
+                    <tr>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-12">#</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-44">Code</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Description</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-28">Category</th>
+                      <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-20">Qty</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-16">UOM</th>
+                      <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-28">Unit Price</th>
+                      <th className="px-3 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase w-32">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ff-border-light)]">
+                    {displayItems.map((item, index) => {
+                      const isItemEdited = editedItems.has(item.id);
+                      return (
+                        <tr key={item.id || index} className={`hover:bg-[var(--ff-bg-hover)] ${isItemEdited ? 'bg-blue-500/5' : ''}`}>
+                          <td className="px-3 py-2 text-xs text-[var(--ff-text-secondary)]">
+                            {item.lineNumber || index + 1}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)] font-mono truncate max-w-[176px]" title={item.itemCode}>
+                            {item.itemCode || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)]">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                defaultValue={String(getEditValue(item, 'description'))}
+                                onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                                className="w-full bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-2 py-1 text-sm text-[var(--ff-text-primary)]"
+                              />
+                            ) : (
+                              <span className="truncate block max-w-md" title={item.description}>{item.description}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-[var(--ff-text-secondary)] truncate max-w-[112px]" title={item.category}>
+                            {item.category || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)] text-right">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                defaultValue={Number(getEditValue(item, 'quantity'))}
+                                onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                className="w-20 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-2 py-1 text-sm text-right text-[var(--ff-text-primary)]"
+                              />
+                            ) : (
+                              item.quantity
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-[var(--ff-text-secondary)]">
+                            {item.uom || 'Each'}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-[var(--ff-text-primary)] text-right">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={Number(getEditValue(item, 'unitPrice'))}
+                                onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                className="w-28 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded px-2 py-1 text-sm text-right text-[var(--ff-text-primary)]"
+                              />
+                            ) : (
+                              formatCurrency(item.unitPrice || 0)
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-sm font-medium text-[var(--ff-text-primary)] text-right whitespace-nowrap">
+                            {formatCurrency(
+                              isEditing
+                                ? (Number(getEditValue(item, 'quantity')) || item.quantity) * (Number(getEditValue(item, 'unitPrice')) || item.unitPrice)
+                                : item.totalPrice || (item.quantity * (item.unitPrice || 0))
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-[var(--ff-bg-tertiary)]">
+                    <tr>
+                      <td colSpan={7} className="px-3 py-3 text-sm font-semibold text-[var(--ff-text-primary)] text-right">
+                        Total{hideZeros && hiddenCount > 0 ? ' (visible)' : ''}:
+                      </td>
+                      <td className="px-3 py-3 text-sm font-bold text-[var(--ff-text-primary)] text-right whitespace-nowrap">
+                        {formatCurrency(totalValue)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
             </div>
           </div>
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+function StatCard({ icon: Icon, label, value }: { icon: typeof Package; label: string; value: string }) {
+  return (
+    <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+      <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] mb-1">
+        <Icon className="h-4 w-4" />
+        <span className="text-xs">{label}</span>
+      </div>
+      <p className="text-lg font-semibold text-[var(--ff-text-primary)] truncate">{value}</p>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-[var(--ff-text-secondary)]">{label}</span>
+      <span className="text-[var(--ff-text-primary)]">{value}</span>
+    </div>
   );
 }

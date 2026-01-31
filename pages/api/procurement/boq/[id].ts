@@ -60,10 +60,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       updatedAt: boq.updated_at,
       items: items.map((item: any) => ({
         id: item.id,
+        lineNumber: Number(item.line_number) || 0,
         itemCode: item.item_code || '',
         description: item.description,
         quantity: Number(item.quantity) || 0,
-        unit: item.uom || 'unit',
+        uom: item.uom || 'Each',
         unitPrice: Number(item.unit_price) || 0,
         totalPrice: Number(item.total_price) || 0,
         category: item.category || 'Materials',
