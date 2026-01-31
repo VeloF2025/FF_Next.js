@@ -4,6 +4,59 @@
 
 ---
 
+## 2026-01-31: False Resubmission Detection in dr-acknowledgment.ts
+
+**Problem — WA system sending "🔄 Resubmitted!" messages on first submissions:**
+DR1736292 and 113 other DRs were receiving resubmission acknowledgments despite being first-time submissions. The WA message showed "This is submission #2 for this DR" and called `markForRework()` which reset the QA workflow.
+
+**Root Cause — `dr-acknowledgment.ts` line 476:**
+```typescript
+const isResubmission = existingSubmission !== null;  // TOO AGGRESSIVE
+```
+This treated ANY existing record in `dr_photo_unified_reviews` as a "previous submission." But records are created by many concurrent sources: `process-new-dr.ts` (running concurrently from Go Bridge), `updateOneMapStatus()` UPSERT within `dr-acknowledgment` itself, OES imports, and more.
+
+**Race condition flow:**
+1. Go Bridge receives WA message → calls both `dr-acknowledgment` and `process-new-dr` concurrently
+2. One endpoint creates a bare record in `dr_photo_unified_reviews`
+3. When `dr-acknowledgment` checks, it finds that record → `isResubmission = true`
+4. Calls `markForRework()` → increments `submission_count`, resets QA workflow, sends "Resubmitted!" message
+
+**Compare to `process-new-dr.ts`** which has 3 nuanced paths:
+- PATH 1: `ageSeconds < 60` → Idempotency guard (duplicate call)
+- PATH 2: No `wa_message_id`/`wa_received_at` → First WA submission (bare record from dr-ack/OES)
+- PATH 3: Has WA context → Genuine resubmission
+
+`dr-acknowledgment.ts` had none of this nuance — just `!== null`.
+
+**Fix (commit `841531b5`):**
+```typescript
+const isResubmission = existingSubmission !== null && (
+  existingSubmission.qa_decision !== null ||
+  existingSubmission.feedback_message !== null
+);
+```
+Only treat as resubmission if DR has been through QA (decision made or feedback sent). This matches the semantic meaning: "resubmission" means tech re-sent photos after receiving QA feedback.
+
+**Data fix:** Reset `submission_count` to 1 for 114 affected DRs via:
+```sql
+UPDATE dr_photo_unified_reviews SET submission_count = 1
+WHERE submission_count > 1 AND qa_decision IS NULL AND feedback_message IS NULL;
+```
+
+**Key lesson — Two endpoints, same bug, different fixes:**
+The `process-new-dr.ts` race condition was fixed on 2026-01-30 (commit `cf8beb04`) with three code paths. But the SAME race condition also existed in `dr-acknowledgment.ts` — it just manifested differently (false resubmission ack message instead of false submission_count increment). When fixing a race condition between concurrent endpoints, always check ALL endpoints involved, not just one.
+
+**Diagnostic query:**
+```sql
+SELECT drop_number, submission_count, qa_decision, feedback_message
+FROM dr_photo_unified_reviews
+WHERE submission_count > 1 AND qa_decision IS NULL AND feedback_message IS NULL;
+```
+
+**KB:** `.claude/knowledge-base/activate/dr-acknowledgment-race-condition.md` (updated)
+
+---
+
 ## 2026-01-31: Performance Optimization — next.config.js & API Query Parallelization
 
 **Problem — App-wide slowness (client-side loading + API response times):**
