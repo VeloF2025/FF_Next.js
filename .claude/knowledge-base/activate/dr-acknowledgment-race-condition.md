@@ -124,8 +124,50 @@ WHERE submission_count > 1
   );
 ```
 
+## Bug: dr-acknowledgment.ts Also Causes False Resubmissions (2026-01-31)
+
+The `process-new-dr.ts` three-path fix from 2026-01-30 was incomplete. The SAME race condition also exists WITHIN `dr-acknowledgment.ts` itself.
+
+### Root Cause
+
+`dr-acknowledgment.ts` line 476 used a simple null check:
+```typescript
+const isResubmission = existingSubmission !== null;  // TOO AGGRESSIVE
+```
+
+Any record in `dr_photo_unified_reviews` was treated as a "previous submission." But records are created by many sources (see table above). When Go Bridge calls `dr-acknowledgment` and the record already exists (created by `process-new-dr` concurrently, or by `updateOneMapStatus` in a prior `dr-acknowledgment` call), the endpoint falsely calls `markForRework()` which increments `submission_count` and sends "🔄 Resubmitted!" message.
+
+### Impact
+
+114 DRs had falsely inflated `submission_count` (> 1) despite never being through QA review. Fixed by resetting to 1.
+
+### Fix
+
+Changed resubmission detection to require evidence of QA processing:
+```typescript
+// Only treat as resubmission if DR has been through QA at least once
+const isResubmission = existingSubmission !== null && (
+  existingSubmission.qa_decision !== null ||
+  existingSubmission.feedback_message !== null
+);
+```
+
+This aligns with the semantic meaning: a "resubmission" means the tech is re-sending photos after receiving QA feedback. Without feedback, it's just a concurrent/duplicate creation.
+
+### Diagnostic Query
+
+```sql
+-- Find DRs falsely marked as resubmissions
+SELECT drop_number, submission_count, qa_decision, feedback_message, created_at
+FROM dr_photo_unified_reviews
+WHERE submission_count > 1
+  AND qa_decision IS NULL
+  AND feedback_message IS NULL;
+```
+
 ## Commits
 
 - `37e97952` — Add project and sender_phone to all process-new-dr paths
 - `b3e9cdf3` — Prevent row duplication from LEFT JOINs in drops query
-- `cf8beb04` — Prevent false resubmission when dr-acknowledgment creates record first
+- `cf8beb04` — Prevent false resubmission when dr-acknowledgment creates record first (process-new-dr)
+- (pending) — Fix false resubmission in dr-acknowledgment.ts itself

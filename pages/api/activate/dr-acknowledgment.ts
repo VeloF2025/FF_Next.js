@@ -472,8 +472,16 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     log.info('DrAcknowledgment', `Getting acknowledgment data for ${dropNumber}`, { project });
 
     // Check if this is a resubmission
+    // IMPORTANT: A bare record created by updateOneMapStatus, process-new-dr, or OES import
+    // is NOT a real resubmission. Only treat as resubmission if the DR has been through
+    // QA review at least once (qa_decision set) or feedback was sent (feedback_message set).
+    // Without this check, concurrent calls from Go Bridge cause false resubmission detection.
+    // See: .claude/knowledge-base/activate/dr-acknowledgment-race-condition.md
     const existingSubmission = await checkExistingSubmission(dropNumber);
-    const isResubmission = existingSubmission !== null;
+    const isResubmission = existingSubmission !== null && (
+      existingSubmission.qa_decision !== null ||
+      existingSubmission.feedback_message !== null
+    );
     let submissionNumber = 1;
     let previousPhotoCount = 0;
 
@@ -483,6 +491,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       log.info('DrAcknowledgment', `RESUBMISSION detected for ${dropNumber}`, {
         previousSubmissions: existingSubmission.submission_count,
         previousPhotoCount,
+        qaDecision: existingSubmission.qa_decision,
+      });
+    } else if (existingSubmission !== null) {
+      log.info('DrAcknowledgment', `Record exists for ${dropNumber} but no QA decision yet - treating as first submission`, {
+        submissionCount: existingSubmission.submission_count,
+        qaDecision: existingSubmission.qa_decision,
+        feedbackMessage: existingSubmission.feedback_message ? 'yes' : 'no',
       });
     }
 
