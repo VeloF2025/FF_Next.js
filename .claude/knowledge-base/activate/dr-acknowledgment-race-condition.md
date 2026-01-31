@@ -170,4 +170,4 @@ WHERE submission_count > 1
 - `37e97952` — Add project and sender_phone to all process-new-dr paths
 - `b3e9cdf3` — Prevent row duplication from LEFT JOINs in drops query
 - `cf8beb04` — Prevent false resubmission when dr-acknowledgment creates record first (process-new-dr)
-- (pending) — Fix false resubmission in dr-acknowledgment.ts itself
+- `841531b5` — Fix false resubmission in dr-acknowledgment.ts itself (114 DRs fixed)
