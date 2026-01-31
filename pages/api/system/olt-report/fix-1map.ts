@@ -170,6 +170,14 @@ async function fixSingleDR(
         [fixResult, JSON.stringify(fixDetails), userId, drNumber]
       );
 
+      // Update DR Review summary page serial (dr_photo_unified_reviews)
+      await client.query(
+        `UPDATE dr_photo_unified_reviews
+         SET ont_serial_scanned = $1
+         WHERE drop_number = $2`,
+        [correctSerial, drNumber]
+      );
+
       // Log to activity log with appropriate message
       const ontOldValue = 'ont' in result ? result.ont.oldValue : result.oldValue;
 
