@@ -384,7 +384,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         fetchStats();
         setSelectedFile(null);
       } else {
-        setError(data.error || result.error || 'Import failed');
+        setError(data.error?.message || data.error || 'Import failed');
       }
     } catch {
       setError('Import failed');
@@ -526,7 +526,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         fetchRecords('needs_investigation');
         fetchStats();
       } else {
-        setError(data.error?.message || data.error || 'Resolve failed');
+        setError(typeof data.error === 'string' ? data.error : data.error?.message || 'Resolve failed');
       }
     } catch {
       setError('Resolve failed');
@@ -561,7 +561,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         fetchRecords('needs_investigation');
         fetchStats();
       } else {
-        setError(data.error?.message || data.error || 'Escalate failed');
+        setError(typeof data.error === 'string' ? data.error : data.error?.message || 'Escalate failed');
       }
     } catch {
       setError('Escalate failed');
