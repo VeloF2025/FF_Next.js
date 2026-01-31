@@ -47,9 +47,16 @@ const nextConfig = {
 
   // Disable static generation to prevent SSR issues
   experimental: {
-    disableOptimizedLoading: true,
-    // Enable optimized package imports
-    optimizePackageImports: ['@tanstack/react-query', 'react-icons'],
+    // Enable optimized package imports for tree-shaking
+    optimizePackageImports: [
+      '@tanstack/react-query',
+      'react-icons',
+      'lucide-react',
+      'date-fns',
+      'zod',
+      'react-hot-toast',
+      '@heroicons/react',
+    ],
   },
 
   // Security and performance headers
@@ -228,50 +235,7 @@ const nextConfig = {
       };
     }
 
-    // Production optimizations
-    if (!dev && !isServer) {
-      // Optimize chunk splitting
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            // Framework chunk (React, Next.js)
-            framework: {
-              name: 'framework',
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|prop-types|use-subscription)[\\/]/,
-              priority: 40,
-              enforce: true,
-            },
-            // Common libraries chunk
-            lib: {
-              test: /[\\/]node_modules[\\/]/,
-              name(module) {
-                const packageName = module.context.match(
-                  /[\\/]node_modules[\\/](.*?)([\\/]|$)/
-                )?.[1];
-                return `npm.${packageName?.replace('@', '')}`;
-              },
-              priority: 30,
-              minChunks: 1,
-              reuseExistingChunk: true,
-            },
-            // Shared application code
-            commons: {
-              name: 'commons',
-              minChunks: 2,
-              priority: 20,
-            },
-          },
-        },
-        // Minimize runtime chunk
-        runtimeChunk: {
-          name: 'runtime',
-        },
-      };
-    }
+    // Let Next.js handle chunk splitting (its defaults are well-optimized)
 
     // Ensure proper handling of undefined paths
     if (config.resolve && config.resolve.alias) {

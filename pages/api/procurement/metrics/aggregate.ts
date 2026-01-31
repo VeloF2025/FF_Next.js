@@ -21,17 +21,24 @@ async function handler(
   }
 
   try {
-    // Get aggregate metrics from multiple sources
+    // Get aggregate metrics from multiple sources (all independent, run in parallel)
+    const [
+      projectCount,
+      boqTotal,
+      rfqCount,
+      poCount,
+      stockItemCount,
+      supplierCount,
+      costSavings,
+      cycleTime,
+      supplierOTIF,
+      monthlyVolume,
+    ] = await Promise.all([
+      // Count active projects
+      sql`SELECT COUNT(*) as total FROM projects WHERE status = 'active'`,
 
-    // Count active projects
-    const projectCount = await sql`
-      SELECT COUNT(*) as total FROM projects WHERE status = 'active'
-    `;
-
-    // Total BOQ Value across all projects
-    // First try to sum from boq_items, then fallback to boqs.total_estimated_value
-    const boqTotal = await sql`
-      SELECT COALESCE(
+      // Total BOQ Value across all projects
+      sql`SELECT COALESCE(
         NULLIF(
           (SELECT SUM(bi.total_price) FROM boq_items bi
            JOIN boqs b ON bi.boq_id = b.id
@@ -40,34 +47,24 @@ async function handler(
         ),
         (SELECT SUM(total_estimated_value) FROM boqs WHERE status != 'archived'),
         0
-      ) as total_value
-    `;
+      ) as total_value`,
 
-    // Active RFQs count
-    const rfqCount = await sql`
-      SELECT COUNT(*) as total
+      // Active RFQs count
+      sql`SELECT COUNT(*) as total
       FROM rfqs r
-      WHERE r.status NOT IN ('closed', 'cancelled', 'awarded')
-    `;
+      WHERE r.status NOT IN ('closed', 'cancelled', 'awarded')`,
 
-    // Total Purchase Orders count
-    const poCount = await sql`
-      SELECT COUNT(*) as total FROM purchase_orders
-    `;
+      // Total Purchase Orders count
+      sql`SELECT COUNT(*) as total FROM purchase_orders`,
 
-    // Total Stock Items count
-    const stockItemCount = await sql`
-      SELECT COUNT(*) as total FROM stock_items WHERE is_active = true
-    `;
+      // Total Stock Items count
+      sql`SELECT COUNT(*) as total FROM stock_items WHERE is_active = true`,
 
-    // Total Suppliers count
-    const supplierCount = await sql`
-      SELECT COUNT(*) as total FROM suppliers WHERE status = 'active'
-    `;
+      // Total Suppliers count
+      sql`SELECT COUNT(*) as total FROM suppliers WHERE status = 'active'`,
 
-    // Calculate average cost savings (comparison of RFQ estimates vs awarded amounts)
-    const costSavings = await sql`
-      SELECT
+      // Calculate average cost savings (comparison of RFQ estimates vs awarded amounts)
+      sql`SELECT
         CASE
           WHEN SUM(r.total_budget_estimate) > 0 THEN
             ROUND(
@@ -79,12 +76,10 @@ async function handler(
       FROM rfqs r
       LEFT JOIN purchase_orders po ON po.rfq_id = r.id
       WHERE r.status = 'awarded'
-      AND r.total_budget_estimate > 0
-    `;
+      AND r.total_budget_estimate > 0`,
 
-    // Calculate average cycle time (days from RFQ creation to PO creation)
-    const cycleTime = await sql`
-      SELECT
+      // Calculate average cycle time (days from RFQ creation to PO creation)
+      sql`SELECT
         COALESCE(
           AVG(
             EXTRACT(DAY FROM (po.created_at - r.created_at))
@@ -93,12 +88,10 @@ async function handler(
         ) as avg_days
       FROM rfqs r
       JOIN purchase_orders po ON po.rfq_id = r.id
-      WHERE r.status = 'awarded'
-    `;
+      WHERE r.status = 'awarded'`,
 
-    // Calculate supplier OTIF (On-Time In-Full) - based on GRN data
-    const supplierOTIF = await sql`
-      SELECT
+      // Calculate supplier OTIF (On-Time In-Full) - based on GRN data
+      sql`SELECT
         CASE
           WHEN COUNT(*) > 0 THEN
             ROUND(
@@ -109,20 +102,18 @@ async function handler(
               END)::NUMERIC / COUNT(*)::NUMERIC * 100,
               0
             )
-          ELSE 92 -- Default value if no data
+          ELSE 92
         END as otif_percent
       FROM goods_receipt_notes grn
       JOIN purchase_orders po ON grn.purchase_order_id = po.id
-      WHERE grn.status = 'completed'
-    `;
+      WHERE grn.status = 'completed'`,
 
-    // Monthly procurement volume (last 30 days)
-    const monthlyVolume = await sql`
-      SELECT COALESCE(SUM(total_amount), 0) as volume
+      // Monthly procurement volume (last 30 days)
+      sql`SELECT COALESCE(SUM(total_amount), 0) as volume
       FROM purchase_orders
       WHERE created_at >= NOW() - INTERVAL '30 days'
-      AND status NOT IN ('draft', 'cancelled')
-    `;
+      AND status NOT IN ('draft', 'cancelled')`,
+    ]);
 
     const metrics: AggregateProjectMetrics = {
       totalProjects: parseInt(projectCount[0]?.total) || 0,

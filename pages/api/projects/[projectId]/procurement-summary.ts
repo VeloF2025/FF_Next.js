@@ -36,30 +36,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Project', projectId);
     }
 
-    // Get BOQ counts
-    const boqStats = await sql`
-      SELECT
+    // All queries are independent - run in parallel
+    const [boqStats, rfqStats, poStats, grnStats] = await Promise.all([
+      // Get BOQ counts
+      sql`SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'approved') as approved,
         COUNT(*) FILTER (WHERE status = 'draft') as draft
       FROM boqs
-      WHERE project_id = ${projectId}
-    `;
+      WHERE project_id = ${projectId}`,
 
-    // Get RFQ counts (project_id is VARCHAR)
-    const rfqStats = await sql`
-      SELECT
+      // Get RFQ counts (project_id is VARCHAR)
+      sql`SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'open') as open,
         COUNT(*) FILTER (WHERE status = 'closed') as closed,
         COUNT(*) FILTER (WHERE status = 'awarded') as awarded
       FROM rfqs
-      WHERE project_id::text = ${projectId}
-    `;
+      WHERE project_id::text = ${projectId}`,
 
-    // Get PO counts and values
-    const poStats = await sql`
-      SELECT
+      // Get PO counts and values
+      sql`SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE status = 'pending_approval') as pending,
         COUNT(*) FILTER (WHERE status = 'approved') as approved,
@@ -68,12 +65,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COALESCE(SUM(total_amount) FILTER (WHERE status = 'approved'), 0) as approved_value,
         COALESCE(SUM(total_amount) FILTER (WHERE status = 'completed'), 0) as completed_value
       FROM purchase_orders
-      WHERE project_id = ${projectId}
-    `;
+      WHERE project_id = ${projectId}`,
 
-    // Get GRN counts and values (GRN links to project via purchase_orders)
-    const grnStats = await sql`
-      SELECT
+      // Get GRN counts and values (GRN links to project via purchase_orders)
+      sql`SELECT
         COUNT(DISTINCT grn.id) as total,
         COUNT(DISTINCT grn.id) FILTER (WHERE grn.status = 'pending') as pending,
         COUNT(DISTINCT grn.id) FILTER (WHERE grn.status = 'received') as received,
@@ -81,8 +76,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM goods_receipt_notes grn
       LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
       LEFT JOIN goods_receipt_items gri ON gri.grn_id = grn.id
-      WHERE po.project_id = ${projectId}
-    `;
+      WHERE po.project_id = ${projectId}`,
+    ]);
 
     // Format response
     const response = {
