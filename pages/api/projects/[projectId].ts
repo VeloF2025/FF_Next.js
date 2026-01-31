@@ -55,6 +55,9 @@ async function handler(
               p.project_manager,
               COALESCE(s.first_name || ' ' || s.last_name, u.first_name || ' ' || u.last_name, p.project_manager::text) as project_manager_name,
               p.progress,
+              p.location,
+              p.latitude,
+              p.longitude,
               p.created_at,
               p.updated_at,
               c.company_name as client_name

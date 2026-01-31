@@ -9,7 +9,30 @@ interface ProjectInfoCardProps {
   project: Project;
 }
 
+function formatLocation(location: unknown): string {
+  if (!location) return 'Not specified';
+  const loc = typeof location === 'string' ? location : String(location);
+
+  // Try parsing as JSON (handles {"coordinates":...,"city":"Lawley",...} format)
+  try {
+    const parsed = JSON.parse(loc);
+    const parts: string[] = [];
+    if (parsed.city) parts.push(parsed.city);
+    if (parsed.region) parts.push(parsed.region);
+    if (parsed.province) parts.push(parsed.province);
+    if (parsed.country) parts.push(parsed.country);
+    if (parts.length > 0) return parts.filter(Boolean).join(', ');
+    // If JSON but no readable fields, return the raw city or a fallback
+    return parsed.address || loc;
+  } catch {
+    // Not JSON — return as-is (plain text location)
+    return loc;
+  }
+}
+
 export function ProjectInfoCard({ project }: ProjectInfoCardProps) {
+  const displayLocation = formatLocation(project.location);
+
   return (
     <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6">
       <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Project Information</h2>
@@ -26,8 +49,8 @@ export function ProjectInfoCard({ project }: ProjectInfoCardProps) {
           <div>
             <h3 className="text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Location</h3>
             <div className="flex items-center text-[var(--ff-text-primary)]">
-              <MapPin className="h-4 w-4 mr-2" />
-              {project.location}
+              <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+              {displayLocation}
             </div>
           </div>
 
@@ -35,7 +58,7 @@ export function ProjectInfoCard({ project }: ProjectInfoCardProps) {
             <div>
               <h3 className="text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Client</h3>
               <div className="flex items-center text-[var(--ff-text-primary)]">
-                <Building2 className="h-4 w-4 mr-2" />
+                <Building2 className="h-4 w-4 mr-2 flex-shrink-0" />
                 {project.clientName}
               </div>
             </div>
