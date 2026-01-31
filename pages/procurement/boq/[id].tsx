@@ -9,7 +9,7 @@ import { AppLayout } from '@/components/layout';
 import {
   ArrowLeft, FileText, Calendar, Package, Edit2, Save, X,
   Trash2, Download, Loader2, XCircle, CheckCircle, Clock,
-  User, Upload, ChevronDown, Eye, EyeOff,
+  User, Upload, ChevronDown, Eye, EyeOff, History, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { notificationService } from '@/services/core/NotificationService';
@@ -55,6 +55,19 @@ interface VersionInfo {
   createdAt: string;
 }
 
+interface ChangeEntry {
+  id: string;
+  boqItemId: string | null;
+  action: string;
+  fieldChanged: string;
+  oldValue: string;
+  newValue: string;
+  changedByName: string;
+  changeSummary: string;
+  createdAt: string;
+  itemCode: string | null;
+}
+
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
   uploaded: { label: 'Uploaded', color: 'bg-blue-500/20 text-blue-400', icon: FileText },
@@ -74,6 +87,13 @@ const formatDate = (dateStr: string | null | undefined) => {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 2 }).format(value);
 
+const formatDateTime = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 export default function BOQDetailPage() {
   const router = useRouter();
   const { id } = router.query;
@@ -90,6 +110,9 @@ export default function BOQDetailPage() {
   const [hideZeros, setHideZeros] = useState(false);
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+  const [changeHistory, setChangeHistory] = useState<ChangeEntry[]>([]);
+  const [changeCount, setChangeCount] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -108,10 +131,12 @@ export default function BOQDetailPage() {
         setBoq(data);
         setItems(data.items || []);
         fetchVersions(data.projectId);
+        fetchChangeHistory(boqId);
       } else if (data.boq) {
         setBoq(data.boq);
         setItems(data.items || []);
         if (data.boq.projectId) fetchVersions(data.boq.projectId);
+        fetchChangeHistory(boqId);
       } else {
         setError(data.error?.message || 'Failed to load BOQ');
       }
@@ -130,6 +155,19 @@ export default function BOQDetailPage() {
       if (data.data?.versions) setVersions(data.data.versions);
     } catch (err) {
       log.error('Failed to fetch versions', err);
+    }
+  };
+
+  const fetchChangeHistory = async (boqId: string) => {
+    try {
+      const res = await fetch(`/api/procurement/boq/change-history?boqId=${boqId}`);
+      const data = await res.json();
+      if (data.data?.changes) {
+        setChangeHistory(data.data.changes);
+        setChangeCount(data.data.total || 0);
+      }
+    } catch (err) {
+      log.error('Failed to fetch change history', err);
     }
   };
 
@@ -191,7 +229,8 @@ export default function BOQDetailPage() {
       const data = await res.json();
 
       if (res.ok) {
-        notificationService.success(`${updates.length} items updated`);
+        const changesLogged = data.data?.changesLogged || data.changesLogged || 0;
+        notificationService.success(`${updates.length} items updated (${changesLogged} changes logged)`);
         setIsEditing(false);
         setEditedItems(new Map());
         if (id && typeof id === 'string') fetchBOQ(id);
@@ -522,6 +561,69 @@ export default function BOQDetailPage() {
                 </table>
               )}
             </div>
+          </div>
+          {/* Change History */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-[var(--ff-bg-hover)] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <History className="h-5 w-5 text-[var(--ff-text-secondary)]" />
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Change History</h3>
+                {changeCount > 0 && (
+                  <span className="bg-blue-500/20 text-blue-400 text-xs font-medium px-2 py-0.5 rounded-full">
+                    {changeCount}
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={`h-5 w-5 text-[var(--ff-text-secondary)] transition-transform ${showHistory ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showHistory && (
+              <div className="border-t border-[var(--ff-border-light)]">
+                {changeHistory.length === 0 ? (
+                  <p className="px-6 py-8 text-center text-[var(--ff-text-secondary)]">
+                    No changes recorded yet. Edit items to start tracking changes.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-[var(--ff-border-light)]">
+                    {changeHistory.map((change) => (
+                      <div key={change.id} className="px-6 py-3 flex items-start gap-4">
+                        <div className="flex-shrink-0 mt-1">
+                          <div className="h-2 w-2 rounded-full bg-blue-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-[var(--ff-text-primary)]">
+                              {change.changedByName}
+                            </span>
+                            <span className="text-xs text-[var(--ff-text-secondary)]">
+                              changed <span className="font-mono text-[var(--ff-text-primary)]">{change.fieldChanged}</span>
+                              {change.itemCode && (
+                                <> on <span className="font-mono text-[var(--ff-text-primary)]">{change.itemCode}</span></>
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-xs">
+                            <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-mono truncate max-w-[200px]" title={change.oldValue}>
+                              {change.oldValue}
+                            </span>
+                            <ArrowRight className="h-3 w-3 text-[var(--ff-text-secondary)] flex-shrink-0" />
+                            <span className="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-mono truncate max-w-[200px]" title={change.newValue}>
+                              {change.newValue}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-xs text-[var(--ff-text-secondary)] whitespace-nowrap flex-shrink-0">
+                          {formatDateTime(change.createdAt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
