@@ -12,6 +12,7 @@ import {
   User, Upload, ChevronDown, Eye, EyeOff, History, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
+import StockItemMapper from '@/components/procurement/boq/StockItemMapper';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import * as XLSX from 'xlsx';
@@ -26,6 +27,9 @@ interface BOQItem {
   unitPrice: number;
   totalPrice: number;
   category: string;
+  stockItemId: string | null;
+  stockMatchMethod: string | null;
+  stockMatchConfidence: number | null;
 }
 
 interface BOQDetail {
@@ -571,6 +575,21 @@ export default function BOQDetailPage() {
               )}
             </div>
           </div>
+          {/* Stock Item Mapping */}
+          <StockItemMapper
+            boqId={boq.id}
+            items={items.map(i => ({
+              id: i.id,
+              itemCode: i.itemCode,
+              description: i.description,
+              category: i.category,
+              stockItemId: i.stockItemId,
+              stockMatchMethod: i.stockMatchMethod,
+              stockMatchConfidence: i.stockMatchConfidence,
+            }))}
+            onMappingComplete={() => { if (id && typeof id === 'string') fetchBOQ(id); }}
+          />
+
           {/* Change History */}
           <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
             <button

@@ -29,6 +29,7 @@ import {
 import { Button } from '@/shared/components/ui/Button';
 import { ConvertToPOModal } from '@/components/procurement/rfq/ConvertToPOModal';
 import { QuoteScannerModal } from '@/modules/procurement/quote-scanner';
+import SupplierCodeMapper from '@/components/procurement/rfq/SupplierCodeMapper';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 
@@ -374,31 +375,47 @@ export default function RFQDetailPage() {
                 <div className="p-4">
                   {/* Items Tab */}
                   {activeTab === 'items' && (
-                    <div className="space-y-3">
-                      {rfq.items.length === 0 ? (
-                        <p className="text-center py-8 text-[var(--ff-text-secondary)]">No items added</p>
-                      ) : (
-                        rfq.items.map((item, index) => (
-                          <div key={item.id || index} className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium text-[var(--ff-text-primary)]">{item.description}</p>
-                                {item.specifications && (
-                                  <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{item.specifications}</p>
-                                )}
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        {rfq.items.length === 0 ? (
+                          <p className="text-center py-8 text-[var(--ff-text-secondary)]">No items added</p>
+                        ) : (
+                          rfq.items.map((item, index) => (
+                            <div key={item.id || index} className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="font-medium text-[var(--ff-text-primary)]">{item.description}</p>
+                                  {item.specifications && (
+                                    <p className="text-sm text-[var(--ff-text-secondary)] mt-1">{item.specifications}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-[var(--ff-text-primary)]">
+                                    {formatCurrency(item.estimatedUnitPrice * item.quantity)}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-[var(--ff-text-primary)]">
-                                  {formatCurrency(item.estimatedUnitPrice * item.quantity)}
-                                </p>
+                              <div className="flex gap-4 mt-2 text-sm text-[var(--ff-text-tertiary)]">
+                                <span>Qty: {item.quantity} {item.unit}</span>
+                                <span>Unit Price: {formatCurrency(item.estimatedUnitPrice)}</span>
                               </div>
                             </div>
-                            <div className="flex gap-4 mt-2 text-sm text-[var(--ff-text-tertiary)]">
-                              <span>Qty: {item.quantity} {item.unit}</span>
-                              <span>Unit Price: {formatCurrency(item.estimatedUnitPrice)}</span>
-                            </div>
-                          </div>
-                        ))
+                          ))
+                        )}
+                      </div>
+
+                      {/* Supplier Code Mapper */}
+                      {rfq.items.length > 0 && (
+                        <SupplierCodeMapper
+                          rfqItems={rfq.items.map(i => ({
+                            id: i.id,
+                            description: i.description,
+                            quantity: i.quantity,
+                            unit: i.unit,
+                          }))}
+                          supplierName={rfq.suppliers[0]?.companyName}
+                          supplierId={rfq.suppliers[0]?.id}
+                        />
                       )}
                     </div>
                   )}

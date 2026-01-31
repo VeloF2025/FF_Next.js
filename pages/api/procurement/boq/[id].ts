@@ -69,6 +69,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         totalPrice: Number(item.total_price) || 0,
         category: item.category || 'Materials',
         stockItemId: item.stock_item_id || null,
+        stockMatchMethod: item.stock_match_method || null,
+        stockMatchConfidence: item.stock_match_confidence != null ? Number(item.stock_match_confidence) : null,
       })),
     };
 

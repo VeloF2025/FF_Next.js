@@ -7,6 +7,7 @@ import fs from 'fs';
 import * as XLSX from 'xlsx';
 import { neon } from '@neondatabase/serverless';
 import { BOQImportEnhanced, type BOQRow } from '@/services/procurement/import/boqImportEnhanced';
+import { createStockMatcher } from '@/services/procurement/import/stockMatcher';
 import type { ColumnMapping, BOQTargetField } from '@/types/procurement/boq.types';
 
 export const config = {
@@ -131,22 +132,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       createMaterials,
     });
 
-    // Match stock items by item_code
+    // Match stock items using fuzzy matching pipeline
     const sql = neon(process.env.DATABASE_URL!);
     let stockItemsMatched = 0;
 
     if (result.boqId) {
-      const stockMatches = await sql`
-        SELECT si.id as stock_item_id, si.item_code, bi.id as boq_item_id
-        FROM boq_items bi
-        JOIN stock_items si ON LOWER(si.item_code) = LOWER(bi.item_code)
-        WHERE bi.boq_id = ${result.boqId} AND bi.item_code IS NOT NULL AND bi.item_code != ''
+      const boqItemRows = await sql`
+        SELECT id, item_code, description, category
+        FROM boq_items
+        WHERE boq_id = ${result.boqId}
+          AND description IS NOT NULL AND description != ''
       `;
 
-      for (const match of stockMatches) {
-        await sql`UPDATE boq_items SET stock_item_id = ${match.stock_item_id} WHERE id = ${match.boq_item_id}`;
+      if (boqItemRows.length > 0) {
+        const stockMatcher = createStockMatcher(process.env.DATABASE_URL!);
+        const matchResults = await stockMatcher.matchBatch(
+          boqItemRows.map(r => ({
+            id: r.id as string,
+            itemCode: (r.item_code as string) || null,
+            description: r.description as string,
+            category: (r.category as string) || null,
+          }))
+        );
+
+        stockItemsMatched = await stockMatcher.saveMatches(matchResults);
       }
-      stockItemsMatched = stockMatches.length;
     }
 
     // Save as template if requested
