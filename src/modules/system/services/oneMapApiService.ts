@@ -72,12 +72,30 @@ interface SearchResult {
   error?: string;
 }
 
+interface PropUpdate {
+  propId: string;
+  oldValue: string | null;
+  newValue: string;
+  updated: boolean;
+}
+
+interface DualPropUpdate {
+  propId: string;
+  ont: { oldValue: string | null; newValue: string; updated: boolean };
+  ups: { oldValue: string | null; newValue: string | null; updated: boolean };
+}
+
 interface UpdateResult {
   success: boolean;
   oldValue: string | null;
   newValue: string;
   propId: string;
   error?: string;
+  // Multi-prop_id tracking: ALL records for the DR
+  allPropUpdates?: PropUpdate[];
+  totalRecords?: number;
+  updatedCount?: number;
+  alreadyCorrectCount?: number;
 }
 
 interface DualUpdateResult {
@@ -94,6 +112,11 @@ interface DualUpdateResult {
     updated: boolean;
   };
   error?: string;
+  // Multi-prop_id tracking: ALL records for the DR
+  allPropUpdates?: DualPropUpdate[];
+  totalRecords?: number;
+  updatedCount?: number;
+  alreadyCorrectCount?: number;
 }
 
 class OneMapApiService {
@@ -133,7 +156,7 @@ class OneMapApiService {
       const setCookie = loginPage.headers.get('set-cookie') || '';
       const cookieJar = setCookie
         .split(',')
-        .map((c) => c.split(';')[0].trim())
+        .map((c) => (c.split(';')[0] || '').trim())
         .join('; ');
 
       // Step 2: POST login with CSRF
@@ -159,7 +182,7 @@ class OneMapApiService {
         log.error('OneMapAPI', 'Failed to get session cookie');
         return false;
       }
-      this.sessionCookie = sidMatch[1];
+      this.sessionCookie = sidMatch[1] || '';
 
       // Step 3: Visit app to initialize layer access (CRITICAL!)
       log.info('OneMapAPI', 'Step 3: Initializing layer access...');
@@ -447,58 +470,86 @@ class OneMapApiService {
     }
 
     const records = searchResult.records;
+    const allPropUpdates: PropUpdate[] = [];
 
-    // Step 2: Check if already correct
-    const alreadyCorrect = records.find(
+    // Categorize: correct vs wrong/empty
+    const correctRecords = records.filter(
       (r) => r.ph_ont?.toUpperCase() === correctSerial.toUpperCase()
     );
-    if (alreadyCorrect) {
+    const wrongRecords = records.filter(
+      (r) => r.ph_ont?.toUpperCase() !== correctSerial.toUpperCase()
+    );
+
+    // Track already correct records
+    for (const r of correctRecords) {
+      allPropUpdates.push({
+        propId: r.prop_id,
+        oldValue: r.ph_ont,
+        newValue: correctSerial,
+        updated: false,
+      });
+    }
+
+    // Update ALL records that don't have the correct serial
+    for (let i = 0; i < wrongRecords.length; i++) {
+      const rec = wrongRecords[i]!;
+      const updateResult = await this.updateOntSerial(rec.prop_id, correctSerial);
+      allPropUpdates.push({
+        propId: rec.prop_id,
+        oldValue: rec.ph_ont,
+        newValue: correctSerial,
+        updated: updateResult.success,
+      });
+      // Small delay between API calls to avoid rate limiting
+      if (i < wrongRecords.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    const updatedCount = allPropUpdates.filter((u) => u.updated).length;
+    const alreadyCorrectCount = correctRecords.length;
+
+    // If ALL records already had correct serial
+    if (wrongRecords.length === 0) {
       return {
         success: true,
         oldValue: correctSerial,
         newValue: correctSerial,
-        propId: alreadyCorrect.prop_id,
+        propId: correctRecords[0]?.prop_id || '',
         error: 'Already correct',
+        allPropUpdates,
+        totalRecords: records.length,
+        updatedCount: 0,
+        alreadyCorrectCount,
       };
     }
 
-    // Step 3: Find record to update - priority order:
-    // 1. Record with wrong ONT (if specified)
-    // 2. Record with status "Home Installation: Installed" (highest prop_id if multiple)
-    // 3. Highest prop_id from all records
-    let target: OneMapRecord | undefined;
-
+    // Determine primary target for backward-compatible fields
+    let primaryTarget = wrongRecords[0]!;
     if (wrongSerial) {
-      target = records.find(
+      const match = wrongRecords.find(
         (r) => r.ph_ont?.toUpperCase() === wrongSerial.toUpperCase()
       );
+      if (match) primaryTarget = match;
     }
 
-    if (!target) {
-      // Find all with "Home Installation: Installed" status
-      const installedRecords = records.filter((r) => r.status === 'Home Installation: Installed');
-      if (installedRecords.length > 0) {
-        // Pick the one with highest prop_id (most recent)
-        target = installedRecords.sort((a, b) =>
-          parseInt(b.prop_id) - parseInt(a.prop_id)
-        )[0];
-      }
-    }
-
-    if (!target) {
-      // No installed status found - pick highest prop_id from all records
-      target = records.sort((a, b) =>
-        parseInt(b.prop_id) - parseInt(a.prop_id)
-      )[0];
-    }
-
-    // Step 4: Update the record
-    const oldValue = target.ph_ont || '';
-    const updateResult = await this.updateOntSerial(target.prop_id, correctSerial);
+    log.info('OneMapAPI', `Fixed ${updatedCount}/${records.length} records for ${drNumber}`, {
+      drNumber,
+      updatedCount,
+      alreadyCorrectCount,
+      totalRecords: records.length,
+      propIds: allPropUpdates.map((u) => `${u.propId}:${u.updated ? 'fixed' : 'ok'}`),
+    });
 
     return {
-      ...updateResult,
-      oldValue,
+      success: updatedCount > 0,
+      oldValue: primaryTarget.ph_ont || null,
+      newValue: correctSerial,
+      propId: primaryTarget.prop_id,
+      allPropUpdates,
+      totalRecords: records.length,
+      updatedCount,
+      alreadyCorrectCount,
     };
   }
 
@@ -532,65 +583,90 @@ class OneMapApiService {
     }
 
     const records = searchResult.records;
+    const allPropUpdates: DualPropUpdate[] = [];
 
-    // Step 2: Check if already correct (both ONT and UPS if provided)
-    const alreadyCorrect = records.find((r) => {
+    // Categorize: fully correct vs needing update
+    const correctRecords = records.filter((r) => {
       const ontMatch = r.ph_ont?.toUpperCase() === correctOntSerial.toUpperCase();
       const upsMatch = !correctUpsSerial || r.br_ser?.toUpperCase() === correctUpsSerial.toUpperCase();
       return ontMatch && upsMatch;
     });
+    const wrongRecords = records.filter((r) => {
+      const ontMatch = r.ph_ont?.toUpperCase() === correctOntSerial.toUpperCase();
+      const upsMatch = !correctUpsSerial || r.br_ser?.toUpperCase() === correctUpsSerial.toUpperCase();
+      return !(ontMatch && upsMatch);
+    });
 
-    if (alreadyCorrect) {
-      return {
-        success: true,
-        propId: alreadyCorrect.prop_id,
-        ont: { oldValue: correctOntSerial, newValue: correctOntSerial, updated: false },
-        ups: { oldValue: alreadyCorrect.br_ser, newValue: correctUpsSerial || null, updated: false },
-        error: 'Already correct',
-      };
+    // Track already correct
+    for (const r of correctRecords) {
+      allPropUpdates.push({
+        propId: r.prop_id,
+        ont: { oldValue: r.ph_ont, newValue: correctOntSerial, updated: false },
+        ups: { oldValue: r.br_ser, newValue: correctUpsSerial || null, updated: false },
+      });
     }
 
-    // Step 3: Find record to update - priority order:
-    // 1. Record with wrong ONT (if specified)
-    // 2. Record with status "Home Installation: Installed" (highest prop_id if multiple)
-    // 3. Highest prop_id from all records
-    let target: OneMapRecord | undefined;
-
-    if (wrongSerial) {
-      target = records.find(
-        (r) => r.ph_ont?.toUpperCase() === wrongSerial.toUpperCase()
+    // Update ALL records that need fixing
+    for (let i = 0; i < wrongRecords.length; i++) {
+      const rec = wrongRecords[i]!;
+      const updateResult = await this.updateOntAndUpsSerial(
+        rec.prop_id,
+        correctOntSerial,
+        correctUpsSerial
       );
-    }
-
-    if (!target) {
-      const installedRecords = records.filter((r) => r.status === 'Home Installation: Installed');
-      if (installedRecords.length > 0) {
-        target = installedRecords.sort((a, b) =>
-          parseInt(b.prop_id) - parseInt(a.prop_id)
-        )[0];
+      allPropUpdates.push({
+        propId: rec.prop_id,
+        ont: { oldValue: rec.ph_ont, newValue: correctOntSerial, updated: updateResult.ont.updated },
+        ups: { oldValue: rec.br_ser, newValue: correctUpsSerial || null, updated: updateResult.ups.updated },
+      });
+      if (i < wrongRecords.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
     }
 
-    if (!target) {
-      target = records.sort((a, b) =>
-        parseInt(b.prop_id) - parseInt(a.prop_id)
-      )[0];
+    const updatedCount = allPropUpdates.filter((u) => u.ont.updated || u.ups.updated).length;
+    const alreadyCorrectCount = correctRecords.length;
+
+    // If ALL records already correct
+    if (wrongRecords.length === 0) {
+      return {
+        success: true,
+        propId: correctRecords[0]?.prop_id || '',
+        ont: { oldValue: correctOntSerial, newValue: correctOntSerial, updated: false },
+        ups: { oldValue: correctRecords[0]?.br_ser || null, newValue: correctUpsSerial || null, updated: false },
+        error: 'Already correct',
+        allPropUpdates,
+        totalRecords: records.length,
+        updatedCount: 0,
+        alreadyCorrectCount,
+      };
     }
 
-    // Step 4: Update both ONT and UPS serials
-    const oldOntValue = target.ph_ont || '';
-    const oldUpsValue = target.br_ser || '';
+    // Primary target for backward compat
+    let primaryTarget = wrongRecords[0]!;
+    if (wrongSerial) {
+      const match = wrongRecords.find(
+        (r) => r.ph_ont?.toUpperCase() === wrongSerial.toUpperCase()
+      );
+      if (match) primaryTarget = match;
+    }
 
-    const updateResult = await this.updateOntAndUpsSerial(
-      target.prop_id,
-      correctOntSerial,
-      correctUpsSerial
-    );
+    log.info('OneMapAPI', `Fixed ${updatedCount}/${records.length} records for ${drNumber} (ONT+UPS)`, {
+      drNumber,
+      updatedCount,
+      alreadyCorrectCount,
+      totalRecords: records.length,
+    });
 
     return {
-      ...updateResult,
-      ont: { ...updateResult.ont, oldValue: oldOntValue },
-      ups: { ...updateResult.ups, oldValue: oldUpsValue },
+      success: updatedCount > 0,
+      propId: primaryTarget.prop_id,
+      ont: { oldValue: primaryTarget.ph_ont || null, newValue: correctOntSerial, updated: updatedCount > 0 },
+      ups: { oldValue: primaryTarget.br_ser || null, newValue: correctUpsSerial || null, updated: updatedCount > 0 && !!correctUpsSerial },
+      allPropUpdates,
+      totalRecords: records.length,
+      updatedCount,
+      alreadyCorrectCount,
     };
   }
 }
@@ -599,4 +675,4 @@ class OneMapApiService {
 export const oneMapApi = new OneMapApiService();
 
 // Export types
-export type { OneMapRecord, SearchResult, UpdateResult, DualUpdateResult };
+export type { OneMapRecord, SearchResult, UpdateResult, DualUpdateResult, PropUpdate, DualPropUpdate };

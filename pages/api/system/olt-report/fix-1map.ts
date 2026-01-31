@@ -120,10 +120,20 @@ async function fixSingleDR(
       const fixResult = alreadyCorrect ? 'already_correct' : 'success';
       const resolution = alreadyCorrect ? 'already_correct' : 'data_corrected';
 
+      // Extract multi-prop_id tracking info
+      const totalRecords = result.totalRecords || 1;
+      const updatedCount = result.updatedCount || (alreadyCorrect ? 0 : 1);
+      const alreadyCorrectCount = result.alreadyCorrectCount || (alreadyCorrect ? 1 : 0);
+      const allPropUpdates = result.allPropUpdates || [];
+
       // Build fix details for DB storage
       const fixDetails: Record<string, unknown> = {
         ont_old: 'ont' in result ? result.ont.oldValue : result.oldValue,
         ont_new: correctSerial,
+        totalRecords,
+        updatedCount,
+        alreadyCorrectCount,
+        allPropUpdates,
       };
       if (hasUpsSerial && 'ups' in result) {
         fixDetails.ups_old = result.ups.oldValue;
@@ -163,30 +173,46 @@ async function fixSingleDR(
       // Log to activity log with appropriate message
       const ontOldValue = 'ont' in result ? result.ont.oldValue : result.oldValue;
 
+      // Build prop_id summary for activity log
+      const propIdSummary = allPropUpdates.length > 0
+        ? allPropUpdates.map((u: { propId: string; updated?: boolean; ont?: { updated: boolean } }) => {
+            const wasUpdated = 'ont' in u ? u.ont?.updated : u.updated;
+            return `${u.propId}:${wasUpdated ? 'FIXED' : 'OK'}`;
+          }).join(', ')
+        : `${result.propId || 'unknown'}`;
+
       if (alreadyCorrect) {
         await logActivity(
           drNumber,
           'SERIAL_VERIFIED',
           {
-            details: `1Map already has correct serials - no update needed`,
+            details: `1Map CONFIRMED: All ${totalRecords} record(s) already have correct ONT serial ${correctSerial} [prop_ids: ${propIdSummary}]`,
             propId: 'propId' in result ? result.propId : null,
             ont: correctSerial,
             ups: upsSerialToSet,
             source: 'olt_report',
             fix_type: 'already_correct',
+            totalRecords,
+            allPropUpdates,
           },
           userId || 'system'
         );
 
-        log.info('FixOneMap', 'DR already correct - skipped update', {
+        log.info('FixOneMap', 'DR already correct on all records', {
           drNumber,
-          propId: 'propId' in result ? result.propId : null,
-          currentSerial: correctSerial,
+          totalRecords,
+          propIds: propIdSummary,
         });
       } else {
-        let details = `1Map ONT serial updated: ${ontOldValue || 'EMPTY'} → ${correctSerial}`;
+        let details = `1Map UPDATED: ONT serial fixed on ${updatedCount}/${totalRecords} record(s). `;
+        details += `${ontOldValue || 'EMPTY'} → ${correctSerial}`;
+        if (alreadyCorrectCount > 0) {
+          details += ` (${alreadyCorrectCount} already correct)`;
+        }
+        details += ` [prop_ids: ${propIdSummary}]`;
+
         if (hasUpsSerial && 'ups' in result && result.ups.updated) {
-          details += ` | UPS serial updated: ${result.ups.oldValue || 'EMPTY'} → ${result.ups.newValue}`;
+          details += ` | UPS serial: ${result.ups.oldValue || 'EMPTY'} → ${result.ups.newValue}`;
         }
 
         await logActivity(
@@ -201,16 +227,18 @@ async function fixSingleDR(
               : null,
             source: 'olt_report',
             fix_type: hasUpsSerial ? 'onemap_fix_ont_and_ups' : 'onemap_fix_success',
+            totalRecords,
+            updatedCount,
+            allPropUpdates,
           },
           userId || 'system'
         );
 
-        log.info('FixOneMap', 'Successfully fixed DR', {
+        log.info('FixOneMap', `Fixed ${updatedCount}/${totalRecords} records for DR`, {
           drNumber,
-          propId: 'propId' in result ? result.propId : null,
-          ontOldValue,
-          ontNewValue: correctSerial,
-          upsUpdated: hasUpsSerial && 'ups' in result ? result.ups.updated : false,
+          updatedCount,
+          alreadyCorrectCount,
+          propIds: propIdSummary,
         });
       }
 
@@ -231,6 +259,14 @@ async function fixSingleDR(
             source: 'olt_report',
             fix_type: alreadyCorrect ? 'already_correct' : 'onemap_fix_success',
             wrong_onemap_serial: wrongSerial || null,
+            totalRecords,
+            updatedCount,
+            alreadyCorrectCount,
+            allPropUpdates: allPropUpdates.map((u: { propId: string; updated?: boolean; oldValue?: string | null; ont?: { updated: boolean; oldValue: string | null } }) => ({
+              propId: u.propId,
+              oldValue: 'ont' in u ? u.ont?.oldValue : u.oldValue,
+              updated: 'ont' in u ? u.ont?.updated : u.updated,
+            })),
           }),
         ]
       );
@@ -404,7 +440,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (result.success) {
       return apiResponse.success(res, result);
     } else {
-      return apiResponse.success(res, result, 200); // Still 200 but success: false
+      return apiResponse.success(res, result); // Still 200 but success: false in result
     }
   } catch (error) {
     log.error('FixOneMap', 'API error', { error });

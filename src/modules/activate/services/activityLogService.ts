@@ -51,6 +51,8 @@ export type ActivityEventType =
   | 'SERIAL_HISTORY_ENTRY'
   | 'WA_PHOTO_VLM_PROCESSED'
   | 'SERIAL_CONFIRMED'
+  | 'SERIAL_VERIFIED'
+  | 'INVESTIGATE'
   | 'MANUAL_SERIAL_EDIT';
 
 /**
@@ -238,6 +240,16 @@ const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: string; i
     title: 'Serial Manually Edited',
     icon: '✏️',
     iconColor: 'text-yellow-500',
+  },
+  SERIAL_VERIFIED: {
+    title: '1Map Serial Verified',
+    icon: '✓',
+    iconColor: 'text-green-500',
+  },
+  INVESTIGATE: {
+    title: 'Needs Investigation',
+    icon: '🔎',
+    iconColor: 'text-orange-500',
   },
 };
 
