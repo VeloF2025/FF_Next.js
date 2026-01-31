@@ -251,7 +251,7 @@ export default function BOQUpload({
       return;
     }
 
-    setState(prev => ({ ...prev, isUploading: true, stage: 'Importing...', progress: 30 }));
+    setState(prev => ({ ...prev, isUploading: true, stage: 'Importing...', progress: 30, message: 'Processing file and creating BOQ items. This may take a minute for large files...' }));
 
     try {
       const formData = new FormData();

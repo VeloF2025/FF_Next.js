@@ -27,7 +27,7 @@ export function BOQUploadProgress({
   };
 
   const getStatusIcon = () => {
-    if (!job) return null;
+    if (!job) return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />;
 
     switch (job.status) {
       case 'completed':
@@ -41,8 +41,6 @@ export function BOQUploadProgress({
     }
   };
 
-  if (!job) return null;
-
   return (
     <div className="border border-[var(--ff-border-light)] rounded-lg p-4 bg-[var(--ff-bg-tertiary)]">
       <div className="flex items-center justify-between mb-3">
@@ -50,7 +48,7 @@ export function BOQUploadProgress({
           {getStatusIcon()}
           <span className="font-medium text-[var(--ff-text-primary)]">Import Progress</span>
         </div>
-        {(job.status === 'parsing' || job.status === 'mapping' || job.status === 'validating' || job.status === 'processing') && onCancel && (
+        {(!job || job.status === 'parsing' || job.status === 'mapping' || job.status === 'validating' || job.status === 'processing') && onCancel && (
           <button
             onClick={onCancel}
             className="text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
@@ -76,7 +74,7 @@ export function BOQUploadProgress({
         )}
       </div>
 
-      {job.metadata && (
+      {job?.metadata && (
         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
           <div>
             <span className="text-[var(--ff-text-secondary)]">Processed:</span>
@@ -93,16 +91,16 @@ export function BOQUploadProgress({
         </div>
       )}
 
-      {job.status === 'failed' && job.error && (
+      {job?.status === 'failed' && job.error && (
         <div className="mt-3 p-2 bg-red-500/10 rounded-md">
           <p className="text-sm text-red-400">{job.error}</p>
         </div>
       )}
 
-      {job.status === 'completed' && (
+      {job?.status === 'completed' && (
         <div className="mt-3 p-2 bg-green-500/10 rounded-md">
           <p className="text-sm text-green-400">
-            Import completed successfully! {job.metadata.processedRows || 0} items processed.
+            Import completed successfully! {job.metadata?.processedRows || 0} items processed.
           </p>
         </div>
       )}
