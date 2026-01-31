@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuth } from '../../../lib/auth-mock';
 import { sql } from '../../../lib/db.mjs';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 type SummarData = {
   success: boolean;
@@ -25,7 +24,6 @@ async function handler(
   }
 
   // Check authentication
-  const { userId } = getAuth(req);
   if (!userId) {
     return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
   }

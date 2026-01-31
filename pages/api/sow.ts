@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/auth';
-import { getAuth } from '../../lib/auth-mock';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 // Initialize database connection

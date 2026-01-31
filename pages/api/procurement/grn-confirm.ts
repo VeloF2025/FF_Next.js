@@ -15,9 +15,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logUpdate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -34,7 +33,7 @@ export default withAuth(withErrorHandler(async (
     return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
-  const { userId } = getAuth(req);
+  const userId = (req as AuthenticatedNextApiRequest).user.id;
   const { grnId, notes } = req.body as ConfirmRequest;
 
   if (!grnId) {

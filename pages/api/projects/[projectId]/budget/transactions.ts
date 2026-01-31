@@ -10,9 +10,8 @@ import type { BudgetTransaction, TransactionType } from '@/types/budget';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -30,7 +29,6 @@ export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
-  const { userId } = getAuth(req);
   const projectId = req.query.projectId as string;
 
   if (!projectId) {

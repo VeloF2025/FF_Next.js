@@ -2,9 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -17,9 +16,9 @@ export default withAuth(withErrorHandler(async (
   }
 
   const { id } = req.query;
-  const session = getAuth(req);
-  const userId = session.userId;
-  const userName = session.user.name;
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userId = authReq.user.id;
+  const userName = authReq.user.name;
   const { notes } = req.body || {};
 
   if (!id || typeof id !== 'string') {

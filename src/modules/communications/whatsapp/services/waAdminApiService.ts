@@ -45,9 +45,12 @@ async function fetchApi<T>(
     const data = await response.json();
 
     if (!response.ok) {
+      const errorMsg = typeof data.error === 'string'
+        ? data.error
+        : (data.error?.message || `HTTP ${response.status}`);
       return {
         success: false,
-        error: data.error || `HTTP ${response.status}`,
+        error: errorMsg,
       };
     }
 

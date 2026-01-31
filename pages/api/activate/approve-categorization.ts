@@ -14,9 +14,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { getAuth } from '@/lib/auth-mock';
 import {
   ApproveCategorizeRequest,
   ApproveCategorizeResponse,
@@ -38,7 +37,7 @@ const pool = new Pool({
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {
     // Get authenticated user
-    const { userId } = getAuth(req);
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     const approvedBy = userId || 'anonymous';
 
     const { dropNumber, approvals, approve_all } = req.body as ApproveCategorizeRequest;

@@ -1,8 +1,6 @@
 import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { getAuth } from '../../lib/auth-mock';
-
 // Lazy load ProjectCreationWizard to reduce initial bundle size
 const ProjectCreationWizard = dynamic(
   () => import('@/modules/projects/components/ProjectWizard/ProjectCreationWizard').then(mod => ({ default: mod.ProjectCreationWizard })),
@@ -25,16 +23,5 @@ export default function NewProjectPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const { userId } = getAuth(ctx.req);
-
-  if (!userId) {
-    return {
-      redirect: {
-        destination: '/sign-in',
-        permanent: false,
-      },
-    };
-  }
-
   return { props: {} };
 };

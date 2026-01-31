@@ -12,9 +12,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { getAuth } from '@/lib/auth-mock';
 import { VlmCategorizationResult, Photo } from '@/modules/activate/types/unified.types';
 import { recordCorrection, RecordCorrectionInput } from '@/modules/qa-learning';
 import { STEP_LABELS } from '@/modules/activate/utils/stepMapper';
@@ -45,7 +44,7 @@ interface UpdatePhotoStepResponse {
  */
 async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   try {
-    const { userId } = getAuth(req);
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     const updatedBy = userId || 'anonymous';
 
     const { dropNumber, photoFilename, newStep, reason } = req.body as UpdatePhotoStepRequest;

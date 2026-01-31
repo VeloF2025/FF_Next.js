@@ -1,5 +1,4 @@
 import { GetServerSideProps } from 'next';
-import { getAuth } from '../../../lib/auth-mock';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 
@@ -18,16 +17,5 @@ export default function ProjectTrackerPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const { userId } = getAuth(ctx.req);
-
-  if (!userId) {
-    return {
-      redirect: {
-        destination: '/sign-in',
-        permanent: false,
-      },
-    };
-  }
-
   return { props: {} };
 };

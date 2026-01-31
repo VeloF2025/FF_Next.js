@@ -3,8 +3,7 @@ import type { MyApprovalTask, PendingApprovalsCount } from '@/types/procurement/
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -16,14 +15,11 @@ export default withAuth(withErrorHandler(async (
     return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
-  const { userId } = getAuth(req);
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userId = authReq.user.id;
+  const userRole = authReq.user.role;
 
   try {
-    // Get current user's role
-    const userResult = await sql`
-      SELECT role FROM users WHERE id = ${userId}
-    `;
-    const userRole = userResult.length > 0 ? (userResult[0] as Record<string, unknown>).role as string : 'viewer';
     const isAdmin = userRole === 'super_admin' || userRole === 'admin';
 
     // Get pending approval requests filtered by user's permissions

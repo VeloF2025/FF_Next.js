@@ -6,8 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { getAuth } from '@/lib/auth-mock';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
@@ -60,8 +59,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const originalOcrMetadata = (originalDoc.ocr_metadata || {}) as Record<string, string>;
 
     // Get the current user for verifier ID from Clerk (needed for HITL recording)
-    const { userId } = getAuth(req);
-
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     // If edited OCR metadata provided, update the document first
     if (editedOcrMetadata && Object.keys(editedOcrMetadata).length > 0) {
       await sql`

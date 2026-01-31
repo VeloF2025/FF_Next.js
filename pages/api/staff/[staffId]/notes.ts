@@ -6,10 +6,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -37,7 +36,8 @@ async function handler(
   }
 
   try {
-    const { userId, userName } = getAuth(req);
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
+    const userName = (req as AuthenticatedNextApiRequest).user.name || 'Unknown';
 
     if (req.method === 'GET') {
       // List notes for staff member

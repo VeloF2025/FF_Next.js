@@ -1,5 +1,4 @@
 import { GetServerSideProps } from 'next';
-import { getAuth } from '../../../lib/auth-mock';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -8,6 +7,9 @@ const ProjectDetail = dynamic(() => import('@/pages/ProjectDetail').then(mod => 
   ssr: false,
   loading: () => <div>Loading project...</div>
 });
+
+// UUID v4 regex for validating project IDs
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default function ProjectDetailPage() {
   const router = useRouter();
@@ -23,12 +25,13 @@ export default function ProjectDetailPage() {
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const { userId } = getAuth(ctx.req);
+  const { id } = ctx.params || {};
 
-  if (!userId) {
+  // Validate that id is a valid UUID - prevents catching named routes like /projects/execution
+  if (!id || typeof id !== 'string' || !UUID_REGEX.test(id)) {
     return {
       redirect: {
-        destination: '/sign-in',
+        destination: '/projects',
         permanent: false,
       },
     };

@@ -5,11 +5,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import { safeArrayQuery, safeMutation } from '../../../lib/safe-query';
 import { apiResponse } from '../../../lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 // Create a new connection for each request
@@ -28,11 +27,6 @@ async function handler(
   }
 
   // Check authentication
-  const { userId } = getAuth(req);
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   try {
     switch (req.method) {
       case 'GET': {

@@ -4,9 +4,8 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { neon } from '@neondatabase/serverless';
 import { logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -14,7 +13,7 @@ export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
-  const { userId } = getAuth(req);
+  const userId = (req as AuthenticatedNextApiRequest).user.id;
 
   if (req.method === 'GET') {
     try {

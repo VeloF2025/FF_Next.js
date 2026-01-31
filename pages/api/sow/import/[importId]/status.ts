@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuth } from '../../../../../lib/auth-mock';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 /**
  * SOW Import Status API Route
@@ -19,8 +18,7 @@ async function handler(
 
   try {
     // Get authentication from Clerk
-    const { userId } = getAuth(req);
-    
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

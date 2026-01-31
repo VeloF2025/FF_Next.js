@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/auth';
-import { getAuth } from '../../../lib/auth-mock';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
@@ -20,7 +19,6 @@ async function handler(
   res: NextApiResponse<PoleData>
 ) {
   // Check authentication
-  const { userId } = getAuth(req);
   if (!userId) {
     return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
   }

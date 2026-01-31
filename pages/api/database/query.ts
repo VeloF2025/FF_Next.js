@@ -1,7 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
-import { getAuth } from '../../../lib/auth-mock';
-
 /**
  * Database Query API Route
  * Proxies database queries to the backend API server
@@ -17,8 +15,7 @@ async function handler(
 
   try {
     // Get authentication from Clerk
-    const { userId } = getAuth(req);
-    
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

@@ -11,9 +11,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -26,8 +25,7 @@ export default withAuth(withErrorHandler(async (
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
-
-  const { userId } = getAuth(req);
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
   const projectId = req.query.projectId as string;
   const { adjustmentType, amount, reason, categoryId } = req.body;
 

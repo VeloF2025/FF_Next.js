@@ -10,10 +10,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { BudgetCheckResult } from '@/types/budget';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -25,8 +24,6 @@ export default withAuth(withErrorHandler(async (
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
-
-  const { userId } = getAuth(req);
   const { projectId, amount, categoryId } = req.body;
 
   // Validate required fields

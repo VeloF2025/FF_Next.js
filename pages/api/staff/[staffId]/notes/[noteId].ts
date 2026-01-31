@@ -7,10 +7,9 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { getAuth } from '@/lib/auth-mock';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -29,8 +28,7 @@ async function handler(
   }
 
   try {
-    const { userId } = getAuth(req);
-
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     if (req.method === 'GET') {
       // Get single note
       const notes = await sql`

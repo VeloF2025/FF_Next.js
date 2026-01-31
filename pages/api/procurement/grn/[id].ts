@@ -5,8 +5,7 @@ import type { GoodsReceiptNote, GoodsReceiptItem } from '@/types/procurement/grn
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
-import { getAuth } from '@/lib/auth-mock';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -15,7 +14,7 @@ export default withAuth(withErrorHandler(async (
   res: NextApiResponse
 ) => {
   const { id } = req.query;
-  const { userId } = getAuth(req);
+  const userId = (req as AuthenticatedNextApiRequest).user.id;
 
   if (!id || typeof id !== 'string') {
     return apiResponse.badRequest(res, 'GRN ID is required');

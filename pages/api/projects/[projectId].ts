@@ -1,10 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuth } from '../../../lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import { safeArrayQuery, safeMutation } from '../../../lib/safe-query';
 import { apiResponse } from '../../../lib/apiResponse';
 import { logUpdate, logDelete } from '../../../lib/db-logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 /**
  * Project API Route
@@ -24,12 +23,7 @@ async function handler(
 
   try {
     // Get authentication
-    const { userId } = getAuth(req);
-
-    if (!userId) {
-      return apiResponse.unauthorized(res);
-    }
-
+    const userId = (req as AuthenticatedNextApiRequest).user.id;
     if (!id || typeof id !== 'string') {
       return apiResponse.validationError(res, { id: 'Project ID is required' });
     }

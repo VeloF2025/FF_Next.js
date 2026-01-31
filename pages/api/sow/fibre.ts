@@ -1,13 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { getAuth } from '../../../lib/auth-mock';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { userId } = getAuth(req);
-  
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }

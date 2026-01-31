@@ -8,8 +8,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuth } from '@/lib/auth-mock';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { getProjectImportStatus } from '@/services/project-import';
@@ -21,12 +20,6 @@ async function handler(
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
-  const { userId } = getAuth(req);
-  if (!userId) {
-    return apiResponse.unauthorized(res);
-  }
-
   try {
     const { projectId } = req.query;
 
