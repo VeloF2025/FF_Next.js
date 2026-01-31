@@ -27,91 +27,99 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { includeHistory } = req.query;
 
   try {
-    // Get overall success rate from recovery_actions
-    const overallResult = await db.query(`
-      SELECT
-        SUM(success_count) as total_success,
-        SUM(failure_count) as total_failure
-      FROM recovery_actions
-    `);
+    // All 9 queries are independent - run in parallel
+    const [
+      overallResult,
+      mttrResult,
+      pendingResult,
+      activeResult,
+      daemonResult,
+      todayStats,
+      commonFailuresResult,
+      improvingResult,
+      decliningResult,
+    ] = await Promise.all([
+      // Overall success rate from recovery_actions
+      db.query(`
+        SELECT
+          SUM(success_count) as total_success,
+          SUM(failure_count) as total_failure
+        FROM recovery_actions
+      `),
+      // MTTR from resolved incidents
+      db.query(`
+        SELECT
+          AVG(time_to_resolve_seconds) as avg_seconds,
+          COUNT(*) as incident_count
+        FROM infrastructure_incidents
+        WHERE resolved = true AND time_to_resolve_seconds IS NOT NULL
+      `),
+      // Pending approvals count
+      db.query(`SELECT COUNT(*) as count FROM recovery_approval_queue WHERE status = 'pending'`),
+      // Active incidents count
+      db.query(`SELECT COUNT(*) as count FROM infrastructure_incidents WHERE resolved = false`),
+      // Daemon status from recent health logs
+      db.query(`
+        SELECT timestamp as last_check, created_at
+        FROM system_health_logs
+        ORDER BY created_at DESC
+        LIMIT 1
+      `),
+      // Today's stats (internally uses Promise.all for 3 queries)
+      getTodayStats(db),
+      // Common failures
+      db.query(`
+        SELECT
+          a.action_name,
+          a.failure_count,
+          s.name as service_name
+        FROM recovery_actions a
+        JOIN infrastructure_services s ON a.service_id = s.id
+        WHERE a.failure_count > 0
+        ORDER BY a.failure_count DESC
+        LIMIT 5
+      `),
+      // Improving actions
+      db.query(`
+        SELECT a.action_name, a.consecutive_success, s.name as service_name
+        FROM recovery_actions a
+        JOIN infrastructure_services s ON a.service_id = s.id
+        WHERE a.consecutive_success >= 3
+        ORDER BY a.consecutive_success DESC
+        LIMIT 5
+      `),
+      // Declining actions
+      db.query(`
+        SELECT a.action_name, a.consecutive_failure, s.name as service_name
+        FROM recovery_actions a
+        JOIN infrastructure_services s ON a.service_id = s.id
+        WHERE a.consecutive_failure >= 2
+        ORDER BY a.consecutive_failure DESC
+        LIMIT 5
+      `),
+    ]);
+
     const overallRow = getFirstRow(overallResult);
     const totalSuccess = parseInt(String(overallRow?.total_success || '0'), 10);
     const totalFailure = parseInt(String(overallRow?.total_failure || '0'), 10);
     const totalExecutions = totalSuccess + totalFailure;
 
-    // Get MTTR from resolved incidents
-    const mttrResult = await db.query(`
-      SELECT
-        AVG(time_to_resolve_seconds) as avg_seconds,
-        COUNT(*) as incident_count
-      FROM infrastructure_incidents
-      WHERE resolved = true AND time_to_resolve_seconds IS NOT NULL
-    `);
     const mttrRow = getFirstRow(mttrResult);
     const mttrSeconds = mttrRow?.avg_seconds ? Math.round(parseFloat(String(mttrRow.avg_seconds))) : null;
 
-    // Get pending approvals count
-    const pendingResult = await db.query(`
-      SELECT COUNT(*) as count FROM recovery_approval_queue WHERE status = 'pending'
-    `);
     const pendingCount = parseInt(String(getFirstRow(pendingResult)?.count || '0'), 10);
-
-    // Get active incidents count
-    const activeResult = await db.query(`
-      SELECT COUNT(*) as count FROM infrastructure_incidents WHERE resolved = false
-    `);
     const activeIncidents = parseInt(String(getFirstRow(activeResult)?.count || '0'), 10);
 
-    // Get daemon status from recent health logs
-    const daemonResult = await db.query(`
-      SELECT timestamp as last_check, created_at
-      FROM system_health_logs
-      ORDER BY created_at DESC
-      LIMIT 1
-    `);
     const daemonRow = getFirstRow(daemonResult);
     const isRunning = daemonRow?.created_at
       ? new Date().getTime() - new Date(String(daemonRow.created_at)).getTime() < 120000
       : false;
 
-    // Get today's stats
-    const todayStats = await getTodayStats(db);
-
-    // Get common failures
-    const commonFailuresResult = await db.query(`
-      SELECT
-        a.action_name,
-        a.failure_count,
-        s.name as service_name
-      FROM recovery_actions a
-      JOIN infrastructure_services s ON a.service_id = s.id
-      WHERE a.failure_count > 0
-      ORDER BY a.failure_count DESC
-      LIMIT 5
-    `);
     const commonFailures = getRows(commonFailuresResult).map((row: Record<string, unknown>) => ({
       actionName: row.action_name,
       serviceName: row.service_name,
       failureCount: row.failure_count,
     }));
-
-    // Get trends (improving/declining actions)
-    const improvingResult = await db.query(`
-      SELECT a.action_name, a.consecutive_success, s.name as service_name
-      FROM recovery_actions a
-      JOIN infrastructure_services s ON a.service_id = s.id
-      WHERE a.consecutive_success >= 3
-      ORDER BY a.consecutive_success DESC
-      LIMIT 5
-    `);
-    const decliningResult = await db.query(`
-      SELECT a.action_name, a.consecutive_failure, s.name as service_name
-      FROM recovery_actions a
-      JOIN infrastructure_services s ON a.service_id = s.id
-      WHERE a.consecutive_failure >= 2
-      ORDER BY a.consecutive_failure DESC
-      LIMIT 5
-    `);
 
     // Build response
     const response: Record<string, unknown> = {
