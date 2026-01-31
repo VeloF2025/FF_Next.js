@@ -167,8 +167,8 @@ const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT serial number from a 
 CRITICAL: The label has MULTIPLE fields. You must find the CORRECT one:
 
 ✅ CORRECT - Find the "S/N:" field (Serial Number):
-   - Starts with "ALCL" or "ALCB" (e.g., ALCLB6A9C97, ALCLB48CC3CA)
-   - Exactly 11-12 alphanumeric characters
+   - Starts with "ALCL" or "ALCB" followed by 7-8 alphanumeric characters
+   - Exactly 11-12 characters total
    - Located on a WHITE sticker, usually has a barcode above it
 
 ❌ WRONG - Do NOT extract these fields:
@@ -183,6 +183,8 @@ The S/N field is typically:
 - Above or near the barcode
 - Format: S/N: ALCLXXXXXXXX or SN: ALCLXXXXXXXX
 
+Read the ACTUAL text from the photo. Do NOT guess or invent serial numbers.
+
 Respond in this exact JSON format:
 {
   "found": true/false,
@@ -192,7 +194,8 @@ Respond in this exact JSON format:
 }
 
 IMPORTANT: If you cannot find a field starting with ALCL or ALCB, set found to false.
-Do NOT return SSID values (ALHN-*) as the serial.`;
+Do NOT return SSID values (ALHN-*) as the serial.
+NEVER return a serial you are not sure about - null is better than wrong.`;
 
 /**
  * Prompt for Step 9 front panel extraction (ONT serial + DR number)
@@ -207,10 +210,11 @@ Look for these THREE items:
    - Look for lit LEDs labeled POWER, PON, LAN, WLAN, etc.
 
 2. ONT SERIAL NUMBER - A sticker/label with the device serial:
-   ✅ CORRECT: Starts with "ALCL" or "ALCB" (e.g., ALCLB48CC3CA)
+   ✅ CORRECT: Starts with "ALCL" or "ALCB" followed by 7-8 alphanumeric characters
    ❌ WRONG: Do NOT extract SSID (starts with "ALHN-" like ALHN-C397)
-   - The serial is 11-12 alphanumeric characters
+   - The serial is 11-12 characters total
    - May be on a small white sticker on the front
+   - Read the ACTUAL text, do NOT guess
 
 3. DR NUMBER - A handwritten or printed label:
    - Format: "DR" followed by 6-7 digits (e.g., DR1736721)
@@ -281,6 +285,9 @@ IMPORTANT:
 function isValidOntSerial(serial: string | null): boolean {
   if (!serial) return false;
   const s = serial.trim().toUpperCase();
+
+  // Hallucination guard — reject prompt examples
+  if (isPromptExampleSerial(s)) return false;
 
   // Reject SSID patterns (common VLM mistake)
   if (s.startsWith('ALHN') || s.startsWith('ALH-') || s.includes('-')) {
@@ -1258,17 +1265,18 @@ const WA_PHOTO_SERIAL_PROMPT = `You are extracting device serial numbers from a 
 This photo shows a printed sticker with TWO serial numbers that need to be captured:
 
 1. ONT SERIAL NUMBER:
-   - Starts with "ALCL" or "ALCB" (e.g., ALCLB6A9C97, ALCLB48CC3CA)
+   - Starts with "ALCL" or "ALCB" followed by 7-8 alphanumeric characters
    - Usually labeled "S/N:" or "ONT Serial"
-   - 11-12 alphanumeric characters
+   - 11-12 characters total
    ❌ Do NOT extract SSID values (start with "ALHN-" like ALHN-C397)
 
 2. UPS SERIAL NUMBER:
-   - Starts with "GU18W" (e.g., GU18W220901234)
+   - Starts with "GU18W" followed by 8-10 alphanumeric characters
    - Usually labeled "UPS Serial" or "Gizzu Serial"
-   - 13-15 alphanumeric characters
+   - 13-15 characters total
 
 Both serials should be on the same sticker/label.
+Read the ACTUAL text from the photo. Do NOT guess or invent serial numbers.
 
 Respond in this exact JSON format:
 {
@@ -1285,18 +1293,50 @@ Respond in this exact JSON format:
 }
 
 IMPORTANT:
-- Only extract serials that clearly match the expected patterns
+- Only extract serials you can ACTUALLY READ in the photo
 - If text is blurry or partially visible, lower the confidence score
-- Return null for any serial you cannot confidently read`;
+- Return null for any serial you cannot confidently read
+- NEVER return a serial you are not sure about - null is better than wrong`;
+
+/**
+ * Serials used as examples in VLM prompts — if the model returns
+ * one of these exactly it is regurgitating the prompt, not reading
+ * the photo.  Normalised to uppercase, stripped of whitespace/dashes.
+ */
+const PROMPT_EXAMPLE_SERIALS = new Set([
+  'ALCLB6A9C97',
+  'ALCLB48CC3CA',
+  'GU18W220901234',
+]);
+
+/** Minimum confidence we accept from VLM serial extraction */
+const VLM_CONFIDENCE_FLOOR = 0.65;
+
+/**
+ * Returns true if the serial is a known prompt example (hallucination).
+ */
+function isPromptExampleSerial(serial: string | null): boolean {
+  if (!serial) return false;
+  const s = serial.trim().toUpperCase().replace(/[\s-]/g, '');
+  if (PROMPT_EXAMPLE_SERIALS.has(s)) {
+    log.warn('VlmExtraction', `Rejected prompt-example hallucination: ${serial}`);
+    return true;
+  }
+  return false;
+}
 
 /**
  * Validate UPS/Gizzu serial format
  * - Must start with GU18W
  * - Must be 13-15 characters
+ * - Must not be a prompt example (hallucination guard)
  */
 function isValidUpsSerial(serial: string | null): boolean {
   if (!serial) return false;
   const s = serial.trim().toUpperCase();
+
+  // Hallucination guard — reject prompt examples
+  if (isPromptExampleSerial(s)) return false;
 
   // Must start with GU18W (Gizzu UPS pattern)
   if (!s.startsWith('GU18W')) {
@@ -1381,12 +1421,16 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
       finalOnt = ontFromBarcode;
       ontConfidence = 0.98; // Barcode is highly reliable
     } else if (ontResult.found && ontResult.serial) {
-      const normalized = normalizeSerial(ontResult.serial);
-      if (isValidOntSerial(normalized)) {
-        finalOnt = normalized;
-        ontConfidence = ontResult.confidence;
+      if (ontResult.confidence < VLM_CONFIDENCE_FLOOR) {
+        log.warn('VlmExtraction', `WA photo ONT below confidence floor (${ontResult.confidence.toFixed(2)} < ${VLM_CONFIDENCE_FLOOR}): ${ontResult.serial}`);
       } else {
-        log.warn('VlmExtraction', `WA photo VLM returned invalid ONT: ${ontResult.serial}`);
+        const normalized = normalizeSerial(ontResult.serial);
+        if (isValidOntSerial(normalized)) {
+          finalOnt = normalized;
+          ontConfidence = ontResult.confidence;
+        } else {
+          log.warn('VlmExtraction', `WA photo VLM returned invalid ONT: ${ontResult.serial}`);
+        }
       }
     }
 
@@ -1394,12 +1438,16 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
     let finalUps: string | null = null;
     let upsConfidence = 0;
     if (upsResult.found && upsResult.serial) {
-      const normalized = upsResult.serial.trim().toUpperCase().replace(/[\s-]/g, '');
-      if (isValidUpsSerial(normalized)) {
-        finalUps = normalized;
-        upsConfidence = upsResult.confidence;
+      if (upsResult.confidence < VLM_CONFIDENCE_FLOOR) {
+        log.warn('VlmExtraction', `WA photo UPS below confidence floor (${upsResult.confidence.toFixed(2)} < ${VLM_CONFIDENCE_FLOOR}): ${upsResult.serial}`);
       } else {
-        log.warn('VlmExtraction', `WA photo VLM returned invalid UPS: ${upsResult.serial}`);
+        const normalized = upsResult.serial.trim().toUpperCase().replace(/[\s-]/g, '');
+        if (isValidUpsSerial(normalized)) {
+          finalUps = normalized;
+          upsConfidence = upsResult.confidence;
+        } else {
+          log.warn('VlmExtraction', `WA photo VLM returned invalid UPS: ${upsResult.serial}`);
+        }
       }
     }
 
