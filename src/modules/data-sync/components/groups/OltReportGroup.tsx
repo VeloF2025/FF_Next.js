@@ -640,15 +640,25 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
       {/* Tab Content */}
       {currentTab === 'import' && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
-            Import OLT Report
-          </h2>
-          <p className="text-sm text-[var(--ff-text-secondary)] mb-6">
-            Upload a Nokia OLT report Excel file to import mismatch data
-          </p>
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+          {/* Header */}
+          <div className="p-6 border-b border-[var(--ff-border-light)]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <FileSpreadsheet className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                  Import OLT Report
+                </h2>
+                <p className="text-sm text-[var(--ff-text-secondary)]">
+                  Upload a Nokia OLT report Excel file to detect serial mismatches
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <div className="space-y-4">
+          <div className="p-6 space-y-6">
             {/* Project Select */}
             <div>
               <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
@@ -657,7 +667,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               <select
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
-                className="w-full max-w-md px-4 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+                className="w-full max-w-sm px-3 py-2.5 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
               >
                 <option value="">All Projects</option>
                 {projects.map((p) => (
@@ -668,65 +678,123 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               </select>
             </div>
 
-            {/* File Input */}
+            {/* Drop Zone */}
             <div>
               <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
                 Excel File
               </label>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-                className="block w-full max-w-md text-sm text-[var(--ff-text-secondary)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--ff-accent)] file:text-white hover:file:bg-[var(--ff-accent)]/80"
-              />
+              <div
+                onClick={() => !isUploading && document.getElementById('olt-file-input')?.click()}
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-500', 'bg-blue-500/5'); }}
+                onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-500', 'bg-blue-500/5'); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-blue-500', 'bg-blue-500/5');
+                  const file = e.dataTransfer.files?.[0];
+                  if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+                    setSelectedFile(file);
+                    setUploadResult(null);
+                  }
+                }}
+                className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                  selectedFile
+                    ? 'border-green-500/40 bg-green-500/5'
+                    : 'border-[var(--ff-border-light)] hover:border-blue-500/40 hover:bg-blue-500/5'
+                } ${isUploading ? 'pointer-events-none opacity-60' : ''}`}
+              >
+                <input
+                  id="olt-file-input"
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {selectedFile ? (
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                      <FileSpreadsheet className="w-6 h-6 text-green-400" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                        {selectedFile.name}
+                      </p>
+                      <p className="text-xs text-[var(--ff-text-secondary)]">
+                        {(selectedFile.size / 1024 / 1024).toFixed(1)} MB &middot; Ready to import
+                      </p>
+                    </div>
+                    {!isUploading && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setUploadResult(null); }}
+                        className="ml-2 p-1 rounded hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-[var(--ff-text-tertiary)] mx-auto mb-3" />
+                    <p className="text-sm text-[var(--ff-text-primary)] font-medium">
+                      Drop your Nokia OLT report here
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
+                      or click to browse &middot; .xlsx or .xls files
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Upload Button */}
+            {/* Import Button */}
             <button
               onClick={handleImport}
               disabled={!selectedFile || isUploading}
-              className="flex items-center gap-2 px-6 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent)]/80 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 w-full max-w-sm px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {isUploading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Importing...
+                  Importing &middot; This may take a minute...
                 </>
               ) : (
                 <>
                   <Upload className="w-4 h-4" />
-                  Import
+                  Import Report
                 </>
               )}
             </button>
 
             {/* Upload Result */}
             {uploadResult && (
-              <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <div className="flex items-center gap-2 text-green-400 font-semibold mb-2">
-                  <CheckCircle className="w-5 h-5" />
-                  Import Successful
+              <div className="rounded-xl border border-green-500/20 overflow-hidden">
+                <div className="flex items-center gap-2 px-5 py-3 bg-green-500/10 border-b border-green-500/20">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-semibold text-green-400">Import Successful</span>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-[var(--ff-text-secondary)]">Total:</span>{' '}
-                    <span className="text-[var(--ff-text-primary)]">
+                <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[var(--ff-border-light)]">
+                  <div className="p-4 text-center">
+                    <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
                       {uploadResult.stats.totalRecords}
-                    </span>
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">Total Records</p>
                   </div>
-                  <div>
-                    <span className="text-[var(--ff-text-secondary)]">Matches:</span>{' '}
-                    <span className="text-green-400">{uploadResult.stats.matchCount}</span>
+                  <div className="p-4 text-center">
+                    <p className="text-2xl font-bold text-green-400">
+                      {uploadResult.stats.matchCount}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">Matches</p>
                   </div>
-                  <div>
-                    <span className="text-[var(--ff-text-secondary)]">Mismatches:</span>{' '}
-                    <span className="text-amber-400">{uploadResult.stats.mismatchCount}</span>
+                  <div className="p-4 text-center">
+                    <p className="text-2xl font-bold text-amber-400">
+                      {uploadResult.stats.mismatchCount}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">Mismatches</p>
                   </div>
-                  <div>
-                    <span className="text-[var(--ff-text-secondary)]">Empty:</span>{' '}
-                    <span className="text-[var(--ff-text-tertiary)]">
+                  <div className="p-4 text-center">
+                    <p className="text-2xl font-bold text-[var(--ff-text-tertiary)]">
                       {uploadResult.stats.emptySerialCount}
-                    </span>
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)] mt-1">Empty Serials</p>
                   </div>
                 </div>
               </div>
