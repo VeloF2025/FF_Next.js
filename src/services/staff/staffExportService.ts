@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { StaffMember } from '@/types/staff.types';
 import { staffNeonService } from './staffNeonService';
 import { safeToDate } from '@/utils/dateHelpers';
+import type { StaffAccessResult } from '@/types/staff/access.types';
 
 /**
  * Export and template generation for staff
@@ -9,42 +10,66 @@ import { safeToDate } from '@/utils/dateHelpers';
 export const staffExportService = {
   /**
    * Export staff to Excel file
+   * @param staff - Staff data to export (or fetches all if not provided)
+   * @param access - Access level to determine which columns to include
    */
-  async exportToExcel(staff?: StaffMember[]): Promise<Blob> {
+  async exportToExcel(staff?: StaffMember[], access?: StaffAccessResult): Promise<Blob> {
     // Get all staff if not provided
     const dataToExport = staff || await staffNeonService.getAll();
-    
-    // Transform data for export
-    const exportData = dataToExport.map(s => ({
-      'Employee ID': s.employeeId,
-      'Name': s.name,
-      'Email': s.email,
-      'Phone': s.phone,
-      'Alternative Phone': s.alternativePhone || '',
-      'Position': s.position,
-      'Department': s.department,
-      'Level': s.level,
-      'Status': s.status,
-      'Manager': s.managerName || '',
-      'Skills': s.skills.join(', '),
-      'Experience Years': s.experienceYears,
-      'Address': s.address,
-      'City': s.city,
-      'Province': s.province,
-      'Postal Code': s.postalCode,
-      'Emergency Contact Name': s.emergencyContactName || '',
-      'Emergency Contact Phone': s.emergencyContactPhone || '',
-      'Start Date': s.startDate ? safeToDate(s.startDate).toLocaleDateString('en-GB') : '',
-      'Contract Type': s.contractType,
-      'Working Hours': s.workingHours,
-      'Available Weekends': s.availableWeekends ? 'Yes' : 'No',
-      'Available Nights': s.availableNights ? 'Yes' : 'No',
-      'Current Projects': s.currentProjectCount,
-      'Max Projects': s.maxProjectCount,
-      'Projects Completed': s.totalProjectsCompleted,
-      'Average Rating': s.averageProjectRating,
-      'On-Time Completion Rate': `${s.onTimeCompletionRate}%`
-    }));
+
+    // Base export data - visible to all users
+    const exportData = dataToExport.map(s => {
+      const baseData: Record<string, string | number> = {
+        'Employee ID': s.employeeId,
+        'Name': s.name,
+        'Email': s.email,
+        'Phone': s.phone,
+        'Alternative Phone': s.alternativePhone || '',
+        'Position': s.position,
+        'Department': s.department,
+        'Level': s.level,
+        'Status': s.status,
+        'Manager': s.managerName || '',
+        'Skills': s.skills.join(', '),
+        'Experience Years': s.experienceYears,
+        'Address': s.address,
+        'City': s.city,
+        'Province': s.province,
+        'Postal Code': s.postalCode,
+        'Start Date': s.startDate ? safeToDate(s.startDate).toLocaleDateString('en-GB') : '',
+        'Contract Type': s.contractType,
+        'Working Hours': s.workingHours,
+        'Available Weekends': s.availableWeekends ? 'Yes' : 'No',
+        'Available Nights': s.availableNights ? 'Yes' : 'No',
+        'Current Projects': s.currentProjectCount,
+        'Max Projects': s.maxProjectCount,
+        'Projects Completed': s.totalProjectsCompleted,
+        'Average Rating': s.averageProjectRating,
+        'On-Time Completion Rate': `${s.onTimeCompletionRate}%`
+      };
+
+      // Add sensitive columns only if user has access
+      if (access?.canViewSensitive) {
+        Object.assign(baseData, {
+          'Emergency Contact Name': s.emergencyContactName || '',
+          'Emergency Contact Phone': s.emergencyContactPhone || '',
+          'Salary': (s as any).salaryAmount || '',
+          'Hourly Rate': (s as any).hourlyRate || '',
+          'Salary Grade': (s as any).salaryGrade || '',
+          'SA ID Number': (s as any).saIdNumber || '',
+          'Passport Number': (s as any).passportNumber || '',
+          'Tax Number': (s as any).taxNumber || '',
+          'UIF Number': (s as any).uifNumber || '',
+          'Bank Name': (s as any).bankName || '',
+          'Bank Account': (s as any).bankAccountNumber || '',
+          'Bank Branch': (s as any).bankBranchCode || '',
+          'Next of Kin Name': (s as any).nextOfKinName || '',
+          'Next of Kin Phone': (s as any).nextOfKinPhone || '',
+        });
+      }
+
+      return baseData;
+    });
     
     // Create workbook
     const ws = XLSX.utils.json_to_sheet(exportData);

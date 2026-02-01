@@ -2,15 +2,18 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { getSql } from '@/lib/neon-sql';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { checkStaffAccess, filterStaffFields, filterStaffList } from '@/services/staff/staffAccessService';
 
 // Create a new SQL instance for each request to avoid connection issues
 const getSqlInstance = () => getSql();
 
 export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const sql = getSqlInstance();
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userId = authReq.user.id;
   // CORS handled by withErrorHandler
-  
+
   try {
     switch (req.method) {
       case 'GET': {
@@ -97,14 +100,18 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           
           const staffRows = staff as any[];
           if (staffRows.length === 0) {
-            return res.status(404).json({ 
-              success: false, 
-              data: null, 
-              message: 'Staff member not found' 
+            return res.status(404).json({
+              success: false,
+              data: null,
+              message: 'Staff member not found'
             });
           }
-          
-          res.status(200).json({ success: true, data: staffRows[0] });
+
+          // Check access level and filter sensitive data
+          const access = await checkStaffAccess(userId, id as string);
+          const filteredStaff = filterStaffFields(staffRows[0], access);
+
+          res.status(200).json({ success: true, data: filteredStaff });
         } else {
           // Build query with filters using parameterized queries
           let staff;
@@ -125,7 +132,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 LOWER(s.email) LIKE LOWER(${searchTerm}) OR
                 LOWER(s.employee_id) LIKE LOWER(${searchTerm})
               ) AND s.department = ${department} AND s.status = ${status} AND LOWER(s.position) LIKE LOWER(${positionTerm})
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (search && department && status) {
             const searchTerm = `%${search}%`;
@@ -142,7 +149,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 LOWER(s.email) LIKE LOWER(${searchTerm}) OR
                 LOWER(s.employee_id) LIKE LOWER(${searchTerm})
               ) AND s.department = ${department} AND s.status = ${status}
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (search && department) {
             const searchTerm = `%${search}%`;
@@ -159,7 +166,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 LOWER(s.email) LIKE LOWER(${searchTerm}) OR
                 LOWER(s.employee_id) LIKE LOWER(${searchTerm})
               ) AND s.department = ${department}
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (search) {
             const searchTerm = `%${search}%`;
@@ -176,7 +183,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 LOWER(s.email) LIKE LOWER(${searchTerm}) OR
                 LOWER(s.employee_id) LIKE LOWER(${searchTerm})
               )
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (department && status && position) {
             const positionTerm = `%${position}%`;
@@ -187,7 +194,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as full_name
               FROM staff s
               WHERE s.department = ${department} AND s.status = ${status} AND LOWER(s.position) LIKE LOWER(${positionTerm})
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (department && status) {
             staff = await sql`
@@ -197,7 +204,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as full_name
               FROM staff s
               WHERE s.department = ${department} AND s.status = ${status}
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (department) {
             staff = await sql`
@@ -207,7 +214,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as full_name
               FROM staff s
               WHERE s.department = ${department}
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (status) {
             staff = await sql`
@@ -217,7 +224,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as full_name
               FROM staff s
               WHERE s.status = ${status}
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else if (position) {
             const positionTerm = `%${position}%`;
@@ -228,7 +235,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as full_name
               FROM staff s
               WHERE LOWER(s.position) LIKE LOWER(${positionTerm})
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           } else {
             // Simple query without any parameters when none are provided
@@ -238,16 +245,21 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name
               FROM staff s
-              ORDER BY s.created_at DESC NULLS LAST
+              ORDER BY s.first_name ASC, s.last_name ASC
             `;
           }
           
           // Return empty array if no staff, not an error
           const staffRows = staff as any[];
+
+          // Check access level and filter sensitive data from list
+          const access = await checkStaffAccess(userId);
+          const filteredList = filterStaffList(staffRows || [], access);
+
           res.status(200).json({
             success: true,
-            data: staffRows || [],
-            message: staffRows.length === 0 ? 'No staff members found' : undefined
+            data: filteredList,
+            message: filteredList.length === 0 ? 'No staff members found' : undefined
           });
         }
         break;

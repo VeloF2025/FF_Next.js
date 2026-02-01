@@ -3,18 +3,20 @@
  * GET /api/staff/[staffId]/documents - Get all documents for a staff member
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import type { DocumentType, VerificationStatus } from '@/types/staff-document.types';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { canAccessStaffDocuments } from '@/services/staff/staffAccessService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentsAPI');
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   const { staffId, documentType, verificationStatus } = req.query;
+  const userId = req.user.id;
 
   if (!staffId || typeof staffId !== 'string') {
     return res.status(400).json({ error: 'Staff ID is required' });
@@ -22,6 +24,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     try {
+      // Check if user can access documents for this staff member
+      const canAccess = await canAccessStaffDocuments(userId, staffId);
+      if (!canAccess) {
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You do not have permission to view documents for this staff member'
+        });
+      }
       let query = sql`
         SELECT
           sd.*,

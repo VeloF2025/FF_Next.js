@@ -3,12 +3,13 @@
  * GET /api/staff/[staffId]/compliance - Get compliance document status
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { SA_CONTRACT_CONFIG, SAContractType, mapLegacyContractType } from '@/types/staff/compliance.types';
+import { canAccessStaffDocuments } from '@/services/staff/staffAccessService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffComplianceAPI');
@@ -65,8 +66,9 @@ interface ComplianceStatus {
   isEmployee: boolean;
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   const { staffId } = req.query;
+  const userId = req.user.id;
 
   if (!staffId || typeof staffId !== 'string') {
     return res.status(400).json({ error: 'Staff ID is required' });
@@ -74,6 +76,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     try {
+      // Check if user can access compliance data for this staff member
+      // Compliance contains bank, tax, UIF info - requires sensitive access or self-view
+      const canAccess = await canAccessStaffDocuments(userId, staffId);
+      if (!canAccess) {
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You do not have permission to view compliance data for this staff member'
+        });
+      }
       // Fetch staff member's contract type
       const staffResult = await sql`
         SELECT contract_type FROM staff WHERE id = ${staffId}

@@ -24,12 +24,18 @@ import {
   UserMinus,
   Users,
   Building2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import { formatLabel } from '@/lib/utils';
 
 type StaffStatusType = 'active' | 'inactive' | 'on_leave' | 'suspended' | 'terminated' | 'resigned' | 'retired';
+
+type SortColumn = 'name' | 'position' | 'department' | 'status' | 'projects';
+type SortDirection = 'asc' | 'desc';
 
 interface StaffMember {
   id: string;
@@ -86,6 +92,8 @@ export default function StaffDirectoryPage() {
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [includeFormerEmployees, setIncludeFormerEmployees] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   useEffect(() => {
     fetchStaff();
@@ -170,6 +178,26 @@ export default function StaffDirectoryPage() {
     return labels[status] || formatLabel(status);
   };
 
+  // Sort handler
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort icon component
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-4 w-4 ml-1" />
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
+
   const filteredStaff = staff.filter((member) => {
     const search = searchTerm.toLowerCase();
     const matchesSearch =
@@ -185,6 +213,39 @@ export default function StaffDirectoryPage() {
     const matchesFormerFilter = includeFormerEmployees || !isFormerEmployee(member.status);
 
     return matchesSearch && matchesDepartment && matchesStatus && matchesFormerFilter;
+  });
+
+  // Sort the filtered staff
+  const sortedStaff = [...filteredStaff].sort((a, b) => {
+    let aValue: string | number = '';
+    let bValue: string | number = '';
+
+    switch (sortColumn) {
+      case 'name':
+        aValue = (a.name || '').toLowerCase();
+        bValue = (b.name || '').toLowerCase();
+        break;
+      case 'position':
+        aValue = (a.position || '').toLowerCase();
+        bValue = (b.position || '').toLowerCase();
+        break;
+      case 'department':
+        aValue = (a.department || '').toLowerCase();
+        bValue = (b.department || '').toLowerCase();
+        break;
+      case 'status':
+        aValue = a.status;
+        bValue = b.status;
+        break;
+      case 'projects':
+        aValue = a.projects || 0;
+        bValue = b.projects || 0;
+        break;
+    }
+
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
   });
 
   // Calculate stats
@@ -352,23 +413,53 @@ export default function StaffDirectoryPage() {
                 <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
                   <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                        Staff Member
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center">
+                          Staff Member
+                          <SortIcon column="name" />
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                        Position
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        onClick={() => handleSort('position')}
+                      >
+                        <div className="flex items-center">
+                          Position
+                          <SortIcon column="position" />
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                        Department
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        onClick={() => handleSort('department')}
+                      >
+                        <div className="flex items-center">
+                          Department
+                          <SortIcon column="department" />
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                         Contact
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                        Status
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center">
+                          Status
+                          <SortIcon column="status" />
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
-                        Projects
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        onClick={() => handleSort('projects')}
+                      >
+                        <div className="flex items-center">
+                          Projects
+                          <SortIcon column="projects" />
+                        </div>
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
                         Actions
@@ -376,7 +467,7 @@ export default function StaffDirectoryPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
-                    {filteredStaff.map((member) => (
+                    {sortedStaff.map((member) => (
                       <tr
                         key={member.id}
                         className="hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors"
@@ -471,7 +562,7 @@ export default function StaffDirectoryPage() {
                     ))}
                   </tbody>
                 </table>
-                {filteredStaff.length === 0 && (
+                {sortedStaff.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-[var(--ff-text-secondary)]">No staff members found</p>
                   </div>

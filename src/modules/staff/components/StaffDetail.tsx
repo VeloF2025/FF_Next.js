@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   ArrowLeft,
@@ -14,8 +14,10 @@ import {
   AlertTriangle,
   MessageSquare,
   Activity,
+  Lock,
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
+import { useStaffAccess } from '@/hooks/staff/useStaffAccess';
 import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 import { StaffDocumentList } from '@/components/staff/StaffDocumentList';
@@ -33,13 +35,20 @@ import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 
 type TabType = 'overview' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
 
-const TABS: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+interface TabConfig {
+  id: TabType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  requiresSensitiveAccess?: boolean;
+}
+
+const ALL_TABS: TabConfig[] = [
   { id: 'overview', label: 'Overview', icon: User },
-  { id: 'employment', label: 'Employment', icon: Briefcase },
-  { id: 'compliance', label: 'Compliance', icon: Shield },
+  { id: 'employment', label: 'Employment', icon: Briefcase, requiresSensitiveAccess: true },
+  { id: 'compliance', label: 'Compliance', icon: Shield, requiresSensitiveAccess: true },
   { id: 'vehicles', label: 'Vehicles', icon: Car },
-  { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle },
-  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle, requiresSensitiveAccess: true },
+  { id: 'documents', label: 'Documents', icon: FileText, requiresSensitiveAccess: true },
   { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'notes', label: 'Notes', icon: MessageSquare },
   { id: 'activity', label: 'Activity', icon: Activity },
@@ -49,8 +58,26 @@ export function StaffDetail() {
   const router = useRouter();
   const { id } = router.query as { id: string };
   const { data: staff, isLoading, error, refetch } = useStaffMember(id || '');
+  const { data: accessLevel, isLoading: accessLoading } = useStaffAccess(id);
   const deleteMutation = useDeleteStaff();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // Filter tabs based on access level
+  const visibleTabs = useMemo(() => {
+    if (!accessLevel) return ALL_TABS.filter(t => !t.requiresSensitiveAccess);
+
+    // Full access or self-view can see all tabs
+    if (accessLevel.canViewSensitive || accessLevel.isSelfView) {
+      return ALL_TABS;
+    }
+
+    // Limited access - hide sensitive tabs
+    return ALL_TABS.filter(t => !t.requiresSensitiveAccess);
+  }, [accessLevel]);
+
+  // Determine if user can edit (HR admins only for sensitive data)
+  const canEdit = accessLevel?.canEditSensitive || false;
+  const canViewSensitive = accessLevel?.canViewSensitive || accessLevel?.isSelfView || false;
 
   // Modal states
   const [showDisciplinaryForm, setShowDisciplinaryForm] = useState(false);
@@ -284,7 +311,7 @@ export function StaffDetail() {
     // The StaffDocumentList component handles the actual upload
   };
 
-  if (isLoading) {
+  if (isLoading || accessLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -353,7 +380,7 @@ export function StaffDetail() {
         {/* Tabs */}
         <div className="border-b border-[var(--ff-border-light)] overflow-x-auto">
           <nav className="flex -mb-px px-6" aria-label="Tabs">
-            {TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
@@ -373,6 +400,14 @@ export function StaffDetail() {
           </nav>
         </div>
 
+        {/* Limited Access Notice */}
+        {!canViewSensitive && (
+          <div className="mx-6 mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 text-amber-400 text-sm">
+            <Lock className="h-4 w-4 flex-shrink-0" />
+            <span>You have limited access to this staff member&apos;s data. Some tabs and sensitive information are hidden.</span>
+          </div>
+        )}
+
         {/* Content */}
         <div className="p-6">
           {activeTab === 'overview' && (
@@ -386,11 +421,11 @@ export function StaffDetail() {
             />
           )}
 
-          {activeTab === 'employment' && (
+          {activeTab === 'employment' && canViewSensitive && (
             <EmploymentTab staff={staff} />
           )}
 
-          {activeTab === 'compliance' && (
+          {activeTab === 'compliance' && canViewSensitive && (
             <ComplianceTab
               staff={staff}
               onUploadDocument={handleUploadDocument}
@@ -407,16 +442,16 @@ export function StaffDetail() {
             />
           )}
 
-          {activeTab === 'disciplinary' && (
+          {activeTab === 'disciplinary' && canViewSensitive && (
             <DisciplinaryTab
               staffId={id}
-              onAddIncident={handleAddIncident}
-              onEditIncident={handleEditIncident}
+              onAddIncident={canEdit ? handleAddIncident : undefined}
+              onEditIncident={canEdit ? handleEditIncident : undefined}
             />
           )}
 
-          {activeTab === 'documents' && (
-            <StaffDocumentList staffId={id} isAdmin={true} onVerify={handleVerifyDocument} />
+          {activeTab === 'documents' && canViewSensitive && (
+            <StaffDocumentList staffId={id} isAdmin={canEdit} onVerify={canEdit ? handleVerifyDocument : undefined} />
           )}
 
           {activeTab === 'projects' && (
