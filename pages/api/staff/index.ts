@@ -123,7 +123,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -140,7 +142,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -157,7 +161,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -174,7 +180,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -191,7 +199,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE s.department = ${department} AND s.status = ${status} AND LOWER(s.position) LIKE LOWER(${positionTerm})
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -201,7 +211,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE s.department = ${department} AND s.status = ${status}
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -211,7 +223,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE s.department = ${department}
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -221,7 +235,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE s.status = ${status}
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -232,7 +248,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               WHERE LOWER(s.position) LIKE LOWER(${positionTerm})
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -243,7 +261,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT
                 s.*,
                 CONCAT(s.first_name, ' ', s.last_name) as name,
-                CONCAT(s.first_name, ' ', s.last_name) as full_name
+                CONCAT(s.first_name, ' ', s.last_name) as full_name,
+                s.employee_id as "employeeId",
+                s.current_project_count as "currentProjectCount"
               FROM staff s
               ORDER BY s.first_name ASC, s.last_name ASC
             `;
