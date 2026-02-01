@@ -29,10 +29,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react';
-import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
-import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { useKPIDashboardData } from '@/hooks/useDashboardData';
-import { getKPIDashboardCards } from '@/config/dashboards/dashboardConfigs';
 import { TrendChart, FunnelChart, GaugeChart } from '@/modules/activate/components/reporting/shared/TrendChart';
 import { log } from '@/lib/logger';
 
@@ -117,14 +114,8 @@ export function EnhancedKPIDashboard() {
   const [availableProjects, setAvailableProjects] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Use existing dashboard data hook for stats cards
+  // Use existing dashboard data hook for refresh
   const {
-    stats,
-    trends,
-    isLoading: statsLoading,
-    formatNumber,
-    formatCurrency,
-    formatPercentage,
     loadDashboardData,
   } = useKPIDashboardData();
 
@@ -247,13 +238,6 @@ export function EnhancedKPIDashboard() {
     handleRefresh();
   }, [timeRange, selectedProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Get KPI cards from existing config
-  const dashboardKpiCards = getKPIDashboardCards(stats, trends, {
-    formatNumber,
-    formatCurrency,
-    formatPercentage,
-  });
-
   // Prepare trend chart data
   const trendChartData = trendData?.data?.map((d) => ({
     label: d.label,
@@ -340,10 +324,7 @@ export function EnhancedKPIDashboard() {
         </div>
       )}
 
-      {/* Stats Cards */}
-      <StatsGrid cards={dashboardKpiCards} columns={4} className="mb-6" />
-
-      {/* Velocity Metrics */}
+      {/* Velocity Metrics - Primary KPIs */}
       {trendData?.velocity && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="ff-card p-4">
