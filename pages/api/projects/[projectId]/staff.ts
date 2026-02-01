@@ -9,12 +9,29 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ProjectStaffAPI');
 
+/**
+ * Update the current_project_count for a staff member based on active assignments
+ */
+async function syncProjectCount(staffId: string): Promise<void> {
+  await sql`
+    UPDATE staff
+    SET current_project_count = (
+      SELECT COUNT(*) FROM staff_projects
+      WHERE staff_id = ${staffId} AND is_active = true
+    ),
+    updated_at = NOW()
+    WHERE id = ${staffId}
+  `;
+  logger.info('Synced project count for staff', { staffId });
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const authReq = req as AuthenticatedNextApiRequest;
   const { projectId, activeOnly, staffId: staffIdToRemove } = req.query;
 
   if (!projectId || typeof projectId !== 'string') {
@@ -95,9 +112,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Get the current user for assigned_by
       let assignedBy: string | null = null;
+      const userId = authReq.user?.id;
       if (userId) {
         const [staffMember] = await sql`
-          SELECT id FROM staff WHERE clerk_id = ${userId}
+          SELECT id FROM staff WHERE user_id = ${userId}
         `;
         if (staffMember) {
           assignedBy = staffMember.id as string;
@@ -130,6 +148,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (!updated) {
           return res.status(500).json({ error: 'Failed to update assignment' });
         }
+
+        // Sync project count after reactivation
+        await syncProjectCount(staffId);
 
         return res.status(200).json({
           success: true,
@@ -165,6 +186,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(500).json({ error: 'Failed to create assignment' });
       }
 
+      // Sync project count after new assignment
+      await syncProjectCount(staffId);
+
       return res.status(201).json({
         success: true,
         assignment: mapDbToStaffProject(created as Record<string, unknown>),
@@ -196,6 +220,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!updated) {
         return res.status(404).json({ error: 'Assignment not found' });
       }
+
+      // Sync project count after removal
+      await syncProjectCount(staffIdToRemove);
 
       logger.info('Staff removed from project', { staffId: staffIdToRemove, projectId });
 
