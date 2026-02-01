@@ -55,6 +55,40 @@ const statusConfig = {
   },
 };
 
+// Helper function to format location from various data types
+function formatLocation(location: any): string {
+  if (!location) return 'Unknown';
+  
+  // Already a string
+  if (typeof location === 'string') {
+    // Check if it's a JSON string
+    try {
+      const parsed = JSON.parse(location);
+      return formatLocation(parsed);
+    } catch {
+      return location || 'Unknown';
+    }
+  }
+  
+  // It's an object with city/province/region
+  if (typeof location === 'object') {
+    const parts: string[] = [];
+    
+    if (location.city) parts.push(location.city);
+    if (location.region && location.region !== location.city) parts.push(location.region);
+    if (location.province && location.province !== location.city && location.province !== location.region) {
+      parts.push(location.province);
+    }
+    
+    if (parts.length > 0) return parts.join(', ');
+    
+    // Fallback: if only coordinates, return "Unknown"
+    if (location.coordinates) return 'Unknown';
+  }
+  
+  return 'Unknown';
+}
+
 // Helper function to map Project to DisplayProject
 function mapProjectToDisplay(project: Project): DisplayProject {
   // 🟢 WORKING: Safe date conversion with fallbacks
@@ -72,7 +106,7 @@ function mapProjectToDisplay(project: Project): DisplayProject {
     progress: Number(project.actualProgress) || 0,
     startDate: safeDate(project.startDate),
     endDate: safeDate(project.endDate),
-    location: project.location || 'Unknown',
+    location: formatLocation(project.location),
     teamSize: project.teamMembers?.length || 0,
     priority: project.priority || 'low', // Default to low if priority is missing
     tasksCompleted: 0, // TODO: Connect to task system when available
