@@ -23,11 +23,66 @@ Example: `/manual maintenance`, `/manual procurement`, `/manual activate`
 3. Build a feature inventory: pages, workflows, integrations, settings
 
 ### Phase 2: Capture Screenshots
-1. Ensure dev server is running on port 3004: `PORT=3004 npm run dev`
-2. Get browser tab context: `mcp__claude-in-chrome__tabs_context_mcp`
-3. Create a new tab: `mcp__claude-in-chrome__tabs_create_mcp`
-4. For each module page:
-   a. Navigate to `http://localhost:3004/<module-path>`
+
+**Method A: Local HTTP Server (Recommended - bypasses Chrome download blocking)**
+
+1. Start screenshot server (saves base64 to files):
+   ```bash
+   cat > /tmp/screenshot-server.js << 'SCRIPT'
+   const http = require('http');
+   const fs = require('fs');
+   const path = require('path');
+   const SAVE_DIR = 'docs/user-manuals/screenshots/<module>';
+
+   const server = http.createServer((req, res) => {
+     res.setHeader('Access-Control-Allow-Origin', '*');
+     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+     if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+     if (req.method === 'POST') {
+       let body = '';
+       req.on('data', chunk => body += chunk);
+       req.on('end', () => {
+         const { filename, data } = JSON.parse(body);
+         const buffer = Buffer.from(data, 'base64');
+         fs.writeFileSync(path.join(SAVE_DIR, filename), buffer);
+         console.log(`Saved: ${filename}`);
+         res.writeHead(200, { 'Content-Type': 'application/json' });
+         res.end(JSON.stringify({ ok: true, size: buffer.length }));
+       });
+     }
+   });
+   server.listen(9876, '127.0.0.1', () => console.log('Screenshot server on :9876'));
+   SCRIPT
+   node /tmp/screenshot-server.js &
+   ```
+
+2. For each page, run this in Chrome MCP javascript_tool:
+   ```javascript
+   (async () => {
+     if (!window.html2canvas) {
+       const s = document.createElement('script');
+       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+       document.head.appendChild(s);
+       await new Promise(r => s.onload = r);
+     }
+     const canvas = await html2canvas(document.body, { scale: 1, useCORS: true, logging: false });
+     const base64 = canvas.toDataURL('image/png').split(',')[1];
+     const resp = await fetch('http://127.0.0.1:9876', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ filename: 'XX-page-name.png', data: base64 })
+     });
+     return resp.json();
+   })();
+   ```
+
+3. Kill server when done: `pkill -f screenshot-server.js`
+
+**Method B: Direct Download (may be blocked by Chrome)**
+
+1. For each module page:
+   a. Navigate to page
    b. Wait for page to load (use `wait` action, 3 seconds)
    c. Take screenshot using html2canvas injection:
    ```javascript
@@ -43,8 +98,9 @@ Example: `/manual maintenance`, `/manual procurement`, `/manual activate`
      link.click();
    })();
    ```
-   d. Name screenshots: `01-<page-name>.png`, `02-<page-name>.png`, etc.
-5. Copy screenshots from `~/Downloads/` to `docs/user-manuals/screenshots/<module>/`
+2. Copy screenshots from `~/Downloads/` to `docs/user-manuals/screenshots/<module>/`
+
+**Note:** Method A is preferred because Chrome often blocks programmatic downloads from Method B. The local server approach bypasses this by using fetch() to POST base64 data to a local Node.js server that writes files directly.
 
 ### Phase 3: Write Manual
 Create `docs/user-manuals/source/<module>.md` with this structure:

@@ -3900,3 +3900,88 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo '$(cat /tmp/fix.b64)' | base
 This bypasses all intermediate shell escaping issues.
 
 ---
+
+## 2026-02-01: Chrome Screenshot Capture Pipeline for User Manuals
+
+**Problem — Chrome blocks programmatic downloads from `link.click()`:**
+When generating user manuals with html2canvas screenshots, the standard approach of creating a data URL and triggering `link.click()` download is blocked by Chrome's security policies for programmatic downloads.
+
+```javascript
+// THIS APPROACH IS BLOCKED BY CHROME:
+const canvas = await html2canvas(document.body);
+const link = document.createElement('a');
+link.download = 'screenshot.png';
+link.href = canvas.toDataURL('image/png');
+link.click();  // BLOCKED - Chrome prevents programmatic downloads
+```
+
+**Solution — Local HTTP server + fetch() POST pipeline:**
+
+1. Start a Node.js server that accepts base64 image data via POST:
+```javascript
+// /tmp/screenshot-server.js
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const SAVE_DIR = 'docs/user-manuals/screenshots/<module>';
+
+const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      const { filename, data } = JSON.parse(body);
+      const buffer = Buffer.from(data, 'base64');
+      fs.writeFileSync(path.join(SAVE_DIR, filename), buffer);
+      console.log(`Saved: ${filename} (${buffer.length} bytes)`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, size: buffer.length }));
+    });
+  }
+});
+server.listen(9876, '127.0.0.1', () => console.log('Screenshot server on :9876'));
+```
+
+2. Use fetch() from Chrome to POST screenshot data (via Claude in Chrome MCP):
+```javascript
+(async () => {
+  if (!window.html2canvas) {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(s);
+    await new Promise(r => s.onload = r);
+  }
+  const canvas = await html2canvas(document.body, { scale: 1, useCORS: true, logging: false });
+  const base64 = canvas.toDataURL('image/png').split(',')[1];
+  const resp = await fetch('http://127.0.0.1:9876', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: 'XX-page-name.png', data: base64 })
+  });
+  return resp.json();
+})();
+```
+
+**Why this works:**
+- `fetch()` POST requests are NOT blocked by Chrome's download protection
+- Server runs locally, so no CORS issues (just need Access-Control-Allow-Origin: *)
+- Base64 encoding handles binary data cleanly through JSON
+- Server writes files directly to the correct directory
+
+**Full workflow for user manuals:**
+1. `node /tmp/screenshot-server.js &` — Start server in background
+2. Navigate to each page via `mcp__claude-in-chrome__navigate`
+3. Wait for load via `mcp__claude-in-chrome__computer` with `action: wait`
+4. Inject html2canvas + POST via `mcp__claude-in-chrome__javascript_tool`
+5. Repeat for all pages
+6. `pkill -f screenshot-server.js` — Kill server when done
+
+**Skill updated:** `.claude/skills/manual.md` — Added Method A (Local HTTP Server) as recommended approach
+
+**Applied to:** FibreFlow Complete User Manual (34 screenshots, 1675-line markdown, 5.4MB PDF)
+
+---
