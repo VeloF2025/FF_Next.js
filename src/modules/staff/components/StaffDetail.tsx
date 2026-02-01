@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Activity,
   Lock,
+  BarChart3,
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { useStaffAccess } from '@/hooks/staff/useStaffAccess';
@@ -29,11 +30,12 @@ import { VehiclesTab } from './tabs/VehiclesTab';
 import { DisciplinaryTab } from './tabs/DisciplinaryTab';
 import { NotesTab } from './tabs/NotesTab';
 import { ActivityTab } from './tabs/ActivityTab';
+import { PerformanceTab } from './tabs/PerformanceTab';
 import { DisciplinaryIncidentForm } from './DisciplinaryIncidentForm';
 import { VehicleAssignmentForm } from './VehicleAssignmentForm';
 import type { DisciplinaryIncident, VehicleAssignment } from '@/types/staff';
 
-type TabType = 'overview' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
+type TabType = 'overview' | 'performance' | 'employment' | 'compliance' | 'vehicles' | 'disciplinary' | 'documents' | 'projects' | 'notes' | 'activity';
 
 interface TabConfig {
   id: TabType;
@@ -44,6 +46,7 @@ interface TabConfig {
 
 const ALL_TABS: TabConfig[] = [
   { id: 'overview', label: 'Overview', icon: User },
+  { id: 'performance', label: 'Performance', icon: BarChart3 },
   { id: 'employment', label: 'Employment', icon: Briefcase, requiresSensitiveAccess: true },
   { id: 'compliance', label: 'Compliance', icon: Shield, requiresSensitiveAccess: true },
   { id: 'vehicles', label: 'Vehicles', icon: Car },
@@ -419,6 +422,10 @@ export function StaffDetail() {
               onProfilePhotoDelete={handleProfilePhotoDelete}
               onComparePhotos={handleComparePhotos}
             />
+          )}
+
+          {activeTab === 'performance' && (
+            <PerformanceTab staffId={id} />
           )}
 
           {activeTab === 'employment' && canViewSensitive && (
