@@ -1,11 +1,11 @@
 import { GetServerSideProps } from 'next';
 import { AppLayout } from '../src/components/layout/AppLayout';
-import { KPIDashboard } from '../src/modules/kpi-dashboard/KPIDashboard';
+import { EnhancedKPIDashboard } from '../src/modules/kpi-dashboard/EnhancedKPIDashboard';
 
 export default function KPIDashboardPage() {
   return (
     <AppLayout>
-      <KPIDashboard />
+      <EnhancedKPIDashboard />
     </AppLayout>
   );
 }
