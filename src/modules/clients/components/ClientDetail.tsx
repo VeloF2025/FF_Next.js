@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Edit, Trash2, Building, Activity, FileText } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Building, Activity, FileText, Package } from 'lucide-react';
 import { useClient, useDeleteClient } from '@/hooks/useClients';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
@@ -15,6 +15,7 @@ import {
   ServiceTypesSection,
   NotesSection
 } from './ClientDetailSections';
+import { ClientProjectsTab } from './ClientProjectsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { Permission } from '@/types/auth.types';
 import { log } from '@/lib/logger';
@@ -33,7 +34,7 @@ export function ClientDetail() {
     
     try {
       await deleteMutation.mutateAsync(id);
-      router.push('/app/clients');
+      router.push('/clients');
     } catch (error) {
       log.error('Failed to delete client:', { data: error }, 'ClientDetail');
     }
@@ -54,7 +55,7 @@ export function ClientDetail() {
           <Building className="w-12 h-12 text-red-400 mx-auto mb-3" />
           <h3 className="text-lg font-medium text-red-400 mb-2">Client not found</h3>
           <button
-            onClick={() => router.push('/app/clients')}
+            onClick={() => router.push('/clients')}
             className="text-blue-400 hover:text-blue-300 font-medium"
           >
             Back to Client List
@@ -69,7 +70,7 @@ export function ClientDetail() {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => router.push('/app/clients')}
+          onClick={() => router.push('/clients')}
           className="inline-flex items-center text-sm text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
@@ -90,7 +91,7 @@ export function ClientDetail() {
             {hasPermission(Permission.CLIENTS_UPDATE) && (
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => router.push(`/app/clients/${id}/edit`)}
+                  onClick={() => router.push(`/clients/${id}/edit`)}
                   className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 >
                   <Edit className="w-4 h-4 mr-2" />
@@ -130,7 +131,7 @@ export function ClientDetail() {
               }`}
             >
               <FileText className="w-4 h-4" />
-              Projects ({client.totalProjects})
+              Projects ({client.totalProjects || (Number(client.activeProjects || 0) + Number(client.completedProjects || 0))})
             </button>
             <button
               onClick={() => setActiveTab('history')}
@@ -168,36 +169,11 @@ export function ClientDetail() {
       )}
 
       {activeTab === 'projects' && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Client Projects</h3>
-            {hasPermission(Permission.PROJECTS_CREATE) && (
-              <button
-                onClick={() => router.push(`/app/projects/new?clientId=${id}`)}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                New Project
-              </button>
-            )}
-          </div>
-
-          {client.totalProjects > 0 ? (
-            <div className="text-[var(--ff-text-secondary)]">
-              <p className="mb-4">
-                This client has {client.activeProjects} active project{client.activeProjects !== 1 ? 's' : ''} and {' '}
-                {client.completedProjects} completed project{client.completedProjects !== 1 ? 's' : ''}.
-              </p>
-              <button
-                onClick={() => router.push(`/app/projects?clientId=${id}`)}
-                className="text-blue-400 hover:text-blue-300 font-medium"
-              >
-                View All Projects →
-              </button>
-            </div>
-          ) : (
-            <p className="text-[var(--ff-text-tertiary)]">No projects found for this client.</p>
-          )}
-        </div>
+        <ClientProjectsTab 
+          clientId={id} 
+          clientName={client.name}
+          requiresPO={client.requiresPO}
+        />
       )}
 
       {activeTab === 'history' && (

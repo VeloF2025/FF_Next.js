@@ -405,7 +405,7 @@ export function CheckInForm({
 
             return (
               <div key={category}>
-                <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 tracking-wide mb-3">
                   {categoryLabels[category]}
                 </h4>
                 <div className="space-y-3">

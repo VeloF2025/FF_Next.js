@@ -127,7 +127,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <div className="mt-4 space-y-4">
                     {/* Stack Trace */}
                     <div>
-                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-2">
+                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] tracking-wide mb-2">
                         Stack Trace
                       </h3>
                       <pre className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] p-4 rounded-lg overflow-x-auto text-xs border border-[var(--ff-border-light)]">
@@ -137,7 +137,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
                     {/* Component Stack */}
                     <div>
-                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-2">
+                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] tracking-wide mb-2">
                         Component Stack
                       </h3>
                       <pre className="bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] p-4 rounded-lg overflow-x-auto text-xs border border-[var(--ff-border-light)]">

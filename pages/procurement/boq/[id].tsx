@@ -486,14 +486,14 @@ export default function BOQDetailPage() {
                 <table className="w-full">
                   <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-12">#</th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-44">Code</th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider">Description</th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-36">Category</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-20">Qty</th>
-                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-16">UOM</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-28">Unit Price</th>
-                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] uppercase tracking-wider w-32">Total</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-12">#</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-44">Code</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide">Description</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-36">Category</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-20">Qty</th>
+                      <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-16">UOM</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-28">Unit Price</th>
+                      <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-32">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ff-border-light)]">

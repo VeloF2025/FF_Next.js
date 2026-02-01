@@ -3,7 +3,7 @@
 import { useRouter } from 'next/router';
 import { Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import type { Client } from '@/types/client.types';
-import { getStatusColor, getPriorityColor, getCategoryIcon, formatCurrency } from '../utils/clientUtils';
+import { getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, getCategoryIcon, formatCurrency } from '../utils/clientUtils';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface ClientTableRowProps {
@@ -15,7 +15,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
   const router = useRouter();
 
   const handleRowClick = () => {
-    router.push(`/app/clients/${client.id}`);
+    router.push(`/clients/${client.id}`);
   };
 
   const handleActionClick = (e: React.MouseEvent, action: () => void) => {
@@ -74,13 +74,13 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
 
       <td className="px-4 py-4">
         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(client.status)}`}>
-          {client.status}
+          {getStatusLabel(client.status)}
         </span>
       </td>
 
       <td className="px-4 py-4">
         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(client.priority)}`}>
-          {client.priority}
+          {getPriorityLabel(client.priority)}
         </span>
       </td>
 
@@ -109,7 +109,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
       <td className="px-4 py-4">
         <div className="flex items-center gap-2">
           <button
-            onClick={(e) => handleActionClick(e, () => router.push(`/app/clients/${client.id}`))}
+            onClick={(e) => handleActionClick(e, () => router.push(`/clients/${client.id}`))}
             className="p-1 text-blue-400 hover:text-blue-300"
             title="View"
           >
@@ -117,7 +117,7 @@ export function ClientTableRow({ client, onDelete }: ClientTableRowProps) {
           </button>
           <PermissionGate permission="clients.list" action="edit">
             <button
-              onClick={(e) => handleActionClick(e, () => router.push(`/app/clients/${client.id}/edit`))}
+              onClick={(e) => handleActionClick(e, () => router.push(`/clients/${client.id}/edit`))}
               className="p-1 text-indigo-400 hover:text-indigo-300"
               title="Edit"
             >

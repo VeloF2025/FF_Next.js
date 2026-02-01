@@ -9,17 +9,19 @@ export function ProjectMetricsSection({ client }: SectionProps) {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center">
-          <p className="text-3xl font-bold text-blue-400">{client.activeProjects}</p>
+          <p className="text-3xl font-bold text-blue-400">{client.activeProjects ?? 0}</p>
           <p className="text-sm text-[var(--ff-text-tertiary)]">Active Projects</p>
         </div>
 
         <div className="text-center">
-          <p className="text-3xl font-bold text-green-400">{client.completedProjects}</p>
+          <p className="text-3xl font-bold text-green-400">{client.completedProjects ?? 0}</p>
           <p className="text-sm text-[var(--ff-text-tertiary)]">Completed</p>
         </div>
 
         <div className="text-center">
-          <p className="text-3xl font-bold text-[var(--ff-text-secondary)]">{client.totalProjects}</p>
+          <p className="text-3xl font-bold text-[var(--ff-text-secondary)]">
+            {client.totalProjects || (Number(client.activeProjects || 0) + Number(client.completedProjects || 0))}
+          </p>
           <p className="text-sm text-[var(--ff-text-tertiary)]">Total Projects</p>
         </div>
       </div>

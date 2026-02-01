@@ -23,7 +23,7 @@ export function ClientDetail() {
     try {
       await deleteMutation.mutateAsync(id!);
       notificationService.success('Client deleted');
-      navigate('/app/clients');
+      navigate('/clients');
     } catch (error) {
       notificationService.error('Failed to delete client');
     }
@@ -52,7 +52,7 @@ export function ClientDetail() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/app/clients')}
+          onClick={() => navigate('/clients')}
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
@@ -75,7 +75,7 @@ export function ClientDetail() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate(`/app/clients/${id}/edit`)}
+                onClick={() => navigate(`/clients/${id}/edit`)}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 <Edit className="w-4 h-4 mr-1" />

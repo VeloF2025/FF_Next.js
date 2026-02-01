@@ -65,8 +65,8 @@ export function ProjectHeader({
         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${priorityColors[project.priority] || 'bg-gray-100 text-gray-800'}`}>
           {project.priority ? (project.priority.charAt(0).toUpperCase() + project.priority.slice(1) + ' Priority') : 'No Priority'}
         </span>
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-          {project.projectType ? project.projectType.toUpperCase() : 'STANDARD'}
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-500/20 text-gray-400">
+          {project.projectType ? (project.projectType.charAt(0).toUpperCase() + project.projectType.slice(1).toLowerCase()) : 'Standard'}
         </span>
       </div>
     </>

@@ -571,25 +571,25 @@ export default function RequisitionDetailPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-[var(--ff-border-light)]">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider w-12">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-12">
                           #
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                           Description
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider w-24">
+                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-24">
                           Qty
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider w-24">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-24">
                           UOM
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider w-32">
+                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-32">
                           Unit Price
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider w-32">
+                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-32">
                           Line Total
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                           Supplier
                         </th>
                       </tr>

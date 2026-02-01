@@ -36,16 +36,16 @@ export default function DocumentStatusTable({
           <table className="min-w-full bg-white border border-gray-200 rounded-lg">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Document Type
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Expiry Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Action
                 </th>
               </tr>
@@ -85,16 +85,16 @@ export default function DocumentStatusTable({
           <table className="min-w-full bg-white border border-gray-200 rounded-lg">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Team Member
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Role
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   ID Document Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Action
                 </th>
               </tr>

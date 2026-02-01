@@ -71,25 +71,25 @@ export function SyncHistoryTable({ history }: SyncHistoryTableProps) {
         <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
           <thead className="bg-[var(--ff-bg-tertiary)]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Job ID
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Direction
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Records
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Duration
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Started
               </th>
             </tr>

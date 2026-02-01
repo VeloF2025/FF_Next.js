@@ -87,7 +87,7 @@ export function PortfolioDashboard({ className = '' }: PortfolioDashboardProps) 
         {/* Compliance & Maintenance Summary Cards */}
         <div className="ff-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
               H&S Compliance
             </h3>
             <div className="p-2 rounded-lg bg-green-500/20">
@@ -127,7 +127,7 @@ export function PortfolioDashboard({ className = '' }: PortfolioDashboardProps) 
 
         <div className="ff-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
               Maintenance
             </h3>
             <div className="p-2 rounded-lg bg-orange-500/20">

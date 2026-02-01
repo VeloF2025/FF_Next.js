@@ -31,19 +31,19 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
     <table className="w-full">
       <thead>
         <tr className="border-b border-[var(--ff-border-primary)]">
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Pole Number
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Coordinates
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Type
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Status
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Municipality
           </th>
         </tr>
@@ -76,19 +76,19 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
     <table className="w-full">
       <thead>
         <tr className="border-b border-[var(--ff-border-primary)]">
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Drop Number
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Pole Number
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Address
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Cable Type
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Length
           </th>
         </tr>
@@ -121,22 +121,22 @@ export function SOWDataTable({ data, type, maxItems = 50 }: SOWDataTableProps) {
     <table className="w-full">
       <thead>
         <tr className="border-b border-[var(--ff-border-primary)]">
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Segment ID
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Cable Size
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Layer
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Length (m)
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Complete
           </th>
-          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+          <th className="text-left px-4 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
             Contractor
           </th>
         </tr>

@@ -60,9 +60,11 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
 
     const key = (status || '').toLowerCase();
     const displayStatus = status?.replace('_', ' ');
+    // Title Case formatting
+    const formattedStatus = displayStatus ? displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1).toLowerCase() : 'Unknown';
     return (
       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${statusConfig[key] || 'bg-gray-500/20 text-gray-400'}`}>
-        {displayStatus}
+        {formattedStatus}
       </span>
     );
   };
@@ -75,9 +77,11 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
       CRITICAL: 'bg-red-500/20 text-red-400',
     };
 
+    // Title Case formatting
+    const formattedPriority = priority ? priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase() : 'Normal';
     return (
       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${priorityConfig[priority] || 'bg-gray-500/20 text-gray-400'}`}>
-        {priority?.toLowerCase()}
+        {formattedPriority}
       </span>
     );
   };
@@ -141,31 +145,31 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
         <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
           <thead className="bg-[var(--ff-bg-tertiary)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Project
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Client
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Location
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Priority
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Duration
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Budget
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Health
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Actions
               </th>
             </tr>

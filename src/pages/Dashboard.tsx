@@ -94,7 +94,7 @@ export function Dashboard() {
       subValue: 'Total Clients',
       icon: Building2,
       color: '#f97316',
-      route: '/app/clients'
+      route: '/clients'
     },
     {
       title: 'Staff',

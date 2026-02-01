@@ -176,7 +176,7 @@ export function AddApprovalModal({
                 <div className="space-y-4 max-h-60 overflow-y-auto border border-[var(--ff-border-light)] rounded-lg p-3">
                   {Object.entries(groupedTypes).map(([category, types]) => (
                     <div key={category}>
-                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] uppercase tracking-wider mb-2">
+                      <h3 className="text-xs font-semibold text-[var(--ff-text-secondary)] tracking-wide mb-2">
                         {category}
                       </h3>
                       <div className="space-y-1">

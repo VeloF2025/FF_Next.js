@@ -112,7 +112,7 @@ export function ClientForm() {
       } else {
         await createMutation.mutateAsync(formData);
       }
-      router.push('/app/clients');
+      router.push('/clients');
     } catch (error) {
       log.error('Failed to save client:', { data: error }, 'ClientForm');
     }
@@ -148,7 +148,7 @@ export function ClientForm() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <button
-          onClick={() => router.push('/app/clients')}
+          onClick={() => router.push('/clients')}
           className="inline-flex items-center text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
@@ -259,7 +259,7 @@ export function ClientForm() {
           <div className="flex justify-end gap-3 pt-4 border-t border-[var(--ff-border-light)]">
             <button
               type="button"
-              onClick={() => router.push('/app/clients')}
+              onClick={() => router.push('/clients')}
               className="px-6 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Cancel

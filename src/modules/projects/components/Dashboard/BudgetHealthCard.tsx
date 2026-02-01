@@ -60,7 +60,7 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
   return (
     <div className="ff-card">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
           Budget Health
         </h3>
         <div className={`flex items-center gap-2 px-2 py-1 rounded-full ${healthColors.bg}`}>

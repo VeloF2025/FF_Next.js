@@ -124,7 +124,7 @@ export function ClientForm() {
       } else {
         await createMutation.mutateAsync(formData);
       }
-      navigate('/app/clients');
+      navigate('/clients');
     } catch (error) {
       log.error('Error saving client:', { data: error }, 'index');
     }
@@ -147,7 +147,7 @@ export function ClientForm() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/app/clients')}
+          onClick={() => navigate('/clients')}
           className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -190,7 +190,7 @@ export function ClientForm() {
           <div className="flex justify-end gap-3 pt-6 border-t border-neutral-200">
             <button
               type="button"
-              onClick={() => navigate('/app/clients')}
+              onClick={() => navigate('/clients')}
               className="px-4 py-2 text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
             >
               Cancel

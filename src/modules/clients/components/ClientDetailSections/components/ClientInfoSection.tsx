@@ -12,10 +12,10 @@ export function ClientInfoSection({ client }: SectionProps) {
         </div>
         <div className="flex gap-2">
           <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(client.status)}`}>
-            {client.status.toUpperCase()}
+            {client.status.charAt(0).toUpperCase() + client.status.slice(1).toLowerCase()}
           </span>
           <span className={`px-3 py-1 text-xs font-medium rounded-full ${getPriorityColor(client.priority)}`}>
-            {client.priority.toUpperCase()}
+            {client.priority.charAt(0).toUpperCase() + client.priority.slice(1).toLowerCase()}
           </span>
         </div>
       </div>

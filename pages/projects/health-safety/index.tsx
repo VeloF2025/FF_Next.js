@@ -242,7 +242,7 @@ function OverallScoreCard({
     >
       <div className="flex items-center justify-between mb-4">
         <Shield className="w-8 h-8 opacity-80" />
-        <span className="text-xs uppercase tracking-wider opacity-80">Overall Score</span>
+        <span className="text-xs tracking-wide opacity-80">Overall Score</span>
       </div>
       <div className="text-4xl font-bold mb-2">{score ?? 'N/A'}%</div>
       <p className="text-sm opacity-80">{projectsConfigured || 0} projects configured</p>

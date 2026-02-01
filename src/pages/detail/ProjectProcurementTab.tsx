@@ -131,7 +131,7 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
       <div className="bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-lg border border-green-500/30 p-4">
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <div className="text-xs text-green-400 font-medium uppercase tracking-wider mb-1">
+            <div className="text-xs text-green-400 font-medium tracking-wide mb-1">
               Total PO Value
             </div>
             <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
@@ -142,7 +142,7 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
             </div>
           </div>
           <div>
-            <div className="text-xs text-blue-400 font-medium uppercase tracking-wider mb-1">
+            <div className="text-xs text-blue-400 font-medium tracking-wide mb-1">
               Total Received
             </div>
             <div className="text-2xl font-bold text-[var(--ff-text-primary)]">

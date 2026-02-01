@@ -572,7 +572,7 @@ function BundleModal({ bundle, categories, stockItems, onSave, onClose }: Bundle
           <div className="p-6 grid grid-cols-2 gap-6">
             {/* Left Column - Bundle Details */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wider">Bundle Details</h3>
+              <h3 className="text-sm font-medium text-gray-300 tracking-wide">Bundle Details</h3>
 
               {/* Code & Name */}
               <div className="grid grid-cols-2 gap-4">
@@ -703,7 +703,7 @@ function BundleModal({ bundle, categories, stockItems, onSave, onClose }: Bundle
 
             {/* Right Column - Bundle Items */}
             <div className="space-y-4">
-              <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wider">Bundle Items</h3>
+              <h3 className="text-sm font-medium text-gray-300 tracking-wide">Bundle Items</h3>
 
               {/* Add Item */}
               <div>
@@ -855,7 +855,7 @@ function BundleDetailModal({ bundle, onClose, onEdit, formatCurrency }: BundleDe
 
           {/* Items Table */}
           <div>
-            <h3 className="text-sm font-medium text-gray-300 uppercase tracking-wider mb-3">Items ({bundle.items.length})</h3>
+            <h3 className="text-sm font-medium text-gray-300 tracking-wide mb-3">Items ({bundle.items.length})</h3>
             <div className="bg-[#1a1d23] rounded-lg border border-gray-700/50 overflow-hidden">
               <table className="w-full">
                 <thead>

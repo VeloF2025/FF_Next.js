@@ -152,7 +152,7 @@ export function GlobalSearch() {
           {/* Search Results */}
           {!loading && !error && results.length > 0 && (
             <div className="py-2">
-              <div className="px-4 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <div className="px-4 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Results ({results.length})
               </div>
               {results.map((result) => (
@@ -190,7 +190,7 @@ export function GlobalSearch() {
           {/* Suggestions */}
           {!loading && suggestions.length > 0 && (
             <div className="border-t border-[var(--ff-border-primary)] py-2">
-              <div className="px-4 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <div className="px-4 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 Suggestions
               </div>
               <div className="px-4 space-y-1">
@@ -211,7 +211,7 @@ export function GlobalSearch() {
           {/* Popular Searches (when no query) */}
           {!query && popularSearches.length > 0 && (
             <div className="py-2">
-              <div className="px-4 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+              <div className="px-4 py-2 text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                 <TrendingUp className="inline w-3 h-3 mr-1" />
                 Popular Searches
               </div>

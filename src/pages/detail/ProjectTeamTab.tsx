@@ -135,7 +135,7 @@ export function ProjectTeamTab({ projectId }: ProjectTeamTabProps) {
               </svg>
             </div>
             <div className="flex-1">
-              <div className="text-xs text-blue-400 font-medium uppercase tracking-wider mb-1">
+              <div className="text-xs text-blue-400 font-medium tracking-wide mb-1">
                 Project Manager
               </div>
               <div className="text-lg font-semibold text-[var(--ff-text-primary)]">

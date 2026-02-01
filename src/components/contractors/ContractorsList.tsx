@@ -119,19 +119,19 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
         <table className="w-full">
           <thead className="bg-[var(--ff-bg-tertiary)]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Company
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Contact
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Compliance
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                 Actions
               </th>
             </tr>

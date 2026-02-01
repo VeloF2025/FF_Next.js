@@ -82,7 +82,7 @@ export function RecentProjectsTable({ projects, isLoading = false }: RecentProje
   return (
     <div className="ff-card">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
           Recent Projects
         </h3>
         <Link

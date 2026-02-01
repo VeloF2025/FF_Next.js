@@ -5,6 +5,42 @@ import { apiLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '../../../lib/api-error-handler';
 
+// Transform database client record to frontend Client type
+function transformClient(dbClient: Record<string, unknown>) {
+  if (!dbClient) return null;
+  
+  // Explicitly build the result object (no spread to avoid override issues)
+  const result = { ...dbClient };
+  
+  // Map database columns to frontend type
+  result.name = dbClient.name || dbClient.company_name || '';
+  result.contactPerson = dbClient.contact_person || dbClient.contactPerson || '';
+  result.postalCode = dbClient.postal_code || dbClient.postalCode || '';
+  result.paymentTerms = dbClient.payment_terms || dbClient.paymentTerms || 'NET30';
+  result.creditRating = dbClient.credit_rating || dbClient.creditRating || 'UNRATED';
+  
+  // Numeric fields with safe coercion
+  const pCount = dbClient.project_count;
+  result.totalProjects = typeof pCount === 'bigint' ? Number(pCount) : 
+                         typeof pCount === 'string' ? parseInt(pCount, 10) || 0 :
+                         typeof pCount === 'number' ? pCount : 0;
+  
+  const aCount = dbClient.active_projects;
+  result.activeProjects = typeof aCount === 'bigint' ? Number(aCount) :
+                          typeof aCount === 'string' ? parseInt(aCount, 10) || 0 :
+                          typeof aCount === 'number' ? aCount : 0;
+  
+  const cCount = dbClient.completed_projects;
+  result.completedProjects = typeof cCount === 'bigint' ? Number(cCount) :
+                             typeof cCount === 'string' ? parseInt(cCount, 10) || 0 :
+                             typeof cCount === 'number' ? cCount : 0;
+  
+  result.creditLimit = Number(dbClient.credit_limit ?? dbClient.creditLimit ?? 0);
+  result.currentBalance = Number(dbClient.current_balance ?? dbClient.currentBalance ?? 0);
+  
+  return result;
+}
+
 export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   // CORS headers are now handled by withErrorHandler
   
@@ -21,7 +57,8 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               SELECT 
                 c.*,
                 COUNT(DISTINCT p.id) as project_count,
-                COUNT(DISTINCT CASE WHEN p.status = 'active' THEN p.id END) as active_projects,
+                COUNT(DISTINCT CASE WHEN p.status = 'active' OR p.status = 'ACTIVE' OR p.status = 'IN_PROGRESS' THEN p.id END) as active_projects,
+                COUNT(DISTINCT CASE WHEN p.status = 'completed' OR p.status = 'COMPLETED' THEN p.id END) as completed_projects,
                 SUM(p.budget) as total_budget,
                 JSON_AGG(
                   DISTINCT JSONB_BUILD_OBJECT(
@@ -49,7 +86,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
             });
           }
           
-          res.status(200).json({ success: true, data: client[0] });
+          res.status(200).json({ success: true, data: transformClient(client[0]) });
         } else {
           // Build query with filters (using safe parameterized queries)
           const clients = await safeArrayQuery(
@@ -121,11 +158,8 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
             { logError: true, retryCount: 2 }
           );
           
-          // Map company_name to name for frontend compatibility
-          const mappedClients = (clients || []).map((client: any) => ({
-            ...client,
-            name: client.name || client.company_name || 'Unnamed Client'
-          }));
+          // Map database fields to frontend Client type
+          const mappedClients = (clients || []).map((client: any) => transformClient(client));
 
           // Return empty array if no clients, not an error
           res.status(200).json({

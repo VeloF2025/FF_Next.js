@@ -27,7 +27,7 @@ export function NetworkProgressCard({ network, isLoading = false }: NetworkProgr
   return (
     <div className="ff-card">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
           Network Progress
         </h3>
         <div className="p-2 rounded-lg bg-cyan-500/20">

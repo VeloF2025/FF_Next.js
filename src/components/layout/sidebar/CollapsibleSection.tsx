@@ -79,7 +79,7 @@ export function CollapsibleSection({
         <button
           type="button"
           onClick={handleClick}
-          className={`w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wider mb-2 px-2 py-1 rounded transition-colors ${
+          className={`w-full flex items-center justify-between text-xs font-semibold tracking-wide mb-2 px-2 py-1 rounded transition-colors ${
             isCollapsible ? 'hover:bg-white/5 cursor-pointer' : 'cursor-default'
           }`}
           style={{ color: hasActiveItem ? themeConfig.colors.primary[400] : sidebarStyles.textColorTertiary }}

@@ -415,7 +415,7 @@ export default function StaffDirectoryPage() {
                   <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
                         onClick={() => handleSort('name')}
                       >
                         <div className="flex items-center">
@@ -424,7 +424,7 @@ export default function StaffDirectoryPage() {
                         </div>
                       </th>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
                         onClick={() => handleSort('position')}
                       >
                         <div className="flex items-center">
@@ -433,7 +433,7 @@ export default function StaffDirectoryPage() {
                         </div>
                       </th>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
                         onClick={() => handleSort('department')}
                       >
                         <div className="flex items-center">
@@ -441,11 +441,11 @@ export default function StaffDirectoryPage() {
                           <SortIcon column="department" />
                         </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                         Contact
                       </th>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
                         onClick={() => handleSort('status')}
                       >
                         <div className="flex items-center">
@@ -454,7 +454,7 @@ export default function StaffDirectoryPage() {
                         </div>
                       </th>
                       <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
+                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
                         onClick={() => handleSort('projects')}
                       >
                         <div className="flex items-center">
@@ -462,7 +462,7 @@ export default function StaffDirectoryPage() {
                           <SortIcon column="projects" />
                         </div>
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                      <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                         Actions
                       </th>
                     </tr>

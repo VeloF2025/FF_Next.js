@@ -331,16 +331,16 @@ export default function StockCategoriesPage() {
           <div className="flex items-center gap-3 px-4 py-3 bg-gray-800/30 border-b border-gray-700">
             <div className="w-5" /> {/* Spacer for expand button */}
             <div className="w-8" /> {/* Spacer for icon */}
-            <div className="flex-1 text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <div className="flex-1 text-xs font-medium text-gray-400 tracking-wide">
               Category
             </div>
-            <div className="text-xs font-medium text-gray-400 uppercase tracking-wider w-20 text-center">
+            <div className="text-xs font-medium text-gray-400 tracking-wide w-20 text-center">
               Tracking
             </div>
-            <div className="text-xs font-medium text-gray-400 uppercase tracking-wider w-12 text-center">
+            <div className="text-xs font-medium text-gray-400 tracking-wide w-12 text-center">
               UOM
             </div>
-            <div className="text-xs font-medium text-gray-400 uppercase tracking-wider w-16 text-right">
+            <div className="text-xs font-medium text-gray-400 tracking-wide w-16 text-right">
               Items
             </div>
             <div className="w-20" /> {/* Actions */}

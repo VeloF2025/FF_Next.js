@@ -128,22 +128,22 @@ export default function AllContractorsSummary() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Contractor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
                   Completion
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wide">
                   Missing
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wide">
                   Expired
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wide">
                   Pending
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 tracking-wide">
                   Actions
                 </th>
               </tr>

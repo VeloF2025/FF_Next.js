@@ -126,7 +126,7 @@ export function TicketHeader({ ticket, backLink = '/maintenance/tickets', onStat
       {/* Contact Information Section */}
       {(ticket.client_name || ticket.client_contact || ticket.client_email) && (
         <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] mb-3 uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] mb-3 tracking-wide">
             Contact Information
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -248,7 +248,7 @@ export function TicketHeader({ ticket, backLink = '/maintenance/tickets', onStat
       {/* FibreFlow Cross-Reference Info */}
       {ticket.fibreflow_enrichment && (ticket.fibreflow_enrichment.sow_match_found || ticket.fibreflow_enrichment.onemap_match_found) && (
         <div className="mt-4 pt-4 border-t border-[var(--ff-border-light)]">
-          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] mb-3 uppercase tracking-wider flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-secondary)] mb-3 tracking-wide flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-green-400" />
             FibreFlow Cross-Reference
           </h3>

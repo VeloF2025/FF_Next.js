@@ -4,6 +4,25 @@ import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Transform database client record to frontend Client type
+function transformClient(dbClient: Record<string, unknown>) {
+  if (!dbClient) return null;
+  return {
+    ...dbClient,
+    // Map database columns to frontend type
+    name: dbClient.name || dbClient.company_name || '',
+    totalProjects: Number(dbClient.total_projects || dbClient.project_count || 0),
+    activeProjects: Number(dbClient.active_projects || 0),
+    completedProjects: Number(dbClient.completed_projects || 0),
+    contactPerson: dbClient.contact_person || dbClient.contactPerson || '',
+    postalCode: dbClient.postal_code || dbClient.postalCode || '',
+    creditLimit: Number(dbClient.credit_limit || dbClient.creditLimit || 0),
+    currentBalance: Number(dbClient.current_balance || dbClient.currentBalance || 0),
+    paymentTerms: dbClient.payment_terms || dbClient.paymentTerms || 'NET30',
+    creditRating: dbClient.credit_rating || dbClient.creditRating || 'UNRATED',
+  };
+}
+
 /**
  * Client API Route
  * GET /api/clients/[id] - Get a single client with related projects
@@ -71,7 +90,7 @@ async function handler(
 
         return res.status(200).json({ 
           success: true, 
-          data: client[0] 
+          data: transformClient(client[0]) 
         });
       }
 

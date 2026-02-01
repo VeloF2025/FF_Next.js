@@ -386,7 +386,7 @@ export function EscalationList({
         <div key={groupKey}>
           {/* Group header */}
           {groupBy !== 'none' && (
-            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] mb-3 uppercase tracking-wider">
+            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] mb-3 tracking-wide">
               {groupBy === 'scope_type'
                 ? getScopeTypeLabel(groupKey as EscalationScopeType)
                 : formatStatusLabel(groupKey as EscalationStatus)}

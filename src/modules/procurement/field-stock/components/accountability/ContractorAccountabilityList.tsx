@@ -147,25 +147,25 @@ export function ContractorAccountabilityList({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Contractor
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-center text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Status
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Issued
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Consumed
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Returned
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Unaccounted
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
                   Actions
                 </th>
               </tr>

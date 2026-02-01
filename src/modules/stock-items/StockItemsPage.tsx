@@ -275,25 +275,25 @@ export function StockItemsPage() {
           <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
             <thead className="bg-[var(--ff-bg-tertiary)]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Item Code
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Category
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   UOM
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Available
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Cost
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Source
                 </th>
               </tr>

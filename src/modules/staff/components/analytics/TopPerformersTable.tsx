@@ -37,22 +37,22 @@ export function TopPerformersTable({ topPerformers }: TopPerformersTableProps) {
         <table className="min-w-full">
           <thead>
             <tr className="border-b border-[var(--ff-border-light)]">
-              <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider pb-3">
+              <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide pb-3">
                 Staff Member
               </th>
-              <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider pb-3">
+              <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide pb-3">
                 Department
               </th>
-              <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider pb-3">
+              <th className="text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide pb-3">
                 Position
               </th>
-              <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider pb-3">
+              <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide pb-3">
                 Projects
               </th>
-              <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider pb-3">
+              <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide pb-3">
                 Rating
               </th>
-              <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider pb-3">
+              <th className="text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide pb-3">
                 On-Time %
               </th>
             </tr>

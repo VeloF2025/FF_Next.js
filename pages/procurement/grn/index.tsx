@@ -242,28 +242,28 @@ export default function GRNListPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[var(--ff-border-light)]">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       GRN #
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       PO #
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Supplier
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Warehouse
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Delivery Date
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Items
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Qty Received
                     </th>
                     <th className="px-4 py-3"></th>

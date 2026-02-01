@@ -1,36 +1,42 @@
 export const getStatusColor = (status: string): string => {
-  switch (status) {
-    case 'active': return 'bg-green-100 text-green-800';
-    case 'prospect': return 'bg-blue-100 text-blue-800';
-    case 'inactive': return 'bg-gray-100 text-gray-800';
-    case 'suspended': return 'bg-red-100 text-red-800';
-    case 'former': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-800';
+  const statusLower = status?.toLowerCase() || '';
+  switch (statusLower) {
+    case 'active': return 'bg-green-500/20 text-green-400';
+    case 'prospect': return 'bg-blue-500/20 text-blue-400';
+    case 'inactive': return 'bg-gray-500/20 text-gray-400';
+    case 'suspended': return 'bg-red-500/20 text-red-400';
+    case 'former': return 'bg-orange-500/20 text-orange-400';
+    default: return 'bg-gray-500/20 text-gray-400';
   }
 };
 
 export const getPriorityColor = (priority: string): string => {
-  switch (priority) {
-    case 'vip': return 'bg-purple-100 text-purple-800';
-    case 'critical': return 'bg-red-100 text-red-800';
-    case 'high': return 'bg-orange-100 text-orange-800';
-    case 'medium': return 'bg-yellow-100 text-yellow-800';
-    case 'low': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
+  const priorityLower = priority?.toLowerCase() || '';
+  switch (priorityLower) {
+    case 'vip': return 'bg-purple-500/20 text-purple-400';
+    case 'critical': return 'bg-red-500/20 text-red-400';
+    case 'high': return 'bg-orange-500/20 text-orange-400';
+    case 'medium': return 'bg-yellow-500/20 text-yellow-400';
+    case 'low': return 'bg-gray-500/20 text-gray-400';
+    default: return 'bg-gray-500/20 text-gray-400';
   }
 };
 
 export const getCreditRatingColor = (rating: string): string => {
-  switch (rating) {
-    case 'excellent': return 'text-green-600';
-    case 'good': return 'text-blue-600';
-    case 'fair': return 'text-yellow-600';
-    case 'poor': return 'text-red-600';
-    default: return 'text-gray-600';
+  const ratingLower = rating?.toLowerCase() || '';
+  switch (ratingLower) {
+    case 'excellent': return 'text-green-400';
+    case 'good': return 'text-blue-400';
+    case 'fair': return 'text-yellow-400';
+    case 'poor': return 'text-red-400';
+    default: return 'text-gray-400';
   }
 };
 
-export const formatCurrency = (amount: number): string => {
+export const formatCurrency = (amount: number | null | undefined): string => {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return 'R 0';
+  }
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',

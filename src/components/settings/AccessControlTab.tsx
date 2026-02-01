@@ -788,12 +788,12 @@ export function AccessControlTab() {
         <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
           <thead className="bg-[var(--ff-bg-tertiary)]">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">User</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Department</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Active</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Last Login</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">User</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Department</th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Active</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Last Login</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ff-border-light)]">

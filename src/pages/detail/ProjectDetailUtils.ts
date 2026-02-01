@@ -46,7 +46,8 @@ export const formatPriority = (priority: string): string => {
  * Format project type for display
  */
 export const formatProjectType = (projectType: string): string => {
-  return projectType ? projectType.toUpperCase() : 'STANDARD';
+  if (!projectType) return 'Standard';
+  return projectType.charAt(0).toUpperCase() + projectType.slice(1).toLowerCase();
 };
 
 /**

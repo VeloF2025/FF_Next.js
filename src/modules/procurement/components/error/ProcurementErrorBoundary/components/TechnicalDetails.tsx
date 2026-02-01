@@ -37,7 +37,7 @@ export function TechnicalDetails({
         <div className="mt-4 space-y-4">
           {/* Error Type */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-2">
               Error Type
             </h3>
             <p className="text-sm text-gray-700">{error?.name}</p>
@@ -45,7 +45,7 @@ export function TechnicalDetails({
           
           {/* Stack Trace */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-2">
               Stack Trace
             </h3>
             <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
@@ -55,7 +55,7 @@ export function TechnicalDetails({
           
           {/* Component Stack */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            <h3 className="text-xs font-semibold text-gray-500 tracking-wide mb-2">
               Component Stack
             </h3>
             <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">

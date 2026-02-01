@@ -552,12 +552,12 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                 <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
                   <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Project</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider">Installed</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-500 uppercase tracking-wider">Activated</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-500 uppercase tracking-wider">Not Reviewed</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-green-500 uppercase tracking-wider">Reviewed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Project</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-blue-500 tracking-wide">Installed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-purple-500 tracking-wide">Activated</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-yellow-500 tracking-wide">Not Reviewed</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-green-500 tracking-wide">Reviewed</th>
                     </tr>
                   </thead>
                   <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">

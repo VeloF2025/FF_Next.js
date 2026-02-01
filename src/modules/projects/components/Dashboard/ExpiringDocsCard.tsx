@@ -81,7 +81,7 @@ export function ExpiringDocsCard({ expiringDocs, isLoading = false }: ExpiringDo
   return (
     <div className={`ff-card ${hasExpiredOrCritical ? 'ring-2 ring-red-500/30' : ''}`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
           Expiring Documents
         </h3>
         {hasExpiredOrCritical && (
@@ -149,7 +149,7 @@ export function ExpiringDocsCard({ expiringDocs, isLoading = false }: ExpiringDo
           {/* Critical documents preview */}
           {criticalDocs.length > 0 && !loadingDocs && (
             <div className="space-y-2 mb-4 pt-3 border-t border-[var(--ff-border-light)]">
-              <p className="text-xs text-[var(--ff-text-secondary)] uppercase font-medium">
+              <p className="text-xs text-[var(--ff-text-secondary)] font-medium">
                 Requires Attention
               </p>
               {criticalDocs.map((doc) => (

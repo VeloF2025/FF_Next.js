@@ -202,7 +202,7 @@ export function SidebarCustomization() {
 
       {/* Selected Items (Draggable) */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-[var(--ff-text-tertiary)] mb-4">
+        <h4 className="text-sm font-semibold tracking-wide text-[var(--ff-text-tertiary)] mb-4">
           Your Shortcuts ({selectedItems.length}/{MAX_ITEMS})
         </h4>
 
@@ -253,7 +253,7 @@ export function SidebarCustomization() {
 
       {/* Available Items */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-[var(--ff-text-tertiary)] mb-4">
+        <h4 className="text-sm font-semibold tracking-wide text-[var(--ff-text-tertiary)] mb-4">
           Available Items
         </h4>
 

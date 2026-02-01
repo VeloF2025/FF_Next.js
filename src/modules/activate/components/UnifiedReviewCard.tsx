@@ -576,7 +576,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
       {/* Serial Numbers from OneMap */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide mb-1">
             ONT Barcode
           </label>
           <p className={`text-lg font-mono font-semibold ${hasOntSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
@@ -584,7 +584,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
           </p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide mb-1">
             UPS Serial
           </label>
           <p className={`text-lg font-mono font-semibold ${hasUpsSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>

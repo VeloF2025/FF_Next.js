@@ -15,6 +15,20 @@ export const getStatusColor = (status: ClientStatus): string => {
   }
 };
 
+export const getStatusLabel = (status: ClientStatus | string): string => {
+  const statusMap: Record<string, string> = {
+    active: 'Active',
+    inactive: 'Inactive',
+    prospect: 'Prospect',
+    churned: 'Churned',
+    ACTIVE: 'Active',
+    INACTIVE: 'Inactive',
+    PROSPECT: 'Prospect',
+    CHURNED: 'Churned',
+  };
+  return statusMap[status] || status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+};
+
 export const getPriorityColor = (priority: ClientPriority): string => {
   switch (priority) {
     case ClientPriority.VIP:
@@ -30,6 +44,22 @@ export const getPriorityColor = (priority: ClientPriority): string => {
     default:
       return 'bg-gray-500/20 text-gray-400';
   }
+};
+
+export const getPriorityLabel = (priority: ClientPriority | string): string => {
+  const priorityMap: Record<string, string> = {
+    vip: 'VIP',
+    critical: 'Critical',
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
+    VIP: 'VIP',
+    CRITICAL: 'Critical',
+    HIGH: 'High',
+    MEDIUM: 'Medium',
+    LOW: 'Low',
+  };
+  return priorityMap[priority] || priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase();
 };
 
 export const getCategoryIcon = (category: ClientCategory): string => {

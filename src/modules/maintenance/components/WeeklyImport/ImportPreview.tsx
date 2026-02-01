@@ -65,25 +65,25 @@ export function ImportPreview({ preview }: ImportPreviewProps) {
           <table className="w-full text-sm">
             <thead className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Row
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Ticket UID
                   <span className="block text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]">FT Ref</span>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   DR Number
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Project
                   <span className="block text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]">Area</span>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Title
                   <span className="block text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]">Issue</span>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Status
                 </th>
               </tr>

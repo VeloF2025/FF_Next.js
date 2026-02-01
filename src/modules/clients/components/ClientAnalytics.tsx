@@ -238,19 +238,19 @@ export function ClientAnalytics() {
             <table className="min-w-full">
               <thead>
                 <tr className="border-b border-[var(--ff-border-light)]">
-                  <th className="text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider pb-3">
+                  <th className="text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide pb-3">
                     Client
                   </th>
-                  <th className="text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider pb-3">
+                  <th className="text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide pb-3">
                     Category
                   </th>
-                  <th className="text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider pb-3">
+                  <th className="text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide pb-3">
                     Projects
                   </th>
-                  <th className="text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider pb-3">
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide pb-3">
                     Total Value
                   </th>
-                  <th className="text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wider pb-3">
+                  <th className="text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide pb-3">
                     Avg Value
                   </th>
                 </tr>

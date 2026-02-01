@@ -7,6 +7,17 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
     "./hooks/**/*.{js,ts,jsx,tsx}",
   ],
+  // Safelist dynamic badge colors that are constructed via template literals
+  safelist: [
+    // Status badge colors (opacity backgrounds with colored text)
+    'bg-green-500/20', 'text-green-400',
+    'bg-blue-500/20', 'text-blue-400',
+    'bg-yellow-500/20', 'text-yellow-400',
+    'bg-orange-500/20', 'text-orange-400',
+    'bg-red-500/20', 'text-red-400',
+    'bg-purple-500/20', 'text-purple-400',
+    'bg-gray-500/20', 'text-gray-400',
+  ],
   darkMode: 'class',
   theme: {
   	extend: {
