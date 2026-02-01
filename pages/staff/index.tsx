@@ -47,6 +47,7 @@ interface StaffMember {
   department?: string;
   status: StaffStatusType;
   projects?: number;
+  projectNames?: string;
   joinDate?: string;
   endDate?: string;
   exitType?: string;
@@ -238,8 +239,8 @@ export default function StaffDirectoryPage() {
         bValue = b.status;
         break;
       case 'projects':
-        aValue = a.projects || 0;
-        bValue = b.projects || 0;
+        aValue = (a.projectNames || '').toLowerCase();
+        bValue = (b.projectNames || '').toLowerCase();
         break;
     }
 
@@ -524,8 +525,10 @@ export default function StaffDirectoryPage() {
                             {getStatusLabel(member.status)}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-[var(--ff-text-primary)]">{member.projects || 0}</div>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-[var(--ff-text-primary)] max-w-[200px] truncate" title={member.projectNames || ''}>
+                            {member.projectNames || '-'}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end space-x-2">

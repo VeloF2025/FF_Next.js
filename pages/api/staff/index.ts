@@ -65,6 +65,10 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
               s.experience_years as "experienceYears",
               s.max_project_count as "maxProjectCount",
               s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames",
               s.working_hours as "workingHours",
               s.weekly_hours as "weeklyHours",
               s.available_weekends as "availableWeekends",
@@ -125,7 +129,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -144,7 +152,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -163,7 +175,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -182,7 +198,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE (
                 LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE LOWER(${searchTerm}) OR
@@ -201,7 +221,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE s.department = ${department} AND s.status = ${status} AND LOWER(s.position) LIKE LOWER(${positionTerm})
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -213,7 +237,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE s.department = ${department} AND s.status = ${status}
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -225,7 +253,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE s.department = ${department}
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -237,7 +269,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE s.status = ${status}
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -250,7 +286,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               WHERE LOWER(s.position) LIKE LOWER(${positionTerm})
               ORDER BY s.first_name ASC, s.last_name ASC
@@ -263,7 +303,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                 CONCAT(s.first_name, ' ', s.last_name) as name,
                 CONCAT(s.first_name, ' ', s.last_name) as full_name,
                 s.employee_id as "employeeId",
-                s.current_project_count as "currentProjectCount"
+                s.current_project_count as "currentProjectCount",
+                (SELECT STRING_AGG(p.project_name, ', ' ORDER BY p.project_name)
+                 FROM staff_projects sp
+                 JOIN projects p ON p.id = sp.project_id
+                 WHERE sp.staff_id = s.id AND sp.is_active = true) as "projectNames"
               FROM staff s
               ORDER BY s.first_name ASC, s.last_name ASC
             `;
