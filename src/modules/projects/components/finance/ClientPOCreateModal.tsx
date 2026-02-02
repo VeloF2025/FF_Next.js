@@ -206,8 +206,8 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--ff-card-bg)] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-[var(--ff-card-bg)] px-6 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
+      <div className="bg-[var(--ff-bg-card)] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-[var(--ff-bg-card)] px-6 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Create Client PO</h2>
           <button
             onClick={onClose}
@@ -247,7 +247,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
         {/* Import Tab */}
         {activeTab === 'import' && (
-          <div className="p-6">
+          <div className="p-6 bg-[var(--ff-bg-card)]">
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
