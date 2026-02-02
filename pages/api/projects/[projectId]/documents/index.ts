@@ -62,18 +62,49 @@ async function handleGet(
     const clientPoId = req.query.clientPoId as string | undefined;
     const activeOnly = req.query.activeOnly !== 'false'; // Default to true
 
-    const documents = await sql`
-      SELECT
-        pd.*,
-        cpo.po_number as client_po_number
-      FROM project_documents pd
-      LEFT JOIN client_purchase_orders cpo ON cpo.id = pd.client_po_id
-      WHERE pd.project_id = ${projectId}
-      ${activeOnly ? sql`AND pd.is_active = true` : sql``}
-      ${documentType ? sql`AND pd.document_type = ${documentType}` : sql``}
-      ${clientPoId ? sql`AND pd.client_po_id = ${clientPoId}` : sql``}
-      ORDER BY pd.uploaded_at DESC
-    `;
+    // Build query based on filters - avoid empty sql fragments
+    let documents;
+    if (documentType && clientPoId) {
+      documents = await sql`
+        SELECT pd.*, cpo.po_number as client_po_number
+        FROM project_documents pd
+        LEFT JOIN client_purchase_orders cpo ON cpo.id = pd.client_po_id
+        WHERE pd.project_id = ${projectId}
+          AND (${!activeOnly} OR pd.is_active = true)
+          AND pd.document_type = ${documentType}
+          AND pd.client_po_id = ${clientPoId}
+        ORDER BY pd.uploaded_at DESC
+      `;
+    } else if (documentType) {
+      documents = await sql`
+        SELECT pd.*, cpo.po_number as client_po_number
+        FROM project_documents pd
+        LEFT JOIN client_purchase_orders cpo ON cpo.id = pd.client_po_id
+        WHERE pd.project_id = ${projectId}
+          AND (${!activeOnly} OR pd.is_active = true)
+          AND pd.document_type = ${documentType}
+        ORDER BY pd.uploaded_at DESC
+      `;
+    } else if (clientPoId) {
+      documents = await sql`
+        SELECT pd.*, cpo.po_number as client_po_number
+        FROM project_documents pd
+        LEFT JOIN client_purchase_orders cpo ON cpo.id = pd.client_po_id
+        WHERE pd.project_id = ${projectId}
+          AND (${!activeOnly} OR pd.is_active = true)
+          AND pd.client_po_id = ${clientPoId}
+        ORDER BY pd.uploaded_at DESC
+      `;
+    } else {
+      documents = await sql`
+        SELECT pd.*, cpo.po_number as client_po_number
+        FROM project_documents pd
+        LEFT JOIN client_purchase_orders cpo ON cpo.id = pd.client_po_id
+        WHERE pd.project_id = ${projectId}
+          AND (${!activeOnly} OR pd.is_active = true)
+        ORDER BY pd.uploaded_at DESC
+      `;
+    }
 
     return apiResponse.success(res, {
       documents: documents.map(transformDocument),
