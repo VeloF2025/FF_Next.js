@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
 import { useStaffAccess } from '@/hooks/staff/useStaffAccess';
+import { useStaffFeatures } from '../hooks/useStaffFeatures';
+import { usePermission } from '@/hooks/usePermission';
 import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 import { StaffDocumentList } from '@/components/staff/StaffDocumentList';
@@ -42,19 +44,20 @@ interface TabConfig {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   requiresSensitiveAccess?: boolean;
+  permissionKey: string;
 }
 
 const ALL_TABS: TabConfig[] = [
-  { id: 'overview', label: 'Overview', icon: User },
-  { id: 'performance', label: 'Performance', icon: BarChart3 },
-  { id: 'employment', label: 'Employment', icon: Briefcase, requiresSensitiveAccess: true },
-  { id: 'compliance', label: 'Compliance', icon: Shield, requiresSensitiveAccess: true },
-  { id: 'vehicles', label: 'Vehicles', icon: Car },
-  { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle, requiresSensitiveAccess: true },
-  { id: 'documents', label: 'Documents', icon: FileText, requiresSensitiveAccess: true },
-  { id: 'projects', label: 'Projects', icon: FolderKanban },
-  { id: 'notes', label: 'Notes', icon: MessageSquare },
-  { id: 'activity', label: 'Activity', icon: Activity },
+  { id: 'overview', label: 'Overview', icon: User, permissionKey: 'people.staff.tabs.overview' },
+  { id: 'performance', label: 'Performance', icon: BarChart3, permissionKey: 'people.staff.tabs.performance' },
+  { id: 'employment', label: 'Employment', icon: Briefcase, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.employment' },
+  { id: 'compliance', label: 'Compliance', icon: Shield, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.compliance' },
+  { id: 'vehicles', label: 'Vehicles', icon: Car, permissionKey: 'people.staff.tabs.vehicles' },
+  { id: 'disciplinary', label: 'Disciplinary', icon: AlertTriangle, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.disciplinary' },
+  { id: 'documents', label: 'Documents', icon: FileText, requiresSensitiveAccess: true, permissionKey: 'people.staff.tabs.documents' },
+  { id: 'projects', label: 'Projects', icon: FolderKanban, permissionKey: 'people.staff.tabs.projects' },
+  { id: 'notes', label: 'Notes', icon: MessageSquare, permissionKey: 'people.staff.tabs.notes' },
+  { id: 'activity', label: 'Activity', icon: Activity, permissionKey: 'people.staff.tabs.activity' },
 ];
 
 export function StaffDetail() {
@@ -62,21 +65,38 @@ export function StaffDetail() {
   const { id } = router.query as { id: string };
   const { data: staff, isLoading, error, refetch } = useStaffMember(id || '');
   const { data: accessLevel, isLoading: accessLoading } = useStaffAccess(id);
+  const { can, isLoading: permissionsLoading } = usePermission();
+  const { isFeatureEnabled, isLoading: featuresLoading } = useStaffFeatures();
   const deleteMutation = useDeleteStaff();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  // Filter tabs based on access level
+  // Filter tabs based on access level, permissions, and feature settings
   const visibleTabs = useMemo(() => {
-    if (!accessLevel) return ALL_TABS.filter(t => !t.requiresSensitiveAccess);
-
-    // Full access or self-view can see all tabs
-    if (accessLevel.canViewSensitive || accessLevel.isSelfView) {
-      return ALL_TABS;
+    // Wait for permissions and features to load
+    if (permissionsLoading || featuresLoading) {
+      // Show non-sensitive tabs while loading
+      if (!accessLevel) return ALL_TABS.filter(t => !t.requiresSensitiveAccess);
+      if (accessLevel.canViewSensitive || accessLevel.isSelfView) {
+        return ALL_TABS;
+      }
+      return ALL_TABS.filter(t => !t.requiresSensitiveAccess);
     }
 
-    // Limited access - hide sensitive tabs
-    return ALL_TABS.filter(t => !t.requiresSensitiveAccess);
-  }, [accessLevel]);
+    return ALL_TABS.filter(tab => {
+      // Check RBAC permission
+      const hasPermission = can(tab.permissionKey, 'view');
+
+      // Check feature setting
+      const featureEnabled = isFeatureEnabled(tab.permissionKey);
+
+      // Check sensitive access
+      const sensitiveAccessOk = !tab.requiresSensitiveAccess ||
+        accessLevel?.canViewSensitive ||
+        accessLevel?.isSelfView;
+
+      return hasPermission && featureEnabled && sensitiveAccessOk;
+    });
+  }, [accessLevel, permissionsLoading, featuresLoading, can, isFeatureEnabled]);
 
   // Determine if user can edit (HR admins only for sensitive data)
   const canEdit = accessLevel?.canEditSensitive || false;
@@ -314,7 +334,7 @@ export function StaffDetail() {
     // The StaffDocumentList component handles the actual upload
   };
 
-  if (isLoading || accessLoading) {
+  if (isLoading || accessLoading || permissionsLoading || featuresLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
