@@ -23,7 +23,13 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
   const { data: drops = [] } = useProjectDrops(projectId);
   const { data: fibre = [] } = useProjectFibre(projectId);
 
-  const hasData = poles.length > 0 || drops.length > 0 || fibre.length > 0;
+  // Use summary counts from API (accurate) instead of array lengths (limited to 1000)
+  const summary = sowData?.data?.summary;
+  const totalPoles = summary?.totalPoles ?? poles.length;
+  const totalDrops = summary?.totalDrops ?? drops.length;
+  const totalFibre = summary?.totalFibre ?? fibre.length;
+
+  const hasData = totalPoles > 0 || totalDrops > 0 || totalFibre > 0;
 
   if (isLoading) {
     return (
@@ -48,9 +54,9 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
       <SOWTabs
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        polesCount={poles.length}
-        dropsCount={drops.length}
-        fibreCount={fibre.length}
+        polesCount={totalPoles}
+        dropsCount={totalDrops}
+        fibreCount={totalFibre}
       />
 
       {/* Tab Content */}
@@ -58,16 +64,16 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
         {activeTab === 'summary' && (
           <div className="space-y-6">
             <SOWSummaryCards
-              polesCount={poles.length}
-              dropsCount={drops.length}
-              fibreCount={fibre.length}
+              polesCount={totalPoles}
+              dropsCount={totalDrops}
+              fibreCount={totalFibre}
             />
 
             <SOWDataStatus
               sowData={sowData}
-              polesCount={poles.length}
-              dropsCount={drops.length}
-              fibreCount={fibre.length}
+              polesCount={totalPoles}
+              dropsCount={totalDrops}
+              fibreCount={totalFibre}
             />
 
             <SOWStatistics
@@ -81,9 +87,9 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Poles Data</h3>
-              <span className="text-sm text-[var(--ff-text-secondary)]">{poles.length} total poles</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">{totalPoles.toLocaleString()} total poles</span>
             </div>
-            <SOWDataTable type="poles" data={poles} />
+            <SOWDataTable type="poles" data={poles} totalCount={totalPoles} />
           </div>
         )}
 
@@ -91,9 +97,9 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Drops Data</h3>
-              <span className="text-sm text-[var(--ff-text-secondary)]">{drops.length} total drops</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">{totalDrops.toLocaleString()} total drops</span>
             </div>
-            <SOWDataTable type="drops" data={drops} />
+            <SOWDataTable type="drops" data={drops} totalCount={totalDrops} />
           </div>
         )}
 
@@ -101,9 +107,9 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Fibre Segments</h3>
-              <span className="text-sm text-[var(--ff-text-secondary)]">{fibre.length} total segments</span>
+              <span className="text-sm text-[var(--ff-text-secondary)]">{totalFibre.toLocaleString()} total segments</span>
             </div>
-            <SOWDataTable type="fibre" data={fibre} />
+            <SOWDataTable type="fibre" data={fibre} totalCount={totalFibre} />
           </div>
         )}
       </div>

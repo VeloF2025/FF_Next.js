@@ -1,5 +1,6 @@
 /**
  * SOW Data Table Component
+ * Displays paginated SOW data with proper counts
  */
 
 import { cn } from '@/utils/cn';
@@ -8,13 +9,17 @@ interface SOWDataTableProps {
   type: 'poles' | 'drops' | 'fibre';
   data: any[];
   maxRows?: number;
+  totalCount?: number; // Actual total count from database (may be larger than data.length)
 }
 
-export function SOWDataTable({ type, data, maxRows = 20 }: SOWDataTableProps) {
+export function SOWDataTable({ type, data, maxRows = 20, totalCount }: SOWDataTableProps) {
   const displayData = data.slice(0, maxRows);
+  // Use totalCount if provided, otherwise fall back to data.length
+  const actualTotal = totalCount ?? data.length;
+  const typeLabel = type === 'fibre' ? 'segments' : type;
 
   if (data.length === 0) {
-    return <p className="text-gray-500">No {type} data found</p>;
+    return <p className="text-[var(--ff-text-secondary)]">No {type} data found</p>;
   }
 
   if (type === 'poles') {
@@ -62,9 +67,9 @@ export function SOWDataTable({ type, data, maxRows = 20 }: SOWDataTableProps) {
             </tbody>
           </table>
         </div>
-        {data.length > maxRows && (
-          <div className="text-center py-4 text-gray-500 text-sm">
-            Showing first {maxRows} of {data.length} poles
+        {actualTotal > maxRows && (
+          <div className="text-center py-4 text-[var(--ff-text-secondary)] text-sm border-t border-[var(--ff-border-light)]">
+            Showing first {maxRows} of {actualTotal.toLocaleString()} {typeLabel}
           </div>
         )}
       </>
@@ -117,9 +122,9 @@ export function SOWDataTable({ type, data, maxRows = 20 }: SOWDataTableProps) {
             </tbody>
           </table>
         </div>
-        {data.length > maxRows && (
-          <div className="text-center py-4 text-gray-500 text-sm">
-            Showing first {maxRows} of {data.length} drops
+        {actualTotal > maxRows && (
+          <div className="text-center py-4 text-[var(--ff-text-secondary)] text-sm border-t border-[var(--ff-border-light)]">
+            Showing first {maxRows} of {actualTotal.toLocaleString()} {typeLabel}
           </div>
         )}
       </>
@@ -176,9 +181,9 @@ export function SOWDataTable({ type, data, maxRows = 20 }: SOWDataTableProps) {
           </tbody>
         </table>
       </div>
-      {data.length > maxRows && (
-        <div className="text-center py-4 text-gray-500 text-sm">
-          Showing first {maxRows} of {data.length} segments
+      {actualTotal > maxRows && (
+        <div className="text-center py-4 text-[var(--ff-text-secondary)] text-sm border-t border-[var(--ff-border-light)]">
+          Showing first {maxRows} of {actualTotal.toLocaleString()} {typeLabel}
         </div>
       )}
     </>

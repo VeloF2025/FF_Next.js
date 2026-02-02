@@ -62,6 +62,20 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
       sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`
     ]);
 
+    // Get latest import timestamp from sow_imports table
+    let lastImported: string | null = null;
+    try {
+      const importResult = await sql`
+        SELECT imported_at FROM sow_imports
+        WHERE project_id = ${projectId}::uuid
+        ORDER BY imported_at DESC
+        LIMIT 1
+      `;
+      lastImported = importResult[0]?.imported_at || null;
+    } catch {
+      // sow_imports table might not exist or have no data - ignore
+    }
+
     return res.status(200).json({
       success: true,
       data: {
@@ -71,7 +85,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
         summary: {
           totalPoles: parseInt(poleCount[0]?.count || '0'),
           totalDrops: parseInt(dropCount[0]?.count || '0'),
-          totalFibre: parseInt(fibreCount[0]?.count || '0')
+          totalFibre: parseInt(fibreCount[0]?.count || '0'),
+          lastImported,
+          dataSource: 'PostgreSQL'
         }
       }
     });
