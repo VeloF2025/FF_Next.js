@@ -80,6 +80,10 @@ export default withAuth(withErrorHandler(async (
       return apiResponse.success(res, {
         clientPOs: posWithLiveCounts.map(transformClientPO),
         count: posWithLiveCounts.length,
+        _debug: {
+          liveActivatedCount,
+          activationsResultRaw: activationsResult[0],
+        }
       });
     } catch (error) {
       log.error('Failed to fetch Client POs', { projectId, error });
