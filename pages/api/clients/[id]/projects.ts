@@ -77,7 +77,7 @@ export default async function handler(
         p.project_type as "projectType",
         COALESCE(p.budget, 0) as budget,
         COALESCE(p.actual_cost, 0) as "actualCost",
-        COALESCE(p.actual_progress, 0) as progress,
+        COALESCE(p.progress, 0) as progress,
         COALESCE(p.project_manager, '-') as "projectManager",
         p.start_date as "startDate",
         p.end_date as "endDate",
