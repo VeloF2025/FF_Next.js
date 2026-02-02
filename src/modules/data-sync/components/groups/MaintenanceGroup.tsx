@@ -5,15 +5,18 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   RefreshCw,
   GitCompare,
   FileSpreadsheet,
   FileUp,
   MessageSquare,
+  Loader2,
+  Lock,
 } from 'lucide-react';
 import type { MaintenanceTabId } from '../../types';
+import { usePermission } from '@/hooks/usePermission';
 
 // Import existing maintenance components
 import { SyncDashboard } from '@/modules/maintenance/components/QContact/SyncDashboard';
@@ -25,13 +28,13 @@ import { WeeklyImportWizard } from '@/modules/maintenance/components/WeeklyImpor
 import { WATrackingDashboard } from '@/modules/maintenance/components/WATrackingDashboard';
 import { useTriggerManualSync } from '@/modules/maintenance/hooks/useQContactSync';
 
-// Tab configuration
-const TABS: { id: MaintenanceTabId; label: string; icon: React.ElementType }[] = [
-  { id: 'qcontact', label: 'QContact Sync', icon: RefreshCw },
-  { id: 'alignment', label: 'QC Alignment', icon: GitCompare },
-  { id: 'three-way', label: '3-Way Alignment', icon: FileSpreadsheet },
-  { id: 'weekly', label: 'Weekly Import', icon: FileUp },
-  { id: 'wa-tracking', label: 'Offline Tracking', icon: MessageSquare },
+// Tab configuration with permission keys
+const TABS: { id: MaintenanceTabId; label: string; icon: React.ElementType; permissionKey: string }[] = [
+  { id: 'qcontact', label: 'QContact Sync', icon: RefreshCw, permissionKey: 'system.data-sync.maintenance.qcontact' },
+  { id: 'alignment', label: 'QC Alignment', icon: GitCompare, permissionKey: 'system.data-sync.maintenance.alignment' },
+  { id: 'three-way', label: '3-Way Alignment', icon: FileSpreadsheet, permissionKey: 'system.data-sync.maintenance.three-way' },
+  { id: 'weekly', label: 'Weekly Import', icon: FileUp, permissionKey: 'system.data-sync.maintenance.weekly' },
+  { id: 'wa-tracking', label: 'Offline Tracking', icon: MessageSquare, permissionKey: 'system.data-sync.maintenance.wa-tracking' },
 ];
 
 interface MaintenanceGroupProps {
@@ -40,26 +43,64 @@ interface MaintenanceGroupProps {
 }
 
 export function MaintenanceGroup({ activeTab, onTabChange }: MaintenanceGroupProps) {
+  const { can, isLoading: permissionsLoading } = usePermission();
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const triggerSync = useTriggerManualSync();
 
-  // Default to first tab if none specified
-  const currentTab = (activeTab as MaintenanceTabId) || 'qcontact';
+  // Filter tabs based on permissions
+  const accessibleTabs = useMemo(() => {
+    if (permissionsLoading) return [];
+    return TABS.filter(tab => can(tab.permissionKey, 'view'));
+  }, [permissionsLoading, can]);
+
+  // Default to first accessible tab
+  const currentTab = useMemo(() => {
+    const requested = activeTab as MaintenanceTabId;
+    if (accessibleTabs.some(t => t.id === requested)) {
+      return requested;
+    }
+    return accessibleTabs[0]?.id || 'qcontact';
+  }, [activeTab, accessibleTabs]);
 
   // Sync URL with active tab on mount
   useEffect(() => {
-    if (!activeTab) {
-      onTabChange('qcontact');
+    if (!activeTab && accessibleTabs.length > 0) {
+      onTabChange(accessibleTabs[0].id);
     }
-  }, [activeTab, onTabChange]);
+  }, [activeTab, onTabChange, accessibleTabs]);
+
+  // Show loading state
+  if (permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
+      </div>
+    );
+  }
+
+  // Show access denied if no tabs accessible
+  if (accessibleTabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+          <Lock className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Access Restricted</h2>
+        <p className="text-[var(--ff-text-secondary)] max-w-md">
+          You don&apos;t have permission to access any Maintenance tabs.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
       <div className="border-b border-[var(--ff-border-light)]">
         <nav className="flex gap-1" aria-label="Maintenance Tabs">
-          {TABS.map((tab) => {
+          {accessibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
             return (

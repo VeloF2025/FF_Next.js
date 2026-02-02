@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Clock,
   RefreshCw,
@@ -21,8 +21,10 @@ import {
   Radio,
   ChevronDown,
   ChevronRight,
+  Lock,
 } from 'lucide-react';
 import type { SyncHistoryEntry, SyncOperationType } from '../../types';
+import { usePermission } from '@/hooks/usePermission';
 
 // Filter options
 const FILTER_OPTIONS: { value: string; label: string; icon: React.ElementType; color: string }[] = [
@@ -57,11 +59,18 @@ interface HistoryGroupProps {
 }
 
 export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
+  const { can, isLoading: permissionsLoading } = usePermission();
   const [entries, setEntries] = useState<SyncHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Check permission for timeline tab
+  const hasAccess = useMemo(() => {
+    if (permissionsLoading) return true; // Assume access while loading
+    return can('system.data-sync.history.timeline', 'view');
+  }, [permissionsLoading, can]);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -129,6 +138,31 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
     failed: entries.filter(e => e.status === 'failed').length,
     running: entries.filter(e => e.status === 'running').length,
   };
+
+  // Show loading state
+  if (permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
+      </div>
+    );
+  }
+
+  // Show access denied if no permission
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+          <Lock className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Access Restricted</h2>
+        <p className="text-[var(--ff-text-secondary)] max-w-md">
+          You don&apos;t have permission to access sync history.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

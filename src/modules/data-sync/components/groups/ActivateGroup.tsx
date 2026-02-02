@@ -5,20 +5,21 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { FileSpreadsheet, WifiOff, PlusCircle } from 'lucide-react';
+import React, { useEffect, useMemo } from 'react';
+import { FileSpreadsheet, WifiOff, PlusCircle, Loader2, Lock } from 'lucide-react';
 import type { ActivateTabId } from '../../types';
+import { usePermission } from '@/hooks/usePermission';
 
 // Import existing activate components
 import { OESImportTab } from '@/modules/activate/components/OESImportTab';
 import { OfflineImportTab } from '@/modules/activate/components/OfflineImportTab';
 import { ManualDREntry } from '@/modules/activate/components/ManualDREntry';
 
-// Tab configuration
-const TABS: { id: ActivateTabId; label: string; icon: React.ElementType }[] = [
-  { id: 'oes', label: 'OES Import', icon: FileSpreadsheet },
-  { id: 'arch', label: 'ARCH Import', icon: WifiOff },
-  { id: 'manual', label: 'Manual Entry', icon: PlusCircle },
+// Tab configuration with permission keys
+const TABS: { id: ActivateTabId; label: string; icon: React.ElementType; permissionKey: string }[] = [
+  { id: 'oes', label: 'OES Import', icon: FileSpreadsheet, permissionKey: 'system.data-sync.activate.oes' },
+  { id: 'arch', label: 'ARCH Import', icon: WifiOff, permissionKey: 'system.data-sync.activate.arch' },
+  { id: 'manual', label: 'Manual Entry', icon: PlusCircle, permissionKey: 'system.data-sync.activate.manual' },
 ];
 
 interface ActivateGroupProps {
@@ -27,15 +28,29 @@ interface ActivateGroupProps {
 }
 
 export function ActivateGroup({ activeTab, onTabChange }: ActivateGroupProps) {
-  // Default to first tab if none specified
-  const currentTab = (activeTab as ActivateTabId) || 'oes';
+  const { can, isLoading: permissionsLoading } = usePermission();
+
+  // Filter tabs based on permissions
+  const accessibleTabs = useMemo(() => {
+    if (permissionsLoading) return [];
+    return TABS.filter(tab => can(tab.permissionKey, 'view'));
+  }, [permissionsLoading, can]);
+
+  // Default to first accessible tab
+  const currentTab = useMemo(() => {
+    const requested = activeTab as ActivateTabId;
+    if (accessibleTabs.some(t => t.id === requested)) {
+      return requested;
+    }
+    return accessibleTabs[0]?.id || 'oes';
+  }, [activeTab, accessibleTabs]);
 
   // Sync URL with active tab on mount
   useEffect(() => {
-    if (!activeTab) {
-      onTabChange('oes');
+    if (!activeTab && accessibleTabs.length > 0) {
+      onTabChange(accessibleTabs[0].id);
     }
-  }, [activeTab, onTabChange]);
+  }, [activeTab, onTabChange, accessibleTabs]);
 
   // Callback for when an import completes (optional refresh trigger)
   const handleImportComplete = () => {
@@ -43,12 +58,37 @@ export function ActivateGroup({ activeTab, onTabChange }: ActivateGroupProps) {
     // For now, components handle their own success states
   };
 
+  // Show loading state
+  if (permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
+      </div>
+    );
+  }
+
+  // Show access denied if no tabs accessible
+  if (accessibleTabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+          <Lock className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">Access Restricted</h2>
+        <p className="text-[var(--ff-text-secondary)] max-w-md">
+          You don&apos;t have permission to access any Activate tabs.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
       <div className="border-b border-[var(--ff-border-light)]">
         <nav className="flex gap-1" aria-label="Activate Tabs">
-          {TABS.map((tab) => {
+          {accessibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
             return (
