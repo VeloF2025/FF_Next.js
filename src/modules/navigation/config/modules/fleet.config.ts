@@ -24,6 +24,7 @@ export const fleetConfig: ModuleNavigationConfig = {
   basePath: '/fleet',
   icon: Car,
   tabs: [
+    // Core assets
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -32,11 +33,11 @@ export const fleetConfig: ModuleNavigationConfig = {
       path: '/fleet',
     },
     {
-      id: 'analytics',
-      label: 'Analytics',
-      icon: TrendingUp,
-      path: '/fleet/analytics',
-      rbacKey: 'fleet:analytics:view',
+      id: 'vehicles',
+      label: 'Vehicles',
+      icon: Car,
+      path: '/fleet/vehicles',
+      rbacKey: 'fleet:vehicles:view',
     },
     {
       id: 'drivers',
@@ -45,6 +46,23 @@ export const fleetConfig: ModuleNavigationConfig = {
       path: '/fleet/drivers',
       rbacKey: 'fleet:drivers:view',
     },
+    // GPS & Location tracking
+    {
+      id: 'investigation',
+      label: 'GPS Investigation',
+      shortLabel: 'GPS',
+      icon: FileSearch,
+      path: '/fleet/investigation',
+      rbacKey: 'fleet:investigation:view',
+    },
+    {
+      id: 'locations',
+      label: 'Locations',
+      icon: MapPin,
+      path: '/fleet/locations',
+      rbacKey: 'fleet:locations:view',
+    },
+    // Operations
     {
       id: 'fuel',
       label: 'Fuel',
@@ -60,27 +78,13 @@ export const fleetConfig: ModuleNavigationConfig = {
       path: '/fleet/maintenance',
       rbacKey: 'fleet:maintenance:view',
     },
+    // Reporting & Admin
     {
-      id: 'vehicles',
-      label: 'Vehicles',
-      icon: Car,
-      path: '/fleet/vehicles',
-      rbacKey: 'fleet:vehicles:view',
-    },
-    {
-      id: 'investigation',
-      label: 'GPS Investigation',
-      shortLabel: 'GPS',
-      icon: FileSearch,
-      path: '/fleet/investigation',
-      rbacKey: 'fleet:investigation:view',
-    },
-    {
-      id: 'locations',
-      label: 'Locations',
-      icon: MapPin,
-      path: '/fleet/locations',
-      rbacKey: 'fleet:locations:view',
+      id: 'analytics',
+      label: 'Analytics',
+      icon: TrendingUp,
+      path: '/fleet/analytics',
+      rbacKey: 'fleet:analytics:view',
     },
     {
       id: 'portal',
