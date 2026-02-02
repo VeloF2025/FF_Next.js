@@ -70,6 +70,11 @@ export function PortfolioDashboard({ className = '' }: PortfolioDashboardProps) 
     );
   }
 
+  // Check if we have meaningful data to show
+  const hasMaintenanceData = dashboardData.maintenance.openTickets > 0 || dashboardData.maintenance.criticalTickets > 0;
+  const hasComplianceData = dashboardData.compliance.openIncidents > 0 || dashboardData.compliance.pendingAudits > 0;
+  const hasBudgetData = dashboardData.budget.totalBudget > 0;
+
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Stats Cards */}
@@ -79,94 +84,85 @@ export function PortfolioDashboard({ className = '' }: PortfolioDashboardProps) 
         isLoading={isLoading}
       />
 
-      {/* Metrics Grid - 2x2 on desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <BudgetHealthCard budget={dashboardData.budget} isLoading={isLoading} />
-        <NetworkProgressCard network={dashboardData.network} isLoading={isLoading} />
+      {/* Main Content - Network Progress + Recent Projects */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <NetworkProgressCard network={dashboardData.network} isLoading={isLoading} />
 
-        {/* Compliance & Maintenance Summary Cards */}
-        <div className="ff-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
-              H&S Compliance
-            </h3>
-            <div className="p-2 rounded-lg bg-green-500/20">
-              <ShieldCheck className="w-5 h-5 text-green-400" />
-            </div>
-          </div>
-          {isLoading ? (
-            <div className="space-y-3">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
-            </div>
-          ) : (
-            <>
-              <div className="text-center mb-4">
-                <p className="text-4xl font-bold text-[var(--ff-text-primary)]">
-                  {dashboardData.compliance.avgHsScore}%
-                </p>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Average Score</p>
+          {/* Only show Budget if there's data */}
+          {hasBudgetData && (
+            <BudgetHealthCard budget={dashboardData.budget} isLoading={isLoading} />
+          )}
+
+          {/* Expiring Documents */}
+          <ExpiringDocsCard expiringDocs={dashboardData.expiringDocs} isLoading={isLoading} />
+        </div>
+
+        <div className="lg:col-span-2">
+          <RecentProjectsTable projects={dashboardData.recentProjects} isLoading={isLoading} />
+        </div>
+      </div>
+
+      {/* Secondary Metrics - Only show if there's meaningful data */}
+      {(hasMaintenanceData || hasComplianceData) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* H&S Compliance - only show if relevant */}
+          {hasComplianceData && (
+            <div className="ff-card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
+                  Safety & Compliance
+                </h3>
+                <div className="p-2 rounded-lg bg-green-500/20">
+                  <ShieldCheck className="w-5 h-5 text-green-400" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
-                  <p className={`text-xl font-semibold ${dashboardData.compliance.openIncidents > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  <p className={`text-2xl font-semibold ${dashboardData.compliance.openIncidents > 0 ? 'text-red-500' : 'text-green-500'}`}>
                     {dashboardData.compliance.openIncidents}
                   </p>
                   <p className="text-xs text-[var(--ff-text-secondary)]">Open Incidents</p>
                 </div>
                 <div>
-                  <p className="text-xl font-semibold text-amber-500">
+                  <p className="text-2xl font-semibold text-amber-500">
                     {dashboardData.compliance.pendingAudits}
                   </p>
                   <p className="text-xs text-[var(--ff-text-secondary)]">Pending Audits</p>
                 </div>
               </div>
-            </>
+            </div>
+          )}
+
+          {/* Maintenance - only show if there are tickets */}
+          {hasMaintenanceData && (
+            <div className="ff-card">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
+                  Maintenance Tickets
+                </h3>
+                <div className="p-2 rounded-lg bg-orange-500/20">
+                  <Wrench className="w-5 h-5 text-orange-400" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
+                    {dashboardData.maintenance.openTickets}
+                  </p>
+                  <p className="text-xs text-[var(--ff-text-secondary)]">Open Tickets</p>
+                </div>
+                <div>
+                  <p className={`text-2xl font-semibold ${dashboardData.maintenance.criticalTickets > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    {dashboardData.maintenance.criticalTickets}
+                  </p>
+                  <p className="text-xs text-[var(--ff-text-secondary)]">Critical</p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
-
-        <div className="ff-card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
-              Maintenance
-            </h3>
-            <div className="p-2 rounded-lg bg-orange-500/20">
-              <Wrench className="w-5 h-5 text-orange-400" />
-            </div>
-          </div>
-          {isLoading ? (
-            <div className="space-y-3">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4" />
-            </div>
-          ) : (
-            <>
-              <div className="text-center mb-4">
-                <p className="text-4xl font-bold text-[var(--ff-text-primary)]">
-                  {dashboardData.maintenance.openTickets}
-                </p>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Open Tickets</p>
-              </div>
-              <div className="text-center">
-                <p className={`text-xl font-semibold ${dashboardData.maintenance.criticalTickets > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                  {dashboardData.maintenance.criticalTickets}
-                </p>
-                <p className="text-xs text-[var(--ff-text-secondary)]">Critical Priority</p>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Expiring Docs Card (full width on mobile, side by side with recent on desktop) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <ExpiringDocsCard expiringDocs={dashboardData.expiringDocs} isLoading={isLoading} />
-        </div>
-        <div className="lg:col-span-2">
-          <RecentProjectsTable projects={dashboardData.recentProjects} isLoading={isLoading} />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

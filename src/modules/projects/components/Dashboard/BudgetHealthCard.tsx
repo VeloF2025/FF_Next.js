@@ -46,11 +46,37 @@ function getHealthColor(health: BudgetMetrics['health']): {
 
 export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCardProps) {
   const healthColors = getHealthColor(budget.health);
+  const hasNoBudget = budget.totalBudget === 0;
 
   if (isLoading) {
     return (
       <div className="ff-card animate-pulse">
         <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded" />
+      </div>
+    );
+  }
+
+  // Show empty state when no budget data
+  if (hasNoBudget) {
+    return (
+      <div className="ff-card">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
+            Budget Overview
+          </h3>
+          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+            <span className="w-2 h-2 rounded-full bg-gray-400" />
+            <span className="text-xs font-medium text-gray-500">No Data</span>
+          </div>
+        </div>
+        <div className="text-center py-6">
+          <p className="text-[var(--ff-text-secondary)] text-sm">
+            No project budgets configured yet
+          </p>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+            Add budgets to projects to see financial health
+          </p>
+        </div>
       </div>
     );
   }
@@ -61,7 +87,7 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
     <div className="ff-card">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
-          Budget Health
+          Budget Overview
         </h3>
         <div className={`flex items-center gap-2 px-2 py-1 rounded-full ${healthColors.bg}`}>
           <span className={`w-2 h-2 rounded-full ${healthColors.dot}`} />
@@ -77,7 +103,7 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
           <span>{budget.utilizationPercent.toFixed(0)}% utilized</span>
           <span>{formatCurrency(budget.totalActual)} / {formatCurrency(budget.totalBudget)}</span>
         </div>
-        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               budget.health === 'healthy' ? 'bg-green-500' :
@@ -88,30 +114,18 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
         </div>
       </div>
 
-      {/* Metrics grid */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Metrics - simplified 2 column */}
+      <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-xs text-[var(--ff-text-secondary)]">Total Budget</p>
-          <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
+          <p className="text-xs text-[var(--ff-text-secondary)]">Budget</p>
+          <p className="font-semibold text-[var(--ff-text-primary)]">
             {formatCurrency(budget.totalBudget)}
           </p>
         </div>
         <div>
-          <p className="text-xs text-[var(--ff-text-secondary)]">Committed</p>
-          <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
-            {formatCurrency(budget.totalCommitted)}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-[var(--ff-text-secondary)]">Actual Spend</p>
-          <p className="text-lg font-semibold text-[var(--ff-text-primary)]">
+          <p className="text-xs text-[var(--ff-text-secondary)]">Spent</p>
+          <p className="font-semibold text-[var(--ff-text-primary)]">
             {formatCurrency(budget.totalActual)}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-[var(--ff-text-secondary)]">Available</p>
-          <p className="text-lg font-semibold text-green-600">
-            {formatCurrency(budget.available)}
           </p>
         </div>
       </div>

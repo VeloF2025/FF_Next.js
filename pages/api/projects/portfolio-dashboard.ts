@@ -251,7 +251,7 @@ export default async function handler(
       // Table may not exist
     }
 
-    // 7. Get recent projects (last 10)
+    // 7. Get recent projects (last 10) with REAL progress from drops/activations
     const recentProjects = await safeArrayQuery<{
       id: string;
       project_name: string;
@@ -259,6 +259,8 @@ export default async function handler(
       status: string;
       progress: number;
       manager_name: string | null;
+      total_drops: number;
+      completed_drops: number;
     }>(
       async () => sql`
         SELECT
@@ -266,12 +268,24 @@ export default async function handler(
           p.project_name,
           c.company_name as client_name,
           p.status,
-          COALESCE(p.progress, 0)::int as progress,
+          COALESCE(drop_stats.total_drops, 0)::int as total_drops,
+          COALESCE(drop_stats.completed_drops, 0)::int as completed_drops,
+          CASE
+            WHEN COALESCE(drop_stats.total_drops, 0) = 0 THEN 0
+            ELSE ROUND((COALESCE(drop_stats.completed_drops, 0)::numeric / drop_stats.total_drops) * 100)::int
+          END as progress,
           COALESCE(s.name, NULLIF(CONCAT(u.first_name, ' ', u.last_name), ' '), p.project_manager::text) as manager_name
         FROM projects p
         LEFT JOIN clients c ON p.client_id = c.id
         LEFT JOIN staff s ON p.project_manager::text = s.id::text
         LEFT JOIN users u ON p.project_manager::text = u.id::text
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::int as total_drops,
+            COUNT(*) FILTER (WHERE d.status IN ('completed', 'activated', 'installed'))::int as completed_drops
+          FROM drops d
+          WHERE d.project_id = p.id
+        ) drop_stats ON true
         ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC
         LIMIT 10
       `
