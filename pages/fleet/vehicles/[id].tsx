@@ -52,6 +52,7 @@ import type {
   VehicleInsurance,
 } from '@/modules/fleet/types';
 import { DriverLicenseUploadModal } from '@/modules/fleet/components/DriverLicenseUploadModal';
+import { LicenseDiscModal } from '@/modules/fleet/components/LicenseDiscModal';
 
 // ============================================================================
 // Types
@@ -863,12 +864,16 @@ function DocumentsTab({
   licenseDisc,
   documents,
   loadingDocs,
+  onLicenseDiscUpdated,
 }: {
   vehicle: FleetVehicle;
   licenseDisc: LicenseDisc | null;
   documents: VehicleDocument[];
   loadingDocs: boolean;
+  onLicenseDiscUpdated: () => void;
 }) {
+  const [showLicenseDiscModal, setShowLicenseDiscModal] = useState(false);
+
   if (loadingDocs) {
     return (
       <div className="animate-pulse space-y-6">
@@ -889,9 +894,12 @@ function DocumentsTab({
             <Car className="w-5 h-5 text-[var(--ff-primary)]" />
             License Disc
           </h2>
-          <button className="px-3 py-1.5 text-sm bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] flex items-center gap-1.5">
+          <button
+            onClick={() => setShowLicenseDiscModal(true)}
+            className="px-3 py-1.5 text-sm bg-[var(--ff-primary)] text-white rounded-lg hover:bg-[var(--ff-primary-dark)] flex items-center gap-1.5"
+          >
             <Plus className="w-4 h-4" />
-            Renew
+            {licenseDisc ? 'Renew' : 'Add'}
           </button>
         </div>
 
@@ -1033,6 +1041,20 @@ function DocumentsTab({
           </div>
         )}
       </div>
+
+      {/* License Disc Modal */}
+      {showLicenseDiscModal && (
+        <LicenseDiscModal
+          vehicleId={vehicle.id}
+          vehicleRegistration={vehicle.registration}
+          currentDisc={licenseDisc}
+          onSuccess={() => {
+            onLicenseDiscUpdated();
+            setShowLicenseDiscModal(false);
+          }}
+          onClose={() => setShowLicenseDiscModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -3354,6 +3376,7 @@ export default function VehicleDetailPage() {
                 licenseDisc={licenseDisc}
                 documents={documents}
                 loadingDocs={loadingDocs}
+                onLicenseDiscUpdated={fetchDocumentsData}
               />
             )}
             {activeTab === 'insurance' && (

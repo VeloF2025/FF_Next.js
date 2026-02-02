@@ -33,7 +33,6 @@ export default withAuth(withErrorHandler(async (
       SELECT
         COALESCE(SUM(total_value), 0) as total_contract_value,
         COALESCE(SUM(contracted_drops), 0) as total_drops_contracted,
-        COALESCE(SUM(drops_activated), 0) as total_drops_activated,
         COALESCE(SUM(amount_invoiced), 0) as total_invoiced,
         COALESCE(SUM(amount_paid), 0) as total_paid,
         COUNT(*) as po_count,
@@ -43,16 +42,25 @@ export default withAuth(withErrorHandler(async (
         AND status != 'cancelled'
     `;
 
+    // Get actual OES activations count for this project
+    const activationsResult = await sql`
+      SELECT COUNT(*) as total_drops_activated
+      FROM oes_activations oa
+      INNER JOIN drops d ON d.id = oa.drop_id
+      WHERE d.project_id = ${projectId}
+    `;
+
     const clientPOs = clientPOsResult[0];
+    const totalDropsActivated = Number(activationsResult[0]?.total_drops_activated || 0);
     const clientPOSummary = {
       totalContractValue: Number(clientPOs?.total_contract_value || 0),
       totalDropsContracted: Number(clientPOs?.total_drops_contracted || 0),
-      totalDropsActivated: Number(clientPOs?.total_drops_activated || 0),
+      totalDropsActivated,
       totalInvoiced: Number(clientPOs?.total_invoiced || 0),
       totalPaid: Number(clientPOs?.total_paid || 0),
       totalOutstanding: Number(clientPOs?.total_invoiced || 0) - Number(clientPOs?.total_paid || 0),
       activationProgress: Number(clientPOs?.total_drops_contracted) > 0
-        ? Math.round((Number(clientPOs?.total_drops_activated) / Number(clientPOs?.total_drops_contracted)) * 100 * 100) / 100
+        ? Math.round((totalDropsActivated / Number(clientPOs?.total_drops_contracted)) * 100 * 100) / 100
         : 0,
       invoicingProgress: Number(clientPOs?.total_contract_value) > 0
         ? Math.round((Number(clientPOs?.total_invoiced) / Number(clientPOs?.total_contract_value)) * 100 * 100) / 100
