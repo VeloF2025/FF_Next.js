@@ -125,8 +125,15 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
         ...prev,
         [documentType]: { uploading: false, error: null },
       }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Upload failed';
+    } catch (error: unknown) {
+      let message = 'Upload failed';
+      if (error instanceof Error) {
+        message = error.message;
+      } else if (typeof error === 'string') {
+        message = error;
+      } else if (error && typeof error === 'object' && 'error' in error) {
+        message = String((error as { error: unknown }).error);
+      }
       setUploadState((prev) => ({
         ...prev,
         [documentType]: { uploading: false, error: message },
