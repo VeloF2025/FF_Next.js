@@ -21,6 +21,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
+import { log } from '@/lib/logger';
 
 interface BirthdayAlert {
   id: string;
@@ -90,7 +91,7 @@ export function StaffAlertsPanel({ className = '', defaultExpanded = true }: Sta
         setAlerts(data);
       }
     } catch (error) {
-      console.error('Error fetching staff alerts:', error);
+      log.error('Error fetching staff alerts', { error }, 'StaffAlertsPanel');
     } finally {
       setLoading(false);
     }

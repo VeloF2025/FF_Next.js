@@ -3,6 +3,8 @@
  * Uses API routes instead of direct database access for security
  */
 
+import { log } from '@/lib/logger';
+
 const API_BASE = '/api';
 
 interface DbClient {
@@ -219,7 +221,7 @@ export const clientApiService = {
         totalProjectValue: 0
       };
     } catch (error) {
-      console.error('Error fetching client summary:', error);
+      log.error('Error fetching client summary', { error }, 'clientApiService');
       return {
         totalClients: 0,
         activeClients: 0,

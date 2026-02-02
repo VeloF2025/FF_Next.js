@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Paperclip, Link, Image, File, Trash2, Upload, ExternalLink } from 'lucide-react';
 import type { DevQueueAttachment } from '../types/devQueue';
+import { log } from '@/lib/logger';
 
 interface AttachmentsModalProps {
   isOpen: boolean;
@@ -55,7 +56,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
         setAttachments(data.data || []);
       }
     } catch (err) {
-      console.error('Failed to fetch attachments:', err);
+      log.error('Failed to fetch attachments', err, 'AttachmentsModal');
     } finally {
       setLoading(false);
     }
@@ -143,7 +144,7 @@ export function AttachmentsModal({ isOpen, onClose, itemId, itemTitle }: Attachm
         setAttachments(prev => prev.filter(a => a.id !== attachmentId));
       }
     } catch (err) {
-      console.error('Failed to delete attachment:', err);
+      log.error('Failed to delete attachment', err, 'AttachmentsModal');
     }
   };
 

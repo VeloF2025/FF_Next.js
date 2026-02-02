@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SOW, SOWFilterType } from '../types/sow.types';
+import { log } from '@/lib/logger';
 
 export function useSOWData() {
   const [sows, setSOWs] = useState<SOW[]>([]);
@@ -114,7 +115,7 @@ export function useSOWData() {
       setSOWs(sows);
       setError(null);
     } catch (err) {
-      console.error('Error fetching SOW data:', err);
+      log.error('Error fetching SOW data', { error: err }, 'useSOWData');
       setError('Failed to load SOW data');
       setSOWs([]);
     } finally {

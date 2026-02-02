@@ -15,6 +15,7 @@
 
 import { useState, useEffect, memo } from 'react';
 import { notificationService } from '@/services/core/NotificationService';
+import { log } from '@/lib/logger';
 import {
   Card,
   CardContent,
@@ -129,7 +130,9 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
   useEffect(() => {
     return () => {
       if (isEditing) {
-        unlockDrop(drop.id, currentUser).catch(console.error);
+        unlockDrop(drop.id, currentUser).catch((err) => {
+          log.error('Failed to unlock drop on unmount', err, 'QaReviewCard');
+        });
       }
     };
   }, [isEditing, drop.id, currentUser]);
@@ -202,7 +205,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsLocked(true);
       setLockError(null);
     } catch (error) {
-      console.error('Error acquiring lock:', error);
+      log.error('Error acquiring lock', error, 'QaReviewCard');
       setLockError('Failed to acquire lock');
     } finally {
       setSaving(false);
@@ -241,7 +244,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsLocked(false);
       setLockError(null);
     } catch (error) {
-      console.error('Error canceling:', error);
+      log.error('Error canceling', error, 'QaReviewCard');
     } finally {
       setSaving(false);
     }
@@ -276,7 +279,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsLocked(false);
       setLockError(null);
     } catch (error) {
-      console.error('Error saving:', error);
+      log.error('Error saving', error, 'QaReviewCard');
     } finally {
       setSaving(false);
     }
@@ -295,7 +298,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       await onSendFeedback(drop.id, editedDropNumber, feedbackMessage, drop.project || undefined);
       setFeedbackMessage('');
     } catch (error) {
-      console.error('Error sending feedback:', error);
+      log.error('Error sending feedback', error, 'QaReviewCard');
       notificationService.error(`Failed to send feedback: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSending(false);
@@ -364,7 +367,7 @@ export const QaReviewCard = memo(function QaReviewCard({ drop, onUpdate, onSendF
       setIsEditingDropNumber(false);
       notificationService.success('Drop number saved');
     } catch (error) {
-      console.error('Error saving drop number:', error);
+      log.error('Error saving drop number', error, 'QaReviewCard');
       notificationService.error('Failed to save drop number');
       // Revert to original value
       setEditedDropNumber(drop.dropNumber);

@@ -11,6 +11,7 @@ import {
   StaffStatus,
   getExitTypeForStatus,
 } from '@/types/staff/enums.types';
+import { log } from '@/lib/logger';
 import {
   Select,
   SelectContent,
@@ -116,7 +117,7 @@ export function ExitEmployeeModal({
       });
       onClose();
     } catch (error) {
-      console.error('Error processing exit:', error);
+      log.error('Error processing exit', error, 'ExitEmployeeModal');
     } finally {
       setIsSubmitting(false);
     }

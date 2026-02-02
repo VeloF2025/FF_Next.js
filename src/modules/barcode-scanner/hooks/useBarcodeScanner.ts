@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { log } from '@/lib/logger';
 import type {
   ScannerState,
   ScanResult,
@@ -131,7 +132,7 @@ export function useBarcodeScanner({
         (errorMessage: string) => {
           // Scan error (usually just "no code found" - ignore these)
           if (config.verbose) {
-            console.debug('Scan attempt:', errorMessage);
+            log.debug('Scan attempt', { message: errorMessage }, 'BarcodeScanner');
           }
         }
       );
@@ -162,8 +163,8 @@ export function useBarcodeScanner({
       setState('idle');
       setIsTorchOn(false);
     } catch (err) {
-      // Ignore stop errors
-      console.debug('Error stopping scanner:', err);
+      // Ignore stop errors - just log for debugging
+      log.debug('Scanner stop error (ignored)', { error: err }, 'BarcodeScanner');
       setState('idle');
     }
   }, []);
@@ -184,7 +185,7 @@ export function useBarcodeScanner({
         setIsTorchOn(newState);
       }
     } catch (err) {
-      console.debug('Torch not supported or error:', err);
+      log.debug('Torch not supported or error', { error: err }, 'BarcodeScanner');
     }
   }, [state, isTorchOn]);
 

@@ -20,6 +20,7 @@ import {
   User,
   BarChart3,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { getRAGStatus, AUDIT_STATUS_CONFIG } from '../types/audit.types';
 import type { HSProjectConfig, HSProjectAudit } from '../types/audit.types';
 
@@ -79,7 +80,7 @@ export function ProjectHSTab({
         window.location.href = `/health-safety/audits/${data.data.id}`;
       }
     } catch (err) {
-      console.error('Failed to create audit:', err);
+      log.error('Failed to create audit', { error: err, projectId }, 'ProjectHSTab');
     }
   }, [projectId, onStartAudit, mutateAudits]);
 

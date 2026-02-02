@@ -4,6 +4,7 @@ import { Plus, RefreshCw, Video, Calendar, Film } from 'lucide-react';
 import Link from 'next/link';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { notificationService } from '@/services/core/NotificationService';
+import { log } from '@/lib/logger';
 import type { Meeting, UpcomingMeeting } from './types/meeting.types';
 import { MeetingStatsCards } from './components/MeetingStatsCards';
 import { MeetingsList } from './components/MeetingsList';
@@ -60,7 +61,7 @@ export function MeetingsDashboard() {
         setUpcomingMeetings([]);
       }
     } catch (error) {
-      console.error('Failed to load meetings:', error);
+      log.error('Failed to load meetings', { error }, 'MeetingsDashboard');
       // Fallback to empty arrays
       setMeetings([]);
       setUpcomingMeetings([]);

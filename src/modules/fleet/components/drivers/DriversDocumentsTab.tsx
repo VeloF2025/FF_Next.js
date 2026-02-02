@@ -22,6 +22,7 @@ import {
 import toast from 'react-hot-toast';
 import { DriverLicenseUploadModal } from '../DriverLicenseUploadModal';
 import { DocumentVerificationModal } from '@/components/shared/DocumentVerificationModal';
+import { log } from '@/lib/logger';
 
 interface DriverDocument {
   staffId: string;
@@ -129,7 +130,7 @@ export function DriversDocumentsTab({ onRefresh }: DriversDocumentsTabProps) {
       const data = await res.json();
       setDrivers(data.data.drivers);
     } catch (error) {
-      console.error('Failed to fetch drivers:', error);
+      log.error('Failed to fetch drivers documents', { error }, 'DriversDocumentsTab');
       toast.error('Failed to load drivers');
     } finally {
       setLoading(false);

@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Info,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type { ResponseValue, RAGStatus } from '../types/audit.types';
 import { CHECKLIST_CATEGORIES } from '../types/checklist.types';
 
@@ -140,7 +141,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
       mutate();
       setResponses({});
     } catch (err) {
-      console.error('Failed to save:', err);
+      log.error('Failed to save audit responses', { error: err }, 'AuditWizard');
     } finally {
       setIsSaving(false);
     }
@@ -167,7 +168,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
         onComplete?.(data.data.overall_score, data.data.rag_status);
       }
     } catch (err) {
-      console.error('Failed to complete audit:', err);
+      log.error('Failed to complete audit', { error: err }, 'AuditWizard');
     } finally {
       setIsSubmitting(false);
     }

@@ -3,52 +3,68 @@
     "a4683cd9-f8fd-4c38-9e10-92432a1399da": {
       "session_id": "a4683cd9-f8fd-4c38-9e10-92432a1399da",
       "started_at": "2026-02-02T11:57:15.191Z",
-      "total_input_tokens": 56532,
+      "total_input_tokens": 72548,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.16959599999999986,
-      "tool_calls": 423,
+      "total_cost_usd": 0.21764399999999995,
+      "tool_calls": 553,
       "tools_used": {
         "Grep": 15,
         "Glob": 2,
-        "Read": 88,
-        "Bash": 48,
-        "Edit": 259,
-        "Task": 11
+        "Read": 115,
+        "Bash": 68,
+        "Edit": 337,
+        "Task": 16
       }
     },
     "4da83a63-37f4-4d4b-92f1-3b1ed8028cbf": {
       "session_id": "4da83a63-37f4-4d4b-92f1-3b1ed8028cbf",
       "started_at": "2026-02-02T12:18:30.424Z",
-      "total_input_tokens": 4811,
+      "total_input_tokens": 5819,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.014433000000000003,
-      "tool_calls": 29,
+      "total_cost_usd": 0.017457,
+      "tool_calls": 44,
       "tools_used": {
-        "Bash": 15,
+        "Bash": 18,
         "Grep": 2,
-        "Read": 4,
-        "mcp__claude-in-chrome__tabs_context_mcp": 1,
-        "mcp__claude-in-chrome__navigate": 1,
-        "mcp__claude-in-chrome__computer": 2,
-        "mcp__claude-in-chrome__javascript_tool": 3,
-        "Glob": 1
+        "Read": 6,
+        "mcp__claude-in-chrome__tabs_context_mcp": 2,
+        "mcp__claude-in-chrome__navigate": 2,
+        "mcp__claude-in-chrome__computer": 7,
+        "mcp__claude-in-chrome__javascript_tool": 4,
+        "Glob": 2,
+        "Edit": 1
       }
     },
     "b4695b9f-7a13-486c-80be-918a1f557adc": {
       "session_id": "b4695b9f-7a13-486c-80be-918a1f557adc",
       "started_at": "2026-02-02T12:28:48.138Z",
-      "total_input_tokens": 1841,
+      "total_input_tokens": 2641,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.005523000000000001,
-      "tool_calls": 25,
+      "total_cost_usd": 0.007923,
+      "tool_calls": 43,
       "tools_used": {
         "Grep": 4,
         "Read": 3,
         "Edit": 4,
-        "Bash": 10,
-        "mcp__claude-in-chrome__navigate": 1,
-        "mcp__claude-in-chrome__computer": 2,
-        "mcp__claude-in-chrome__read_network_requests": 1
+        "Bash": 20,
+        "mcp__claude-in-chrome__navigate": 2,
+        "mcp__claude-in-chrome__computer": 7,
+        "mcp__claude-in-chrome__read_network_requests": 3
+      }
+    },
+    "b7930880-efa7-40e7-af61-b18585586a41": {
+      "session_id": "b7930880-efa7-40e7-af61-b18585586a41",
+      "started_at": "2026-02-02T12:35:14.418Z",
+      "total_input_tokens": 2443,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.007328999999999999,
+      "tool_calls": 16,
+      "tools_used": {
+        "Skill": 1,
+        "Read": 3,
+        "Write": 2,
+        "Edit": 4,
+        "Bash": 6
       }
     }
   }

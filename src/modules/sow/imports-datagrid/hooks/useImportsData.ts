@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
 import type {
   PoleData,
   FibreData,
@@ -66,7 +67,7 @@ export const useImportsData = ({ projectId, matchingMode }: UseImportsDataProps)
         toast.success('Import data loaded successfully');
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      log.error('Error fetching import data', { error, projectId, matchingMode }, 'useImportsData');
       toast.error('Failed to load import data');
     } finally {
       setLoading(false);

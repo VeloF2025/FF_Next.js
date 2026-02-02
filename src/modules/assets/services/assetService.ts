@@ -4,6 +4,7 @@
  * Handles CRUD operations for assets.
  */
 
+import { log } from '@/lib/logger';
 import { getDbConnection } from '../utils/db';
 import {
   CreateAssetSchema,
@@ -205,7 +206,7 @@ export const assetService = {
         },
       };
     } catch (error) {
-      console.error('Error fetching assets:', error);
+      log.error('Failed to fetch assets', { error }, 'assetService');
       return {
         success: false,
         data: [],
@@ -236,7 +237,7 @@ export const assetService = {
         data: row ? transformRow(row) : null,
       };
     } catch (error) {
-      console.error('Error fetching asset:', error);
+      log.error('Failed to fetch asset', { error, id }, 'assetService');
       return {
         success: false,
         data: null,
@@ -260,7 +261,7 @@ export const assetService = {
         data: row ? transformRow(row) : null,
       };
     } catch (error) {
-      console.error('Error fetching asset by number:', error);
+      log.error('Failed to fetch asset by number', { error, assetNumber }, 'assetService');
       return {
         success: false,
         data: null,
@@ -284,7 +285,7 @@ export const assetService = {
         data: row ? transformRow(row) : null,
       };
     } catch (error) {
-      console.error('Error fetching asset by barcode:', error);
+      log.error('Failed to fetch asset by barcode', { error, barcode }, 'assetService');
       return {
         success: false,
         data: null,
@@ -396,7 +397,7 @@ export const assetService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error creating asset:', error);
+      log.error('Failed to create asset', { error, input }, 'assetService');
       return {
         success: false,
         data: null,
@@ -453,7 +454,7 @@ export const assetService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error updating asset:', error);
+      log.error('Failed to update asset', { error, id, input }, 'assetService');
       return {
         success: false,
         data: null,
@@ -514,7 +515,7 @@ export const assetService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error updating asset status:', error);
+      log.error('Failed to update asset status', { error, id, newStatus }, 'assetService');
       return {
         success: false,
         data: null,
@@ -555,7 +556,7 @@ export const assetService = {
         data: true,
       };
     } catch (error) {
-      console.error('Error deleting asset:', error);
+      log.error('Failed to delete asset', { error, id }, 'assetService');
       return {
         success: false,
         data: false,
@@ -596,7 +597,7 @@ export const assetService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching calibration due assets:', error);
+      log.error('Failed to fetch calibration due assets', { error, withinDays }, 'assetService');
       return {
         success: false,
         data: [],
@@ -626,7 +627,7 @@ export const assetService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching maintenance due assets:', error);
+      log.error('Failed to fetch maintenance due assets', { error, withinDays }, 'assetService');
       return {
         success: false,
         data: [],
@@ -679,7 +680,7 @@ export const assetService = {
         },
       };
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      log.error('Failed to fetch dashboard stats', { error }, 'assetService');
       return {
         success: false,
         data: null,
@@ -713,7 +714,7 @@ export const assetService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error searching assets:', error);
+      log.error('Failed to search assets', { error, term }, 'assetService');
       return {
         success: false,
         data: [],
@@ -768,7 +769,7 @@ export const assetService = {
         })),
       };
     } catch (error) {
-      console.error('Error fetching assignment history:', error);
+      log.error('Failed to fetch assignment history', { error, assetId }, 'assetService');
       return {
         success: false,
         data: [],

@@ -38,7 +38,7 @@ export default withAuth(withErrorHandler(async (
         SELECT
           ci.*,
           c.company_name as client_name,
-          p.name as project_name,
+          p.project_name as project_name,
           cpo.po_number as client_po_number
         FROM customer_invoices ci
         LEFT JOIN clients c ON c.id = ci.client_id
@@ -208,7 +208,7 @@ export default withAuth(withErrorHandler(async (
         SELECT
           ci.*,
           c.company_name as client_name,
-          p.name as project_name,
+          p.project_name as project_name,
           cpo.po_number as client_po_number
         FROM customer_invoices ci
         LEFT JOIN clients c ON c.id = ci.client_id

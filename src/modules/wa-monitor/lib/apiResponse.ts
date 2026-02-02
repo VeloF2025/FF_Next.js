@@ -8,6 +8,7 @@
  */
 
 import { NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 
 /**
  * Standard API Response Types
@@ -280,7 +281,7 @@ export class ApiResponseHelper {
     message = 'An internal error occurred'
   ): void {
     // Log the actual error for debugging
-    console.error('Internal Server Error:', error);
+    log.error('Internal Server Error', error, 'ApiResponseHelper');
 
     // In production, don't expose internal error details
     const isDevelopment = process.env.NODE_ENV === 'development';
@@ -300,7 +301,7 @@ export class ApiResponseHelper {
     message = 'A database error occurred'
   ): void {
     // Log the actual error for debugging
-    console.error('Database Error:', error);
+    log.error('Database Error', error, 'ApiResponseHelper');
 
     // In production, don't expose database error details
     const isDevelopment = process.env.NODE_ENV === 'development';

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { getAllContractorsRagStatus } from '../services/ragApiService';
 import type { ContractorRagStatus, RagSummaryStats, RagStatus } from '../types/rag.types';
 import { RagSummaryCards } from './RagSummaryCards';
@@ -32,7 +33,7 @@ export function RagDashboard() {
       setContractors(result.data);
       setSummary(result.summary);
     } catch (err: any) {
-      console.error('Error loading RAG data:', err);
+      log.error('Error loading RAG data', { error: err }, 'RagDashboard');
       setError(err.message || 'Failed to load RAG status');
     } finally {
       setLoading(false);

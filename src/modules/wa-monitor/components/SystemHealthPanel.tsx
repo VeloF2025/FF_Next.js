@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { log } from '@/lib/logger';
 import {
   Card,
   CardContent,
@@ -93,7 +94,7 @@ export function SystemHealthPanel({
       setHealthData(data.data);
       setLastCheck(new Date());
     } catch (err) {
-      console.error('Health check error:', err);
+      log.error('Health check error', err, 'SystemHealthPanel');
       setError(err instanceof Error ? err.message : 'Failed to fetch health data');
     } finally {
       setLoading(false);

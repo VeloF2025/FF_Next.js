@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import type { VehicleAssignment, VehicleAssignmentCreate } from '@/types/staff';
 import { COMMON_VEHICLE_MAKES } from '@/types/staff/vehicle.types';
 import Link from 'next/link';
+import { log } from '@/lib/logger';
 
 interface FleetVehicleOption {
   id: string;
@@ -98,7 +99,7 @@ export function VehicleAssignmentForm({
           setFleetVehicles(vehicles);
         }
       } catch (err) {
-        console.error('Failed to fetch fleet vehicles:', err);
+        log.error('Failed to fetch fleet vehicles', err, 'VehicleAssignmentForm');
       } finally {
         setLoadingFleet(false);
       }

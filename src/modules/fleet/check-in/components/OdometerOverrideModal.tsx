@@ -14,6 +14,7 @@ import {
   ImageIcon,
   RefreshCw,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface OdometerOverrideModalProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export function OdometerOverrideModal({
         await videoRef.current.play();
       }
     } catch (err) {
-      console.error('Camera error:', err);
+      log.error('Failed to access camera', { error: err }, 'OdometerOverrideModal');
       setCameraError('Could not access camera. Please allow camera permissions.');
       setIsCapturing(false);
     }

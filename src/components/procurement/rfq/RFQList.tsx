@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, FileText, Plus } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface RFQ {
   id: string;
@@ -73,7 +74,7 @@ export default function RFQList({
 
       setRfqs(transformedRfqs);
     } catch (error) {
-      console.error('Error loading RFQs:', error);
+      log.error('Error loading RFQs', { error }, 'RFQList');
       setRfqs([]);
     } finally {
       setIsLoading(false);

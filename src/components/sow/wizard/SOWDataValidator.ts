@@ -367,7 +367,7 @@ export const processStepData = async (projectId: string, stepType: string, data:
     
     return result;
   } catch (error) {
-    console.error('Error uploading SOW data:', error);
+    log.error('Error uploading SOW data', { error, projectId, stepType, dataLength: data.length }, 'SOWDataValidator');
     // DO NOT fallback to localStorage - throw the error instead
     throw new Error(`Failed to save ${stepType} data: ${error.message}`);
   }

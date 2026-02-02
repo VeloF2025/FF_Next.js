@@ -22,6 +22,7 @@ import {
   Hash,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
 
 interface OcrMetadata {
   fullName?: string;
@@ -93,7 +94,7 @@ export function DocumentVerificationModal({
         const data = await res.json();
         setDocument(data.data);
       } catch (error) {
-        console.error('Failed to fetch document:', error);
+        log.error('Failed to fetch document', { error, documentId }, 'DocumentVerificationModal');
         toast.error('Failed to load document details');
         onClose();
       } finally {
@@ -125,7 +126,7 @@ export function DocumentVerificationModal({
       toast.success('Document verified successfully');
       onSuccess();
     } catch (error) {
-      console.error('Failed to verify document:', error);
+      log.error('Failed to verify document', { error, documentId, staffId }, 'DocumentVerificationModal');
       toast.error(error instanceof Error ? error.message : 'Failed to verify document');
     } finally {
       setVerifying(false);
@@ -159,7 +160,7 @@ export function DocumentVerificationModal({
       toast.success('Document rejected');
       onSuccess();
     } catch (error) {
-      console.error('Failed to reject document:', error);
+      log.error('Failed to reject document', { error, documentId, staffId, reason: rejectionReason }, 'DocumentVerificationModal');
       toast.error(error instanceof Error ? error.message : 'Failed to reject document');
     } finally {
       setRejecting(false);

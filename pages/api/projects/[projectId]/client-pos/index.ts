@@ -33,7 +33,7 @@ export default withAuth(withErrorHandler(async (
       // Query with optional status filter - avoid empty sql fragments
       const clientPOs = status
         ? await sql`
-            SELECT cpo.*, c.company_name as client_name, p.name as project_name
+            SELECT cpo.*, c.company_name as client_name, p.project_name as project_name
             FROM client_purchase_orders cpo
             LEFT JOIN clients c ON c.id = cpo.client_id
             LEFT JOIN projects p ON p.id = cpo.project_id
@@ -41,7 +41,7 @@ export default withAuth(withErrorHandler(async (
             ORDER BY cpo.created_at DESC
           `
         : await sql`
-            SELECT cpo.*, c.company_name as client_name, p.name as project_name
+            SELECT cpo.*, c.company_name as client_name, p.project_name as project_name
             FROM client_purchase_orders cpo
             LEFT JOIN clients c ON c.id = cpo.client_id
             LEFT JOIN projects p ON p.id = cpo.project_id
@@ -148,7 +148,7 @@ export default withAuth(withErrorHandler(async (
         SELECT
           cpo.*,
           c.company_name as client_name,
-          p.name as project_name
+          p.project_name as project_name
         FROM client_purchase_orders cpo
         LEFT JOIN clients c ON c.id = cpo.client_id
         LEFT JOIN projects p ON p.id = cpo.project_id

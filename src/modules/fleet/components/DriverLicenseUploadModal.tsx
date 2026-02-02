@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Upload, Loader2, Search, User, FileText, AlertCircle } from 'lucide-react';
 import { DocumentUploadWizard } from '@/components/shared/DocumentUploadWizard';
+import { log } from '@/lib/logger';
 
 interface AvailableDriver {
   id: string;
@@ -67,7 +68,7 @@ export function DriverLicenseUploadModal({
         const data = await res.json();
         setAvailableStaff(data.data.drivers);
       } catch (error) {
-        console.error('Failed to fetch staff:', error);
+        log.error('Failed to fetch available staff', { error }, 'DriverLicenseUploadModal');
       } finally {
         setLoadingStaff(false);
       }

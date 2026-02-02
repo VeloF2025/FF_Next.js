@@ -85,7 +85,7 @@ export async function executePythonEvaluation(
     pythonProcess.stderr.on('data', (data) => {
       const output = data.toString();
       stderr += output;
-      console.error(`[Python stderr]: ${output.trim()}`);
+      log.error('Python stderr output', { stderr: output.trim() }, 'PythonService');
     });
 
     pythonProcess.on('close', (code) => {
@@ -148,7 +148,7 @@ export async function executePythonEvaluation(
     });
 
     pythonProcess.on('error', (error) => {
-      console.error(`[Python] Failed to start process:`, error);
+      log.error('Failed to start Python process', { error }, 'PythonService');
       reject(
         new PythonEvaluationError(
           `Failed to start Python process: ${error.message}`,

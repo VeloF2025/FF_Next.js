@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Drop, DropsStats, DropsFiltersState } from '../types/drops.types';
+import { log } from '@/lib/logger';
 
 export function useDropsManagement() {
   const [drops, setDrops] = useState<Drop[]>([]);
@@ -61,7 +62,7 @@ export function useDropsManagement() {
         }
       }
     } catch (error) {
-      console.error('Error fetching all drops stats:', error);
+      log.error('Error fetching all drops stats', { error }, 'useDropsManagement');
     }
   };
 
@@ -181,7 +182,7 @@ export function useDropsManagement() {
         calculateStats(mockDrops);
       }
     } catch (err) {
-      console.error('Error fetching drops:', err);
+      log.error('Error fetching drops', { error: err }, 'useDropsManagement');
       setError(err instanceof Error ? err.message : 'Failed to fetch drops');
       // Use mock data as fallback
       const mockDrops: Drop[] = [
@@ -338,7 +339,7 @@ export function useDropsManagement() {
         }
       }
     } catch (error) {
-      console.error('Error searching drops:', error);
+      log.error('Error searching drops', { error, searchTerm, statusFilter }, 'useDropsManagement');
       setError(error instanceof Error ? error.message : 'Failed to search drops');
     } finally {
       setLoading(false);

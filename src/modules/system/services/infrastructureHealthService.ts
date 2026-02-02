@@ -4,6 +4,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 import type {
   ServiceStatus,
   ServiceStatusValue,
@@ -351,7 +352,7 @@ async function saveHealthSnapshot(health: SystemHealthResponse): Promise<void> {
       )
     `;
   } catch (error) {
-    console.error('Failed to save health snapshot:', error);
+    log.error('Failed to save health snapshot', error, 'infrastructureHealthService');
   }
 }
 

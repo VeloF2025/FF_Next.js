@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { modalVariants, overlayVariants } from '@/lib/animations/modal-variants';
 import type { AssetLabelExtraction } from '../services/assetVlmService';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // TYPES
@@ -110,7 +111,7 @@ export function LabelScanner({
         await videoRef.current.play();
       }
     } catch (err) {
-      console.error('Camera error:', err);
+      log.error('Could not access camera', { error: err }, 'LabelScanner');
       setError('Could not access camera. Please use file upload instead.');
       setState('idle');
     }
@@ -201,7 +202,7 @@ export function LabelScanner({
           setState('success');
         }
       } catch (err) {
-        console.error('Processing error:', err);
+        log.error('Image processing failed', { error: err, mode, assetId }, 'LabelScanner');
         setError(err instanceof Error ? err.message : 'Processing failed');
         setState('error');
       }
