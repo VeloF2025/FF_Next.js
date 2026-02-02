@@ -135,6 +135,116 @@ const filteredUsers = useMemo(() => {
 }, [users, searchTerm]);
 ```
 
+## Tab-Level Permission Filtering
+
+### Pattern Implementation
+All modules with tabs should filter tabs by user permissions:
+
+```typescript
+// 1. Define tabs with permission keys
+const TABS = [
+  { id: 'overview', label: 'Overview', permissionKey: 'module.tabs.overview' },
+  { id: 'settings', label: 'Settings', permissionKey: 'module.tabs.settings' },
+];
+
+// 2. Filter tabs using usePermission hook
+const { can, isLoading } = usePermission();
+
+const accessibleTabs = useMemo(() => {
+  if (isLoading) return []; // Don't show tabs while loading
+  return TABS.filter(tab => can(tab.permissionKey, 'view'));
+}, [isLoading, can]);
+
+// 3. Show loading state
+if (isLoading) {
+  return <Loader2 className="animate-spin" />;
+}
+
+// 4. Show access denied if no tabs
+if (accessibleTabs.length === 0) {
+  return <AccessDenied message="No accessible tabs" />;
+}
+
+// 5. Render only accessible tabs
+{accessibleTabs.map(tab => <Tab key={tab.id} {...tab} />)}
+```
+
+### Modules Using Tab Filtering
+| Module | Permission Pattern | Tabs |
+|--------|-------------------|------|
+| Data Sync - OLT | `system.data-sync.olt.*` | import, pending, investigate, escalations, history, reporting |
+| Data Sync - Maintenance | `system.data-sync.maintenance.*` | qcontact, alignment, three-way, weekly, wa-tracking |
+| Data Sync - Activate | `system.data-sync.activate.*` | oes, arch, manual |
+| Staff Detail | `people.staff.tabs.*` | overview, performance, employment, compliance, vehicles, etc. |
+
+## User Permission Overrides
+
+### Override Structure
+```sql
+-- user_permission_overrides table
+CREATE TABLE user_permission_overrides (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL,
+  permission_key VARCHAR(100) NOT NULL,
+  override_type VARCHAR(20) NOT NULL, -- 'grant' or 'revoke'
+  actions JSONB DEFAULT '{}',         -- { view: true/false, edit: true/false }
+  granted_by UUID,
+  granted_at TIMESTAMPTZ DEFAULT NOW(),
+  reason TEXT
+);
+```
+
+### Grant Type with Restricted Access
+To give a user access to ONLY specific tabs (restricting from role permissions):
+```sql
+-- Grant type with view:false REPLACES role permissions
+INSERT INTO user_permission_overrides (user_id, permission_key, override_type, actions)
+VALUES
+  -- Grant access to these
+  ('user-id', 'system.data-sync', 'grant', '{"view": true}'),
+  ('user-id', 'system.data-sync.olt', 'grant', '{"view": true}'),
+  ('user-id', 'system.data-sync.olt.pending', 'grant', '{"view": true}'),
+  -- Deny access to these (grant type with view:false)
+  ('user-id', 'system.data-sync.olt.import', 'grant', '{"view": false}'),
+  ('user-id', 'system.data-sync.olt.investigate', 'grant', '{"view": false}');
+```
+
+### Permission Resolution Logic
+```typescript
+// In getUserEffectivePermissions():
+// 1. Start with role permissions
+// 2. Apply user overrides:
+//    - 'grant' with view:true  → CAN access
+//    - 'grant' with view:false → CANNOT access (overrides role)
+//    - 'revoke' → CANNOT access
+```
+
+## Permission Hierarchy
+
+```
+system
+├── system.health
+├── system.infrastructure
+├── system.data-sync                    (page access)
+│   ├── system.data-sync.maintenance    (group access)
+│   │   ├── system.data-sync.maintenance.qcontact
+│   │   ├── system.data-sync.maintenance.alignment
+│   │   └── ...
+│   ├── system.data-sync.olt            (group access)
+│   │   ├── system.data-sync.olt.import
+│   │   ├── system.data-sync.olt.pending
+│   │   └── ...
+│   └── ...
+
+people
+├── people.staff
+│   ├── people.staff.sensitive          (access to sensitive data)
+│   └── people.staff.tabs
+│       ├── people.staff.tabs.overview
+│       ├── people.staff.tabs.employment
+│       └── ...
+```
+
 ## Critical Gotchas
 
 1. **Two-Table Permission Grant**
@@ -144,16 +254,29 @@ const filteredUsers = useMemo(() => {
 
 2. **Override vs Role**
    - `user_permission_overrides` can grant OR revoke
-   - Check `is_granted` field (true = grant, false = revoke)
+   - `grant` type with `actions.view: false` = user CANNOT access (despite role)
+   - `grant` type with `actions.view: true` = user CAN access
    - Overrides always win over role-based permissions
 
-3. **Client-Side vs Server-Side Search**
+3. **Flash of Unauthorized Content**
+   - Always return empty array while permissions are loading
+   - Show loading spinner until permissions resolve
+   - WRONG: `if (loading) return ALL_TABS;`
+   - RIGHT: `if (loading) return [];`
+
+4. **Client-Side vs Server-Side Search**
    - For small datasets (<500 users), use client-side filtering
    - Provides instant feedback without spinners
    - Server-side filtering creates perceived lag even with debounce
+
+5. **Page vs Group vs Tab Permissions**
+   - Page permission (e.g., `system.data-sync`) controls sidebar/page access
+   - Group permission (e.g., `system.data-sync.olt`) controls group card visibility
+   - Tab permission (e.g., `system.data-sync.olt.pending`) controls individual tab visibility
 
 ## Related
 
 - `.claude/modules/staff.md` - Staff management (uses permissions)
 - `.claude/modules/admin.md` - Admin module overview
 - `src/hooks/usePermission.ts` - Permission checking hook
+- `src/lib/permissions/index.ts` - Permission resolution logic

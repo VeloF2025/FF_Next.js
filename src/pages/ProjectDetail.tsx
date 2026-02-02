@@ -18,6 +18,10 @@ import { ProjectHierarchyTab } from './detail/ProjectHierarchyTab';
 import { ProjectTimelineTab } from './detail/ProjectTimelineTab';
 import { ProjectDetailLoading } from './detail/ProjectDetailLoading';
 import { ProjectDetailNotFound } from './detail/ProjectDetailNotFound';
+// PRD-058: Enhanced Overview components
+import { ProjectOverviewKPICards } from './detail/ProjectOverviewKPICards';
+import { ProjectWorkflowChecklist } from './detail/ProjectWorkflowChecklist';
+import { ProjectExpiringDocsList } from './detail/ProjectExpiringDocsList';
 // Sprint 1: New tab components
 import { ProjectTeamTab } from './detail/ProjectTeamTab';
 import { ProjectProcurementTab } from './detail/ProjectProcurementTab';
@@ -130,27 +134,51 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
       {/* Tab Content */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Project Information */}
-          <div className="lg:col-span-2 space-y-6">
-            <ProjectInfoCard project={project} />
-            <ProjectProgressCard project={project} />
-          </div>
+          {/* KPI Cards Row (PRD-058) */}
+          <ProjectOverviewKPICards
+            project={project}
+            onNavigateToTeam={() => handleTabChange('team')}
+            onNavigateToBudget={() => router.push(`/projects/${id}/budget`)}
+            onNavigateToDocuments={() => handleTabChange('documents')}
+          />
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Activation Requirements Card - show for planning projects */}
-            {project.status?.toLowerCase() === 'planning' && (
-              <ActivationBlockersCard
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Project Information */}
+              <ProjectInfoCard project={project} />
+
+              {/* Workflow Checklist (PRD-058) */}
+              <ProjectWorkflowChecklist
                 projectId={id!}
-                projectStatus={project.status}
-                onActivate={handleProjectActivated}
-                onRefresh={refetch}
+                projectStatus={project.status || 'planning'}
               />
-            )}
-            <ProjectKeyDetails project={project} />
-            <ProjectQuickStats project={project} />
-          </div>
+
+              {/* Progress */}
+              <ProjectProgressCard project={project} />
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Activation Requirements Card - show for planning projects */}
+              {project.status?.toLowerCase() === 'planning' && (
+                <ActivationBlockersCard
+                  projectId={id!}
+                  projectStatus={project.status}
+                  onActivate={handleProjectActivated}
+                  onRefresh={refetch}
+                />
+              )}
+
+              {/* Expiring Documents (PRD-058) */}
+              <ProjectExpiringDocsList
+                projectId={id!}
+                onNavigateToDocuments={() => handleTabChange('documents')}
+              />
+
+              <ProjectKeyDetails project={project} />
+              <ProjectQuickStats project={project} />
+            </div>
           </div>
         </div>
       )}
