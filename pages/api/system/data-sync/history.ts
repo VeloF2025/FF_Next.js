@@ -26,6 +26,33 @@ const VALID_TYPES: SyncOperationType[] = [
   'olt_import',
 ];
 
+/**
+ * Auto-complete QField sync operations stuck in "running" for > 10 minutes.
+ * QField syncs are fire-and-forget webhooks that don't callback on completion.
+ * Typical sync takes 60-90 seconds, so > 10 min means it's either complete or failed.
+ */
+async function autoCompleteStaleOperations(): Promise<void> {
+  try {
+    const result = await rawSql`
+      UPDATE data_sync_operations
+      SET status = 'success',
+          completed_at = NOW(),
+          duration_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))::int,
+          details = details || '{"auto_completed": true, "reason": "stale_operation_cleanup"}'::jsonb
+      WHERE status = 'running'
+        AND operation_type = 'qfield_sync'
+        AND started_at < NOW() - INTERVAL '10 minutes'
+      RETURNING id
+    `;
+    if (result.length > 0) {
+      log.info('DataSyncHistory', `Auto-completed ${result.length} stale QField sync(s)`);
+    }
+  } catch (err) {
+    // Non-fatal - just log and continue
+    log.warn('DataSyncHistory', 'Failed to auto-complete stale operations', err);
+  }
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -34,6 +61,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
     const typeFilter = (req.query.type as string) || 'all';
+
+    // Auto-complete stale QField syncs (running > 10 min = likely finished but callback failed)
+    await autoCompleteStaleOperations();
 
     // Build the UNION query across all sources
     const entries = await fetchHistory(limit, typeFilter);
