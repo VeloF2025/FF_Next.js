@@ -136,7 +136,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Activation Requirements Card - show for planning projects */}
-            {project.status === 'planning' && (
+            {project.status?.toLowerCase() === 'planning' && (
               <ActivationBlockersCard
                 projectId={id!}
                 projectStatus={project.status}
