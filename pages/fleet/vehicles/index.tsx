@@ -112,7 +112,7 @@ export default function FleetVehiclesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [actionsMenuId, setActionsMenuId] = useState<string | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
@@ -303,7 +303,7 @@ export default function FleetVehiclesPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Fleet Vehicles</h1>
             <p className="text-[var(--ff-text-secondary)]">
-              {vehicles.length} vehicle{vehicles.length !== 1 ? 's' : ''} in fleet
+              {filteredVehicles.length} {statusFilter ? statusFilter : ''} vehicle{filteredVehicles.length !== 1 ? 's' : ''}{statusFilter ? '' : ' in fleet'}
             </p>
           </div>
           <button
