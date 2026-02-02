@@ -111,18 +111,8 @@ export default async function handler(
       outstandingBalance: 0, // Would need invoices data to calculate
     };
 
-    // Get client financial data for outstanding balance
-    const clientData = await sql`
-      SELECT 
-        COALESCE(outstanding_balance, 0) as outstanding_balance,
-        COALESCE(current_balance, 0) as current_balance
-      FROM clients 
-      WHERE id = ${id}
-    `;
-
-    if (clientData.length > 0) {
-      summary.outstandingBalance = Number(clientData[0].outstanding_balance || clientData[0].current_balance || 0);
-    }
+    // Note: outstanding_balance would need invoices/payments tables to calculate
+    // For now, we leave it at 0 as set above
 
     log.info('Fetched client projects', { 
       data: { id, projectCount: projects.length } 
