@@ -12,15 +12,25 @@
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DataSyncPage } from '@/modules/data-sync';
-import { useAuth } from '@/contexts/AuthContext';
-import { Permission } from '@/types/auth.types';
-import { AlertTriangle } from 'lucide-react';
+import { usePermission } from '@/hooks/usePermission';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 
 export default function DataSyncRoute() {
-  const { user, hasPermission } = useAuth();
+  const { can, isLoading } = usePermission();
 
-  // Check permissions
-  const hasAccess = hasPermission(Permission.SYSTEM_ADMIN) || user?.role === 'super_admin';
+  // Check RBAC permission for data-sync page
+  const hasAccess = can('system.data-sync', 'view');
+
+  // Show loading while checking permissions
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (!hasAccess) {
     return (
