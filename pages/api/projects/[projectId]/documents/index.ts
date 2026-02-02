@@ -150,8 +150,8 @@ async function handlePost(
     const fileBuffer = await fs.readFile(uploadedFile.filepath);
     const uploadResult = await vfStorage.uploadFile(
       fileBuffer,
-      'projects',
-      `documents/${projectId}`,
+      'procurement',
+      `project-documents/${projectId}`,
       storagePath
     );
 
