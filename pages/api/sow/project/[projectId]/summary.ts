@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * SOW Project Summary API Route
@@ -11,14 +14,12 @@ async function handler(
 ) {
   const { projectId } = req.query;
 
-  // Only allow GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get authentication from Clerk
-    const userId = (req as AuthenticatedNextApiRequest).user.id;
+    const userId = (req as AuthenticatedNextApiRequest).user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -27,31 +28,37 @@ async function handler(
       return res.status(400).json({ error: 'Project ID is required' });
     }
 
-    // Proxy to backend API server
-    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${backendUrl}/api/sow/summary?projectId=${projectId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-      },
+    // Get counts from main tables
+    const [poleCount, dropCount, fibreCount] = await Promise.all([
+      sql`SELECT COUNT(*) as count FROM poles WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(*) as count FROM drops WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`
+    ]);
+
+    // Get activation count
+    const activationCount = await sql`
+      SELECT COUNT(*) as count
+      FROM oes_activations oa
+      INNER JOIN drops d ON d.id = oa.drop_id
+      WHERE d.project_id = ${projectId}
+    `;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        projectId,
+        totalPoles: parseInt(poleCount[0]?.count || '0'),
+        totalDrops: parseInt(dropCount[0]?.count || '0'),
+        totalFibre: parseInt(fibreCount[0]?.count || '0'),
+        totalActivated: parseInt(activationCount[0]?.count || '0'),
+        lastUpdated: new Date().toISOString()
+      }
     });
-
-    if (!response.ok) {
-      const error = await response.text();
-      return res.status(response.status).json({ 
-        success: false,
-        error: error || `Failed to fetch SOW summary: ${response.status}` 
-      });
-    }
-
-    const result = await response.json();
-    return res.status(200).json(result);
   } catch (error) {
     console.error('SOW summary error:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch SOW summary' 
+      error: error instanceof Error ? error.message : 'Failed to fetch SOW summary'
     });
   }
 }

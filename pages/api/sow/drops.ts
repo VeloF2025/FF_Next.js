@@ -46,25 +46,25 @@ async function handler(
 
       if (projectId) {
         query = await sql`
-          SELECT * FROM sow_drops
+          SELECT * FROM drops
           WHERE project_id = ${projectId}
           ORDER BY created_at DESC
           LIMIT ${limitNum} OFFSET ${offsetNum}
         `;
 
         totalQuery = await sql`
-          SELECT COUNT(*) as total FROM sow_drops
+          SELECT COUNT(*) as total FROM drops
           WHERE project_id = ${projectId}
         `;
       } else {
         query = await sql`
-          SELECT * FROM sow_drops
+          SELECT * FROM drops
           ORDER BY created_at DESC
           LIMIT ${limitNum} OFFSET ${offsetNum}
         `;
 
         totalQuery = await sql`
-          SELECT COUNT(*) as total FROM sow_drops
+          SELECT COUNT(*) as total FROM drops
         `;
       }
 
@@ -119,7 +119,7 @@ async function handler(
     
     // Ensure SOW tables exist
     await sql`
-      CREATE TABLE IF NOT EXISTS sow_drops (
+      CREATE TABLE IF NOT EXISTS drops (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
         project_id uuid NOT NULL,
         drop_number varchar(255) NOT NULL,
@@ -146,7 +146,7 @@ async function handler(
     `;
 
     // Clear existing drops for this project
-    await sql`DELETE FROM sow_drops WHERE project_id = ${projectId}`;
+    await sql`DELETE FROM drops WHERE project_id = ${projectId}`;
 
     // Insert drops
     const dropsData = drops.map(drop => ({
@@ -176,7 +176,7 @@ async function handler(
     
     for (let i = 0; i < dropsData.length; i += batchSize) {
       const batch = dropsData.slice(i, i + batchSize);
-      await sql`INSERT INTO sow_drops ${sql(batch)}`;
+      await sql`INSERT INTO drops ${sql(batch)}`;
       totalInserted += batch.length;
     }
 

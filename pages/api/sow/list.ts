@@ -58,7 +58,7 @@ async function handler(
     let totalCount = 0;
 
     if (type === 'all' || type === 'poles') {
-      const polesData = await getSOWData('sow_poles', {
+      const polesData = await getSOWData('poles', {
         projectId: projectId as string,
         status: status as string,
         search: search as string,
@@ -78,7 +78,7 @@ async function handler(
     }
 
     if (type === 'all' || type === 'drops') {
-      const dropsData = await getSOWData('sow_drops', {
+      const dropsData = await getSOWData('drops', {
         projectId: projectId as string,
         status: status as string,
         search: search as string,
@@ -98,7 +98,7 @@ async function handler(
     }
 
     if (type === 'all' || type === 'fibre') {
-      const fibreData = await getSOWData('sow_fibre', {
+      const fibreData = await getSOWData('fibre_segments', {
         projectId: projectId as string,
         status: status as string,
         search: search as string,
@@ -191,11 +191,11 @@ async function getSOWData(
   }
   
   if (search) {
-    if (table === 'sow_poles') {
+    if (table === 'poles') {
       whereConditions.push(`(s.pole_number ILIKE $${queryParams.length + 1} OR s.location ILIKE $${queryParams.length + 1})`);
-    } else if (table === 'sow_drops') {
+    } else if (table === 'drops') {
       whereConditions.push(`(s.drop_number ILIKE $${queryParams.length + 1} OR s.address ILIKE $${queryParams.length + 1})`);
-    } else if (table === 'sow_fibre') {
+    } else if (table === 'fibre_segments') {
       whereConditions.push(`(s.cable_id ILIKE $${queryParams.length + 1} OR s.start_location ILIKE $${queryParams.length + 1} OR s.end_location ILIKE $${queryParams.length + 1})`);
     }
     queryParams.push(`%${search}%`);
@@ -240,7 +240,7 @@ async function ensureTablesExist() {
     
   // Ensure SOW tables exist
   await sql`
-    CREATE TABLE IF NOT EXISTS sow_poles (
+    CREATE TABLE IF NOT EXISTS poles (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       project_id UUID,
       pole_number VARCHAR(255) NOT NULL,
@@ -253,7 +253,7 @@ async function ensureTablesExist() {
     )`;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS sow_drops (
+    CREATE TABLE IF NOT EXISTS drops (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       project_id UUID,
       drop_number VARCHAR(255) NOT NULL,
@@ -266,7 +266,7 @@ async function ensureTablesExist() {
     )`;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS sow_fibre (
+    CREATE TABLE IF NOT EXISTS fibre_segments (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       project_id UUID,
       cable_id VARCHAR(255) NOT NULL,

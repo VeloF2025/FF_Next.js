@@ -5,6 +5,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -18,11 +19,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     switch (req.method) {
       case 'GET': {
-        // Get SOW summary for the project
+        // Get SOW summary for the project - query main tables
         const [poles, drops, fibre] = await Promise.all([
-          sql`SELECT COUNT(*) as count FROM sow_poles WHERE project_id = ${projectId}`,
-          sql`SELECT COUNT(*) as count FROM sow_drops WHERE project_id = ${projectId}`,
-          sql`SELECT COUNT(*) as count FROM sow_fibre WHERE project_id = ${projectId}`
+          sql`SELECT COUNT(*) as count FROM poles WHERE project_id = ${projectId}`,
+          sql`SELECT COUNT(*) as count FROM drops WHERE project_id = ${projectId}`,
+          sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`
         ]);
 
         return res.status(200).json({

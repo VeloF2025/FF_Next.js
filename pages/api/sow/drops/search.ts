@@ -58,7 +58,7 @@ async function handler(
 
     // Get search results with pagination
     const query = await sql.unsafe(`
-      SELECT * FROM sow_drops
+      SELECT * FROM drops
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -66,7 +66,7 @@ async function handler(
 
     // Get total count for search results
     const countQuery = await sql.unsafe(`
-      SELECT COUNT(*) as total FROM sow_drops
+      SELECT COUNT(*) as total FROM drops
       ${whereClause}
     `, params);
 

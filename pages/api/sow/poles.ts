@@ -37,7 +37,7 @@ async function handler(
 
       // Fetch poles data for the project with pagination
       const poles = await sql`
-        SELECT * FROM sow_poles
+        SELECT * FROM poles
         WHERE project_id = ${projectId}
         ORDER BY pole_number ASC
         LIMIT ${parseInt(limit as string)}
@@ -83,7 +83,7 @@ async function handler(
     
     // Ensure SOW tables exist
     await sql`
-      CREATE TABLE IF NOT EXISTS sow_poles (
+      CREATE TABLE IF NOT EXISTS poles (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
         project_id uuid NOT NULL,
         pole_number varchar(255) NOT NULL,
@@ -110,7 +110,7 @@ async function handler(
     `;
 
     // Clear existing poles for this project
-    await sql`DELETE FROM sow_poles WHERE project_id = ${projectId}`;
+    await sql`DELETE FROM poles WHERE project_id = ${projectId}`;
 
     // Prepare poles data for insertion
     const polesData = poles.map(pole => ({
@@ -146,7 +146,7 @@ async function handler(
       // Insert each pole individually (Neon doesn't support bulk insert with sql())
       for (const pole of batch) {
         await sql`
-          INSERT INTO sow_poles (
+          INSERT INTO poles (
             project_id, pole_number, latitude, longitude, status,
             pole_type, pole_spec, height, diameter, owner,
             pon_no, zone_no, address, municipality,

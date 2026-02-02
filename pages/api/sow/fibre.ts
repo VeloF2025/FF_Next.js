@@ -20,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'GET': {
         // Fetch fibre data from the database
         const fibreData = await sql`
-          SELECT * FROM sow_fibre
+          SELECT * FROM fibre_segments
           WHERE project_id = ${projectId}
           ORDER BY segment_id, zone_no
         `;
@@ -40,12 +40,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         // Clear existing data
-        await sql`DELETE FROM sow_fibre WHERE project_id = ${projectId}`;
+        await sql`DELETE FROM fibre_segments WHERE project_id = ${projectId}`;
 
         // Insert new data
         for (const fibre of data) {
           await sql`
-            INSERT INTO sow_fibre (
+            INSERT INTO fibre_segments (
               project_id, from_pole, to_pole, cable_type,
               cable_size, length_m, route_type,
               installation_method, status, raw_data

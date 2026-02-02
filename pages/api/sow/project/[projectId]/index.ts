@@ -1,5 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * SOW Project Data API Route
@@ -11,14 +14,12 @@ async function handler(
 ) {
   const { projectId } = req.query;
 
-  // Only allow GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get authentication from Clerk
-    const userId = (req as AuthenticatedNextApiRequest).user.id;
+    const userId = (req as AuthenticatedNextApiRequest).user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -27,31 +28,38 @@ async function handler(
       return res.status(400).json({ error: 'Project ID is required' });
     }
 
-    // Proxy to backend API server
-    const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3001';
-    const response = await fetch(`${backendUrl}/api/sow?projectId=${projectId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': userId,
-      },
+    // Get SOW data from main tables
+    const [polesResult, dropsResult, fibreResult] = await Promise.all([
+      sql`SELECT * FROM poles WHERE project_id = ${projectId} ORDER BY pole_id LIMIT 1000`,
+      sql`SELECT * FROM drops WHERE project_id = ${projectId} ORDER BY drop_id LIMIT 1000`,
+      sql`SELECT * FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
+    ]);
+
+    // Get counts
+    const [poleCount, dropCount, fibreCount] = await Promise.all([
+      sql`SELECT COUNT(*) as count FROM poles WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(*) as count FROM drops WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        poles: polesResult,
+        drops: dropsResult,
+        fibre: fibreResult,
+        summary: {
+          totalPoles: parseInt(poleCount[0]?.count || '0'),
+          totalDrops: parseInt(dropCount[0]?.count || '0'),
+          totalFibre: parseInt(fibreCount[0]?.count || '0')
+        }
+      }
     });
-
-    if (!response.ok) {
-      const error = await response.text();
-      return res.status(response.status).json({ 
-        success: false,
-        error: error || `Failed to fetch SOW data: ${response.status}` 
-      });
-    }
-
-    const result = await response.json();
-    return res.status(200).json(result);
   } catch (error) {
     console.error('SOW project data error:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch SOW data' 
+      error: error instanceof Error ? error.message : 'Failed to fetch SOW data'
     });
   }
 }

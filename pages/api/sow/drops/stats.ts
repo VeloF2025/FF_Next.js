@@ -26,7 +26,7 @@ async function handler(
         COALESCE(AVG(CASE WHEN status = 'completed' AND created_date IS NOT NULL AND updated_at IS NOT NULL
           THEN EXTRACT(EPOCH FROM (updated_at - created_date))/3600 END), 0) as avg_install_time,
         COALESCE(SUM(CASE WHEN cable_length IS NOT NULL THEN CAST(cable_length AS NUMERIC) ELSE 0 END), 0) as total_cable_used
-      FROM sow_drops
+      FROM drops
     `;
 
     const stats = statsQuery[0];
