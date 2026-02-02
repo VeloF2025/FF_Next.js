@@ -4,6 +4,8 @@ import { safeArrayQuery, safeMutation } from '../../../lib/safe-query';
 import { apiResponse } from '../../../lib/apiResponse';
 import { logUpdate, logDelete } from '../../../lib/db-logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
+import { checkActivationRequirements } from '@/modules/projects/services/activationService';
 
 /**
  * Project API Route
@@ -74,6 +76,42 @@ async function handler(
       case 'PUT': {
         const updateData = req.body;
         const sql = getSql();
+
+        // Check if attempting to change status to 'active'
+        if (updateData.status === 'active') {
+          // Get current status
+          const currentProject = await safeArrayQuery(
+            async () => sql`SELECT status FROM projects WHERE id = ${id}`,
+            { logError: true }
+          );
+
+          const currentStatus = currentProject?.[0]?.status;
+
+          // Only validate when transitioning from 'planning' to 'active'
+          if (currentStatus === 'planning') {
+            const activationCheck = await checkActivationRequirements(id);
+
+            if (!activationCheck.canActivate) {
+              log.warn('Project activation blocked - requirements not met', {
+                projectId: id,
+                blockers: activationCheck.blockers,
+              });
+
+              return res.status(403).json({
+                success: false,
+                error: 'Cannot activate project - requirements not met',
+                blockers: activationCheck.blockers,
+                summary: activationCheck.summary,
+              });
+            }
+
+            log.info('Project activation requirements validated', {
+              projectId: id,
+              summary: activationCheck.summary,
+            });
+          }
+        }
+
         const updateResult = await safeMutation(
           async () => sql`
             UPDATE projects SET

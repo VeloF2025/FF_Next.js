@@ -90,6 +90,8 @@ export const getTabConfig = (): TabConfig[] => [
   { id: 'sow', label: 'SOW Data' },
   { id: 'agreements', label: 'Agreements' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'finance-dashboard', label: 'Finance Dashboard' },
+  { id: 'income', label: 'Income' },
   { id: 'budget', label: 'Budget' },
   { id: 'hs', label: 'Health & Safety' },
 ];
@@ -138,6 +140,10 @@ export const getGroupedTabConfig = (): TabGroup[] => [
   {
     id: 'finance',
     label: 'Finance',
-    tabs: [{ id: 'budget', label: 'Budget' }],
+    tabs: [
+      { id: 'finance-dashboard', label: 'Dashboard' },
+      { id: 'income', label: 'Income' },
+      { id: 'budget', label: 'Budget' },
+    ],
   },
 ];

@@ -155,6 +155,8 @@ export function PipelineProjectDetail() {
     cession_date: '',
     cession_document_url: '',
   });
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionModalOpen, setTransitionModalOpen] = useState(false);
 
   // Map auth role to drawer role
   const drawerUserRole = useMemo((): 'pm' | 'ops' | 'admin' | 'viewer' => {
@@ -228,6 +230,36 @@ export function PipelineProjectDetail() {
 
   const handleAddApprovalSuccess = () => {
     loadProject();
+  };
+
+  const handleTransitionToPlanned = async () => {
+    if (!id || transitioning) return;
+
+    setTransitioning(true);
+    try {
+      const response = await fetch(`/api/pipeline/projects/${id}/transition`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectManagerId: project?.project_manager_id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to transition project');
+        return;
+      }
+
+      // Redirect to the new project detail page
+      router.push(`/projects/${data.data.project.id}`);
+    } catch (err) {
+      console.error('Failed to transition project:', err);
+      alert('Failed to transition project. Please try again.');
+    } finally {
+      setTransitioning(false);
+    }
   };
 
   // Initialize legal docs when project loads
@@ -937,9 +969,17 @@ export function PipelineProjectDetail() {
                   </button>
                 )}
                 {project.pipeline_status === 'ready_to_plan' && (
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
-                    <CheckCircle className="w-4 h-4" />
-                    Transition to Planned
+                  <button
+                    onClick={handleTransitionToPlanned}
+                    disabled={transitioning}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {transitioning ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    {transitioning ? 'Transitioning...' : 'Transition to Planned'}
                   </button>
                 )}
               </div>

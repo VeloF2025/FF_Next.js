@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
 import { ProjectHSTab } from '@/modules/health-safety/components';
 import BOQList from '@/components/procurement/boq/BOQList';
+import { ActivationBlockersCard } from '@/modules/projects/components/activation';
 
 // Import split components
 import { ProjectInfoCard } from './detail/ProjectInfoCard';
@@ -23,6 +24,13 @@ import { ProjectProcurementTab } from './detail/ProjectProcurementTab';
 import { ProjectMaintenanceTab } from './detail/ProjectMaintenanceTab';
 // PRD-058: Agreements tab
 import { ProjectAgreementsTab } from './detail/ProjectAgreementsTab';
+// Finance Dashboard
+import { FinanceDashboardTab } from '@/modules/projects/components/finance';
+// Income Tab (lazy load)
+import dynamic from 'next/dynamic';
+const ProjectIncomeTab = dynamic(() => import('./detail/ProjectIncomeTab').then(m => ({ default: m.ProjectIncomeTab })), {
+  loading: () => <div className="animate-pulse h-64 bg-[var(--ff-bg-secondary)] rounded-lg" />,
+});
 
 interface ProjectDetailProps {
   projectId: string;
@@ -49,9 +57,13 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
     );
   };
 
-  const { data: project, isLoading, error } = useProject(id!);
+  const { data: project, isLoading, error, refetch } = useProject(id!);
   const { data: hierarchy, isLoading: isHierarchyLoading } = useProjectHierarchy(id!);
   const deleteMutation = useDeleteProject();
+
+  const handleProjectActivated = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   // Fetch badge counts for tabs
   useEffect(() => {
@@ -123,6 +135,15 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Activation Requirements Card - show for planning projects */}
+            {project.status === 'planning' && (
+              <ActivationBlockersCard
+                projectId={id!}
+                projectStatus={project.status}
+                onActivate={handleProjectActivated}
+                onRefresh={refetch}
+              />
+            )}
             <ProjectKeyDetails project={project} />
             <ProjectQuickStats project={project} />
           </div>
@@ -168,6 +189,18 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'timeline' && (
         <ProjectTimelineTab />
+      )}
+
+      {activeTab === 'finance-dashboard' && (
+        <FinanceDashboardTab
+          projectId={id!}
+          onNavigateToIncome={() => handleTabChange('income')}
+          onNavigateToBudget={() => router.push(`/projects/${id}/budget`)}
+        />
+      )}
+
+      {activeTab === 'income' && (
+        <ProjectIncomeTab projectId={id!} />
       )}
 
       {activeTab === 'budget' && (
