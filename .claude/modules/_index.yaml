@@ -4,7 +4,7 @@
 
 version: 2
 last_updated: "2026-01-20"
-total_modules: 36
+total_modules: 37
 
 # Module Categories
 categories:
@@ -34,7 +34,7 @@ categories:
 
   admin:
     description: "Administration and settings"
-    modules: [admin, settings, staff, onboarding, dashboard, action-items]
+    modules: [admin, settings, staff, onboarding, dashboard, action-items, access-control]
 
   other:
     description: "Specialized modules"
@@ -47,6 +47,12 @@ modules:
     purpose: "Track and manage action items across projects"
     complexity: low
     profile: action-items.md
+
+  access-control:
+    category: admin
+    purpose: "Role-based access control and permissions"
+    complexity: medium
+    profile: access-control.md
 
   admin:
     category: admin
@@ -260,6 +266,10 @@ modules:
 
 # Database Tables by Module (quick lookup)
 database_mapping:
+  users: [access-control, admin, staff]
+  access_permissions: [access-control]
+  role_permissions: [access-control]
+  user_permission_overrides: [access-control]
   drops: [sow, wa-monitor]
   qa_photo_reviews: [wa-monitor, dr-photo-review]
   foto_ai_reviews: [foto-review, activate]
