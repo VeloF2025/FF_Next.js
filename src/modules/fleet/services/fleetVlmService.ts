@@ -324,7 +324,8 @@ const LICENSE_DISK_PROMPT = `You are analyzing a South African vehicle licence d
 TASK: Extract all vehicle details from this licence disk photo.
 
 CONTEXT: A South African licence disk is a circular sticker displayed on vehicle windscreens. It contains:
-- Registration number (e.g., "GP 456-789")
+- Disc number (the "NO." field, e.g., "4046048YMKK1")
+- Registration/Licence number (e.g., "KR27FNGP")
 - VIN (Vehicle Identification Number) - 17 characters
 - Engine number
 - Make (manufacturer)
@@ -332,28 +333,30 @@ CONTEXT: A South African licence disk is a circular sticker displayed on vehicle
 - Year of first registration
 - Tare (unladen mass in kg)
 - GVM (Gross Vehicle Mass in kg)
-- Licence expiry date
+- Licence expiry date (Date of expiry/Vervaldatum)
 - Colour (sometimes listed)
 
 INSTRUCTIONS:
 1. Look for all text fields on the licence disk
 2. Extract each piece of information carefully
-3. VIN is typically 17 characters long
-4. Registration follows South African format (e.g., "XX 000-000 GP" or "XX 000 GP")
-5. If you can see a date, extract it in YYYY-MM-DD format
-6. If a field is not visible or unreadable, use null
+3. The disc number is labeled "NO." at the top of the disc
+4. VIN is typically 17 characters long
+5. Registration follows South African format (e.g., "XX 000-000 GP" or "XX00XXGP")
+6. Extract the expiry date in YYYY-MM-DD format (look for "Date of expiry" or "Vervaldatum")
+7. If a field is not visible or unreadable, use null
 
 RESPONSE FORMAT (JSON only, no other text):
 {
-  "registration": "GP 456-789",
-  "vin": "AHTBB3CD102123456",
-  "engine_number": "1KD1234567",
+  "disc_number": "4046048YMKK1",
+  "registration": "KR27FNGP",
+  "vin": "JTMHV05J004302371",
+  "engine_number": "1VD0525677",
   "make": "TOYOTA",
-  "description": "HILUX 2.4 GD-6",
-  "year": 2023,
-  "tare": 1900,
-  "gvm": 3100,
-  "license_expiry": "2025-06-30",
+  "description": "Station wagon",
+  "year": 2020,
+  "tare": 2510,
+  "gvm": 3350,
+  "license_expiry": "2026-06-30",
   "color": "WHITE",
   "confidence": 0.85,
   "raw_text": "all visible text from the disk"
@@ -361,6 +364,7 @@ RESPONSE FORMAT (JSON only, no other text):
 
 If the licence disk is not clearly visible or unreadable:
 {
+  "disc_number": null,
   "registration": null,
   "vin": null,
   "engine_number": null,
@@ -1000,6 +1004,7 @@ export async function extractLicenseDiskDetails(
 
     const content = await callVlmApi(base64Image, LICENSE_DISK_PROMPT, 'license_plate');
     const result = parseVlmJson<{
+      disc_number: string | null;
       registration: string | null;
       vin: string | null;
       engine_number: string | null;
@@ -1022,6 +1027,7 @@ export async function extractLicenseDiskDetails(
     }
 
     return {
+      discNumber: result.disc_number,
       registration: result.registration,
       vin: vin,
       engineNumber: result.engine_number,
@@ -1038,6 +1044,7 @@ export async function extractLicenseDiskDetails(
   } catch (error) {
     log.error('FleetVlmService', `Licence disk extraction failed: ${error}`);
     return {
+      discNumber: null,
       registration: null,
       vin: null,
       engineNumber: null,

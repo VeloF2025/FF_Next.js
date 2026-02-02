@@ -1047,6 +1047,7 @@ function DocumentsTab({
         <LicenseDiscModal
           vehicleId={vehicle.id}
           vehicleRegistration={vehicle.registration}
+          vehicle={vehicle}
           currentDisc={licenseDisc}
           onSuccess={() => {
             onLicenseDiscUpdated();

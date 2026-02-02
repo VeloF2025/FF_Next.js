@@ -25,6 +25,7 @@ export interface FleetVehicle {
   year: number | null;
   color: string | null;
   vin: string | null;
+  engineNumber: string | null;
 
   // Ownership
   ownershipType: OwnershipType;
@@ -65,6 +66,7 @@ export interface CreateVehicleRequest {
   year?: number;
   color?: string;
   vin?: string;
+  engineNumber?: string;
   ownershipType?: OwnershipType;
   ownerName?: string;
   fuelRatePerKm?: number;
@@ -83,6 +85,7 @@ export interface UpdateVehicleRequest {
   year?: number | null;
   color?: string | null;
   vin?: string | null;
+  engineNumber?: string | null;
   ownershipType?: OwnershipType;
   ownerName?: string | null;
   fuelRatePerKm?: number;
@@ -136,6 +139,7 @@ export interface FleetVehicleRow {
   year: number | null;
   color: string | null;
   vin: string | null;
+  engine_number: string | null;
   ownership_type: string;
   owner_name: string | null;
   fuel_rate_per_km: string; // NUMERIC returns as string
@@ -159,6 +163,7 @@ export function rowToFleetVehicle(row: FleetVehicleRow): FleetVehicle {
     year: row.year,
     color: row.color,
     vin: row.vin,
+    engineNumber: row.engine_number,
     ownershipType: row.ownership_type as OwnershipType,
     ownerName: row.owner_name,
     fuelRatePerKm: parseFloat(row.fuel_rate_per_km),

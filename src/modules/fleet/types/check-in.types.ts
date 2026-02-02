@@ -441,6 +441,7 @@ export interface FuelReceiptExtractionResult {
  * South African licence disk contains: VIN, Engine No, Make, Description, Tare, GVM, Expiry
  */
 export interface LicenseDiskExtractionResult {
+  discNumber: string | null; // The "NO." field on the disc
   registration: string | null;
   vin: string | null;
   engineNumber: string | null;
