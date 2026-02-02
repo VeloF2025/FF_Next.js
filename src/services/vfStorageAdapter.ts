@@ -95,11 +95,15 @@ export class VFStorageService {
       const actualFilename = result.filename || fileName;
       const actualPath = result.path || `${type}/${category}/${actualFilename}`;
 
-      // Fix: Server returns vf.fibreflow.app URLs but we need internal URLs
-      // Transform to use actual storage server URL for direct access
+      // Return public HTTPS URL for browser access
+      // Server may return internal IP URLs - convert them to public HTTPS
       let actualUrl = result.url || `${this.baseUrl}/${actualPath}`;
-      if (actualUrl.includes('vf.fibreflow.app')) {
-        actualUrl = actualUrl.replace('https://vf.fibreflow.app', this.baseUrl);
+      if (actualUrl.includes('100.96.203.105:8091')) {
+        actualUrl = actualUrl.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
+      }
+      // Ensure we always return HTTPS public URL
+      if (!actualUrl.startsWith('https://vf.fibreflow.app')) {
+        actualUrl = `https://vf.fibreflow.app/${actualPath}`;
       }
 
       return {
@@ -170,10 +174,10 @@ export class VFStorageService {
   }
 
   /**
-   * Get the full URL for a stored file
+   * Get the full URL for a stored file (public HTTPS URL for browser access)
    */
   getFileUrl(type: string, category: string, filename: string): string {
-    return `${this.baseUrl}/${type}/${category}/${filename}`;
+    return `https://vf.fibreflow.app/${type}/${category}/${filename}`;
   }
 }
 
