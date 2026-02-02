@@ -55,16 +55,16 @@ export function ModuleTabs({
   onTabChange,
 }: ModuleTabsProps) {
   return (
-    <nav className="flex -mb-px overflow-x-auto scrollbar-hide" aria-label="Module tabs">
+    <nav className="flex w-full -mb-px overflow-x-auto scrollbar-hide" aria-label="Module tabs">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         const isLocked = tab.rbacKey && !hasPermission(tab.rbacKey);
         const badge = tabBadges[tab.id] || tab.badge;
         const Icon = tab.icon;
 
-        // Tab styles using CSS variables
+        // Tab styles using CSS variables - flex-1 distributes tabs evenly
         const baseStyles =
-          'flex items-center gap-2 py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors';
+          'flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors flex-1 min-w-0';
         const activeStyles =
           'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10';
         const inactiveStyles =
