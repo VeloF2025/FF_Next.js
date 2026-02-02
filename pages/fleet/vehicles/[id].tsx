@@ -933,9 +933,9 @@ function DocumentsTab({
                 </p>
               </div>
               <div>
-                <label className="block text-xs text-[var(--ff-text-secondary)]">Issue Date</label>
+                <label className="block text-xs text-[var(--ff-text-secondary)]">Expiry Date</label>
                 <p className="text-[var(--ff-text-primary)]">
-                  {formatDate(licenseDisc.issueDate)}
+                  {formatDate(licenseDisc.expiryDate)}
                 </p>
               </div>
             </div>
