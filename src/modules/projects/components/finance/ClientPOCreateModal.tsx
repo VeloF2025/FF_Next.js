@@ -115,7 +115,9 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
         throw new Error(result.message || 'Failed to extract data from PDF');
       }
 
-      const result: POExtractionAPIResponse = await response.json();
+      const apiResult = await response.json();
+      // API wraps response in { success, data }
+      const result: POExtractionAPIResponse = apiResult.data || apiResult;
 
       if (!result.success || !result.extraction) {
         throw new Error(result.error || 'Extraction failed - no data returned');
