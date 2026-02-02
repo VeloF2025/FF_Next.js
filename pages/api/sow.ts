@@ -20,12 +20,10 @@ interface ProcessedSOWResult {
   errors?: string[];
 }
 
-// Main API handler for SOW imports
+// Main API handler for SOW data
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // For testing: use mock user ID
-  // TODO: Re-enable Clerk authentication
-  const userId = 'test-user-123';
-  
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
+
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -41,32 +39,49 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-// GET /api/sow - Get SOW import history
+// GET /api/sow - Get SOW data for a project (poles, drops, fibre)
 async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: string) {
-  const { projectId, limit = 20 } = req.query;
-  
+  const { projectId, type } = req.query;
+
+  if (!projectId || typeof projectId !== 'string') {
+    return res.status(400).json({ success: false, error: 'Project ID is required' });
+  }
+
   try {
-    let sowImports;
-    
-    if (projectId) {
-      sowImports = await sql`
-        SELECT * FROM sow_imports 
-        WHERE project_id = ${Number(projectId)}
-        ORDER BY imported_at DESC
-        LIMIT ${Number(limit)}
-      `;
-    } else {
-      sowImports = await sql`
-        SELECT * FROM sow_imports
-        ORDER BY imported_at DESC
-        LIMIT ${Number(limit)}
-      `;
-    }
-    
-    return res.status(200).json(sowImports);
+    // Fetch data from main tables (not sow_* tables)
+    const [polesResult, dropsResult, fibreResult] = await Promise.all([
+      sql`SELECT * FROM poles WHERE project_id = ${projectId} ORDER BY pole_id LIMIT 1000`,
+      sql`SELECT * FROM drops WHERE project_id = ${projectId} ORDER BY drop_id LIMIT 1000`,
+      sql`SELECT * FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
+    ]);
+
+    // Get counts for summary
+    const [poleCount, dropCount, fibreCount] = await Promise.all([
+      sql`SELECT COUNT(*) as count FROM poles WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(*) as count FROM drops WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        poles: polesResult,
+        drops: dropsResult,
+        fibre: fibreResult,
+        summary: {
+          totalPoles: parseInt(poleCount[0]?.count || '0'),
+          totalDrops: parseInt(dropCount[0]?.count || '0'),
+          totalFibre: parseInt(fibreCount[0]?.count || '0')
+        }
+      }
+    });
   } catch (error) {
     console.error('Error in GET /api/sow:', error);
-    return res.status(500).json({ error: 'Failed to fetch SOW imports' });
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch SOW data',
+      data: { poles: [], drops: [], fibre: [], summary: { totalPoles: 0, totalDrops: 0, totalFibre: 0 } }
+    });
   }
 }
 

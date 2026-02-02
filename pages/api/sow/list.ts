@@ -22,6 +22,7 @@ async function handler(
   res: NextApiResponse<SOWListResponse>
 ) {
   // Check authentication
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
   if (!userId) {
     return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
   }
