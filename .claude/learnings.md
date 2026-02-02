@@ -3985,3 +3985,66 @@ server.listen(9876, '127.0.0.1', () => console.log('Screenshot server on :9876')
 **Applied to:** FibreFlow Complete User Manual (34 screenshots, 1675-line markdown, 5.4MB PDF)
 
 ---
+
+## VF Storage HTTPS URL Requirement
+**Date:** 2026-02-02
+**Severity:** HIGH
+**Context:** Mixed content errors when serving files from VF Storage
+
+**Problem:** VF Storage URLs stored with internal IP (`http://100.96.203.105:8091/...`) cause mixed content errors when the page is served over HTTPS. Browsers block HTTP resources on HTTPS pages.
+
+**Root Cause:** Multiple storage services were returning raw URLs from the VF Storage server response without converting to public HTTPS URLs.
+
+**Solution:** All storage services must convert internal URLs to public HTTPS:
+```typescript
+// Convert internal IP URL to public HTTPS URL
+let url = result.url;
+if (url.includes('100.96.203.105:8091')) {
+  url = url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
+}
+// Fallback: ensure HTTPS public URL
+if (!url.startsWith('https://vf.fibreflow.app')) {
+  url = `https://vf.fibreflow.app/${path}`;
+}
+```
+
+**Key Distinction:**
+- **Server-to-server**: Use internal IP (`http://100.96.203.105:8091`) for uploads/downloads
+- **Browser-facing/DB storage**: Use public HTTPS (`https://vf.fibreflow.app`)
+
+**Affected Files Fixed:**
+- `src/services/vfStorageAdapter.ts` - Main storage adapter
+- `src/services/storage/storageAdapter.ts` - Unified storage adapter
+- `src/modules/pipeline/services/pipelineDocumentSyncService.ts` - Pipeline docs
+- `scripts/sync-smartsheet-documents.js` - Smartsheet sync script
+
+**Database Fix:** If HTTP URLs are already in database:
+```sql
+UPDATE staff SET profile_photo_url = REPLACE(profile_photo_url, 'http://100.96.203.105:8091', 'https://vf.fibreflow.app') WHERE profile_photo_url LIKE 'http://100.96.203.105%';
+```
+
+---
+
+## Staff Table Photo Columns
+**Date:** 2026-02-02
+**Severity:** MEDIUM
+**Context:** Fleet drivers-documents API 500 error
+
+**Problem:** API was selecting `s.photo_url` but the staff table has `profile_photo_url` and `id_photo_url` columns.
+
+**Fix:**
+```sql
+-- Wrong
+SELECT photo_url FROM staff;
+
+-- Correct
+SELECT COALESCE(profile_photo_url, id_photo_url) as photo_url FROM staff;
+```
+
+**Column Names:**
+- `profile_photo_url` - Manually uploaded profile photo
+- `id_photo_url` - Photo extracted from ID document via OCR
+- `photo_match_score` - AI face comparison score
+- `photo_verified_at` - Timestamp of last photo comparison
+
+---

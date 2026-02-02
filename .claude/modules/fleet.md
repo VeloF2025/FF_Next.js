@@ -105,6 +105,32 @@ First Check-In Flow:
 | GPS Investigation | `/fleet/investigation` | Trip analysis |
 | Driver Leaderboard | `/fleet/drivers` | Performance ranking |
 
+## Tab Order (Feb 2026)
+Dashboard → Vehicles → Drivers → GPS Investigation → Locations → Fuel → Maintenance → Analytics → Portal → Check-In Audit
+
+## Vehicles List Defaults
+- **Default filter**: Active vehicles (not all)
+- **Count display**: Shows filtered count (e.g., "14 active vehicles")
+
+## License Disc Feature
+- **Modal**: `LicenseDiscModal.tsx` - Two-step wizard (upload → verify)
+- **VLM Extraction**: Extracts disc number, registration, VIN, engine number, make, description, year, color, tare, GVM, expiry
+- **Verification**: Cross-checks extracted data against vehicle record
+- **Auto-update**: Can update missing VIN, engine number, color from disc
+
+### License Disc API
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/fleet/vehicles/[id]/license-disc` | GET/POST | Get/create license disc |
+| `/api/fleet/vehicles/extract-license-disk` | POST | VLM extraction from photo |
+
+## Recent Changes (Feb 2026)
+- Added `LicenseDiscModal` with full OCR extraction and verification
+- Added `engineNumber` field to `FleetVehicle` type
+- Reordered tabs: Vehicles first, then Drivers
+- Default vehicles list to Active status filter
+- Show filtered vehicle count in header
+
 ## Recent Changes (Jan 2026)
 - Added `VehicleCalibrationModal` for first-time setup
 - Added calibration API with grandfathering logic
