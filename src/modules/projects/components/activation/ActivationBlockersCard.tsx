@@ -91,6 +91,7 @@ export function ActivationBlockersCard({
 }: ActivationBlockersCardProps) {
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [check, setCheck] = useState<ActivationCheck | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,6 +146,30 @@ export function ActivationBlockersCard({
       alert('Failed to activate project');
     } finally {
       setActivating(false);
+    }
+  };
+
+  const handleSeedRequirements = async () => {
+    if (seeding) return;
+
+    setSeeding(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/requirements/seed`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error?.message || 'Failed to seed requirements');
+        return;
+      }
+
+      // Refresh to show updated status
+      await loadActivationStatus();
+    } catch (err) {
+      alert('Failed to seed requirements');
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -262,6 +287,29 @@ export function ActivationBlockersCard({
           details={blockers.contractorSigned.signedAgreements}
         />
       </div>
+
+      {/* Seed Requirements Button - show when requirements need seeding */}
+      {blockers.hsCompliance.message.includes('run requirement seeding') && (
+        <div className="px-4 pb-2">
+          <button
+            onClick={handleSeedRequirements}
+            disabled={seeding}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
+          >
+            {seeding ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Seeding...
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-4 h-4" />
+                Seed Project Requirements
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Activate Button */}
       <div className="p-4 border-t border-[var(--ff-border-light)]">
