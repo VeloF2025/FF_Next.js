@@ -141,17 +141,18 @@ async function handlePost(
       });
     }
 
-    // Upload to VF Storage
+    // Upload to VF Storage - use flat folder structure with projectId in filename
     const vfStorage = new VFStorageService();
     const timestamp = Date.now();
     const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `${documentType}_${timestamp}_${sanitizedName}`;
+    // Include projectId in filename for flat storage structure
+    const storagePath = `${projectId}_${documentType}_${timestamp}_${sanitizedName}`;
 
     const fileBuffer = await fs.readFile(uploadedFile.filepath);
     const uploadResult = await vfStorage.uploadFile(
       fileBuffer,
       'procurement',
-      `project-documents/${projectId}`,
+      'project-docs',
       storagePath
     );
 
