@@ -9,7 +9,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Upload,
   AlertTriangle,
@@ -28,17 +28,19 @@ import {
   Loader2,
   CheckSquare,
   Square,
+  Lock,
 } from 'lucide-react';
 import type { OltTabId } from '../../types';
+import { usePermission } from '@/hooks/usePermission';
 
-// Tab configuration
-const TABS: { id: OltTabId; label: string; icon: React.ElementType }[] = [
-  { id: 'import', label: 'Import', icon: Upload },
-  { id: 'pending', label: 'Fixable', icon: Wrench },
-  { id: 'investigate', label: 'Investigate', icon: Search },
-  { id: 'escalations', label: 'Escalations', icon: AlertTriangle },
-  { id: 'history', label: 'History', icon: History },
-  { id: 'reporting', label: 'Reporting', icon: BarChart3 },
+// Tab configuration with permission keys
+const TABS: { id: OltTabId; label: string; icon: React.ElementType; permissionKey: string }[] = [
+  { id: 'import', label: 'Import', icon: Upload, permissionKey: 'system.data-sync.olt.import' },
+  { id: 'pending', label: 'Fixable', icon: Wrench, permissionKey: 'system.data-sync.olt.pending' },
+  { id: 'investigate', label: 'Investigate', icon: Search, permissionKey: 'system.data-sync.olt.investigate' },
+  { id: 'escalations', label: 'Escalations', icon: AlertTriangle, permissionKey: 'system.data-sync.olt.escalations' },
+  { id: 'history', label: 'History', icon: History, permissionKey: 'system.data-sync.olt.history' },
+  { id: 'reporting', label: 'Reporting', icon: BarChart3, permissionKey: 'system.data-sync.olt.reporting' },
 ];
 
 type ReportPeriod = 'today' | 'yesterday' | 'week' | '30days' | 'all';
@@ -98,7 +100,23 @@ interface OltReportGroupProps {
 }
 
 export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) {
-  const currentTab = (activeTab as OltTabId) || 'pending';
+  const { can, isLoading: permissionsLoading } = usePermission();
+
+  // Filter tabs based on permissions
+  const accessibleTabs = useMemo(() => {
+    if (permissionsLoading) return [];
+    return TABS.filter(tab => can(tab.permissionKey, 'view'));
+  }, [permissionsLoading, can]);
+
+  // Default to first accessible tab if current tab not accessible
+  const currentTab = useMemo(() => {
+    const requested = activeTab as OltTabId;
+    if (accessibleTabs.some(t => t.id === requested)) {
+      return requested;
+    }
+    return accessibleTabs[0]?.id || 'pending';
+  }, [activeTab, accessibleTabs]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -614,6 +632,33 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const fixableRecords = records.filter((r) => r.olt_serial);
   const allSelected = fixableRecords.length > 0 && selectedIds.size === fixableRecords.length;
 
+  // Show loading state while permissions are being resolved
+  if (permissionsLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+        <span className="ml-3 text-[var(--ff-text-secondary)]">Loading...</span>
+      </div>
+    );
+  }
+
+  // Show access denied if no tabs are accessible
+  if (accessibleTabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+          <Lock className="w-8 h-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">
+          Access Restricted
+        </h2>
+        <p className="text-[var(--ff-text-secondary)] max-w-md">
+          You don&apos;t have permission to access any OLT Report tabs.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Stats Bar */}
@@ -644,10 +689,10 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation - Only show tabs user has permission for */}
       <div className="border-b border-[var(--ff-border-light)]">
         <nav className="flex gap-1" aria-label="OLT Report Tabs">
-          {TABS.map((tab) => {
+          {accessibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
             return (
