@@ -164,7 +164,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-6">
+      <div className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)] p-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
             <FileText className="w-5 h-5 text-blue-400" />
@@ -179,7 +179,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
       </div>
 
       {/* Client PO Documents Section */}
-      <section className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+      <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
         <div className="p-4 border-b border-[var(--ff-border-light)]">
           <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">Client PO Documents</h3>
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
@@ -228,7 +228,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
       </section>
 
       {/* Service Schedules Section (BSS/MSS) */}
-      <section className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+      <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
         <div className="p-4 border-b border-[var(--ff-border-light)]">
           <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">Service Schedules</h3>
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
@@ -263,7 +263,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
       </section>
 
       {/* SOW Data Import Section */}
-      <section className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+      <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
         <div className="p-4 border-b border-[var(--ff-border-light)]">
           <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">SOW Data Import</h3>
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
@@ -336,7 +336,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
       </section>
 
       {/* BOQ Data Import Section */}
-      <section className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+      <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
         <div className="p-4 border-b border-[var(--ff-border-light)]">
           <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">BOQ Data Import</h3>
           <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
