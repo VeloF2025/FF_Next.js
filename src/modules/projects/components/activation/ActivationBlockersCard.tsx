@@ -149,7 +149,7 @@ export function ActivationBlockersCard({
   };
 
   // Only show for planning status
-  if (projectStatus !== 'planning') {
+  if (projectStatus?.toLowerCase() !== 'planning') {
     return null;
   }
 
