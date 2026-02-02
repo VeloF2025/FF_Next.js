@@ -44,6 +44,12 @@ export interface ClientPurchaseOrder {
   createdAt: string;
   updatedAt: string;
 
+  // Source document (PDF import)
+  sourceDocumentUrl?: string;
+  sourceDocumentName?: string;
+  vlmExtractionData?: Record<string, unknown>;
+  vlmConfidenceScore?: number;
+
   // Joined data (optional)
   clientName?: string;
   projectName?: string;
@@ -62,6 +68,11 @@ export interface ClientPOCreateInput {
   taxInclusive?: boolean;
   description?: string;
   terms?: string;
+  // Source document (for PDF import)
+  sourceDocumentUrl?: string;
+  sourceDocumentName?: string;
+  vlmExtractionData?: Record<string, unknown>;
+  vlmConfidenceScore?: number;
 }
 
 export interface ClientPOUpdateInput {

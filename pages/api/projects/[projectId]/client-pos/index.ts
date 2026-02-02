@@ -96,7 +96,7 @@ export default withAuth(withErrorHandler(async (
       // Calculate total value
       const totalValue = body.contractedDrops * body.pricePerDrop;
 
-      // Create Client PO
+      // Create Client PO (with optional source document from PDF import)
       const result = await sql`
         INSERT INTO client_purchase_orders (
           po_number, reference, project_id, client_id,
@@ -104,6 +104,8 @@ export default withAuth(withErrorHandler(async (
           po_date, valid_from, valid_to,
           tax_rate, tax_inclusive,
           description, terms,
+          source_document_url, source_document_name,
+          vlm_extraction_data, vlm_confidence_score,
           status, created_by
         ) VALUES (
           ${body.poNumber},
@@ -120,6 +122,10 @@ export default withAuth(withErrorHandler(async (
           ${body.taxInclusive ?? false},
           ${body.description || null},
           ${body.terms || null},
+          ${body.sourceDocumentUrl || null},
+          ${body.sourceDocumentName || null},
+          ${body.vlmExtractionData ? JSON.stringify(body.vlmExtractionData) : null},
+          ${body.vlmConfidenceScore || null},
           'draft',
           ${userId || 'system'}
         )
@@ -184,6 +190,10 @@ function transformClientPO(row: Record<string, unknown>): ClientPurchaseOrder {
     taxInclusive: row.tax_inclusive as boolean,
     description: row.description as string | undefined,
     terms: row.terms as string | undefined,
+    sourceDocumentUrl: row.source_document_url as string | undefined,
+    sourceDocumentName: row.source_document_name as string | undefined,
+    vlmExtractionData: row.vlm_extraction_data as Record<string, unknown> | undefined,
+    vlmConfidenceScore: row.vlm_confidence_score ? Number(row.vlm_confidence_score) : undefined,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
