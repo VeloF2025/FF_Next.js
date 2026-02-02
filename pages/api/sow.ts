@@ -50,8 +50,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
   try {
     // Fetch data from main tables (not sow_* tables)
     const [polesResult, dropsResult, fibreResult] = await Promise.all([
-      sql`SELECT * FROM poles WHERE project_id = ${projectId} ORDER BY pole_id LIMIT 1000`,
-      sql`SELECT * FROM drops WHERE project_id = ${projectId} ORDER BY drop_id LIMIT 1000`,
+      sql`SELECT * FROM poles WHERE project_id = ${projectId} ORDER BY pole_number LIMIT 1000`,
+      sql`SELECT * FROM drops WHERE project_id = ${projectId} ORDER BY drop_number LIMIT 1000`,
       sql`SELECT * FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
     ]);
 
