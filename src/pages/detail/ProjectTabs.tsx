@@ -43,11 +43,17 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
     [groups, activeGroupId]
   );
 
+  // Generate grid columns class based on number of tabs
+  const gridColsClass = `grid-cols-${groups.length}`;
+
   return (
     <div className="space-y-0">
-      {/* Primary Group Tabs */}
+      {/* Primary Group Tabs - using grid for guaranteed equal width */}
       <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="-mb-px flex w-full overflow-x-auto">
+        <nav
+          className="-mb-px grid w-full"
+          style={{ gridTemplateColumns: `repeat(${groups.length}, 1fr)` }}
+        >
           {groups.map((group) => {
             const isActive = activeGroupId === group.id;
             // Show badge count for group (sum of all tab badges in group)
@@ -66,7 +72,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
                     onTabChange(firstTab.id as TabId);
                   }
                 }}
-                className={`flex-1 py-3 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex items-center justify-center gap-2 ${
+                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors flex items-center justify-center gap-2 ${
                   isActive
                     ? 'border-blue-500 text-blue-400 bg-blue-500/5'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)]'
@@ -87,7 +93,10 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
       {/* Sub-tabs for active group (only show if group has multiple tabs) */}
       {activeGroup && activeGroup.tabs.length > 1 && (
         <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-2">
-          <nav className="flex w-full overflow-x-auto py-1">
+          <nav
+            className="grid w-full py-1 gap-1"
+            style={{ gridTemplateColumns: `repeat(${activeGroup.tabs.length}, 1fr)` }}
+          >
             {activeGroup.tabs.map((tab) => {
               const badgeCount = badges[tab.id];
               const isActive = activeTab === tab.id;
@@ -96,7 +105,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id as TabId)}
-                  className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-2 ${
+                  className={`py-1.5 px-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                     isActive
                       ? 'bg-blue-500/10 text-blue-400'
                       : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)]'

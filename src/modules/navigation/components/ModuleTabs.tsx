@@ -55,16 +55,20 @@ export function ModuleTabs({
   onTabChange,
 }: ModuleTabsProps) {
   return (
-    <nav className="flex w-full -mb-px overflow-x-auto scrollbar-hide" aria-label="Module tabs">
+    <nav
+      className="grid w-full -mb-px"
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
+      aria-label="Module tabs"
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         const isLocked = tab.rbacKey && !hasPermission(tab.rbacKey);
         const badge = tabBadges[tab.id] || tab.badge;
         const Icon = tab.icon;
 
-        // Tab styles using CSS variables - flex-1 distributes tabs evenly
+        // Tab styles using CSS variables - grid ensures equal width
         const baseStyles =
-          'flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors flex-1 min-w-0';
+          'flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors';
         const activeStyles =
           'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10';
         const inactiveStyles =
