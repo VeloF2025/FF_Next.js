@@ -16,16 +16,16 @@ interface CommunicationsStatsCardsProps {
 export function CommunicationsStatsCards({ stats }: CommunicationsStatsCardsProps) {
   const cards = [
     {
-      label: 'Upcoming Meetings',
+      label: 'Total Meetings',
       value: stats.upcomingMeetings,
       icon: Calendar,
       iconColor: 'text-blue-400',
     },
     {
-      label: 'Pending Actions',
-      value: stats.pendingActions,
+      label: 'Completed',
+      value: stats.overdueItems, // Repurposed to show completed meetings
       icon: CheckCircle,
-      iconColor: 'text-yellow-400',
+      iconColor: 'text-green-400',
     },
     {
       label: 'Unread',
@@ -34,10 +34,10 @@ export function CommunicationsStatsCards({ stats }: CommunicationsStatsCardsProp
       iconColor: 'text-purple-400',
     },
     {
-      label: 'Overdue',
-      value: stats.overdueItems,
+      label: 'Pending Actions',
+      value: stats.pendingActions,
       icon: AlertCircle,
-      iconColor: 'text-red-400',
+      iconColor: 'text-yellow-400',
     },
   ];
 

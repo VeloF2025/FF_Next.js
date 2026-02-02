@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Loading } from '../components';
 import {
   ClientsPage,
@@ -176,11 +177,8 @@ export const moduleRoutes = [
   },
   {
     path: 'meetings',
-    element: (
-      <Suspense fallback={<Loading />}>
-        <MeetingsDashboard />
-      </Suspense>
-    ),
+    // Redirect /meetings to /communications?tab=meetings
+    element: <Navigate to="/communications?tab=meetings" replace />,
   },
   {
     path: 'action-items',

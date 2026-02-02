@@ -40,7 +40,7 @@ export const communicationsSection: NavSection = {
       external: true,
     },
     {
-      to: '/meetings',
+      to: '/communications?tab=meetings',
       icon: Users,
       label: 'Meetings',
       shortLabel: 'Meet',

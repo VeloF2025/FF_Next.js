@@ -1,98 +1,133 @@
-import { Video, Users, MoreVertical } from 'lucide-react';
-import { Meeting, Status } from '@/types/communications.types';
+'use client';
+
+/**
+ * Communications Meetings Tab
+ *
+ * Integrates the full Meetings module functionality:
+ * - MeetingsList component (card-based with agenda/keywords)
+ * - MeetingDetailModal for viewing details
+ * - Sub-tab filters (all/upcoming/past/cancelled)
+ */
+
+import { useState } from 'react';
+import { Calendar } from 'lucide-react';
+import type { Meeting } from '@/modules/meetings/types/meeting.types';
+import { MeetingsList } from '@/modules/meetings/components/MeetingsList';
+import { MeetingDetailModal } from '@/modules/meetings/components/MeetingDetailModal';
 
 interface CommunicationsMeetingsTabProps {
   meetings: Meeting[];
-  getStatusColor: (status: Status) => string;
+  getStatusColor: (status: string) => string;
+  onRefresh?: () => Promise<void>;
 }
 
-export function CommunicationsMeetingsTab({ meetings, getStatusColor }: CommunicationsMeetingsTabProps) {
+type MeetingFilter = 'all' | 'upcoming' | 'past' | 'cancelled';
+
+export function CommunicationsMeetingsTab({
+  meetings,
+  getStatusColor,
+  onRefresh
+}: CommunicationsMeetingsTabProps) {
+  const [activeFilter, setActiveFilter] = useState<MeetingFilter>('all');
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Filter meetings based on active filter
+  const filteredMeetings = meetings.filter(meeting => {
+    switch (activeFilter) {
+      case 'upcoming':
+        return meeting.status === 'scheduled';
+      case 'past':
+        return meeting.status === 'completed';
+      case 'cancelled':
+        return meeting.status === 'cancelled';
+      default:
+        return true;
+    }
+  });
+
+  // Handle meeting click to show detail modal
+  const handleEditMeeting = (meeting: Meeting) => {
+    setSelectedMeeting(meeting);
+    setShowDetailModal(true);
+  };
+
+  // Handle delete (no-op for now since Fireflies meetings are read-only)
+  const handleDeleteMeeting = (meetingId: string) => {
+    // Future: implement delete functionality
+  };
+
+  const filters: { key: MeetingFilter; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: meetings.length },
+    { key: 'upcoming', label: 'Upcoming', count: meetings.filter(m => m.status === 'scheduled').length },
+    { key: 'past', label: 'Past', count: meetings.filter(m => m.status === 'completed').length },
+    { key: 'cancelled', label: 'Cancelled', count: meetings.filter(m => m.status === 'cancelled').length },
+  ];
+
+  if (meetings.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Calendar className="w-12 h-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
+        <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No meetings yet</h3>
+        <p className="text-[var(--ff-text-secondary)]">
+          Click &quot;Sync Fireflies&quot; to import your recorded meetings, or schedule a new meeting.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-              Meeting
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-              Date & Time
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-              Type
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-              Attendees
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {meetings.map((meeting) => (
-            <tr key={meeting.id}>
-              <td className="px-6 py-4">
-                <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {meeting.title}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {meeting.agenda.length} agenda items
-                  </div>
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900">
-                  {meeting.date.toISOString().split('T')[0]}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {meeting.time} ({meeting.duration})
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center">
-                  {meeting.type === 'virtual' ? (
-                    <Video className="w-4 h-4 mr-2 text-blue-500" />
-                  ) : (
-                    <Users className="w-4 h-4 mr-2 text-green-500" />
-                  )}
-                  <span className="text-sm text-gray-900">
-                    {meeting.type}
-                  </span>
-                </div>
-              </td>
-              <td className="px-6 py-4">
-                <div className="flex -space-x-2">
-                  {meeting.attendees.slice(0, 3).map((attendee, i) => (
-                    <div key={i} className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium text-gray-700 border-2 border-white">
-                      {attendee.split(' ').map(n => n[0]).join('')}
-                    </div>
-                  ))}
-                  {meeting.attendees.length > 3 && (
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600 border-2 border-white">
-                      +{meeting.attendees.length - 3}
-                    </div>
-                  )}
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(meeting.status)}`}>
-                  {meeting.status}
-                </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button className="text-gray-400 hover:text-gray-600">
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-4">
+      {/* Sub-tab filters */}
+      <div className="flex items-center gap-2">
+        {filters.map(filter => (
+          <button
+            key={filter.key}
+            onClick={() => setActiveFilter(filter.key)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              activeFilter === filter.key
+                ? 'bg-[var(--ff-primary)] text-white'
+                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]'
+            }`}
+          >
+            {filter.label}
+            {filter.count > 0 && (
+              <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full ${
+                activeFilter === filter.key
+                  ? 'bg-white/20 text-white'
+                  : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-tertiary)]'
+              }`}>
+                {filter.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Meeting List */}
+      {filteredMeetings.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-[var(--ff-text-secondary)]">
+            No {activeFilter === 'all' ? '' : activeFilter} meetings found.
+          </p>
+        </div>
+      ) : (
+        <MeetingsList
+          meetings={filteredMeetings}
+          onEditMeeting={handleEditMeeting}
+          onDeleteMeeting={handleDeleteMeeting}
+        />
+      )}
+
+      {/* Meeting Detail Modal */}
+      <MeetingDetailModal
+        meeting={selectedMeeting}
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedMeeting(null);
+        }}
+      />
     </div>
   );
 }

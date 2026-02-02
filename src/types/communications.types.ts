@@ -3,20 +3,11 @@
  * All types for meetings, action items, notifications
  */
 
-export interface Meeting {
-  id: string;
-  title: string;
-  date: Date;
-  time: string;
-  duration: string;
-  type: 'in_person' | 'virtual' | 'hybrid';
-  attendees: string[];
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-  agenda: string[];
-  minutes?: string;
-  actionItems?: ActionItem[];
-}
+// Re-export Meeting types from meetings module to avoid duplication
+export type { Meeting, ActionItem as MeetingActionItem } from '@/modules/meetings/types/meeting.types';
+import type { Meeting } from '@/modules/meetings/types/meeting.types';
 
+// Communications-specific ActionItem (different from meeting ActionItem)
 export interface ActionItem {
   id: string;
   description: string;
