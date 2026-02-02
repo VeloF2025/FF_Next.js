@@ -1,102 +1,89 @@
 {
   "sessions": {
-    "a943ae60-6839-48ae-9eea-3923877c37d7": {
-      "session_id": "a943ae60-6839-48ae-9eea-3923877c37d7",
-      "started_at": "2026-01-29T04:21:55.891Z",
-      "total_input_tokens": 32830,
+    "38d0b45c-2f42-4973-be7e-356321a73997": {
+      "session_id": "38d0b45c-2f42-4973-be7e-356321a73997",
+      "started_at": "2026-01-31T16:06:26.594Z",
+      "total_input_tokens": 35494,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.09849000000000012,
-      "tool_calls": 84,
+      "total_cost_usd": 0.10648199999999987,
+      "tool_calls": 294,
       "tools_used": {
-        "Read": 17,
-        "Glob": 1,
+        "Read": 31,
         "Task": 1,
+        "Write": 2,
+        "ExitPlanMode": 1,
+        "TodoWrite": 5,
+        "Bash": 52,
+        "mcp__claude-in-chrome__tabs_context_mcp": 4,
+        "mcp__claude-in-chrome__tabs_create_mcp": 2,
+        "mcp__claude-in-chrome__resize_window": 1,
+        "mcp__claude-in-chrome__navigate": 39,
+        "mcp__claude-in-chrome__computer": 65,
+        "mcp__claude-in-chrome__javascript_tool": 43,
+        "TaskUpdate": 9,
+        "Glob": 4,
+        "Grep": 10,
+        "mcp__claude-in-chrome__find": 6,
+        "mcp__claude-in-chrome__form_input": 1,
+        "mcp__claude-in-chrome__read_console_messages": 1,
+        "mcp__claude-in-chrome__read_network_requests": 2,
+        "Edit": 11,
+        "TaskCreate": 4
+      }
+    },
+    "b913eff5-24f5-4cc5-adc1-d482c40bd13f": {
+      "session_id": "b913eff5-24f5-4cc5-adc1-d482c40bd13f",
+      "started_at": "2026-02-01T07:56:28.586Z",
+      "total_input_tokens": 108,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.00032399999999999996,
+      "tool_calls": 8,
+      "tools_used": {
+        "Bash": 1,
+        "mcp__claude-in-chrome__tabs_context_mcp": 1,
+        "mcp__claude-in-chrome__navigate": 3,
+        "mcp__claude-in-chrome__get_page_text": 2,
+        "TodoWrite": 1
+      }
+    },
+    "0a7feef5-586d-411d-8358-3efcf9866628": {
+      "session_id": "0a7feef5-586d-411d-8358-3efcf9866628",
+      "started_at": "2026-02-01T07:58:17.568Z",
+      "total_input_tokens": 7535,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.022605,
+      "tool_calls": 194,
+      "tools_used": {
+        "Bash": 55,
+        "Read": 94,
+        "Glob": 25,
+        "Grep": 12,
+        "Task": 4,
+        "Write": 1,
         "AskUserQuestion": 1,
+        "Edit": 2
+      }
+    },
+    "e2cdf80e-3ee8-45c1-986e-00a3b22c5c36": {
+      "session_id": "e2cdf80e-3ee8-45c1-986e-00a3b22c5c36",
+      "started_at": "2026-02-01T08:08:26.762Z",
+      "total_input_tokens": 22643,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.06792900000000003,
+      "tool_calls": 164,
+      "tools_used": {
+        "TaskCreate": 1,
+        "TaskUpdate": 2,
+        "Bash": 50,
+        "Read": 22,
+        "Glob": 10,
+        "Grep": 7,
         "Write": 5,
-        "ExitPlanMode": 1,
-        "TodoWrite": 8,
-        "Edit": 9,
-        "Grep": 2,
-        "Bash": 16,
+        "Edit": 39,
         "mcp__claude-in-chrome__tabs_context_mcp": 2,
-        "mcp__claude-in-chrome__navigate": 2,
-        "mcp__claude-in-chrome__computer": 19
-      }
-    },
-    "752a680f-d241-448f-946c-80a9e8f7abcd": {
-      "session_id": "752a680f-d241-448f-946c-80a9e8f7abcd",
-      "started_at": "2026-01-29T04:22:25.519Z",
-      "total_input_tokens": 32355,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.09706500000000004,
-      "tool_calls": 123,
-      "tools_used": {
-        "AskUserQuestion": 1,
-        "Read": 34,
-        "Glob": 14,
-        "Grep": 8,
-        "Bash": 28,
-        "Task": 1,
-        "Write": 12,
-        "ExitPlanMode": 1,
-        "TodoWrite": 10,
-        "Edit": 7,
-        "mcp__claude-in-chrome__tabs_context_mcp": 3,
-        "mcp__claude-in-chrome__computer": 4
-      }
-    },
-    "9a735cfe-e09d-447a-8d8d-ce086823b4bf": {
-      "session_id": "9a735cfe-e09d-447a-8d8d-ce086823b4bf",
-      "started_at": "2026-01-29T04:24:52.083Z",
-      "total_input_tokens": 34334,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.10300200000000001,
-      "tool_calls": 219,
-      "tools_used": {
-        "Bash": 72,
-        "TaskOutput": 2,
-        "TodoWrite": 19,
-        "Read": 54,
-        "Edit": 36,
-        "Grep": 14,
-        "Task": 3,
-        "AskUserQuestion": 1,
-        "Write": 6,
-        "ExitPlanMode": 2,
-        "Glob": 9,
-        "EnterPlanMode": 1
-      }
-    },
-    "cd88b577-d534-4dc8-a672-35ea2a1f20ad": {
-      "session_id": "cd88b577-d534-4dc8-a672-35ea2a1f20ad",
-      "started_at": "2026-01-29T04:26:05.455Z",
-      "total_input_tokens": 4281,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.012843000000000002,
-      "tool_calls": 31,
-      "tools_used": {
-        "Bash": 28,
-        "Read": 2,
-        "Edit": 1
-      }
-    },
-    "2180422c-a65c-4c63-ae67-6cd7a140d371": {
-      "session_id": "2180422c-a65c-4c63-ae67-6cd7a140d371",
-      "started_at": "2026-01-29T04:54:55.673Z",
-      "total_input_tokens": 3962,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.011885999999999999,
-      "tool_calls": 59,
-      "tools_used": {
-        "Read": 7,
-        "Grep": 2,
-        "Glob": 2,
-        "Bash": 41,
-        "Task": 1,
-        "Edit": 2,
-        "Skill": 1,
-        "AskUserQuestion": 1,
-        "TodoWrite": 2
+        "mcp__claude-in-chrome__navigate": 3,
+        "mcp__claude-in-chrome__computer": 20,
+        "mcp__claude-in-chrome__find": 3
       }
     }
   }

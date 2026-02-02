@@ -21,31 +21,41 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const result = await sql`
-      SELECT 
+    // Get client stats
+    const clientResult = await sql`
+      SELECT
         COUNT(*) as total_clients,
-        COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active_clients,
-        COUNT(CASE WHEN status = 'INACTIVE' THEN 1 END) as inactive_clients,
-        COUNT(CASE WHEN metadata->>'priority' = 'HIGH' THEN 1 END) as high_priority,
-        COUNT(CASE WHEN metadata->>'category' = 'PREMIUM' THEN 1 END) as premium_clients
+        COUNT(CASE WHEN LOWER(status) = 'active' THEN 1 END) as active_clients,
+        COUNT(CASE WHEN LOWER(status) = 'inactive' THEN 1 END) as inactive_clients,
+        COUNT(CASE WHEN LOWER(priority) = 'high' THEN 1 END) as high_priority
       FROM clients
     `;
-    
+
+    // Get project stats across all clients
+    const projectResult = await sql`
+      SELECT
+        COUNT(*) as total_projects,
+        COALESCE(SUM(budget), 0) as total_value
+      FROM projects p
+      WHERE p.client_id IS NOT NULL
+    `;
+
     const summary = {
-      totalClients: parseInt(result[0].total_clients),
-      activeClients: parseInt(result[0].active_clients),
-      inactiveClients: parseInt(result[0].inactive_clients),
+      totalClients: parseInt(clientResult[0].total_clients || '0'),
+      activeClients: parseInt(clientResult[0].active_clients || '0'),
+      inactiveClients: parseInt(clientResult[0].inactive_clients || '0'),
       prospectClients: 0,
-      totalProjectValue: 0,
+      totalProjects: parseInt(projectResult[0].total_projects || '0'),
+      totalProjectValue: parseFloat(projectResult[0].total_value || '0'),
       averageProjectValue: 0,
       topClientsByValue: [],
       clientsByCategory: {},
       clientsByStatus: {
-        ACTIVE: parseInt(result[0].active_clients),
-        INACTIVE: parseInt(result[0].inactive_clients)
+        ACTIVE: parseInt(clientResult[0].active_clients || '0'),
+        INACTIVE: parseInt(clientResult[0].inactive_clients || '0')
       },
       clientsByPriority: {
-        HIGH: parseInt(result[0].high_priority)
+        HIGH: parseInt(clientResult[0].high_priority || '0')
       },
       monthlyGrowth: 0,
       conversionRate: 0

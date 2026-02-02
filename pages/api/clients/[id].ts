@@ -58,8 +58,8 @@ async function handler(
           SELECT 
             c.*,
             COUNT(DISTINCT p.id) as project_count,
-            COUNT(DISTINCT CASE WHEN p.status = 'ACTIVE' OR p.status = 'IN_PROGRESS' THEN p.id END) as active_projects,
-            COUNT(DISTINCT CASE WHEN p.status = 'COMPLETED' THEN p.id END) as completed_projects,
+            COUNT(DISTINCT CASE WHEN LOWER(p.status) IN ('active', 'in_progress', 'in progress') THEN p.id END) as active_projects,
+            COUNT(DISTINCT CASE WHEN LOWER(p.status) = 'completed' THEN p.id END) as completed_projects,
             SUM(p.budget_allocated) as total_budget,
             SUM(p.budget_spent) as total_spent,
             JSON_AGG(

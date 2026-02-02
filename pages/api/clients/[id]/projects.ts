@@ -78,7 +78,7 @@ export default async function handler(
         COALESCE(p.budget, 0) as budget,
         COALESCE(p.actual_cost, 0) as "actualCost",
         COALESCE(p.progress, 0) as progress,
-        p.project_manager::text as "projectManager",
+        COALESCE(s.first_name || ' ' || s.last_name, u.first_name || ' ' || u.last_name, '-') as "projectManager",
         p.start_date as "startDate",
         p.end_date as "endDate",
         COALESCE(pp.po_count, 0)::int as "poCount",
@@ -88,6 +88,8 @@ export default async function handler(
         COALESCE(pp.pending_po_count, 0)::int as "pendingPoCount"
       FROM projects p
       LEFT JOIN project_pos pp ON pp.project_id = p.id
+      LEFT JOIN staff s ON p.project_manager::text = s.id::text
+      LEFT JOIN users u ON p.project_manager::text = u.id::text
       WHERE p.client_id = ${id}
       ORDER BY 
         CASE p.status 

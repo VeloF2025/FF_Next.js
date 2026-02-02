@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Edit, Trash2, Building, Activity, FileText, Package } from 'lucide-react';
+import { Edit, Trash2, Building, Activity, FileText } from 'lucide-react';
 import { useClient, useDeleteClient } from '@/hooks/useClients';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
@@ -67,17 +67,6 @@ export function ClientDetail() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={() => router.push('/clients')}
-          className="inline-flex items-center text-sm text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Client List
-        </button>
-      </div>
-
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] mb-6">
         <div className="p-6">
           <div className="flex items-start justify-between mb-6">
