@@ -31,8 +31,8 @@ export function ProjectIncomeTab({ projectId }: ProjectIncomeTabProps) {
     try {
       const response = await fetch(`/api/projects/${projectId}/client-pos`);
       if (!response.ok) throw new Error('Failed to fetch Client POs');
-      const data = await response.json();
-      setClientPOs(data.clientPOs || []);
+      const result = await response.json();
+      setClientPOs(result.data?.clientPOs || []);
     } catch (error) {
       log.error('Failed to fetch Client POs', { projectId, error });
     }
@@ -42,9 +42,9 @@ export function ProjectIncomeTab({ projectId }: ProjectIncomeTabProps) {
     try {
       const response = await fetch(`/api/projects/${projectId}/customer-invoices`);
       if (!response.ok) throw new Error('Failed to fetch invoices');
-      const data = await response.json();
-      setInvoices(data.invoices || []);
-      setInvoiceSummary(data.summary || null);
+      const result = await response.json();
+      setInvoices(result.data?.invoices || []);
+      setInvoiceSummary(result.data?.summary || null);
     } catch (error) {
       log.error('Failed to fetch invoices', { projectId, error });
     }
@@ -54,8 +54,8 @@ export function ProjectIncomeTab({ projectId }: ProjectIncomeTabProps) {
     try {
       const response = await fetch(`/api/projects/${projectId}/finance/dashboard`);
       if (!response.ok) throw new Error('Failed to fetch summary');
-      const data = await response.json();
-      setPoSummary(data.clientPOs || null);
+      const result = await response.json();
+      setPoSummary(result.data?.clientPOs || null);
     } catch (error) {
       log.error('Failed to fetch summary', { projectId, error });
     }
