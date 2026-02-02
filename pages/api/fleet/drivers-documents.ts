@@ -54,7 +54,7 @@ async function handler(
         s.id as staff_id,
         CONCAT(s.first_name, ' ', s.last_name) as staff_name,
         s.department,
-        s.photo_url,
+        COALESCE(s.profile_photo_url, s.id_photo_url) as photo_url,
         ll.document_id,
         ll.verification_status as document_status,
         ll.expiry_date as license_expiry,
