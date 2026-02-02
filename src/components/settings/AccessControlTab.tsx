@@ -123,6 +123,8 @@ export function AccessControlTab() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('');
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -353,6 +355,7 @@ export function AccessControlTab() {
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (roleFilter) params.set('role', roleFilter);
       if (statusFilter) params.set('status', statusFilter);
+      if (departmentFilter) params.set('department', departmentFilter);
 
       const res = await fetch(`/api/admin/users?${params}`);
       const data = await res.json();
@@ -362,7 +365,7 @@ export function AccessControlTab() {
     } catch (err) {
       setError('Failed to fetch users');
     }
-  }, [debouncedSearch, roleFilter, statusFilter]);
+  }, [debouncedSearch, roleFilter, statusFilter, departmentFilter]);
 
   // Fetch roles
   const fetchRoles = useCallback(async () => {
@@ -642,6 +645,35 @@ export function AccessControlTab() {
     return { total: users.length, active, inactive, admins };
   }, [users]);
 
+  // Extract unique departments from users
+  const departments = useMemo(() => {
+    const depts = users
+      .map(u => u.department)
+      .filter((d): d is string => Boolean(d));
+    return [...new Set(depts)].sort();
+  }, [users]);
+
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchTerm) count++;
+    if (roleFilter) count++;
+    if (statusFilter) count++;
+    if (departmentFilter) count++;
+    return count;
+  }, [searchTerm, roleFilter, statusFilter, departmentFilter]);
+
+  // Check if any filters are active
+  const hasActiveFilters = activeFilterCount > 0;
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setRoleFilter('');
+    setStatusFilter('');
+    setDepartmentFilter('');
+  };
+
   // Render users tab
   const renderUsersTab = () => (
     <div className="space-y-4">
@@ -686,19 +718,20 @@ export function AccessControlTab() {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Enhanced Search */}
-          <div className="flex-1 min-w-[300px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--ff-text-secondary)]" />
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
+        {/* Main Search Bar */}
+        <div className="p-4">
+          <div className="flex items-center gap-3">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
               <input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search by name, email, or department... (Ctrl+K)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-10 py-3 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+                className="w-full pl-10 pr-10 py-2.5 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
               {searchTerm && (
                 <button
@@ -706,80 +739,182 @@ export function AccessControlTab() {
                     setSearchTerm('');
                     searchInputRef.current?.focus();
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-[var(--ff-bg-primary)] rounded"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-[var(--ff-bg-primary)] rounded"
                 >
-                  <XCircle className="w-5 h-5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]" />
+                  <XCircle className="w-4 h-4 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]" />
                 </button>
               )}
             </div>
-            {searchTerm && searchTerm !== debouncedSearch && (
-              <div className="mt-1 flex items-center text-xs text-[var(--ff-text-tertiary)]">
-                <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                Searching...
-              </div>
-            )}
-          </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-
-            {/* Role Filter */}
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] text-sm"
+            {/* Filters Toggle Button */}
+            <button
+              onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-colors ${
+                showFiltersPanel || hasActiveFilters
+                  ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+                  : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+              }`}
             >
-              <option value="">All Roles</option>
-              {roles.map(r => (
-                <option key={r.name} value={r.name}>{r.displayName} ({r.userCount})</option>
-              ))}
-            </select>
+              <Filter className="w-4 h-4" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-medium">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
-            {/* Status Filter */}
-            <div className="flex rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+            {/* Clear Filters Button */}
+            {hasActiveFilters && (
               <button
-                onClick={() => setStatusFilter('')}
-                className={`px-3 py-2 text-sm ${statusFilter === '' ? 'bg-blue-500 text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}
+                onClick={clearAllFilters}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
               >
-                All
-              </button>
-              <button
-                onClick={() => setStatusFilter('active')}
-                className={`px-3 py-2 text-sm ${statusFilter === 'active' ? 'bg-green-500 text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}
-              >
-                Active
-              </button>
-              <button
-                onClick={() => setStatusFilter('inactive')}
-                className={`px-3 py-2 text-sm ${statusFilter === 'inactive' ? 'bg-red-500 text-white' : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]'}`}
-              >
-                Inactive
-              </button>
-            </div>
-
-            {/* Clear Filters */}
-            {(roleFilter || statusFilter || searchTerm) && (
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setRoleFilter('');
-                  setStatusFilter('');
-                }}
-                className="px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 rounded-lg"
-              >
-                Clear All
+                <X className="w-4 h-4" />
+                <span>Clear</span>
               </button>
             )}
           </div>
+
+          {/* Loading indicator */}
+          {searchTerm && searchTerm !== debouncedSearch && (
+            <div className="mt-2 flex items-center text-xs text-[var(--ff-text-tertiary)]">
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              Searching...
+            </div>
+          )}
+
+          {/* Active Filter Pills */}
+          {hasActiveFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {searchTerm && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs">
+                  Search: &quot;{searchTerm}&quot;
+                  <button onClick={() => setSearchTerm('')} className="hover:bg-blue-500/30 rounded-full p-0.5">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {roleFilter && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-400 text-xs">
+                  Role: {roles.find(r => r.name === roleFilter)?.displayName || roleFilter}
+                  <button onClick={() => setRoleFilter('')} className="hover:bg-purple-500/30 rounded-full p-0.5">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {statusFilter && (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ${
+                  statusFilter === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                }`}>
+                  Status: {statusFilter}
+                  <button onClick={() => setStatusFilter('')} className={`rounded-full p-0.5 ${
+                    statusFilter === 'active' ? 'hover:bg-green-500/30' : 'hover:bg-red-500/30'
+                  }`}>
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+              {departmentFilter && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs">
+                  Dept: {departmentFilter}
+                  <button onClick={() => setDepartmentFilter('')} className="hover:bg-orange-500/30 rounded-full p-0.5">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Results info */}
-        <div className="mt-3 text-sm text-[var(--ff-text-secondary)]">
-          Showing {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
-          {searchTerm && ` matching "${searchTerm}"`}
-          {roleFilter && ` with role "${roles.find(r => r.name === roleFilter)?.displayName || roleFilter}"`}
-          {statusFilter && ` (${statusFilter})`}
+        {/* Expandable Filters Panel */}
+        {showFiltersPanel && (
+          <div className="border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Role Filter */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+                  Role
+                </label>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="">All Roles</option>
+                  {roles.map(r => (
+                    <option key={r.name} value={r.name}>{r.displayName} ({r.userCount})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              {/* Department Filter */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+                  Department
+                </label>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="">All Departments</option>
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quick Status Buttons */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+                  Quick Filters
+                </label>
+                <div className="flex rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+                  <button
+                    onClick={() => setStatusFilter('')}
+                    className={`flex-1 px-3 py-2 text-sm transition-colors ${statusFilter === '' ? 'bg-blue-500 text-white' : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('active')}
+                    className={`flex-1 px-3 py-2 text-sm transition-colors ${statusFilter === 'active' ? 'bg-green-500 text-white' : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'}`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('inactive')}
+                    className={`flex-1 px-3 py-2 text-sm transition-colors ${statusFilter === 'inactive' ? 'bg-red-500 text-white' : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'}`}
+                  >
+                    Inactive
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results Summary */}
+        <div className="px-4 py-3 border-t border-[var(--ff-border-light)] text-sm text-[var(--ff-text-secondary)]">
+          Showing <span className="font-medium text-[var(--ff-text-primary)]">{filteredUsers.length}</span> of {userStats.total} users
+          {hasActiveFilters && ' (filtered)'}
         </div>
       </div>
 

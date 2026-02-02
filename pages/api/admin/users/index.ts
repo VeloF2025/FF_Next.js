@@ -7,6 +7,7 @@ import type { NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -19,26 +20,7 @@ async function handler(
   }
 
   try {
-    const { search, role, status } = req.query;
-
-    let query = sql`
-      SELECT
-        u.id,
-        u.email,
-        u.first_name,
-        u.last_name,
-        u.role,
-        u.department,
-        u.is_active,
-        u.created_at,
-        u.last_login,
-        u.profile_picture,
-        s.position,
-        s.phone
-      FROM users u
-      LEFT JOIN staff s ON s.user_id = u.id
-      WHERE 1=1
-    `;
+    const { search, role, status, department } = req.query;
 
     // Build dynamic query based on filters
     const users = await sql`
@@ -58,9 +40,10 @@ async function handler(
       FROM users u
       LEFT JOIN staff s ON s.user_id = u.id
       WHERE
-        (${!search} OR u.email ILIKE ${'%' + (search || '') + '%'} OR u.first_name ILIKE ${'%' + (search || '') + '%'} OR u.last_name ILIKE ${'%' + (search || '') + '%'})
+        (${!search} OR u.email ILIKE ${'%' + (search || '') + '%'} OR u.first_name ILIKE ${'%' + (search || '') + '%'} OR u.last_name ILIKE ${'%' + (search || '') + '%'} OR u.department ILIKE ${'%' + (search || '') + '%'})
         AND (${!role} OR u.role = ${role})
         AND (${status === undefined} OR u.is_active = ${status === 'active'})
+        AND (${!department} OR u.department = ${department})
       ORDER BY u.created_at DESC
     `;
 
@@ -89,7 +72,7 @@ async function handler(
       roles: availableRoles,
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
+    log.error('Error fetching users', { error });
     return apiResponse.internalError(res, error);
   }
 }
