@@ -19,10 +19,13 @@ import {
   Calendar,
   User,
   BarChart3,
+  Building,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { getRAGStatus, AUDIT_STATUS_CONFIG } from '../types/audit.types';
 import type { HSProjectConfig, HSProjectAudit } from '../types/audit.types';
+import { ContractorHSGrid } from './ContractorHSGrid';
+import { ProjectIncidentsSection } from './ProjectIncidentsSection';
 
 interface ProjectHSTabProps {
   projectId: string;
@@ -192,6 +195,32 @@ export function ProjectHSTab({
             ))}
           </div>
         )}
+      </div>
+
+      {/* Contractor Compliance Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h4 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <Building className="w-5 h-5 text-blue-500" />
+            Contractor Compliance
+          </h4>
+        </div>
+        <div className="p-4">
+          <ContractorHSGrid projectId={projectId} compact />
+        </div>
+      </div>
+
+      {/* Incidents Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h4 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-orange-500" />
+            Incidents
+          </h4>
+        </div>
+        <div className="p-4">
+          <ProjectIncidentsSection projectId={projectId} compact />
+        </div>
       </div>
 
       {/* Config Details (Collapsible) */}

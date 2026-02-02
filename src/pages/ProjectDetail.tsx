@@ -28,6 +28,8 @@ import { ProjectProcurementTab } from './detail/ProjectProcurementTab';
 import { ProjectMaintenanceTab } from './detail/ProjectMaintenanceTab';
 // PRD-058: Agreements tab
 import { ProjectAgreementsTab } from './detail/ProjectAgreementsTab';
+// Wayleaves tab
+import { ProjectWayleavesTab } from './detail/ProjectWayleavesTab';
 // Finance Dashboard
 import { FinanceDashboardTab } from '@/modules/projects/components/finance';
 // Income Tab (lazy load)
@@ -217,6 +219,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'agreements' && (
         <ProjectAgreementsTab projectId={id!} />
+      )}
+
+      {activeTab === 'wayleaves' && (
+        <ProjectWayleavesTab projectId={id!} />
       )}
 
       {activeTab === 'timeline' && (

@@ -155,6 +155,13 @@ export default withAuth(withErrorHandler(async (
       WHERE id = ${pipelineProjectId}
     `;
 
+    // 6b. Set bidirectional link on project
+    await sql`
+      UPDATE projects
+      SET pipeline_project_id = ${pipelineProjectId}
+      WHERE id = ${project.id}
+    `;
+
     // 7. Seed project requirements
     await sql`SELECT seed_project_requirements(${project.id}::uuid)`;
 
