@@ -26,8 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT
         COUNT(*) as total_clients,
         COUNT(CASE WHEN LOWER(status) = 'active' THEN 1 END) as active_clients,
-        COUNT(CASE WHEN LOWER(status) = 'inactive' THEN 1 END) as inactive_clients,
-        COUNT(CASE WHEN LOWER(priority) = 'high' THEN 1 END) as high_priority
+        COUNT(CASE WHEN LOWER(status) = 'inactive' THEN 1 END) as inactive_clients
       FROM clients
     `;
 
@@ -55,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         INACTIVE: parseInt(clientResult[0].inactive_clients || '0')
       },
       clientsByPriority: {
-        HIGH: parseInt(clientResult[0].high_priority || '0')
+        HIGH: 0
       },
       monthlyGrowth: 0,
       conversionRate: 0
