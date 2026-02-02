@@ -31,6 +31,10 @@ import dynamic from 'next/dynamic';
 const ProjectIncomeTab = dynamic(() => import('./detail/ProjectIncomeTab').then(m => ({ default: m.ProjectIncomeTab })), {
   loading: () => <div className="animate-pulse h-64 bg-[var(--ff-bg-secondary)] rounded-lg" />,
 });
+// Documents Tab (lazy load)
+const ProjectDocumentsTab = dynamic(() => import('./detail/ProjectDocumentsTab').then(m => ({ default: m.ProjectDocumentsTab })), {
+  loading: () => <div className="animate-pulse h-64 bg-[var(--ff-bg-secondary)] rounded-lg" />,
+});
 
 interface ProjectDetailProps {
   projectId: string;
@@ -235,6 +239,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
           onStartAudit={() => router.push(`/health-safety/project/${id}/audits/new`)}
           onConfigureHS={() => router.push(`/health-safety/project/${id}/configure`)}
         />
+      )}
+
+      {activeTab === 'documents' && (
+        <ProjectDocumentsTab projectId={id!} />
       )}
     </div>
   );

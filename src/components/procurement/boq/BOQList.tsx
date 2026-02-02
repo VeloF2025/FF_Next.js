@@ -94,7 +94,7 @@ export default function BOQList({
           <h3 className="mt-4 text-lg font-medium text-[var(--ff-text-primary)]">No BOQs Found</h3>
           <p className="mt-2 text-sm text-[var(--ff-text-secondary)]">
             {boqs.length === 0
-              ? "No BOQs have been created for this project yet."
+              ? "No BOQs have been imported for this project yet."
               : "No BOQs match your current filters."}
           </p>
           {boqs.length === 0 && (onCreateBOQ || onUploadBOQ) && (
@@ -116,6 +116,11 @@ export default function BOQList({
                 </button>
               )}
             </div>
+          )}
+          {boqs.length === 0 && !onCreateBOQ && !onUploadBOQ && (
+            <p className="mt-4 text-xs text-blue-400">
+              Import BOQ data via the Finance → Documents tab
+            </p>
           )}
           {Object.values(filters).some(filter => filter !== '' && filter !== 'all') && (
             <button

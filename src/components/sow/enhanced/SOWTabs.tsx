@@ -1,11 +1,12 @@
 /**
  * SOW Tabs Component
+ * View-only tabs - upload functionality moved to Documents tab
  */
 
-import { Activity, MapPin, Home, Cable, Upload } from 'lucide-react';
+import { Activity, MapPin, Home, Cable } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-export type TabType = 'summary' | 'poles' | 'drops' | 'fibre' | 'upload';
+export type TabType = 'summary' | 'poles' | 'drops' | 'fibre';
 
 interface SOWTabsProps {
   activeTab: TabType;
@@ -15,19 +16,18 @@ interface SOWTabsProps {
   fibreCount: number;
 }
 
-export function SOWTabs({ 
-  activeTab, 
-  onTabChange, 
-  polesCount, 
-  dropsCount, 
-  fibreCount 
+export function SOWTabs({
+  activeTab,
+  onTabChange,
+  polesCount,
+  dropsCount,
+  fibreCount
 }: SOWTabsProps) {
   const tabs = [
     { id: 'summary' as TabType, label: 'Summary', icon: Activity },
     { id: 'poles' as TabType, label: `Poles (${polesCount})`, icon: MapPin },
     { id: 'drops' as TabType, label: `Drops (${dropsCount})`, icon: Home },
     { id: 'fibre' as TabType, label: `Fibre (${fibreCount})`, icon: Cable },
-    { id: 'upload' as TabType, label: 'Import/Update', icon: Upload },
   ];
 
   return (

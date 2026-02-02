@@ -144,6 +144,7 @@ export const getGroupedTabConfig = (): TabGroup[] => [
       { id: 'finance-dashboard', label: 'Dashboard' },
       { id: 'income', label: 'Income' },
       { id: 'budget', label: 'Budget' },
+      { id: 'documents', label: 'Documents' },
     ],
   },
 ];
