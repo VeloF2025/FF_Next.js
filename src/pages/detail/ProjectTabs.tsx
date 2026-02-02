@@ -47,7 +47,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
     <div className="space-y-0">
       {/* Primary Group Tabs */}
       <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="-mb-px flex space-x-1 overflow-x-auto">
+        <nav className="-mb-px flex w-full overflow-x-auto">
           {groups.map((group) => {
             const isActive = activeGroupId === group.id;
             // Show badge count for group (sum of all tab badges in group)
@@ -66,7 +66,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
                     onTabChange(firstTab.id as TabId);
                   }
                 }}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex items-center gap-2 ${
+                className={`flex-1 py-3 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex items-center justify-center gap-2 ${
                   isActive
                     ? 'border-blue-500 text-blue-400 bg-blue-500/5'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)]'
@@ -87,7 +87,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
       {/* Sub-tabs for active group (only show if group has multiple tabs) */}
       {activeGroup && activeGroup.tabs.length > 1 && (
         <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-2">
-          <nav className="flex space-x-1 overflow-x-auto py-1">
+          <nav className="flex w-full overflow-x-auto py-1">
             {activeGroup.tabs.map((tab) => {
               const badgeCount = badges[tab.id];
               const isActive = activeTab === tab.id;
@@ -96,7 +96,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
                 <button
                   key={tab.id}
                   onClick={() => onTabChange(tab.id as TabId)}
-                  className={`py-1.5 px-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-2 ${
                     isActive
                       ? 'bg-blue-500/10 text-blue-400'
                       : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)]'
