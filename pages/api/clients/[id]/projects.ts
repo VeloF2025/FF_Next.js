@@ -68,17 +68,17 @@ export default async function handler(
         FROM purchase_orders po
         GROUP BY po.project_id
       )
-      SELECT 
+      SELECT
         p.id,
-        COALESCE(p.project_name, p.name) as name,
-        COALESCE(p.project_code, p.code) as code,
+        p.project_name as name,
+        p.project_code as code,
         p.status,
         p.priority,
         p.project_type as "projectType",
         COALESCE(p.budget, 0) as budget,
         COALESCE(p.actual_cost, 0) as "actualCost",
         COALESCE(p.actual_progress, 0) as progress,
-        COALESCE(p.project_manager, p.project_manager_name, '-') as "projectManager",
+        COALESCE(p.project_manager, '-') as "projectManager",
         p.start_date as "startDate",
         p.end_date as "endDate",
         COALESCE(pp.po_count, 0)::int as "poCount",
