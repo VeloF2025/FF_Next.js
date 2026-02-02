@@ -195,27 +195,36 @@ export const clientApiService = {
   async getClientSummary(): Promise<{
     totalClients: number;
     activeClients: number;
-    newThisMonth: number;
-    totalRevenue?: number;
+    inactiveClients?: number;
+    prospectClients?: number;
+    totalProjects?: number;
+    totalProjectValue: number;
+    averageProjectValue?: number;
+    topClientsByValue?: unknown[];
+    clientsByCategory?: Record<string, number>;
+    clientsByStatus?: Record<string, number>;
+    clientsByPriority?: Record<string, number>;
+    monthlyGrowth?: number;
+    conversionRate?: number;
   }> {
-    const clients = await this.getAll();
-    const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    
-    const newThisMonth = clients.filter(c => {
-      if (!c.created_at) return false;
-      const created = new Date(c.created_at);
-      return created.getMonth() === thisMonth && created.getFullYear() === thisYear;
-    }).length;
-
-    const totalRevenue = clients.reduce((sum, c) => sum + (c.totalRevenue || 0), 0);
-
-    return {
-      totalClients: clients.length,
-      activeClients: clients.filter(c => c.status === 'ACTIVE' || c.status === 'active').length,
-      newThisMonth,
-      totalRevenue
-    };
+    try {
+      const response = await fetch(`${API_BASE}/clients/summary`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch client summary: ${response.status}`);
+      }
+      const result = await response.json();
+      return result.data || {
+        totalClients: 0,
+        activeClients: 0,
+        totalProjectValue: 0
+      };
+    } catch (error) {
+      console.error('Error fetching client summary:', error);
+      return {
+        totalClients: 0,
+        activeClients: 0,
+        totalProjectValue: 0
+      };
+    }
   }
 };
