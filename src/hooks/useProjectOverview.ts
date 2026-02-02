@@ -163,7 +163,7 @@ export function useProjectBudgetSummary(projectId: string | undefined) {
     queryKey: ['project-budget-summary', projectId],
     queryFn: async () => {
       if (!projectId) throw new Error('Project ID required');
-      const res = await fetch(`/api/projects/${projectId}/budget-summary`);
+      const res = await fetch(`/api/projects/${projectId}/budget`);
       if (!res.ok) {
         // Return defaults if budget API not available
         return {
@@ -176,13 +176,18 @@ export function useProjectBudgetSummary(projectId: string | undefined) {
       }
       const json = await res.json();
       const data = json.data || json;
-      const percentUsed = data.totalBudget > 0
-        ? Math.round((data.actualSpent / data.totalBudget) * 100)
+      // Handle both direct response and summary sub-object
+      const summary = data.summary || data;
+      const totalBudget = summary.totalBudget || 0;
+      const actualSpent = summary.actual || summary.actualSpent || 0;
+      const committed = summary.committed || 0;
+      const percentUsed = totalBudget > 0
+        ? Math.round((actualSpent / totalBudget) * 100)
         : 0;
       return {
-        totalBudget: data.totalBudget || 0,
-        actualSpent: data.actualSpent || data.actualCost || 0,
-        committed: data.committed || 0,
+        totalBudget,
+        actualSpent,
+        committed,
         percentUsed,
         health: percentUsed > 90 ? 'critical' : percentUsed > 75 ? 'warning' : 'healthy',
       };

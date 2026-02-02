@@ -59,38 +59,57 @@ export default withAuth(withErrorHandler(async (
       const stage = req.query.stage as string | undefined;
       const includeCompleted = req.query.includeCompleted !== 'false';
 
-      const requirements = await sql`
-        SELECT
-          id,
-          project_id,
-          requirement_type,
-          requirement_name,
-          description,
-          is_completed,
-          completed_at,
-          completed_by,
-          document_id,
-          document_url,
-          expiry_date,
-          expiry_alert_sent,
-          stage,
-          sort_order,
-          created_at,
-          updated_at
-        FROM project_requirements
-        WHERE project_id = ${projectId}
-        ${stage ? sql`AND stage = ${stage}` : sql``}
-        ${!includeCompleted ? sql`AND is_completed = false` : sql``}
-        ORDER BY
-          CASE stage
-            WHEN 'pipeline' THEN 1
-            WHEN 'planning' THEN 2
-            WHEN 'execution' THEN 3
-            WHEN 'closure' THEN 4
-          END,
-          sort_order,
-          requirement_name
-      `;
+      // Build query based on filters
+      let requirements;
+      if (stage && !includeCompleted) {
+        requirements = await sql`
+          SELECT
+            id, project_id, requirement_type, requirement_name, description,
+            is_completed, completed_at, completed_by, document_id, document_url,
+            expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
+          FROM project_requirements
+          WHERE project_id = ${projectId}
+            AND stage = ${stage}
+            AND is_completed = false
+          ORDER BY sort_order, requirement_name
+        `;
+      } else if (stage) {
+        requirements = await sql`
+          SELECT
+            id, project_id, requirement_type, requirement_name, description,
+            is_completed, completed_at, completed_by, document_id, document_url,
+            expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
+          FROM project_requirements
+          WHERE project_id = ${projectId}
+            AND stage = ${stage}
+          ORDER BY sort_order, requirement_name
+        `;
+      } else if (!includeCompleted) {
+        requirements = await sql`
+          SELECT
+            id, project_id, requirement_type, requirement_name, description,
+            is_completed, completed_at, completed_by, document_id, document_url,
+            expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
+          FROM project_requirements
+          WHERE project_id = ${projectId}
+            AND is_completed = false
+          ORDER BY
+            CASE stage WHEN 'pipeline' THEN 1 WHEN 'planning' THEN 2 WHEN 'execution' THEN 3 WHEN 'closure' THEN 4 END,
+            sort_order, requirement_name
+        `;
+      } else {
+        requirements = await sql`
+          SELECT
+            id, project_id, requirement_type, requirement_name, description,
+            is_completed, completed_at, completed_by, document_id, document_url,
+            expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
+          FROM project_requirements
+          WHERE project_id = ${projectId}
+          ORDER BY
+            CASE stage WHEN 'pipeline' THEN 1 WHEN 'planning' THEN 2 WHEN 'execution' THEN 3 WHEN 'closure' THEN 4 END,
+            sort_order, requirement_name
+        `;
+      }
 
       // Calculate summary
       const allRequirements = stage ? requirements : await sql`
