@@ -274,9 +274,34 @@ people
    - Group permission (e.g., `system.data-sync.olt`) controls group card visibility
    - Tab permission (e.g., `system.data-sync.olt.pending`) controls individual tab visibility
 
+## CLI Tool: /access Skill
+
+Quick permission management from command line:
+
+```bash
+# Check all permissions for a user
+node scripts/access-control.mjs check user@example.com
+
+# Grant a permission
+node scripts/access-control.mjs grant user@example.com system.data-sync.olt.pending
+
+# Deny a permission (creates override with view:false)
+node scripts/access-control.mjs deny user@example.com system.data-sync.olt.import
+
+# List available permissions
+node scripts/access-control.mjs list system
+
+# Debug why user can/can't access something
+node scripts/access-control.mjs debug user@example.com system.data-sync.olt.import
+```
+
+**Skill Documentation:** `.claude/skills/access.md`
+
 ## Related
 
 - `.claude/modules/staff.md` - Staff management (uses permissions)
 - `.claude/modules/admin.md` - Admin module overview
+- `.claude/skills/access.md` - CLI access management skill
+- `scripts/access-control.mjs` - CLI implementation
 - `src/hooks/usePermission.ts` - Permission checking hook
 - `src/lib/permissions/index.ts` - Permission resolution logic

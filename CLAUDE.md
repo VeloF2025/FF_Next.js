@@ -73,6 +73,7 @@ return apiResponse.notFound(res, 'Resource', id);
 - Wait for confirmation before showing success toasts
 - Use consistent dynamic parameter names (`[projectId]` not `[id]`)
 - Nested dynamic routes fail in Vercel - flatten them
+- **NO conditional SQL fragments** - `${cond ? sql`AND x` : sql``}` breaks Neon - use explicit query branches
 
 ## Module Documentation
 

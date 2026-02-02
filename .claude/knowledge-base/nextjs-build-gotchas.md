@@ -330,3 +330,90 @@ pages/projects/
 3. Test every sidebar/tab link before deploying
 
 **Reference:** Commit `fb51b13c` - fix(routing): add missing project pages
+
+---
+
+## Neon Conditional SQL Fragments Cause 500 Errors
+
+**Severity:** CRITICAL - causes runtime 500 errors with no clear stack trace
+
+**Problem:** Using conditional SQL fragments with `@neondatabase/serverless` causes silent failures:
+
+```typescript
+// ❌ BAD - This pattern BREAKS with Neon serverless
+const results = await sql`
+  SELECT * FROM users
+  WHERE project_id = ${projectId}
+  ${status ? sql`AND status = ${status}` : sql``}
+  ${type ? sql`AND type = ${type}` : sql``}
+`;
+// Result: 500 Internal Server Error
+```
+
+**Why It Fails:**
+- Neon's tagged template SQL doesn't handle nested conditional fragments correctly
+- The empty `sql``\` fallback creates malformed queries
+- No useful error message - just generic 500
+
+**Fixed Files (audit 2026-02-02):**
+- `pages/api/projects/[projectId]/documents/index.ts`
+- `pages/api/projects/[projectId]/client-pos/index.ts`
+- `pages/api/projects/[projectId]/requirements/index.ts`
+
+**Fix Pattern - Use Explicit Conditional Branches:**
+
+```typescript
+// ✅ GOOD - Explicit query variants
+let results;
+if (status && type) {
+  results = await sql`
+    SELECT * FROM users
+    WHERE project_id = ${projectId}
+      AND status = ${status}
+      AND type = ${type}
+  `;
+} else if (status) {
+  results = await sql`
+    SELECT * FROM users
+    WHERE project_id = ${projectId}
+      AND status = ${status}
+  `;
+} else if (type) {
+  results = await sql`
+    SELECT * FROM users
+    WHERE project_id = ${projectId}
+      AND type = ${type}
+  `;
+} else {
+  results = await sql`
+    SELECT * FROM users
+    WHERE project_id = ${projectId}
+  `;
+}
+```
+
+**Alternative - Build WHERE Clauses Separately:**
+
+```typescript
+// ✅ GOOD - For complex filters, build conditions array
+const conditions = [`project_id = '${projectId}'`];
+if (status) conditions.push(`status = '${status}'`);
+if (type) conditions.push(`type = '${type}'`);
+
+// Then use raw SQL (be careful with injection!)
+const whereClause = conditions.join(' AND ');
+```
+
+**Quick Diagnosis:**
+```bash
+# Find potential problem files
+grep -r "sql\`AND" pages/api/ --include="*.ts"
+grep -r ": sql\`\`" pages/api/ --include="*.ts"
+```
+
+**Prevention:**
+1. NEVER use conditional `${condition ? sql`...` : sql``}` pattern
+2. Write explicit query branches for each filter combination
+3. Test API endpoints with and without optional parameters
+
+**Reference:** Commit `592d15fd` - fix requirements API conditional SQL

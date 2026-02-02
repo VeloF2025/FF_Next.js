@@ -63,26 +63,29 @@ Extract the command and arguments from user input.
 ### Step 2: Execute Based on Command
 
 #### For `check`:
-```typescript
-// Query user's effective permissions
-const query = `
-  SELECT
-    u.email,
-    u.role,
-    ap.key as permission_key,
-    CASE
-      WHEN upo.id IS NOT NULL THEN
-        CASE WHEN (upo.actions->>'view')::boolean = false THEN false ELSE true END
-      ELSE true
-    END as can_view,
-    CASE WHEN upo.id IS NOT NULL THEN 'override' ELSE 'role' END as source
-  FROM users u
-  LEFT JOIN role_permissions rp ON rp.role = u.role
-  LEFT JOIN access_permissions ap ON ap.id = rp.permission_id
-  LEFT JOIN user_permission_overrides upo ON upo.user_id = u.id AND upo.permission_key = ap.key
-  WHERE u.email = $1
-  ORDER BY ap.key
-`;
+```bash
+# Use CLI script (recommended)
+node scripts/access-control.mjs check user@example.com
+```
+
+Or via SQL:
+```sql
+SELECT
+  rp.permission_key,
+  (rp.actions->>'view')::boolean as can_view,
+  'role' as source
+FROM users u
+JOIN role_permissions rp ON rp.role = u.role
+WHERE u.email = $1
+UNION ALL
+SELECT
+  upo.permission_key,
+  (upo.actions->>'view')::boolean as can_view,
+  'override' as source
+FROM user_permission_overrides upo
+JOIN users u ON u.id = upo.user_id
+WHERE u.email = $1
+ORDER BY permission_key;
 ```
 
 #### For `grant`:
@@ -121,45 +124,16 @@ const query = `
 ```
 
 #### For `debug`:
-```typescript
-// Show detailed permission resolution
-const query = `
-  WITH user_info AS (
-    SELECT id, email, role FROM users WHERE email = $1
-  ),
-  role_perm AS (
-    SELECT ap.key, true as has_role_perm
-    FROM role_permissions rp
-    JOIN access_permissions ap ON ap.id = rp.permission_id
-    JOIN user_info u ON rp.role = u.role
-    WHERE ap.key = $2
-  ),
-  user_override AS (
-    SELECT
-      upo.permission_key,
-      upo.override_type,
-      upo.actions,
-      (upo.actions->>'view')::boolean as can_view
-    FROM user_permission_overrides upo
-    JOIN user_info u ON upo.user_id = u.id
-    WHERE upo.permission_key = $2
-  )
-  SELECT
-    u.email,
-    u.role,
-    rp.has_role_perm,
-    uo.override_type,
-    uo.can_view as override_view,
-    CASE
-      WHEN uo.override_type IS NOT NULL THEN uo.can_view
-      WHEN rp.has_role_perm THEN true
-      ELSE false
-    END as final_access
-  FROM user_info u
-  LEFT JOIN role_perm rp ON true
-  LEFT JOIN user_override uo ON true
-`;
+```bash
+# Use CLI script (recommended)
+node scripts/access-control.mjs debug user@example.com system.data-sync.olt.import
 ```
+
+Output shows:
+- User's role
+- Whether role has the permission
+- Whether override exists and its value
+- Final access decision with reason
 
 ### Step 3: Format Output
 
