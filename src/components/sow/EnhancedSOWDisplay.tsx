@@ -79,6 +79,8 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
             <SOWStatistics
               poles={poles}
               drops={drops}
+              totalPoles={totalPoles}
+              totalDrops={totalDrops}
             />
           </div>
         )}
