@@ -239,10 +239,17 @@ export function LicenseDiscModal({
 
   // Upload image to storage
   const uploadImage = useCallback(async (file: File): Promise<string> => {
+    // Create custom filename with vehicleId prefix for organization
+    const timestamp = Date.now();
+    const ext = file.name.split('.').pop() || 'jpg';
+    const customFilename = `${vehicleId}_${timestamp}.${ext}`;
+
     const formData = new FormData();
-    formData.append('file', file);
+    // Pass custom filename as third argument to append
+    formData.append('file', file, customFilename);
     formData.append('type', 'fleet');
-    formData.append('category', `vehicles/${vehicleId}/license-disc`);
+    // Use flat category path - avoid nested slashes
+    formData.append('category', 'license-discs');
 
     const res = await fetch('/api/storage/upload', {
       method: 'POST',
@@ -250,7 +257,8 @@ export function LicenseDiscModal({
     });
 
     if (!res.ok) {
-      throw new Error('Failed to upload image');
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to upload image');
     }
 
     const data = await res.json();
