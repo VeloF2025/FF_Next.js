@@ -129,11 +129,11 @@ export function AccessControlTab() {
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce search
+  // Debounce search - 500ms delay to avoid excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-    }, 300);
+    }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -776,13 +776,6 @@ export function AccessControlTab() {
             )}
           </div>
 
-          {/* Loading indicator */}
-          {searchTerm && searchTerm !== debouncedSearch && (
-            <div className="mt-2 flex items-center text-xs text-[var(--ff-text-tertiary)]">
-              <Loader2 className="w-3 h-3 animate-spin mr-1" />
-              Searching...
-            </div>
-          )}
 
           {/* Active Filter Pills */}
           {hasActiveFilters && (
