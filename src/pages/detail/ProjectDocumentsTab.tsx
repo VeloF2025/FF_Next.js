@@ -23,7 +23,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useSOWUpload } from '@/modules/projects/components/SOWUploadSection/hooks/useSOWUpload';
-import { useProjectPoles, useProjectDrops, useProjectFibre } from '@/hooks/useNeonSOW';
+import { useProjectSOW } from '@/hooks/useNeonSOW';
 import type { ProjectDocument, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 import type { ClientPurchaseOrder } from '@/types/finance';
 import { log } from '@/lib/logger';
@@ -48,10 +48,11 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   const bssInputRef = useRef<HTMLInputElement>(null);
   const mssInputRef = useRef<HTMLInputElement>(null);
 
-  // SOW data hooks
-  const { data: poles = [] } = useProjectPoles(projectId);
-  const { data: drops = [] } = useProjectDrops(projectId);
-  const { data: fibre = [] } = useProjectFibre(projectId);
+  // SOW data hooks - use summary counts for display
+  const { data: sowData } = useProjectSOW(projectId);
+  const polesCount = sowData?.data?.summary?.totalPoles ?? 0;
+  const dropsCount = sowData?.data?.summary?.totalDrops ?? 0;
+  const fibreCount = sowData?.data?.summary?.totalFibre ?? 0;
 
   // SOW upload hook
   const {
@@ -278,21 +279,21 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
                 <MapPin className="w-4 h-4" />
                 Poles
               </div>
-              <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{poles.length.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{polesCount.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
               <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] text-sm mb-1">
                 <Home className="w-4 h-4" />
                 Drops
               </div>
-              <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{drops.length.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{dropsCount.toLocaleString()}</p>
             </div>
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
               <div className="flex items-center gap-2 text-[var(--ff-text-secondary)] text-sm mb-1">
                 <Cable className="w-4 h-4" />
                 Fibre Segments
               </div>
-              <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{fibre.length.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-[var(--ff-text-primary)]">{fibreCount.toLocaleString()}</p>
             </div>
           </div>
 
@@ -302,7 +303,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               type="poles"
               label="Poles Data"
               icon={MapPin}
-              currentCount={poles.length}
+              currentCount={polesCount}
               sowFiles={sowFiles}
               processing={sowProcessing}
               inputRef={polesInputRef}
@@ -313,7 +314,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               type="drops"
               label="Drops Data"
               icon={Home}
-              currentCount={drops.length}
+              currentCount={dropsCount}
               sowFiles={sowFiles}
               processing={sowProcessing}
               inputRef={dropsInputRef}
@@ -324,7 +325,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               type="fibre"
               label="Fibre Segments"
               icon={Cable}
-              currentCount={fibre.length}
+              currentCount={fibreCount}
               sowFiles={sowFiles}
               processing={sowProcessing}
               inputRef={fibreInputRef}
