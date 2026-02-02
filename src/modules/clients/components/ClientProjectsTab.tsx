@@ -20,7 +20,7 @@ import {
   Package
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '../utils/clientUtils';
 
 interface ClientProject {
   id: string;
