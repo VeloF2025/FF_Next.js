@@ -120,7 +120,6 @@ export function AccessControlTab() {
   // Users state
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
@@ -128,14 +127,6 @@ export function AccessControlTab() {
   const [provisioning, setProvisioning] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Debounce search - 500ms delay to avoid excessive API calls
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
 
   // Keyboard shortcut for search (Ctrl+K)
   useEffect(() => {
@@ -348,16 +339,10 @@ export function AccessControlTab() {
     setLocalRolePerms(new Map(serverRolePerms));
   };
 
-  // Fetch users
+  // Fetch all users once (filtering happens client-side for instant search)
   const fetchUsers = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      if (roleFilter) params.set('role', roleFilter);
-      if (statusFilter) params.set('status', statusFilter);
-      if (departmentFilter) params.set('department', departmentFilter);
-
-      const res = await fetch(`/api/admin/users?${params}`);
+      const res = await fetch('/api/admin/users');
       const data = await res.json();
       if (data.success) {
         setUsers(data.data.users);
@@ -365,7 +350,7 @@ export function AccessControlTab() {
     } catch (err) {
       setError('Failed to fetch users');
     }
-  }, [debouncedSearch, roleFilter, statusFilter, departmentFilter]);
+  }, []);
 
   // Fetch roles
   const fetchRoles = useCallback(async () => {
@@ -633,9 +618,32 @@ export function AccessControlTab() {
   };
 
   // Filter users for display
+  // Client-side filtering for instant search (like QA Centre)
   const filteredUsers = useMemo(() => {
-    return users;
-  }, [users]);
+    return users.filter(user => {
+      // Search filter - check name, email, department
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        const matchesSearch =
+          user.fullName?.toLowerCase().includes(search) ||
+          user.email?.toLowerCase().includes(search) ||
+          user.department?.toLowerCase().includes(search);
+        if (!matchesSearch) return false;
+      }
+
+      // Role filter
+      if (roleFilter && user.role !== roleFilter) return false;
+
+      // Status filter
+      if (statusFilter === 'active' && !user.isActive) return false;
+      if (statusFilter === 'inactive' && user.isActive) return false;
+
+      // Department filter
+      if (departmentFilter && user.department !== departmentFilter) return false;
+
+      return true;
+    });
+  }, [users, searchTerm, roleFilter, statusFilter, departmentFilter]);
 
   // Stats
   const userStats = useMemo(() => {
