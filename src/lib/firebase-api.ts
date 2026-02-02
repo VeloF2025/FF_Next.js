@@ -3,6 +3,8 @@
  * Handles all database operations through API routes
  */
 
+import { log } from '@/lib/logger';
+
 // Get the base URL for API
 const getBaseUrl = () => {
   // In development, use local dev server
@@ -45,7 +47,7 @@ async function apiCall<T = any>(
 
     return data.data || data;
   } catch (error) {
-    console.error(`API call to ${endpoint} failed:`, error);
+    log.error(`API call to ${endpoint} failed`, error instanceof Error ? { message: error.message } : { error }, 'FirebaseApi');
     throw error;
   }
 }

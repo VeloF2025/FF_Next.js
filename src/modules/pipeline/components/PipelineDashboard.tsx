@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   List,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import { PipelineKanban } from './PipelineKanban';
 import type {
   PipelineDashboardStats,
@@ -105,7 +106,7 @@ export function PipelineDashboard() {
         setAllProjects(allProjectsData.data.projects);
       }
     } catch (error) {
-      console.error('Failed to load pipeline data:', error);
+      log.error('Failed to load pipeline data', { error }, 'PipelineDashboard');
     } finally {
       setLoading(false);
     }
@@ -126,7 +127,7 @@ export function PipelineDashboard() {
       // Refresh data after successful update
       loadData();
     } catch (error) {
-      console.error('Failed to update project status:', error);
+      log.error('Failed to update project status', { error, projectId, newStatus }, 'PipelineDashboard');
       // Revert will happen via loadData refresh
       loadData();
     }

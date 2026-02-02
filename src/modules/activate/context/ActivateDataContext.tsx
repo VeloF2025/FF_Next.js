@@ -33,6 +33,7 @@ import {
   type DropsFilters,
 } from '../services/activateDataService';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // TYPES
@@ -248,7 +249,7 @@ export function ActivateDataProvider({
     enabled: autoRefreshEnabled,
     onRefreshError: (err) => {
       // Silent error handling - don't disrupt user
-      console.warn('[ActivateData] Background refresh failed:', err.message);
+      log.warn('Background refresh failed', { error: err.message }, 'ActivateDataContext');
     },
   });
 

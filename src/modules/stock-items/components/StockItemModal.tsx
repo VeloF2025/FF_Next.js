@@ -3,6 +3,7 @@ import { X, Package, Trash2, AlertCircle, ExternalLink, Loader2, ChevronDown, Se
 import { useStockItemMutations } from '../hooks/useStockItems';
 import type { StockItem, CreateStockItemInput } from '@/types/stockItem.types';
 import { CATEGORY_COLORS, TRACKING_TYPE_LABELS } from '@/types/stockItem.types';
+import { log } from '@/lib/logger';
 
 interface StockCategory {
   id: string;
@@ -60,7 +61,7 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
           setCategories(data.data || []);
         }
       } catch (err) {
-        console.error('Failed to fetch categories:', err);
+        log.error('Failed to fetch categories', { error: err }, 'StockItemModal');
       }
     }
     fetchCategories();

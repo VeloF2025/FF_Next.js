@@ -12,6 +12,7 @@ import { Search, Plus, Eye, Edit, Trash2 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import type { Contractor } from '@/types/contractor.core.types';
 import { CONTRACTOR_STATUSES, COMPLIANCE_STATUSES } from '@/types/contractor.core.types';
+import { log } from '@/lib/logger';
 
 interface ContractorsListProps {
   initialContractors: Contractor[];
@@ -63,7 +64,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
       notificationService.success('Contractor suspended successfully');
       router.refresh();
     } catch (error: unknown) {
-      console.error('Suspend error:', error);
+      log.error('Failed to suspend contractor', { error, contractorId: id }, 'ContractorsList');
       const message = error instanceof Error ? error.message : 'Failed to suspend contractor';
       notificationService.error(message);
     } finally {

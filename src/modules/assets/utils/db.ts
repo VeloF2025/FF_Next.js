@@ -6,6 +6,7 @@
  */
 
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 let sql: NeonQueryFunction<false, false> | null = null;
 let currentDatabaseUrl: string | null = null;
@@ -47,7 +48,7 @@ export async function validateConnection(): Promise<boolean> {
     await db`SELECT 1`;
     return true;
   } catch (error) {
-    console.error('Asset module database connection failed:', error);
+    log.error('Asset module database connection failed', { error }, 'assets.db');
     return false;
   }
 }

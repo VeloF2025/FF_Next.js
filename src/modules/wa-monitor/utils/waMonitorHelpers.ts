@@ -4,6 +4,7 @@
  */
 
 import { format, formatDistanceToNow } from 'date-fns';
+import { log } from '@/lib/logger';
 import type { QaReviewDrop, DropStatus } from '../types/wa-monitor.types';
 
 // ==================== DATE FORMATTING ====================
@@ -19,7 +20,7 @@ export function formatDateTime(date: Date | string | null): string {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return format(dateObj, 'MMM d, yyyy h:mm a');
   } catch (error) {
-    console.error('Error formatting date:', error);
+    log.error('Error formatting date', { error, date }, 'waMonitorHelpers.formatDateTime');
     return '-';
   }
 }
@@ -35,7 +36,7 @@ export function formatRelativeTime(date: Date | string | null): string {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return formatDistanceToNow(dateObj, { addSuffix: true });
   } catch (error) {
-    console.error('Error formatting relative time:', error);
+    log.error('Error formatting relative time', { error, date }, 'waMonitorHelpers.formatRelativeTime');
     return '-';
   }
 }
@@ -51,7 +52,7 @@ export function formatDate(date: Date | string | null): string {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     return format(dateObj, 'MMM d, yyyy');
   } catch (error) {
-    console.error('Error formatting date:', error);
+    log.error('Error formatting date', { error, date }, 'waMonitorHelpers.formatDate');
     return '-';
   }
 }

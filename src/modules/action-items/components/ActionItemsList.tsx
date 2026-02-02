@@ -5,6 +5,7 @@ import { CheckCircle, Clock, AlertCircle, Calendar, User, ExternalLink } from 'l
 import { notificationService } from '@/services/core/NotificationService';
 import { ActionItem } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
+import { log } from '@/lib/logger';
 
 interface ActionItemsListProps {
   items: ActionItem[];
@@ -21,7 +22,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
       await actionItemsService.updateStatus(item.id, newStatus);
       onItemUpdated?.();
     } catch (error) {
-      console.error('Error updating action item:', error);
+      log.error('Error updating action item', { error, itemId: item.id }, 'ActionItemsList');
       notificationService.error('Failed to update action item');
     } finally {
       setUpdatingId(null);

@@ -5,6 +5,7 @@
 import { socketIOAdapter } from '@/services/realtime/socketIOAdapter';
 import type { RealtimeEvent } from '@/services/realtime/websocketService';
 import type { Project } from '@/types/project.types';
+import { log } from '@/lib/logger';
 
 /**
  * Get all projects (via API)
@@ -113,7 +114,7 @@ export async function deleteProject(id: string): Promise<void> {
 export function subscribeToProject(id: string, callback: (project: Project | null) => void): () => void {
   // Ensure WebSocket is connected
   if (!socketIOAdapter.isConnected()) {
-    socketIOAdapter.connect().catch(console.error);
+    socketIOAdapter.connect().catch(err => log.error('Failed to connect WebSocket', { data: err }, 'projectRealtime'));
   }
 
   // Subscribe to specific project changes
@@ -129,7 +130,7 @@ export function subscribeToProject(id: string, callback: (project: Project | nul
           const project = await getProjectById(id);
           callback(project);
         } catch (error) {
-          console.error('Error fetching project data:', error);
+          log.error('Error fetching project data', { data: error }, 'projectRealtime');
           callback(null);
         }
       }
@@ -148,7 +149,7 @@ export function subscribeToProject(id: string, callback: (project: Project | nul
 export function subscribeToProjects(callback: (projects: Project[]) => void): () => void {
   // Ensure WebSocket is connected
   if (!socketIOAdapter.isConnected()) {
-    socketIOAdapter.connect().catch(console.error);
+    socketIOAdapter.connect().catch(err => log.error('Failed to connect WebSocket', { data: err }, 'projectRealtime'));
   }
 
   // Subscribe to all project changes
@@ -160,7 +161,7 @@ export function subscribeToProjects(callback: (projects: Project[]) => void): ()
         const projects = await getAllProjects();
         callback(projects);
       } catch (error) {
-        console.error('Error fetching projects list:', error);
+        log.error('Error fetching projects list', { data: error }, 'projectRealtime');
         callback([]);
       }
     }

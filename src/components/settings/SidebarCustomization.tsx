@@ -20,6 +20,7 @@ import {
   Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface CustomizableItem {
   id: string;
@@ -79,7 +80,7 @@ export function SidebarCustomization() {
         setOriginalItems(items);
       }
     } catch (error) {
-      console.error('Failed to fetch sidebar preferences:', error);
+      log.error('Failed to fetch sidebar preferences', error, 'SidebarCustomization');
     } finally {
       setLoading(false);
     }
@@ -99,7 +100,7 @@ export function SidebarCustomization() {
         setHasChanges(false);
       }
     } catch (error) {
-      console.error('Failed to save sidebar preferences:', error);
+      log.error('Failed to save sidebar preferences', error, 'SidebarCustomization');
     } finally {
       setSaving(false);
     }
@@ -119,7 +120,7 @@ export function SidebarCustomization() {
         setHasChanges(false);
       }
     } catch (error) {
-      console.error('Failed to reset sidebar preferences:', error);
+      log.error('Failed to reset sidebar preferences', error, 'SidebarCustomization');
     } finally {
       setSaving(false);
     }

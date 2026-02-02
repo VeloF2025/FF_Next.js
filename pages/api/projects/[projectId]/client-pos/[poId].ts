@@ -33,7 +33,7 @@ export default withAuth(withErrorHandler(async (
       const result = await sql`
         SELECT
           cpo.*,
-          c.name as client_name,
+          c.company_name as client_name,
           p.name as project_name
         FROM client_purchase_orders cpo
         LEFT JOIN clients c ON c.id = cpo.client_id
@@ -139,7 +139,7 @@ export default withAuth(withErrorHandler(async (
       const refreshed = await sql`
         SELECT
           cpo.*,
-          c.name as client_name,
+          c.company_name as client_name,
           p.name as project_name
         FROM client_purchase_orders cpo
         LEFT JOIN clients c ON c.id = cpo.client_id

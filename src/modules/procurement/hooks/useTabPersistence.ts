@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { log } from '@/lib/logger';
 
 interface UseTabPersistenceOptions {
   /** Key prefix for localStorage (e.g., 'sourcing' -> 'procurement_sourcing_tab') */
@@ -90,7 +91,7 @@ export function useTabPersistence({
   // Change tab handler
   const changeTab = useCallback((tab: string) => {
     if (!validTabs.includes(tab)) {
-      console.warn(`Invalid tab "${tab}". Valid tabs: ${validTabs.join(', ')}`);
+      log.warn(`Invalid tab "${tab}". Valid tabs: ${validTabs.join(', ')}`, undefined, 'useTabPersistence');
       return;
     }
 

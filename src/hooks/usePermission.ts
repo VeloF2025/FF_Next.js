@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { log } from '@/lib/logger';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
 
@@ -101,7 +102,7 @@ export function usePermission(): UsePermissionReturn {
         setPermissions([]);
       }
     } catch (error) {
-      console.error('Failed to fetch permissions:', error);
+      log.error('Failed to fetch permissions', error, 'usePermission');
       setPermissions([]);
     } finally {
       setIsLoading(false);

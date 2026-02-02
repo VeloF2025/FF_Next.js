@@ -10,6 +10,7 @@ import type {
     RecordingResponse,
     LiveKitRoom
 } from '../types/livekit.types';
+import { log } from '@/lib/logger';
 
 // Environment variables
 const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
@@ -20,7 +21,7 @@ const EGRESS_OUTPUT_PATH = process.env.EGRESS_OUTPUT_PATH || '/opt/recordings';
 // Validate configuration
 function validateConfig(): boolean {
     if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-        console.error('LiveKit configuration missing. Required: LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET');
+        log.error('LiveKit configuration missing. Required: LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET', {}, 'livekitService');
         return false;
     }
     return true;
@@ -87,7 +88,7 @@ export async function generateToken(request: TokenRequest): Promise<TokenRespons
         const jwt = await token.toJwt();
         return { success: true, token: jwt };
     } catch (error: any) {
-        console.error('Error generating token:', error);
+        log.error('Error generating token', { error }, 'livekitService');
         return { success: false, error: error.message };
     }
 }
@@ -122,7 +123,7 @@ export async function createRoom(request: CreateRoomRequest): Promise<CreateRoom
 
         return { success: true, room: liveKitRoom };
     } catch (error: any) {
-        console.error('Error creating room:', error);
+        log.error('Error creating room', { error }, 'livekitService');
         return { success: false, error: error.message };
     }
 }
@@ -155,7 +156,7 @@ export async function listRooms(): Promise<LiveKitRoom[]> {
             };
         });
     } catch (error: any) {
-        console.error('Error listing rooms:', error);
+        log.error('Error listing rooms', { error }, 'livekitService');
         return [];
     }
 }
@@ -173,7 +174,7 @@ export async function deleteRoom(roomName: string): Promise<boolean> {
         await client.deleteRoom(roomName);
         return true;
     } catch (error: any) {
-        console.error('Error deleting room:', error);
+        log.error('Error deleting room', { error }, 'livekitService');
         return false;
     }
 }
@@ -205,7 +206,7 @@ export async function startRecording(roomName: string): Promise<RecordingRespons
             recordingPath: filepath,
         };
     } catch (error: any) {
-        console.error('Error starting recording:', error);
+        log.error('Error starting recording', { error }, 'livekitService');
         return { success: false, error: error.message };
     }
 }
@@ -224,7 +225,7 @@ export async function stopRecording(egressId: string): Promise<RecordingResponse
 
         return { success: true, egressId };
     } catch (error: any) {
-        console.error('Error stopping recording:', error);
+        log.error('Error stopping recording', { error }, 'livekitService');
         return { success: false, error: error.message };
     }
 }

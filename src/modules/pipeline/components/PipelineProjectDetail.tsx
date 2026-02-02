@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth.types';
+import { log } from '@/lib/logger';
 import {
   ArrowLeft,
   Building2,
@@ -255,7 +256,7 @@ export function PipelineProjectDetail() {
       // Redirect to the new project detail page
       router.push(`/projects/${data.data.project.id}`);
     } catch (err) {
-      console.error('Failed to transition project:', err);
+      log.error('Failed to transition project', { error: err, projectId: id }, 'PipelineProjectDetail');
       alert('Failed to transition project. Please try again.');
     } finally {
       setTransitioning(false);
@@ -307,7 +308,7 @@ export function PipelineProjectDetail() {
       setLegalDocsChanged(false);
       loadProject();
     } catch (err) {
-      console.error('Failed to save legal docs:', err);
+      log.error('Failed to save legal docs', { error: err, projectId: id, legalDocs }, 'PipelineProjectDetail');
     } finally {
       setSavingLegalDocs(false);
     }
@@ -337,7 +338,7 @@ export function PipelineProjectDetail() {
         setApprovalStatus(approvalsData.data.status);
       }
     } catch (error) {
-      console.error('Failed to load project:', error);
+      log.error('Failed to load project', { error, projectId: id }, 'PipelineProjectDetail');
     } finally {
       setLoading(false);
     }

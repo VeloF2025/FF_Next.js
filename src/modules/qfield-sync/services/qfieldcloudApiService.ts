@@ -5,6 +5,7 @@
 
 import https from 'https';
 import { Pool } from 'pg';
+import { log } from '@/lib/logger';
 
 // QFieldCloud API Configuration
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
@@ -84,7 +85,7 @@ export async function getProjects() {
     `);
     return result.rows;
   } catch (error) {
-    console.error('Error fetching projects from QFieldCloud DB:', error);
+    log.error('Error fetching projects from QFieldCloud DB', { error }, 'qfieldcloudApiService');
     // Fallback to API if database fails
     return qfieldApiRequest('/projects/');
   }
@@ -114,7 +115,7 @@ export async function getProjectLayers(projectId: string) {
 
     return result.rows;
   } catch (error) {
-    console.error('Error fetching layers from DB:', error);
+    log.error('Error fetching layers from DB', { error, projectId }, 'qfieldcloudApiService');
     // Fallback to API
     return qfieldApiRequest(`/projects/${projectId}/layers/`);
   }
@@ -143,7 +144,7 @@ export async function getLayerFeatures(projectId: string, layerName: string) {
 
     return result.rows;
   } catch (error) {
-    console.error('Error fetching features from DB:', error);
+    log.error('Error fetching features from DB', { error, projectId, layerName }, 'qfieldcloudApiService');
     // Fallback to API
     return qfieldApiRequest(`/projects/${projectId}/layers/${layerName}/features/`);
   }
@@ -192,7 +193,7 @@ export async function getQFieldPoles(projectId?: string) {
       image_count: row.photos ? JSON.parse(row.photos).length : 0
     }));
   } catch (error) {
-    console.error('Error fetching poles from QFieldCloud:', error);
+    log.error('Error fetching poles from QFieldCloud', { error, projectId }, 'qfieldcloudApiService');
     throw error;
   }
 }
@@ -245,7 +246,7 @@ export async function getQFieldDrops(projectId?: string) {
       }
     }));
   } catch (error) {
-    console.error('Error fetching drops from QFieldCloud:', error);
+    log.error('Error fetching drops from QFieldCloud', { error, projectId }, 'qfieldcloudApiService');
     throw error;
   }
 }
@@ -307,7 +308,7 @@ export async function getQFieldCables(projectId?: string) {
       source: 'qfieldcloud'
     }));
   } catch (error) {
-    console.error('Error fetching cables from QFieldCloud:', error);
+    log.error('Error fetching cables from QFieldCloud', { error, projectId }, 'qfieldcloudApiService');
     throw error;
   }
 }
@@ -339,7 +340,7 @@ export async function getSyncStatus(projectId?: string) {
       lastFullSync: new Date().toISOString()
     };
   } catch (error) {
-    console.error('Error getting sync status:', error);
+    log.error('Error getting sync status', { error, projectId }, 'qfieldcloudApiService');
     throw error;
   }
 }

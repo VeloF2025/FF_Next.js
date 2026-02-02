@@ -47,6 +47,7 @@ import {
   Block as BlockIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
+import { log } from '@/lib/logger';
 
 // ==================== TYPES ====================
 
@@ -137,7 +138,7 @@ export function DailyReconciliationDashboard({
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('Failed to fetch reconciliation:', errorMessage);
+      log.error('Failed to fetch reconciliation', { error: errorMessage }, 'DailyReconciliationDashboard');
       setError(errorMessage);
     } finally {
       setLoading(false);

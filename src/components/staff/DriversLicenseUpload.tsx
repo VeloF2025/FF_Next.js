@@ -6,14 +6,13 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, DropzoneState } from 'react-dropzone';
 import {
   Upload,
   X,
   Check,
   AlertCircle,
   Image as ImageIcon,
-  RotateCcw,
 } from 'lucide-react';
 import {
   MAX_FILE_SIZE,
@@ -115,20 +114,36 @@ export function DriversLicenseUpload({
     [files, onFilesChange]
   );
 
-  const renderDropzone = (side: 'front' | 'back', label: string) => {
+  // Call useDropzone at top level for both sides
+  const frontDropzone = useDropzone({
+    onDrop: (acceptedFiles) => handleFileSelect('front', acceptedFiles),
+    accept: {
+      'image/*': ['.jpg', '.jpeg', '.png'],
+      'application/pdf': ['.pdf'],
+    },
+    maxFiles: 1,
+    disabled: !!files.front,
+  });
+
+  const backDropzone = useDropzone({
+    onDrop: (acceptedFiles) => handleFileSelect('back', acceptedFiles),
+    accept: {
+      'image/*': ['.jpg', '.jpeg', '.png'],
+      'application/pdf': ['.pdf'],
+    },
+    maxFiles: 1,
+    disabled: !!files.back,
+  });
+
+  const renderDropzone = (
+    side: 'front' | 'back',
+    label: string,
+    dropzone: DropzoneState
+  ) => {
     const file = files[side];
     const preview = previews[side];
     const hasFile = !!file;
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-      onDrop: (acceptedFiles) => handleFileSelect(side, acceptedFiles),
-      accept: {
-        'image/*': ['.jpg', '.jpeg', '.png'],
-        'application/pdf': ['.pdf'],
-      },
-      maxFiles: 1,
-      disabled: hasFile,
-    });
+    const { getRootProps, getInputProps, isDragActive } = dropzone;
 
     return (
       <div className="flex-1">
@@ -216,8 +231,8 @@ export function DriversLicenseUpload({
       </div>
 
       <div className="flex gap-4">
-        {renderDropzone('front', 'Front Side')}
-        {renderDropzone('back', 'Back Side')}
+        {renderDropzone('front', 'Front Side', frontDropzone)}
+        {renderDropzone('back', 'Back Side', backDropzone)}
       </div>
 
       {error && (

@@ -10,6 +10,7 @@ import { Upload, CheckCircle2, XCircle, FileText, Plus } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, DocumentType } from '@/types/contractor-document.types';
 import { DocumentUploadForm } from '../DocumentUploadForm';
+import { log } from '@/lib/logger';
 
 export interface OnboardingStage {
   id: number;
@@ -57,7 +58,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
         setDocuments(data.data || []);
       }
     } catch (err) {
-      console.error('Error fetching documents:', err);
+      log.error('Failed to fetch contractor documents', { error: err, contractorId: stage.contractorId }, 'OnboardingStageCardEnhanced');
     } finally {
       setIsLoadingDocs(false);
     }

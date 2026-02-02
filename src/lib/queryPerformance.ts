@@ -5,6 +5,8 @@
  * Tracks query execution times and identifies slow queries
  */
 
+import { log } from '@/lib/logger';
+
 interface QueryMetric {
   query: string;
   duration: number;
@@ -63,9 +65,10 @@ class QueryPerformanceMonitor {
 
     // Log slow queries
     if (duration > this.slowQueryThreshold) {
-      console.warn(
-        `[Slow Query] ${duration.toFixed(2)}ms:`,
-        this.truncateQuery(query)
+      log.warn(
+        `${duration.toFixed(2)}ms: ${this.truncateQuery(query)}`,
+        { duration, query: this.truncateQuery(query) },
+        'SlowQuery'
       );
     }
   }
@@ -193,7 +196,7 @@ class QueryPerformanceMonitor {
    * Print performance report to console
    */
   printReport(): void {
-    console.log('\n' + this.generateReport());
+    log.info('Database Query Performance Report', { report: this.generateReport() }, 'QueryPerformance');
   }
 
   /**
@@ -327,9 +330,10 @@ export class N1QueryDetector {
 
     // Check for N+1 pattern
     if (recent.length >= this.threshold) {
-      console.warn(
-        `[N+1 Query Detected] Query pattern executed ${recent.length} times in ${this.detectionWindow}ms:`,
-        this.truncateQuery(query)
+      log.warn(
+        `Query pattern executed ${recent.length} times in ${this.detectionWindow}ms: ${this.truncateQuery(query)}`,
+        { count: recent.length, detectionWindow: this.detectionWindow, query: this.truncateQuery(query) },
+        'N+1QueryDetected'
       );
     }
   }

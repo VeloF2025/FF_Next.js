@@ -21,6 +21,7 @@ import {
   ShieldQuestion,
 } from 'lucide-react';
 import { LabelScanner, type VerificationResult } from './LabelScanner';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // TYPES
@@ -119,7 +120,7 @@ export function AssetVerificationPanel({
         // Callback to parent
         onVerificationComplete?.(result);
       } catch (err) {
-        console.error('Error saving verification:', err);
+        log.error('Error saving verification', { err, assetId, result }, 'AssetVerificationPanel');
       } finally {
         setIsVerifying(false);
       }

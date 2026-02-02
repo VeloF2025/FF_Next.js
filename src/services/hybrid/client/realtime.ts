@@ -5,6 +5,7 @@
 import { socketIOAdapter } from '@/services/realtime/socketIOAdapter';
 import type { RealtimeEvent } from '@/services/realtime/websocketService';
 import type { Client } from '@/types/client.types';
+import { log } from '@/lib/logger';
 
 /**
  * Get all clients (via API)
@@ -92,7 +93,7 @@ export async function updateClient(id: string, updates: Partial<Client>): Promis
 export function subscribeToClient(id: string, callback: (client: Client | null) => void): () => void {
   // Ensure WebSocket is connected
   if (!socketIOAdapter.isConnected()) {
-    socketIOAdapter.connect().catch(console.error);
+    socketIOAdapter.connect().catch(err => log.error('Failed to connect WebSocket', { data: err }, 'clientRealtime'));
   }
 
   // Subscribe to specific client changes
@@ -108,7 +109,7 @@ export function subscribeToClient(id: string, callback: (client: Client | null) 
           const client = await getClientById(id);
           callback(client);
         } catch (error) {
-          console.error('Error fetching client data:', error);
+          log.error('Error fetching client data', { data: error }, 'clientRealtime');
           callback(null);
         }
       }
@@ -127,7 +128,7 @@ export function subscribeToClient(id: string, callback: (client: Client | null) 
 export function subscribeToClients(callback: (clients: Client[]) => void): () => void {
   // Ensure WebSocket is connected
   if (!socketIOAdapter.isConnected()) {
-    socketIOAdapter.connect().catch(console.error);
+    socketIOAdapter.connect().catch(err => log.error('Failed to connect WebSocket', { data: err }, 'clientRealtime'));
   }
 
   // Subscribe to all client changes
@@ -139,7 +140,7 @@ export function subscribeToClients(callback: (clients: Client[]) => void): () =>
         const clients = await getAllClients();
         callback(clients);
       } catch (error) {
-        console.error('Error fetching clients list:', error);
+        log.error('Error fetching clients list', { data: error }, 'clientRealtime');
         callback([]);
       }
     }

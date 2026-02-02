@@ -3,6 +3,8 @@
  * Centralized API client for all analytics endpoints
  */
 
+import { log } from '@/lib/logger';
+
 // Types
 export interface DashboardFilters {
   startDate?: string;
@@ -78,7 +80,7 @@ class AnalyticsApiClient {
 
       return data.data || data;
     } catch (error) {
-      console.error(`Analytics API error (${endpoint}):`, error);
+      log.error(`Analytics API error (${endpoint})`, { data: error }, 'analyticsApi');
       throw error;
     }
   }

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z, ZodError, ZodSchema } from 'zod';
 import { ApiErrorResponseSchema } from '../common';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // Error Formatting
@@ -178,8 +179,8 @@ export function validateResponse<T>(
   try {
     return schema.parse(data);
   } catch (error) {
-    console.error('Response validation failed:', error);
-    
+    log.error('Response validation failed', error instanceof Error ? { message: error.message } : { error }, 'ValidationUtils');
+
     return NextResponse.json(
       {
         success: false,

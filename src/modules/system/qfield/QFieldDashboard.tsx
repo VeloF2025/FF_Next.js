@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { QFieldSyncDashboard } from '@/modules/qfield-sync/components/QFieldSyncDashboard';
+import { log } from '@/lib/logger';
 
 interface HealthStatus {
   services: {
@@ -284,7 +285,7 @@ export const QFieldDashboard: React.FC = () => {
         setJobStats(data.data.stats);
       }
     } catch (err) {
-      console.error('Failed to load job stats:', err);
+      log.error('Failed to load job stats', { error: err }, 'QFieldDashboard');
     } finally {
       setLoadingStats(false);
     }

@@ -24,7 +24,7 @@ import type {
   ProcurementTabId,
   ProcurementPermissions
 } from '@/types/procurement/portal.types';
-import { useProcurementPortal } from '../context/ProcurementPortalProvider';
+import { useProcurementPortalOptional } from '../context/ProcurementPortalProvider';
 
 // Define category structure
 type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'approvals' | 'reports';
@@ -83,12 +83,7 @@ export function ProcurementTabs({
   const router = useRouter();
 
   // Try to get from context first, fallback to props
-  let context: any = null;
-  try {
-    context = useProcurementPortal();
-  } catch {
-    // Context not available, use props
-  }
+  const context = useProcurementPortalOptional();
 
   const activeTab = propActiveTab ?? context?.activeTab ?? 'overview';
   const onTabChange = propOnTabChange ?? context?.setActiveTab ?? (() => {});

@@ -12,6 +12,7 @@ import { modalVariants, overlayVariants } from '@/lib/animations/modal-variants'
 import { useBarcodeScanner, lookupAssetByCode } from '../hooks/useBarcodeScanner';
 import type { BarcodeScannerModalProps, ScanResult, AssetLookupResult } from '../types/scanner';
 import type { Asset } from '@/modules/assets/types/asset';
+import { log } from '@/lib/logger';
 
 const SCANNER_ELEMENT_ID = 'barcode-scanner-reader';
 
@@ -89,7 +90,7 @@ export function BarcodeScannerModal({
     config,
     onScan: handleScan,
     onError: (error) => {
-      console.error('Scanner error:', error);
+      log.error('Scanner error', { error }, 'BarcodeScannerModal');
     },
   });
 

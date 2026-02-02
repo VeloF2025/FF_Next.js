@@ -5,6 +5,7 @@
  */
 
 import { getDbConnection } from '../utils/db';
+import { log } from '@/lib/logger';
 import {
   CheckoutAssetSchema,
   CheckinAssetSchema,
@@ -159,7 +160,7 @@ export const assignmentService = {
         data: transformRow(assignment),
       };
     } catch (error) {
-      console.error('Error checking out asset:', error);
+      log.error('Error checking out asset', { error, input, createdBy }, 'assignmentService.checkout');
       return {
         success: false,
         data: null,
@@ -255,7 +256,7 @@ export const assignmentService = {
         data: transformRow(updatedAssignment),
       };
     } catch (error) {
-      console.error('Error checking in asset:', error);
+      log.error('Error checking in asset', { error, input, checkedInBy }, 'assignmentService.checkin');
       return {
         success: false,
         data: null,
@@ -345,7 +346,7 @@ export const assignmentService = {
         data: transformRow(newAssignment),
       };
     } catch (error) {
-      console.error('Error transferring asset:', error);
+      log.error('Error transferring asset', { error, input, createdBy }, 'assignmentService.transfer');
       return {
         success: false,
         data: null,
@@ -373,7 +374,7 @@ export const assignmentService = {
         data: assignment ? transformRow(assignment) : null,
       };
     } catch (error) {
-      console.error('Error fetching active assignment:', error);
+      log.error('Error fetching active assignment', { error, assetId }, 'assignmentService.getActiveAssignment');
       return {
         success: false,
         data: null,
@@ -400,7 +401,7 @@ export const assignmentService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching assignment history:', error);
+      log.error('Error fetching assignment history', { error, assetId }, 'assignmentService.getHistory');
       return {
         success: false,
         data: [],
@@ -432,7 +433,7 @@ export const assignmentService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching assignments by assignee:', error);
+      log.error('Error fetching assignments by assignee', { error, assigneeType, assigneeId }, 'assignmentService.getByAssignee');
       return {
         success: false,
         data: [],
@@ -461,7 +462,7 @@ export const assignmentService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching overdue returns:', error);
+      log.error('Error fetching overdue returns', { error }, 'assignmentService.getOverdueReturns');
       return {
         success: false,
         data: [],

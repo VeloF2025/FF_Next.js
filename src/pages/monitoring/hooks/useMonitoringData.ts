@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { log } from '@/lib/logger';
 import { WebVitalMetric, ErrorEvent, SystemHealth } from '../types/monitoring.types';
 
 export function useMonitoringData() {
@@ -41,7 +42,7 @@ export function useMonitoringData() {
           setSystemHealth(data.health || systemHealth);
         }
       } catch (error) {
-        console.error('Failed to fetch monitoring data:', error);
+        log.error('Failed to fetch monitoring data', { error }, 'useMonitoringData');
       } finally {
         setIsLoading(false);
       }

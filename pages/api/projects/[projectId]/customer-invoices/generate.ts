@@ -253,7 +253,7 @@ export default withAuth(withErrorHandler(async (
       const created = await sql`
         SELECT
           ci.*,
-          c.name as client_name,
+          c.company_name as client_name,
           p.name as project_name,
           cpo.po_number as client_po_number
         FROM customer_invoices ci

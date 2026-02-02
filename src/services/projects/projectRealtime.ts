@@ -13,12 +13,12 @@ import {
  * Subscribe to real-time project updates via WebSocket
  */
 export function subscribeToProject(
-  projectId: string, 
+  projectId: string,
   callback: (project: Project | null) => void
 ): () => void {
   // Ensure WebSocket is connected
   if (!socketIOAdapter.isConnected()) {
-    socketIOAdapter.connect().catch(console.error);
+    socketIOAdapter.connect().catch(err => log.error('Failed to connect WebSocket', { data: err }, 'projectRealtime'));
   }
 
   // Subscribe to specific project changes
@@ -64,7 +64,7 @@ export function subscribeToProjects(
 ): () => void {
   // Ensure WebSocket is connected
   if (!socketIOAdapter.isConnected()) {
-    socketIOAdapter.connect().catch(console.error);
+    socketIOAdapter.connect().catch(err => log.error('Failed to connect WebSocket', { data: err }, 'projectRealtime'));
   }
 
   // Subscribe to all project changes

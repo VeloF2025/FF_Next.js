@@ -6,6 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 
 // In production, this would query stored metrics from database or analytics service
 // For now, returning demo structure - integrate with Vercel Analytics or custom storage
@@ -74,7 +75,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    console.error('Error fetching Web Vitals summary:', error);
+    log.error('Error fetching Web Vitals summary', { error }, 'api/analytics/web-vitals/summary');
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch Web Vitals summary',

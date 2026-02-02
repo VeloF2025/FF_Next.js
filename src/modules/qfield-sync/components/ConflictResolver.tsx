@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ChevronRight, Check } from 'lucide-react';
 import { SyncConflict } from '../types/qfield-sync.types';
+import { log } from '@/lib/logger';
 
 interface ConflictResolverProps {
   conflicts: SyncConflict[];
@@ -24,7 +25,7 @@ export function ConflictResolver({ conflicts, onResolve }: ConflictResolverProps
       await onResolve(selectedConflict.id, resolution);
       setSelectedConflict(null);
     } catch (error) {
-      console.error('Failed to resolve conflict:', error);
+      log.error('Failed to resolve conflict', { error, conflictId: selectedConflict.id }, 'ConflictResolver');
     } finally {
       setResolving(false);
     }

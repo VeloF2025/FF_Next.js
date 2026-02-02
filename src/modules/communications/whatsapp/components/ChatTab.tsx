@@ -17,6 +17,7 @@ import {
 import toast from 'react-hot-toast';
 import { waAdminApi } from '../services/waAdminApiService';
 import type { WaMonitoredGroup } from '../types/wa-admin.types';
+import { log } from '@/lib/logger';
 
 interface ChatMessage {
   id: string;
@@ -97,7 +98,7 @@ const ChatTab: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch messages:', error);
+      log.error('Failed to fetch messages', { error }, 'ChatTab');
     }
 
     setLoadingMessages(false);

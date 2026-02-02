@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { offlineStorage } from '../utils/offlineStorage';
 import type { SyncCheckRecordRequest, SyncCheckRecordResponse } from '../../types/check-in.types';
+import { log } from '@/lib/logger';
 
 interface SyncStatus {
   pending: number;
@@ -70,7 +71,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
       }));
       setOfflineRecordCount(records.length);
     } catch (error) {
-      console.error('Failed to load sync status:', error);
+      log.error('Failed to load sync status', { error }, 'useOfflineSync');
     }
   }, []);
 

@@ -11,6 +11,7 @@ import { getContractorProjectsByContractor } from '@/services/contractor/contrac
 import type { ContractorProjectWithDetails } from '@/types/contractor-project.types';
 import { ASSIGNMENT_STATUSES } from '@/types/contractor-project.types';
 import { AssignProjectForm } from './AssignProjectForm';
+import { log } from '@/lib/logger';
 
 interface ContractorProjectsProps {
   contractorId: string;
@@ -33,7 +34,7 @@ export function ContractorProjects({ contractorId }: ContractorProjectsProps) {
       const data = await getContractorProjectsByContractor(contractorId);
       setProjects(data);
     } catch (err: any) {
-      console.error('Error loading projects:', err);
+      log.error('Error loading contractor projects', { error: err, contractorId }, 'ContractorProjects');
       setError(err.message || 'Failed to load projects');
     } finally {
       setLoading(false);

@@ -9,6 +9,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import type { EvaluationResult } from '../types';
+import { log } from '@/lib/logger';
 
 // Database connection - initialized lazily at runtime
 function getDbConnection() {
@@ -55,7 +56,7 @@ export async function getEvaluationByDR(drNumber: string): Promise<EvaluationRes
     const row = rows[0];
     return transformDbRowToEvaluation(row);
   } catch (error) {
-    console.error(`Error fetching evaluation for DR ${drNumber}:`, error);
+    log.error(`Error fetching evaluation for DR ${drNumber}`, { error }, 'fotoDbService');
     throw new Error('Failed to fetch evaluation from database');
   }
 }
@@ -118,7 +119,7 @@ export async function getAllEvaluations(filters?: {
 
     return rows.map(transformDbRowToEvaluation);
   } catch (error) {
-    console.error('Error fetching evaluations:', error);
+    log.error('Error fetching evaluations', { error }, 'fotoDbService');
     throw new Error('Failed to fetch evaluations from database');
   }
 }
@@ -161,7 +162,7 @@ export async function saveEvaluation(evaluation: EvaluationResult): Promise<Eval
 
     return saved;
   } catch (error) {
-    console.error(`Error saving evaluation for DR ${evaluation.dr_number}:`, error);
+    log.error(`Error saving evaluation for DR ${evaluation.dr_number}`, { error }, 'fotoDbService');
     throw new Error('Failed to save evaluation to database');
   }
 }
@@ -191,7 +192,7 @@ export async function markFeedbackSent(drNumber: string): Promise<EvaluationResu
 
     return updated;
   } catch (error) {
-    console.error(`Error marking feedback sent for DR ${drNumber}:`, error);
+    log.error(`Error marking feedback sent for DR ${drNumber}`, { error }, 'fotoDbService');
     throw new Error('Failed to update feedback status');
   }
 }
@@ -217,7 +218,7 @@ export async function getDropSubmitterPhone(drNumber: string): Promise<string | 
 
     return rows[0].submitted_by || null;
   } catch (error) {
-    console.error(`Error getting submitter phone for DR ${drNumber}:`, error);
+    log.error(`Error getting submitter phone for DR ${drNumber}`, { error }, 'fotoDbService');
     return null;
   }
 }

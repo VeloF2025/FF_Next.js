@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Clock, Settings, ChevronDown, ChevronUp, FileDown, Database, ArrowUpDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { log } from '@/lib/logger';
 
 interface SyncResult {
   success: boolean;
@@ -94,7 +95,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
         }
       }
     } catch (e) {
-      console.error('Failed to fetch sync configs:', e);
+      log.error('Failed to fetch sync configs', { error: e }, 'SmartsheetSyncPanel');
     }
   }, []);
 

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { X, Upload, FileText, AlertCircle } from 'lucide-react';
 import { DocumentType, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPE_CATEGORIES } from '@/types/contractor-document.types';
+import { log } from '@/lib/logger';
 
 interface DocumentUploadFormProps {
   contractorId: string;
@@ -163,7 +164,7 @@ export function DocumentUploadForm({ contractorId, onSuccess, onCancel, defaultD
       xhr.timeout = 30000; // 30 second timeout
       xhr.send(uploadData);
     }).catch((err) => {
-      console.error('Upload error:', err);
+      log.error('Document upload error', { error: err, contractorId }, 'DocumentUploadForm');
     });
   };
 

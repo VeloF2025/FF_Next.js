@@ -21,7 +21,7 @@ async function handler(
       const result = await sql`
         SELECT 
           p.*,
-          c.name as client_name,
+          c.company_name as client_name,
           COUNT(DISTINCT sp.id) as pole_count,
           COUNT(DISTINCT sd.id) as drop_count,
           COALESCE(SUM(sf.length), 0) as total_fiber

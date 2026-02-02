@@ -4,6 +4,7 @@
  * Handles API communication and error handling
  */
 
+import { log } from '@/lib/logger';
 import type { QaReviewDrop, WaMonitorApiResponse, WaMonitorSummary, DailyDropsPerProject } from '../types/wa-monitor.types';
 
 // ==================== API ENDPOINTS ====================
@@ -42,7 +43,7 @@ export async function fetchAllDrops(): Promise<{
 
     return { drops, summary };
   } catch (error) {
-    console.error('Error fetching drops:', error);
+    log.error('Error fetching drops', { error }, 'waMonitorApiService.fetchAllDrops');
     throw error instanceof Error ? error : new Error('Failed to fetch QA review drops');
   }
 }
@@ -67,7 +68,7 @@ export async function fetchDropById(id: string): Promise<QaReviewDrop> {
     const data = await response.json();
     return data.data || data;
   } catch (error) {
-    console.error(`Error fetching drop ${id}:`, error);
+    log.error('Error fetching drop by ID', { error, id }, 'waMonitorApiService.fetchDropById');
     throw error instanceof Error ? error : new Error('Failed to fetch drop');
   }
 }
@@ -92,7 +93,7 @@ export async function fetchDropsByStatus(status: 'incomplete' | 'complete'): Pro
     const data = await response.json();
     return data.data || [];
   } catch (error) {
-    console.error(`Error fetching drops with status ${status}:`, error);
+    log.error('Error fetching drops by status', { error, status }, 'waMonitorApiService.fetchDropsByStatus');
     throw error instanceof Error ? error : new Error('Failed to fetch drops by status');
   }
 }
@@ -122,7 +123,7 @@ export async function fetchDailyDropsPerProject(): Promise<{
     const result = await response.json();
     return result.data || { drops: [], total: 0, date: new Date().toISOString().split('T')[0] };
   } catch (error) {
-    console.error('Error fetching daily drops:', error);
+    log.error('Error fetching daily drops', { error }, 'waMonitorApiService.fetchDailyDropsPerProject');
     throw error instanceof Error ? error : new Error('Failed to fetch daily drops per project');
   }
 }
@@ -165,7 +166,7 @@ export async function sendFeedbackToWhatsApp(
       message: data.message || 'Feedback sent successfully'
     };
   } catch (error) {
-    console.error('Error sending feedback:', error);
+    log.error('Error sending feedback', { error, dropId, dropNumber }, 'waMonitorApiService.sendFeedbackToWhatsApp');
     throw error instanceof Error ? error : new Error('Failed to send feedback');
   }
 }
@@ -207,7 +208,7 @@ export async function lockDrop(
 
     return data.data;
   } catch (error) {
-    console.error('Error locking drop:', error);
+    log.error('Error locking drop', { error, dropId, userName }, 'waMonitorApiService.lockDrop');
     throw error instanceof Error ? error : new Error('Failed to lock drop');
   }
 }
@@ -239,7 +240,7 @@ export async function unlockDrop(
     const data = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Error unlocking drop:', error);
+    log.error('Error unlocking drop', { error, dropId, userName }, 'waMonitorApiService.unlockDrop');
     throw error instanceof Error ? error : new Error('Failed to unlock drop');
   }
 }
@@ -270,7 +271,7 @@ export async function updateDrop(
     const data = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Error updating drop:', error);
+    log.error('Error updating drop', { error, dropId }, 'waMonitorApiService.updateDrop');
     throw error instanceof Error ? error : new Error('Failed to update drop');
   }
 }

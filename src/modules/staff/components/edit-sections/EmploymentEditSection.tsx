@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { log } from '@/lib/logger';
 
 interface DepartmentOption {
   id: string;
@@ -63,7 +64,7 @@ export function EmploymentEditSection({ formData, handleInputChange, toggleSkill
         }
       } catch (err) {
         // Fallback to enum if API fails
-        console.error('Failed to fetch departments:', err);
+        log.error('Failed to fetch departments', { error: err }, 'EmploymentEditSection');
       } finally {
         setIsLoadingDepartments(false);
       }

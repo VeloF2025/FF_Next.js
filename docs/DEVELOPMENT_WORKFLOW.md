@@ -66,7 +66,7 @@ Before writing any code, ensure you have a clear specification:
 ### 1.2 Create a Branch
 
 ```bash
-# Ensure you're on latest develop
+# Ensure you're on latest master
 git checkout develop
 git pull origin develop
 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDebounce } from './useDebounce';
+import { log } from '@/lib/logger';
 
 interface SearchResult {
   type: 'project' | 'staff' | 'client' | 'contractor';
@@ -56,7 +57,7 @@ export function useGlobalSearch(initialQuery = '') {
         throw new Error(data.error || 'Search failed');
       }
     } catch (err) {
-      console.error('Search error:', err);
+      log.error('Search error', err, 'useGlobalSearch');
       setError(err instanceof Error ? err.message : 'Search failed');
       setResults([]);
     } finally {
@@ -83,7 +84,7 @@ export function useGlobalSearch(initialQuery = '') {
           setPopularSearches(data.popular);
         }
       })
-      .catch(err => console.error('Failed to load popular searches:', err));
+      .catch(err => log.error('Failed to load popular searches', err, 'useGlobalSearch'));
   }, []);
 
   const clearSearch = useCallback(() => {

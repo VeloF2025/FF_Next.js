@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { FileText, Download, Trash2, Check, X, Clock, AlertTriangle, ExternalLink } from 'lucide-react';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, STATUS_COLORS } from '@/types/contractor-document.types';
+import { log } from '@/lib/logger';
 
 interface DocumentCardProps {
   document: ContractorDocument;
@@ -28,7 +29,7 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
     try {
       await onDelete(document.id);
     } catch (error) {
-      console.error('Delete failed:', error);
+      log.error('Document deletion failed', { error, documentId: document.id }, 'DocumentCard');
     } finally {
       setIsDeleting(false);
     }

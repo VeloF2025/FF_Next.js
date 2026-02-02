@@ -22,6 +22,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { ServiceDefinition, ServiceHealth, ServiceCategory } from '../types/self-healing.types';
+import { log } from '@/lib/logger';
 
 interface ServiceWithHealth extends ServiceDefinition {
   health?: ServiceHealth;
@@ -86,7 +87,7 @@ export default function InfrastructureDashboard() {
       });
       setHealthData(healthMap);
     } catch (err) {
-      console.error('Failed to load infrastructure data:', err);
+      log.error('Failed to load infrastructure data', { error: err }, 'InfrastructureDashboard');
     } finally {
       setLoading(false);
     }

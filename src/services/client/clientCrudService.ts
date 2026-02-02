@@ -3,6 +3,7 @@ import {
   ClientFormData,
   ClientFilter
 } from '@/types/client.types';
+import { log } from '@/lib/logger';
 
 /**
  * Core CRUD operations for client management
@@ -53,7 +54,7 @@ export const clientCrudService = {
       const result = await response.json();
       return result.data || result.clients || [];
     } catch (error) {
-      console.error('Error getting clients:', error);
+      log.error('Error getting clients', { data: error }, 'clientCrudService');
       throw new Error('Failed to fetch clients');
     }
   },
@@ -75,7 +76,7 @@ export const clientCrudService = {
       const result = await response.json();
       return result.data || result.client || null;
     } catch (error) {
-      console.error('Error getting client:', error);
+      log.error('Error getting client', { data: error }, 'clientCrudService');
       throw new Error('Failed to fetch client');
     }
   },
@@ -98,7 +99,7 @@ export const clientCrudService = {
       const result = await response.json();
       return result.data?.id || result.id;
     } catch (error) {
-      console.error('Error creating client:', error);
+      log.error('Error creating client', { data: error }, 'clientCrudService');
       throw new Error('Failed to create client');
     }
   },
@@ -118,7 +119,7 @@ export const clientCrudService = {
         throw new Error('Failed to update client');
       }
     } catch (error) {
-      console.error('Error updating client:', error);
+      log.error('Error updating client', { data: error }, 'clientCrudService');
       throw new Error('Failed to update client');
     }
   },
@@ -137,7 +138,7 @@ export const clientCrudService = {
         throw new Error(error.message || 'Failed to delete client');
       }
     } catch (error) {
-      console.error('Error deleting client:', error);
+      log.error('Error deleting client', { data: error }, 'clientCrudService');
       throw new Error('Failed to delete client');
     }
   },
@@ -154,7 +155,7 @@ export const clientCrudService = {
     // Perform initial fetch
     this.getAll(filter)
       .then(callback)
-      .catch(err => console.error('Error in client subscription:', err));
+      .catch(err => log.error('Error in client subscription', { data: err }, 'clientCrudService'));
 
     // Return no-op unsubscribe
     return () => {};
@@ -172,7 +173,7 @@ export const clientCrudService = {
     // Perform initial fetch
     this.getById(clientId)
       .then(callback)
-      .catch(err => console.error('Error in client subscription:', err));
+      .catch(err => log.error('Error in client subscription', { data: err }, 'clientCrudService'));
 
     // Return no-op unsubscribe
     return () => {};

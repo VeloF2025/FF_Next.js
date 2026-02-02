@@ -14,7 +14,7 @@ const getDatabaseUrl = (): string => {
   
   if (isBrowser) {
     // In browser, return a dummy URL - we should use API routes instead
-    console.warn('Database connection attempted from browser - use API routes instead');
+    log.warn('Database connection attempted from browser - use API routes instead', {}, 'connectionPool');
     return 'postgresql://dummy@localhost/dummy';
   }
 

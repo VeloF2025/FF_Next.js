@@ -7,6 +7,7 @@ import { SearchBar } from './header/SearchBar';
 import { NotificationsDropdown } from './header/NotificationsDropdown';
 import { UserMenuDropdown } from './header/UserMenuDropdown';
 import { useAuth } from '@/contexts/AuthContext';
+import { log } from '@/lib/logger';
 
 export function Header({ 
   title = 'Dashboard', 
@@ -49,7 +50,7 @@ export function Header({
       await signOut();
       // signOut redirects to /sign-in automatically
     } catch (error) {
-      console.error('Logout failed:', error);
+      log.error('Logout failed', error, 'Header');
     }
   };
 

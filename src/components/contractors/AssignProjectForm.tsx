@@ -10,6 +10,7 @@ import { X, Loader2 } from 'lucide-react';
 import { createContractorProject } from '@/services/contractor/contractorProjectsService';
 import { CONTRACTOR_ROLES } from '@/types/contractor-project.types';
 import type { ContractorProjectFormData } from '@/types/contractor-project.types';
+import { log } from '@/lib/logger';
 
 interface AssignProjectFormProps {
   contractorId: string;
@@ -79,7 +80,7 @@ export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignP
       // setProjects(Array.isArray(projectsData) ? projectsData : []);
 
     } catch (err: any) {
-      console.error('Error loading projects:', err);
+      log.error('Error loading projects', { error: err }, 'AssignProjectForm');
       setError(err.message);
     } finally {
       setLoading(false);
@@ -109,7 +110,7 @@ export function AssignProjectForm({ contractorId, onSuccess, onCancel }: AssignP
       await createContractorProject(assignmentData);
       onSuccess();
     } catch (err: any) {
-      console.error('Error creating assignment:', err);
+      log.error('Error creating assignment', { error: err }, 'AssignProjectForm');
       setError(err.message || 'Failed to create assignment');
     } finally {
       setSubmitting(false);

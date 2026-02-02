@@ -1,89 +1,54 @@
 {
   "sessions": {
-    "38d0b45c-2f42-4973-be7e-356321a73997": {
-      "session_id": "38d0b45c-2f42-4973-be7e-356321a73997",
-      "started_at": "2026-01-31T16:06:26.594Z",
-      "total_input_tokens": 35494,
+    "a4683cd9-f8fd-4c38-9e10-92432a1399da": {
+      "session_id": "a4683cd9-f8fd-4c38-9e10-92432a1399da",
+      "started_at": "2026-02-02T11:57:15.191Z",
+      "total_input_tokens": 56532,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.10648199999999987,
-      "tool_calls": 294,
+      "total_cost_usd": 0.16959599999999986,
+      "tool_calls": 423,
       "tools_used": {
-        "Read": 31,
-        "Task": 1,
-        "Write": 2,
-        "ExitPlanMode": 1,
-        "TodoWrite": 5,
-        "Bash": 52,
-        "mcp__claude-in-chrome__tabs_context_mcp": 4,
-        "mcp__claude-in-chrome__tabs_create_mcp": 2,
-        "mcp__claude-in-chrome__resize_window": 1,
-        "mcp__claude-in-chrome__navigate": 39,
-        "mcp__claude-in-chrome__computer": 65,
-        "mcp__claude-in-chrome__javascript_tool": 43,
-        "TaskUpdate": 9,
-        "Glob": 4,
-        "Grep": 10,
-        "mcp__claude-in-chrome__find": 6,
-        "mcp__claude-in-chrome__form_input": 1,
-        "mcp__claude-in-chrome__read_console_messages": 1,
-        "mcp__claude-in-chrome__read_network_requests": 2,
-        "Edit": 11,
-        "TaskCreate": 4
+        "Grep": 15,
+        "Glob": 2,
+        "Read": 88,
+        "Bash": 48,
+        "Edit": 259,
+        "Task": 11
       }
     },
-    "b913eff5-24f5-4cc5-adc1-d482c40bd13f": {
-      "session_id": "b913eff5-24f5-4cc5-adc1-d482c40bd13f",
-      "started_at": "2026-02-01T07:56:28.586Z",
-      "total_input_tokens": 108,
+    "4da83a63-37f4-4d4b-92f1-3b1ed8028cbf": {
+      "session_id": "4da83a63-37f4-4d4b-92f1-3b1ed8028cbf",
+      "started_at": "2026-02-02T12:18:30.424Z",
+      "total_input_tokens": 4811,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.00032399999999999996,
-      "tool_calls": 8,
+      "total_cost_usd": 0.014433000000000003,
+      "tool_calls": 29,
       "tools_used": {
-        "Bash": 1,
+        "Bash": 15,
+        "Grep": 2,
+        "Read": 4,
         "mcp__claude-in-chrome__tabs_context_mcp": 1,
-        "mcp__claude-in-chrome__navigate": 3,
-        "mcp__claude-in-chrome__get_page_text": 2,
-        "TodoWrite": 1
+        "mcp__claude-in-chrome__navigate": 1,
+        "mcp__claude-in-chrome__computer": 2,
+        "mcp__claude-in-chrome__javascript_tool": 3,
+        "Glob": 1
       }
     },
-    "0a7feef5-586d-411d-8358-3efcf9866628": {
-      "session_id": "0a7feef5-586d-411d-8358-3efcf9866628",
-      "started_at": "2026-02-01T07:58:17.568Z",
-      "total_input_tokens": 7535,
+    "b4695b9f-7a13-486c-80be-918a1f557adc": {
+      "session_id": "b4695b9f-7a13-486c-80be-918a1f557adc",
+      "started_at": "2026-02-02T12:28:48.138Z",
+      "total_input_tokens": 1841,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.022605,
-      "tool_calls": 194,
+      "total_cost_usd": 0.005523000000000001,
+      "tool_calls": 25,
       "tools_used": {
-        "Bash": 55,
-        "Read": 94,
-        "Glob": 25,
-        "Grep": 12,
-        "Task": 4,
-        "Write": 1,
-        "AskUserQuestion": 1,
-        "Edit": 2
-      }
-    },
-    "e2cdf80e-3ee8-45c1-986e-00a3b22c5c36": {
-      "session_id": "e2cdf80e-3ee8-45c1-986e-00a3b22c5c36",
-      "started_at": "2026-02-01T08:08:26.762Z",
-      "total_input_tokens": 22643,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.06792900000000003,
-      "tool_calls": 164,
-      "tools_used": {
-        "TaskCreate": 1,
-        "TaskUpdate": 2,
-        "Bash": 50,
-        "Read": 22,
-        "Glob": 10,
-        "Grep": 7,
-        "Write": 5,
-        "Edit": 39,
-        "mcp__claude-in-chrome__tabs_context_mcp": 2,
-        "mcp__claude-in-chrome__navigate": 3,
-        "mcp__claude-in-chrome__computer": 20,
-        "mcp__claude-in-chrome__find": 3
+        "Grep": 4,
+        "Read": 3,
+        "Edit": 4,
+        "Bash": 10,
+        "mcp__claude-in-chrome__navigate": 1,
+        "mcp__claude-in-chrome__computer": 2,
+        "mcp__claude-in-chrome__read_network_requests": 1
       }
     }
   }

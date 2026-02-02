@@ -23,6 +23,7 @@ import {
   getTodaySAST,
   getYesterdaySAST,
 } from '../context';
+import { log } from '@/lib/logger';
 
 type TabType = 'dashboard' | 'reports';
 
@@ -168,7 +169,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
             setProjectZoneData(prev => ({ ...prev, [project]: zones }));
           }
         } catch (err) {
-          console.error('Failed to fetch zone data:', err);
+          log.error('Failed to fetch zone data', { err, project }, 'DrListPage');
         } finally {
           setLoadingProjects(prev => {
             const next = new Set(prev);
@@ -257,8 +258,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
       window.URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Export error:', err);
+      log.error('Export error', { err, filters }, 'DrListPage');
       alert('Failed to export data. Please try again.');
     } finally {
       setIsExporting(false);

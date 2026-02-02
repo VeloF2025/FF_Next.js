@@ -5,6 +5,7 @@
  */
 
 import { getDbConnection } from '../utils/db';
+import { log } from '@/lib/logger';
 import {
   ScheduleMaintenanceSchema,
   CompleteMaintenanceSchema,
@@ -146,7 +147,7 @@ export const maintenanceService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error scheduling maintenance:', error);
+      log.error('Error scheduling maintenance', { error, input, createdBy }, 'maintenanceService.schedule');
       return {
         success: false,
         data: null,
@@ -257,7 +258,7 @@ export const maintenanceService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error completing maintenance:', error);
+      log.error('Error completing maintenance', { error, input, completedBy }, 'maintenanceService.complete');
       return {
         success: false,
         data: null,
@@ -320,7 +321,7 @@ export const maintenanceService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error cancelling maintenance:', error);
+      log.error('Error cancelling maintenance', { error, id, reason, cancelledBy }, 'maintenanceService.cancel');
       return {
         success: false,
         data: null,
@@ -345,7 +346,7 @@ export const maintenanceService = {
         data: row ? transformRow(row) : null,
       };
     } catch (error) {
-      console.error('Error fetching maintenance:', error);
+      log.error('Error fetching maintenance', { error, id }, 'maintenanceService.getById');
       return {
         success: false,
         data: null,
@@ -392,7 +393,7 @@ export const maintenanceService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching maintenance by asset:', error);
+      log.error('Error fetching maintenance by asset', { error, assetId, filter }, 'maintenanceService.getByAsset');
       return {
         success: false,
         data: [],
@@ -424,7 +425,7 @@ export const maintenanceService = {
         data: rows.map(transformRowWithAsset),
       };
     } catch (error) {
-      console.error('Error fetching upcoming maintenance:', error);
+      log.error('Error fetching upcoming maintenance', { error, withinDays }, 'maintenanceService.getUpcoming');
       return {
         success: false,
         data: [],
@@ -454,7 +455,7 @@ export const maintenanceService = {
         data: rows.map(transformRowWithAsset),
       };
     } catch (error) {
-      console.error('Error fetching overdue maintenance:', error);
+      log.error('Error fetching overdue maintenance', { error }, 'maintenanceService.getOverdue');
       return {
         success: false,
         data: [],
@@ -484,7 +485,7 @@ export const maintenanceService = {
         data: { updatedCount: result.length },
       };
     } catch (error) {
-      console.error('Error updating overdue status:', error);
+      log.error('Error updating overdue status', { error }, 'maintenanceService.updateOverdueStatus');
       return {
         success: false,
         data: { updatedCount: 0 },
@@ -512,7 +513,7 @@ export const maintenanceService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching calibration history:', error);
+      log.error('Error fetching calibration history', { error, assetId }, 'maintenanceService.getCalibrationHistory');
       return {
         success: false,
         data: [],
@@ -562,7 +563,7 @@ export const maintenanceService = {
         },
       };
     } catch (error) {
-      console.error('Error fetching maintenance dashboard stats:', error);
+      log.error('Error fetching maintenance dashboard stats', { error }, 'maintenanceService.getDashboardStats');
       return {
         success: false,
         data: null,

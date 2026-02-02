@@ -6,6 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 
 export default async function handler(
   req: NextApiRequest,
@@ -39,7 +40,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    console.error('Error fetching errors summary:', error);
+    log.error('Error fetching errors summary', { error }, 'api/analytics/errors/summary');
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch errors summary',

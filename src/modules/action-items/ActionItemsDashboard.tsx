@@ -5,6 +5,7 @@ import { CheckCircle, Clock, AlertCircle, Calendar, Users, Filter } from 'lucide
 import { useRouter } from 'next/router';
 import { ActionItemStats } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
+import { log } from '@/lib/logger';
 
 export function ActionItemsDashboard() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export function ActionItemsDashboard() {
         const data = await actionItemsService.getStats();
         setStats(data);
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        log.error('Error fetching stats', { error }, 'ActionItemsDashboard');
       } finally {
         setLoading(false);
       }

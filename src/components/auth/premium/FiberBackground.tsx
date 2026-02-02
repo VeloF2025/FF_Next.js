@@ -176,6 +176,7 @@ export function FiberBackground() {
       />
 
       {/* Inline styles for animations */}
+      {/* eslint-disable-next-line react/no-unknown-property */}
       <style jsx>{`
         @keyframes fiber-pulse {
           0%, 100% { opacity: 0.3; }

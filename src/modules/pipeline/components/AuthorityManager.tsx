@@ -23,6 +23,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type {
   ServiceAuthorityWithType,
   CreateServiceAuthorityInput,
@@ -87,7 +88,7 @@ export function AuthorityManager({ currentUserId }: AuthorityManagerProps) {
           setApprovalTypes(data.data);
         }
       } catch (err) {
-        console.error('Failed to load approval types:', err);
+        log.error('Failed to load approval types', { error: err }, 'AuthorityManager');
       }
     }
     loadApprovalTypes();

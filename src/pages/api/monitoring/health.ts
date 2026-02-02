@@ -6,6 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -29,7 +30,7 @@ export default async function handler(
       await sql`SELECT 1 as health_check`;
       checks.database = true;
     } catch (error) {
-      console.error('Database health check failed:', error);
+      log.error('Database health check failed', { error }, 'api/monitoring/health');
     }
 
     // Calculate overall status
@@ -60,7 +61,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    console.error('Health check failed:', error);
+    log.error('Health check failed', { error }, 'api/monitoring/health');
     return res.status(500).json({
       success: false,
       health: {

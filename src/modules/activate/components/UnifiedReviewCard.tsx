@@ -32,6 +32,7 @@ import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
 import { MaintenanceTab } from '@/modules/maintenance/components/MaintenanceTab';
 import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface UnifiedReviewCardProps {
   dropNumber: string;
@@ -222,7 +223,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
     try {
       await updateStep(step, !currentValue);
     } catch (error) {
-      console.error('Failed to update step:', error);
+      log.error('Failed to update step', error, 'UnifiedReviewCard.ManualQATab');
     } finally {
       setIsUpdating(false);
     }
@@ -250,7 +251,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
     try {
       await markIncorrect(Array.from(incorrectSteps), comments);
     } catch (error) {
-      console.error('Failed to mark incorrect:', error);
+      log.error('Failed to mark incorrect', error, 'UnifiedReviewCard.ManualQATab');
     } finally {
       setIsUpdating(false);
     }
@@ -786,7 +787,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
     try {
       await sendFeedback(message);
     } catch (error) {
-      console.error('Failed to send feedback:', error);
+      log.error('Failed to send feedback', error, 'UnifiedReviewCard.FeedbackTab');
     } finally {
       setIsSending(false);
     }

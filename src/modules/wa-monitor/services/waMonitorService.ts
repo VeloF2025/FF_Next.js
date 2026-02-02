@@ -14,6 +14,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 import type { QaReviewDrop, WaMonitorSummary } from '../types/wa-monitor.types';
 
 // Database connection - initialized lazily at runtime
@@ -100,7 +101,7 @@ export async function getAllDrops(): Promise<QaReviewDrop[]> {
 
     return rows.map(transformDbRowToDrop);
   } catch (error) {
-    console.error('Error fetching all drops:', error);
+    log.error('Error fetching all drops', { error }, 'waMonitorService.getAllDrops');
     throw new Error('Failed to fetch QA review drops');
   }
 }
@@ -302,7 +303,7 @@ export async function getPaginatedDrops(
       },
     };
   } catch (error) {
-    console.error('Error fetching paginated drops:', error);
+    log.error('Error fetching paginated drops', { error, page, pageSize, search }, 'waMonitorService.getPaginatedDrops');
     throw new Error('Failed to fetch QA review drops');
   }
 }
@@ -329,7 +330,7 @@ export async function getDropById(id: string): Promise<QaReviewDrop | null> {
 
     return row ? transformDbRowToDrop(row) : null;
   } catch (error) {
-    console.error(`Error fetching drop ${id}:`, error);
+    log.error('Error fetching drop by ID', { error, id }, 'waMonitorService.getDropById');
     throw new Error('Failed to fetch QA review drop');
   }
 }
@@ -357,7 +358,7 @@ export async function getDropsByStatus(status: 'incomplete' | 'complete'): Promi
 
     return rows.map(transformDbRowToDrop);
   } catch (error) {
-    console.error(`Error fetching drops with status ${status}:`, error);
+    log.error('Error fetching drops by status', { error, status }, 'waMonitorService.getDropsByStatus');
     throw new Error('Failed to fetch QA review drops by status');
   }
 }
@@ -469,7 +470,7 @@ export async function calculateSummary(): Promise<WaMonitorSummary> {
       })),
     };
   } catch (error) {
-    console.error('Error calculating summary:', error);
+    log.error('Error calculating summary', { error }, 'waMonitorService.calculateSummary');
     throw new Error('Failed to calculate summary statistics');
   }
 }
@@ -527,7 +528,7 @@ export async function calculateSummaryFast(): Promise<WaMonitorSummary> {
       })),
     };
   } catch (error) {
-    console.error('Error calculating fast summary:', error);
+    log.error('Error calculating fast summary', { error }, 'waMonitorService.calculateSummaryFast');
     throw new Error('Failed to calculate summary statistics');
   }
 }
@@ -596,7 +597,7 @@ export async function getCompleteProjectStats(
       incomplete: parseInt(row.total, 10) - parseInt(row.complete, 10),
     }));
   } catch (error) {
-    console.error('Error calculating complete project stats:', error);
+    log.error('Error calculating complete project stats', { error, dateFrom, dateTo }, 'waMonitorService.getCompleteProjectStats');
     throw new Error('Failed to calculate project statistics');
   }
 }
@@ -637,7 +638,7 @@ export async function getDailyDropsPerProject(date?: string): Promise<Array<{ da
       count: parseInt(row.count, 10),
     }));
   } catch (error) {
-    console.error('Error getting daily drops per project:', error);
+    log.error('Error getting daily drops per project', { error, date }, 'waMonitorService.getDailyDropsPerProject');
     throw new Error('Failed to get daily drops per project');
   }
 }
@@ -834,7 +835,7 @@ export async function getProjectStats(projectName: string): Promise<{
       allTime: calcStats(allTimeStats.total, allTimeStats.complete),
     };
   } catch (error) {
-    console.error(`Error getting project stats for ${projectName}:`, error);
+    log.error('Error getting project stats', { error, projectName }, 'waMonitorService.getProjectStats');
     throw new Error('Failed to get project stats');
   }
 }
@@ -1191,7 +1192,7 @@ export async function getAllProjectsStatsSummary(
       })),
     };
   } catch (error) {
-    console.error('Error getting all projects stats summary:', error);
+    log.error('Error getting all projects stats summary', { error, startDate, endDate }, 'waMonitorService.getAllProjectsStatsSummary');
     throw new Error('Failed to get all projects stats summary');
   }
 }
@@ -1205,7 +1206,7 @@ export async function validateConnection(): Promise<boolean> {
     await sql`SELECT 1`;
     return true;
   } catch (error) {
-    console.error('Database connection failed:', error);
+    log.error('Database connection failed', { error }, 'waMonitorService.validateConnection');
     return false;
   }
 }

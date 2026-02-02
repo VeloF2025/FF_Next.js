@@ -4,6 +4,7 @@
  */
 
 import React, { ComponentType, useRef, useEffect } from 'react';
+import { log } from '@/lib/logger';
 
 /**
  * Performance monitor component
@@ -24,8 +25,10 @@ export function withPerformanceMonitor<P extends object>(
     useEffect(() => {
       renderCount.current++;
       const renderTime = performance.now() - startTime.current;
-      console.log(
-        `[Performance] ${name} render #${renderCount.current}: ${renderTime.toFixed(2)}ms`
+      log.debug(
+        `${name} render #${renderCount.current}: ${renderTime.toFixed(2)}ms`,
+        { renderCount: renderCount.current, renderTime },
+        'Performance'
       );
     });
 
@@ -45,7 +48,7 @@ export function useRenderCount(componentName: string) {
   useEffect(() => {
     renderCount.current++;
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[RenderCount] ${componentName}: ${renderCount.current}`);
+      log.debug(`${componentName}: ${renderCount.current}`, { renderCount: renderCount.current }, 'RenderCount');
     }
   });
 
@@ -74,7 +77,7 @@ export function useWhyDidYouUpdate(name: string, props: Record<string, any>) {
       });
 
       if (Object.keys(changedProps).length > 0) {
-        console.log(`[WhyDidYouUpdate] ${name}`, changedProps);
+        log.debug(`${name}`, changedProps, 'WhyDidYouUpdate');
       }
     }
 

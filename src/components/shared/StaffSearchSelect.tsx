@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, User, Loader2, ChevronDown, X, AlertCircle, CheckCircle } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface AvailableStaff {
   id: string;
@@ -74,7 +75,7 @@ export function StaffSearchSelect({
           if (found) setSelectedStaff(found);
         }
       } catch (error) {
-        console.error('Failed to fetch staff:', error);
+        log.error('Failed to fetch staff', error, 'StaffSearchSelect');
       } finally {
         setLoading(false);
       }

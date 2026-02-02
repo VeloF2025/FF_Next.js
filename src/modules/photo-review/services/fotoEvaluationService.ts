@@ -12,6 +12,7 @@ import type {
   FeedbackResponse,
   PhotoFilters,
 } from '../types';
+import { log } from '@/lib/logger';
 
 // ==================== API ENDPOINTS ====================
 
@@ -82,7 +83,7 @@ export async function fetchPhotos(filters?: PhotoFilters): Promise<DropRecord[]>
 
     return await handleResponse<DropRecord[]>(response);
   } catch (error) {
-    console.error('Error fetching photos:', error);
+    log.error('Error fetching photos', { error }, 'fotoEvaluationService');
     throw error instanceof Error ? error : new Error('Failed to fetch photos');
   }
 }
@@ -101,7 +102,7 @@ export async function fetchPhotosByDR(dr_number: string): Promise<DropRecord> {
 
     return await handleResponse<DropRecord>(response);
   } catch (error) {
-    console.error(`Error fetching photos for DR ${dr_number}:`, error);
+    log.error(`Error fetching photos for DR ${dr_number}`, { error }, 'fotoEvaluationService');
     throw error instanceof Error ? error : new Error('Failed to fetch DR photos');
   }
 }
@@ -124,7 +125,7 @@ export async function evaluateDR(dr_number: string): Promise<EvaluationResult> {
 
     return await handleResponse<EvaluationResult>(response);
   } catch (error) {
-    console.error(`Error evaluating DR ${dr_number}:`, error);
+    log.error(`Error evaluating DR ${dr_number}`, { error }, 'fotoEvaluationService');
     throw error instanceof Error ? error : new Error('Failed to evaluate DR');
   }
 }
@@ -148,7 +149,7 @@ export async function getEvaluation(dr_number: string): Promise<EvaluationResult
 
     return await handleResponse<EvaluationResult>(response);
   } catch (error) {
-    console.error(`Error fetching evaluation for DR ${dr_number}:`, error);
+    log.error(`Error fetching evaluation for DR ${dr_number}`, { error }, 'fotoEvaluationService');
     throw error instanceof Error ? error : new Error('Failed to fetch evaluation');
   }
 }
@@ -182,7 +183,7 @@ export async function sendFeedback(
 
     return await handleResponse<FeedbackResponse>(response);
   } catch (error) {
-    console.error(`Error sending feedback for DR ${dr_number}:`, error);
+    log.error(`Error sending feedback for DR ${dr_number}`, { error }, 'fotoEvaluationService');
     throw error instanceof Error ? error : new Error('Failed to send feedback');
   }
 }
@@ -195,7 +196,7 @@ export async function reEvaluateDR(dr_number: string): Promise<EvaluationResult>
     // Same as evaluateDR - backend will UPDATE existing record
     return await evaluateDR(dr_number);
   } catch (error) {
-    console.error(`Error re-evaluating DR ${dr_number}:`, error);
+    log.error(`Error re-evaluating DR ${dr_number}`, { error }, 'fotoEvaluationService');
     throw error instanceof Error ? error : new Error('Failed to re-evaluate DR');
   }
 }
@@ -208,7 +209,7 @@ export async function isEvaluated(dr_number: string): Promise<boolean> {
     const evaluation = await getEvaluation(dr_number);
     return evaluation !== null;
   } catch (error) {
-    console.error(`Error checking evaluation status for DR ${dr_number}:`, error);
+    log.error(`Error checking evaluation status for DR ${dr_number}`, { error }, 'fotoEvaluationService');
     return false;
   }
 }

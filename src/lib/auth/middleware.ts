@@ -9,6 +9,7 @@ import { verifyToken } from './jwt';
 import { validateSession } from './session';
 import type { AuthUser, AuthRole, JWTPayload } from './types';
 import { ROLE_HIERARCHY } from './types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -134,7 +135,7 @@ export function withAuth(handler: AuthenticatedHandler): NextApiHandler {
       // Call the actual handler
       return handler(req as AuthenticatedNextApiRequest, res);
     } catch (error) {
-      console.error('Auth middleware error:', error);
+      log.error('Auth middleware error', error instanceof Error ? { message: error.message, stack: error.stack } : { error }, 'AuthMiddleware');
       return res.status(500).json({
         success: false,
         error: { code: 'AUTH_ERROR', message: 'Authentication error' },

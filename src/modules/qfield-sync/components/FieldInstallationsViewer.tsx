@@ -17,6 +17,7 @@ import {
   Ruler,
   Users
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 type DataType = 'poles' | 'drops';
 type ViewType = 'summary' | 'comparison' | 'details';
@@ -147,7 +148,7 @@ export function FieldInstallationsViewer() {
         }
       }
     } catch (err) {
-      console.error(`Error fetching ${dataType} data:`, err);
+      log.error(`Error fetching ${dataType} data`, { error: err, dataType }, 'FieldInstallationsViewer');
       setError(err instanceof Error ? err.message : `Failed to fetch ${dataType} data`);
     } finally {
       setLoading(false);

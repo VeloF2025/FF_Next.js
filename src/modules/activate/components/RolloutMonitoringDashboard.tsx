@@ -18,6 +18,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, Typography, Grid, Box, LinearProgress, Alert, Button, Table, TableBody, TableCell, TableHead, TableRow, TableContainer, Paper } from '@mui/material';
 import { RefreshCw, TrendingUp, TrendingDown, AlertCircle, CheckCircle } from 'lucide-react';
 import { getEnabledProjects, getUnifiedReviewRolloutStage } from '@/lib/featureFlags';
+import { log } from '@/lib/logger';
 
 type SystemMetrics = {
   avgResponseTime: number; // milliseconds
@@ -82,7 +83,7 @@ export function RolloutMonitoringDashboard() {
       setMetrics(demoMetrics);
       setLastRefresh(new Date());
     } catch (err) {
-      console.error('Error fetching rollout metrics:', err);
+      log.error('Error fetching rollout metrics', { err }, 'RolloutMonitoringDashboard');
       setError(err instanceof Error ? err.message : 'Failed to fetch metrics');
     } finally {
       setLoading(false);

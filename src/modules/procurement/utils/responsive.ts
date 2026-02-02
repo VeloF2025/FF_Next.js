@@ -87,11 +87,11 @@ export const responsiveTabConfig = {
 };
 
 /**
- * Get responsive configuration for current screen
+ * Hook to get responsive configuration for current screen
  */
-export function getResponsiveTabConfig() {
+export function useResponsiveTabConfig() {
   const { isMobile, isTablet } = useScreenSize();
-  
+
   if (isMobile) return responsiveTabConfig.mobile;
   if (isTablet) return responsiveTabConfig.tablet;
   return responsiveTabConfig.desktop;

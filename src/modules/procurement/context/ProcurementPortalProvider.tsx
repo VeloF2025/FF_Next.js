@@ -27,12 +27,20 @@ export function ProcurementPortalProvider({ value, children }: ProcurementPortal
  */
 export function useProcurementPortal() {
   const context = useContext(ProcurementPortalContext);
-  
+
   if (context === undefined) {
     throw new Error('useProcurementPortal must be used within a ProcurementPortalProvider');
   }
-  
+
   return context;
+}
+
+/**
+ * Optional hook that returns null when used outside of ProcurementPortalProvider
+ * Use this when the component needs to work both with and without the provider
+ */
+export function useProcurementPortalOptional() {
+  return useContext(ProcurementPortalContext) ?? null;
 }
 
 /**

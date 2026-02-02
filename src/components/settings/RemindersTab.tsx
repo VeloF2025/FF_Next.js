@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell, Plus, Trash2, Check, X, Calendar } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface Reminder {
   id: string;
@@ -46,7 +47,7 @@ export function RemindersTab() {
         setReminders(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch reminders:', error);
+      log.error('Failed to fetch reminders', error, 'RemindersTab');
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ export function RemindersTab() {
         setPreferences(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch preferences:', error);
+      log.error('Failed to fetch preferences', error, 'RemindersTab');
     }
   };
 
@@ -79,7 +80,7 @@ export function RemindersTab() {
         setShowNewForm(false);
       }
     } catch (error) {
-      console.error('Failed to create reminder:', error);
+      log.error('Failed to create reminder', error, 'RemindersTab');
     }
   };
 
@@ -95,7 +96,7 @@ export function RemindersTab() {
         setReminders(reminders.filter(r => r.id !== id));
       }
     } catch (error) {
-      console.error('Failed to update reminder:', error);
+      log.error('Failed to update reminder', error, 'RemindersTab');
     }
   };
 
@@ -110,7 +111,7 @@ export function RemindersTab() {
         setReminders(reminders.filter(r => r.id !== id));
       }
     } catch (error) {
-      console.error('Failed to delete reminder:', error);
+      log.error('Failed to delete reminder', error, 'RemindersTab');
     }
   };
 
@@ -126,7 +127,7 @@ export function RemindersTab() {
         setPreferences(data.data);
       }
     } catch (error) {
-      console.error('Failed to update preferences:', error);
+      log.error('Failed to update preferences', error, 'RemindersTab');
     }
   };
 

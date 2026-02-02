@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Download, Eye, Clock, CheckCircle, AlertTriangle, X, Loader2 } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface Agreement {
   id: string;
@@ -188,7 +189,7 @@ function GenerateAgreementModal({ projectId, onClose, onSuccess }: GenerateModal
 
         if (!saveResponse.ok) {
           // Don't throw - PDF was already downloaded
-          console.warn('Failed to save agreement to database');
+          log.warn('Failed to save agreement to database', undefined, 'ProjectAgreementsTab');
         }
       }
 

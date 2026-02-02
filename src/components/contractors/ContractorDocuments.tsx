@@ -11,6 +11,7 @@ import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument } from '@/types/contractor-document.types';
 import { DocumentCard } from './DocumentCard';
 import { DocumentUploadForm } from './DocumentUploadForm';
+import { log } from '@/lib/logger';
 
 interface ContractorDocumentsProps {
   contractorId: string;
@@ -37,7 +38,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
       const data = await response.json();
       setDocuments(data.data || []);
     } catch (err: any) {
-      console.error('Fetch error:', err);
+      log.error('Failed to fetch documents', { error: err }, 'ContractorDocuments');
       setError(err.message || 'Failed to load documents');
     } finally {
       setIsLoading(false);
@@ -80,7 +81,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
       notificationService.success('Document deleted');
 
     } catch (err: unknown) {
-      console.error('Delete error:', err);
+      log.error('Failed to delete document', { error: err }, 'ContractorDocuments');
       const message = err instanceof Error ? err.message : 'Failed to delete document';
       notificationService.error(message);
     }
@@ -110,7 +111,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
       notificationService.success(`Document ${action === 'approve' ? 'approved' : 'rejected'}`);
 
     } catch (err: unknown) {
-      console.error('Verify error:', err);
+      log.error(`Failed to ${action} document`, { error: err }, 'ContractorDocuments');
       const message = err instanceof Error ? err.message : `Failed to ${action} document`;
       notificationService.error(message);
     }
@@ -150,7 +151,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       notificationService.success('Master Build Agreement generated');
     } catch (err: unknown) {
-      console.error('Generate error:', err);
+      log.error('Failed to generate Master Build Agreement', { error: err }, 'ContractorDocuments');
       const message = err instanceof Error ? err.message : 'Failed to generate document';
       notificationService.error(message);
     } finally {

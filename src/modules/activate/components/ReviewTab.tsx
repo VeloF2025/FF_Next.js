@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { STEP_LABELS } from '../utils/stepMapper';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // TYPES
@@ -162,7 +163,7 @@ export function ReviewTab({
         setSelectedIndex(selectedIndex + 1);
       }
     } catch (error) {
-      console.error('Failed to approve step:', error);
+      log.error('Failed to approve step', error, 'ReviewTab');
     } finally {
       setIsProcessing(false);
     }
@@ -182,7 +183,7 @@ export function ReviewTab({
         setSelectedIndex(selectedIndex + 1);
       }
     } catch (error) {
-      console.error('Failed to reject step:', error);
+      log.error('Failed to reject step', error, 'ReviewTab');
     } finally {
       setIsProcessing(false);
     }

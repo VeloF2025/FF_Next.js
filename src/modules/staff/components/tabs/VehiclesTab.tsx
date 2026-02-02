@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import type { VehicleAssignment } from '@/types/staff';
 import { checkVehicleNeedsAttention, formatVehicleDisplayName } from '@/types/staff/vehicle.types';
+import { log } from '@/lib/logger';
 
 // Date format helpers (dd/mm/yyyy <-> yyyy-mm-dd)
 const isoToDisplay = (isoDate: string | null): string => {
@@ -137,7 +138,7 @@ export function VehiclesTab({
 
       setShowEditLicense(false);
     } catch (err) {
-      console.error('Failed to save license details:', err);
+      log.error('Failed to save license details', { error: err, licenseId: licenseDetails.id }, 'VehiclesTab');
     } finally {
       setSaving(false);
     }

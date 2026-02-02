@@ -33,6 +33,7 @@ import {
   TaxStatus,
   SAContractType,
 } from '@/types/staff/compliance.types';
+import { log } from '@/lib/logger';
 
 interface DocumentStatus {
   type: string;
@@ -91,7 +92,7 @@ export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
           setComplianceStatus(data);
         }
       } catch (error) {
-        console.error('Failed to fetch compliance status:', error);
+        log.error('Failed to fetch compliance status', { error, staffId: staff.id }, 'ComplianceTab');
       } finally {
         setIsLoading(false);
       }

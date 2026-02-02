@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorOnboardingProgress, OnboardingProgress } from './ContractorOnboardingProgress';
 import { OnboardingStageCardEnhanced, OnboardingStage } from './OnboardingStageCardEnhanced';
+import { log } from '@/lib/logger';
 
 interface ContractorOnboardingStagesProps {
   contractorId: string;
@@ -42,7 +43,7 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
       calculateProgress(stagesData);
     } catch (err: any) {
       setError(err.message);
-      console.error('Error fetching onboarding stages:', err);
+      log.error('Failed to fetch onboarding stages', { error: err, contractorId }, 'ContractorOnboardingStages');
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +94,7 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
       await fetchStages();
       notificationService.success('Stage updated');
     } catch (err: unknown) {
-      console.error('Error updating stage:', err);
+      log.error('Failed to update onboarding stage', { error: err, stageId, contractorId }, 'ContractorOnboardingStages');
       const message = err instanceof Error ? err.message : 'Unknown error';
       notificationService.error(`Failed to update stage: ${message}`);
     }
@@ -124,7 +125,7 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
       notificationService.success('Onboarding completed successfully');
       await fetchStages();
     } catch (err: unknown) {
-      console.error('Error completing onboarding:', err);
+      log.error('Failed to complete onboarding', { error: err, contractorId }, 'ContractorOnboardingStages');
       const message = err instanceof Error ? err.message : 'Unknown error';
       notificationService.error(`Failed to complete onboarding: ${message}`);
     } finally {

@@ -5,6 +5,7 @@
  */
 
 import { getDbConnection } from '../utils/db';
+import { log } from '@/lib/logger';
 import { CategorySchema, type CategoryInput } from '../utils/schemas';
 import type { AssetCategory } from '../types/asset';
 import type { AssetCategoryTypeValue } from '../constants/assetCategories';
@@ -78,7 +79,7 @@ export const categoryService = {
         data: rows.map(transformRow),
       };
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      log.error('Error fetching categories', { error, filter }, 'categoryService.getAll');
       return {
         success: false,
         data: [],
@@ -103,7 +104,7 @@ export const categoryService = {
         data: row ? transformRow(row) : null,
       };
     } catch (error) {
-      console.error('Error fetching category:', error);
+      log.error('Error fetching category', { error, id }, 'categoryService.getById');
       return {
         success: false,
         data: null,
@@ -128,7 +129,7 @@ export const categoryService = {
         data: row ? transformRow(row) : null,
       };
     } catch (error) {
-      console.error('Error fetching category by code:', error);
+      log.error('Error fetching category by code', { error, code }, 'categoryService.getByCode');
       return {
         success: false,
         data: null,
@@ -196,7 +197,7 @@ export const categoryService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error creating category:', error);
+      log.error('Error creating category', { error, input }, 'categoryService.create');
       return {
         success: false,
         data: null,
@@ -256,7 +257,7 @@ export const categoryService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error updating category:', error);
+      log.error('Error updating category', { error, id, input }, 'categoryService.update');
       return {
         success: false,
         data: null,
@@ -293,7 +294,7 @@ export const categoryService = {
         data: true,
       };
     } catch (error) {
-      console.error('Error deleting category:', error);
+      log.error('Error deleting category', { error, id }, 'categoryService.delete');
       return {
         success: false,
         data: false,
@@ -333,7 +334,7 @@ export const categoryService = {
         data: transformRow(row),
       };
     } catch (error) {
-      console.error('Error updating category status:', error);
+      log.error('Error updating category status', { error, id, isActive }, 'categoryService.setActive');
       return {
         success: false,
         data: null,
@@ -358,7 +359,7 @@ export const categoryService = {
         data: result?.count || 0,
       };
     } catch (error) {
-      console.error('Error getting asset count:', error);
+      log.error('Error getting asset count', { error, id }, 'categoryService.getAssetCount');
       return {
         success: false,
         data: 0,
@@ -383,7 +384,7 @@ export const categoryService = {
         data: rows.map(r => r.type as string),
       };
     } catch (error) {
-      console.error('Error getting category types:', error);
+      log.error('Error getting category types', { error }, 'categoryService.getTypes');
       return {
         success: false,
         data: [],

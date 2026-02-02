@@ -7,6 +7,7 @@
 
 import dynamic from 'next/dynamic';
 import { ComponentType, lazy, Suspense } from 'react';
+import { log } from '@/lib/logger';
 
 /**
  * Loading fallback component
@@ -90,7 +91,7 @@ export async function preload<T>(
   try {
     await importFunc();
   } catch (error) {
-    console.warn('[Preload] Failed to preload component:', error);
+    log.warn('Failed to preload component', error instanceof Error ? { message: error.message } : { error }, 'Preload');
   }
 }
 
@@ -254,10 +255,10 @@ export function lazyLoadMonitored<T extends ComponentType<any>>(
       const module = await importFunc();
       const duration = performance.now() - start;
       LazyLoadMonitor.trackLoad(name, duration);
-      console.log(`[LazyLoad] ${name} loaded in ${duration.toFixed(2)}ms`);
+      log.info(`${name} loaded in ${duration.toFixed(2)}ms`, { name, duration }, 'LazyLoad');
       return module;
     } catch (error) {
-      console.error(`[LazyLoad] Failed to load ${name}:`, error);
+      log.error(`Failed to load ${name}`, error instanceof Error ? { message: error.message } : { error }, 'LazyLoad');
       throw error;
     }
   });

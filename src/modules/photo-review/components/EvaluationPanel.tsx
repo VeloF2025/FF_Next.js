@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { Send, Sparkles, RefreshCw, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import type { DropRecord, EvaluationResult } from '../types';
+import { log } from '@/lib/logger';
 
 interface EvaluationPanelProps {
   drop: DropRecord;
@@ -33,7 +34,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Evaluation failed';
       setError(errorMessage);
-      console.error('Evaluation error:', err);
+      log.error('Evaluation error', { error: err }, 'EvaluationPanel');
     }
   };
 
@@ -100,7 +101,7 @@ export function EvaluationPanel({ drop, evaluation = null, isEvaluating = false,
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send feedback';
       setError(errorMessage);
-      console.error('Send feedback error:', err);
+      log.error('Send feedback error', { error: err }, 'EvaluationPanel');
     } finally {
       setSending(false);
     }

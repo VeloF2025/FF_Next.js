@@ -6,6 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 import { ALERT_RULES, checkAlertRule, createAlert, sendAlert } from '@/lib/alerts';
 
 /**
@@ -57,7 +58,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    console.error('Error checking alerts:', error);
+    log.error('Error checking alerts', { error }, 'api/monitoring/alerts/check');
     return res.status(500).json({
       success: false,
       error: 'Failed to check alerts',

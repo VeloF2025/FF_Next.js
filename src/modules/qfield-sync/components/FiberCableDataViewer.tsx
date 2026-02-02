@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Cable, MapPin, Activity, CheckCircle, Clock, AlertCircle, RefreshCw, Download } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface FiberCable {
   cable_id: string;
@@ -120,7 +121,7 @@ export function FiberCableDataViewer() {
         setCables(allCables);
       }
     } catch (err) {
-      console.error('Error fetching cable data:', err);
+      log.error('Error fetching cable data', { error: err }, 'FiberCableDataViewer');
       setError(err instanceof Error ? err.message : 'Failed to fetch cable data');
     } finally {
       setLoading(false);

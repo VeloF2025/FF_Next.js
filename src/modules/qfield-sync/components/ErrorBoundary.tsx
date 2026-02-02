@@ -5,6 +5,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { log } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -26,7 +27,7 @@ export class QFieldSyncErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('QField Sync Error:', error, errorInfo);
+    log.error('QField Sync Error', { error, errorInfo }, 'QFieldSyncErrorBoundary');
   }
 
   private handleReset = () => {
