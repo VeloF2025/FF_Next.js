@@ -39,6 +39,11 @@ export default withAuth(withErrorHandler(async (
       `;
       const liveActivatedCount = Number(activationsResult[0]?.total_activated || 0);
 
+      // Debug logging
+      console.log('[client-pos] projectId:', projectId);
+      console.log('[client-pos] activationsResult:', JSON.stringify(activationsResult));
+      console.log('[client-pos] liveActivatedCount:', liveActivatedCount);
+
       // Query with optional status filter - avoid empty sql fragments
       const clientPOs = status
         ? await sql`
