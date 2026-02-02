@@ -255,7 +255,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragActive
                   ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-[var(--ff-border-light)] hover:border-[var(--ff-text-secondary)]'
+                  : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] hover:border-[var(--ff-text-secondary)]'
               }`}
             >
               {extracting ? (
