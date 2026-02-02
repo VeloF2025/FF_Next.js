@@ -30,6 +30,15 @@ export default withAuth(withErrorHandler(async (
     try {
       const status = req.query.status as string | undefined;
 
+      // Get live activation count for the project from oes_activations
+      const activationsResult = await sql`
+        SELECT COUNT(*) as total_activated
+        FROM oes_activations oa
+        INNER JOIN drops d ON d.id = oa.drop_id
+        WHERE d.project_id = ${projectId}
+      `;
+      const liveActivatedCount = Number(activationsResult[0]?.total_activated || 0);
+
       // Query with optional status filter - avoid empty sql fragments
       const clientPOs = status
         ? await sql`
@@ -49,9 +58,23 @@ export default withAuth(withErrorHandler(async (
             ORDER BY cpo.created_at DESC
           `;
 
+      // For single PO projects, use the live activation count
+      // For multi-PO projects, this distributes based on contracted ratio (simplified approach)
+      const totalContracted = clientPOs.reduce((sum: number, po: Record<string, unknown>) => sum + Number(po.contracted_drops || 0), 0);
+      const posWithLiveCounts = clientPOs.map((po: Record<string, unknown>) => {
+        if (clientPOs.length === 1) {
+          // Single PO gets all activations
+          return { ...po, drops_activated: liveActivatedCount };
+        } else {
+          // Multi-PO: distribute proportionally (for now, use stored value if available)
+          const ratio = totalContracted > 0 ? Number(po.contracted_drops || 0) / totalContracted : 0;
+          return { ...po, drops_activated: Math.round(liveActivatedCount * ratio) };
+        }
+      });
+
       return apiResponse.success(res, {
-        clientPOs: clientPOs.map(transformClientPO),
-        count: clientPOs.length,
+        clientPOs: posWithLiveCounts.map(transformClientPO),
+        count: posWithLiveCounts.length,
       });
     } catch (error) {
       log.error('Failed to fetch Client POs', { projectId, error });
