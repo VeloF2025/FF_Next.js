@@ -28,6 +28,7 @@ import {
   MapPin,
   Clock,
   Lock,
+  Loader2,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
@@ -100,11 +101,14 @@ export function DataSyncPage() {
   const activeGroup = (router.query.group as TabGroupId) || null;
   const activeTab = (router.query.tab as string) || null;
 
+  // Show loading state while permissions are being resolved
+  const isLoading = permissionsLoading || featuresLoading;
+
   // Filter groups based on permissions and feature settings
   const accessibleGroups = useMemo(() => {
-    // Wait for both to load
+    // Don't show any groups while loading to prevent flash of unauthorized content
     if (permissionsLoading || featuresLoading) {
-      return TAB_GROUPS; // Show all while loading
+      return [];
     }
 
     return TAB_GROUPS.filter((group) => {
@@ -157,6 +161,18 @@ export function DataSyncPage() {
 
   // Get current group config
   const currentGroup = TAB_GROUPS.find((g) => g.id === activeGroup);
+
+  // Show loading state while permissions are being resolved
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--ff-accent)]" />
+          <p className="text-[var(--ff-text-secondary)]">Loading permissions...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show access denied if trying to access a group without permission
   if (activeGroup && !currentGroupAccessible && !permissionsLoading && !featuresLoading) {
