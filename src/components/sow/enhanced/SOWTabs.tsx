@@ -25,9 +25,9 @@ export function SOWTabs({
 }: SOWTabsProps) {
   const tabs = [
     { id: 'summary' as TabType, label: 'Summary', icon: Activity },
-    { id: 'poles' as TabType, label: `Poles (${polesCount})`, icon: MapPin },
-    { id: 'drops' as TabType, label: `Drops (${dropsCount})`, icon: Home },
-    { id: 'fibre' as TabType, label: `Fibre (${fibreCount})`, icon: Cable },
+    { id: 'poles' as TabType, label: `Poles (${polesCount.toLocaleString()})`, icon: MapPin },
+    { id: 'drops' as TabType, label: `Drops (${dropsCount.toLocaleString()})`, icon: Home },
+    { id: 'fibre' as TabType, label: `Fibre (${fibreCount.toLocaleString()})`, icon: Cable },
   ];
 
   return (
@@ -42,7 +42,7 @@ export function SOWTabs({
               className={cn(
                 "py-2 px-1 border-b-2 font-medium text-sm flex items-center transition-colors",
                 activeTab === tab.id
-                  ? "border-primary-500 text-primary-600"
+                  ? "border-blue-500 text-blue-500"
                   : "border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]"
               )}
             >

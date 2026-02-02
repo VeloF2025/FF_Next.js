@@ -45,26 +45,26 @@ export function SOWDataStatus({
     : 'Not yet imported';
 
   return (
-    <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4">
+    <div className="bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-4">
       <h4 className="font-medium text-[var(--ff-text-primary)] mb-3">Data Status</h4>
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div className="flex items-center gap-2">
-          <Database className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+          <Database className="w-4 h-4 text-blue-500" />
           <span className="text-[var(--ff-text-secondary)]">Source:</span>
-          <span className="ml-1 font-medium">{summary?.dataSource || 'PostgreSQL'}</span>
+          <span className="ml-1 font-medium text-[var(--ff-text-primary)]">{summary?.dataSource || 'PostgreSQL'}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+          <Clock className="w-4 h-4 text-blue-500" />
           <span className="text-[var(--ff-text-secondary)]">Last Updated:</span>
-          <span className="ml-1 font-medium">{lastImported}</span>
+          <span className="ml-1 font-medium text-[var(--ff-text-primary)]">{lastImported}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Hash className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+          <Hash className="w-4 h-4 text-blue-500" />
           <span className="text-[var(--ff-text-secondary)]">Total Items:</span>
-          <span className="ml-1 font-medium">{totalItems.toLocaleString()}</span>
+          <span className="ml-1 font-medium text-[var(--ff-text-primary)]">{totalItems.toLocaleString()}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+          <Activity className="w-4 h-4 text-green-500" />
           <span className="text-[var(--ff-text-secondary)]">Status:</span>
           <span className="ml-1 font-medium text-green-500 flex items-center gap-1">
             <CheckCircle className="w-4 h-4" />

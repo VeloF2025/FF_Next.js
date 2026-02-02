@@ -26,24 +26,24 @@ export function SOWStatistics({ poles, drops, totalPoles, totalDrops }: SOWStati
   const utilization = (totalDrops / totalCapacity) * 100;
 
   return (
-    <div className="bg-[var(--ff-bg-tertiary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-      <h4 className="font-medium text-[var(--ff-text-primary)] mb-3">Pole Utilization</h4>
+    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+      <h4 className="font-medium text-amber-500 mb-3">Pole Utilization</h4>
       <div className="grid grid-cols-3 gap-4 text-sm">
         <div>
           <span className="text-[var(--ff-text-secondary)]">Drops per Pole:</span>
-          <span className="ml-2 font-medium text-[var(--ff-text-primary)]">
+          <span className="ml-2 font-medium text-amber-400">
             {avgDropsPerPole.toFixed(1)} avg
           </span>
         </div>
         <div>
           <span className="text-[var(--ff-text-secondary)]">Max Capacity:</span>
-          <span className="ml-2 font-medium text-[var(--ff-text-primary)]">
+          <span className="ml-2 font-medium text-amber-400">
             {totalCapacity.toLocaleString()} drops
           </span>
         </div>
         <div>
           <span className="text-[var(--ff-text-secondary)]">Utilization:</span>
-          <span className="ml-2 font-medium text-[var(--ff-text-primary)]">
+          <span className="ml-2 font-medium text-amber-400">
             {utilization.toFixed(0)}%
           </span>
         </div>
