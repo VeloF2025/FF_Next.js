@@ -110,4 +110,63 @@ npm run build                  # Full build check
 
 ---
 
+## React Hooks Rules
+
+### Rules of Hooks Violations
+**ZERO TOLERANCE** - Hooks must follow React rules
+
+```typescript
+// BLOCKED - Hook called conditionally
+try {
+  const context = useMyContext();
+} catch {
+  // fallback
+}
+
+// BLOCKED - Hook called in non-hook function
+function getConfig() {
+  const { value } = useScreenSize();  // Not a hook!
+  return value;
+}
+
+// BLOCKED - Hook in render helper
+const renderItem = () => {
+  const { data } = useDropzone();  // Inside non-component function!
+  return <div />;
+};
+
+// CORRECT - Create optional hook variant
+export function useMyContextOptional() {
+  return useContext(MyContext) ?? null;
+}
+
+// CORRECT - Rename to hook
+export function useResponsiveConfig() {
+  const { isMobile } = useScreenSize();
+  return isMobile ? mobileConfig : desktopConfig;
+}
+
+// CORRECT - Call hooks at top level, pass to helpers
+const dropzone = useDropzone({ onDrop });
+const renderItem = () => <div {...dropzone.getRootProps()} />;
+```
+
+### Styled-JSX in Next.js
+```typescript
+// Add eslint-disable for styled-jsx (valid Next.js syntax)
+{/* eslint-disable-next-line react/no-unknown-property */}
+<style jsx>{`...`}</style>
+```
+
+---
+
+## Test Files Exception
+
+Console statements are **allowed** in test files:
+- `src/tests/**/*`
+- `**/__tests__/**/*`
+- `*.test.ts`, `*.test.tsx`
+
+---
+
 **Commits with violations are BLOCKED.**
