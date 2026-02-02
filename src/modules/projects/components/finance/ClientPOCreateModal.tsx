@@ -177,7 +177,9 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
     }
   }, [handleFileUpload]);
 
-  const totalValue = (formData.contractedDrops || 0) * (formData.pricePerDrop || 0);
+  const subtotal = (formData.contractedDrops || 0) * (formData.pricePerDrop || 0);
+  const vatAmount = subtotal * ((formData.taxRate || 15) / 100);
+  const totalIncVat = subtotal + vatAmount;
 
   // Confidence indicator for extracted fields
   const renderConfidenceIndicator = () => {
@@ -373,11 +375,23 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               </div>
             </div>
 
-            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[var(--ff-text-secondary)]">Total Contract Value</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">Subtotal (excl. VAT)</span>
+                <span className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                  R {subtotal.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[var(--ff-text-secondary)]">VAT ({formData.taxRate || 15}%)</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">
+                  R {vatAmount.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-blue-500/30">
+                <span className="text-sm font-medium text-[var(--ff-text-primary)]">Total (incl. VAT)</span>
                 <span className="text-xl font-bold text-blue-400">
-                  R {totalValue.toLocaleString()}
+                  R {totalIncVat.toLocaleString()}
                 </span>
               </div>
             </div>
