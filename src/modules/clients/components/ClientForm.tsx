@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Save, Building } from 'lucide-react';
+import { Save, Building } from 'lucide-react';
 import { useClient, useCreateClient, useUpdateClient } from '@/hooks/useClients';
 import { 
   ClientFormData, 
@@ -146,16 +146,6 @@ export function ClientForm() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <button
-          onClick={() => router.push('/clients')}
-          className="inline-flex items-center text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back to Client List
-        </button>
-      </div>
-
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)]">
         <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
           <div className="flex items-center gap-3">
@@ -217,7 +207,7 @@ export function ClientForm() {
             <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Additional Information</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                   Tags (comma-separated)
                 </label>
                 <input
@@ -230,7 +220,7 @@ export function ClientForm() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                   Special Requirements
                 </label>
                 <textarea
@@ -242,7 +232,7 @@ export function ClientForm() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                   Notes
                 </label>
                 <textarea
