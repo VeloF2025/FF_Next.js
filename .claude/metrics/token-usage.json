@@ -51,13 +51,13 @@
     "d687ef10-0fe0-4f96-9d00-9da7a213319d": {
       "session_id": "d687ef10-0fe0-4f96-9d00-9da7a213319d",
       "started_at": "2026-02-02T19:44:32.104Z",
-      "total_input_tokens": 6394,
+      "total_input_tokens": 6454,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.019182000000000005,
-      "tool_calls": 94,
+      "total_cost_usd": 0.019362000000000004,
+      "tool_calls": 97,
       "tools_used": {
         "Glob": 5,
-        "Bash": 24,
+        "Bash": 27,
         "Read": 14,
         "Edit": 10,
         "Grep": 1,
@@ -72,22 +72,23 @@
     "4da83a63-37f4-4d4b-92f1-3b1ed8028cbf": {
       "session_id": "4da83a63-37f4-4d4b-92f1-3b1ed8028cbf",
       "started_at": "2026-02-02T19:45:50.876Z",
-      "total_input_tokens": 13737,
+      "total_input_tokens": 15226,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.04121100000000002,
-      "tool_calls": 131,
+      "total_cost_usd": 0.04567800000000004,
+      "tool_calls": 167,
       "tools_used": {
-        "Bash": 23,
+        "Bash": 27,
         "TaskUpdate": 13,
         "TaskCreate": 8,
-        "mcp__claude-in-chrome__navigate": 9,
-        "mcp__claude-in-chrome__computer": 24,
+        "mcp__claude-in-chrome__navigate": 15,
+        "mcp__claude-in-chrome__computer": 38,
         "mcp__claude-in-chrome__read_console_messages": 2,
-        "Glob": 7,
-        "Read": 22,
+        "Glob": 11,
+        "Read": 25,
         "Grep": 9,
-        "Edit": 13,
-        "mcp__claude-in-chrome__tabs_context_mcp": 1
+        "Edit": 14,
+        "mcp__claude-in-chrome__tabs_context_mcp": 1,
+        "mcp__claude-in-chrome__javascript_tool": 4
       }
     }
   }
