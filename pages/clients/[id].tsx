@@ -1,9 +1,10 @@
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 const ClientDetail = dynamic(
   () => import('../../src/modules/clients/components/ClientDetail').then(mod => mod.ClientDetail),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center min-h-screen">
@@ -14,7 +15,11 @@ const ClientDetail = dynamic(
 );
 
 const ClientDetailPage: NextPage = () => {
-  return <ClientDetail />;
+  return (
+    <AppLayout>
+      <ClientDetail />
+    </AppLayout>
+  );
 };
 
 // Disable static generation to prevent Html import and router issues
