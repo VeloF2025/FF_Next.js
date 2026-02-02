@@ -15,7 +15,7 @@ pdf_options:
     <section>
       <div class="header-line">
         <span style="color: #023047; font-weight: 600;">VELOCITY FIBRE</span>
-        <span>FibreFlow — Complete User Manual v1.0</span>
+        <span>FibreFlow — Complete User Manual v1.1</span>
       </div>
     </section>
   footerTemplate: |-
@@ -166,8 +166,8 @@ css: |-
 <hr class="cover-divider" />
 
 <div class="cover-meta">
-<strong>Version:</strong> 1.0<br/>
-<strong>Last Updated:</strong> 31 January 2026<br/>
+<strong>Version:</strong> 1.1<br/>
+<strong>Last Updated:</strong> 02 February 2026<br/>
 <strong>Application:</strong> FibreFlow (fibreflow.app)<br/>
 <strong>Scope:</strong> All Modules<br/>
 <strong>Classification:</strong> Internal Use
@@ -291,6 +291,18 @@ FibreFlow uses Role-Based Access Control (RBAC). Your role determines which modu
 | **Contractor** | External partner | Contractor portal, assigned project views |
 
 > **Important:** If you cannot see a menu item or feature described in this manual, your role may not have access. Contact your administrator to request additional permissions.
+
+#### Granular Tab-Level Permissions
+
+FibreFlow now supports **granular per-tab access control** within modules. This means:
+- Different users can see different tabs within the same module
+- Permissions are controlled at the individual tab level, not just module level
+- Unauthorized tabs show a loading state briefly, then are hidden (no flash of unauthorized content)
+
+Modules with tab-level permissions include:
+- **System Data Sync** — Activate, QField, History, and OLT Report groups
+- **Staff** — Per-tab access for Overview, Employment, Compliance, etc.
+- **Access Control** — Instant client-side filtering with improved search UX
 
 ### 1.5 Common UI Patterns
 
@@ -446,12 +458,22 @@ Click any project to view its detail page with comprehensive tabs.
 
 | Tab | Content |
 |-----|---------|
-| **Overview** | Project info, status, progress, key metrics |
+| **Overview** | Project info, KPI cards, workflow checklist, activation progress |
 | **Team** | Assigned staff and contractors with roles |
 | **Timeline** | Activity timeline and milestones |
+| **SOW** | Scope of Work data with statistics cards and drop counts |
+| **Documents** | Centralized file uploads for project documentation |
 | **Procurement** | BOQ, RFQ, PO summary for this project |
 | **Health & Safety** | H&S compliance, incidents, checklists |
+| **Wayleaves** | Wayleave applications and servitude agreements |
 | **Reports** | Project-specific reports |
+
+#### Overview Tab (Enhanced)
+
+The Overview tab now includes:
+- **KPI Cards** — Key metrics showing activation progress, completion rates, and blockers
+- **Workflow Checklist** — Track project milestones and requirements
+- **Progress from Activations** — Real-time progress calculated from actual OES activation data
 
 #### Team Management
 
@@ -460,6 +482,22 @@ The Team tab shows a unified view of all team members (staff and contractors):
 - **Team Members** — Staff assigned to this project
 - **Contractors** — External contractors working on the project
 - Add/remove members using the **+ Add Member** button
+
+#### Client PO Management
+
+Track purchase orders received from clients for project activations:
+- **PDF Import** — Upload client PO documents (PDF) for automatic data extraction via VLM
+- **VAT Breakdown** — Create modal shows VAT breakdown with net, VAT, and total amounts
+- **Activation Requirements** — Link POs to activation seed requirements
+- **Blockers Tracking** — Identify activation blockers based on PO status
+
+#### Documents Tab
+
+The Documents tab provides centralized file storage for project documentation:
+- Upload and organize project files
+- Support for multiple file types (PDF, images, documents)
+- Secure HTTPS URLs for all stored files
+- VF Storage integration with flat folder structure
 
 ### 3.3 Pipeline
 
@@ -1016,6 +1054,13 @@ Cost tracking and budget overview for procurement activities.
 - Outstanding payment tracking
 - Cost trends over time
 
+#### Income Dashboard
+
+The Income Dashboard shows revenue tracking based on actual activations:
+- **OES Activations** — Live activation counts from OES data
+- **Revenue by Project** — Income breakdown per project
+- **Client PO Status** — Outstanding and fulfilled client purchase orders
+
 ### 6.7 Approvals
 
 View and action pending approvals across procurement.
@@ -1168,10 +1213,12 @@ The Fleet module manages vehicles, drivers, fuel, GPS tracking, and daily check-
 
 ### 8.2 Vehicles
 
-**Navigation:** Fleet → **Vehicles** tab
+**Navigation:** Fleet → **Vehicles** tab (first tab)
 
 ![Vehicles List](../screenshots/complete/25-fleet-vehicles.png)
 *Figure 8.2: Fleet vehicles list showing registration, make, driver assignment, and status*
+
+> **Note:** The Vehicles tab is now the default first tab. The list defaults to showing only **Active** vehicles, with a filtered count displayed (e.g., "Showing 12 of 15 vehicles").
 
 #### Vehicle Information
 
@@ -1182,12 +1229,22 @@ Each vehicle record includes:
 - Current mileage
 - Fuel level
 - Service due date
-- Insurance and license expiry
-- Documents (registration, insurance, etc.)
+- Insurance and license disc expiry
+- Documents (registration, insurance, license disc, etc.)
+
+#### License Disc Management
+
+The license disc card now shows:
+- **Expiry Date** — When the license disc expires (not issue date)
+- **OCR Verification** — Upload a license disc photo for AI-powered data extraction:
+  - Registration number verification
+  - Expiry date extraction
+  - Vehicle details confirmation
+- **Upload Modal** — Full OCR verification workflow with extracted data preview
 
 ### 8.3 Drivers
 
-**Navigation:** Fleet → **Drivers** tab
+**Navigation:** Fleet → **Drivers** tab (second tab)
 
 - **Driver List** — All registered drivers with license status
 - **Driver Detail** — Contact info, assigned vehicle, license details
@@ -1414,13 +1471,23 @@ The Communications section manages WhatsApp integration, meeting coordination, a
 **Navigation:** Sidebar → **Communications** → **Communications Portal**
 
 ![Communications](../screenshots/complete/30-communications.png)
-*Figure 11.1: Communications Portal showing messaging overview and notification channels*
+*Figure 11.1: Communications Portal showing unified messaging and meetings interface*
 
-A unified view of organizational communications:
+A unified view of organizational communications with integrated meetings:
 - Overview statistics
 - Recent communications
 - Notification channels
 - Action items from communications
+- **Meetings** — Now integrated directly into the Communications Portal (merged from separate module)
+
+#### Meetings Integration
+
+The Meetings module is now part of the Communications Portal, providing:
+- **Fireflies.ai Sync** — Automatically synced meeting transcripts
+- **Meeting Summaries** — AI-generated summaries with key points
+- **Action Items** — Tasks extracted from meeting discussions
+- **Participant Tracking** — Meeting attendance and history
+- **Access Control** — Participant-based access (only see meetings you attended)
 
 ### 11.2 WhatsApp Administration
 
@@ -1492,16 +1559,18 @@ Monitor the health of all FibreFlow services:
 ![Data Sync](../screenshots/complete/33-data-sync.png)
 *Figure 12.2: Data Sync page showing sync operations, OLT report, and operation history*
 
-Manage data synchronization across systems:
+Manage data synchronization across systems.
+
+> **Note:** Data Sync now uses **granular tab-level permissions**. You will only see sync groups your role has access to. A loading spinner appears while permissions are checked, preventing any flash of unauthorized content.
 
 #### Sync Groups
 
 | Group | Description |
 |-------|-------------|
+| **Activate** | OES Sync, SharePoint Sync — Activate QA data imports |
+| **QField** | QField Sync — Push coordinates for field mapping |
+| **History** | Operation history and audit logs |
 | **OLT Report** | Import and fix ONT serial mismatches from OLT reports |
-| **OES Sync** | Import OES activation data from Excel |
-| **SharePoint Sync** | Sync DR data from SharePoint |
-| **QField Sync** | Push coordinates to QField for field mapping |
 | **1Map Sync** | Sync serial numbers with 1Map (OneMap) |
 | **QContact Sync** | Maintenance ticket synchronization |
 
@@ -1672,4 +1741,4 @@ Users can customize their sidebar by:
 
 *This manual is maintained by the Velocity Fibre development team. For questions, corrections, or feature requests, contact the system administrator.*
 
-*Document generated: 31 January 2026*
+*Document generated: 02 February 2026*

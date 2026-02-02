@@ -51,6 +51,8 @@ export interface RecentProject {
   status: string;
   progress: number;
   manager_name: string | null;
+  total_drops?: number;
+  completed_drops?: number;
 }
 
 export interface PortfolioDashboardData {

@@ -39,24 +39,35 @@ function getStatusBadge(status: string): { bg: string; text: string; label: stri
 }
 
 /**
- * Progress bar component
+ * Progress bar component - shows "< 1%" when there's progress but rounds to 0
  */
-function ProgressBar({ value }: { value: number }) {
+function ProgressBar({ value, completedDrops, totalDrops }: { value: number; completedDrops?: number; totalDrops?: number }) {
   const percent = Math.min(Math.max(value, 0), 100);
   const color = percent >= 80 ? 'bg-green-500' :
                 percent >= 50 ? 'bg-blue-500' :
-                percent >= 25 ? 'bg-amber-500' : 'bg-red-500';
+                percent >= 25 ? 'bg-amber-500' : 'bg-gray-400';
+
+  // Show "< 1%" if there are completed drops but rounds to 0%
+  const hasProgress = completedDrops && completedDrops > 0;
+  const displayPercent = percent === 0 && hasProgress ? '< 1%' : `${percent}%`;
+
+  // If no drops, show dash
+  if (totalDrops === 0) {
+    return (
+      <span className="text-xs text-[var(--ff-text-tertiary)]">No drops</span>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
         <div
           className={`h-full ${color} rounded-full transition-all duration-300`}
-          style={{ width: `${percent}%` }}
+          style={{ width: `${Math.max(percent, hasProgress ? 2 : 0)}%` }}
         />
       </div>
-      <span className="text-xs text-[var(--ff-text-secondary)] w-8 text-right">
-        {percent}%
+      <span className="text-xs text-[var(--ff-text-secondary)] w-10 text-right">
+        {displayPercent}
       </span>
     </div>
   );
@@ -145,7 +156,11 @@ export function RecentProjectsTable({ projects, isLoading = false }: RecentProje
                       </span>
                     </td>
                     <td className="py-3 px-3 hidden sm:table-cell">
-                      <ProgressBar value={project.progress} />
+                      <ProgressBar
+                        value={project.progress}
+                        completedDrops={project.completed_drops}
+                        totalDrops={project.total_drops}
+                      />
                     </td>
                     <td className="py-3 px-3 hidden lg:table-cell text-sm text-[var(--ff-text-secondary)]">
                       {project.manager_name || '—'}
