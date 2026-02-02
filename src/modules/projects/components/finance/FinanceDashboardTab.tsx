@@ -37,7 +37,7 @@ export function FinanceDashboardTab({
           throw new Error('Failed to fetch finance dashboard');
         }
         const result = await response.json();
-        setData(result);
+        setData(result.data);
       } catch (err) {
         log.error('Failed to fetch finance dashboard', { projectId, err });
         setError(err instanceof Error ? err.message : 'Failed to load dashboard');
