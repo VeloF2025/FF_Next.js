@@ -24,6 +24,10 @@ import type { TabGroupId, DataSyncStats } from '../types';
 
 interface OverviewDashboardProps {
   onGroupSelect: (groupId: TabGroupId) => void;
+  /**
+   * List of group IDs the user has access to (based on permissions + feature settings)
+   */
+  accessibleGroups?: TabGroupId[];
 }
 
 // Category card configuration
@@ -69,7 +73,7 @@ const CATEGORY_CARDS: {
   },
 ];
 
-export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
+export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewDashboardProps) {
   const [stats, setStats] = useState<DataSyncStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -265,7 +269,9 @@ export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
       <div>
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Sync Categories</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {CATEGORY_CARDS.map((card) => {
+          {CATEGORY_CARDS.filter(
+            (card) => !accessibleGroups || accessibleGroups.includes(card.id)
+          ).map((card) => {
             const Icon = card.icon;
             const cardStats = getStatsForCategory(card.id);
 
@@ -339,34 +345,42 @@ export function OverviewDashboard({ onGroupSelect }: OverviewDashboardProps) {
       <div>
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => onGroupSelect('maintenance')}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
-          >
-            <RefreshCw className="w-4 h-4 text-blue-400" />
-            Sync QContact
-          </button>
-          <button
-            onClick={() => onGroupSelect('activate')}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
-          >
-            <Upload className="w-4 h-4 text-amber-400" />
-            Import OES Report
-          </button>
-          <button
-            onClick={() => onGroupSelect('olt')}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
-          >
-            <Wrench className="w-4 h-4 text-red-400" />
-            Fix OLT Mismatches
-          </button>
-          <button
-            onClick={() => onGroupSelect('history')}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
-          >
-            <Clock className="w-4 h-4 text-cyan-400" />
-            View History
-          </button>
+          {(!accessibleGroups || accessibleGroups.includes('maintenance')) && (
+            <button
+              onClick={() => onGroupSelect('maintenance')}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+            >
+              <RefreshCw className="w-4 h-4 text-blue-400" />
+              Sync QContact
+            </button>
+          )}
+          {(!accessibleGroups || accessibleGroups.includes('activate')) && (
+            <button
+              onClick={() => onGroupSelect('activate')}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+            >
+              <Upload className="w-4 h-4 text-amber-400" />
+              Import OES Report
+            </button>
+          )}
+          {(!accessibleGroups || accessibleGroups.includes('olt')) && (
+            <button
+              onClick={() => onGroupSelect('olt')}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+            >
+              <Wrench className="w-4 h-4 text-red-400" />
+              Fix OLT Mismatches
+            </button>
+          )}
+          {(!accessibleGroups || accessibleGroups.includes('history')) && (
+            <button
+              onClick={() => onGroupSelect('history')}
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+            >
+              <Clock className="w-4 h-4 text-cyan-400" />
+              View History
+            </button>
+          )}
         </div>
       </div>
     </div>

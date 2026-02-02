@@ -8,9 +8,10 @@ import { SidebarCustomization } from '@/components/settings/SidebarCustomization
 import { SageIntegrationTab } from '@/components/settings/SageIntegrationTab';
 import { AccessControlTab } from '@/components/settings/AccessControlTab';
 import { ProcurementSettingsTab } from '@/components/settings/ProcurementSettingsTab';
-import { Palette, Moon, Sun, Settings2, GitBranch, Bell, PanelLeft, Cloud, Shield, ShoppingCart } from 'lucide-react';
+import { SystemSettingsTab } from '@/components/settings/SystemSettingsTab';
+import { Palette, Moon, Sun, Settings2, GitBranch, Bell, PanelLeft, Cloud, Shield, ShoppingCart, Database } from 'lucide-react';
 
-type SettingsTab = 'general' | 'sidebar' | 'workflow' | 'reminders' | 'integrations' | 'access' | 'procurement';
+type SettingsTab = 'general' | 'sidebar' | 'workflow' | 'reminders' | 'integrations' | 'access' | 'procurement' | 'system';
 
 export function Settings() {
   const { themeConfig, setTheme, availableThemes } = useTheme();
@@ -23,6 +24,7 @@ export function Settings() {
     { id: 'access', label: 'Access Control', icon: Shield },
     { id: 'workflow', label: 'Workflow Management', icon: GitBranch },
     { id: 'procurement', label: 'Procurement', icon: ShoppingCart },
+    { id: 'system', label: 'System', icon: Database },
     { id: 'integrations', label: 'Integrations', icon: Cloud },
     { id: 'reminders', label: 'Reminders', icon: Bell }
   ] as const;
@@ -174,13 +176,16 @@ export function Settings() {
       case 'procurement':
         return <ProcurementSettingsTab />;
 
+      case 'system':
+        return <SystemSettingsTab />;
+
       default:
         return null;
     }
   };
 
   // Access Control tab needs full width for the data table
-  const isFullWidth = activeTab === 'access' || activeTab === 'procurement';
+  const isFullWidth = activeTab === 'access' || activeTab === 'procurement' || activeTab === 'system';
 
   return (
     <div className={`p-6 ${isFullWidth ? '' : ''}`}>

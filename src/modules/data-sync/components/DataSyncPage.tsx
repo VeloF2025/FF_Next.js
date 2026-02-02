@@ -7,11 +7,16 @@
  * - /system/data-sync?group=maintenance - Maintenance tabs
  * - /system/data-sync?group=activate - Activate tabs
  * - /system/data-sync?group=olt - OLT Report tabs
+ *
+ * Access Control:
+ * - Groups and tabs are filtered by both RBAC permissions and feature settings
+ * - Feature settings can be toggled in Settings > System
+ * - RBAC permissions are managed in Settings > Access Control
  */
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   ArrowLeft,
@@ -22,6 +27,7 @@ import {
   AlertTriangle,
   MapPin,
   Clock,
+  Lock,
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
@@ -30,9 +36,25 @@ import { ActivateGroup } from './groups/ActivateGroup';
 import { OltReportGroup } from './groups/OltReportGroup';
 import { QFieldGroup } from './groups/QFieldGroup';
 import { HistoryGroup } from './groups/HistoryGroup';
+import { usePermission } from '@/hooks/usePermission';
+import { useSystemFeatures } from '../hooks/useSystemFeatures';
+
+// Permission keys for each group
+const GROUP_PERMISSION_KEYS: Record<TabGroupId, string> = {
+  maintenance: 'system.data-sync.maintenance',
+  activate: 'system.data-sync.activate',
+  olt: 'system.data-sync.olt',
+  qfield: 'system.data-sync.qfield',
+  history: 'system.data-sync.history',
+};
 
 // Tab group configuration
-const TAB_GROUPS: { id: TabGroupId; label: string; icon: React.ElementType; description: string }[] = [
+const TAB_GROUPS: {
+  id: TabGroupId;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+}[] = [
   {
     id: 'maintenance',
     label: 'Maintenance',
@@ -70,9 +92,39 @@ export function DataSyncPage() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Permission and feature hooks
+  const { can, isLoading: permissionsLoading } = usePermission();
+  const { isFeatureEnabled, isLoading: featuresLoading } = useSystemFeatures();
+
   // Get group and tab from URL
   const activeGroup = (router.query.group as TabGroupId) || null;
   const activeTab = (router.query.tab as string) || null;
+
+  // Filter groups based on permissions and feature settings
+  const accessibleGroups = useMemo(() => {
+    // Wait for both to load
+    if (permissionsLoading || featuresLoading) {
+      return TAB_GROUPS; // Show all while loading
+    }
+
+    return TAB_GROUPS.filter((group) => {
+      const permissionKey = GROUP_PERMISSION_KEYS[group.id];
+
+      // Check RBAC permission
+      const hasPermission = can(permissionKey, 'view');
+
+      // Check feature setting
+      const featureEnabled = isFeatureEnabled(permissionKey);
+
+      return hasPermission && featureEnabled;
+    });
+  }, [permissionsLoading, featuresLoading, can, isFeatureEnabled]);
+
+  // Check if current group is accessible
+  const currentGroupAccessible = useMemo(() => {
+    if (!activeGroup) return true;
+    return accessibleGroups.some((g) => g.id === activeGroup);
+  }, [activeGroup, accessibleGroups]);
 
   // Handle group change
   const handleGroupChange = (groupId: TabGroupId | null) => {
@@ -105,6 +157,48 @@ export function DataSyncPage() {
 
   // Get current group config
   const currentGroup = TAB_GROUPS.find((g) => g.id === activeGroup);
+
+  // Show access denied if trying to access a group without permission
+  if (activeGroup && !currentGroupAccessible && !permissionsLoading && !featuresLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => handleGroupChange(null)}
+            className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
+            title="Back to overview"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-semibold text-[var(--ff-text-primary)] flex items-center gap-3">
+              <Database className="w-7 h-7 text-[var(--ff-accent)]" />
+              Access Denied
+            </h1>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
+            <Lock className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-xl font-semibold text-[var(--ff-text-primary)] mb-2">
+            Access Restricted
+          </h2>
+          <p className="text-[var(--ff-text-secondary)] max-w-md">
+            You don&apos;t have permission to access the {currentGroup?.label || activeGroup} section,
+            or this feature has been disabled by an administrator.
+          </p>
+          <button
+            onClick={() => handleGroupChange(null)}
+            className="mt-6 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
+          >
+            Return to Overview
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -151,7 +245,7 @@ export function DataSyncPage() {
       {/* Group Navigation Pills (when viewing a group) */}
       {activeGroup && (
         <div className="flex gap-2 pb-4 border-b border-[var(--ff-border-light)]">
-          {TAB_GROUPS.map((group) => {
+          {accessibleGroups.map((group) => {
             const Icon = group.icon;
             const isActive = activeGroup === group.id;
             return (
@@ -175,7 +269,10 @@ export function DataSyncPage() {
       {/* Content */}
       <div key={lastRefresh.getTime()}>
         {!activeGroup && (
-          <OverviewDashboard onGroupSelect={handleGroupChange} />
+          <OverviewDashboard
+            onGroupSelect={handleGroupChange}
+            accessibleGroups={accessibleGroups.map((g) => g.id)}
+          />
         )}
 
         {activeGroup === 'maintenance' && (
