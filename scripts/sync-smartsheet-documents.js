@@ -142,7 +142,14 @@ async function uploadToStorage(projectId, filename, fileBuffer, mimeType) {
     throw new Error(`Storage upload failed: ${error}`);
   }
 
-  return await response.json();
+  const result = await response.json();
+
+  // Convert internal IP URL to public HTTPS URL
+  if (result.url && result.url.includes('100.96.203.105:8091')) {
+    result.url = result.url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
+  }
+
+  return result;
 }
 
 async function syncDocuments(limit) {

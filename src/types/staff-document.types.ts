@@ -309,9 +309,11 @@ export const DOCUMENT_EXTRACTION_FIELDS: Partial<Record<DocumentType, string[]>>
 
 /**
  * VF Storage server configuration
+ * Note: baseUrl is internal for server-to-server; use publicUrl for browser-facing URLs
  */
 export const VF_STORAGE_CONFIG = {
-  baseUrl: 'http://100.96.203.105:8091',
+  baseUrl: 'http://100.96.203.105:8091', // Internal (server-to-server)
+  publicUrl: 'https://vf.fibreflow.app', // Public (browser-facing)
   endpoints: {
     upload: '/upload',
     list: '/list',

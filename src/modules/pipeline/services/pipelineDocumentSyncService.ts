@@ -213,8 +213,15 @@ async function uploadToStorage(
   }
 
   const result = await response.json() as { url: string; path: string };
+
+  // Convert internal IP URL to public HTTPS URL for browser access
+  let url = result.url;
+  if (url && url.includes('100.96.203.105:8091')) {
+    url = url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
+  }
+
   return {
-    url: result.url,
+    url,
     path: result.path,
   };
 }

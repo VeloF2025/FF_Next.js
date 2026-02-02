@@ -88,12 +88,23 @@ export class StorageAdapter {
     }
 
     const result = await response.json();
+    const actualFileName = result.filename || result.fileName;
+    const path = `${type}/${category}/${actualFileName}`;
+
+    // Always return public HTTPS URL for browser access
+    let url = result.url || result.publicUrl || `${VF_STORAGE_URL}/${path}`;
+    if (url.includes('100.96.203.105:8091')) {
+      url = url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
+    }
+    if (!url.startsWith('https://vf.fibreflow.app')) {
+      url = `https://vf.fibreflow.app/${path}`;
+    }
 
     return {
       success: true,
-      url: result.url || result.publicUrl,
-      path: `${type}/${category}/${result.filename || result.fileName}`,
-      fileName: result.filename || result.fileName,
+      url,
+      path,
+      fileName: actualFileName,
       size: result.size,
       source: 'vf-server',
     };
@@ -232,11 +243,12 @@ export class StorageAdapter {
   }
 
   /**
-   * Get file URL
+   * Get file URL (public HTTPS URL for browser access)
    */
   static getFileUrl(type: string, category: string, fileName: string): string {
     if (USE_VF_STORAGE) {
-      return `${VF_STORAGE_URL}/files/${type}/${category}/${fileName}`;
+      // Return public HTTPS URL, not internal IP
+      return `https://vf.fibreflow.app/${type}/${category}/${fileName}`;
     }
     return `/uploads/${type}/${category}/${fileName}`;
   }
