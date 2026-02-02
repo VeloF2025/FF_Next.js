@@ -198,6 +198,51 @@ export function useProjectBudgetSummary(projectId: string | undefined) {
 }
 
 /**
+ * Finance dashboard summary for progress tracking
+ */
+interface FinanceDashboardSummary {
+  activationProgress: number;
+  totalDropsActivated: number;
+  totalDropsContracted: number;
+  totalContractValue: number;
+  totalInvoiced: number;
+}
+
+/**
+ * Fetch finance dashboard for activation progress
+ */
+export function useProjectFinanceSummary(projectId: string | undefined) {
+  return useQuery<FinanceDashboardSummary>({
+    queryKey: ['project-finance-summary', projectId],
+    queryFn: async () => {
+      if (!projectId) throw new Error('Project ID required');
+      const res = await fetch(`/api/projects/${projectId}/finance/dashboard`);
+      if (!res.ok) {
+        return {
+          activationProgress: 0,
+          totalDropsActivated: 0,
+          totalDropsContracted: 0,
+          totalContractValue: 0,
+          totalInvoiced: 0,
+        };
+      }
+      const json = await res.json();
+      const data = json.data || json;
+      const clientPOs = data.clientPOs || {};
+      return {
+        activationProgress: clientPOs.activationProgress || 0,
+        totalDropsActivated: clientPOs.totalDropsActivated || 0,
+        totalDropsContracted: clientPOs.totalDropsContracted || 0,
+        totalContractValue: clientPOs.totalContractValue || 0,
+        totalInvoiced: clientPOs.totalInvoiced || 0,
+      };
+    },
+    enabled: !!projectId,
+    staleTime: 60_000,
+  });
+}
+
+/**
  * Mark a requirement as complete
  */
 export async function completeRequirement(

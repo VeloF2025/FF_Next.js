@@ -5,7 +5,7 @@
 
 import { TrendingUp, DollarSign, Users, AlertTriangle, Loader2 } from 'lucide-react';
 import { Project } from '@/types/project.types';
-import { useProjectTeamSummary, useProjectBudgetSummary, useProjectExpiringDocs } from '@/hooks/useProjectOverview';
+import { useProjectTeamSummary, useProjectBudgetSummary, useProjectExpiringDocs, useProjectFinanceSummary } from '@/hooks/useProjectOverview';
 import { formatCurrency } from './ProjectDetailUtils';
 
 interface ProjectOverviewKPICardsProps {
@@ -24,9 +24,12 @@ export function ProjectOverviewKPICards({
   const { data: teamData, isLoading: teamLoading } = useProjectTeamSummary(project.id);
   const { data: budgetData, isLoading: budgetLoading } = useProjectBudgetSummary(project.id);
   const { data: expiringDocs, isLoading: expiringLoading } = useProjectExpiringDocs(project.id, 30);
+  const { data: financeSummary, isLoading: financeLoading } = useProjectFinanceSummary(project.id);
 
-  // Calculate progress
-  const progress = Math.round(project.actualProgress || 0);
+  // Use activation progress from finance dashboard, fallback to project.actualProgress
+  const progress = Math.round(financeSummary?.activationProgress || project.actualProgress || 0);
+  const dropsActivated = financeSummary?.totalDropsActivated || 0;
+  const dropsContracted = financeSummary?.totalDropsContracted || 0;
 
   // Get expiring docs count (warning + critical + expired)
   const expiringCount = expiringDocs
@@ -46,18 +49,25 @@ export function ProjectOverviewKPICards({
           <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-blue-500" />
           </div>
-          <span className={`text-2xl font-bold ${
-            progress >= 75 ? 'text-green-500' :
-            progress >= 50 ? 'text-blue-500' :
-            progress >= 25 ? 'text-yellow-500' :
-            'text-[var(--ff-text-primary)]'
-          }`}>
-            {progress}%
-          </span>
+          {financeLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+          ) : (
+            <span className={`text-2xl font-bold ${
+              progress >= 75 ? 'text-green-500' :
+              progress >= 50 ? 'text-blue-500' :
+              progress >= 25 ? 'text-yellow-500' :
+              'text-[var(--ff-text-primary)]'
+            }`}>
+              {progress}%
+            </span>
+          )}
         </div>
         <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">Progress</h3>
         <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
-          Overall completion
+          {dropsContracted > 0
+            ? `${dropsActivated.toLocaleString()} / ${dropsContracted.toLocaleString()} drops`
+            : 'Overall completion'
+          }
         </p>
         {/* Mini progress bar */}
         <div className="mt-2 h-1.5 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
