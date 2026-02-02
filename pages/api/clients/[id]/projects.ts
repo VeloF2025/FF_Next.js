@@ -78,7 +78,7 @@ export default async function handler(
         COALESCE(p.budget, 0) as budget,
         COALESCE(p.actual_cost, 0) as "actualCost",
         COALESCE(p.progress, 0) as progress,
-        COALESCE(p.project_manager, '-') as "projectManager",
+        p.project_manager::text as "projectManager",
         p.start_date as "startDate",
         p.end_date as "endDate",
         COALESCE(pp.po_count, 0)::int as "poCount",
