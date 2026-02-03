@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import {
   parseFirefliesActionItems,
   findAssigneeEmail,
@@ -13,6 +13,8 @@ const sql = neon(process.env.DATABASE_URL!);
  * Extract action items from a meeting's summary
  * POST /api/action-items/extract
  * Body: { meeting_id: number }
+ *
+ * Access Control: User must be a participant of the meeting (or super_admin)
  */
 async function handler(
   req: NextApiRequest,
@@ -20,6 +22,16 @@ async function handler(
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Get user info for access control
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userEmail = authReq.user?.email?.toLowerCase();
+  const userRole = authReq.user?.role;
+  const isSuperAdmin = userRole === 'super_admin';
+
+  if (!userEmail) {
+    return res.status(403).json({ error: 'User email required for meeting access' });
   }
 
   try {
@@ -31,15 +43,25 @@ async function handler(
       });
     }
 
-    // Fetch meeting with action items
-    const [meeting] = await sql`
-      SELECT id, summary, participants
-      FROM meetings
-      WHERE id = ${meeting_id}
-    `;
+    // Fetch meeting with action items - check participant access
+    const [meeting] = isSuperAdmin
+      ? await sql`
+          SELECT id, summary, participants
+          FROM meetings
+          WHERE id = ${meeting_id}
+        `
+      : await sql`
+          SELECT id, summary, participants
+          FROM meetings
+          WHERE id = ${meeting_id}
+          AND EXISTS (
+            SELECT 1 FROM jsonb_array_elements(participants) AS p
+            WHERE LOWER(p->>'email') = ${userEmail}
+          )
+        `;
 
     if (!meeting) {
-      return apiResponse.notFound(res, 'Meeting', meeting_id);
+      return res.status(403).json({ error: 'Meeting not found or not authorized to access' });
     }
 
     // Check if action items exist in summary
