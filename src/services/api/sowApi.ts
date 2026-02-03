@@ -114,8 +114,8 @@ export const sowApi = {
     const CHUNK_SIZE = 250; // Conservative chunk size for Vercel
     
     if (drops.length <= CHUNK_SIZE) {
-      // Small dataset, upload directly
-      return this._uploadDropsChunk(projectId, drops);
+      // Small dataset, upload directly (clear existing first)
+      return this._uploadDropsChunk(projectId, drops, true);
     }
     
     // Large dataset, upload in chunks
@@ -132,7 +132,9 @@ export const sowApi = {
       log.debug('sowApi', { message: `Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} drops)` });
 
       try {
-        const result = await this._uploadDropsChunk(projectId, chunk);
+        // Only clear existing data on first chunk
+        const clearExisting = chunkNumber === 1;
+        const result = await this._uploadDropsChunk(projectId, chunk, clearExisting);
         totalInserted += result.inserted || 0;
         totalUpdated += result.updated || 0;
         if (result.errors) {
@@ -161,13 +163,13 @@ export const sowApi = {
   /**
    * Upload a single chunk of drops data
    */
-  async _uploadDropsChunk(projectId: string, drops: NeonDropData[]) {
+  async _uploadDropsChunk(projectId: string, drops: NeonDropData[], clearExisting = false) {
     const response = await fetch('/api/sow/drops', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ projectId, drops }),
+      body: JSON.stringify({ projectId, drops, clearExisting }),
     });
 
     // Check if response is OK and is JSON

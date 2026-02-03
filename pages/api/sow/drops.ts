@@ -133,8 +133,12 @@ async function handler(
     await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS municipality varchar(255)`;
     await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS raw_data jsonb`;
 
-    // Clear existing drops for this project
-    await sql`DELETE FROM drops WHERE project_id = ${projectId}`;
+    // Note: We don't DELETE here because frontend sends chunks.
+    // ON CONFLICT handles updates. To clear first, use clearExisting param.
+    const { clearExisting } = req.body;
+    if (clearExisting) {
+      await sql`DELETE FROM drops WHERE project_id = ${projectId}`;
+    }
 
     // Use UNNEST for efficient bulk insert (single query per batch)
     let totalInserted = 0;
