@@ -65,9 +65,9 @@ export function ModuleTabs({
         const badge = tabBadges[tab.id] || tab.badge;
         const Icon = tab.icon;
 
-        // Tab styles - grid handles equal width, we just center content
+        // Tab styles - flex-1 for equal width distribution
         const baseStyles =
-          'flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors';
+          'flex-1 flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap';
         const activeStyles =
           'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10';
         const inactiveStyles =
