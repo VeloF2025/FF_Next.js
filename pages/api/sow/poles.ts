@@ -153,8 +153,17 @@ async function handler(
       const statuses = batch.map(p => p.status || 'planned');
       const poleTypes = batch.map(p => p.pole_type || null);
       const poleSpecs = batch.map(p => p.pole_spec || null);
-      const heights = batch.map(p => p.height || null);
-      const diameters = batch.map(p => p.diameter || null);
+      // Parse height/diameter as numbers (extract numeric part from strings like "10m")
+      const heights = batch.map(p => {
+        if (!p.height) return null;
+        const num = parseFloat(String(p.height).replace(/[^\d.]/g, ''));
+        return isNaN(num) ? null : num;
+      });
+      const diameters = batch.map(p => {
+        if (!p.diameter) return null;
+        const num = parseFloat(String(p.diameter).replace(/[^\d.]/g, ''));
+        return isNaN(num) ? null : num;
+      });
       const owners = batch.map(p => p.owner || null);
       const ponNos = batch.map(p => p.pon_no ? parseInt(p.pon_no) : null);
       const zoneNos = batch.map(p => p.zone_no ? parseInt(p.zone_no) : null);
@@ -177,8 +186,8 @@ async function handler(
           ${statuses}::varchar[],
           ${poleTypes}::varchar[],
           ${poleSpecs}::varchar[],
-          ${heights}::varchar[],
-          ${diameters}::varchar[],
+          ${heights}::numeric[],
+          ${diameters}::numeric[],
           ${owners}::varchar[],
           ${ponNos}::integer[],
           ${zoneNos}::integer[],
