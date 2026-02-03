@@ -489,3 +489,67 @@ cd /home/louis/apps/fibreflow && \
 4. Add version markers to verify deployment
 
 **Reference:** 2026-02-03 fleet permissions debugging session
+
+---
+
+## Barrel Exports Bundle Server Code into Client
+
+**Severity:** CRITICAL - page crashes with "neon() requires DATABASE_URL" on client
+
+**Problem:** Barrel exports (`index.ts`) that re-export server utilities cause webpack to bundle server code into client bundles.
+
+**Example Bad Pattern:**
+```typescript
+// src/modules/fleet/portal/index.ts
+export { usePortalSession } from './usePortalSession';  // ← Client hook - OK
+
+// Server utilities bundled into client!
+export {
+  verifyPortalSession,
+  getPortalSessionFromCookie,
+} from './portalSessionUtils';  // ← Contains neon() call at module scope!
+```
+
+```typescript
+// portalSessionUtils.ts
+import { neon } from '@neondatabase/serverless';
+const sql = neon(process.env.DATABASE_URL!);  // ← Runs at module load!
+```
+
+**Why It Happens:**
+1. Page imports from barrel: `import { usePortalSession } from '@/modules/fleet/portal'`
+2. Webpack sees barrel exports everything including server utils
+3. Server utils get bundled into client chunk
+4. `neon()` runs on client where `DATABASE_URL` doesn't exist
+5. Page crashes: "No database connection string was provided to neon()"
+
+**Fix Pattern - Separate Server/Client Exports:**
+```typescript
+// src/modules/fleet/portal/index.ts
+// ONLY export client-safe items from barrel!
+export type { PortalSession, PortalVehicle } from './types';
+export { usePortalSession } from './usePortalSession';
+export const PORTAL_SESSION_COOKIE = 'ff_portal_session';
+
+// NOTE: Server utilities NOT exported here!
+// API routes import directly:
+//   import { verifyPortalSession } from '@/modules/fleet/portal/portalSessionUtils';
+```
+
+**Quick Diagnosis:**
+```bash
+# Error in browser console:
+Error: No database connection string was provided to `neon()`
+
+# Find the problem:
+grep -r "neon(" src/modules/ --include="*.ts" | grep -v ".test."
+# Then check if those files are re-exported from index.ts
+```
+
+**Prevention:**
+1. NEVER export server utilities from barrel exports (`index.ts`)
+2. Import server code directly from source file in API routes
+3. Use `.server.ts` suffix for server-only files (Next.js convention)
+4. Add `'use server'` directive to server-only modules (App Router)
+
+**Reference:** Commit `b6be8d43` - fix fleet portal client-side neon() bundling
