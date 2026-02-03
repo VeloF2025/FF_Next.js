@@ -15,10 +15,10 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const { id } = router.query;
 
-  if (!id) return <AppLayout><div>Loading...</div></AppLayout>;
+  if (!id) return <AppLayout hideHeader><div>Loading...</div></AppLayout>;
 
   return (
-    <AppLayout>
+    <AppLayout hideHeader>
       <ProjectDetail projectId={id as string} />
     </AppLayout>
   );
