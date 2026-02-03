@@ -1,7 +1,17 @@
+/**
+ * SOW Poles API
+ * GET/POST /api/sow/poles
+ *
+ * Protected by Arcjet:
+ * - Bot detection
+ * - Rate limiting (100 req/min)
+ * - Attack protection
+ */
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
-import { log } from '@/lib/logger';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -10,6 +20,7 @@ export const config = {
     bodyParser: {
       sizeLimit: '10mb',
     },
+    responseLimit: false, // Disable Next.js response size limit for this endpoint
   },
 };
 
@@ -17,212 +28,190 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  const userId = (req as AuthenticatedNextApiRequest).user?.id;
   if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Handle GET requests to fetch poles data
+  const sql = getSql();
+
+  // Handle GET request - fetch poles
   if (req.method === 'GET') {
     try {
-      const { projectId, limit = '1000', offset = '0' } = req.query;
+      const { projectId, limit = '1000', offset = '0', fields } = req.query;
+      const limitNum = Math.min(parseInt(limit as string), 5000); // Cap at 5000 to prevent large responses
+      const offsetNum = parseInt(offset as string);
 
-      if (!projectId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Project ID is required'
+      let query;
+      let totalQuery;
+
+      if (projectId) {
+        query = await sql`
+          SELECT * FROM poles
+          WHERE project_id = ${projectId}
+          ORDER BY created_at DESC
+          LIMIT ${limitNum} OFFSET ${offsetNum}
+        `;
+
+        totalQuery = await sql`
+          SELECT COUNT(*) as total FROM poles
+          WHERE project_id = ${projectId}
+        `;
+      } else {
+        query = await sql`
+          SELECT * FROM poles
+          ORDER BY created_at DESC
+          LIMIT ${limitNum} OFFSET ${offsetNum}
+        `;
+
+        totalQuery = await sql`
+          SELECT COUNT(*) as total FROM poles
+        `;
+      }
+
+      const total = parseInt(totalQuery[0]?.total || '0');
+
+      // Apply field filtering if specified (client-side filtering)
+      let filteredData = query;
+      if (fields) {
+        const requestedFields = (fields as string).split(',').map(f => f.trim());
+        filteredData = query.map(item => {
+          const filtered: any = {};
+          requestedFields.forEach(field => {
+            if (field in item) {
+              filtered[field] = item[field];
+            }
+          });
+          return filtered;
         });
       }
 
-      const sql = getSql();
-
-      // Fetch poles data for the project with pagination
-      const poles = await sql`
-        SELECT * FROM poles
-        WHERE project_id = ${projectId}
-        ORDER BY pole_number ASC
-        LIMIT ${parseInt(limit as string)}
-        OFFSET ${parseInt(offset as string)}
-      `;
-
       return res.status(200).json({
         success: true,
-        data: poles
+        data: filteredData,
+        count: filteredData.length,
+        total,
+        page: Math.floor(offsetNum / limitNum) + 1,
+        pageSize: limitNum,
+        totalPages: Math.ceil(total / limitNum)
       });
     } catch (error) {
-      log.error('api/sow/poles', {
-        action: 'fetchError',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+      console.error('Error fetching poles:', error);
       return res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch poles data'
+        error: error instanceof Error ? error.message : 'Failed to fetch poles'
       });
     }
   }
 
-  // Handle POST requests to upload poles data
+  // Handle POST request - upload poles
   if (req.method === 'POST') {
     try {
-    const { projectId, poles } = req.body;
+      const { projectId, poles } = req.body;
 
     if (!projectId || !poles || !Array.isArray(poles)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Missing required fields: projectId or poles array' 
-      });
-    }
-
-    if (poles.length === 0) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'No poles data provided' 
+        error: 'Missing required fields: projectId or poles array'
       });
     }
 
     const sql = getSql();
-    
-    // Ensure SOW tables exist
-    await sql`
-      CREATE TABLE IF NOT EXISTS poles (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        project_id uuid NOT NULL,
-        pole_number varchar(255) NOT NULL,
-        latitude numeric,
-        longitude numeric,
-        status varchar(50),
-        pole_type varchar(100),
-        pole_spec varchar(255),
-        height varchar(50),
-        diameter varchar(50),
-        owner varchar(255),
-        pon_no integer,
-        zone_no integer,
-        address text,
-        municipality varchar(255),
-        created_date timestamp,
-        created_by varchar(255),
-        comments text,
-        raw_data jsonb,
-        created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-        updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(project_id, pole_number)
-      )
-    `;
 
-    // Clear existing poles for this project
-    await sql`DELETE FROM poles WHERE project_id = ${projectId}`;
+    // Add missing columns to existing poles table (safe - IF NOT EXISTS)
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS project_ref varchar(255)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS block varchar(255)`;
 
-    // Prepare poles data for insertion
-    const polesData = poles.map(pole => ({
-      project_id: projectId,
-      pole_number: pole.pole_number,
-      latitude: pole.latitude || null,
-      longitude: pole.longitude || null,
-      status: pole.status || 'planned',
-      pole_type: pole.pole_type || null,
-      pole_spec: pole.pole_spec || null,
-      height: pole.height || null,
-      diameter: pole.diameter || null,
-      owner: pole.owner || null,
-      pon_no: pole.pon_no || null,
-      zone_no: pole.zone_no || null,
-      address: pole.address || null,
-      municipality: pole.municipality || null,
-      created_date: pole.created_date || null,
-      created_by: pole.created_by || null,
-      comments: pole.comments || null,
-      raw_data: pole.raw_data || null,
-      created_at: new Date(),
-      updated_at: new Date()
-    }));
-
-    // Insert in batches of 100
-    const batchSize = 100;
-    let totalInserted = 0;
-    
-    for (let i = 0; i < polesData.length; i += batchSize) {
-      const batch = polesData.slice(i, i + batchSize);
-      
-      // Insert each pole individually (Neon doesn't support bulk insert with sql())
-      for (const pole of batch) {
-        await sql`
-          INSERT INTO poles (
-            project_id, pole_number, latitude, longitude, status,
-            pole_type, pole_spec, height, diameter, owner,
-            pon_no, zone_no, address, municipality,
-            created_date, created_by, comments, raw_data,
-            created_at, updated_at
-          ) VALUES (
-            ${pole.project_id},
-            ${pole.pole_number},
-            ${pole.latitude},
-            ${pole.longitude},
-            ${pole.status},
-            ${pole.pole_type},
-            ${pole.pole_spec},
-            ${pole.height},
-            ${pole.diameter},
-            ${pole.owner},
-            ${pole.pon_no},
-            ${pole.zone_no},
-            ${pole.address},
-            ${pole.municipality},
-            ${pole.created_date},
-            ${pole.created_by},
-            ${pole.comments},
-            ${pole.raw_data},
-            ${pole.created_at},
-            ${pole.updated_at}
-          )
-          ON CONFLICT (project_id, pole_number) 
-          DO UPDATE SET 
-            latitude = EXCLUDED.latitude,
-            longitude = EXCLUDED.longitude,
-            status = EXCLUDED.status,
-            pole_type = EXCLUDED.pole_type,
-            pole_spec = EXCLUDED.pole_spec,
-            height = EXCLUDED.height,
-            diameter = EXCLUDED.diameter,
-            owner = EXCLUDED.owner,
-            pon_no = EXCLUDED.pon_no,
-            zone_no = EXCLUDED.zone_no,
-            address = EXCLUDED.address,
-            municipality = EXCLUDED.municipality,
-            created_date = EXCLUDED.created_date,
-            created_by = EXCLUDED.created_by,
-            comments = EXCLUDED.comments,
-            raw_data = EXCLUDED.raw_data,
-            updated_at = EXCLUDED.updated_at
-        `;
-      }
-      
-      totalInserted += batch.length;
+    // Note: We don't DELETE here because frontend sends chunks.
+    // ON CONFLICT handles updates. To clear first, use clearExisting param.
+    const { clearExisting } = req.body;
+    if (clearExisting) {
+      await sql`DELETE FROM poles WHERE project_id = ${projectId}`;
     }
 
-    log.info('api/sow/poles', {
-      action: 'insertSuccess',
-      totalInserted,
-      projectId
-    });
+    // Use UNNEST for efficient bulk insert (single query per batch)
+    let totalInserted = 0;
+    const batchSize = 1000; // Much larger batches with UNNEST
+
+    for (let i = 0; i < poles.length; i += batchSize) {
+      const batch = poles.slice(i, i + batchSize);
+
+      // Prepare arrays for UNNEST
+      const projectIds = batch.map(() => projectId);
+      const poleNumbers = batch.map(p => p.pole_number);
+      const latitudes = batch.map(p => p.latitude ? parseFloat(p.latitude) : null);
+      const longitudes = batch.map(p => p.longitude ? parseFloat(p.longitude) : null);
+      const statuses = batch.map(p => p.status || 'planned');
+      const poleTypes = batch.map(p => p.pole_type || null);
+      const poleSpecs = batch.map(p => p.pole_spec || null);
+      const heights = batch.map(p => p.height || null);
+      const diameters = batch.map(p => p.diameter || null);
+      const owners = batch.map(p => p.owner || null);
+      const ponNos = batch.map(p => p.pon_no ? parseInt(p.pon_no) : null);
+      const zoneNos = batch.map(p => p.zone_no ? parseInt(p.zone_no) : null);
+      const addresses = batch.map(p => p.address || null);
+      const municipalities = batch.map(p => p.municipality || null);
+      const projectRefs = batch.map(p => p.project_ref || null);
+      const rawDatas = batch.map(p => p.raw_data ? JSON.stringify(p.raw_data) : null);
+
+      await sql`
+        INSERT INTO poles (
+          project_id, pole_number, latitude, longitude, status,
+          pole_type, pole_spec, height, diameter, owner,
+          pon_no, zone_no, address, municipality, project_ref, raw_data
+        )
+        SELECT * FROM UNNEST(
+          ${projectIds}::uuid[],
+          ${poleNumbers}::varchar[],
+          ${latitudes}::numeric[],
+          ${longitudes}::numeric[],
+          ${statuses}::varchar[],
+          ${poleTypes}::varchar[],
+          ${poleSpecs}::varchar[],
+          ${heights}::varchar[],
+          ${diameters}::varchar[],
+          ${owners}::varchar[],
+          ${ponNos}::integer[],
+          ${zoneNos}::integer[],
+          ${addresses}::text[],
+          ${municipalities}::varchar[],
+          ${projectRefs}::varchar[],
+          ${rawDatas}::jsonb[]
+        )
+        ON CONFLICT (project_id, pole_number) DO UPDATE SET
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          status = EXCLUDED.status,
+          pole_type = EXCLUDED.pole_type,
+          pole_spec = EXCLUDED.pole_spec,
+          height = EXCLUDED.height,
+          diameter = EXCLUDED.diameter,
+          owner = EXCLUDED.owner,
+          pon_no = EXCLUDED.pon_no,
+          zone_no = EXCLUDED.zone_no,
+          address = EXCLUDED.address,
+          municipality = EXCLUDED.municipality,
+          project_ref = EXCLUDED.project_ref,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = CURRENT_TIMESTAMP
+      `;
+
+      totalInserted += batch.length;
+    }
 
     return res.status(200).json({
       success: true,
       message: `Successfully uploaded ${totalInserted} poles`,
       inserted: totalInserted,
-      updated: 0,
-      upserted: totalInserted,
-      projectId
+      upserted: totalInserted
     });
 
-    } catch (error) {
-      log.error('api/sow/poles', {
-        action: 'uploadError',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      return res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to upload poles data'
-      });
+  } catch (error) {
+    console.error('Poles upload error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to upload poles data'
+    });
     }
   }
 
@@ -230,4 +219,5 @@ async function handler(
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-export default withAuth(handler);
+// Export with Arcjet protection
+export default withAuth(withArcjetProtection(handler, aj));

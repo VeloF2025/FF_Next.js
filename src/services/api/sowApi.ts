@@ -22,19 +22,19 @@ export const sowApi = {
    */
   async uploadPoles(projectId: string, poles: NeonPoleData[]) {
     // For large datasets, split into chunks to avoid payload size limits
-    const CHUNK_SIZE = 300; // Conservative chunk size for Vercel
-    
+    const CHUNK_SIZE = 250; // Conservative chunk size for Vercel
+
     if (poles.length <= CHUNK_SIZE) {
-      // Small dataset, upload directly
-      return this._uploadPolesChunk(projectId, poles);
+      // Small dataset, upload directly (clear existing first)
+      return this._uploadPolesChunk(projectId, poles, true);
     }
-    
+
     // Large dataset, upload in chunks
     log.debug('sowApi', { message: `Uploading ${poles.length} poles in chunks of ${CHUNK_SIZE}` });
     let totalInserted = 0;
     let totalUpdated = 0;
     const allErrors: any[] = [];
-    
+
     for (let i = 0; i < poles.length; i += CHUNK_SIZE) {
       const chunk = poles.slice(i, i + CHUNK_SIZE);
       const chunkNumber = Math.floor(i / CHUNK_SIZE) + 1;
@@ -43,7 +43,9 @@ export const sowApi = {
       log.debug('sowApi', { message: `Uploading chunk ${chunkNumber}/${totalChunks} (${chunk.length} poles)` });
 
       try {
-        const result = await this._uploadPolesChunk(projectId, chunk);
+        // Only clear existing data on first chunk
+        const clearExisting = chunkNumber === 1;
+        const result = await this._uploadPolesChunk(projectId, chunk, clearExisting);
         totalInserted += result.inserted || 0;
         totalUpdated += result.updated || 0;
         if (result.errors) {
@@ -53,13 +55,13 @@ export const sowApi = {
         log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
         throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
       }
-      
-      // Small delay between chunks
+
+      // Small delay between chunks to avoid overwhelming the serverless function
       if (i + CHUNK_SIZE < poles.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-    
+
     return {
       success: true,
       inserted: totalInserted,
@@ -72,13 +74,13 @@ export const sowApi = {
   /**
    * Upload a single chunk of poles data
    */
-  async _uploadPolesChunk(projectId: string, poles: NeonPoleData[]) {
+  async _uploadPolesChunk(projectId: string, poles: NeonPoleData[], clearExisting = false) {
     const response = await fetch('/api/sow/poles', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ projectId, poles }),
+      body: JSON.stringify({ projectId, poles, clearExisting }),
     });
 
     // Check if response is OK and is JSON

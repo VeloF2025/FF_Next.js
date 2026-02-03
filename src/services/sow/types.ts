@@ -17,6 +17,7 @@ export interface NeonPoleData {
   zone_no?: number | undefined;
   address?: string | undefined;
   municipality?: string | undefined;
+  project_ref?: string | undefined;
   created_date?: string | undefined;
   created_by?: string | undefined;
   comments?: string | undefined;

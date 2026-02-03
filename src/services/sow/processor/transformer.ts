@@ -7,40 +7,55 @@ import { extractValue, extractNumber, extractDate, parseBoolean } from './parser
  */
 
 /**
- * Process Lawley-style poles data
+ * Process poles data
+ *
+ * Column alias mappings support multiple export formats:
+ * - PlanNet/Fibertime format: label (Pole), Planned Location (Latitude/Longitude), type, zone, pon, etc.
+ * - Lawley format: label_1, lat, lon, type_1, spec_1, etc.
+ * - Standard format: pole_number, latitude, longitude, pole_type, etc.
  */
 export function transformPoles(rawData: any[]): NeonPoleData[] {
   const processedPoles: NeonPoleData[] = [];
-  
+
   for (const row of rawData) {
-    // Extract primary pole information from label_1
-    const poleNumber = extractValue(row, ['label_1', 'label', 'pole_number', 'pole_id']);
-    
+    // Support 'label (Pole)' from PlanNet and standard column names
+    const poleNumber = extractValue(row, [
+      'label (Pole)', 'label (pole)', 'label_1', 'label', 'pole_number', 'pole_id', 'pole'
+    ]);
+
     if (!poleNumber) continue;
-    
+
     const pole: NeonPoleData = {
       pole_number: poleNumber,
-      latitude: extractNumber(row, ['lat', 'latitude', 'y', 'coord_y']) || undefined,
-      longitude: extractNumber(row, ['lon', 'longitude', 'lng', 'x', 'coord_x']) || undefined,
-      status: extractValue(row, ['status', 'pole_status']) || 'planned',
-      pole_type: extractValue(row, ['type_1', 'type', 'pole_type']),
-      pole_spec: extractValue(row, ['spec_1', 'spec', 'specification']),
+      // Support 'Planned Location (Latitude/Longitude)' from PlanNet
+      latitude: extractNumber(row, [
+        'Planned Location (Latitude)', 'planned location (latitude)', 'lat', 'latitude', 'y', 'coord_y'
+      ]) || undefined,
+      longitude: extractNumber(row, [
+        'Planned Location (Longitude)', 'planned location (longitude)', 'lon', 'lng', 'longitude', 'x', 'coord_x'
+      ]) || undefined,
+      status: extractValue(row, ['status', 'pole_status', 'state']) || 'planned',
+      pole_type: extractValue(row, ['type', 'type_1', 'pole_type', 'poletype']),
+      pole_spec: extractValue(row, ['spec_1', 'spec', 'specification', 'pole_spec']),
       height: extractValue(row, ['dim1', 'height', 'pole_height']),
       diameter: extractValue(row, ['dim2', 'diameter', 'pole_diameter']),
       owner: extractValue(row, ['cmpownr', 'owner', 'company_owner']),
-      pon_no: extractNumber(row, ['pon_no', 'pon', 'pon_number']),
-      zone_no: extractNumber(row, ['zone_no', 'zone', 'zone_number']),
-      address: extractValue(row, ['address', 'location', 'pole_address']),
+      pon_no: extractNumber(row, ['pon', 'pon_no', 'pon_number']),
+      zone_no: extractNumber(row, ['zone', 'zone_no', 'zone_number']),
+      // Support 'blockname' from PlanNet as address
+      address: extractValue(row, ['blockname', 'block', 'address', 'location', 'pole_address']),
       municipality: extractValue(row, ['mun', 'municipality', 'city']),
+      // Support 'project' as reference
+      project_ref: extractValue(row, ['project', 'stackref (Project)', 'stackref', 'project_code']),
       created_date: extractDate(row, ['datecrtd', 'created_date', 'date_created']),
       created_by: extractValue(row, ['crtdby', 'created_by', 'creator']),
       comments: extractValue(row, ['comments', 'notes', 'remarks']),
       raw_data: row // Store original data for reference
     };
-    
+
     processedPoles.push(pole);
   }
-  
+
   return processedPoles;
 }
 
