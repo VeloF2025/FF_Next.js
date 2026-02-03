@@ -47,6 +47,7 @@ import type {
 import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 import { ProjectDocumentManager } from './ProjectDocumentManager';
 import { AddApprovalModal } from './AddApprovalModal';
+import { LinkToProjectModal } from './LinkToProjectModal';
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
   new: 'New',
@@ -158,6 +159,7 @@ export function PipelineProjectDetail() {
   });
   const [transitioning, setTransitioning] = useState(false);
   const [transitionModalOpen, setTransitionModalOpen] = useState(false);
+  const [linkToProjectModalOpen, setLinkToProjectModalOpen] = useState(false);
 
   // Map auth role to drawer role
   const drawerUserRole = useMemo((): 'pm' | 'ops' | 'admin' | 'viewer' => {
@@ -261,6 +263,11 @@ export function PipelineProjectDetail() {
     } finally {
       setTransitioning(false);
     }
+  };
+
+  const handleLinkToProjectCreated = () => {
+    // Reload project data to reflect new link
+    loadProject();
   };
 
   // Initialize legal docs when project loads
@@ -963,6 +970,13 @@ export function PipelineProjectDetail() {
                   <Edit className="w-4 h-4" />
                   Edit Project
                 </button>
+                <button
+                  onClick={() => setLinkToProjectModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-sm"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Link to Existing Project
+                </button>
                 {!project.po_number && approvalStatus?.complete && (
                   <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] transition-colors text-sm">
                     <FileText className="w-4 h-4" />
@@ -1020,6 +1034,17 @@ export function PipelineProjectDetail() {
           projectId={id}
           province={project?.province || undefined}
           municipality={project?.municipality || undefined}
+        />
+      )}
+
+      {/* Link to Project Modal */}
+      {id && typeof id === 'string' && project && (
+        <LinkToProjectModal
+          pipelineProjectId={id}
+          pipelineProjectName={project.project_name}
+          isOpen={linkToProjectModalOpen}
+          onClose={() => setLinkToProjectModalOpen(false)}
+          onLinkCreated={handleLinkToProjectCreated}
         />
       )}
     </div>
