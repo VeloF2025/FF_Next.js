@@ -4048,3 +4048,83 @@ SELECT COALESCE(profile_photo_url, id_photo_url) as photo_url FROM staff;
 - `photo_verified_at` - Timestamp of last photo comparison
 
 ---
+
+---
+
+## 2026-02-03: Contractor Detail Page Dark Theme Styling
+
+**Problem — Contractor detail page displayed with light theme colors in dark mode:**
+The contractor detail page (`app/(main)/contractors/[id]/page.tsx`) and all child components were using hardcoded Tailwind light theme colors (`bg-white`, `text-gray-900`, `bg-blue-50`, etc.), causing white backgrounds and poor contrast in dark mode.
+
+**Affected Files:**
+- `app/(main)/contractors/[id]/page.tsx` - Main detail page
+- `src/components/contractors/ContractorDocuments.tsx` - Documents section with stats
+- `src/components/contractors/ContractorProjects.tsx` - Project assignments
+- `src/components/contractors/DocumentCard.tsx` - Individual document cards
+
+**Root Cause:**
+The contractors module was built before the dark theme CSS variables were standardized. It used:
+- `bg-white` instead of `bg-[var(--ff-bg-secondary)]`
+- `text-gray-900` instead of `text-[var(--ff-text-primary)]`
+- `bg-blue-50` (solid light backgrounds) instead of `bg-blue-500/20` (semi-transparent)
+- `bg-green-100 text-green-800` instead of `bg-green-500/20 text-green-400`
+
+**Fix Pattern (commit `8e3957e8`):**
+
+1. **Card Backgrounds:**
+   ```tsx
+   // ❌ Before
+   <div className="bg-white border-gray-200">
+   // ✅ After
+   <div className="bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)]">
+   ```
+
+2. **Icon Badge Backgrounds:**
+   ```tsx
+   // ❌ Before (solid light color)
+   <div className="bg-blue-50"><Icon className="text-blue-600" /></div>
+   // ✅ After (semi-transparent)
+   <div className="bg-blue-500/20"><Icon className="text-blue-400" /></div>
+   ```
+
+3. **Status Badges:**
+   ```tsx
+   // ❌ Before
+   <span className="bg-green-100 text-green-800">APPROVED</span>
+   // ✅ After
+   <span className="bg-green-500/20 text-green-400">APPROVED</span>
+   ```
+
+4. **Warning Banners:**
+   ```tsx
+   // ❌ Before
+   <div className="bg-yellow-50 border-yellow-200 text-yellow-800">
+   // ✅ After
+   <div className="bg-yellow-500/10 border-yellow-500/30 text-yellow-400">
+   ```
+
+5. **Empty States:**
+   ```tsx
+   // ❌ Before
+   <div className="bg-gray-50 border-gray-300">
+   // ✅ After
+   <div className="bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)]">
+   ```
+
+**Key Pattern — Semi-Transparent Color Scale:**
+| Solid Light | Semi-Transparent Dark | Usage |
+|-------------|----------------------|-------|
+| `bg-{color}-50` | `bg-{color}-500/20` | Icon backgrounds |
+| `bg-{color}-100` | `bg-{color}-500/20` | Badge backgrounds |
+| `text-{color}-800` | `text-{color}-400` | Badge text |
+| `border-{color}-200` | `border-{color}-500/30` | Banner borders |
+| `bg-{color}-50` (banner) | `bg-{color}-500/10` | Alert backgrounds |
+
+**Key Lesson — Module-Specific Dark Theme Audits:**
+When auditing UI, check if module predates the dark theme standardization. Look for:
+1. Any `bg-white` or `bg-gray-50` in component files
+2. Solid color backgrounds like `bg-blue-50`, `bg-green-100`
+3. Text colors like `text-gray-900`, `text-blue-800`
+
+These are strong indicators that dark theme variables were not applied.
+

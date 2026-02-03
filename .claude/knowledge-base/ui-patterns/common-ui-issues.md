@@ -83,7 +83,7 @@ items.filter(item => ...);
 
 **Good Pattern:**
 ```tsx
-<div className="bg-[var(--ff-card-bg)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)]">
+<div className="bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)]">
 ```
 
 **CSS Variable Reference:**
@@ -91,12 +91,46 @@ items.filter(item => ...);
 |----------|-------|------|-------|
 | `--ff-bg-primary` | white | gray-900 | Page background |
 | `--ff-bg-secondary` | white | gray-800 | Card backgrounds |
-| `--ff-card-bg` | white | gray-800 | Card alias |
+| `--ff-bg-tertiary` | gray-50 | gray-700 | Nested elements, empty states |
 | `--ff-text-primary` | gray-900 | white | Main text |
-| `--ff-text-secondary` | gray-600 | gray-400 | Labels |
+| `--ff-text-secondary` | gray-600 | gray-400 | Labels, descriptions |
+| `--ff-text-tertiary` | gray-500 | gray-500 | Subtle text |
 | `--ff-border-light` | gray-200 | gray-700 | Borders |
+| `--ff-border-medium` | gray-300 | gray-600 | Hover borders |
+| `--ff-bg-hover` | gray-100 | gray-700 | Hover states |
 
-**Reference:** `src/pages/detail/ProjectTimelineTab.tsx` - Fixed 2026-01-27
+**Semi-Transparent Colors for Badges/Icons:**
+
+Instead of solid light backgrounds, use semi-transparent variants for dark theme compatibility:
+
+| Light Pattern | Dark Theme Pattern | Usage |
+|---------------|-------------------|-------|
+| `bg-blue-50` | `bg-blue-500/20` | Blue icon backgrounds |
+| `bg-green-50` | `bg-green-500/20` | Success/verified badges |
+| `bg-yellow-50` | `bg-yellow-500/20` | Warning badges |
+| `bg-red-50` | `bg-red-500/20` | Error/expired badges |
+| `bg-blue-100 text-blue-800` | `bg-blue-500/20 text-blue-400` | Status badges |
+| `bg-green-100 text-green-800` | `bg-green-500/20 text-green-400` | Active/approved badges |
+
+**Warning/Alert Banners:**
+```tsx
+// ❌ Bad - Light theme only
+<div className="bg-yellow-50 border-yellow-200 text-yellow-800">
+
+// ✅ Good - Dark theme compatible
+<div className="bg-yellow-500/10 border-yellow-500/30 text-yellow-400">
+```
+
+**Button Hover States:**
+```tsx
+// ❌ Bad
+<button className="hover:bg-blue-50">
+
+// ✅ Good
+<button className="hover:bg-blue-500/10">
+```
+
+**Reference:** `app/(main)/contractors/[id]/page.tsx` - Fixed 2026-02-03 (commit `8e3957e8`)
 
 ---
 
