@@ -164,15 +164,10 @@ export function LinkToProjectModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-xl bg-[var(--ff-card-bg)] rounded-lg shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)] shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
                 <Link2 className="w-5 h-5 text-blue-500" />
@@ -340,8 +335,7 @@ export function LinkToProjectModal({
                   Link Project
                 </>
               )}
-            </button>
-          </div>
+          </button>
         </div>
       </div>
     </div>
