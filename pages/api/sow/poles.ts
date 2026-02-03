@@ -119,8 +119,17 @@ async function handler(
     const sql = getSql();
 
     // Add missing columns to existing poles table (safe - IF NOT EXISTS)
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS pole_type varchar(100)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS pole_spec varchar(255)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS height varchar(50)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS diameter varchar(50)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS owner varchar(255)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS pon_no integer`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS zone_no integer`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS address text`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS municipality varchar(255)`;
     await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS project_ref varchar(255)`;
-    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS block varchar(255)`;
+    await sql`ALTER TABLE poles ADD COLUMN IF NOT EXISTS raw_data jsonb`;
 
     // Note: We don't DELETE here because frontend sends chunks.
     // ON CONFLICT handles updates. To clear first, use clearExisting param.
