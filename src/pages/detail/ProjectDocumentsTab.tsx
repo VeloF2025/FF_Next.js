@@ -21,8 +21,10 @@ import {
   Cable,
   FileSpreadsheet,
   Trash2,
+  Download,
 } from 'lucide-react';
 import { useSOWUpload } from '@/modules/projects/components/SOWUploadSection/hooks/useSOWUpload';
+import { FILE_TYPE_CONFIGS } from '@/modules/projects/components/SOWUploadSection/types/sowUpload.types';
 import { useProjectSOW } from '@/hooks/useNeonSOW';
 import type { ProjectDocument, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 import type { ClientPurchaseOrder } from '@/types/finance';
@@ -60,6 +62,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
     isProcessing: sowProcessing,
     handleFileUpload: handleSOWFileUpload,
     removeFile: removeSOWFile,
+    downloadTemplate: downloadSOWTemplate,
   } = useSOWUpload(projectId);
 
   // File input refs for SOW
@@ -309,6 +312,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               inputRef={polesInputRef}
               onUpload={(e) => handleSOWFileUpload('poles', e)}
               onRemove={() => removeSOWFile('poles')}
+              onDownloadTemplate={() => downloadSOWTemplate(FILE_TYPE_CONFIGS.find(c => c.type === 'poles')!)}
             />
             <SOWUploadCard
               type="drops"
@@ -320,6 +324,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               inputRef={dropsInputRef}
               onUpload={(e) => handleSOWFileUpload('drops', e)}
               onRemove={() => removeSOWFile('drops')}
+              onDownloadTemplate={() => downloadSOWTemplate(FILE_TYPE_CONFIGS.find(c => c.type === 'drops')!)}
             />
             <SOWUploadCard
               type="fibre"
@@ -331,6 +336,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               inputRef={fibreInputRef}
               onUpload={(e) => handleSOWFileUpload('fibre', e)}
               onRemove={() => removeSOWFile('fibre')}
+              onDownloadTemplate={() => downloadSOWTemplate(FILE_TYPE_CONFIGS.find(c => c.type === 'fibre')!)}
             />
           </div>
         </div>
@@ -482,6 +488,7 @@ interface SOWUploadCardProps {
   inputRef: React.RefObject<HTMLInputElement>;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
+  onDownloadTemplate: () => void;
 }
 
 function SOWUploadCard({
@@ -494,6 +501,7 @@ function SOWUploadCard({
   inputRef,
   onUpload,
   onRemove,
+  onDownloadTemplate,
 }: SOWUploadCardProps) {
   const fileState = sowFiles.find((f) => f.type === type);
   const isProcessing = fileState?.status === 'processing';
@@ -538,7 +546,7 @@ function SOWUploadCard({
         </div>
       )}
 
-      {/* Upload button */}
+      {/* Action buttons */}
       <div className="flex gap-2">
         <button
           onClick={() => inputRef.current?.click()}
@@ -556,6 +564,14 @@ function SOWUploadCard({
               {currentCount > 0 ? 'Update' : 'Import'} Data
             </>
           )}
+        </button>
+
+        <button
+          onClick={onDownloadTemplate}
+          className="px-3 py-2 text-[var(--ff-text-tertiary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+          title="Download template"
+        >
+          <Download className="w-4 h-4" />
         </button>
 
         {fileState && !isProcessing && (
