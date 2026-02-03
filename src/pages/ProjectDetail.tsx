@@ -222,7 +222,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
       )}
 
       {activeTab === 'wayleaves' && (
-        <ProjectWayleavesTab projectId={id!} />
+        <ProjectWayleavesTab projectId={id!} projectName={project?.name} />
       )}
 
       {activeTab === 'timeline' && (

@@ -66,7 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
@@ -108,7 +108,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
@@ -149,7 +149,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
@@ -190,7 +190,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
@@ -230,7 +230,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
@@ -269,7 +269,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
@@ -304,7 +304,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           pp.municipality,
           pp.province,
           pp.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           (
             SELECT COUNT(*)
             FROM pipeline_project_approvals ppa
