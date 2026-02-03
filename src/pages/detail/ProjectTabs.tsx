@@ -49,7 +49,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
   return (
     <div className="space-y-0">
       {/* Primary Group Tabs - using grid for guaranteed equal width */}
-      <div className="border-b border-[var(--ff-border-light)] px-6">
+      <div className="border-b border-[var(--ff-border-light)]">
         <nav
           className="-mb-px grid w-full"
           style={{ gridTemplateColumns: `repeat(${groups.length}, 1fr)` }}
@@ -92,7 +92,7 @@ export function ProjectTabs({ activeTab, onTabChange, badges = {} }: ProjectTabs
 
       {/* Sub-tabs for active group (only show if group has multiple tabs) */}
       {activeGroup && activeGroup.tabs.length > 1 && (
-        <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-6">
+        <div className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
           <nav
             className="grid w-full py-1 gap-1"
             style={{ gridTemplateColumns: `repeat(${activeGroup.tabs.length}, 1fr)` }}

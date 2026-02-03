@@ -46,18 +46,6 @@ function TabBadgeComponent({ badge }: { badge: TabBadge }) {
   );
 }
 
-// Map tab count to Tailwind grid class
-const gridColsMap: Record<number, string> = {
-  1: 'grid-cols-1',
-  2: 'grid-cols-2',
-  3: 'grid-cols-3',
-  4: 'grid-cols-4',
-  5: 'grid-cols-5',
-  6: 'grid-cols-6',
-  7: 'grid-cols-7',
-  8: 'grid-cols-8',
-};
-
 export function ModuleTabs({
   tabs,
   activeTab,
@@ -66,11 +54,9 @@ export function ModuleTabs({
   isLoading = false,
   onTabChange,
 }: ModuleTabsProps) {
-  const gridCols = gridColsMap[tabs.length] || 'grid-cols-6';
-
   return (
     <nav
-      className={`grid w-full -mb-px ${gridCols}`}
+      className="flex w-full -mb-px"
       aria-label="Module tabs"
     >
       {tabs.map((tab) => {

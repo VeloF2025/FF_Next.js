@@ -121,7 +121,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-6">
       <ProjectDetailHeader
         project={project}
         onNavigateBack={() => router.push('/projects')}
