@@ -56,7 +56,7 @@ export const maintenanceConfig: ModuleNavigationConfig = {
       label: 'Teams',
       icon: Users,
       path: '/maintenance/teams',
-      rbacKey: 'maintenance:teams:view',
+      rbacKey: 'maintenance.teams',
     },
     {
       id: 'data-sync',
@@ -64,21 +64,21 @@ export const maintenanceConfig: ModuleNavigationConfig = {
       shortLabel: 'Sync',
       icon: Database,
       path: '/maintenance/data-sync',
-      rbacKey: 'maintenance:data-sync:view',
+      rbacKey: 'maintenance.data-sync',
     },
     {
       id: 'escalations',
       label: 'Escalations',
       icon: AlertTriangle,
       path: '/maintenance/escalations',
-      rbacKey: 'maintenance:escalations:view',
+      rbacKey: 'maintenance.escalations',
     },
     {
       id: 'handover',
       label: 'Handover',
       icon: ArrowRightLeft,
       path: '/maintenance/handover',
-      rbacKey: 'maintenance:handover:view',
+      rbacKey: 'maintenance.handover',
     },
     {
       id: 'risks',
@@ -86,7 +86,7 @@ export const maintenanceConfig: ModuleNavigationConfig = {
       shortLabel: 'Risks',
       icon: ShieldAlert,
       path: '/maintenance/risks',
-      rbacKey: 'maintenance:risks:view',
+      rbacKey: 'maintenance.risks',
     },
   ],
 };

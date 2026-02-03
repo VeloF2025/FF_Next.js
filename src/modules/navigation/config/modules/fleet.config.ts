@@ -37,14 +37,14 @@ export const fleetConfig: ModuleNavigationConfig = {
       label: 'Vehicles',
       icon: Car,
       path: '/fleet/vehicles',
-      rbacKey: 'fleet:vehicles:view',
+      rbacKey: 'fleet.vehicles',
     },
     {
       id: 'drivers',
       label: 'Drivers',
       icon: Users,
       path: '/fleet/drivers',
-      rbacKey: 'fleet:drivers:view',
+      rbacKey: 'fleet.drivers',
     },
     // GPS & Location tracking
     {
@@ -53,14 +53,14 @@ export const fleetConfig: ModuleNavigationConfig = {
       shortLabel: 'GPS',
       icon: FileSearch,
       path: '/fleet/investigation',
-      rbacKey: 'fleet:investigation:view',
+      rbacKey: 'fleet.investigation',
     },
     {
       id: 'locations',
       label: 'Locations',
       icon: MapPin,
       path: '/fleet/locations',
-      rbacKey: 'fleet:locations:view',
+      rbacKey: 'fleet.locations',
     },
     // Operations
     {
@@ -68,7 +68,7 @@ export const fleetConfig: ModuleNavigationConfig = {
       label: 'Fuel',
       icon: Fuel,
       path: '/fleet/fuel',
-      rbacKey: 'fleet:fuel:view',
+      rbacKey: 'fleet.fuel',
     },
     {
       id: 'maintenance',
@@ -76,7 +76,7 @@ export const fleetConfig: ModuleNavigationConfig = {
       shortLabel: 'Maint',
       icon: Wrench,
       path: '/fleet/maintenance',
-      rbacKey: 'fleet:maintenance:view',
+      rbacKey: 'fleet.maintenance',
     },
     // Reporting & Admin
     {
@@ -84,14 +84,14 @@ export const fleetConfig: ModuleNavigationConfig = {
       label: 'Analytics',
       icon: TrendingUp,
       path: '/fleet/analytics',
-      rbacKey: 'fleet:analytics:view',
+      rbacKey: 'fleet.analytics',
     },
     {
       id: 'portal',
       label: 'Portal',
       icon: ScanLine,
       path: '/fleet/portal',
-      rbacKey: 'fleet:portal:view',
+      rbacKey: 'fleet.portal',
     },
     {
       id: 'audit',
@@ -99,7 +99,7 @@ export const fleetConfig: ModuleNavigationConfig = {
       shortLabel: 'Audit',
       icon: ClipboardList,
       path: '/fleet/check-in/audit',
-      rbacKey: 'fleet:audit:view',
+      rbacKey: 'fleet.check-in-audit',
     },
   ],
 };

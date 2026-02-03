@@ -85,7 +85,7 @@ export const projectsConfig: ModuleNavigationConfig = {
       shortLabel: 'Pipe',
       icon: GitBranch,
       path: '/projects/pipeline',
-      rbacKey: 'projects:pipeline:view',
+      rbacKey: 'projects.pipeline',
       subTabs: [
         {
           id: 'overview',
@@ -113,7 +113,7 @@ export const projectsConfig: ModuleNavigationConfig = {
       shortLabel: 'Exec',
       icon: BarChart3,
       path: '/projects/progress',
-      rbacKey: 'projects:progress:view',
+      rbacKey: 'projects.progress',
       subTabs: [
         {
           id: 'progress-reports',
@@ -141,7 +141,7 @@ export const projectsConfig: ModuleNavigationConfig = {
       shortLabel: 'H&S',
       icon: Shield,
       path: '/projects/health-safety',
-      rbacKey: 'projects:health-safety:view',
+      rbacKey: 'projects.health-safety',
       subTabs: [
         {
           id: 'hs-dashboard',
@@ -169,7 +169,7 @@ export const projectsConfig: ModuleNavigationConfig = {
       shortLabel: 'Reports',
       icon: BarChart3,
       path: '/projects/reports',
-      rbacKey: 'projects:reports:view',
+      rbacKey: 'projects.reports',
     },
   ],
 };
