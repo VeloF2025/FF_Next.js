@@ -109,7 +109,6 @@ export default function VehiclePortalPage() {
     authenticateWithPlate,
     logout,
   } = usePortalSession();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // State
@@ -581,26 +580,6 @@ export default function VehiclePortalPage() {
                 >
                   <Camera className="w-6 h-6" />
                   Take Photo
-                </button>
-
-                {/* File upload */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handlePlateCapture(file);
-                  }}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={verifying}
-                  className="w-full py-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300 rounded-xl font-semibold flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Upload className="w-6 h-6" />
-                  Upload from Gallery
                 </button>
               </div>
 
