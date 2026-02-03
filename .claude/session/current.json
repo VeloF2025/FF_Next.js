@@ -1,46 +1,60 @@
 {
-  "session_id": "2026-02-03-pipeline-linking",
-  "started_at": "2026-02-03T11:00:00Z",
-  "last_updated": "2026-02-03T12:39:25.761Z",
+  "session_id": "2026-02-03-sow-imports",
+  "started_at": "2026-02-03T14:30:00Z",
+  "last_updated": "2026-02-03T13:14:49.928Z",
   "working_on": {
-    "task": "Multi-Pipeline Project Linking UI/UX",
+    "task": "SOW Drops Import - PlanNet Format Support",
     "status": "completed",
     "progress": [
-      "Fixed Link Pipeline modal background bleed-through (wrong structure)",
-      "Changed modal to use single container pattern (backdrop + direct child)",
-      "Used bg-[var(--ff-bg-primary)] for solid modal background",
-      "Fixed Neon array handling - changed sql(array) to ANY(${array})",
-      "Simplified pipeline search API query branches",
-      "Deployed fixes to dev server",
-      "Updated knowledge-base with modal and Neon patterns"
+      "Added PlanNet/Fibertime column alias support for drops",
+      "Added 'label (drop)' alias for drop_number",
+      "Added 'strtfeat (Pole)' alias for pole_number",
+      "Added 'subtyp' alias for cable_type",
+      "Added 'stackref (Project)' for project_ref",
+      "Added project_ref field to NeonDropData type",
+      "Fixed whitespace-tolerant column name matching",
+      "Updated template sample data to show PlanNet format",
+      "Deployed to dev server"
     ],
-    "last_action": "Verified modal styling and API working correctly"
+    "last_action": "Deployed SOW column alias changes to dev"
   },
   "learnings": {
-    "modal_pattern": {
-      "issue": "Background bleed-through in modals",
-      "cause": "Three-level nesting with separate backdrop div",
-      "fix": "Use two-level: combined backdrop container with modal as direct child",
-      "css_var": "Use --ff-bg-primary (solid) not --ff-card-bg (may be transparent)"
+    "excel_columns": {
+      "issue": "Excel exports often have trailing whitespace in column names",
+      "example": "'strtfeat (Pole) ' vs 'strtfeat (Pole)'",
+      "fix": "extractValue now trims keys when comparing"
     },
-    "neon_arrays": {
-      "issue": "sql(array) causes tagged-template error",
-      "cause": "Neon's sql must only be used as tagged template literal",
-      "fix": "Use NOT (id = ANY(${array})) instead of NOT IN ${sql(array)}"
+    "plannet_columns": {
+      "drops": {
+        "label (drop)": "drop_number",
+        "strtfeat (Pole)": "pole_number",
+        "subtyp": "cable_type",
+        "dim2": "cable_length",
+        "cblcpty": "cable_capacity",
+        "endfeat": "end_point (ONT)",
+        "stackref (Project)": "project_ref",
+        "cmpownr": "IGNORED - company owner"
+      }
     }
   },
   "commits": {
-    "latest": "ddf4930b fix(api): use ANY() instead of sql() for array handling in Neon"
+    "latest": "d6221ae3 fix(sow): handle trailing whitespace in Excel column names",
+    "previous": "33035866 feat(sow): add PlanNet/Fibertime column alias support"
   },
   "files_modified": [
-    "src/pages/detail/LinkPipelineModal.tsx",
-    "src/modules/pipeline/components/LinkToProjectModal.tsx",
-    "pages/api/pipeline/projects/search.ts",
-    ".claude/knowledge-base/ui-patterns/common-ui-issues.md"
+    "src/services/sow/processor/transformer.ts",
+    "src/services/sow/processor/parser.ts",
+    "src/services/sow/types.ts",
+    "src/modules/projects/components/SOWUploadSection/types/sowUpload.types.ts"
   ],
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "pipeline"
-  }
+    "module": "sow"
+  },
+  "next_steps": [
+    "Test drops import with user's sample file",
+    "Get and analyze sample files for Poles and Fibre Segments",
+    "Update poles and fibre transformers if needed"
+  ]
 }

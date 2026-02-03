@@ -171,13 +171,41 @@ async function handler(
       raw_data: drop.raw_data || null
     }));
 
-    // Insert in batches
-    const batchSize = 100;
+    // Insert drops one by one (Neon doesn't support sql(array) for batch insert)
     let totalInserted = 0;
-    
+    const batchSize = 50;
+
     for (let i = 0; i < dropsData.length; i += batchSize) {
       const batch = dropsData.slice(i, i + batchSize);
-      await sql`INSERT INTO drops ${sql(batch)}`;
+      const promises = batch.map(drop =>
+        sql`INSERT INTO drops (
+          project_id, drop_number, pole_number, cable_type, cable_spec,
+          cable_length, cable_capacity, start_point, end_point,
+          latitude, longitude, address, pon_no, zone_no,
+          municipality, created_date, created_by, raw_data
+        ) VALUES (
+          ${drop.project_id}, ${drop.drop_number}, ${drop.pole_number}, ${drop.cable_type}, ${drop.cable_spec},
+          ${drop.cable_length}, ${drop.cable_capacity}, ${drop.start_point}, ${drop.end_point},
+          ${drop.latitude}, ${drop.longitude}, ${drop.address}, ${drop.pon_no}, ${drop.zone_no},
+          ${drop.municipality}, ${drop.created_date}, ${drop.created_by}, ${drop.raw_data}
+        ) ON CONFLICT (project_id, drop_number) DO UPDATE SET
+          pole_number = EXCLUDED.pole_number,
+          cable_type = EXCLUDED.cable_type,
+          cable_spec = EXCLUDED.cable_spec,
+          cable_length = EXCLUDED.cable_length,
+          cable_capacity = EXCLUDED.cable_capacity,
+          start_point = EXCLUDED.start_point,
+          end_point = EXCLUDED.end_point,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          address = EXCLUDED.address,
+          pon_no = EXCLUDED.pon_no,
+          zone_no = EXCLUDED.zone_no,
+          municipality = EXCLUDED.municipality,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = CURRENT_TIMESTAMP`
+      );
+      await Promise.all(promises);
       totalInserted += batch.length;
     }
 
