@@ -75,7 +75,7 @@ export function ModulePage({
 
         {/* Tab Navigation */}
         {!hideTabs && visibleTabs.length > 0 && (
-          <div className={`px-6 ${hideHeader ? 'pt-4' : ''} border-t border-[var(--ff-border-light)]`}>
+          <div className={`${hideHeader ? 'pt-4' : ''} border-t border-[var(--ff-border-light)]`}>
             <ModuleTabs
               tabs={visibleTabs}
               activeTab={activeTab}
