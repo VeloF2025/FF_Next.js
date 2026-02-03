@@ -25,8 +25,12 @@ export function handleAuthError(options?: {
 
   const currentPath = window.location.pathname + window.location.search;
 
-  // Don't redirect if already on sign-in or auth pages
-  if (currentPath.startsWith('/sign-in') || currentPath.startsWith('/auth/')) {
+  // Don't redirect if already on sign-in, auth pages, or portal (uses plate-based auth)
+  if (
+    currentPath.startsWith('/sign-in') ||
+    currentPath.startsWith('/auth/') ||
+    currentPath.startsWith('/fleet/portal')
+  ) {
     return;
   }
 
@@ -104,11 +108,18 @@ export function installAuthInterceptor() {
   window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);
 
-    // Handle 401 responses globally (except for auth endpoints)
+    // Handle 401 responses globally (except for auth and portal endpoints)
     if (response.status === 401) {
       const url = typeof args[0] === 'string' ? args[0] : args[0] instanceof Request ? args[0].url : '';
-      // Don't redirect for auth check endpoints (they're expected to return 401 when not logged in)
-      if (!url.includes('/api/auth/me') && !url.includes('/api/auth/check-email')) {
+      // Don't redirect for:
+      // - Auth check endpoints (expected 401 when not logged in)
+      // - Portal endpoints (use plate-based auth, not user auth)
+      const isExcludedPath =
+        url.includes('/api/auth/me') ||
+        url.includes('/api/auth/check-email') ||
+        url.includes('/api/fleet/portal/');
+
+      if (!isExcludedPath) {
         handleAuthError();
       }
     }

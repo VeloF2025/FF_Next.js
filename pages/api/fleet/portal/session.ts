@@ -26,11 +26,14 @@ export default async function handler(
     const { valid, session, error } = await verifyPortalSession(req);
 
     if (!valid || !session) {
-      return apiResponse.error(
-        res,
-        ErrorCode.UNAUTHORIZED,
-        error || 'Not authenticated'
-      );
+      // Return 200 with null session - NOT 401
+      // The portal uses plate-based auth, not user auth, so no session is normal
+      return apiResponse.success(res, {
+        session: null,
+        vehicle: null,
+        driver: null,
+        reason: error || 'No active portal session',
+      });
     }
 
     // Fetch full vehicle and driver details
