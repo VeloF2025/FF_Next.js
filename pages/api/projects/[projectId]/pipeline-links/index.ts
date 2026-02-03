@@ -120,6 +120,15 @@ async function handlePost(
     const userId = req.user?.id;
     const { pipeline_project_id, is_primary, notes } = req.body;
 
+    // Look up staff ID from user ID (linked_by references staff table)
+    let staffId: string | null = null;
+    if (userId) {
+      const staffResult = await sql`
+        SELECT id FROM staff WHERE user_id = ${userId} LIMIT 1
+      `;
+      staffId = staffResult.length > 0 ? (staffResult[0] as { id: string }).id : null;
+    }
+
     if (!pipeline_project_id) {
       return apiResponse.badRequest(res, 'Pipeline project ID is required');
     }

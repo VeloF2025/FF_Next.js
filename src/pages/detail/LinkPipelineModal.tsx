@@ -102,7 +102,7 @@ export function LinkPipelineModal({
       if (result.success) {
         setProjects(result.data.projects);
       } else {
-        setError(result.error || 'Failed to search projects');
+        setError(result.error?.message || 'Failed to search projects');
       }
     } catch (err) {
       log.error('Failed to search pipeline projects', { err }, 'LinkPipelineModal');
@@ -154,7 +154,7 @@ export function LinkPipelineModal({
         setNotes('');
         setSearchQuery('');
       } else {
-        setError(result.error || 'Failed to create link');
+        setError(result.error?.message || 'Failed to create link');
       }
     } catch (err) {
       log.error('Failed to create pipeline link', { err }, 'LinkPipelineModal');

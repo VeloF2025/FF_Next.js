@@ -97,7 +97,7 @@ export function LinkToProjectModal({
       if (result.success) {
         setProjects(result.data.projects);
       } else {
-        setError(result.error || 'Failed to search projects');
+        setError(result.error?.message || 'Failed to search projects');
       }
     } catch (err) {
       log.error('Failed to search projects', { err }, 'LinkToProjectModal');
@@ -151,7 +151,7 @@ export function LinkToProjectModal({
         onLinkCreated();
         onClose();
       } else {
-        setError(result.error || 'Failed to create link');
+        setError(result.error?.message || 'Failed to create link');
       }
     } catch (err) {
       log.error('Failed to create pipeline link', { err }, 'LinkToProjectModal');
