@@ -64,9 +64,9 @@ export function transformDrops(rawData: any[]): NeonDropData[] {
 
     const drop: NeonDropData = {
       drop_number: dropNumber,
-      // Support 'strtfeat (Pole)' from PlanNet exports
+      // Support 'strtfeat (Pole)' from PlanNet exports (note: may have trailing space)
       pole_number: extractValue(row, [
-        'strtfeat (Pole)', 'strtfeat', 'start_feature', 'pole_number', 'from_pole', 'pole'
+        'strtfeat (Pole) ', 'strtfeat (Pole)', 'strtfeat', 'start_feature', 'pole_number', 'from_pole', 'pole'
       ]) || '',
       // 'subtyp' indicates cable type in PlanNet (e.g., 'Drop')
       cable_type: extractValue(row, ['subtyp', 'type', 'cable_type', 'subtype']),
@@ -75,7 +75,7 @@ export function transformDrops(rawData: any[]): NeonDropData[] {
       cable_length: extractValue(row, ['dim2', 'length', 'cable_length', 'distance']),
       // 'cblcpty' is cable capacity in PlanNet (e.g., '1F')
       cable_capacity: extractValue(row, ['cblcpty', 'capacity', 'cable_capacity', 'fibre_count']),
-      start_point: extractValue(row, ['strtfeat (Pole)', 'strtfeat', 'start_feature', 'from']),
+      start_point: extractValue(row, ['strtfeat (Pole) ', 'strtfeat (Pole)', 'strtfeat', 'start_feature', 'from']),
       // 'endfeat' is the end point (usually ONT reference)
       end_point: extractValue(row, ['endfeat', 'end_feature', 'to', 'ont']),
       latitude: extractNumber(row, ['lat', 'latitude', 'y']),

@@ -75,6 +75,7 @@ async function processExcel(file: File, _type: string): Promise<any[]> {
 
 /**
  * Helper function to extract value from multiple possible column names
+ * Handles case-insensitive and whitespace-tolerant matching
  */
 export function extractValue(row: Record<string, unknown>, possibleKeys: string[]): string | undefined {
   for (const key of possibleKeys) {
@@ -82,12 +83,14 @@ export function extractValue(row: Record<string, unknown>, possibleKeys: string[
     if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
       return String(row[key]).trim();
     }
-    
-    // Try case-insensitive match
-    const foundKey = Object.keys(row).find(k => 
-      k.toLowerCase() === key.toLowerCase()
+
+    // Try case-insensitive and whitespace-tolerant match
+    // Excel exports often have trailing spaces in column names
+    const normalizedKey = key.toLowerCase().trim();
+    const foundKey = Object.keys(row).find(k =>
+      k.toLowerCase().trim() === normalizedKey
     );
-    
+
     if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
       return String(row[foundKey]).trim();
     }
