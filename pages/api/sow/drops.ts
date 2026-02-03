@@ -117,34 +117,21 @@ async function handler(
     }
 
     const sql = getSql();
-    
-    // Ensure SOW tables exist
-    await sql`
-      CREATE TABLE IF NOT EXISTS drops (
-        id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-        project_id uuid NOT NULL,
-        drop_number varchar(255) NOT NULL,
-        pole_number varchar(255),
-        cable_type varchar(100),
-        cable_spec varchar(255),
-        cable_length varchar(50),
-        cable_capacity varchar(50),
-        start_point varchar(255),
-        end_point varchar(255),
-        latitude numeric,
-        longitude numeric,
-        address text,
-        pon_no integer,
-        zone_no integer,
-        municipality varchar(255),
-        created_date timestamp,
-        created_by varchar(255),
-        raw_data jsonb,
-        created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-        updated_at timestamp DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(project_id, drop_number)
-      )
-    `;
+
+    // Add missing columns to existing drops table (safe - IF NOT EXISTS)
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS pole_number varchar(255)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS cable_spec varchar(255)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS cable_length varchar(50)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS cable_capacity varchar(50)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS start_point varchar(255)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS end_point varchar(255)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS latitude numeric`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS longitude numeric`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS address text`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS pon_no integer`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS zone_no integer`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS municipality varchar(255)`;
+    await sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS raw_data jsonb`;
 
     // Clear existing drops for this project
     await sql`DELETE FROM drops WHERE project_id = ${projectId}`;
@@ -166,8 +153,6 @@ async function handler(
       pon_no: drop.pon_no || null,
       zone_no: drop.zone_no || null,
       municipality: drop.municipality || null,
-      created_date: drop.created_date || null,
-      created_by: drop.created_by || null,
       raw_data: drop.raw_data || null
     }));
 
@@ -181,13 +166,12 @@ async function handler(
         sql`INSERT INTO drops (
           project_id, drop_number, pole_number, cable_type, cable_spec,
           cable_length, cable_capacity, start_point, end_point,
-          latitude, longitude, address, pon_no, zone_no,
-          municipality, created_date, created_by, raw_data
+          latitude, longitude, address, pon_no, zone_no, municipality, raw_data
         ) VALUES (
           ${drop.project_id}, ${drop.drop_number}, ${drop.pole_number}, ${drop.cable_type}, ${drop.cable_spec},
           ${drop.cable_length}, ${drop.cable_capacity}, ${drop.start_point}, ${drop.end_point},
           ${drop.latitude}, ${drop.longitude}, ${drop.address}, ${drop.pon_no}, ${drop.zone_no},
-          ${drop.municipality}, ${drop.created_date}, ${drop.created_by}, ${drop.raw_data}
+          ${drop.municipality}, ${drop.raw_data}
         ) ON CONFLICT (project_id, drop_number) DO UPDATE SET
           pole_number = EXCLUDED.pole_number,
           cable_type = EXCLUDED.cable_type,
