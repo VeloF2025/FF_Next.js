@@ -337,6 +337,83 @@ toast('Session timed out. Redirecting to sign in...', {
 
 ---
 
+## Modal Background Bleed-Through
+
+**Symptom:** Modal content shows page content bleeding through the modal card background.
+
+**Root Cause:** Incorrect modal structure with separate backdrop div causing z-index stacking issues, or using wrong CSS variable (`--ff-card-bg` which may be transparent).
+
+**Bad Pattern:**
+```tsx
+// ❌ Three-level nesting with separate backdrop
+<div className="fixed inset-0 z-50 overflow-y-auto">
+  <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+  <div className="flex min-h-full items-center justify-center p-4">
+    <div className="relative w-full max-w-xl bg-[var(--ff-card-bg)] ...">
+```
+
+**Good Pattern:**
+```tsx
+// ✅ Two-level: combined backdrop + modal as direct child
+<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl w-full max-w-xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    {/* Header */}
+    <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)] shrink-0">
+    {/* Content */}
+    <div className="p-4 space-y-4 overflow-y-auto">
+    {/* Footer */}
+    <div className="flex items-center justify-end gap-3 p-4 border-t border-[var(--ff-border-light)]">
+```
+
+**Key Points:**
+- Use `bg-[var(--ff-bg-primary)]` for solid background (NOT `--ff-card-bg`)
+- Modal card is DIRECT CHILD of backdrop container
+- `flex-col` with `shrink-0` header and footer, scrollable content area
+
+**Reference:** `src/pages/detail/LinkPipelineModal.tsx`, `DocumentVerificationModal.tsx` - Fixed 2026-02-03
+
+---
+
+## Neon Array Handling in SQL Queries
+
+**Symptom:** "This function can now be called only as a tagged-template function" error.
+
+**Root Cause:** Using `sql(array)` function call inside tagged template. Neon's `sql` must be used as tagged template literal only.
+
+**Bad Pattern:**
+```typescript
+// ❌ Calling sql() as function inside template
+const excludeIds = ['uuid1', 'uuid2'];
+const results = await sql`
+  SELECT * FROM items WHERE id NOT IN ${sql(excludeIds)}
+`;
+```
+
+**Good Pattern:**
+```typescript
+// ✅ Use ANY() with array parameter
+const excludeIds = ['uuid1', 'uuid2'];
+const results = await sql`
+  SELECT * FROM items WHERE NOT (id = ANY(${excludeIds}))
+`;
+```
+
+**Alternative - Separate Branches:**
+```typescript
+// When array might be empty, use explicit branches
+if (excludeIds.length > 0) {
+  results = await sql`
+    SELECT * FROM items WHERE NOT (id = ANY(${excludeIds}))
+  `;
+} else {
+  results = await sql`SELECT * FROM items`;
+}
+```
+
+**Reference:** `pages/api/pipeline/projects/search.ts` - Fixed 2026-02-03
+
+---
+
 ## Audit Checklist
 
 When auditing a page, check:

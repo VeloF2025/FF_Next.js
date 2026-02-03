@@ -1,61 +1,46 @@
 {
-  "session_id": "2026-02-02-access-control",
-  "started_at": "2026-02-02T12:00:00Z",
-  "last_updated": "2026-02-03T10:43:59.233Z",
+  "session_id": "2026-02-03-pipeline-linking",
+  "started_at": "2026-02-03T11:00:00Z",
+  "last_updated": "2026-02-03T11:39:48.745Z",
   "working_on": {
-    "task": "Tab-Level Permission Filtering",
+    "task": "Multi-Pipeline Project Linking UI/UX",
     "status": "completed",
     "progress": [
-      "Fixed Janice George Data Sync access (RBAC override setup)",
-      "Implemented tab-level filtering for OLT Report group",
-      "Implemented tab-level filtering for Maintenance group",
-      "Implemented tab-level filtering for Activate group",
-      "Implemented tab-level filtering for QField group",
-      "Implemented tab-level filtering for History group",
-      "Fixed flash of unauthorized content (show loading instead of all tabs)",
-      "Updated access-control.md with comprehensive documentation"
+      "Fixed Link Pipeline modal background bleed-through (wrong structure)",
+      "Changed modal to use single container pattern (backdrop + direct child)",
+      "Used bg-[var(--ff-bg-primary)] for solid modal background",
+      "Fixed Neon array handling - changed sql(array) to ANY(${array})",
+      "Simplified pipeline search API query branches",
+      "Deployed fixes to dev server",
+      "Updated knowledge-base with modal and Neon patterns"
     ],
-    "last_action": "Deployed tab-level permission filtering to staging"
+    "last_action": "Verified modal styling and API working correctly"
   },
-  "user_override_pattern": {
-    "use_case": "Restrict user to specific tabs only",
-    "method": "Grant overrides with view:false for tabs to hide",
-    "example": {
-      "user": "janice@velocityfibre.co.za",
-      "granted": [
-        "system.data-sync",
-        "system.data-sync.olt",
-        "system.data-sync.olt.pending"
-      ],
-      "denied": [
-        "system.data-sync.olt.import",
-        "system.data-sync.olt.investigate",
-        "...all other tabs"
-      ]
+  "learnings": {
+    "modal_pattern": {
+      "issue": "Background bleed-through in modals",
+      "cause": "Three-level nesting with separate backdrop div",
+      "fix": "Use two-level: combined backdrop container with modal as direct child",
+      "css_var": "Use --ff-bg-primary (solid) not --ff-card-bg (may be transparent)"
+    },
+    "neon_arrays": {
+      "issue": "sql(array) causes tagged-template error",
+      "cause": "Neon's sql must only be used as tagged template literal",
+      "fix": "Use NOT (id = ANY(${array})) instead of NOT IN ${sql(array)}"
     }
   },
-  "tab_filtering_pattern": {
-    "steps": [
-      "1. Define TABS array with permissionKey for each tab",
-      "2. Use usePermission hook to get can() and isLoading",
-      "3. Filter tabs: TABS.filter(tab => can(tab.permissionKey, 'view'))",
-      "4. Return empty array while loading (prevents flash)",
-      "5. Show access denied if no accessible tabs"
-    ],
-    "modules_updated": [
-      "OltReportGroup",
-      "MaintenanceGroup",
-      "ActivateGroup",
-      "QFieldGroup",
-      "HistoryGroup"
-    ]
-  },
   "commits": {
-    "latest": "43149bb1 feat(data-sync): add tab-level permission filtering to all groups"
+    "latest": "ddf4930b fix(api): use ANY() instead of sql() for array handling in Neon"
   },
+  "files_modified": [
+    "src/pages/detail/LinkPipelineModal.tsx",
+    "src/modules/pipeline/components/LinkToProjectModal.tsx",
+    "pages/api/pipeline/projects/search.ts",
+    ".claude/knowledge-base/ui-patterns/common-ui-issues.md"
+  ],
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "access-control"
+    "module": "pipeline"
   }
 }
