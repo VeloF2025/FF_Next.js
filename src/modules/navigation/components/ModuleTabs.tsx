@@ -56,7 +56,8 @@ export function ModuleTabs({
 }: ModuleTabsProps) {
   return (
     <nav
-      className="flex w-full -mb-px"
+      className="grid w-full -mb-px"
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}
       aria-label="Module tabs"
     >
       {tabs.map((tab) => {
@@ -65,9 +66,9 @@ export function ModuleTabs({
         const badge = tabBadges[tab.id] || tab.badge;
         const Icon = tab.icon;
 
-        // Tab styles - flex-1 and basis-0 force equal width distribution
+        // Tab styles - grid handles equal width, we just center content
         const baseStyles =
-          'flex-1 basis-0 flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors';
+          'flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors';
         const activeStyles =
           'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10';
         const inactiveStyles =
