@@ -155,11 +155,31 @@ export default withAuth(withErrorHandler(async (
       WHERE id = ${pipelineProjectId}
     `;
 
-    // 6b. Set bidirectional link on project
+    // 6b. Set bidirectional link on project (legacy column for backward compat)
     await sql`
       UPDATE projects
       SET pipeline_project_id = ${pipelineProjectId}
       WHERE id = ${project.id}
+    `;
+
+    // 6c. Create junction table entry (new one-to-many system)
+    await sql`
+      INSERT INTO project_pipeline_links (
+        project_id,
+        pipeline_project_id,
+        is_primary,
+        link_type,
+        linked_by,
+        linked_at
+      ) VALUES (
+        ${project.id},
+        ${pipelineProjectId},
+        true,
+        'transition',
+        ${userId},
+        NOW()
+      )
+      ON CONFLICT (project_id, pipeline_project_id) DO NOTHING
     `;
 
     // 7. Seed project requirements

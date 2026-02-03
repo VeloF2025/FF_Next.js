@@ -1,6 +1,7 @@
 /**
  * Project Wayleaves Tab
  * Displays wayleave approvals for a project with status tracking, expiry alerts, and management
+ * Supports multiple pipeline links with primary link selection
  */
 
 import { useState } from 'react';
@@ -17,14 +18,21 @@ import {
   Mail,
   Calendar,
   ExternalLink,
-  Loader2,
   RefreshCw,
+  Link2,
+  Star,
+  Trash2,
+  MapPin,
+  Info,
+  Loader2,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { PipelineProjectApprovalWithType } from '@/modules/pipeline/types';
+import { LinkPipelineModal } from './LinkPipelineModal';
 
 interface ProjectWayleavesTabProps {
   projectId: string;
+  projectName?: string;
 }
 
 interface WayleavesResponse {
@@ -45,6 +53,30 @@ interface WayleavesResponse {
     days_until: number;
   }>;
   message?: string;
+}
+
+interface PipelineLink {
+  id: string;
+  project_id: string;
+  pipeline_project_id: string;
+  is_primary: boolean;
+  link_type: 'transition' | 'manual';
+  link_order: number;
+  linked_at: string;
+  linked_by: string | null;
+  notes: string | null;
+  pipeline_project_name: string;
+  pipeline_status: string;
+  pipeline_area: string | null;
+  pipeline_municipality: string | null;
+  approval_count: number;
+  approved_count: number;
+}
+
+interface LinksResponse {
+  links: PipelineLink[];
+  primary_link_id: string | null;
+  count: number;
 }
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -70,6 +102,26 @@ function getStatusConfig(status: string) {
   }
 }
 
+const pipelineStatusLabels: Record<string, string> = {
+  lead: 'Lead',
+  qualifying: 'Qualifying',
+  planning: 'Planning',
+  ready_to_plan: 'Ready to Plan',
+  planned: 'Planned',
+  on_hold: 'On Hold',
+  lost: 'Lost',
+};
+
+const pipelineStatusColors: Record<string, string> = {
+  lead: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  qualifying: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  planning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  ready_to_plan: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  planned: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  on_hold: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  lost: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+};
+
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-ZA', {
@@ -84,9 +136,21 @@ function getDaysUntilExpiry(expiryDate: string | null): number | null {
   return Math.ceil((new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-export function ProjectWayleavesTab({ projectId }: ProjectWayleavesTabProps) {
+export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: ProjectWayleavesTabProps) {
   const [selectedApproval, setSelectedApproval] = useState<PipelineProjectApprovalWithType | null>(null);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
+  // Fetch pipeline links
+  const { data: linksData, mutate: mutateLinks } = useSWR<{ data: LinksResponse }>(
+    `/api/projects/${projectId}/pipeline-links`,
+    fetcher
+  );
+
+  const links = linksData?.data?.links || [];
+  const primaryLink = links.find(l => l.is_primary) || links[0];
+
+  // Fetch wayleaves from primary link
   const { data, error, isLoading, mutate } = useSWR<{ data: WayleavesResponse }>(
     `/api/projects/${projectId}/wayleaves`,
     fetcher
@@ -96,7 +160,52 @@ export function ProjectWayleavesTab({ projectId }: ProjectWayleavesTabProps) {
   const approvals = wayleavesData?.approvals || [];
   const status = wayleavesData?.status;
   const expiringAlerts = wayleavesData?.expiring_alerts || [];
-  const hasPipelineLink = Boolean(wayleavesData?.pipeline_project_id);
+  const hasPipelineLink = links.length > 0 || Boolean(wayleavesData?.pipeline_project_id);
+
+  const handleSetPrimary = async (linkId: string) => {
+    setActionInProgress(linkId);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/pipeline-links/${linkId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_primary: true }),
+      });
+
+      if (response.ok) {
+        await mutateLinks();
+        await mutate();
+      }
+    } catch (err) {
+      log.error('Failed to set primary link', { err }, 'ProjectWayleavesTab');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleUnlink = async (linkId: string) => {
+    if (!window.confirm('Are you sure you want to unlink this pipeline area?')) return;
+
+    setActionInProgress(linkId);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/pipeline-links/${linkId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await mutateLinks();
+        await mutate();
+      }
+    } catch (err) {
+      log.error('Failed to unlink pipeline', { err }, 'ProjectWayleavesTab');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleLinkCreated = async () => {
+    await mutateLinks();
+    await mutate();
+  };
 
   if (isLoading) {
     return (
@@ -129,37 +238,179 @@ export function ProjectWayleavesTab({ projectId }: ProjectWayleavesTabProps) {
     );
   }
 
-  // No pipeline link - show setup option
+  // No pipeline link - show setup option with ability to link
   if (!hasPipelineLink) {
     return (
-      <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8 text-center">
-        <FileCheck className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
-          No Pipeline Link
-        </h3>
-        <p className="text-[var(--ff-text-secondary)] mb-6 max-w-md mx-auto">
-          This project was not created from the pipeline, so wayleave tracking is not available.
-          Projects created through the pipeline module automatically include wayleave management.
-        </p>
-        <a
-          href="/pipeline"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-        >
-          <ExternalLink className="w-5 h-5" />
-          Go to Pipeline
-        </a>
+      <div className="space-y-6">
+        <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8 text-center">
+          <FileCheck className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
+            No Pipeline Link
+          </h3>
+          <p className="text-[var(--ff-text-secondary)] mb-6 max-w-md mx-auto">
+            This project is not linked to any pipeline area. Link it to an existing pipeline project
+            to enable wayleave tracking, or create a new project in the pipeline module.
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setIsLinkModalOpen(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            >
+              <Link2 className="w-5 h-5" />
+              Link Pipeline Area
+            </button>
+            <a
+              href="/pipeline"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-tertiary)] rounded-lg"
+            >
+              <ExternalLink className="w-5 h-5" />
+              Go to Pipeline
+            </a>
+          </div>
+        </div>
+
+        <LinkPipelineModal
+          projectId={projectId}
+          projectName={projectName}
+          isOpen={isLinkModalOpen}
+          onClose={() => setIsLinkModalOpen(false)}
+          onLinkCreated={handleLinkCreated}
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Linked Pipeline Areas Section */}
+      <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-blue-500" />
+            Linked Pipeline Areas
+            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)]">
+              {links.length}
+            </span>
+          </h3>
+          <button
+            onClick={() => setIsLinkModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Link Area
+          </button>
+        </div>
+
+        {links.length === 0 ? (
+          <div className="text-center py-4 text-[var(--ff-text-secondary)]">
+            No pipeline areas linked yet
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {links.map(link => (
+              <div
+                key={link.id}
+                className={`p-3 rounded-lg border ${
+                  link.is_primary
+                    ? 'border-blue-500/50 bg-blue-50/50 dark:bg-blue-900/10'
+                    : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {link.is_primary && (
+                        <Star className="w-4 h-4 text-amber-500 flex-shrink-0" fill="currentColor" />
+                      )}
+                      <span className="font-medium text-[var(--ff-text-primary)] truncate">
+                        {link.pipeline_project_name}
+                      </span>
+                      {link.is_primary && (
+                        <span className="text-xs text-blue-600 dark:text-blue-400">(Primary)</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-[var(--ff-text-secondary)]">
+                      {(link.pipeline_area || link.pipeline_municipality) && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {[link.pipeline_area, link.pipeline_municipality].filter(Boolean).join(', ')}
+                        </span>
+                      )}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          pipelineStatusColors[link.pipeline_status] || pipelineStatusColors.lead
+                        }`}
+                      >
+                        {pipelineStatusLabels[link.pipeline_status] || link.pipeline_status}
+                      </span>
+                      {link.approval_count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          {link.approved_count}/{link.approval_count} Approvals
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    <a
+                      href={`/pipeline/projects/${link.pipeline_project_id}`}
+                      className="p-1.5 text-[var(--ff-text-secondary)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                      title="View Pipeline"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                    {!link.is_primary && (
+                      <button
+                        onClick={() => handleSetPrimary(link.id)}
+                        disabled={actionInProgress === link.id}
+                        className="p-1.5 text-[var(--ff-text-secondary)] hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors disabled:opacity-50"
+                        title="Set as Primary"
+                      >
+                        {actionInProgress === link.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Star className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleUnlink(link.id)}
+                      disabled={actionInProgress === link.id}
+                      className="p-1.5 text-[var(--ff-text-secondary)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                      title="Unlink"
+                    >
+                      {actionInProgress === link.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {links.length > 1 && (
+          <div className="mt-3 flex items-start gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-700 dark:text-blue-300">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>Primary link determines which approvals are shown below. Click the star icon to change primary.</span>
+          </div>
+        )}
+      </div>
+
       {/* Progress Header */}
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
             <FileCheck className="w-5 h-5 text-blue-500" />
             Wayleaves & Approvals
+            {primaryLink && (
+              <span className="text-sm font-normal text-[var(--ff-text-secondary)]">
+                from {primaryLink.pipeline_project_name}
+              </span>
+            )}
           </h3>
           <div className="flex items-center gap-3">
             <button
@@ -243,7 +494,7 @@ export function ProjectWayleavesTab({ projectId }: ProjectWayleavesTabProps) {
           <FileCheck className="w-12 h-12 mx-auto mb-4 text-gray-400" />
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">No Wayleaves Yet</h3>
           <p className="text-[var(--ff-text-secondary)]">
-            No wayleave approvals have been added to this project yet.
+            No wayleave approvals have been added to the linked pipeline project yet.
           </p>
         </div>
       ) : (
@@ -344,6 +595,15 @@ export function ProjectWayleavesTab({ projectId }: ProjectWayleavesTabProps) {
           onClose={() => setSelectedApproval(null)}
         />
       )}
+
+      {/* Link Pipeline Modal */}
+      <LinkPipelineModal
+        projectId={projectId}
+        projectName={projectName}
+        isOpen={isLinkModalOpen}
+        onClose={() => setIsLinkModalOpen(false)}
+        onLinkCreated={handleLinkCreated}
+      />
     </div>
   );
 }

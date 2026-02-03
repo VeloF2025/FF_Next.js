@@ -36,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
  */
 async function handleGet(res: NextApiResponse, projectId: string) {
   try {
-    // First check if project has a pipeline link
+    // First check if project exists
     const projectResult = await sql`
       SELECT id, project_name, pipeline_project_id
       FROM projects
@@ -49,8 +49,24 @@ async function handleGet(res: NextApiResponse, projectId: string) {
 
     const project = projectResult[0] as { id: string; project_name: string; pipeline_project_id: string | null };
 
+    // Check junction table first for primary link (new system)
+    const primaryLinkResult = await sql`
+      SELECT pipeline_project_id FROM project_pipeline_links
+      WHERE project_id = ${projectId} AND is_primary = true
+      LIMIT 1
+    `;
+
+    // Use junction table if available, fall back to legacy column
+    let pipelineProjectId: string | null = null;
+    if (primaryLinkResult.length > 0) {
+      pipelineProjectId = (primaryLinkResult[0] as { pipeline_project_id: string }).pipeline_project_id;
+    } else if (project.pipeline_project_id) {
+      // Backward compatibility: use legacy column
+      pipelineProjectId = project.pipeline_project_id;
+    }
+
     // If project has pipeline link, fetch approvals from pipeline
-    if (project.pipeline_project_id) {
+    if (pipelineProjectId) {
       const approvals = await sql`
         SELECT
           a.*,
@@ -61,7 +77,7 @@ async function handleGet(res: NextApiResponse, projectId: string) {
           t.condition_type AS approval_type_condition_type
         FROM pipeline_project_approvals a
         JOIN pipeline_approval_types t ON a.approval_type_id = t.id
-        WHERE a.pipeline_project_id = ${project.pipeline_project_id}
+        WHERE a.pipeline_project_id = ${pipelineProjectId}
           AND t.category = 'wayleave'
         ORDER BY t.display_order, t.name
       `;
@@ -83,7 +99,7 @@ async function handleGet(res: NextApiResponse, projectId: string) {
 
       return apiResponse.success(res, {
         approvals,
-        pipeline_project_id: project.pipeline_project_id,
+        pipeline_project_id: pipelineProjectId,
         status: {
           total: required.length,
           approved: approved.length,
@@ -139,7 +155,7 @@ async function handlePost(
       return apiResponse.badRequest(res, 'Approval type ID is required');
     }
 
-    // Get project's pipeline_project_id
+    // Verify project exists
     const projectResult = await sql`
       SELECT id, pipeline_project_id
       FROM projects
@@ -152,7 +168,22 @@ async function handlePost(
 
     const project = projectResult[0] as { id: string; pipeline_project_id: string | null };
 
-    if (!project.pipeline_project_id) {
+    // Check junction table first for primary link (new system)
+    const primaryLinkResult = await sql`
+      SELECT pipeline_project_id FROM project_pipeline_links
+      WHERE project_id = ${projectId} AND is_primary = true
+      LIMIT 1
+    `;
+
+    // Use junction table if available, fall back to legacy column
+    let pipelineProjectId: string | null = null;
+    if (primaryLinkResult.length > 0) {
+      pipelineProjectId = (primaryLinkResult[0] as { pipeline_project_id: string }).pipeline_project_id;
+    } else if (project.pipeline_project_id) {
+      pipelineProjectId = project.pipeline_project_id;
+    }
+
+    if (!pipelineProjectId) {
       return apiResponse.badRequest(res, 'Project does not have a pipeline link. Cannot add wayleave approvals.');
     }
 
@@ -177,7 +208,7 @@ async function handlePost(
         authority_name, authority_contact_name, authority_contact_email,
         authority_contact_phone, authority_address, notes, created_by
       ) VALUES (
-        ${project.pipeline_project_id},
+        ${pipelineProjectId},
         ${approval_type_id},
         ${rest.is_required ?? true},
         ${rest.authority_name || null},
@@ -207,7 +238,7 @@ async function handlePost(
 
     log.info('Created wayleave approval for project', {
       projectId,
-      pipelineProjectId: project.pipeline_project_id,
+      pipelineProjectId,
       approvalId: (result[0] as { id: string }).id,
     }, 'wayleaves-api');
 
