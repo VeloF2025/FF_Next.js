@@ -54,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           p.status,
           p.location,
           p.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           p.pipeline_project_id as existing_pipeline_id
         FROM projects p
         LEFT JOIN clients c ON c.id = p.client_id
@@ -75,7 +75,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           p.status,
           p.location,
           p.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           p.pipeline_project_id as existing_pipeline_id
         FROM projects p
         LEFT JOIN clients c ON c.id = p.client_id
@@ -93,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           p.status,
           p.location,
           p.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           p.pipeline_project_id as existing_pipeline_id
         FROM projects p
         LEFT JOIN clients c ON c.id = p.client_id
@@ -110,7 +110,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           p.status,
           p.location,
           p.client_id,
-          c.name as client_name,
+          c.company_name as client_name,
           p.pipeline_project_id as existing_pipeline_id
         FROM projects p
         LEFT JOIN clients c ON c.id = p.client_id
