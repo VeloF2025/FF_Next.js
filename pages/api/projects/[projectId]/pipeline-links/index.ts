@@ -203,7 +203,7 @@ async function handlePost(
         ${shouldBePrimary},
         'manual',
         ${linkOrder},
-        ${userId},
+        ${staffId},
         ${notes || null}
       )
       RETURNING *
