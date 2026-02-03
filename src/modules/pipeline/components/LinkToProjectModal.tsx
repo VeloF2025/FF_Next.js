@@ -165,8 +165,8 @@ export function LinkToProjectModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/85" onClick={onClose} />
+      {/* Backdrop - fully opaque to hide background */}
+      <div className="fixed inset-0 bg-black" onClick={onClose} />
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
