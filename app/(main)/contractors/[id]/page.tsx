@@ -65,14 +65,14 @@ export default async function ContractorDetailPage({
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-            <Link href="/contractors" className="hover:text-blue-600">
+          <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-2">
+            <Link href="/contractors" className="hover:text-blue-400">
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <span>Back to Contractors</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{contractor.companyName}</h1>
-          <p className="text-gray-600">{contractor.registrationNumber}</p>
+          <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">{contractor.companyName}</h1>
+          <p className="text-[var(--ff-text-secondary)]">{contractor.registrationNumber}</p>
         </div>
 
         <Link
@@ -87,52 +87,52 @@ export default async function ContractorDetailPage({
       {/* Details */}
       <div className="space-y-6">
         {/* Company Information */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+        <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Company Information</h3>
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Business Type</dt>
-              <dd className="text-sm text-gray-900 mt-1">{contractor.businessType}</dd>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Business Type</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.businessType}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Industry Category</dt>
-              <dd className="text-sm text-gray-900 mt-1">{contractor.industryCategory || '-'}</dd>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Industry Category</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.industryCategory || '-'}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Years in Business</dt>
-              <dd className="text-sm text-gray-900 mt-1">{contractor.yearsInBusiness || '-'}</dd>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Years in Business</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.yearsInBusiness || '-'}</dd>
             </div>
           </dl>
         </div>
 
         {/* Contact Information */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+        <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Contact Information</h3>
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Contact Person</dt>
-              <dd className="text-sm text-gray-900 mt-1">{contractor.contactPerson}</dd>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Contact Person</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.contactPerson}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Email</dt>
-              <dd className="text-sm text-gray-900 mt-1">
-                <a href={`mailto:${contractor.email}`} className="text-blue-600 hover:underline">
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Email</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">
+                <a href={`mailto:${contractor.email}`} className="text-blue-400 hover:underline">
                   {contractor.email}
                 </a>
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Phone</dt>
-              <dd className="text-sm text-gray-900 mt-1">
-                <a href={`tel:${contractor.phone}`} className="text-blue-600 hover:underline">
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Phone</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">
+                <a href={`tel:${contractor.phone}`} className="text-blue-400 hover:underline">
                   {contractor.phone}
                 </a>
               </dd>
             </div>
             {contractor.alternatePhone && (
               <div>
-                <dt className="text-sm font-medium text-gray-500">Alternate Phone</dt>
-                <dd className="text-sm text-gray-900 mt-1">{contractor.alternatePhone}</dd>
+                <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Alternate Phone</dt>
+                <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.alternatePhone}</dd>
               </div>
             )}
           </dl>
@@ -140,32 +140,32 @@ export default async function ContractorDetailPage({
 
         {/* Address */}
         {(contractor.physicalAddress || contractor.city || contractor.province) && (
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Address</h3>
+          <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Address</h3>
             <dl className="space-y-2">
               {contractor.physicalAddress && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Physical Address</dt>
-                  <dd className="text-sm text-gray-900 mt-1">{contractor.physicalAddress}</dd>
+                  <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Physical Address</dt>
+                  <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.physicalAddress}</dd>
                 </div>
               )}
               <div className="flex gap-4">
                 {contractor.city && (
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">City</dt>
-                    <dd className="text-sm text-gray-900 mt-1">{contractor.city}</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">City</dt>
+                    <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.city}</dd>
                   </div>
                 )}
                 {contractor.province && (
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Province</dt>
-                    <dd className="text-sm text-gray-900 mt-1">{contractor.province}</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Province</dt>
+                    <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.province}</dd>
                   </div>
                 )}
                 {contractor.postalCode && (
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Postal Code</dt>
-                    <dd className="text-sm text-gray-900 mt-1">{contractor.postalCode}</dd>
+                    <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Postal Code</dt>
+                    <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.postalCode}</dd>
                   </div>
                 )}
               </div>
@@ -175,25 +175,25 @@ export default async function ContractorDetailPage({
 
         {/* Banking Details */}
         {(contractor.bankName || contractor.accountNumber) && (
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Banking Details</h3>
+          <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Banking Details</h3>
             <dl className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {contractor.bankName && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Bank Name</dt>
-                  <dd className="text-sm text-gray-900 mt-1">{contractor.bankName}</dd>
+                  <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Bank Name</dt>
+                  <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.bankName}</dd>
                 </div>
               )}
               {contractor.accountNumber && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Account Number</dt>
-                  <dd className="text-sm text-gray-900 mt-1">{contractor.accountNumber}</dd>
+                  <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Account Number</dt>
+                  <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.accountNumber}</dd>
                 </div>
               )}
               {contractor.branchCode && (
                 <div>
-                  <dt className="text-sm font-medium text-gray-500">Branch Code</dt>
-                  <dd className="text-sm text-gray-900 mt-1">{contractor.branchCode}</dd>
+                  <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Branch Code</dt>
+                  <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.branchCode}</dd>
                 </div>
               )}
             </dl>
@@ -201,37 +201,37 @@ export default async function ContractorDetailPage({
         )}
 
         {/* Status */}
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Status</h3>
+        <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Status</h3>
           <dl className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <dt className="text-sm font-medium text-gray-500">Contractor Status</dt>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Contractor Status</dt>
               <dd className="mt-1">
-                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-500/20 text-green-400">
                   {contractor.status.replace('_', ' ').toUpperCase()}
                 </span>
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Compliance Status</dt>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Compliance Status</dt>
               <dd className="mt-1">
-                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-400">
                   {contractor.complianceStatus.replace('_', ' ').toUpperCase()}
                 </span>
               </dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500">Active</dt>
-              <dd className="text-sm text-gray-900 mt-1">{contractor.isActive ? 'Yes' : 'No'}</dd>
+              <dt className="text-sm font-medium text-[var(--ff-text-secondary)]">Active</dt>
+              <dd className="text-sm text-[var(--ff-text-primary)] mt-1">{contractor.isActive ? 'Yes' : 'No'}</dd>
             </div>
           </dl>
         </div>
 
         {/* Notes */}
         {contractor.notes && (
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Notes</h3>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{contractor.notes}</p>
+          <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Notes</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] whitespace-pre-wrap">{contractor.notes}</p>
           </div>
         )}
       </div>
@@ -243,11 +243,11 @@ export default async function ContractorDetailPage({
 
       {/* Onboarding Section - Link to dedicated page */}
       <div className="mt-8">
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
+        <div className="bg-[var(--ff-bg-secondary)] p-6 rounded-lg border border-[var(--ff-border-light)]">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Onboarding Progress</h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <h2 className="text-xl font-bold text-[var(--ff-text-primary)]">Onboarding Progress</h2>
+              <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
                 Manage contractor onboarding workflow and required documents
               </p>
             </div>

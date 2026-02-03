@@ -175,8 +175,8 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Documents</h2>
-          <p className="text-gray-600 mt-1">
+          <h2 className="text-2xl font-bold text-[var(--ff-text-primary)]">Documents</h2>
+          <p className="text-[var(--ff-text-secondary)] mt-1">
             Manage contractor documents, certificates, and compliance records
           </p>
         </div>
@@ -186,7 +186,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
           <button
             onClick={handleRefresh}
             disabled={isRefreshing || isLoading}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] rounded-lg transition-colors disabled:opacity-50"
             title="Refresh documents"
           >
             <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -220,50 +220,50 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <FileText className="h-5 w-5 text-blue-600" />
+            <div className="p-2 bg-blue-500/20 rounded-lg">
+              <FileText className="h-5 w-5 text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
-              <p className="text-sm text-gray-600">Total Documents</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{documents.length}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Total Documents</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-50 rounded-lg">
-              <FileText className="h-5 w-5 text-green-600" />
+            <div className="p-2 bg-green-500/20 rounded-lg">
+              <FileText className="h-5 w-5 text-green-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{groupedDocuments.approved.length}</p>
-              <p className="text-sm text-gray-600">Approved</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{groupedDocuments.approved.length}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Approved</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-50 rounded-lg">
-              <FileText className="h-5 w-5 text-yellow-600" />
+            <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <FileText className="h-5 w-5 text-yellow-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{groupedDocuments.pending.length}</p>
-              <p className="text-sm text-gray-600">Pending Review</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{groupedDocuments.pending.length}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Pending Review</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-50 rounded-lg">
-              <FileText className="h-5 w-5 text-red-600" />
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <FileText className="h-5 w-5 text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{groupedDocuments.expired.length}</p>
-              <p className="text-sm text-gray-600">Expired</p>
+              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{groupedDocuments.expired.length}</p>
+              <p className="text-sm text-[var(--ff-text-secondary)]">Expired</p>
             </div>
           </div>
         </div>
@@ -271,7 +271,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       {/* Error State */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400">
           <p className="font-medium">Error loading documents</p>
           <p className="text-sm mt-1">{error}</p>
           <button
@@ -292,10 +292,10 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
 
       {/* Empty State */}
       {!isLoading && !error && documents.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No documents uploaded</h3>
-          <p className="text-gray-600 mb-4">
+        <div className="text-center py-12 bg-[var(--ff-bg-tertiary)] rounded-lg border-2 border-dashed border-[var(--ff-border-light)]">
+          <FileText className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No documents uploaded</h3>
+          <p className="text-[var(--ff-text-secondary)] mb-4">
             Upload documents like insurance certificates, registrations, and compliance records
           </p>
           <button
@@ -314,7 +314,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
           {/* Expired Documents (Show First - High Priority) */}
           {hasExpired && (
             <div>
-              <h3 className="text-lg font-semibold text-red-900 mb-3 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-red-400 mb-3 flex items-center gap-2">
                 ⚠️ Expired Documents ({groupedDocuments.expired.length})
               </h3>
               <div className="space-y-3">
@@ -334,7 +334,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
           {/* Pending Documents */}
           {hasPending && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
                 Pending Review ({groupedDocuments.pending.length})
               </h3>
               <div className="space-y-3">
@@ -354,7 +354,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
           {/* Approved Documents */}
           {groupedDocuments.approved.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
                 Approved Documents ({groupedDocuments.approved.length})
               </h3>
               <div className="space-y-3">
@@ -372,7 +372,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
           {/* Rejected Documents */}
           {groupedDocuments.rejected.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-3">
                 Rejected Documents ({groupedDocuments.rejected.length})
               </h3>
               <div className="space-y-3">
