@@ -1190,7 +1190,10 @@
       "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline origin/master -5)",
       "Bash(git -C /home/hein/Workspace/FF_Next.js log --oneline HEAD -3)",
       "Bash(bun -e \"\nconst { neon } = require\\(''@neondatabase/serverless''\\);\nconst fs = require\\(''fs''\\);\n\nconst sql = neon\\(''postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require''\\);\n\nasync function runMigration\\(\\) {\n  const migrationSql = fs.readFileSync\\(''scripts/migrations/150_client_po_activation_requirement.sql'', ''utf8''\\);\n  \n  console.log\\(''Running migration 150 on PRODUCTION...''\\);\n  \n  try {\n    await sql.unsafe\\(migrationSql\\);\n    console.log\\(''Migration complete!''\\);\n  } catch \\(err\\) {\n    console.error\\(''Migration failed:'', err.message\\);\n    throw err;\n  }\n}\n\nrunMigration\\(\\);\n\")",
-      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require' node scripts/run-migration-151.js:*)"
+      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require' node scripts/run-migration-151.js:*)",
+      "Bash(PORT=3004 node -e:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require\" node:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require\" node scripts/run-migration-157.js:*)"
     ],
     "deny": [],
     "ask": [],
