@@ -417,3 +417,75 @@ grep -r ": sql\`\`" pages/api/ --include="*.ts"
 3. Test API endpoints with and without optional parameters
 
 **Reference:** Commit `592d15fd` - fix requirements API conditional SQL
+
+---
+
+## Staging Server: Wrong Build Directory
+
+**Severity:** CRITICAL - changes appear deployed but don't take effect
+
+**Problem:** Building in the wrong directory on the Velocity server means changes never reach the running service.
+
+**Server Directory Layout:**
+```
+/home/velo/fibreflow/          ← WRONG - personal clone, NOT used by service
+/home/louis/apps/fibreflow/    ← CORRECT - staging service runs from here
+```
+
+**The systemd Service Configuration:**
+```ini
+# /etc/systemd/system/fibreflow.service
+[Service]
+User=louis
+Group=louis
+WorkingDirectory=/home/louis/apps/fibreflow   # ← This is the directory that matters!
+ExecStart=/usr/bin/npm start -- -p 3006
+```
+
+**Symptoms:**
+- `git pull && npm run build` completes successfully
+- Service restarts without errors
+- But the browser shows OLD code behavior
+- JavaScript chunk hashes in browser don't match `.next` directory
+- Accessing new chunk URLs returns 404
+
+**Quick Diagnosis:**
+```bash
+# Check which directory the service uses
+cat /etc/systemd/system/fibreflow.service | grep WorkingDirectory
+
+# Check if you're in the right directory
+pwd  # Should be /home/louis/apps/fibreflow
+
+# Verify build files match what browser requests
+ls /home/louis/apps/fibreflow/.next/static/chunks/ | head
+# Compare with browser Network tab chunk filenames
+```
+
+**Correct Deploy Commands for Staging:**
+```bash
+# SSH to Velocity server
+sshpass -p 'velo2026' ssh velo@100.96.203.105
+
+# Deploy to staging (CORRECT directory)
+cd /home/louis/apps/fibreflow && \
+  echo 'velo2026' | sudo -S git pull && \
+  echo 'velo2026' | sudo -S npm run build && \
+  echo 'velo2026' | sudo -S systemctl restart fibreflow.service
+```
+
+**All Service Directories:**
+
+| Environment | Service | Directory | Port |
+|-------------|---------|-----------|------|
+| Staging | `fibreflow.service` | `/home/louis/apps/fibreflow` | 3006 |
+| Dev | `fibreflow-dev.service` | `/home/hein/apps/fibreflow-dev` | 3005 |
+| Production | `fibreflow-production.service` | `/home/velo/fibreflow-production` | 3000 |
+
+**Prevention:**
+1. Always check `WorkingDirectory` in service file before deploying
+2. Use absolute paths in deploy scripts
+3. Verify chunk filenames match after deploy
+4. Add version markers to verify deployment
+
+**Reference:** 2026-02-03 fleet permissions debugging session

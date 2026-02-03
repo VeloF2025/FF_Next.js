@@ -318,6 +318,103 @@ Check API logs for errors.
 | `pages/api/admin/users/[userId]/permissions.ts` | User overrides API |
 | `src/types/auth.types.ts` | Permission enum |
 
+## Navigation Tab Permissions
+
+Module navigation tabs use `rbacKey` to control visibility and access.
+
+### Permission Key Format
+
+```typescript
+// CORRECT: Dot-separated format
+rbacKey: 'fleet.vehicles'
+rbacKey: 'fleet.drivers'
+rbacKey: 'system.data-sync.olt.pending'
+
+// WRONG: Do NOT use colon format
+rbacKey: 'fleet:vehicles:view'  // ❌ Won't match database keys
+```
+
+### How Tab Filtering Works
+
+```typescript
+// src/modules/navigation/hooks/useModuleTabs.ts
+const { can } = usePermission();
+
+// Tab is locked if user can't view it
+const isLocked = tab.rbacKey && !can(tab.rbacKey, 'view');
+
+// Permission check in usePermission hook
+const perm = permissionMap.get(permissionKey);
+if (!perm) return false;  // No permission = no access
+return perm.canView;
+```
+
+### Adding Tab Permissions
+
+1. Add permission to database:
+```sql
+INSERT INTO access_permissions (key, name, module, description)
+VALUES ('fleet.vehicles', 'Fleet Vehicles', 'fleet', 'Access to fleet vehicles tab');
+```
+
+2. Grant to roles:
+```sql
+INSERT INTO role_permissions (role, permission_key, actions)
+VALUES ('viewer', 'fleet.vehicles', '{"view": true, "create": false, "edit": false, "delete": false}');
+```
+
+3. Add rbacKey to navigation config:
+```typescript
+// src/modules/navigation/config/modules/fleet.config.ts
+{
+  id: 'vehicles',
+  label: 'Vehicles',
+  icon: Car,
+  path: '/fleet/vehicles',
+  rbacKey: 'fleet.vehicles',  // Must match database key
+}
+```
+
+## Meeting Access Control Pattern
+
+Meetings use participant-based access control rather than role-based.
+
+### Database Schema
+
+```sql
+-- Meetings store participants as JSONB array
+meetings (
+  id UUID PRIMARY KEY,
+  title VARCHAR(255),
+  participants JSONB,  -- [{"email": "user@example.com", "name": "User"}, ...]
+  summary JSONB,
+  ...
+)
+```
+
+### Access Control Query
+
+```typescript
+// Only return meetings where user is a participant
+const meetings = await sql`
+  SELECT * FROM meetings
+  WHERE EXISTS (
+    SELECT 1 FROM jsonb_array_elements(participants) AS p
+    WHERE LOWER(p->>'email') = ${userEmail}
+  )
+`;
+```
+
+### Secured Endpoints
+
+| Endpoint | Access Rule |
+|----------|-------------|
+| `GET /api/meetings` | User sees only meetings they're a participant of |
+| `GET /api/meetings?id=X` | 403 if not a participant |
+| `POST /api/action-items/extract` | Must be a participant to extract |
+
+**Exception:** `super_admin` role bypasses all meeting access checks.
+
 ## Future Enhancements
 
 - [ ] Permission templates (e.g., "Project Manager" bundle)
