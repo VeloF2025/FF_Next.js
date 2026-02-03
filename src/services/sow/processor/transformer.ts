@@ -46,38 +46,54 @@ export function transformPoles(rawData: any[]): NeonPoleData[] {
 
 /**
  * Process Lawley-style drops data
+ *
+ * Column alias mappings support multiple export formats:
+ * - PlanNet/Fibertime format: label (drop), strtfeat (Pole), dim2, cblcpty, etc.
+ * - Standard format: drop_number, pole_number, cable_length, etc.
  */
 export function transformDrops(rawData: any[]): NeonDropData[] {
   const processedDrops: NeonDropData[] = [];
-  
+
   for (const row of rawData) {
-    const dropNumber = extractValue(row, ['label', 'drop_number', 'drop_id', 'drop_label']);
-    
+    // Support both 'label (drop)' from PlanNet and standard column names
+    const dropNumber = extractValue(row, [
+      'label (drop)', 'label', 'drop_number', 'drop_id', 'drop_label', 'drop'
+    ]);
+
     if (!dropNumber) continue;
-    
+
     const drop: NeonDropData = {
       drop_number: dropNumber,
-      pole_number: extractValue(row, ['strtfeat', 'start_feature', 'pole_number', 'from_pole']) || '',
-      cable_type: extractValue(row, ['type', 'cable_type']),
+      // Support 'strtfeat (Pole)' from PlanNet exports
+      pole_number: extractValue(row, [
+        'strtfeat (Pole)', 'strtfeat', 'start_feature', 'pole_number', 'from_pole', 'pole'
+      ]) || '',
+      // 'subtyp' indicates cable type in PlanNet (e.g., 'Drop')
+      cable_type: extractValue(row, ['subtyp', 'type', 'cable_type', 'subtype']),
       cable_spec: extractValue(row, ['spec', 'specification', 'cable_spec']),
+      // 'dim2' contains cable length in PlanNet (e.g., '30m')
       cable_length: extractValue(row, ['dim2', 'length', 'cable_length', 'distance']),
-      cable_capacity: extractValue(row, ['cblcpty', 'capacity', 'cable_capacity']),
-      start_point: extractValue(row, ['strtfeat', 'start_feature', 'from']),
-      end_point: extractValue(row, ['endfeat', 'end_feature', 'to']),
+      // 'cblcpty' is cable capacity in PlanNet (e.g., '1F')
+      cable_capacity: extractValue(row, ['cblcpty', 'capacity', 'cable_capacity', 'fibre_count']),
+      start_point: extractValue(row, ['strtfeat (Pole)', 'strtfeat', 'start_feature', 'from']),
+      // 'endfeat' is the end point (usually ONT reference)
+      end_point: extractValue(row, ['endfeat', 'end_feature', 'to', 'ont']),
       latitude: extractNumber(row, ['lat', 'latitude', 'y']),
       longitude: extractNumber(row, ['lon', 'longitude', 'lng', 'x']),
       address: extractValue(row, ['address', 'location', 'drop_address']),
       pon_no: extractNumber(row, ['pon_no', 'pon', 'pon_number']),
       zone_no: extractNumber(row, ['zone_no', 'zone', 'zone_number']),
       municipality: extractValue(row, ['mun', 'municipality', 'city']),
+      // 'stackref (Project)' contains project reference in PlanNet
+      project_ref: extractValue(row, ['stackref (Project)', 'stackref', 'project', 'project_code']),
       created_date: extractDate(row, ['datecrtd', 'created_date', 'date_created']),
       created_by: extractValue(row, ['crtdby', 'created_by', 'creator']),
       raw_data: row
     };
-    
+
     processedDrops.push(drop);
   }
-  
+
   return processedDrops;
 }
 

@@ -41,10 +41,11 @@ export const FILE_TYPE_CONFIGS: FileTypeConfig[] = [
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
     borderColor: 'border-blue-200',
-    requiredColumns: ['pole_number', 'latitude', 'longitude'],
+    requiredColumns: ['label_1 or pole_number', 'lat', 'lon'],
+    // Sample uses PlanNet/Fibertime format - standard names also accepted
     sampleData: [
-      { pole_number: 'P001', latitude: -33.9249, longitude: 18.4241, max_drops: 12 },
-      { pole_number: 'P002', latitude: -33.9251, longitude: 18.4243, max_drops: 12 }
+      { label_1: 'TEM.P.A001', type_1: 'Pole', lat: -33.9249, lon: 18.4241, pon_no: 1, zone_no: 1 },
+      { label_1: 'TEM.P.A002', type_1: 'Pole', lat: -33.9251, lon: 18.4243, pon_no: 1, zone_no: 1 }
     ]
   },
   {
@@ -55,10 +56,11 @@ export const FILE_TYPE_CONFIGS: FileTypeConfig[] = [
     color: 'text-green-600',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
-    requiredColumns: ['drop_number', 'pole_number', 'address'],
+    requiredColumns: ['label (drop) or drop_number'],
+    // Sample uses PlanNet/Fibertime format - standard names also accepted
     sampleData: [
-      { drop_number: 'D001', pole_number: 'P001', address: '123 Main St', status: 'planned' },
-      { drop_number: 'D002', pole_number: 'P001', address: '125 Main St', status: 'planned' }
+      { 'label (drop)': 'DR2612776', type: 'Cable', subtyp: 'Drop', dim2: '30m', cblcpty: '1F', 'strtfeat (Pole)': 'TEM.P.A001', endfeat: 'ONT.001', lat: -33.9249, lon: 18.4241, pon_no: 1, zone_no: 1 },
+      { 'label (drop)': 'DR2612777', type: 'Cable', subtyp: 'Drop', dim2: '25m', cblcpty: '1F', 'strtfeat (Pole)': 'TEM.P.A001', endfeat: 'ONT.002', lat: -33.9251, lon: 18.4243, pon_no: 1, zone_no: 1 }
     ]
   },
   {
@@ -69,10 +71,10 @@ export const FILE_TYPE_CONFIGS: FileTypeConfig[] = [
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-200',
-    requiredColumns: ['segment_id', 'from_point', 'to_point', 'distance'],
+    requiredColumns: ['segment_id or label', 'cable size', 'length'],
     sampleData: [
-      { segment_id: 'S001', from_point: 'P001', to_point: 'P002', distance: 150, cable_type: 'aerial' },
-      { segment_id: 'S002', from_point: 'P002', to_point: 'P003', distance: 200, cable_type: 'underground' }
+      { label: 'S001', 'cable size': '48F', layer: 'Backbone', length: 150, pon_no: 1, zone_no: 1 },
+      { label: 'S002', 'cable size': '24F', layer: 'Distribution', length: 200, pon_no: 1, zone_no: 2 }
     ]
   }
 ];

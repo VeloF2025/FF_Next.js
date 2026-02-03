@@ -39,6 +39,7 @@ export interface NeonDropData {
   pon_no?: number | undefined;
   zone_no?: number | undefined;
   municipality?: string | undefined;
+  project_ref?: string | undefined;
   created_date?: string | undefined;
   created_by?: string | undefined;
   service_type?: string | undefined;
