@@ -138,12 +138,22 @@ async function handler(
       await sql`DELETE FROM poles WHERE project_id = ${projectId}`;
     }
 
+    // Deduplicate poles by pole_number (keep last occurrence)
+    // This handles files where same pole appears multiple times (linked to multiple DRs)
+    const poleMap = new Map();
+    for (const pole of poles) {
+      if (pole.pole_number) {
+        poleMap.set(pole.pole_number, pole);
+      }
+    }
+    const uniquePoles = Array.from(poleMap.values());
+
     // Use UNNEST for efficient bulk insert (single query per batch)
     let totalInserted = 0;
     const batchSize = 1000; // Much larger batches with UNNEST
 
-    for (let i = 0; i < poles.length; i += batchSize) {
-      const batch = poles.slice(i, i + batchSize);
+    for (let i = 0; i < uniquePoles.length; i += batchSize) {
+      const batch = uniquePoles.slice(i, i + batchSize);
 
       // Prepare arrays for UNNEST
       const projectIds = batch.map(() => projectId);
@@ -217,11 +227,13 @@ async function handler(
       totalInserted += batch.length;
     }
 
+    const duplicatesRemoved = poles.length - uniquePoles.length;
     return res.status(200).json({
       success: true,
-      message: `Successfully uploaded ${totalInserted} poles`,
+      message: `Successfully uploaded ${totalInserted} unique poles${duplicatesRemoved > 0 ? ` (${duplicatesRemoved} duplicates removed)` : ''}`,
       inserted: totalInserted,
-      upserted: totalInserted
+      upserted: totalInserted,
+      duplicatesRemoved
     });
 
   } catch (error) {
