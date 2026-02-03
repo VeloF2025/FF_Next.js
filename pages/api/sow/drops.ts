@@ -136,43 +136,56 @@ async function handler(
     // Clear existing drops for this project
     await sql`DELETE FROM drops WHERE project_id = ${projectId}`;
 
-    // Insert drops
-    const dropsData = drops.map(drop => ({
-      project_id: projectId,
-      drop_number: drop.drop_number,
-      pole_number: drop.pole_number || null,
-      cable_type: drop.cable_type || null,
-      cable_spec: drop.cable_spec || null,
-      cable_length: drop.cable_length || null,
-      cable_capacity: drop.cable_capacity || null,
-      start_point: drop.start_point || null,
-      end_point: drop.end_point || null,
-      latitude: drop.latitude || null,
-      longitude: drop.longitude || null,
-      address: drop.address || null,
-      pon_no: drop.pon_no || null,
-      zone_no: drop.zone_no || null,
-      municipality: drop.municipality || null,
-      raw_data: drop.raw_data || null
-    }));
-
-    // Insert drops one by one (Neon doesn't support sql(array) for batch insert)
+    // Use UNNEST for efficient bulk insert (single query per batch)
     let totalInserted = 0;
-    const batchSize = 50;
+    const batchSize = 1000; // Much larger batches with UNNEST
 
-    for (let i = 0; i < dropsData.length; i += batchSize) {
-      const batch = dropsData.slice(i, i + batchSize);
-      const promises = batch.map(drop =>
-        sql`INSERT INTO drops (
+    for (let i = 0; i < drops.length; i += batchSize) {
+      const batch = drops.slice(i, i + batchSize);
+
+      // Prepare arrays for UNNEST
+      const projectIds = batch.map(() => projectId);
+      const dropNumbers = batch.map(d => d.drop_number);
+      const poleNumbers = batch.map(d => d.pole_number || null);
+      const cableTypes = batch.map(d => d.cable_type || null);
+      const cableSpecs = batch.map(d => d.cable_spec || null);
+      const cableLengths = batch.map(d => d.cable_length || null);
+      const cableCapacities = batch.map(d => d.cable_capacity || null);
+      const startPoints = batch.map(d => d.start_point || null);
+      const endPoints = batch.map(d => d.end_point || null);
+      const latitudes = batch.map(d => d.latitude ? parseFloat(d.latitude) : null);
+      const longitudes = batch.map(d => d.longitude ? parseFloat(d.longitude) : null);
+      const addresses = batch.map(d => d.address || null);
+      const ponNos = batch.map(d => d.pon_no ? parseInt(d.pon_no) : null);
+      const zoneNos = batch.map(d => d.zone_no ? parseInt(d.zone_no) : null);
+      const municipalities = batch.map(d => d.municipality || null);
+      const rawDatas = batch.map(d => d.raw_data ? JSON.stringify(d.raw_data) : null);
+
+      await sql`
+        INSERT INTO drops (
           project_id, drop_number, pole_number, cable_type, cable_spec,
           cable_length, cable_capacity, start_point, end_point,
           latitude, longitude, address, pon_no, zone_no, municipality, raw_data
-        ) VALUES (
-          ${drop.project_id}, ${drop.drop_number}, ${drop.pole_number}, ${drop.cable_type}, ${drop.cable_spec},
-          ${drop.cable_length}, ${drop.cable_capacity}, ${drop.start_point}, ${drop.end_point},
-          ${drop.latitude}, ${drop.longitude}, ${drop.address}, ${drop.pon_no}, ${drop.zone_no},
-          ${drop.municipality}, ${drop.raw_data}
-        ) ON CONFLICT (project_id, drop_number) DO UPDATE SET
+        )
+        SELECT * FROM UNNEST(
+          ${projectIds}::uuid[],
+          ${dropNumbers}::varchar[],
+          ${poleNumbers}::varchar[],
+          ${cableTypes}::varchar[],
+          ${cableSpecs}::varchar[],
+          ${cableLengths}::varchar[],
+          ${cableCapacities}::varchar[],
+          ${startPoints}::varchar[],
+          ${endPoints}::varchar[],
+          ${latitudes}::numeric[],
+          ${longitudes}::numeric[],
+          ${addresses}::text[],
+          ${ponNos}::integer[],
+          ${zoneNos}::integer[],
+          ${municipalities}::varchar[],
+          ${rawDatas}::jsonb[]
+        )
+        ON CONFLICT (project_id, drop_number) DO UPDATE SET
           pole_number = EXCLUDED.pole_number,
           cable_type = EXCLUDED.cable_type,
           cable_spec = EXCLUDED.cable_spec,
@@ -187,9 +200,9 @@ async function handler(
           zone_no = EXCLUDED.zone_no,
           municipality = EXCLUDED.municipality,
           raw_data = EXCLUDED.raw_data,
-          updated_at = CURRENT_TIMESTAMP`
-      );
-      await Promise.all(promises);
+          updated_at = CURRENT_TIMESTAMP
+      `;
+
       totalInserted += batch.length;
     }
 
