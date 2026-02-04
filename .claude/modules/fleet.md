@@ -172,6 +172,41 @@ location /storage/ {
 - Links to Check-In History page
 - Lightbox for full-size viewing
 
+## Vehicles API Query Branches
+
+**IMPORTANT**: `pages/api/fleet/vehicles.ts` has 8 query branches for different filter combinations. When adding new fields (like license disc), ALL branches must be updated:
+
+| Branch | Condition |
+|--------|-----------|
+| 1 | `status && type && search` |
+| 2 | `status && type` |
+| 3 | `status` |
+| 4 | `type` |
+| 5 | `search` |
+| 6 | `assigned === 'true'` |
+| 7 | `assigned === 'false'` |
+| 8 | Default (no filters) |
+
+### License Disc in Vehicles List
+All branches include:
+```sql
+ld.expiry_date as "licenseDiscExpiry",
+CASE
+  WHEN ld.expiry_date IS NULL THEN NULL
+  WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+  WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+  WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+  ELSE 'ok'
+END as "expiryStatus"
+
+LEFT JOIN LATERAL (
+  SELECT expiry_date FROM fleet_license_disc
+  WHERE vehicle_id = fv.id AND status = 'active'
+  ORDER BY expiry_date DESC
+  LIMIT 1
+) ld ON true
+```
+
 ## Recent Changes (Jan 2026)
 - Added `VehicleCalibrationModal` for first-time setup
 - Added calibration API with grandfathering logic

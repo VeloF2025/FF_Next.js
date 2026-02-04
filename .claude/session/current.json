@@ -1,9 +1,9 @@
 {
   "session_id": "2026-02-04-fleet-photos",
   "started_at": "2026-02-04T12:00:00Z",
-  "last_updated": "2026-02-04T16:20:53.205Z",
+  "last_updated": "2026-02-04T17:52:52.399Z",
   "working_on": {
-    "task": "Fleet Photos & Documents Fix",
+    "task": "Fleet Photos & License Disc Fix",
     "status": "completed",
     "progress": [
       "Added Photos tab to vehicle detail page",
@@ -11,9 +11,11 @@
       "Fixed photo URLs to use /storage/ prefix for nginx proxy",
       "Added /storage/ nginx proxy to dev.fibreflow.app",
       "Photos now display correctly on vf and dev environments",
+      "Fixed license disc data not showing in vehicle list",
+      "Added license disc JOIN to ALL query branches in vehicles API",
       "Deployed to dev, vf, and app environments"
     ],
-    "last_action": "Verified photos showing on all environments"
+    "last_action": "Fixed license disc JOIN in all 8 query branches of vehicles.ts"
   },
   "learnings": {
     "vf_storage_urls": {
@@ -43,6 +45,21 @@
       "fleet_check_photos": "Photos captured during check-ins, linked via record_id",
       "fleet_vehicle_photos": "General vehicle photos (damage, receipts), linked via vehicle_id",
       "api_combines": "GET /api/fleet/vehicles/[id]/photos returns from both tables"
+    },
+    "vehicles_api_query_branches": {
+      "issue": "Multiple query branches in vehicles.ts need identical field selections",
+      "branches": [
+        "status+type+search",
+        "status+type",
+        "status",
+        "type",
+        "search",
+        "assigned=true",
+        "assigned=false",
+        "default"
+      ],
+      "common_mistake": "Adding a JOIN to one branch but forgetting others",
+      "solution": "When adding new fields (like license disc), update ALL 8 branches"
     }
   },
   "bugs_fixed": [
@@ -65,12 +82,18 @@
       "file": "/etc/nginx/sites-enabled/vf-fibreflow",
       "issue": "dev.fibreflow.app missing /storage/ proxy",
       "fix": "Added location /storage/ block to dev server"
+    },
+    {
+      "file": "pages/api/fleet/vehicles.ts",
+      "issue": "License disc data only returned in 2 of 8 query branches",
+      "fix": "Added LEFT JOIN LATERAL on fleet_license_disc with status='active' to ALL branches"
     }
   ],
   "commits": [
     "eadf08f7 fix(fleet): correct photo URLs to use /storage/ prefix for nginx proxy",
     "8d90d70c fix(fleet): use axios for photo upload to fix form-data compatibility",
-    "1db82906 feat(fleet): add Photos tab and enhance vehicle photo display"
+    "1db82906 feat(fleet): add Photos tab and enhance vehicle photo display",
+    "f74b5c1d fix(fleet): add license disc data to all vehicle list query branches"
   ],
   "context": {
     "project": "FibreFlow",
@@ -78,7 +101,7 @@
     "module": "fleet"
   },
   "next_steps": [
-    "Test photo upload from mobile devices",
-    "Add /storage/ proxy to app.fibreflow.app nginx if needed"
+    "Verify license disc expiry warnings display correctly in browser",
+    "Test photo upload from mobile devices"
   ]
 }
