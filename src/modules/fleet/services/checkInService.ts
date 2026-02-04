@@ -332,6 +332,17 @@ export async function createCheckRecord(input: CreateCheckRecordInput): Promise<
   // Update check schedule
   await updateCheckScheduleAfterCheckIn(input.vehicleId, checkType);
 
+  // Record odometer reading to history (ensures persistence even if VLM fails)
+  // This captures the final value submitted (whether from VLM auto-fill, manual entry, or HITL override)
+  if (input.odometerReading) {
+    await recordOdometerReading({
+      vehicleId: input.vehicleId,
+      checkRecordId: recordRow.id,
+      reading: input.odometerReading,
+      source: input.odometerSource || 'check_in',
+    });
+  }
+
   return rowToCheckRecord(recordRow);
 }
 

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   CheckCircle,
   XCircle,
@@ -44,6 +45,7 @@ function getPhotoUrl(url: string): string {
 
 export default function CheckInHistoryPage() {
   const router = useRouter();
+  const { currentUser } = useAuth();
   const { recordId } = router.query;
 
   const [records, setRecords] = useState<CheckRecordWithDetails[]>([]);
@@ -96,13 +98,18 @@ export default function CheckInHistoryPage() {
 
   // Handle approval
   const handleApprove = async (id: string, approve: boolean) => {
+    if (!currentUser?.id) {
+      setError('You must be logged in to approve records');
+      return;
+    }
+
     try {
       const response = await fetch(`/api/fleet/check-in/records/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: approve ? 'approved' : 'rejected',
-          approvedBy: 'current-user-id', // TODO: Get from auth
+          approvedBy: currentUser.id,
         }),
       });
 

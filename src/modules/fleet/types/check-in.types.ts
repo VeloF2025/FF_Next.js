@@ -57,8 +57,12 @@ export type VlmProcessingStatus = 'pending' | 'completed' | 'failed';
 
 /**
  * Odometer reading source
+ * - 'manual': Manually entered by driver (no photo)
+ * - 'vlm': Extracted by VLM from dashboard photo
+ * - 'check_in': Submitted during check-in (may be VLM auto-filled or manual)
+ * - 'manual_override': HITL correction after VLM extraction
  */
-export type OdometerSource = 'manual' | 'vlm';
+export type OdometerSource = 'manual' | 'vlm' | 'check_in' | 'manual_override';
 
 /**
  * Reminder channel
@@ -213,6 +217,7 @@ export interface CreateCheckRecordInput {
   driverName: string;
   checkType?: CheckType; // Defaults to 'daily'
   odometerReading?: number;
+  odometerSource?: OdometerSource; // Track if HITL overrode the value
   fuelLevel?: number; // 0-100 percentage
   responses: CreateCheckResponseInput[];
   offlineId?: string; // For offline sync

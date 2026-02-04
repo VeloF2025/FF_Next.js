@@ -187,6 +187,9 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   const [odometerVerifiedOverride, setOdometerVerifiedOverrideState] = useState(false);
   const [verificationPhotoDataUrl, setVerificationPhotoDataUrl] = useState<string | null>(null);
 
+  // Track if odometer was manually overridden (for correct source tracking)
+  const [odometerWasOverridden, setOdometerWasOverridden] = useState(false);
+
   // Get required photos based on check type
   const requiredPhotos = checkType === 'daily' ? DAILY_PHOTOS : WEEKLY_PHOTOS;
 
@@ -300,6 +303,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     // Update the appropriate field
     if (photoType === 'dashboard') {
       setFormState(prev => ({ ...prev, odometerReading: String(numValue) }));
+      // Track that this is a manual override (HITL correction)
+      setOdometerWasOverridden(true);
     } else if (photoType === 'fuel_gauge') {
       setFormState(prev => ({ ...prev, fuelLevel: String(numValue) }));
     }
@@ -486,6 +491,16 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     try {
       const isOnline = navigator.onLine;
 
+      // Determine odometer source based on how the value was entered
+      // Priority: manual_override (HITL correction) > vlm > check_in (manual entry)
+      let odometerSource: 'check_in' | 'vlm' | 'manual_override' = 'check_in';
+      const odometerVlm = vlmResults.get('dashboard');
+      if (odometerWasOverridden || odometerVerifiedOverride) {
+        odometerSource = 'manual_override';
+      } else if (odometerVlm?.extractedNumeric !== null && (odometerVlm?.confidence ?? 0) > 0.5) {
+        odometerSource = 'vlm';
+      }
+
       // Prepare input
       const input: CreateCheckRecordInput = {
         vehicleId: formState.vehicleId,
@@ -494,6 +509,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
         driverId,
         driverName,
         odometerReading: formState.odometerReading ? parseInt(formState.odometerReading, 10) : undefined,
+        odometerSource,
         responses: Array.from(formState.responses.values()),
       };
 
@@ -638,7 +654,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, requiredPhotos, vehicleId, vehicleRegistration]);
+  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, requiredPhotos, vehicleId, vehicleRegistration, vlmResults, odometerWasOverridden, odometerVerifiedOverride]);
 
   // Reset form
   const reset = useCallback(() => {
