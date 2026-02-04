@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import {
   Car,
   ArrowLeft,
@@ -19,6 +20,9 @@ import {
   Calendar,
   User,
   Gauge,
+  X,
+  Camera,
+  ExternalLink,
 } from 'lucide-react';
 
 interface CheckResponse {
@@ -35,6 +39,10 @@ interface CheckPhoto {
   id: string;
   photoType: string;
   fileUrl: string;
+  storageServiceUrl: string | null;
+  vlmProcessed?: boolean;
+  vlmConfidence?: number | null;
+  capturedAt?: string;
 }
 
 interface CheckRecord {
@@ -59,15 +67,35 @@ interface VehicleInfo {
   year: number | null;
 }
 
+const photoTypeLabels: Record<string, string> = {
+  dashboard: 'Dashboard',
+  odometer: 'Odometer',
+  fuel_gauge: 'Fuel',
+  front: 'Front',
+  rear: 'Rear',
+  under_vehicle: 'Under',
+  license_disk: 'License Disk',
+  damage: 'Damage',
+  odometer_override: 'Override',
+};
+
 export default function VehicleCheckInHistoryPage() {
   const router = useRouter();
-  const { id: vehicleId } = router.query;
+  const { id: vehicleId, recordId: highlightRecordId } = router.query;
 
   const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
   const [records, setRecords] = useState<CheckRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState<CheckPhoto | null>(null);
+
+  // Auto-expand highlighted record
+  useEffect(() => {
+    if (highlightRecordId && typeof highlightRecordId === 'string') {
+      setExpandedRecord(highlightRecordId);
+    }
+  }, [highlightRecordId]);
 
   // Load vehicle info and check-in records
   useEffect(() => {
@@ -168,26 +196,35 @@ export default function VehicleCheckInHistoryPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 shadow-sm">
-          <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
+          <div className="max-w-lg mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Car className="w-8 h-8 text-blue-600" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Check-In History
-                </h1>
-                {vehicle && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {vehicle.registration}
-                  </p>
-                )}
+              <Link href={`/fleet/vehicles/${vehicleId}?tab=photos`}>
+                <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                  <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </button>
+              </Link>
+              <div className="flex items-center gap-3">
+                <Car className="w-8 h-8 text-blue-600" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Check-In History
+                  </h1>
+                  {vehicle && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {vehicle.registration}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
+            {vehicleId && (
+              <Link href={`/fleet/vehicles/${vehicleId}`}>
+                <button className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                  <ExternalLink className="w-4 h-4" />
+                  Vehicle
+                </button>
+              </Link>
+            )}
           </div>
         </div>
 
@@ -241,10 +278,14 @@ export default function VehicleCheckInHistoryPage() {
           {/* Records List */}
           {!isLoading && records.length > 0 && (
             <div className="space-y-3">
-              {records.map((record) => (
+              {records.map((record) => {
+                const isHighlighted = highlightRecordId === record.id;
+                return (
                 <div
                   key={record.id}
-                  className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
+                  className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden ${
+                    isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+                  }`}
                 >
                   {/* Record Header */}
                   <div
@@ -327,37 +368,100 @@ export default function VehicleCheckInHistoryPage() {
                       {/* Photos */}
                       {record.photos && record.photos.length > 0 && (
                         <>
-                          <h4 className="font-medium text-gray-900 dark:text-white mb-2 text-sm">
-                            Photos
+                          <h4 className="font-medium text-gray-900 dark:text-white mb-2 text-sm flex items-center gap-2">
+                            <Camera className="w-4 h-4" />
+                            Photos ({record.photos.length})
                           </h4>
                           <div className="grid grid-cols-3 gap-2">
-                            {record.photos.map((photo) => (
-                              <div
-                                key={photo.id}
-                                className="relative aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700"
-                              >
-                                <img
-                                  src={photo.fileUrl.startsWith('/uploads/') ? `/api${photo.fileUrl}` : photo.fileUrl}
-                                  alt={photo.photoType}
-                                  className="w-full h-full object-cover"
-                                />
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">
-                                  <span className="text-white text-xs capitalize">
-                                    {photo.photoType}
-                                  </span>
+                            {record.photos.map((photo) => {
+                              const photoUrl = photo.storageServiceUrl || photo.fileUrl;
+                              const displayUrl = photoUrl.startsWith('/uploads/') ? `/api${photoUrl}` : photoUrl;
+                              return (
+                                <div
+                                  key={photo.id}
+                                  onClick={() => setLightboxPhoto(photo)}
+                                  className="relative aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 cursor-pointer group"
+                                >
+                                  <img
+                                    src={displayUrl}
+                                    alt={photo.photoType}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">
+                                    <span className="text-white text-xs">
+                                      {photoTypeLabels[photo.photoType] || photo.photoType}
+                                    </span>
+                                    {photo.vlmProcessed && (
+                                      <span className="text-green-300 text-xs ml-1">VLM</span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </>
                       )}
                     </div>
                   )}
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>
+
+        {/* Lightbox Modal */}
+        {lightboxPhoto && (
+          <div
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setLightboxPhoto(null)}
+          >
+            <div
+              className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl max-h-[90vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="relative">
+                <img
+                  src={lightboxPhoto.storageServiceUrl || lightboxPhoto.fileUrl}
+                  alt={lightboxPhoto.photoType}
+                  className="w-full h-auto"
+                />
+                <button
+                  onClick={() => setLightboxPhoto(null)}
+                  className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 border-t dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {photoTypeLabels[lightboxPhoto.photoType] || lightboxPhoto.photoType}
+                    </h3>
+                    {lightboxPhoto.capturedAt && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Captured: {new Date(lightboxPhoto.capturedAt).toLocaleString('en-ZA')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {lightboxPhoto.vlmProcessed && (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded text-sm">
+                        VLM Processed
+                      </span>
+                    )}
+                    {lightboxPhoto.vlmConfidence != null && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded text-sm">
+                        {Math.round(lightboxPhoto.vlmConfidence * 100)}% conf
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

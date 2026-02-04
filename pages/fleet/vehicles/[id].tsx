@@ -43,6 +43,7 @@ import {
   ImageIcon,
   Search,
   Upload,
+  History,
 } from 'lucide-react';
 import type {
   VehicleDocument,
@@ -94,7 +95,7 @@ interface Investigation {
   createdAt: string;
 }
 
-type TabId = 'overview' | 'odometer' | 'fuel' | 'ownership' | 'documents' | 'insurance';
+type TabId = 'overview' | 'odometer' | 'fuel' | 'ownership' | 'documents' | 'insurance' | 'photos';
 
 interface OdometerReading {
   id: string;
@@ -155,6 +156,28 @@ interface FuelSummary {
   totalLitres: number;
   avgConsumption: number | null;
   transactionCount: number;
+}
+
+interface VehiclePhoto {
+  id: string;
+  vehicleId: string;
+  photoType: string;
+  fileUrl: string;
+  fileKey: string | null;
+  fileSize: number | null;
+  mimeType: string | null;
+  checkRecordId: string | null;
+  fuelTransactionId: string | null;
+  vlmProcessed: boolean;
+  vlmResult: unknown;
+  vlmConfidence: number | null;
+  capturedAt: string;
+  capturedBy: string | null;
+  notes: string | null;
+  createdAt: string;
+  source: 'vehicle_photos' | 'check_photos';
+  checkDate?: string;
+  checkTime?: string;
 }
 
 interface VehicleStatistics {
@@ -1276,6 +1299,252 @@ function InsuranceTab({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhotosTab({
+  vehicleId,
+  photos,
+  photosByType,
+  photosBySource,
+  loading,
+  onRefresh,
+}: {
+  vehicleId: string;
+  photos: VehiclePhoto[];
+  photosByType: Record<string, number>;
+  photosBySource: { vehicle_photos: number; check_photos: number };
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [lightboxPhoto, setLightboxPhoto] = useState<VehiclePhoto | null>(null);
+
+  const photoTypeLabels: Record<string, string> = {
+    dashboard: 'Dashboard/Odometer',
+    odometer: 'Odometer',
+    fuel_gauge: 'Fuel Gauge',
+    front: 'Exterior Front',
+    rear: 'Exterior Rear',
+    exterior_front: 'Exterior Front',
+    exterior_rear: 'Exterior Rear',
+    under_vehicle: 'Under Vehicle',
+    license_disk: 'License Disk',
+    damage: 'Damage',
+    receipt: 'Receipt',
+    licence_plate_front: 'License Plate Front',
+    licence_plate_rear: 'License Plate Rear',
+    odometer_override: 'Odometer Override',
+  };
+
+  const filteredPhotos = selectedType === 'all'
+    ? photos
+    : photos.filter(p => p.photoType === selectedType);
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-6">
+        <div className="h-32 bg-[var(--ff-bg-tertiary)] rounded-lg"></div>
+        <div className="h-64 bg-[var(--ff-bg-tertiary)] rounded-lg"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Card */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
+            <Camera className="w-5 h-5 text-[var(--ff-primary)]" />
+            Vehicle Photos
+          </h2>
+          <div className="flex gap-2">
+            <Link href={`/fleet/vehicles/${vehicleId}/check-in-history`}>
+              <button className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5">
+                <History className="w-4 h-4" />
+                Check-In History
+              </button>
+            </Link>
+            <button
+              onClick={onRefresh}
+              className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
+            <p className="text-xs text-[var(--ff-text-secondary)]">Total Photos</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{photos.length}</p>
+          </div>
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
+            <p className="text-xs text-[var(--ff-text-secondary)]">From Check-Ins</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{photosBySource.check_photos}</p>
+          </div>
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
+            <p className="text-xs text-[var(--ff-text-secondary)]">Vehicle Photos</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{photosBySource.vehicle_photos}</p>
+          </div>
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3">
+            <p className="text-xs text-[var(--ff-text-secondary)]">Photo Types</p>
+            <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{Object.keys(photosByType).length}</p>
+          </div>
+        </div>
+
+        {/* Type Filter */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setSelectedType('all')}
+            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+              selectedType === 'all'
+                ? 'bg-[var(--ff-primary)] text-white'
+                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
+            }`}
+          >
+            All ({photos.length})
+          </button>
+          {Object.entries(photosByType).map(([type, count]) => (
+            <button
+              key={type}
+              onClick={() => setSelectedType(type)}
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                selectedType === type
+                  ? 'bg-[var(--ff-primary)] text-white'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
+              }`}
+            >
+              {photoTypeLabels[type] || type} ({count})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Photo Grid */}
+      {filteredPhotos.length === 0 ? (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] p-12 text-center">
+          <ImageIcon className="w-16 h-16 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No photos yet</h3>
+          <p className="text-[var(--ff-text-secondary)]">
+            Photos from vehicle check-ins and fuel receipts will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredPhotos.map((photo) => (
+            <div
+              key={photo.id}
+              onClick={() => setLightboxPhoto(photo)}
+              className="bg-[var(--ff-bg-secondary)] rounded-lg shadow border border-[var(--ff-border-light)] overflow-hidden cursor-pointer hover:border-[var(--ff-primary)] transition-colors group"
+            >
+              <div className="aspect-square relative">
+                <img
+                  src={photo.fileUrl}
+                  alt={photo.photoType}
+                  className="w-full h-full object-cover"
+                />
+                {photo.vlmProcessed && (
+                  <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded">
+                    VLM
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+              </div>
+              <div className="p-3">
+                <p className="text-sm font-medium text-[var(--ff-text-primary)]">
+                  {photoTypeLabels[photo.photoType] || photo.photoType}
+                </p>
+                <p className="text-xs text-[var(--ff-text-secondary)]">
+                  {new Date(photo.capturedAt).toLocaleDateString('en-ZA', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+                {photo.capturedBy && (
+                  <p className="text-xs text-[var(--ff-text-tertiary)]">
+                    By: {photo.capturedBy}
+                  </p>
+                )}
+                <span className={`text-xs px-1.5 py-0.5 rounded mt-1 inline-block ${
+                  photo.source === 'check_photos'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {photo.source === 'check_photos' ? 'Check-In' : 'Vehicle'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div
+            className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl max-h-[90vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <img
+                src={lightboxPhoto.fileUrl}
+                alt={lightboxPhoto.photoType}
+                className="w-full h-auto"
+              />
+              <button
+                onClick={() => setLightboxPhoto(null)}
+                className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 border-t border-[var(--ff-border-light)]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                    {photoTypeLabels[lightboxPhoto.photoType] || lightboxPhoto.photoType}
+                  </h3>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    Captured: {new Date(lightboxPhoto.capturedAt).toLocaleString('en-ZA')}
+                    {lightboxPhoto.capturedBy && ` by ${lightboxPhoto.capturedBy}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {lightboxPhoto.vlmProcessed && (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm">
+                      VLM Processed
+                    </span>
+                  )}
+                  {lightboxPhoto.vlmConfidence !== null && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm">
+                      {Math.round(lightboxPhoto.vlmConfidence * 100)}% confidence
+                    </span>
+                  )}
+                </div>
+              </div>
+              {lightboxPhoto.checkRecordId && (
+                <Link
+                  href={`/fleet/vehicles/${vehicleId}/check-in-history?recordId=${lightboxPhoto.checkRecordId}`}
+                  className="mt-3 inline-flex items-center gap-1 text-sm text-[var(--ff-primary)] hover:underline"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  View Check-In Record
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2662,9 +2931,15 @@ export default function VehicleDetailPage() {
   const [uploadForStaffId, setUploadForStaffId] = useState<string | null>(null);
   const [uploadForStaffName, setUploadForStaffName] = useState<string | null>(null);
 
+  // Photos data
+  const [vehiclePhotos, setVehiclePhotos] = useState<VehiclePhoto[]>([]);
+  const [photosByType, setPhotosByType] = useState<Record<string, number>>({});
+  const [photosBySource, setPhotosBySource] = useState<{ vehicle_photos: number; check_photos: number }>({ vehicle_photos: 0, check_photos: 0 });
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+
   // Set initial tab from URL
   useEffect(() => {
-    if (tab && typeof tab === 'string' && ['overview', 'odometer', 'ownership', 'documents', 'insurance'].includes(tab)) {
+    if (tab && typeof tab === 'string' && ['overview', 'odometer', 'ownership', 'documents', 'insurance', 'photos', 'fuel'].includes(tab)) {
       setActiveTab(tab as TabId);
     }
   }, [tab]);
@@ -2853,6 +3128,25 @@ export default function VehicleDetailPage() {
     }
   }, [id]);
 
+  // Fetch photos data
+  const fetchPhotosData = useCallback(async () => {
+    if (!id) return;
+    setLoadingPhotos(true);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${id}/photos?limit=100`);
+      if (res.ok) {
+        const data = await res.json();
+        setVehiclePhotos(data.data?.photos || []);
+        setPhotosByType(data.data?.byType || {});
+        setPhotosBySource(data.data?.bySource || { vehicle_photos: 0, check_photos: 0 });
+      }
+    } catch (err) {
+      console.error('Failed to fetch photos:', err);
+    } finally {
+      setLoadingPhotos(false);
+    }
+  }, [id]);
+
   // Fetch available staff for assignment
   const fetchAvailableStaff = useCallback(async () => {
     setLoadingStaff(true);
@@ -2966,6 +3260,9 @@ export default function VehicleDetailPage() {
       case 'fuel':
         fetchFuelTransactions();
         break;
+      case 'photos':
+        fetchPhotosData();
+        break;
       case 'ownership':
         fetchOwnershipData();
         break;
@@ -2976,7 +3273,7 @@ export default function VehicleDetailPage() {
         fetchInsuranceData();
         break;
     }
-  }, [activeTab, vehicle, fetchOdometerData, fetchFuelTransactions, fetchOwnershipData, fetchDocumentsData, fetchInsuranceData]);
+  }, [activeTab, vehicle, fetchOdometerData, fetchFuelTransactions, fetchPhotosData, fetchOwnershipData, fetchDocumentsData, fetchInsuranceData]);
 
   const handleSave = async () => {
     if (!vehicle) return;
@@ -3127,6 +3424,7 @@ export default function VehicleDetailPage() {
     { id: 'overview', label: 'Overview', icon: Car },
     { id: 'odometer', label: 'Odometer', icon: Gauge },
     { id: 'fuel', label: 'Fuel Spend', icon: Fuel },
+    { id: 'photos', label: 'Photos', icon: Camera },
     { id: 'ownership', label: 'Ownership', icon: Building2 },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'insurance', label: 'Insurance', icon: Shield },
@@ -3361,6 +3659,16 @@ export default function VehicleDetailPage() {
                 summary={fuelSummary}
                 loading={fuelLoading}
                 onRefresh={fetchFuelTransactions}
+              />
+            )}
+            {activeTab === 'photos' && (
+              <PhotosTab
+                vehicleId={vehicle.id}
+                photos={vehiclePhotos}
+                photosByType={photosByType}
+                photosBySource={photosBySource}
+                loading={loadingPhotos}
+                onRefresh={fetchPhotosData}
               />
             )}
             {activeTab === 'ownership' && (

@@ -138,58 +138,167 @@ async function handleGet(
   res: NextApiResponse,
   vehicleId: string
 ) {
-  const { type, limit = '50', offset = '0' } = req.query;
+  const { type, limit = '50', offset = '0', source } = req.query;
   const limitNum = Math.min(parseInt(limit as string, 10), 100);
   const offsetNum = parseInt(offset as string, 10);
+  const photoSource = source as string | undefined;
 
-  // Filter by photo type if provided
-  let rows: VehiclePhotoRow[];
-  let countResult: Array<{ total: string }>;
-
-  if (type && typeof type === 'string') {
-    rows = await sql`
-      SELECT * FROM fleet_vehicle_photos
-      WHERE vehicle_id = ${vehicleId} AND photo_type = ${type}
-      ORDER BY captured_at DESC, created_at DESC
-      LIMIT ${limitNum} OFFSET ${offsetNum}
-    ` as VehiclePhotoRow[];
-
-    countResult = await sql`
-      SELECT COUNT(*) as total FROM fleet_vehicle_photos
-      WHERE vehicle_id = ${vehicleId} AND photo_type = ${type}
-    ` as Array<{ total: string }>;
-  } else {
-    rows = await sql`
-      SELECT * FROM fleet_vehicle_photos
-      WHERE vehicle_id = ${vehicleId}
-      ORDER BY captured_at DESC, created_at DESC
-      LIMIT ${limitNum} OFFSET ${offsetNum}
-    ` as VehiclePhotoRow[];
-
-    countResult = await sql`
-      SELECT COUNT(*) as total FROM fleet_vehicle_photos
-      WHERE vehicle_id = ${vehicleId}
-    ` as Array<{ total: string }>;
+  // Combined photo type from both tables
+  interface CombinedPhoto {
+    id: string;
+    vehicleId: string;
+    photoType: string;
+    fileUrl: string;
+    fileKey: string | null;
+    fileSize: number | null;
+    mimeType: string | null;
+    checkRecordId: string | null;
+    fuelTransactionId: string | null;
+    vlmProcessed: boolean;
+    vlmResult: unknown;
+    vlmConfidence: number | null;
+    capturedAt: string;
+    capturedBy: string | null;
+    notes: string | null;
+    createdAt: string;
+    source: 'vehicle_photos' | 'check_photos';
+    checkDate?: string;
+    checkTime?: string;
   }
 
-  // Get photo counts by type
-  const typeCounts = await sql`
+  let vehiclePhotos: CombinedPhoto[] = [];
+  let checkPhotos: CombinedPhoto[] = [];
+  let vehiclePhotoCount = 0;
+  let checkPhotoCount = 0;
+
+  // Get photos from fleet_vehicle_photos (unless filtering to check_photos only)
+  if (!photoSource || photoSource === 'vehicle_photos' || photoSource === 'all') {
+    let vehicleRows: VehiclePhotoRow[];
+    if (type && typeof type === 'string') {
+      vehicleRows = await sql`
+        SELECT * FROM fleet_vehicle_photos
+        WHERE vehicle_id = ${vehicleId} AND photo_type = ${type}
+        ORDER BY captured_at DESC, created_at DESC
+      ` as VehiclePhotoRow[];
+    } else {
+      vehicleRows = await sql`
+        SELECT * FROM fleet_vehicle_photos
+        WHERE vehicle_id = ${vehicleId}
+        ORDER BY captured_at DESC, created_at DESC
+      ` as VehiclePhotoRow[];
+    }
+    vehiclePhotos = vehicleRows.map(row => ({
+      ...rowToPhoto(row),
+      source: 'vehicle_photos' as const,
+    }));
+    vehiclePhotoCount = vehicleRows.length;
+  }
+
+  // Get photos from fleet_check_photos (via check records for this vehicle)
+  if (!photoSource || photoSource === 'check_photos' || photoSource === 'all') {
+    interface CheckPhotoRow {
+      id: string;
+      record_id: string;
+      response_id: string | null;
+      photo_type: string;
+      is_required: boolean;
+      file_url: string;
+      file_path: string | null;
+      file_size: number | null;
+      latitude: number | null;
+      longitude: number | null;
+      storage_service_url: string | null;
+      captured_at: string;
+      vlm_processed: boolean;
+      vlm_result: unknown;
+      vlm_confidence: number | null;
+      check_date: string;
+      check_time: string;
+      driver_name: string;
+    }
+
+    let checkRows: CheckPhotoRow[];
+    if (type && typeof type === 'string') {
+      checkRows = await sql`
+        SELECT p.*, r.check_date, r.check_time, r.driver_name
+        FROM fleet_check_photos p
+        JOIN fleet_check_records r ON r.id = p.record_id
+        WHERE r.vehicle_id = ${vehicleId} AND p.photo_type = ${type}
+        ORDER BY p.captured_at DESC
+      ` as CheckPhotoRow[];
+    } else {
+      checkRows = await sql`
+        SELECT p.*, r.check_date, r.check_time, r.driver_name
+        FROM fleet_check_photos p
+        JOIN fleet_check_records r ON r.id = p.record_id
+        WHERE r.vehicle_id = ${vehicleId}
+        ORDER BY p.captured_at DESC
+      ` as CheckPhotoRow[];
+    }
+
+    checkPhotos = checkRows.map(row => ({
+      id: row.id,
+      vehicleId,
+      photoType: row.photo_type,
+      fileUrl: row.storage_service_url || row.file_url,
+      fileKey: row.file_path,
+      fileSize: row.file_size,
+      mimeType: 'image/jpeg',
+      checkRecordId: row.record_id,
+      fuelTransactionId: null,
+      vlmProcessed: row.vlm_processed,
+      vlmResult: row.vlm_result,
+      vlmConfidence: row.vlm_confidence,
+      capturedAt: row.captured_at,
+      capturedBy: row.driver_name,
+      notes: null,
+      createdAt: row.captured_at,
+      source: 'check_photos' as const,
+      checkDate: row.check_date,
+      checkTime: row.check_time,
+    }));
+    checkPhotoCount = checkRows.length;
+  }
+
+  // Combine and sort by captured_at descending
+  const allPhotos = [...vehiclePhotos, ...checkPhotos]
+    .sort((a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime())
+    .slice(offsetNum, offsetNum + limitNum);
+
+  // Get photo counts by type from both tables
+  const vehicleTypeCounts = await sql`
     SELECT photo_type, COUNT(*) as count
     FROM fleet_vehicle_photos
     WHERE vehicle_id = ${vehicleId}
     GROUP BY photo_type
-    ORDER BY photo_type
   ` as Array<{ photo_type: string; count: string }>;
 
-  const total = parseInt(countResult[0]?.total || '0', 10);
-  const photos = rows.map(rowToPhoto);
+  const checkTypeCounts = await sql`
+    SELECT p.photo_type, COUNT(*) as count
+    FROM fleet_check_photos p
+    JOIN fleet_check_records r ON r.id = p.record_id
+    WHERE r.vehicle_id = ${vehicleId}
+    GROUP BY p.photo_type
+  ` as Array<{ photo_type: string; count: string }>;
+
+  // Combine type counts
+  const byType: Record<string, number> = {};
+  for (const row of vehicleTypeCounts) {
+    byType[row.photo_type] = (byType[row.photo_type] || 0) + parseInt(row.count, 10);
+  }
+  for (const row of checkTypeCounts) {
+    byType[row.photo_type] = (byType[row.photo_type] || 0) + parseInt(row.count, 10);
+  }
+
+  const total = vehiclePhotoCount + checkPhotoCount;
 
   return apiResponse.success(res, {
-    photos,
-    byType: typeCounts.reduce(
-      (acc, row) => ({ ...acc, [row.photo_type]: parseInt(row.count, 10) }),
-      {} as Record<string, number>
-    ),
+    photos: allPhotos,
+    byType,
+    bySource: {
+      vehicle_photos: vehiclePhotoCount,
+      check_photos: checkPhotoCount,
+    },
     pagination: {
       page: Math.floor(offsetNum / limitNum) + 1,
       pageSize: limitNum,
