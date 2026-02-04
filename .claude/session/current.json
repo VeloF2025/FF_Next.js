@@ -1,72 +1,73 @@
 {
-  "session_id": "2026-02-03-sow-imports",
-  "started_at": "2026-02-03T14:30:00Z",
-  "last_updated": "2026-02-04T04:55:10.153Z",
+  "session_id": "2026-02-04-e2e-audit",
+  "started_at": "2026-02-04T05:00:00Z",
+  "last_updated": "2026-02-04T05:53:18.712Z",
   "working_on": {
-    "task": "SOW Poles Import - PlanNet Format Support",
-    "status": "ready_to_test",
+    "task": "E2E Audit - Project Detail Page",
+    "status": "completed",
     "progress": [
-      "Added PlanNet/Fibertime column alias support for drops",
-      "Fixed drops API with UNNEST bulk insert",
-      "Successfully imported 30,816 drops",
-      "Added PlanNet/Fibertime column alias support for poles",
-      "Added 'label (Pole)' alias for pole_number",
-      "Added 'Planned Location (Latitude/Longitude)' aliases",
-      "Added 'zone', 'pon', 'type', 'blockname' aliases",
-      "Fixed poles API with UNNEST bulk insert",
-      "Added clearExisting parameter for chunked uploads",
-      "Added project_ref field to NeonPoleData type",
-      "Deployed to dev server"
+      "Fixed tab URL aliases (work→sow, contracts→agreements, etc.)",
+      "Fixed date format conversion for HTML date inputs",
+      "Fixed Budget tab direct navigation UX",
+      "Fixed pipeline navigation URLs (404 errors)",
+      "Verified all project tabs load correctly",
+      "Verified SOW data displays (2,294 poles, 30,816 drops)",
+      "Verified Finance Dashboard working",
+      "Verified Documents tab with BSS upload",
+      "Verified Wayleaves tab with pipeline links"
     ],
-    "last_action": "Deployed poles import optimizations to dev"
+    "last_action": "Completed E2E audit with 4 bug fixes"
   },
   "learnings": {
-    "excel_columns": {
-      "issue": "Excel exports often have trailing whitespace in column names",
-      "example": "'strtfeat (Pole) ' vs 'strtfeat (Pole)'",
-      "fix": "extractValue now trims keys when comparing"
+    "tab_url_routing": {
+      "issue": "Tab groups (work, contracts, finance) don't match tab IDs (sow, agreements, finance-dashboard)",
+      "solution": "TAB_ALIASES mapping in ProjectDetail.tsx normalizes URLs",
+      "pattern": "Always map group names to actual tab IDs for URL navigation"
     },
-    "plannet_columns": {
-      "drops": {
-        "label (drop)": "drop_number",
-        "strtfeat (Pole)": "pole_number",
-        "subtyp": "cable_type",
-        "dim2": "cable_length",
-        "cblcpty": "cable_capacity",
-        "endfeat": "end_point (ONT)",
-        "stackref (Project)": "project_ref"
-      },
-      "poles": {
-        "label (Pole)": "pole_number",
-        "Planned Location (Latitude)": "latitude",
-        "Planned Location (Longitude)": "longitude",
-        "zone": "zone_no",
-        "pon": "pon_no",
-        "type": "pole_type",
-        "blockname": "address",
-        "status": "status",
-        "project": "project_ref"
-      }
+    "html_date_inputs": {
+      "issue": "ISO dates from DB don't display in HTML date inputs",
+      "solution": "formatDateForInput() converts ISO to YYYY-MM-DD",
+      "code": "new Date(date).toISOString().split('T')[0]"
+    },
+    "pipeline_routes": {
+      "correct_pattern": "/pipeline/[id]",
+      "wrong_pattern": "/pipeline/projects/[id]/approvals",
+      "note": "Two route sets exist: /pipeline/* and /projects/pipeline/*"
+    },
+    "next_link_vs_anchor": {
+      "absolute_paths": "href='/path' should be absolute from domain root",
+      "note": "Standard <a> tags with leading slash work correctly"
     }
   },
-  "commits": {
-    "latest": "f9c34452 fix(sow): optimize poles API with UNNEST bulk insert and chunked uploads",
-    "previous": "d6221ae3 fix(sow): handle trailing whitespace in Excel column names"
-  },
-  "files_modified": [
-    "src/services/sow/processor/transformer.ts",
-    "pages/api/sow/poles.ts",
-    "src/services/api/sowApi.ts",
-    "src/services/sow/types.ts"
+  "bugs_fixed": [
+    {
+      "file": "src/pages/ProjectDetail.tsx",
+      "issue": "Tab URL aliases not mapped",
+      "fix": "Added TAB_ALIASES record"
+    },
+    {
+      "file": "src/modules/projects/components/ProjectForm.tsx",
+      "issue": "Date inputs show mm/dd/yyyy placeholder",
+      "fix": "Added formatDateForInput() function"
+    },
+    {
+      "file": "src/pages/ProjectDetail.tsx",
+      "issue": "Budget tab requires extra click",
+      "fix": "Direct navigation to /projects/[id]/budget"
+    },
+    {
+      "file": "src/pages/detail/ProjectWayleavesTab.tsx",
+      "issue": "Pipeline links return 404",
+      "fix": "Changed /pipeline/projects/[id] to /pipeline/[id]"
+    }
+  ],
+  "commits": [
+    "2d9d7333 fix(wayleaves): correct pipeline navigation URLs"
   ],
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "sow"
+    "module": "projects"
   },
-  "next_steps": [
-    "Test poles import with user's sample file (30,816 poles)",
-    "Verify all data imported correctly",
-    "Update fibre transformer if needed"
-  ]
+  "next_steps": []
 }

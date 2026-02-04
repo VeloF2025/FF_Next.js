@@ -95,13 +95,34 @@ Location: `src/modules/projects/services/projectNeonService/`
 
 ### Project Detail Page (Sprint 1)
 Location: `src/pages/detail/`
-- `ProjectDetail.tsx` - Main detail page with 9 tabs
-- `ProjectTabs.tsx` - Horizontal tab navigation
+- `ProjectDetail.tsx` - Main detail page with tab routing
+- `ProjectTabs.tsx` - Horizontal tab navigation with groups
 - `ProjectTeamTab.tsx` - Unified team view (staff + contractors)
 - `ProjectProcurementTab.tsx` - BOQ/RFQ/PO/GRN summary
 - `ProjectMaintenanceTab.tsx` - Ticket status breakdown
+- `ProjectWayleavesTab.tsx` - Pipeline links and approvals
+- `ProjectDocumentsTab.tsx` - BSS/MSS uploads, SOW data import
 
-**Tabs:** Overview, Team, Procurement, Maintenance, Hierarchy, SOW Data, Timeline, Budget, Health & Safety
+**Tab Groups & IDs:**
+| Group | Tab IDs |
+|-------|---------|
+| Overview | overview |
+| Work | sow, boq, team |
+| Contracts | agreements, wayleaves |
+| Planning | timeline, hierarchy |
+| Operations | procurement, maintenance, hs |
+| Finance | finance-dashboard, income, budget, documents |
+
+**Tab URL Aliases** (in `ProjectDetail.tsx`):
+```typescript
+const TAB_ALIASES = {
+  'work': 'sow',
+  'contracts': 'agreements',
+  'planning': 'timeline',
+  'operations': 'procurement',
+  'finance': 'finance-dashboard',
+};
+```
 
 ## Hooks
 ```typescript
@@ -139,6 +160,17 @@ useFiberStringingDashboard()
 - **Complex Nesting**: Pole tracker has complex nested service structure
 - **Type Casting**: When joining to `maintenance_tickets` or `rfqs`, cast `project_id::text = p.id::text` (mixed UUID/TEXT columns)
 - **API Response Format**: Team API must return `{primaryManager, members, stats}` - not flat array
+- **Tab URL Aliases**: Group names (work, contracts) don't match tab IDs (sow, agreements) - use TAB_ALIASES
+- **HTML Date Inputs**: ISO dates from DB must be converted to YYYY-MM-DD for HTML date inputs:
+  ```typescript
+  const formatDateForInput = (date: string | Date | null): string => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toISOString().split('T')[0];
+  };
+  ```
+- **Pipeline Routes**: Two route sets exist - `/pipeline/[id]` and `/projects/pipeline/[id]`. Use `/pipeline/[id]` for cross-module links
+- **Budget Tab UX**: Budget tab navigates directly to `/projects/[id]/budget` page (not inline content)
 
 ## Sprint 1 Reference
 - **Commit**: `b7217c26` - feat(projects): implement Sprint 1 - Project Hub Foundation

@@ -3,14 +3,14 @@
 # Detailed profiles in individual .md files
 
 version: 2
-last_updated: "2026-01-20"
-total_modules: 37
+last_updated: "2026-02-04"
+total_modules: 38
 
 # Module Categories
 categories:
   core:
     description: "Core business functionality"
-    modules: [projects, clients, sow, installations, workflow, tasks, ticketing]
+    modules: [projects, clients, sow, installations, workflow, tasks, ticketing, pipeline]
 
   procurement:
     description: "Procurement and inventory management"
@@ -180,6 +180,12 @@ modules:
     complexity: high
     profile: onboarding.md
 
+  pipeline:
+    category: core
+    purpose: "Sales pipeline and wayleave approval tracking"
+    complexity: medium
+    profile: pipeline.md
+
   onemap:
     category: operations
     purpose: "OneMap GIS integration"
@@ -273,7 +279,7 @@ database_mapping:
   drops: [sow, wa-monitor]
   qa_photo_reviews: [wa-monitor, dr-photo-review]
   foto_ai_reviews: [foto-review, activate]
-  projects: [projects, sow, installations]
+  projects: [projects, sow, installations, pipeline]
   contractors: [onboarding, rag, staff]
   installations: [installations, workflow]
   assets: [assets, procurement]
@@ -284,6 +290,11 @@ database_mapping:
   fleet_check_records: [fleet]
   fleet_vehicle_calibration: [fleet]
   wa_phone_numbers: [wa-monitor, communications]
+  pipeline_projects: [pipeline]
+  pipeline_project_approvals: [pipeline]
+  project_pipeline_links: [pipeline, projects]
+  approval_types: [pipeline]
+  authorities: [pipeline]
 
 # Isolation Status
 isolation:
