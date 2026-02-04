@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import FormData from 'form-data';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -237,4 +237,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

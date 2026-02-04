@@ -256,3 +256,99 @@ export function hasRole(user: AuthUser, requiredRole: AuthRole): boolean {
 export function hasPermission(user: AuthUser, permission: string): boolean {
   return user.permissions.includes('all') || user.permissions.includes(permission);
 }
+
+/**
+ * Fleet authentication middleware
+ * Accepts EITHER traditional user auth OR portal session (plate-based)
+ * Used for fleet APIs that need to work with both logged-in users and driver portal
+ */
+export interface FleetAuthenticatedRequest extends NextApiRequest {
+  user?: AuthUser;
+  sessionId?: string;
+  portalSession?: {
+    sessionId: string;
+    vehicleId: string;
+    vehicleRegistration: string;
+    driverId: string | null;
+    driverName: string | null;
+  };
+  authType: 'user' | 'portal';
+}
+
+export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: NextApiResponse) => Promise<void> | void): NextApiHandler {
+  return async (req: NextApiRequest, res: NextApiResponse) => {
+    const fleetReq = req as FleetAuthenticatedRequest;
+
+    try {
+      // First try traditional user auth
+      const token = extractToken(req);
+      if (token) {
+        const payload = await verifyToken(token);
+        if (payload) {
+          const sessionValid = await validateSession(payload.sessionId, token);
+          if (sessionValid) {
+            const user = await getUserById(payload.sub);
+            if (user?.isActive) {
+              fleetReq.user = user;
+              fleetReq.sessionId = payload.sessionId;
+              fleetReq.authType = 'user';
+              return handler(fleetReq, res);
+            }
+          }
+        }
+      }
+
+      // Then try portal session (plate-based auth)
+      const { parse } = await import('cookie');
+      const cookies = parse(req.headers.cookie || '');
+      const portalToken = cookies['ff_portal_session'];
+
+      if (portalToken) {
+        try {
+          const sessionData = JSON.parse(
+            Buffer.from(portalToken, 'base64').toString('utf-8')
+          );
+
+          // Check expiry
+          if (new Date() < new Date(sessionData.expiresAt)) {
+            // Verify session exists in database
+            const rows = await sql`
+              SELECT id, is_active
+              FROM fleet_portal_sessions
+              WHERE id = ${sessionData.sessionId}
+                AND is_active = true
+                AND expires_at > NOW()
+              LIMIT 1
+            `;
+
+            if (rows.length > 0) {
+              fleetReq.portalSession = {
+                sessionId: sessionData.sessionId,
+                vehicleId: sessionData.vehicleId,
+                vehicleRegistration: sessionData.vehicleRegistration,
+                driverId: sessionData.driverId,
+                driverName: sessionData.driverName,
+              };
+              fleetReq.authType = 'portal';
+              return handler(fleetReq, res);
+            }
+          }
+        } catch {
+          // Invalid portal session, continue to reject
+        }
+      }
+
+      // No valid auth found
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required (user login or portal session)' },
+      });
+    } catch (error) {
+      log.error('Fleet auth middleware error', error instanceof Error ? { message: error.message } : { error }, 'FleetAuthMiddleware');
+      return res.status(500).json({
+        success: false,
+        error: { code: 'AUTH_ERROR', message: 'Authentication error' },
+      });
+    }
+  };
+}

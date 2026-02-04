@@ -21,7 +21,7 @@ import {
   getLatestOdometerReading,
 } from '@/modules/fleet/services/checkInService';
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -275,4 +275,4 @@ export const config = {
   },
 };
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

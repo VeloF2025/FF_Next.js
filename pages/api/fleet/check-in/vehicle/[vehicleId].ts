@@ -16,7 +16,7 @@ import {
   getLatestFuelLevel,
 } from '@/modules/fleet/services/checkInService';
 import type { CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { vehicleId, availability, stats, lastReading, limit, offset, status } = req.query;
@@ -75,4 +75,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

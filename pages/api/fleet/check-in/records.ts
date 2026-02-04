@@ -12,7 +12,7 @@ import {
   getFleetCheckInStats,
 } from '@/modules/fleet/services/checkInService';
 import type { CreateCheckRecordInput, CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -79,4 +79,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

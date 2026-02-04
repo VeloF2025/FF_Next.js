@@ -6,7 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import {
@@ -508,4 +508,4 @@ async function handlePatch(
   return apiResponse.success(res, { transaction });
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

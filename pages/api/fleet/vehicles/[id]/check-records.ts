@@ -7,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { getCheckRecords } from '@/modules/fleet/services/checkInService';
 import type { CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id: vehicleId, limit, offset, status } = req.query;
@@ -38,4 +38,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

@@ -6,7 +6,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 import {
   getCheckRecordWithDetails,
   updateCheckRecordStatus,
@@ -54,4 +54,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

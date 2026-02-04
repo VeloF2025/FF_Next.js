@@ -1,22 +1,24 @@
 {
   "session_id": "2026-02-03-sow-imports",
   "started_at": "2026-02-03T14:30:00Z",
-  "last_updated": "2026-02-03T14:50:37.735Z",
+  "last_updated": "2026-02-04T04:34:49.192Z",
   "working_on": {
-    "task": "SOW Drops Import - PlanNet Format Support",
-    "status": "completed",
+    "task": "SOW Poles Import - PlanNet Format Support",
+    "status": "ready_to_test",
     "progress": [
       "Added PlanNet/Fibertime column alias support for drops",
-      "Added 'label (drop)' alias for drop_number",
-      "Added 'strtfeat (Pole)' alias for pole_number",
-      "Added 'subtyp' alias for cable_type",
-      "Added 'stackref (Project)' for project_ref",
-      "Added project_ref field to NeonDropData type",
-      "Fixed whitespace-tolerant column name matching",
-      "Updated template sample data to show PlanNet format",
+      "Fixed drops API with UNNEST bulk insert",
+      "Successfully imported 30,816 drops",
+      "Added PlanNet/Fibertime column alias support for poles",
+      "Added 'label (Pole)' alias for pole_number",
+      "Added 'Planned Location (Latitude/Longitude)' aliases",
+      "Added 'zone', 'pon', 'type', 'blockname' aliases",
+      "Fixed poles API with UNNEST bulk insert",
+      "Added clearExisting parameter for chunked uploads",
+      "Added project_ref field to NeonPoleData type",
       "Deployed to dev server"
     ],
-    "last_action": "Deployed SOW column alias changes to dev"
+    "last_action": "Deployed poles import optimizations to dev"
   },
   "learnings": {
     "excel_columns": {
@@ -32,20 +34,30 @@
         "dim2": "cable_length",
         "cblcpty": "cable_capacity",
         "endfeat": "end_point (ONT)",
-        "stackref (Project)": "project_ref",
-        "cmpownr": "IGNORED - company owner"
+        "stackref (Project)": "project_ref"
+      },
+      "poles": {
+        "label (Pole)": "pole_number",
+        "Planned Location (Latitude)": "latitude",
+        "Planned Location (Longitude)": "longitude",
+        "zone": "zone_no",
+        "pon": "pon_no",
+        "type": "pole_type",
+        "blockname": "address",
+        "status": "status",
+        "project": "project_ref"
       }
     }
   },
   "commits": {
-    "latest": "d6221ae3 fix(sow): handle trailing whitespace in Excel column names",
-    "previous": "33035866 feat(sow): add PlanNet/Fibertime column alias support"
+    "latest": "f9c34452 fix(sow): optimize poles API with UNNEST bulk insert and chunked uploads",
+    "previous": "d6221ae3 fix(sow): handle trailing whitespace in Excel column names"
   },
   "files_modified": [
     "src/services/sow/processor/transformer.ts",
-    "src/services/sow/processor/parser.ts",
-    "src/services/sow/types.ts",
-    "src/modules/projects/components/SOWUploadSection/types/sowUpload.types.ts"
+    "pages/api/sow/poles.ts",
+    "src/services/api/sowApi.ts",
+    "src/services/sow/types.ts"
   ],
   "context": {
     "project": "FibreFlow",
@@ -53,8 +65,8 @@
     "module": "sow"
   },
   "next_steps": [
-    "Test drops import with user's sample file",
-    "Get and analyze sample files for Poles and Fibre Segments",
-    "Update poles and fibre transformers if needed"
+    "Test poles import with user's sample file (30,816 poles)",
+    "Verify all data imported correctly",
+    "Update fibre transformer if needed"
   ]
 }
