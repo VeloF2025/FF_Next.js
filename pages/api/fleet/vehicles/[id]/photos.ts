@@ -240,7 +240,8 @@ async function handleGet(
       id: row.id,
       vehicleId,
       photoType: row.photo_type,
-      fileUrl: row.storage_service_url || row.file_url,
+      // Use file_url (which has /storage/ prefix) or construct from file_path
+      fileUrl: row.file_url || (row.file_path ? `/storage/${row.file_path}` : row.storage_service_url),
       fileKey: row.file_path,
       fileSize: row.file_size,
       mimeType: 'image/jpeg',

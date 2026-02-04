@@ -80,10 +80,11 @@ async function uploadToStorage(
   log.info('Storage upload successful', { result });
 
   // Return both the internal storage URL and public URL
+  // The storage service returns URLs without /storage/ prefix, so we construct the correct public URL
   return {
     path: result.path, // e.g., 'fleet/check-ins/1705618234567-abc123.jpg'
-    url: `${STORAGE_PUBLIC_URL}/${result.path}`, // e.g., '/storage/fleet/check-ins/...'
-    storageServiceUrl: result.url, // Full internal URL
+    url: `/storage/${result.path}`, // e.g., '/storage/fleet/check-ins/...'
+    storageServiceUrl: `/storage/${result.path}`, // Use same URL for consistency
   };
 }
 
