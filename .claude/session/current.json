@@ -1,73 +1,84 @@
 {
-  "session_id": "2026-02-04-e2e-audit",
-  "started_at": "2026-02-04T05:00:00Z",
-  "last_updated": "2026-02-04T13:53:11.777Z",
+  "session_id": "2026-02-04-fleet-photos",
+  "started_at": "2026-02-04T12:00:00Z",
+  "last_updated": "2026-02-04T16:20:53.205Z",
   "working_on": {
-    "task": "E2E Audit - Project Detail Page",
+    "task": "Fleet Photos & Documents Fix",
     "status": "completed",
     "progress": [
-      "Fixed tab URL aliases (work→sow, contracts→agreements, etc.)",
-      "Fixed date format conversion for HTML date inputs",
-      "Fixed Budget tab direct navigation UX",
-      "Fixed pipeline navigation URLs (404 errors)",
-      "Verified all project tabs load correctly",
-      "Verified SOW data displays (2,294 poles, 30,816 drops)",
-      "Verified Finance Dashboard working",
-      "Verified Documents tab with BSS upload",
-      "Verified Wayleaves tab with pipeline links"
+      "Added Photos tab to vehicle detail page",
+      "Fixed photo upload using axios instead of fetch for form-data",
+      "Fixed photo URLs to use /storage/ prefix for nginx proxy",
+      "Added /storage/ nginx proxy to dev.fibreflow.app",
+      "Photos now display correctly on vf and dev environments",
+      "Deployed to dev, vf, and app environments"
     ],
-    "last_action": "Completed E2E audit with 4 bug fixes"
+    "last_action": "Verified photos showing on all environments"
   },
   "learnings": {
-    "tab_url_routing": {
-      "issue": "Tab groups (work, contracts, finance) don't match tab IDs (sow, agreements, finance-dashboard)",
-      "solution": "TAB_ALIASES mapping in ProjectDetail.tsx normalizes URLs",
-      "pattern": "Always map group names to actual tab IDs for URL navigation"
+    "vf_storage_urls": {
+      "issue": "VF Storage service returns URLs without /storage/ prefix",
+      "storage_returns": "https://vf.fibreflow.app/fleet/check-ins/...",
+      "correct_url": "/storage/fleet/check-ins/...",
+      "solution": "Construct URL from result.path with /storage/ prefix"
     },
-    "html_date_inputs": {
-      "issue": "ISO dates from DB don't display in HTML date inputs",
-      "solution": "formatDateForInput() converts ISO to YYYY-MM-DD",
-      "code": "new Date(date).toISOString().split('T')[0]"
+    "form_data_upload": {
+      "issue": "Node.js form-data package doesn't work with native fetch",
+      "error": "Unexpected end of form",
+      "solution": "Use axios which has proper form-data stream support",
+      "code": "axios.post(url, formData, { headers: formData.getHeaders() })"
     },
-    "pipeline_routes": {
-      "correct_pattern": "/pipeline/[id]",
-      "wrong_pattern": "/pipeline/projects/[id]/approvals",
-      "note": "Two route sets exist: /pipeline/* and /projects/pipeline/*"
+    "nginx_storage_proxy": {
+      "issue": "Each domain needs /storage/ proxy configured separately",
+      "location": "/etc/nginx/sites-enabled/vf-fibreflow",
+      "config": "location /storage/ { proxy_pass http://localhost:8091/; }"
     },
-    "next_link_vs_anchor": {
-      "absolute_paths": "href='/path' should be absolute from domain root",
-      "note": "Standard <a> tags with leading slash work correctly"
+    "staging_deployment_paths": {
+      "vf_staging": "/home/louis/apps/fibreflow (user: louis)",
+      "dev": "/home/hein/apps/fibreflow-dev (user: hein)",
+      "production": "/home/velo/fibreflow-production (user: velo)",
+      "note": "Service file specifies User and WorkingDirectory - must match"
+    },
+    "two_photo_tables": {
+      "fleet_check_photos": "Photos captured during check-ins, linked via record_id",
+      "fleet_vehicle_photos": "General vehicle photos (damage, receipts), linked via vehicle_id",
+      "api_combines": "GET /api/fleet/vehicles/[id]/photos returns from both tables"
     }
   },
   "bugs_fixed": [
     {
-      "file": "src/pages/ProjectDetail.tsx",
-      "issue": "Tab URL aliases not mapped",
-      "fix": "Added TAB_ALIASES record"
+      "file": "pages/api/fleet/check-in/photos.ts",
+      "issue": "Photo upload fails with 'Unexpected end of form'",
+      "fix": "Changed from fetch to axios for proper form-data handling"
     },
     {
-      "file": "src/modules/projects/components/ProjectForm.tsx",
-      "issue": "Date inputs show mm/dd/yyyy placeholder",
-      "fix": "Added formatDateForInput() function"
+      "file": "pages/api/fleet/vehicles/[id]/photos.ts",
+      "issue": "Photos API returning wrong URLs (using storage_service_url)",
+      "fix": "Changed to use file_url or construct from file_path with /storage/ prefix"
     },
     {
-      "file": "src/pages/ProjectDetail.tsx",
-      "issue": "Budget tab requires extra click",
-      "fix": "Direct navigation to /projects/[id]/budget"
+      "file": "pages/api/fleet/check-in/photos.ts",
+      "issue": "storageServiceUrl stored without /storage/ prefix",
+      "fix": "Changed to use /storage/${result.path} for consistency"
     },
     {
-      "file": "src/pages/detail/ProjectWayleavesTab.tsx",
-      "issue": "Pipeline links return 404",
-      "fix": "Changed /pipeline/projects/[id] to /pipeline/[id]"
+      "file": "/etc/nginx/sites-enabled/vf-fibreflow",
+      "issue": "dev.fibreflow.app missing /storage/ proxy",
+      "fix": "Added location /storage/ block to dev server"
     }
   ],
   "commits": [
-    "2d9d7333 fix(wayleaves): correct pipeline navigation URLs"
+    "eadf08f7 fix(fleet): correct photo URLs to use /storage/ prefix for nginx proxy",
+    "8d90d70c fix(fleet): use axios for photo upload to fix form-data compatibility",
+    "1db82906 feat(fleet): add Photos tab and enhance vehicle photo display"
   ],
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "projects"
+    "module": "fleet"
   },
-  "next_steps": []
+  "next_steps": [
+    "Test photo upload from mobile devices",
+    "Add /storage/ proxy to app.fibreflow.app nginx if needed"
+  ]
 }

@@ -50,24 +50,59 @@
     "8f9b4a28-ada8-43d6-85f4-3fb826692f5a": {
       "session_id": "8f9b4a28-ada8-43d6-85f4-3fb826692f5a",
       "started_at": "2026-02-04T10:17:27.610Z",
-      "total_input_tokens": 20027,
+      "total_input_tokens": 23571,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.06008100000000007,
-      "tool_calls": 219,
+      "total_cost_usd": 0.0707130000000001,
+      "tool_calls": 276,
       "tools_used": {
-        "Read": 30,
+        "Read": 34,
         "Glob": 3,
-        "Grep": 15,
+        "Grep": 16,
         "TaskCreate": 5,
         "TaskUpdate": 8,
-        "Edit": 24,
-        "Bash": 102,
+        "Edit": 26,
+        "Bash": 119,
         "TaskList": 1,
         "mcp__claude-in-chrome__tabs_context_mcp": 2,
-        "mcp__claude-in-chrome__navigate": 4,
-        "mcp__claude-in-chrome__computer": 22,
-        "mcp__claude-in-chrome__javascript_tool": 2,
-        "mcp__claude-in-chrome__find": 1
+        "mcp__claude-in-chrome__navigate": 8,
+        "mcp__claude-in-chrome__computer": 49,
+        "mcp__claude-in-chrome__javascript_tool": 3,
+        "mcp__claude-in-chrome__find": 1,
+        "Write": 1
+      }
+    },
+    "112b4ee8-2ae4-47af-accf-bbddd4d2b7d7": {
+      "session_id": "112b4ee8-2ae4-47af-accf-bbddd4d2b7d7",
+      "started_at": "2026-02-04T15:38:15.923Z",
+      "total_input_tokens": 3312,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.009936,
+      "tool_calls": 53,
+      "tools_used": {
+        "Glob": 6,
+        "Bash": 26,
+        "Read": 17,
+        "Grep": 1,
+        "Task": 1,
+        "Edit": 2
+      }
+    },
+    "5847711d-747b-4338-a969-682b71f49458": {
+      "session_id": "5847711d-747b-4338-a969-682b71f49458",
+      "started_at": "2026-02-04T16:16:42.442Z",
+      "total_input_tokens": 3130,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.00939,
+      "tool_calls": 35,
+      "tools_used": {
+        "Read": 21,
+        "TaskList": 1,
+        "AskUserQuestion": 2,
+        "Glob": 5,
+        "Bash": 3,
+        "Grep": 1,
+        "Task": 1,
+        "Write": 1
       }
     }
   }

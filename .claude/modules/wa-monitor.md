@@ -96,6 +96,7 @@ Groups are managed via the FibreFlow WA Portal UI (`/communications/whatsapp` â†
 | Lawley | dr_submission | Lawley | `120363418298130331@g.us` |
 | Mohadin | dr_submission | Mohadin | `120363421532174586@g.us` |
 | Mamelodi | dr_submission | Mamelodi | `120363408849234743@g.us` |
+| Mamelodi Internal | dr_submission | Mamelodi | `120363425029043207@g.us` |
 | Marketing Activations | dr_submission | Marketing | `120363422808656601@g.us` |
 | Mohadin Maintenance | maintenance | Mohadin | `120363424360693693@g.us` |
 | Lawley Maintenance | maintenance | Lawley | `120363423947610853@g.us` |
@@ -303,49 +304,66 @@ ssh root@72.61.197.178 "tail -100 /opt/whatsapp-bridge/bridge.log | grep -E '(40
 
 ### Adding New Groups to Bridge
 
-The bridge has a **hardcoded** list of tracked groups in `main.go`. Messages from non-tracked groups are received but NOT stored to SQLite.
+Adding a new WhatsApp group requires **TWO places**: database + compiled Go code.
 
-**Source location:** `/home/louis/whatsapp-bridge-go/main.go` (Velocity server)
+**Prerequisites:**
+- Bridge phone (+27 63 841 2276) must be added to the WhatsApp group
+- Someone must send a message in the group to register it
 
-**Steps to add a new group:**
+**Step 1: Get the Group JID**
 
-1. **Edit the PROJECTS map** in main.go:
+After the bridge phone is added and a message is sent:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105
-sudo nano /home/louis/whatsapp-bridge-go/main.go
+# Check bridge logs for new group JID
+ssh root@72.61.197.178 "tail -100 /opt/whatsapp-bridge/bridge.log" | grep "Message event"
+# Look for: Chat=120363XXXXXXXXXX@g.us
 ```
 
-2. **Add entry to PROJECTS** (around line 40):
-```go
-"New Project": {
-    "group_jid":          "120363XXXXXXXXXX@g.us",
-    "project_name":       "Project Name",
-    "group_description": "Description",
-},
+**Step 2: Add to Database** (from FF_Next.js directory)
+```bash
+node -e "
+const { neon } = require('@neondatabase/serverless');
+const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+(async () => {
+  const result = await sql\`
+    INSERT INTO wa_monitored_groups (group_jid, group_name, project_name, group_type, description, is_active)
+    VALUES ('GROUP_JID_HERE', 'Group Name', 'Project', 'dr_submission', 'Description', true)
+    RETURNING id, group_name
+  \`;
+  console.log('Added:', result);
+})();
+"
+```
+Group types: `dr_submission` (activations), `maintenance`, `admin`
+
+**Step 3: Add to main.go PROJECTS map**
+```bash
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "sed -i '/\"Mamelodi\": {/i\\
+\	\"New Group Name\": {\\
+\		\"group_jid\":          \"120363XXXXXXXXXX@g.us\",\\
+\		\"project_name\":       \"Project\",\\
+\		\"group_description\": \"Description\",\\
+\	},
+' /home/louis/whatsapp-bridge-go/main.go"
 ```
 
-3. **Compile:**
+**Step 4: Compile and Deploy**
 ```bash
-cd /home/louis/whatsapp-bridge-go
-sudo go build -o whatsapp-bridge-new .
+# Compile on Velocity
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && echo 'velo2026' | sudo -S go build -o whatsapp-bridge-new ."
+
+# Copy via local machine (servers can't SSH to each other)
+sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new /tmp/
+scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
+
+# Deploy and restart on VPS
+ssh root@72.61.197.178 "systemctl stop whatsapp-bridge && cp /opt/whatsapp-bridge/whatsapp-bridge /opt/whatsapp-bridge/whatsapp-bridge.backup && mv /opt/whatsapp-bridge/whatsapp-bridge-new /opt/whatsapp-bridge/whatsapp-bridge && chmod +x /opt/whatsapp-bridge/whatsapp-bridge && systemctl start whatsapp-bridge"
 ```
 
-4. **Deploy to VPS:**
+**Step 5: Reload and Verify**
 ```bash
-# Copy via local machine (Velocity can't SSH to VPS directly)
-sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new ~/
-scp ~/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
-rm ~/whatsapp-bridge-new
-```
-
-5. **Replace and restart on VPS:**
-```bash
-ssh root@72.61.197.178
-systemctl stop whatsapp-bridge
-cp /opt/whatsapp-bridge/whatsapp-bridge /opt/whatsapp-bridge/whatsapp-bridge.backup
-mv /opt/whatsapp-bridge/whatsapp-bridge-new /opt/whatsapp-bridge/whatsapp-bridge
-chmod +x /opt/whatsapp-bridge/whatsapp-bridge
-systemctl start whatsapp-bridge
+curl -s http://72.61.197.178:8083/reload-groups
+curl -s http://72.61.197.178:8083/groups | jq '.groups[] | {GroupName, GroupJID, GroupType}'
 ```
 
 **Note:** Adding a group to SQLite `chats` table alone is NOT enough - the filtering is in the compiled Go code.

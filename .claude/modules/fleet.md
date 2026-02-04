@@ -125,11 +125,52 @@ Dashboard → Vehicles → Drivers → GPS Investigation → Locations → Fuel 
 | `/api/fleet/vehicles/extract-license-disk` | POST | VLM extraction from photo |
 
 ## Recent Changes (Feb 2026)
+- **Photos Tab**: Added to vehicle detail page showing all photos from check-ins
+- **Photo Storage Fix**: Photos now use `/storage/` prefix for nginx proxy
+- **Two Photo Tables**: `fleet_check_photos` (check-in photos) + `fleet_vehicle_photos` (general vehicle photos)
+- **Photo Upload Fix**: Changed from `fetch` to `axios` for proper form-data handling
 - Added `LicenseDiscModal` with full OCR extraction and verification
 - Added `engineNumber` field to `FleetVehicle` type
 - Reordered tabs: Vehicles first, then Drivers
 - Default vehicles list to Active status filter
 - Show filtered vehicle count in header
+
+## Photo Storage Architecture
+
+### Storage Flow
+```
+Camera capture → dataUrl + File → FormData → API → VF Storage (:8091) → nginx /storage/ proxy
+```
+
+### URL Format
+- **Correct**: `/storage/fleet/check-ins/filename.jpeg` (via nginx proxy)
+- **Wrong**: `/fleet/check-ins/filename.jpeg` (missing /storage/ prefix)
+- **Wrong**: `https://domain/fleet/...` (VF Storage returns this but needs /storage/ added)
+
+### Nginx Configuration
+Each domain (dev, vf, app) needs `/storage/` proxy:
+```nginx
+location /storage/ {
+    proxy_pass http://localhost:8091/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    client_max_body_size 100M;
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+}
+```
+
+### Photo API
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/fleet/vehicles/[id]/photos` | GET | Get all vehicle photos (both tables) |
+| `/api/fleet/check-in/photos` | POST | Upload check-in photo |
+
+### Photos Tab on Vehicle Detail
+- Shows photos from both `fleet_check_photos` and `fleet_vehicle_photos`
+- Filter by photo type (dashboard, fuel_gauge, odometer, etc.)
+- Links to Check-In History page
+- Lightbox for full-size viewing
 
 ## Recent Changes (Jan 2026)
 - Added `VehicleCalibrationModal` for first-time setup

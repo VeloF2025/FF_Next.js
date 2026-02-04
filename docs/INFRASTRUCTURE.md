@@ -203,13 +203,30 @@ QFIELD_API_KEY=your_api_key
 
 ## Nginx Configuration
 
-**Main config:** `/etc/nginx/sites-available/vf-fibreflow`
+**Main config:** `/etc/nginx/sites-enabled/vf-fibreflow`
 
-Routes:
+### vf.fibreflow.app (Staging)
 - `/` → localhost:3006 (Staging FibreFlow)
 - `/pdf-tools/` → localhost:3007 (PDFCraft)
-- `/storage/` → localhost:8091 (Storage API)
+- `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
 - `/wa-proxy/` → localhost:8092 (WhatsApp proxy)
+
+### dev.fibreflow.app (Dev)
+- `/` → localhost:3005 (Dev FibreFlow)
+- `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
+
+### Storage Proxy Configuration
+**IMPORTANT:** Each domain needs the `/storage/` proxy for fleet photos to work:
+```nginx
+location /storage/ {
+    proxy_pass http://localhost:8091/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    client_max_body_size 100M;
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+}
+```
 
 ---
 
