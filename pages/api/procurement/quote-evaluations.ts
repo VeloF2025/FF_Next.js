@@ -8,16 +8,15 @@ import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
-  }
-
-  try {
-    const { status, search, projectId } = req.query;
-
-    // Get RFQs that have received quotes, with quote statistics
-    const evaluations = await sql`
+// Helper to get evaluations with explicit query branches (no conditional SQL fragments)
+async function getEvaluations(
+  status: string | undefined,
+  search: string | undefined,
+  projectId: string | undefined
+) {
+  // Base query without filters
+  if (!status && !search && !projectId) {
+    return sql`
       SELECT
         r.id as rfq_id,
         r.title as rfq_title,
@@ -45,23 +44,283 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         FROM quotes q
         WHERE q.rfq_id = r.id::text
       ) qs ON true
-      WHERE 1=1
-        ${status ? sql`AND (
+      ORDER BY r.created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  // With projectId only
+  if (projectId && !status && !search) {
+    return sql`
+      SELECT
+        r.id as rfq_id,
+        r.title as rfq_title,
+        r.status as rfq_status,
+        r.created_at,
+        r.closing_date as deadline,
+        r.project_id,
+        COALESCE(qs.total_quotes, 0)::int as total_quotes,
+        COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+        COALESCE(qs.average_bid, 0)::numeric as average_bid,
+        COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+        CASE
+          WHEN r.status = 'awarded' THEN 'AWARDED'
+          WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+          WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+          ELSE 'PENDING'
+        END as evaluation_status
+      FROM rfqs r
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int as total_quotes,
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
+        FROM quotes q
+        WHERE q.rfq_id = r.id::text
+      ) qs ON true
+      WHERE r.project_id = ${projectId}
+      ORDER BY r.created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  // With search only
+  if (search && !status && !projectId) {
+    const searchPattern = `%${search}%`;
+    return sql`
+      SELECT
+        r.id as rfq_id,
+        r.title as rfq_title,
+        r.status as rfq_status,
+        r.created_at,
+        r.closing_date as deadline,
+        r.project_id,
+        COALESCE(qs.total_quotes, 0)::int as total_quotes,
+        COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+        COALESCE(qs.average_bid, 0)::numeric as average_bid,
+        COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+        CASE
+          WHEN r.status = 'awarded' THEN 'AWARDED'
+          WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+          WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+          ELSE 'PENDING'
+        END as evaluation_status
+      FROM rfqs r
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int as total_quotes,
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
+        FROM quotes q
+        WHERE q.rfq_id = r.id::text
+      ) qs ON true
+      WHERE r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern}
+      ORDER BY r.created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  // With status only - status filter on evaluation_status
+  if (status && !search && !projectId) {
+    return sql`
+      SELECT * FROM (
+        SELECT
+          r.id as rfq_id,
+          r.title as rfq_title,
+          r.status as rfq_status,
+          r.created_at,
+          r.closing_date as deadline,
+          r.project_id,
+          COALESCE(qs.total_quotes, 0)::int as total_quotes,
+          COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+          COALESCE(qs.average_bid, 0)::numeric as average_bid,
+          COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
           CASE
             WHEN r.status = 'awarded' THEN 'AWARDED'
             WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
             WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
             ELSE 'PENDING'
-          END = ${status as string}
-        )` : sql``}
-        ${search ? sql`AND (r.title ILIKE ${'%' + (search as string) + '%'} OR r.id::text ILIKE ${'%' + (search as string) + '%'})` : sql``}
-        ${projectId ? sql`AND r.project_id = ${projectId as string}` : sql``}
+          END as evaluation_status
+        FROM rfqs r
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::int as total_quotes,
+            MIN(total_value)::numeric as lowest_bid,
+            AVG(total_value)::numeric as average_bid,
+            MAX(total_value)::numeric as highest_bid
+          FROM quotes q
+          WHERE q.rfq_id = r.id::text
+        ) qs ON true
+      ) sub
+      WHERE evaluation_status = ${status}
+      ORDER BY created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  // With projectId and search
+  if (projectId && search && !status) {
+    const searchPattern = `%${search}%`;
+    return sql`
+      SELECT
+        r.id as rfq_id,
+        r.title as rfq_title,
+        r.status as rfq_status,
+        r.created_at,
+        r.closing_date as deadline,
+        r.project_id,
+        COALESCE(qs.total_quotes, 0)::int as total_quotes,
+        COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+        COALESCE(qs.average_bid, 0)::numeric as average_bid,
+        COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+        CASE
+          WHEN r.status = 'awarded' THEN 'AWARDED'
+          WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+          WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+          ELSE 'PENDING'
+        END as evaluation_status
+      FROM rfqs r
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int as total_quotes,
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
+        FROM quotes q
+        WHERE q.rfq_id = r.id::text
+      ) qs ON true
+      WHERE r.project_id = ${projectId}
+        AND (r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern})
       ORDER BY r.created_at DESC
       LIMIT 100
     `;
+  }
 
-    // Build stats
-    const stats = await sql`
+  // With projectId and status
+  if (projectId && status && !search) {
+    return sql`
+      SELECT * FROM (
+        SELECT
+          r.id as rfq_id,
+          r.title as rfq_title,
+          r.status as rfq_status,
+          r.created_at,
+          r.closing_date as deadline,
+          r.project_id,
+          COALESCE(qs.total_quotes, 0)::int as total_quotes,
+          COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+          COALESCE(qs.average_bid, 0)::numeric as average_bid,
+          COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+          CASE
+            WHEN r.status = 'awarded' THEN 'AWARDED'
+            WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+            WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+            ELSE 'PENDING'
+          END as evaluation_status
+        FROM rfqs r
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::int as total_quotes,
+            MIN(total_value)::numeric as lowest_bid,
+            AVG(total_value)::numeric as average_bid,
+            MAX(total_value)::numeric as highest_bid
+          FROM quotes q
+          WHERE q.rfq_id = r.id::text
+        ) qs ON true
+        WHERE r.project_id = ${projectId}
+      ) sub
+      WHERE evaluation_status = ${status}
+      ORDER BY created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  // With search and status
+  if (search && status && !projectId) {
+    const searchPattern = `%${search}%`;
+    return sql`
+      SELECT * FROM (
+        SELECT
+          r.id as rfq_id,
+          r.title as rfq_title,
+          r.status as rfq_status,
+          r.created_at,
+          r.closing_date as deadline,
+          r.project_id,
+          COALESCE(qs.total_quotes, 0)::int as total_quotes,
+          COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+          COALESCE(qs.average_bid, 0)::numeric as average_bid,
+          COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+          CASE
+            WHEN r.status = 'awarded' THEN 'AWARDED'
+            WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+            WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+            ELSE 'PENDING'
+          END as evaluation_status
+        FROM rfqs r
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::int as total_quotes,
+            MIN(total_value)::numeric as lowest_bid,
+            AVG(total_value)::numeric as average_bid,
+            MAX(total_value)::numeric as highest_bid
+          FROM quotes q
+          WHERE q.rfq_id = r.id::text
+        ) qs ON true
+        WHERE r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern}
+      ) sub
+      WHERE evaluation_status = ${status}
+      ORDER BY created_at DESC
+      LIMIT 100
+    `;
+  }
+
+  // All three filters
+  const searchPattern = `%${search}%`;
+  return sql`
+    SELECT * FROM (
+      SELECT
+        r.id as rfq_id,
+        r.title as rfq_title,
+        r.status as rfq_status,
+        r.created_at,
+        r.closing_date as deadline,
+        r.project_id,
+        COALESCE(qs.total_quotes, 0)::int as total_quotes,
+        COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+        COALESCE(qs.average_bid, 0)::numeric as average_bid,
+        COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+        CASE
+          WHEN r.status = 'awarded' THEN 'AWARDED'
+          WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+          WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+          ELSE 'PENDING'
+        END as evaluation_status
+      FROM rfqs r
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int as total_quotes,
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
+        FROM quotes q
+        WHERE q.rfq_id = r.id::text
+      ) qs ON true
+      WHERE r.project_id = ${projectId}
+        AND (r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern})
+    ) sub
+    WHERE evaluation_status = ${status}
+    ORDER BY created_at DESC
+    LIMIT 100
+  `;
+}
+
+// Helper to get stats with explicit query branches
+async function getStats(projectId: string | undefined) {
+  if (projectId) {
+    return sql`
       SELECT
         COUNT(*)::int as total,
         COUNT(*) FILTER (WHERE status = 'open' AND NOT EXISTS (
@@ -74,8 +333,43 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(*) FILTER (WHERE status = 'awarded')::int as awarded,
         COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id::text)), 0)::numeric as total_value
       FROM rfqs
-      ${projectId ? sql`WHERE project_id = ${projectId as string}` : sql``}
+      WHERE project_id = ${projectId}
     `;
+  }
+
+  return sql`
+    SELECT
+      COUNT(*)::int as total,
+      COUNT(*) FILTER (WHERE status = 'open' AND NOT EXISTS (
+        SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id::text
+      ))::int as pending,
+      COUNT(*) FILTER (WHERE status = 'open' AND EXISTS (
+        SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id::text
+      ))::int as in_progress,
+      COUNT(*) FILTER (WHERE status = 'closed')::int as completed,
+      COUNT(*) FILTER (WHERE status = 'awarded')::int as awarded,
+      COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id::text)), 0)::numeric as total_value
+    FROM rfqs
+  `;
+}
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
+  }
+
+  try {
+    const { status, search, projectId } = req.query;
+
+    // Get evaluations using explicit query branches
+    const evaluations = await getEvaluations(
+      status as string | undefined,
+      search as string | undefined,
+      projectId as string | undefined
+    );
+
+    // Get stats using explicit query branches
+    const stats = await getStats(projectId as string | undefined);
 
     const formattedEvaluations = evaluations.map((e: Record<string, unknown>) => ({
       id: e.rfq_id,
