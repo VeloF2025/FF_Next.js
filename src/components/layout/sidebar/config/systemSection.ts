@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, Download, FileDown, Activity, BarChart3, HeartPulse, Server, Database } from 'lucide-react';
+import { Settings, Download, FileDown, Activity, BarChart3, HeartPulse, Server, Database, Brain } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -38,6 +38,14 @@ export const systemSection: NavSection = {
       shortLabel: 'Sync',
       permissions: [Permission.SYSTEM_ADMIN],
       rbacKey: 'system.data-sync',
+    },
+    {
+      to: '/system/vlm-learning',
+      icon: Brain,
+      label: 'VLM Learning',
+      shortLabel: 'VLM',
+      permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'system.vlm-learning',
     },
     {
       to: XYOPS_URL,
