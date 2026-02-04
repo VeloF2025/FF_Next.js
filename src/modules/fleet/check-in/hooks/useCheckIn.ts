@@ -578,13 +578,27 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       // Upload photos and re-process VLM with real record ID
       log.info('useCheckIn', { action: 'uploadPhotosStart', recordId: record.id, photoCount: formState.photos.size });
       for (const [type, photo] of formState.photos.entries()) {
-        if (photo.file) {
-          log.info('useCheckIn', { action: 'uploadingPhoto', photoType: type, fileName: photo.file.name, fileSize: photo.file.size });
+        // Get file - use existing file or convert from dataUrl as fallback
+        let fileToUpload = photo.file;
+        if (!fileToUpload && photo.dataUrl) {
+          // Convert dataUrl to File as fallback (handles cases where File was lost)
+          try {
+            const response = await fetch(photo.dataUrl);
+            const blob = await response.blob();
+            fileToUpload = new File([blob], `${type}-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            log.info('useCheckIn', { action: 'convertedDataUrlToFile', photoType: type, fileSize: fileToUpload.size });
+          } catch (convertError) {
+            log.error('useCheckIn', { action: 'dataUrlConversionFailed', photoType: type, error: convertError });
+          }
+        }
+
+        if (fileToUpload) {
+          log.info('useCheckIn', { action: 'uploadingPhoto', photoType: type, fileName: fileToUpload.name, fileSize: fileToUpload.size });
           // Upload photo first
           const formData = new FormData();
           formData.append('recordId', record.id);
           formData.append('photoType', type);
-          formData.append('file', photo.file);
+          formData.append('file', fileToUpload);
           // Include GPS coordinates if available
           if (photo.latitude != null) {
             formData.append('latitude', String(photo.latitude));
@@ -664,9 +678,9 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
             });
           }
         } else {
-          // No File object - this is a bug, log it!
+          // No File AND no dataUrl - photo capture failed completely
           log.error('useCheckIn', {
-            action: 'photoMissingFile',
+            action: 'photoMissingFileAndDataUrl',
             photoType: type,
             hasDataUrl: !!photo.dataUrl,
             dataUrlLength: photo.dataUrl?.length || 0
