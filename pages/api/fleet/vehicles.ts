@@ -14,7 +14,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { getSql } from '@/lib/neon-sql';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import type { FleetVehicle, VehicleType, OwnershipType, VehicleStatus } from '@/modules/fleet/types';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 const getSqlInstance = () => getSql();
 
@@ -58,7 +58,7 @@ function validateRates(fuelRate: number | undefined, depreciationRate: number | 
   return null;
 }
 
-export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
+export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const sql = getSqlInstance();
 
   switch (req.method) {

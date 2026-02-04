@@ -51,9 +51,24 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const id = projectId;
   const [tabBadges, setTabBadges] = useState<Record<string, number>>({});
 
-  // Read tab from URL query param, default to 'overview'
-  const tabFromUrl = router.query.tab as TabId | undefined;
-  const activeTab = tabFromUrl || 'overview';
+  // Tab URL aliases - map group names and legacy URLs to actual tab IDs
+  const TAB_ALIASES: Record<string, TabId> = {
+    // Group name aliases (for direct URL navigation like ?tab=work)
+    'work': 'sow',
+    'contracts': 'agreements',
+    'planning': 'timeline',
+    'operations': 'procurement',
+    'finance': 'finance-dashboard',
+    // Legacy/alternative URL aliases
+    'finance-documents': 'documents',
+    'sow-data': 'sow',
+    'health-safety': 'hs',
+  };
+
+  // Read tab from URL query param, normalize aliases, default to 'overview'
+  const tabFromUrl = router.query.tab as string | undefined;
+  const normalizedTab = tabFromUrl ? (TAB_ALIASES[tabFromUrl] || tabFromUrl) : 'overview';
+  const activeTab = normalizedTab as TabId;
 
   // Handle tab change - update URL
   const handleTabChange = (newTab: TabId) => {

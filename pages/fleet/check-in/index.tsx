@@ -83,7 +83,10 @@ export default function CheckInPage() {
       try {
         const response = await fetch('/api/fleet/vehicles');
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to load vehicles');
+        if (!response.ok) {
+          const errorMsg = data.error?.message || data.error || data.message || 'Failed to load vehicles';
+          throw new Error(typeof errorMsg === 'string' ? errorMsg : 'Failed to load vehicles');
+        }
         setVehicles(data.data || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load vehicles');
