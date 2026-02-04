@@ -27,6 +27,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
@@ -89,6 +91,7 @@ export default function StaffDirectoryPage() {
   const router = useRouter();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -103,47 +106,25 @@ export default function StaffDirectoryPage() {
   const fetchStaff = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await fetch('/api/staff');
 
       if (response.ok) {
         const data = await response.json();
         setStaff(data.data || []);
       } else {
-        setStaff(getSampleStaff());
+        const errorData = await response.json().catch(() => ({}));
+        const message = errorData?.error?.message || `Failed to load staff (${response.status})`;
+        setError(message);
+        setStaff([]);
       }
-    } catch {
-      setStaff(getSampleStaff());
+    } catch (err) {
+      setError('Network error: Unable to connect to server');
+      setStaff([]);
     } finally {
       setLoading(false);
     }
   };
-
-  const getSampleStaff = (): StaffMember[] => [
-    {
-      id: '1',
-      employeeId: 'EMP001',
-      name: 'John Smith',
-      email: 'john.smith@company.com',
-      phone: '+27 11 234 5678',
-      position: 'Senior Field Technician',
-      department: 'Field Operations',
-      status: 'active',
-      projects: 3,
-      joinDate: '2022-01-15',
-    },
-    {
-      id: '2',
-      employeeId: 'EMP002',
-      name: 'Sarah Johnson',
-      email: 'sarah.johnson@company.com',
-      phone: '+27 11 234 5679',
-      position: 'Project Manager',
-      department: 'Project Management',
-      status: 'active',
-      projects: 5,
-      joinDate: '2021-06-20',
-    },
-  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -287,6 +268,26 @@ export default function StaffDirectoryPage() {
       <AppLayout>
         <ModulePage config={staffConfig} headerActions={headerActions} isLoading>
           <StaffDirectorySkeleton />
+        </ModulePage>
+      </AppLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AppLayout>
+        <ModulePage config={staffConfig} headerActions={headerActions}>
+          <div className="flex flex-col items-center justify-center py-16 space-y-4">
+            <div className="p-4 bg-red-500/10 rounded-full">
+              <AlertTriangle className="h-12 w-12 text-red-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">Failed to Load Staff</h2>
+            <p className="text-[var(--ff-text-secondary)] text-center max-w-md">{error}</p>
+            <Button onClick={fetchStaff} className="flex items-center gap-2 mt-4">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </div>
         </ModulePage>
       </AppLayout>
     );
