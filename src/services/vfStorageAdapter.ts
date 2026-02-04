@@ -95,16 +95,9 @@ export class VFStorageService {
       const actualFilename = result.filename || fileName;
       const actualPath = result.path || `${type}/${category}/${actualFilename}`;
 
-      // Return public HTTPS URL for browser access
-      // Server may return internal IP URLs - convert them to public HTTPS
-      let actualUrl = result.url || `${this.baseUrl}/${actualPath}`;
-      if (actualUrl.includes('100.96.203.105:8091')) {
-        actualUrl = actualUrl.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
-      }
-      // Ensure we always return HTTPS public URL
-      if (!actualUrl.startsWith('https://vf.fibreflow.app')) {
-        actualUrl = `https://vf.fibreflow.app/${actualPath}`;
-      }
+      // Return public HTTPS URL for browser access via /storage/ proxy
+      // The /storage/ prefix routes through nginx proxy to the VF storage server
+      const actualUrl = `https://vf.fibreflow.app/storage/${actualPath}`;
 
       return {
         success: true,
@@ -174,10 +167,10 @@ export class VFStorageService {
   }
 
   /**
-   * Get the full URL for a stored file (public HTTPS URL for browser access)
+   * Get the full URL for a stored file (public HTTPS URL via /storage/ proxy)
    */
   getFileUrl(type: string, category: string, filename: string): string {
-    return `https://vf.fibreflow.app/${type}/${category}/${filename}`;
+    return `https://vf.fibreflow.app/storage/${type}/${category}/${filename}`;
   }
 }
 
@@ -234,6 +227,41 @@ export async function listStaffDocuments(
  */
 export async function isVFStorageAvailable(): Promise<boolean> {
   return vfStorage.checkHealth();
+}
+
+/**
+ * Normalize a storage URL to ensure it uses the /storage/ proxy path
+ * Handles legacy URLs that were stored without the /storage/ prefix
+ *
+ * @param url - The storage URL to normalize
+ * @returns Normalized URL with /storage/ prefix, or original URL if not a VF storage URL
+ */
+export function normalizeStorageUrl(url: string | undefined | null): string | undefined {
+  if (!url) return undefined;
+
+  // Only process URLs from our domains
+  const vfDomains = ['vf.fibreflow.app', 'dev.fibreflow.app', 'app.fibreflow.app'];
+  const isVFUrl = vfDomains.some(domain => url.includes(domain));
+
+  if (!isVFUrl) return url;
+
+  // If URL already has /storage/, it's correct
+  if (url.includes('/storage/')) return url;
+
+  // Check if this is a storage path (procurement, staff, fleet, etc.)
+  const storagePaths = ['/procurement/', '/staff/', '/fleet/', '/contractors/', '/assets/'];
+  const needsStorage = storagePaths.some(path => url.includes(path));
+
+  if (!needsStorage) return url;
+
+  // Insert /storage/ before the storage path
+  for (const path of storagePaths) {
+    if (url.includes(path)) {
+      return url.replace(path, `/storage${path}`);
+    }
+  }
+
+  return url;
 }
 
 // Export the service and helpers

@@ -12,7 +12,7 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
-import { VFStorageService } from '@/services/vfStorageAdapter';
+import { VFStorageService, normalizeStorageUrl } from '@/services/vfStorageAdapter';
 import type { ProjectDocument, ProjectDocumentCreateInput, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -257,7 +257,7 @@ function transformDocument(row: Record<string, unknown>): ProjectDocument {
     projectId: row.project_id as string,
     documentType: row.document_type as ProjectDocumentType,
     documentName: row.document_name as string,
-    fileUrl: row.file_url as string,
+    fileUrl: normalizeStorageUrl(row.file_url as string) || '',
     filePath: row.file_path as string | undefined,
     fileSize: row.file_size as number | undefined,
     mimeType: row.mime_type as string | undefined,

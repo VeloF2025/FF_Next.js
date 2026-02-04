@@ -11,6 +11,7 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { normalizeStorageUrl } from '@/services/vfStorageAdapter';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -220,7 +221,7 @@ function transformClientPO(row: Record<string, unknown>): ClientPurchaseOrder {
     taxInclusive: row.tax_inclusive as boolean,
     description: row.description as string | undefined,
     terms: row.terms as string | undefined,
-    sourceDocumentUrl: row.source_document_url as string | undefined,
+    sourceDocumentUrl: normalizeStorageUrl(row.source_document_url as string | undefined),
     sourceDocumentName: row.source_document_name as string | undefined,
     vlmExtractionData: row.vlm_extraction_data as Record<string, unknown> | undefined,
     vlmConfidenceScore: row.vlm_confidence_score ? Number(row.vlm_confidence_score) : undefined,
