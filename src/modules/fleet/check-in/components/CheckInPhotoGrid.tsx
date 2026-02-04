@@ -15,7 +15,7 @@ interface PhotoData {
 
 interface CheckInPhotoGridProps {
   photos: Map<CheckPhotoType, PhotoData>;
-  onPhotoCapture: (type: CheckPhotoType, dataUrl: string, file?: File) => void;
+  onPhotoCapture: (type: CheckPhotoType, dataUrl: string, file?: File, latitude?: number | null, longitude?: number | null) => void;
   onPhotoRemove: (type: CheckPhotoType) => void;
   hasDamage?: boolean; // Show damage photo option
 }
@@ -46,11 +46,31 @@ export function CheckInPhotoGrid({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Capture GPS coordinates
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+
+    if (navigator.geolocation) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          });
+        });
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      } catch {
+        // GPS not available or denied - continue without coordinates
+      }
+    }
+
     // Convert to data URL
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      onPhotoCapture(type, dataUrl, file);
+      onPhotoCapture(type, dataUrl, file, latitude, longitude);
     };
     reader.readAsDataURL(file);
 

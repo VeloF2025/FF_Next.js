@@ -38,6 +38,8 @@ const WEEKLY_PHOTOS = [
 interface PhotoData {
   dataUrl: string;
   file?: File;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface CheckInFormState {
@@ -126,7 +128,7 @@ interface UseCheckInReturn {
   setOdometerReading: (value: string) => void;
   setFuelLevel: (value: string) => void;
   setItemResponse: (itemId: string, isPassed: boolean, notes?: string) => void;
-  setPhoto: (type: CheckPhotoType, dataUrl: string, file?: File) => void;
+  setPhoto: (type: CheckPhotoType, dataUrl: string, file?: File, latitude?: number | null, longitude?: number | null) => void;
   removePhoto: (type: CheckPhotoType) => void;
   overrideVlmValue: (photoType: CheckPhotoType, value: string | number) => void;
   confirmOdometerOverride: () => void;
@@ -269,10 +271,10 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     });
   }, [template]);
 
-  const setPhoto = useCallback((type: CheckPhotoType, dataUrl: string, file?: File) => {
+  const setPhoto = useCallback((type: CheckPhotoType, dataUrl: string, file?: File, latitude?: number | null, longitude?: number | null) => {
     setFormState(prev => {
       const newPhotos = new Map(prev.photos);
-      newPhotos.set(type, { dataUrl, file });
+      newPhotos.set(type, { dataUrl, file, latitude, longitude });
       return { ...prev, photos: newPhotos };
     });
   }, []);
@@ -512,8 +514,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
           await offlineStorage.saveOfflinePhoto(offlineRecord.offlineId, {
             photoType: type,
             dataUrl: photo.dataUrl,
-            latitude: null,
-            longitude: null,
+            latitude: photo.latitude ?? null,
+            longitude: photo.longitude ?? null,
           });
         }
 
@@ -565,6 +567,13 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
           formData.append('recordId', record.id);
           formData.append('photoType', type);
           formData.append('file', photo.file);
+          // Include GPS coordinates if available
+          if (photo.latitude != null) {
+            formData.append('latitude', String(photo.latitude));
+          }
+          if (photo.longitude != null) {
+            formData.append('longitude', String(photo.longitude));
+          }
 
           const uploadResponse = await fetch('/api/fleet/check-in/photos', {
             method: 'POST',

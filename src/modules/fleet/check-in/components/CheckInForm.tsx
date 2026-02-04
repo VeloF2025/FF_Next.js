@@ -104,8 +104,8 @@ export function CheckInForm({
   };
 
   // Handle photo capture with auto-VLM processing
-  const handlePhotoCapture = async (type: CheckPhotoType, dataUrl: string, file?: File) => {
-    setPhoto(type, dataUrl, file);
+  const handlePhotoCapture = async (type: CheckPhotoType, dataUrl: string, file?: File, latitude?: number | null, longitude?: number | null) => {
+    setPhoto(type, dataUrl, file, latitude, longitude);
     // Auto-process VLM for dashboard and fuel_gauge photos
     const photoConfig = requiredPhotos.find(p => p.type === type);
     if (photoConfig?.vlmType) {
