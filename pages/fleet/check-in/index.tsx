@@ -51,7 +51,10 @@ export default function CheckInPage() {
       // Fetch vehicle details (uses query param, not path param)
       const response = await fetch(`/api/fleet/vehicles?id=${vehicleId}`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Vehicle not found');
+      if (!response.ok) {
+        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : null) || data.message || 'Vehicle not found';
+        throw new Error(errMsg);
+      }
 
       const vehicleData = data.data;
       const vehicle: Vehicle = {
@@ -121,7 +124,10 @@ export default function CheckInPage() {
     try {
       const response = await fetch(`/api/fleet/check-in/vehicle/${vehicle.id}?availability=true`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to check availability');
+      if (!response.ok) {
+        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : null) || data.message || 'Failed to check availability';
+        throw new Error(errMsg);
+      }
       setVehicleAvailability(data.data);
       setPageState('check-in');
     } catch (err) {

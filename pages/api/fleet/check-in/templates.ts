@@ -15,7 +15,7 @@ import {
   createTemplate,
 } from '@/modules/fleet/services/checkInService';
 import type { CreateTemplateInput, CheckType } from '@/modules/fleet/types/check-in.types';
-import { withAuth } from '@/lib/auth';
+import { withFleetAuth } from '@/lib/auth/middleware';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -69,4 +69,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withFleetAuth(handler);

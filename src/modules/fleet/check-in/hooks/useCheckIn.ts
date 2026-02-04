@@ -207,7 +207,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to load template');
+        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : null) || data.message || 'Failed to load template';
+        throw new Error(errMsg);
       }
 
       const templateData = data.data || data;
@@ -550,7 +551,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit check-in');
+        const errMsg = data.error?.message || (typeof data.error === 'string' ? data.error : null) || data.message || 'Failed to submit check-in';
+        throw new Error(errMsg);
       }
 
       const record = (data.data || data) as CheckRecord;
