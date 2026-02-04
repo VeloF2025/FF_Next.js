@@ -6,30 +6,42 @@ const sql = neon(process.env.DATABASE_URL!);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    // Test 1: Simple query
-    const test1 = await sql`SELECT 1 as test`;
-
-    // Test 2: Check if rfqs table exists and has data
-    const test2 = await sql`SELECT COUNT(*) as count FROM rfqs`;
-
-    // Test 3: Check if quotes table exists and has data
-    const test3 = await sql`SELECT COUNT(*) as count FROM quotes`;
-
-    // Test 4: Try a simple join
-    const test4 = await sql`
-      SELECT r.id, r.title, r.status
+    // Test 5: Try the actual quote-evaluations query
+    const test5 = await sql`
+      SELECT
+        r.id as rfq_id,
+        r.title as rfq_title,
+        r.status as rfq_status,
+        r.created_at,
+        r.closing_date as deadline,
+        r.project_id,
+        COALESCE(qs.total_quotes, 0)::int as total_quotes,
+        COALESCE(qs.lowest_bid, 0)::numeric as lowest_bid,
+        COALESCE(qs.average_bid, 0)::numeric as average_bid,
+        COALESCE(qs.highest_bid, 0)::numeric as highest_bid,
+        CASE
+          WHEN r.status = 'awarded' THEN 'AWARDED'
+          WHEN r.status = 'closed' AND COALESCE(qs.total_quotes, 0) > 0 THEN 'COMPLETED'
+          WHEN COALESCE(qs.total_quotes, 0) > 0 THEN 'IN_PROGRESS'
+          ELSE 'PENDING'
+        END as evaluation_status
       FROM rfqs r
-      LIMIT 3
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(*)::int as total_quotes,
+          MIN(total_amount)::numeric as lowest_bid,
+          AVG(total_amount)::numeric as average_bid,
+          MAX(total_amount)::numeric as highest_bid
+        FROM quotes q
+        WHERE q.rfq_id = r.id
+      ) qs ON true
+      ORDER BY r.created_at DESC
+      LIMIT 10
     `;
 
     return res.json({
       success: true,
-      results: {
-        connectionTest: test1[0],
-        rfqsCount: test2[0].count,
-        quotesCount: test3[0].count,
-        sampleRfqs: test4
-      }
+      evaluations: test5
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
