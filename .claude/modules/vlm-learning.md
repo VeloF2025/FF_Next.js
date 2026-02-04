@@ -60,6 +60,9 @@ Daily aggregated metrics for accuracy tracking.
 - `quote_supplier` - Supplier information
 - `quote_line_item` - Line item extraction
 - `quote_totals` - Totals extraction
+- `po_header` - PO number, reference, date
+- `po_quantity` - Quantity/drops extraction
+- `po_pricing` - Unit price, subtotal, VAT, total
 
 ## Integration Points
 
@@ -90,6 +93,14 @@ Daily aggregated metrics for accuracy tracking.
 ```typescript
 // In quoteExtractionService.ts
 // extractQuoteFromImage() uses few-shot learning
+
+// In poExtractionService.ts
+// extractPOFromImage() uses few-shot learning for:
+// - po_header: PO number, reference, date
+// - po_quantity: Quantity/drops extraction
+// - po_pricing: Unit price, totals
+//
+// recordPOFormCorrections() records user corrections for learning
 ```
 
 ## API Endpoints

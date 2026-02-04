@@ -5,6 +5,7 @@
  * - Fibertime PO format parsing
  * - PDF to image conversion
  * - VLM API integration
+ * - VLM Learning System integration for continuous improvement
  *
  * Status: WORKING - Client PO PDF Import Feature
  *
@@ -13,6 +14,14 @@
 
 import { log } from '@/lib/logger';
 import type { POExtractionResult } from '../types/po-extraction.types';
+import {
+  getVlmFewShotExamples,
+  buildVlmFewShotPrompt,
+  recordCorrectExtraction,
+  recordVlmCorrection,
+  hashPromptContent,
+} from '@/services/vlmLearningService';
+import type { RecordCorrectionInput } from '@/types/vlm-learning';
 
 // ============================================================================
 // CONFIGURATION
@@ -70,11 +79,12 @@ If multiple pages, focus on the main order details page.`;
 
 /**
  * Extract PO information from a document image using VLM
+ * Uses VLM Learning System for few-shot examples to improve accuracy
  */
 export async function extractPOFromImage(
   imageBase64: string,
   documentName?: string
-): Promise<POExtractionResult & { success: boolean; error?: string; processingTimeMs: number }> {
+): Promise<POExtractionResult & { success: boolean; error?: string; processingTimeMs: number; promptHash?: string }> {
   const startTime = Date.now();
 
   try {
@@ -90,8 +100,23 @@ export async function extractPOFromImage(
       ? imageBase64
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // Call VLM API
-    const response = await callVlmApi(imageDataUrl);
+    // Get few-shot examples from VLM Learning System
+    const [headerExamples, quantityExamples, pricingExamples] = await Promise.all([
+      getVlmFewShotExamples({ module: 'procurement', analysisType: 'po_header', maxExamples: 2 }),
+      getVlmFewShotExamples({ module: 'procurement', analysisType: 'po_quantity', maxExamples: 2 }),
+      getVlmFewShotExamples({ module: 'procurement', analysisType: 'po_pricing', maxExamples: 2 }),
+    ]);
+
+    // Build enhanced prompt with few-shot examples
+    const fewShotSection = buildPOFewShotSection(headerExamples, quantityExamples, pricingExamples);
+    const enhancedPrompt = fewShotSection
+      ? `${PO_EXTRACTION_PROMPT}\n\n${fewShotSection}`
+      : PO_EXTRACTION_PROMPT;
+
+    const promptHash = hashPromptContent(enhancedPrompt);
+
+    // Call VLM API with enhanced prompt
+    const response = await callVlmApi(imageDataUrl, enhancedPrompt);
 
     if (!response) {
       return createErrorResult('VLM API returned no response', startTime);
@@ -109,18 +134,45 @@ export async function extractPOFromImage(
       quantity: extraction.quantity,
       total: extraction.total,
       confidence: extraction.confidence,
+      fewShotExamples: headerExamples.length + quantityExamples.length + pricingExamples.length,
     });
+
+    // Record successful extraction metrics (non-blocking)
+    if (extraction.confidence >= 0.7) {
+      recordCorrectExtraction('procurement', 'po_header', extraction.confidence).catch(() => {});
+      if (extraction.quantity) {
+        recordCorrectExtraction('procurement', 'po_quantity', extraction.confidence).catch(() => {});
+      }
+      if (extraction.total || extraction.unitPrice) {
+        recordCorrectExtraction('procurement', 'po_pricing', extraction.confidence).catch(() => {});
+      }
+    }
 
     return {
       ...extraction,
       success: true,
       processingTimeMs,
+      promptHash,
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     log.error('[POExtraction] Extraction failed', { error: errorMsg, documentName });
     return createErrorResult(errorMsg, startTime);
   }
+}
+
+/**
+ * Build few-shot section for PO extraction prompt
+ */
+function buildPOFewShotSection(
+  headerExamples: Array<{ incorrect: string | null; correct: string; context?: string }>,
+  quantityExamples: Array<{ incorrect: string | null; correct: string; context?: string }>,
+  pricingExamples: Array<{ incorrect: string | null; correct: string; context?: string }>
+): string {
+  const allExamples = [...headerExamples, ...quantityExamples, ...pricingExamples];
+  if (allExamples.length === 0) return '';
+
+  return buildVlmFewShotPrompt(allExamples as Parameters<typeof buildVlmFewShotPrompt>[0]);
 }
 
 /**
@@ -184,7 +236,7 @@ export async function extractPOFromMultipleImages(
 // VLM API CALL
 // ============================================================================
 
-async function callVlmApi(imageDataUrl: string): Promise<string | null> {
+async function callVlmApi(imageDataUrl: string, prompt?: string): Promise<string | null> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
 
@@ -195,7 +247,7 @@ async function callVlmApi(imageDataUrl: string): Promise<string | null> {
         {
           role: 'user',
           content: [
-            { type: 'text', text: PO_EXTRACTION_PROMPT },
+            { type: 'text', text: prompt || PO_EXTRACTION_PROMPT },
             { type: 'image_url', image_url: { url: imageDataUrl } },
           ],
         },
@@ -431,4 +483,154 @@ export function isValidExtraction(extraction: POExtractionResult): boolean {
   const hasQuantity = extraction.quantity !== null && extraction.quantity > 0;
 
   return Boolean(hasIdentifier && hasQuantity);
+}
+
+// ============================================================================
+// VLM LEARNING INTEGRATION - CORRECTION RECORDING
+// ============================================================================
+
+/**
+ * Record a PO extraction correction for VLM learning
+ * Call this when a user edits VLM-extracted values in the form
+ */
+export async function recordPOExtractionCorrection(
+  fieldType: 'po_header' | 'po_quantity' | 'po_pricing',
+  vlmExtractedValue: string | number | null,
+  correctedValue: string | number,
+  context?: {
+    projectId?: string;
+    documentName?: string;
+    vlmConfidence?: number;
+    promptHash?: string;
+    correctedByName?: string;
+    correctedById?: string;
+  }
+): Promise<void> {
+  try {
+    // Only record if values actually differ
+    const vlmStr = vlmExtractedValue?.toString() || '';
+    const correctedStr = correctedValue.toString();
+
+    if (vlmStr === correctedStr) {
+      return; // No correction needed
+    }
+
+    await recordVlmCorrection({
+      module: 'procurement',
+      analysisType: fieldType,
+      vlmExtractedValue: vlmStr || null,
+      correctedValue: correctedStr,
+      vlmConfidence: context?.vlmConfidence,
+      vlmPromptHash: context?.promptHash,
+      vlmModel: VLM_MODEL,
+      correctionReason: detectCorrectionReason(vlmStr, correctedStr, fieldType),
+      context: {
+        projectId: context?.projectId,
+        documentName: context?.documentName,
+      },
+      correctedByName: context?.correctedByName,
+      correctedById: context?.correctedById,
+    });
+
+    log.info('[POExtraction] Recorded correction', {
+      fieldType,
+      vlmValue: vlmStr,
+      correctedValue: correctedStr,
+    });
+  } catch (error) {
+    // Don't fail the main operation if correction recording fails
+    log.error('[POExtraction] Failed to record correction', { error });
+  }
+}
+
+/**
+ * Detect the correction reason based on value comparison
+ */
+function detectCorrectionReason(
+  vlmValue: string,
+  correctedValue: string,
+  fieldType: string
+): RecordCorrectionInput['correctionReason'] {
+  if (!vlmValue) return 'ocr_failure';
+
+  // Check for digit confusion in numeric fields
+  if (fieldType === 'po_quantity' || fieldType === 'po_pricing') {
+    const vlmNum = vlmValue.replace(/[^0-9.]/g, '');
+    const correctNum = correctedValue.replace(/[^0-9.]/g, '');
+
+    if (vlmNum.length === correctNum.length && vlmNum !== correctNum) {
+      return 'digit_confusion';
+    }
+
+    // Check for decimal issues
+    if (vlmNum.includes('.') !== correctNum.includes('.')) {
+      return 'format_error';
+    }
+  }
+
+  // Check for partial extraction
+  if (correctedValue.includes(vlmValue) || vlmValue.includes(correctedValue)) {
+    return 'partial_extraction';
+  }
+
+  return 'other';
+}
+
+/**
+ * Batch record corrections for all changed fields in a PO form
+ * Call this when saving a PO that was pre-populated from VLM extraction
+ */
+export async function recordPOFormCorrections(
+  vlmExtraction: POExtractionResult,
+  formData: {
+    poNumber?: string;
+    reference?: string;
+    poDate?: string;
+    contractedDrops?: number;
+    pricePerDrop?: number;
+  },
+  context?: {
+    projectId?: string;
+    documentName?: string;
+    vlmConfidence?: number;
+    promptHash?: string;
+    correctedByName?: string;
+    correctedById?: string;
+  }
+): Promise<void> {
+  const corrections: Array<Promise<void>> = [];
+
+  // Check PO header fields
+  if (formData.poNumber && formData.poNumber !== vlmExtraction.poNumber) {
+    corrections.push(
+      recordPOExtractionCorrection('po_header', vlmExtraction.poNumber, formData.poNumber, context)
+    );
+  }
+  if (formData.reference && formData.reference !== vlmExtraction.reference) {
+    corrections.push(
+      recordPOExtractionCorrection('po_header', vlmExtraction.reference, formData.reference, context)
+    );
+  }
+  if (formData.poDate && formData.poDate !== vlmExtraction.poDate) {
+    corrections.push(
+      recordPOExtractionCorrection('po_header', vlmExtraction.poDate, formData.poDate, context)
+    );
+  }
+
+  // Check quantity
+  if (formData.contractedDrops && formData.contractedDrops !== vlmExtraction.quantity) {
+    corrections.push(
+      recordPOExtractionCorrection('po_quantity', vlmExtraction.quantity, formData.contractedDrops, context)
+    );
+  }
+
+  // Check pricing
+  if (formData.pricePerDrop && formData.pricePerDrop !== vlmExtraction.unitPrice) {
+    corrections.push(
+      recordPOExtractionCorrection('po_pricing', vlmExtraction.unitPrice, formData.pricePerDrop, context)
+    );
+  }
+
+  // Execute all corrections in parallel
+  await Promise.all(corrections);
 }

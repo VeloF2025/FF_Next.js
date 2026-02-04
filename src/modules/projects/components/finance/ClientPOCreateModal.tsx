@@ -9,6 +9,7 @@ import type { ClientPOCreateInput } from '@/types/finance';
 import { log } from '@/lib/logger';
 import type { POExtractionAPIResponse, POExtractionResult } from '@/modules/projects/types/po-extraction.types';
 import { getConfidenceColorClass, getConfidenceLevel, CONFIDENCE_THRESHOLDS } from '@/modules/projects/types/po-extraction.types';
+import { recordPOFormCorrections } from '@/modules/projects/services/poExtractionService';
 
 interface ClientPOCreateModalProps {
   projectId: string;
@@ -80,6 +81,21 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
       if (!response.ok) {
         const result = await response.json();
         throw new Error(result.message || 'Failed to create Client PO');
+      }
+
+      // Record VLM corrections for learning (non-blocking)
+      if (extractionResult) {
+        recordPOFormCorrections(extractionResult, {
+          poNumber: formData.poNumber,
+          reference: formData.reference || undefined,
+          poDate: formData.poDate,
+          contractedDrops: formData.contractedDrops,
+          pricePerDrop: formData.pricePerDrop,
+        }, {
+          projectId,
+          documentName: documentName || undefined,
+          vlmConfidence: extractionResult.confidence,
+        }).catch(() => {}); // Non-blocking
       }
 
       onCreated();

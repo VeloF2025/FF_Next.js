@@ -38,6 +38,9 @@ export type VlmAnalysisType =
   | 'quote_supplier'
   | 'quote_line_item'
   | 'quote_totals'
+  | 'po_header'        // PO number, reference, date extraction
+  | 'po_quantity'      // Quantity/drops extraction
+  | 'po_pricing'       // Unit price, subtotal, VAT, total extraction
   // Assets module
   | 'equipment_label'
   // Staff module
@@ -58,7 +61,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
     'green_lights_check',
   ],
   fleet: ['odometer', 'license_plate', 'fuel_gauge', 'fuel_receipt', 'license_disk'],
-  procurement: ['quote_supplier', 'quote_line_item', 'quote_totals'],
+  procurement: ['quote_supplier', 'quote_line_item', 'quote_totals', 'po_header', 'po_quantity', 'po_pricing'],
   assets: ['equipment_label'],
   staff: ['id_extraction', 'photo_match'],
 };
