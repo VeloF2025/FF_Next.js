@@ -54,6 +54,15 @@ interface OdometerHistory {
   recordedAt: string;
 }
 
+interface CheckPhoto {
+  id: string;
+  photoType: string;
+  fileUrl: string;
+  latitude: number | null;
+  longitude: number | null;
+  capturedAt: string | null;
+}
+
 interface AuditRecord {
   id: string;
   vehicle_id: string;
@@ -76,6 +85,7 @@ interface AuditRecord {
   updated_at: string;
   vlm_results: VlmResult[] | null;
   odometer_history: OdometerHistory | null;
+  photos: CheckPhoto[] | null;
 }
 
 interface AuditStats {
@@ -607,6 +617,50 @@ export default function CheckInAuditPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Check-In Photos */}
+                          {record.photos && record.photos.length > 0 && (
+                            <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                              <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                                <Eye className="w-4 h-4" />
+                                Check-In Photos ({record.photos.length})
+                              </h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {record.photos.map((photo) => (
+                                  <div key={photo.id} className="relative aspect-video rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 group">
+                                    <img
+                                      src={photo.fileUrl.startsWith('/uploads/') ? `/api${photo.fileUrl}` : photo.fileUrl}
+                                      alt={photo.photoType}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                                      <span className="text-white text-xs capitalize">
+                                        {photo.photoType.replace('_', ' ')}
+                                      </span>
+                                    </div>
+                                    {/* GPS coordinates indicator */}
+                                    {photo.latitude && photo.longitude && (
+                                      <div className="absolute top-2 right-2 bg-blue-500/80 rounded-full p-1" title={`${photo.latitude.toFixed(4)}, ${photo.longitude.toFixed(4)}`}>
+                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                    {/* Click to enlarge */}
+                                    <a
+                                      href={photo.fileUrl.startsWith('/uploads/') ? `/api${photo.fileUrl}` : photo.fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <span className="text-white text-xs font-medium">View full size</span>
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}

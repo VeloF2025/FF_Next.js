@@ -94,6 +94,14 @@ export const fleetConfig: ModuleNavigationConfig = {
       rbacKey: 'fleet.portal',
     },
     {
+      id: 'check-in-history',
+      label: 'Check-In History',
+      shortLabel: 'History',
+      icon: ClipboardList,
+      path: '/fleet/check-in/history',
+      rbacKey: 'fleet.check-in-history',
+    },
+    {
       id: 'audit',
       label: 'Check-In Audit',
       shortLabel: 'Audit',

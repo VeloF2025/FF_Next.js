@@ -142,7 +142,20 @@ async function handler(
           WHERE oh.check_record_id = cr.id
           ORDER BY oh.recorded_at DESC
           LIMIT 1
-        ) as odometer_history
+        ) as odometer_history,
+        -- Get photos for the check-in
+        (
+          SELECT json_agg(json_build_object(
+            'id', fcp.id,
+            'photoType', fcp.photo_type,
+            'fileUrl', fcp.file_url,
+            'latitude', fcp.latitude,
+            'longitude', fcp.longitude,
+            'capturedAt', fcp.captured_at
+          ) ORDER BY fcp.created_at)
+          FROM fleet_check_photos fcp
+          WHERE fcp.record_id = cr.id
+        ) as photos
       FROM fleet_check_records cr
       JOIN fleet_vehicles fv ON fv.id = cr.vehicle_id
       ${whereClause}
