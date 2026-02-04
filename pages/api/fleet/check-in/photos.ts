@@ -19,6 +19,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import FormData from 'form-data';
+import axios from 'axios';
 import { log } from '@/lib/logger';
 import { withFleetAuth } from '@/lib/auth/middleware';
 import { recordVlmCorrection } from '@/services/vlmLearningService';
@@ -63,31 +64,19 @@ async function uploadToStorage(
   formData.append('file', fileContent, {
     filename,
     contentType: 'image/jpeg',
-    knownLength: fileContent.length,
   });
 
   const uploadUrl = `${VF_STORAGE_URL}/upload/fleet/${category}`;
   log.info('Uploading to VF Storage', { uploadUrl, filename, fileSize: fileContent.length });
 
-  // Use node-fetch compatible approach with form-data
-  const headers = formData.getHeaders();
-
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
-    body: formData.getBuffer(),
-    headers: {
-      ...headers,
-      'Content-Length': String(formData.getLengthSync()),
-    },
+  // Use axios which has proper form-data support
+  const response = await axios.post(uploadUrl, formData, {
+    headers: formData.getHeaders(),
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    log.error('Storage upload failed', { status: response.status, error: errorText });
-    throw new Error(`Storage upload failed: ${response.status} ${errorText}`);
-  }
-
-  const result = await response.json();
+  const result = response.data;
   log.info('Storage upload successful', { result });
 
   // Return both the internal storage URL and public URL
