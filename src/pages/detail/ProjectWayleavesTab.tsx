@@ -353,7 +353,7 @@ export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: Proj
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                     <a
-                      href={`/pipeline/projects/${link.pipeline_project_id}`}
+                      href={`/pipeline/${link.pipeline_project_id}`}
                       className="p-1.5 text-[var(--ff-text-secondary)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
                       title="View Pipeline"
                     >
@@ -421,7 +421,7 @@ export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: Proj
               <RefreshCw className="w-4 h-4" />
             </button>
             <a
-              href={`/pipeline/projects/${wayleavesData?.pipeline_project_id}/approvals`}
+              href={`/pipeline/${wayleavesData?.pipeline_project_id}`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
             >
               <Plus className="w-4 h-4" />
@@ -806,7 +806,7 @@ function ApprovalDetailDrawer({ approval, pipelineProjectId, onClose }: Approval
           {/* Edit Link */}
           <div className="pt-4 border-t border-[var(--ff-border-light)]">
             <a
-              href={`/pipeline/projects/${pipelineProjectId}/approvals/${approval.id}`}
+              href={`/pipeline/${pipelineProjectId}`}
               className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >
               Edit in Pipeline
