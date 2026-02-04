@@ -42,7 +42,7 @@ async function getEvaluations(
           AVG(total_value)::numeric as average_bid,
           MAX(total_value)::numeric as highest_bid
         FROM quotes q
-        WHERE q.rfq_id = r.id::text
+        WHERE q.rfq_id = r.id
       ) qs ON true
       ORDER BY r.created_at DESC
       LIMIT 100
@@ -77,7 +77,7 @@ async function getEvaluations(
           AVG(total_value)::numeric as average_bid,
           MAX(total_value)::numeric as highest_bid
         FROM quotes q
-        WHERE q.rfq_id = r.id::text
+        WHERE q.rfq_id = r.id
       ) qs ON true
       WHERE r.project_id = ${projectId}
       ORDER BY r.created_at DESC
@@ -114,7 +114,7 @@ async function getEvaluations(
           AVG(total_value)::numeric as average_bid,
           MAX(total_value)::numeric as highest_bid
         FROM quotes q
-        WHERE q.rfq_id = r.id::text
+        WHERE q.rfq_id = r.id
       ) qs ON true
       WHERE r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern}
       ORDER BY r.created_at DESC
@@ -151,7 +151,7 @@ async function getEvaluations(
             AVG(total_value)::numeric as average_bid,
             MAX(total_value)::numeric as highest_bid
           FROM quotes q
-          WHERE q.rfq_id = r.id::text
+          WHERE q.rfq_id = r.id
         ) qs ON true
       ) sub
       WHERE evaluation_status = ${status}
@@ -189,7 +189,7 @@ async function getEvaluations(
           AVG(total_value)::numeric as average_bid,
           MAX(total_value)::numeric as highest_bid
         FROM quotes q
-        WHERE q.rfq_id = r.id::text
+        WHERE q.rfq_id = r.id
       ) qs ON true
       WHERE r.project_id = ${projectId}
         AND (r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern})
@@ -227,7 +227,7 @@ async function getEvaluations(
             AVG(total_value)::numeric as average_bid,
             MAX(total_value)::numeric as highest_bid
           FROM quotes q
-          WHERE q.rfq_id = r.id::text
+          WHERE q.rfq_id = r.id
         ) qs ON true
         WHERE r.project_id = ${projectId}
       ) sub
@@ -267,7 +267,7 @@ async function getEvaluations(
             AVG(total_value)::numeric as average_bid,
             MAX(total_value)::numeric as highest_bid
           FROM quotes q
-          WHERE q.rfq_id = r.id::text
+          WHERE q.rfq_id = r.id
         ) qs ON true
         WHERE r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern}
       ) sub
@@ -306,7 +306,7 @@ async function getEvaluations(
           AVG(total_value)::numeric as average_bid,
           MAX(total_value)::numeric as highest_bid
         FROM quotes q
-        WHERE q.rfq_id = r.id::text
+        WHERE q.rfq_id = r.id
       ) qs ON true
       WHERE r.project_id = ${projectId}
         AND (r.title ILIKE ${searchPattern} OR r.id::text ILIKE ${searchPattern})
@@ -324,14 +324,14 @@ async function getStats(projectId: string | undefined) {
       SELECT
         COUNT(*)::int as total,
         COUNT(*) FILTER (WHERE status = 'open' AND NOT EXISTS (
-          SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id::text
+          SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id
         ))::int as pending,
         COUNT(*) FILTER (WHERE status = 'open' AND EXISTS (
-          SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id::text
+          SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id
         ))::int as in_progress,
         COUNT(*) FILTER (WHERE status = 'closed')::int as completed,
         COUNT(*) FILTER (WHERE status = 'awarded')::int as awarded,
-        COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id::text)), 0)::numeric as total_value
+        COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id)), 0)::numeric as total_value
       FROM rfqs
       WHERE project_id = ${projectId}
     `;
@@ -341,14 +341,14 @@ async function getStats(projectId: string | undefined) {
     SELECT
       COUNT(*)::int as total,
       COUNT(*) FILTER (WHERE status = 'open' AND NOT EXISTS (
-        SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id::text
+        SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id
       ))::int as pending,
       COUNT(*) FILTER (WHERE status = 'open' AND EXISTS (
-        SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id::text
+        SELECT 1 FROM quotes q WHERE q.rfq_id = rfqs.id
       ))::int as in_progress,
       COUNT(*) FILTER (WHERE status = 'closed')::int as completed,
       COUNT(*) FILTER (WHERE status = 'awarded')::int as awarded,
-      COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id::text)), 0)::numeric as total_value
+      COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id)), 0)::numeric as total_value
     FROM rfqs
   `;
 }
