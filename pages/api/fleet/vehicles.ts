@@ -121,10 +121,24 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             va.staff_id as "assignedStaffId",
-            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName"
+            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           LEFT JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
           LEFT JOIN staff s ON s.id = va.staff_id
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE fv.status = ${status}
             AND fv.vehicle_type = ${type}
             AND (
@@ -151,10 +165,24 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             va.staff_id as "assignedStaffId",
-            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName"
+            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           LEFT JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
           LEFT JOIN staff s ON s.id = va.staff_id
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE fv.status = ${status} AND fv.vehicle_type = ${type}
           ORDER BY fv.created_at DESC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -175,10 +203,24 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             va.staff_id as "assignedStaffId",
-            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName"
+            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           LEFT JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
           LEFT JOIN staff s ON s.id = va.staff_id
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE fv.status = ${status}
           ORDER BY fv.created_at DESC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -199,10 +241,24 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             va.staff_id as "assignedStaffId",
-            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName"
+            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           LEFT JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
           LEFT JOIN staff s ON s.id = va.staff_id
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE fv.vehicle_type = ${type}
           ORDER BY fv.created_at DESC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -224,10 +280,24 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             va.staff_id as "assignedStaffId",
-            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName"
+            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           LEFT JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
           LEFT JOIN staff s ON s.id = va.staff_id
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE (
             LOWER(fv.registration) LIKE LOWER(${searchTerm}) OR
             LOWER(fv.make) LIKE LOWER(${searchTerm}) OR
@@ -252,10 +322,24 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             va.staff_id as "assignedStaffId",
-            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName"
+            CONCAT(s.first_name, ' ', s.last_name) as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           INNER JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
           LEFT JOIN staff s ON s.id = va.staff_id
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE fv.status = 'active'
           ORDER BY fv.created_at DESC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -276,9 +360,23 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
             fv.created_at as "createdAt",
             fv.updated_at as "updatedAt",
             NULL as "assignedStaffId",
-            NULL as "assignedStaffName"
+            NULL as "assignedStaffName",
+            ld.expiry_date as "licenseDiscExpiry",
+            CASE
+              WHEN ld.expiry_date IS NULL THEN NULL
+              WHEN ld.expiry_date < CURRENT_DATE THEN 'expired'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
+              WHEN ld.expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
+              ELSE 'ok'
+            END as "expiryStatus"
           FROM fleet_vehicles fv
           LEFT JOIN vehicle_assignments va ON va.fleet_vehicle_id = fv.id AND va.is_active = true
+          LEFT JOIN LATERAL (
+            SELECT expiry_date FROM fleet_license_disc
+            WHERE vehicle_id = fv.id AND status = 'active'
+            ORDER BY expiry_date DESC
+            LIMIT 1
+          ) ld ON true
           WHERE fv.status = 'active' AND va.id IS NULL
           ORDER BY fv.created_at DESC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -313,7 +411,7 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
           LEFT JOIN staff s ON s.id = va.staff_id
           LEFT JOIN LATERAL (
             SELECT expiry_date FROM fleet_license_disc
-            WHERE vehicle_id = fv.id
+            WHERE vehicle_id = fv.id AND status = 'active'
             ORDER BY expiry_date DESC
             LIMIT 1
           ) ld ON true
