@@ -38,9 +38,9 @@ async function getEvaluations(
       LEFT JOIN LATERAL (
         SELECT
           COUNT(*)::int as total_quotes,
-          MIN(total_amount)::numeric as lowest_bid,
-          AVG(total_amount)::numeric as average_bid,
-          MAX(total_amount)::numeric as highest_bid
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
         FROM quotes q
         WHERE q.rfq_id = r.id
       ) qs ON true
@@ -73,9 +73,9 @@ async function getEvaluations(
       LEFT JOIN LATERAL (
         SELECT
           COUNT(*)::int as total_quotes,
-          MIN(total_amount)::numeric as lowest_bid,
-          AVG(total_amount)::numeric as average_bid,
-          MAX(total_amount)::numeric as highest_bid
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
         FROM quotes q
         WHERE q.rfq_id = r.id
       ) qs ON true
@@ -110,9 +110,9 @@ async function getEvaluations(
       LEFT JOIN LATERAL (
         SELECT
           COUNT(*)::int as total_quotes,
-          MIN(total_amount)::numeric as lowest_bid,
-          AVG(total_amount)::numeric as average_bid,
-          MAX(total_amount)::numeric as highest_bid
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
         FROM quotes q
         WHERE q.rfq_id = r.id
       ) qs ON true
@@ -147,9 +147,9 @@ async function getEvaluations(
         LEFT JOIN LATERAL (
           SELECT
             COUNT(*)::int as total_quotes,
-            MIN(total_amount)::numeric as lowest_bid,
-            AVG(total_amount)::numeric as average_bid,
-            MAX(total_amount)::numeric as highest_bid
+            MIN(total_value)::numeric as lowest_bid,
+            AVG(total_value)::numeric as average_bid,
+            MAX(total_value)::numeric as highest_bid
           FROM quotes q
           WHERE q.rfq_id = r.id
         ) qs ON true
@@ -185,9 +185,9 @@ async function getEvaluations(
       LEFT JOIN LATERAL (
         SELECT
           COUNT(*)::int as total_quotes,
-          MIN(total_amount)::numeric as lowest_bid,
-          AVG(total_amount)::numeric as average_bid,
-          MAX(total_amount)::numeric as highest_bid
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
         FROM quotes q
         WHERE q.rfq_id = r.id
       ) qs ON true
@@ -223,9 +223,9 @@ async function getEvaluations(
         LEFT JOIN LATERAL (
           SELECT
             COUNT(*)::int as total_quotes,
-            MIN(total_amount)::numeric as lowest_bid,
-            AVG(total_amount)::numeric as average_bid,
-            MAX(total_amount)::numeric as highest_bid
+            MIN(total_value)::numeric as lowest_bid,
+            AVG(total_value)::numeric as average_bid,
+            MAX(total_value)::numeric as highest_bid
           FROM quotes q
           WHERE q.rfq_id = r.id
         ) qs ON true
@@ -263,9 +263,9 @@ async function getEvaluations(
         LEFT JOIN LATERAL (
           SELECT
             COUNT(*)::int as total_quotes,
-            MIN(total_amount)::numeric as lowest_bid,
-            AVG(total_amount)::numeric as average_bid,
-            MAX(total_amount)::numeric as highest_bid
+            MIN(total_value)::numeric as lowest_bid,
+            AVG(total_value)::numeric as average_bid,
+            MAX(total_value)::numeric as highest_bid
           FROM quotes q
           WHERE q.rfq_id = r.id
         ) qs ON true
@@ -302,9 +302,9 @@ async function getEvaluations(
       LEFT JOIN LATERAL (
         SELECT
           COUNT(*)::int as total_quotes,
-          MIN(total_amount)::numeric as lowest_bid,
-          AVG(total_amount)::numeric as average_bid,
-          MAX(total_amount)::numeric as highest_bid
+          MIN(total_value)::numeric as lowest_bid,
+          AVG(total_value)::numeric as average_bid,
+          MAX(total_value)::numeric as highest_bid
         FROM quotes q
         WHERE q.rfq_id = r.id
       ) qs ON true
@@ -331,7 +331,7 @@ async function getStats(projectId: string | undefined) {
         ))::int as in_progress,
         COUNT(*) FILTER (WHERE status = 'closed')::int as completed,
         COUNT(*) FILTER (WHERE status = 'awarded')::int as awarded,
-        COALESCE(SUM((SELECT MIN(total_amount) FROM quotes q WHERE q.rfq_id = rfqs.id)), 0)::numeric as total_amount
+        COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id)), 0)::numeric as total_value
       FROM rfqs
       WHERE project_id = ${projectId}
     `;
@@ -348,7 +348,7 @@ async function getStats(projectId: string | undefined) {
       ))::int as in_progress,
       COUNT(*) FILTER (WHERE status = 'closed')::int as completed,
       COUNT(*) FILTER (WHERE status = 'awarded')::int as awarded,
-      COALESCE(SUM((SELECT MIN(total_amount) FROM quotes q WHERE q.rfq_id = rfqs.id)), 0)::numeric as total_amount
+      COALESCE(SUM((SELECT MIN(total_value) FROM quotes q WHERE q.rfq_id = rfqs.id)), 0)::numeric as total_value
     FROM rfqs
   `;
 }
@@ -397,7 +397,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         inProgress: statsData.in_progress || 0,
         completed: statsData.completed || 0,
         awarded: statsData.awarded || 0,
-        totalValue: Number(statsData.total_amount || 0),
+        totalValue: Number(statsData.total_value || 0),
         averageEvaluationTime: 0, // Would need timeline tracking
       },
     });
