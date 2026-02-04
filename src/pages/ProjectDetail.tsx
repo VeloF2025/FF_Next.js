@@ -16,7 +16,7 @@ import { ProjectKeyDetails } from './detail/ProjectKeyDetails';
 import { ProjectQuickStats } from './detail/ProjectQuickStats';
 import { ProjectHierarchyTab } from './detail/ProjectHierarchyTab';
 import { ProjectTimelineTab } from './detail/ProjectTimelineTab';
-import { ProjectDetailLoading } from './detail/ProjectDetailLoading';
+import { ProjectDetailLoading, TabContentLoading } from './detail/ProjectDetailLoading';
 import { ProjectDetailNotFound } from './detail/ProjectDetailNotFound';
 // PRD-058: Enhanced Overview components
 import { ProjectOverviewKPICards } from './detail/ProjectOverviewKPICards';
@@ -34,13 +34,15 @@ import { ProjectWayleavesTab } from './detail/ProjectWayleavesTab';
 import { FinanceDashboardTab } from '@/modules/projects/components/finance';
 // Income Tab (lazy load)
 import dynamic from 'next/dynamic';
-const ProjectIncomeTab = dynamic(() => import('./detail/ProjectIncomeTab').then(m => ({ default: m.ProjectIncomeTab })), {
-  loading: () => <div className="animate-pulse h-64 bg-[var(--ff-bg-secondary)] rounded-lg" />,
-});
+const ProjectIncomeTab = dynamic(
+  () => import('./detail/ProjectIncomeTab').then(m => ({ default: m.ProjectIncomeTab })),
+  { loading: () => <TabContentLoading /> }
+);
 // Documents Tab (lazy load)
-const ProjectDocumentsTab = dynamic(() => import('./detail/ProjectDocumentsTab').then(m => ({ default: m.ProjectDocumentsTab })), {
-  loading: () => <div className="animate-pulse h-64 bg-[var(--ff-bg-secondary)] rounded-lg" />,
-});
+const ProjectDocumentsTab = dynamic(
+  () => import('./detail/ProjectDocumentsTab').then(m => ({ default: m.ProjectDocumentsTab })),
+  { loading: () => <TabContentLoading /> }
+);
 
 interface ProjectDetailProps {
   projectId: string;
