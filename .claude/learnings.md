@@ -4,6 +4,48 @@
 
 ---
 
+## 2026-02-04: Silent Demo Data Fallback Anti-Pattern
+
+**Problem — Staff page showing fake data instead of real staff:**
+The `/staff` page was showing 2 demo staff members (John Smith EMP001, Sarah Johnson EMP002) instead of the real 62 staff records, with no indication to the user that the data was fake.
+
+**Root Cause — Silent fallback in `pages/staff/index.tsx:108-116`:**
+```typescript
+// ❌ ANTI-PATTERN: Silent fallback to demo data
+if (response.ok) {
+  setStaff(data.data || []);
+} else {
+  setStaff(getSampleStaff());  // User has no idea this is fake!
+}
+```
+
+When the API call failed (e.g., expired auth token returning 401), the page silently showed hardcoded demo data. Users had no indication they were viewing fake records.
+
+**Fix — Show error state instead of demo data:**
+```typescript
+// ✅ CORRECT: Show error when API fails
+if (response.ok) {
+  setStaff(data.data || []);
+} else {
+  setError('Failed to load staff');
+  setStaff([]);
+}
+```
+
+Added error state with "Failed to Load Staff" message and "Try Again" button.
+
+**Key Lesson — Never Silently Fall Back to Demo Data:**
+1. Demo/sample data should ONLY be used in development/test environments
+2. Production code should show clear error states when APIs fail
+3. If you see `getSampleStaff()`, `getMockData()`, or similar in fetch handlers, it's likely a bug
+4. Search codebase for similar patterns: `grep -r "getSample\|getMock\|fallback.*demo" src/ pages/`
+
+**Files to audit for this anti-pattern:**
+- Any page with `useEffect` + `fetch` that has demo data defined
+- Look for catch blocks that set state to hardcoded arrays
+
+---
+
 ## 2026-01-31: False Resubmission Detection in dr-acknowledgment.ts
 
 **Problem — WA system sending "🔄 Resubmitted!" messages on first submissions:**

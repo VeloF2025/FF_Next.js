@@ -124,3 +124,4 @@ importFromExcel(file, overwriteExisting)
 - **SA ID Number dual fields**: `saIdNumber` (Overview) and `idNumber` (Compliance) sync bidirectionally in `StaffEditForm.handleInputChange`
 - **Position dropdown**: Uses `getPositionsByDepartment()` from `staff-hierarchy.types.ts` — must include current position as fallback option for legacy data
 - **Department stored twice**: As display name in `department` VARCHAR + UUID in `department_id` FK. API resolves name→UUID on save
+- **No demo data fallback** (fixed 2026-02-04): `pages/staff/index.tsx` previously fell back to demo data (John Smith, Sarah Johnson) when API failed. Now shows proper error state with retry button. See `learnings.md` for details.
