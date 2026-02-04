@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import {
   Plus,
   Download,
@@ -62,7 +62,7 @@ interface QuoteStats {
 
 
 const QuoteEvaluationPage: React.FC = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [evaluations, setEvaluations] = useState<QuoteEvaluation[]>([]);
   const [stats, setStats] = useState<QuoteStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,8 +153,8 @@ const QuoteEvaluationPage: React.FC = () => {
   };
 
   const handleViewEvaluation = useCallback((rfqId: string) => {
-    navigate(`/app/procurement/rfq/${rfqId}`);
-  }, [navigate]);
+    router.push(`/procurement/rfq/${rfqId}`);
+  }, [router]);
 
   const handleExportCSV = useCallback(() => {
     if (evaluations.length === 0) return;
@@ -381,7 +381,7 @@ const QuoteEvaluationPage: React.FC = () => {
             variant="outline"
             size="sm"
             icon={<BarChart3 className="h-4 w-4" />}
-            onClick={() => navigate('/app/procurement/reports')}
+            onClick={() => router.push('/procurement/reports')}
           >
             Analytics
           </VelocityButton>
@@ -396,7 +396,7 @@ const QuoteEvaluationPage: React.FC = () => {
           <VelocityButton
             size="sm"
             icon={<Plus className="h-4 w-4" />}
-            onClick={() => navigate('/app/procurement/rfq')}
+            onClick={() => router.push('/procurement/rfq')}
           >
             New RFQ
           </VelocityButton>
