@@ -72,6 +72,12 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
   // Handle tab change - update URL
   const handleTabChange = (newTab: TabId) => {
+    // Budget tab navigates directly to the full budget page (better UX)
+    if (newTab === 'budget') {
+      router.push(`/projects/${id}/budget`);
+      return;
+    }
+
     router.push(
       {
         pathname: router.pathname,

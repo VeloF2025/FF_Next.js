@@ -74,6 +74,20 @@ const PROVINCES = [
   'Western Cape',
 ];
 
+/**
+ * Convert ISO date string or Date to YYYY-MM-DD format for HTML date input
+ */
+const formatDateForInput = (date: string | Date | null | undefined): string => {
+  if (!date) return '';
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
+
 export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onCancel }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: clients = [], isLoading: isClientsLoading } = useActiveClients();
@@ -114,8 +128,9 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
         projectManagerId: project.projectManager || project.project_manager || '',
         status: project.status || 'planning',
         priority: project.priority || 'medium',
-        startDate: project.startDate || project.start_date || '',
-        endDate: project.endDate || project.end_date || '',
+        // Convert ISO dates to YYYY-MM-DD format for HTML date inputs
+        startDate: formatDateForInput(project.startDate || project.start_date),
+        endDate: formatDateForInput(project.endDate || project.end_date),
         budget: project.budget || 0,
         location: project.location || {},
       };
