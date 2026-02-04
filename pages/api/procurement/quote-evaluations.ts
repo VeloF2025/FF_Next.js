@@ -402,8 +402,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       },
     });
   } catch (error) {
-    log.error('Failed to fetch quote evaluations', { data: error }, 'procurement/quote-evaluations');
-    return apiResponse.error(res, 'Failed to fetch quote evaluations');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    log.error('Failed to fetch quote evaluations', {
+      message: errorMessage,
+      stack: errorStack,
+      data: error
+    }, 'procurement/quote-evaluations');
+    return apiResponse.error(res, `Failed to fetch quote evaluations: ${errorMessage}`);
   }
 }
 
