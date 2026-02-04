@@ -576,8 +576,10 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       const record = (data.data || data) as CheckRecord;
 
       // Upload photos and re-process VLM with real record ID
+      log.info('useCheckIn', { action: 'uploadPhotosStart', recordId: record.id, photoCount: formState.photos.size });
       for (const [type, photo] of formState.photos.entries()) {
         if (photo.file) {
+          log.info('useCheckIn', { action: 'uploadingPhoto', photoType: type, fileName: photo.file.name, fileSize: photo.file.size });
           // Upload photo first
           const formData = new FormData();
           formData.append('recordId', record.id);
@@ -591,13 +593,14 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
             formData.append('longitude', String(photo.longitude));
           }
 
-          const uploadResponse = await fetch('/api/fleet/check-in/photos', {
-            method: 'POST',
-            body: formData,
-          });
+          try {
+            const uploadResponse = await fetch('/api/fleet/check-in/photos', {
+              method: 'POST',
+              body: formData,
+            });
 
-          // Get the photo ID from the upload response
-          if (uploadResponse.ok) {
+            // Get the photo ID from the upload response
+            if (uploadResponse.ok) {
             const uploadData = await uploadResponse.json();
             const photoId = uploadData.data?.id || uploadData.id;
 
@@ -643,7 +646,31 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
                 hasDataUrl: !!photo.dataUrl
               });
             }
+            } else {
+              // Upload failed - log the error
+              const errorText = await uploadResponse.text();
+              log.error('useCheckIn', {
+                action: 'photoUploadFailed',
+                photoType: type,
+                status: uploadResponse.status,
+                error: errorText
+              });
+            }
+          } catch (uploadError) {
+            log.error('useCheckIn', {
+              action: 'photoUploadException',
+              photoType: type,
+              error: uploadError instanceof Error ? uploadError.message : uploadError
+            });
           }
+        } else {
+          // No File object - this is a bug, log it!
+          log.error('useCheckIn', {
+            action: 'photoMissingFile',
+            photoType: type,
+            hasDataUrl: !!photo.dataUrl,
+            dataUrlLength: photo.dataUrl?.length || 0
+          });
         }
       }
 
