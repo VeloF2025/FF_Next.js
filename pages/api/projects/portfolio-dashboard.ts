@@ -177,32 +177,38 @@ export default async function handler(
       : 0;
 
     // 4. Get H&S compliance metrics (with fallback for missing tables)
-    // NOTE: hs_incidents and hs_audits tables may not exist in all environments
-    // Query each table separately to allow partial data if one exists
+    // NOTE: H&S module uses hs_ticket_details (joined with tickets) for incidents
+    // and hs_project_audits for audits - NOT hs_incidents/hs_audits
     let compliance = {
       avg_hs_score: 0,
       open_incidents: 0,
       pending_audits: 0,
     };
 
-    // Try hs_incidents separately
+    // Query incidents from tickets + hs_ticket_details
     try {
       const incidentRows = await sql`
-        SELECT COUNT(*)::int as count FROM hs_incidents WHERE status NOT IN ('resolved', 'closed')
+        SELECT COUNT(*)::int as count
+        FROM tickets t
+        JOIN hs_ticket_details htd ON htd.ticket_id = t.id
+        WHERE t.ticket_type IN ('hse_incident', 'hse_near_miss')
+        AND t.status NOT IN ('resolved', 'closed', 'cancelled')
       `;
       compliance.open_incidents = incidentRows[0]?.count || 0;
     } catch {
-      // hs_incidents table doesn't exist yet - use 0
+      // H&S tables may not exist yet - use 0
     }
 
-    // Try hs_audits separately
+    // Query pending audits from hs_project_audits
     try {
       const auditRows = await sql`
-        SELECT COUNT(*)::int as count FROM hs_audits WHERE status = 'scheduled' OR status = 'pending'
+        SELECT COUNT(*)::int as count
+        FROM hs_project_audits
+        WHERE status IN ('in_progress', 'requires_action')
       `;
       compliance.pending_audits = auditRows[0]?.count || 0;
     } catch {
-      // hs_audits table doesn't exist yet - use 0
+      // hs_project_audits table may not exist yet - use 0
     }
 
     // 5. Get maintenance ticket counts
