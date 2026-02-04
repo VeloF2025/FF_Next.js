@@ -177,28 +177,32 @@ export default async function handler(
       : 0;
 
     // 4. Get H&S compliance metrics (with fallback for missing tables)
+    // NOTE: hs_incidents and hs_audits tables may not exist in all environments
+    // Query each table separately to allow partial data if one exists
     let compliance = {
       avg_hs_score: 0,
       open_incidents: 0,
       pending_audits: 0,
     };
 
+    // Try hs_incidents separately
     try {
-      const complianceRows = await safeArrayQuery<{
-        avg_hs_score: number;
-        open_incidents: number;
-        pending_audits: number;
-      }>(
-        async () => sql`
-          SELECT
-            0::numeric as avg_hs_score,
-            (SELECT COUNT(*)::int FROM hs_incidents WHERE status NOT IN ('resolved', 'closed')) as open_incidents,
-            (SELECT COUNT(*)::int FROM hs_audits WHERE status = 'scheduled' OR status = 'pending') as pending_audits
-        `
-      );
-      compliance = complianceRows[0] || compliance;
+      const incidentRows = await sql`
+        SELECT COUNT(*)::int as count FROM hs_incidents WHERE status NOT IN ('resolved', 'closed')
+      `;
+      compliance.open_incidents = incidentRows[0]?.count || 0;
     } catch {
-      // Tables may not exist yet
+      // hs_incidents table doesn't exist yet - use 0
+    }
+
+    // Try hs_audits separately
+    try {
+      const auditRows = await sql`
+        SELECT COUNT(*)::int as count FROM hs_audits WHERE status = 'scheduled' OR status = 'pending'
+      `;
+      compliance.pending_audits = auditRows[0]?.count || 0;
+    } catch {
+      // hs_audits table doesn't exist yet - use 0
     }
 
     // 5. Get maintenance ticket counts
