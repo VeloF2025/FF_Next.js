@@ -20,6 +20,11 @@ import type {
   ExtractedLineItem,
   ExtractedTotals,
 } from '../types/extraction.types';
+import {
+  getVlmFewShotExamples,
+  buildVlmFewShotPrompt,
+  recordCorrectExtraction,
+} from '@/services/vlmLearningService';
 
 // ============================================================================
 // CONFIGURATION
@@ -100,6 +105,7 @@ IMPORTANT for line items:
 
 /**
  * Extract quote information from a document image using VLM
+ * Enhanced with few-shot learning from past corrections
  */
 export async function extractQuoteFromImage(
   imageBase64: string,
@@ -120,8 +126,26 @@ export async function extractQuoteFromImage(
       ? imageBase64
       : `data:image/jpeg;base64,${imageBase64}`;
 
-    // Call VLM API
-    const response = await callVlmApi(imageDataUrl);
+    // Get few-shot examples from past corrections (non-blocking)
+    let enhancedPrompt = QUOTE_EXTRACTION_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'procurement',
+        analysisType: 'quote_line_item',
+        maxExamples: 2,
+        prioritizeCanonical: true,
+      });
+      if (examples.length > 0) {
+        const fewShotSection = buildVlmFewShotPrompt(examples);
+        enhancedPrompt = `${QUOTE_EXTRACTION_PROMPT}\n\n${fewShotSection}`;
+        log.debug('[QuoteExtraction] Injected few-shot examples');
+      }
+    } catch (fewShotError) {
+      log.warn('[QuoteExtraction] Few-shot retrieval failed', { error: fewShotError });
+    }
+
+    // Call VLM API with enhanced prompt
+    const response = await callVlmApi(imageDataUrl, enhancedPrompt);
 
     if (!response) {
       return createErrorResult('VLM API returned no response', startTime);
@@ -139,6 +163,13 @@ export async function extractQuoteFromImage(
       lineItemCount: extraction.lineItems?.length || 0,
       total: extraction.totals?.total,
     });
+
+    // Record successful extraction metric (non-blocking)
+    if (extraction.lineItems && extraction.lineItems.length > 0) {
+      recordCorrectExtraction('procurement', 'quote_line_item', 0.8).catch(() => {
+        // Silently ignore metric recording failures
+      });
+    }
 
     return {
       ...extraction,
@@ -275,7 +306,7 @@ export async function extractQuoteFromMultipleImages(
 // VLM API CALL
 // ============================================================================
 
-async function callVlmApi(imageDataUrl: string): Promise<string | null> {
+async function callVlmApi(imageDataUrl: string, customPrompt?: string): Promise<string | null> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
 
@@ -286,7 +317,7 @@ async function callVlmApi(imageDataUrl: string): Promise<string | null> {
         {
           role: 'user',
           content: [
-            { type: 'text', text: QUOTE_EXTRACTION_PROMPT },
+            { type: 'text', text: customPrompt || QUOTE_EXTRACTION_PROMPT },
             { type: 'image_url', image_url: { url: imageDataUrl } },
           ],
         },

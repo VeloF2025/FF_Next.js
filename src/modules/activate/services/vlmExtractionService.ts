@@ -25,6 +25,11 @@ import {
   type BlurDetectionResult,
   type PreprocessResult,
 } from './imagePreprocessService';
+import {
+  getVlmFewShotExamples,
+  buildVlmFewShotPrompt,
+  recordCorrectExtraction,
+} from '@/services/vlmLearningService';
 
 // Feature flag for barcode extraction
 const ENABLE_BARCODE_EXTRACTION = process.env.ENABLE_BARCODE_EXTRACTION !== 'false'; // Enabled by default
@@ -454,6 +459,7 @@ async function preprocessForVlm(
 
 /**
  * Extract power meter reading from Step 7 photo
+ * Enhanced with few-shot learning from past corrections
  */
 export async function extractPowerMeterReading(photoUrl: string): Promise<PowerMeterExtraction> {
   log.debug('VlmExtraction', `Extracting power meter reading from ${photoUrl}`);
@@ -465,12 +471,30 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
     const preprocessed = await preprocessForVlm(base64, 'Power meter');
     base64 = preprocessed.base64;
 
+    // Get few-shot examples from past corrections (non-blocking)
+    let enhancedPrompt = POWER_METER_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'activate',
+        analysisType: 'power_meter_dbm',
+        maxExamples: 2,
+        prioritizeCanonical: true,
+      });
+      if (examples.length > 0) {
+        const fewShotSection = buildVlmFewShotPrompt(examples);
+        enhancedPrompt = `${POWER_METER_PROMPT}\n\n${fewShotSection}`;
+        log.debug('VlmExtraction', `Injected ${examples.length} few-shot examples for power meter`);
+      }
+    } catch (fewShotError) {
+      log.warn('VlmExtraction', `Few-shot retrieval failed: ${fewShotError}`);
+    }
+
     const result = await callVlmExtraction<{
       found: boolean;
       value: number | null;
       rawText: string | null;
       confidence: number;
-    }>(base64, POWER_METER_PROMPT, 'Power meter extraction');
+    }>(base64, enhancedPrompt, 'Power meter extraction');
 
     if (!result.success || !result.data) {
       return {
@@ -484,6 +508,13 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
     }
 
     const { found, value, rawText, confidence } = result.data;
+
+    // Record successful extraction metric (non-blocking)
+    if (found && value !== null && confidence >= 0.7) {
+      recordCorrectExtraction('activate', 'power_meter_dbm', confidence).catch(() => {
+        // Silently ignore metric recording failures
+      });
+    }
 
     return {
       success: found && value !== null,
@@ -509,15 +540,34 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
 
 /**
  * Extract ONT serial from Step 6 photo (back of ONT) using VLM only
+ * Enhanced with few-shot learning from past corrections
  * (Internal function - use extractOntSerialFromBack for barcode-first approach)
  */
 async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExtraction> {
+  // Get few-shot examples from past corrections (non-blocking)
+  let enhancedPrompt = ONT_SERIAL_BACK_PROMPT;
+  try {
+    const examples = await getVlmFewShotExamples({
+      module: 'activate',
+      analysisType: 'ont_serial_back',
+      maxExamples: 3,
+      prioritizeCanonical: true,
+    });
+    if (examples.length > 0) {
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      enhancedPrompt = `${ONT_SERIAL_BACK_PROMPT}\n\n${fewShotSection}`;
+      log.debug('VlmExtraction', `Injected ${examples.length} few-shot examples for ONT serial`);
+    }
+  } catch (fewShotError) {
+    log.warn('VlmExtraction', `Few-shot retrieval failed: ${fewShotError}`);
+  }
+
   const result = await callVlmExtraction<{
     found: boolean;
     serial: string | null;
     rawText: string | null;
     confidence: number;
-  }>(base64, ONT_SERIAL_BACK_PROMPT, 'ONT serial back extraction');
+  }>(base64, enhancedPrompt, 'ONT serial back extraction');
 
   if (!result.success || !result.data) {
     return {
@@ -539,6 +589,13 @@ async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExt
 
   if (found && serial && !isValid) {
     log.warn('VlmExtraction', `VLM returned invalid serial "${serial}" (likely SSID or wrong field)`);
+  }
+
+  // Record successful extraction metric (non-blocking)
+  if (found && isValid && confidence >= 0.7) {
+    recordCorrectExtraction('activate', 'ont_serial_back', confidence).catch(() => {
+      // Silently ignore metric recording failures
+    });
   }
 
   return {

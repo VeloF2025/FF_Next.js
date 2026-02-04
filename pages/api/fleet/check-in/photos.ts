@@ -21,6 +21,7 @@ import path from 'path';
 import FormData from 'form-data';
 import { log } from '@/lib/logger';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { recordVlmCorrection } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -212,6 +213,30 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                   ${checkRecord.driver_id}
                 )
               `;
+
+              // Record VLM correction for learning (non-blocking)
+              if (originalVlmValue && overrideValue) {
+                recordVlmCorrection({
+                  module: 'fleet',
+                  analysisType: 'odometer',
+                  sourceId: recordId,
+                  sourceTable: 'fleet_check_records',
+                  photoUrl: storage.url,
+                  vlmExtractedValue: originalVlmValue,
+                  correctedValue: overrideValue,
+                  correctionReason: 'digit_confusion',
+                  correctionNotes: overrideReason || 'Manual verification override',
+                  context: {
+                    vehicleId: checkRecord.vehicle_id,
+                    recordId,
+                    photoId: photo.id,
+                  },
+                  correctedByName: checkRecord.driver_name,
+                  correctedById: checkRecord.driver_id,
+                }).catch((err) => {
+                  log.error('Failed to record VLM correction', { error: err });
+                });
+              }
 
               log.info('Audit log created for odometer override', {
                 vehicleId: checkRecord.vehicle_id,

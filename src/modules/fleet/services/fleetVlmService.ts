@@ -19,6 +19,11 @@ import {
   LicenseDiskExtractionResult,
   VlmAnalysisType,
 } from '../types/check-in.types';
+import {
+  getVlmFewShotExamples,
+  buildVlmFewShotPrompt,
+  recordCorrectExtraction,
+} from '@/services/vlmLearningService';
 
 // Database connection for calibration queries
 const sql = neon(process.env.DATABASE_URL!);
@@ -493,6 +498,7 @@ function parseVlmJson<T>(content: string): T {
 /**
  * Extract odometer reading from dashboard photo with multi-pass verification
  * Runs extraction twice and compares results to catch digit confusion errors
+ * Now enhanced with few-shot learning from past corrections
  * @param base64Image - Base64-encoded image of the dashboard/odometer
  * @returns Odometer reading result with verification metadata
  */
@@ -500,10 +506,32 @@ export async function extractOdometerReading(
   base64Image: string
 ): Promise<OdometerExtractionResult> {
   try {
-    log.info('FleetVlmService', 'Extracting odometer reading (multi-pass)...');
+    log.info('FleetVlmService', 'Extracting odometer reading (multi-pass with few-shot)...');
+
+    // Get few-shot examples from past corrections (non-blocking, don't fail if unavailable)
+    let fewShotSection = '';
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'fleet',
+        analysisType: 'odometer',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      if (examples.length > 0) {
+        fewShotSection = buildVlmFewShotPrompt(examples);
+        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for odometer`);
+      }
+    } catch (fewShotError) {
+      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+    }
+
+    // Build enhanced prompt with few-shot examples
+    const enhancedPrompt = fewShotSection
+      ? `${ODOMETER_PROMPT}\n\n${fewShotSection}`
+      : ODOMETER_PROMPT;
 
     // First pass
-    const content1 = await callVlmApi(base64Image, ODOMETER_PROMPT, 'odometer');
+    const content1 = await callVlmApi(base64Image, enhancedPrompt, 'odometer');
     const result1 = parseVlmJson<{
       reading: number | null;
       confidence: number;
@@ -525,7 +553,7 @@ export async function extractOdometerReading(
     }
 
     // Second pass for verification (catches digit confusion)
-    const content2 = await callVlmApi(base64Image, ODOMETER_PROMPT, 'odometer');
+    const content2 = await callVlmApi(base64Image, enhancedPrompt, 'odometer');
     const result2 = parseVlmJson<{
       reading: number | null;
       confidence: number;
@@ -570,6 +598,13 @@ export async function extractOdometerReading(
     const finalConfidence = readingsMatch
       ? Math.min(bestResult.confidence + 0.05, 1.0) // Boost confidence if both passes agree
       : Math.max(bestResult.confidence - 0.1, 0.5); // Reduce if they disagree
+
+    // Record successful extraction metric (non-blocking)
+    if (bestResult.reading && finalConfidence >= 0.7) {
+      recordCorrectExtraction('fleet', 'odometer', finalConfidence).catch(() => {
+        // Silently ignore metric recording failures
+      });
+    }
 
     return {
       reading: bestResult.reading,
