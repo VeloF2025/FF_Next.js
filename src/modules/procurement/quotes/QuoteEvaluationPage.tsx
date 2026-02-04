@@ -231,10 +231,10 @@ const QuoteEvaluationPage: React.FC = () => {
             <span className="text-gray-500"> / {evaluation.totalQuotes} evaluated</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full" 
-              style={{ 
-                width: `${(evaluation.evaluatedQuotes / evaluation.totalQuotes) * 100}%` 
+            <div
+              className="bg-blue-600 h-2 rounded-full"
+              style={{
+                width: `${evaluation.totalQuotes > 0 ? (evaluation.evaluatedQuotes / evaluation.totalQuotes) * 100 : 0}%`
               }}
             />
           </div>

@@ -113,26 +113,26 @@
     "ad15e5c4-d347-435d-b9e8-823429386fdc": {
       "session_id": "ad15e5c4-d347-435d-b9e8-823429386fdc",
       "started_at": "2026-02-04T16:23:17.168Z",
-      "total_input_tokens": 12518,
+      "total_input_tokens": 13385,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.037554000000000004,
-      "tool_calls": 196,
+      "total_cost_usd": 0.04015500000000002,
+      "tool_calls": 223,
       "tools_used": {
-        "Read": 17,
+        "Read": 21,
         "Glob": 11,
-        "Bash": 59,
+        "Bash": 62,
         "TaskCreate": 8,
         "TaskUpdate": 7,
-        "Grep": 6,
+        "Grep": 9,
         "mcp__claude-in-chrome__tabs_context_mcp": 2,
         "mcp__claude-in-chrome__tabs_create_mcp": 1,
-        "mcp__claude-in-chrome__navigate": 12,
-        "mcp__claude-in-chrome__computer": 51,
-        "mcp__claude-in-chrome__read_console_messages": 1,
+        "mcp__claude-in-chrome__navigate": 15,
+        "mcp__claude-in-chrome__computer": 62,
+        "mcp__claude-in-chrome__read_console_messages": 2,
         "mcp__claude-in-chrome__read_network_requests": 3,
-        "Edit": 14,
+        "Edit": 15,
         "Write": 2,
-        "mcp__claude-in-chrome__javascript_tool": 2
+        "mcp__claude-in-chrome__javascript_tool": 3
       }
     },
     "84674933-1e58-458b-852d-f2850de9c365": {
