@@ -11,9 +11,9 @@ const sql = neon(process.env.DATABASE_URL || '');
 
 async function getContractors(): Promise<Contractor[]> {
   try {
+    // Show all contractors - suspended ones can be filtered in UI
     const rows = await sql`
       SELECT * FROM contractors
-      WHERE is_active = true
       ORDER BY created_at DESC
     `;
 

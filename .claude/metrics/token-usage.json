@@ -224,16 +224,18 @@
     "46e59b81-00b6-4d2f-a839-ef192b5bdb2b": {
       "session_id": "46e59b81-00b6-4d2f-a839-ef192b5bdb2b",
       "started_at": "2026-02-05T12:46:14.276Z",
-      "total_input_tokens": 3188,
+      "total_input_tokens": 4530,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.009564,
-      "tool_calls": 26,
+      "total_cost_usd": 0.01359,
+      "tool_calls": 69,
       "tools_used": {
-        "Grep": 4,
-        "Glob": 1,
-        "Read": 7,
-        "Edit": 5,
-        "Bash": 9
+        "Grep": 12,
+        "Glob": 10,
+        "Read": 13,
+        "Edit": 7,
+        "Bash": 24,
+        "mcp__claude-in-chrome__tabs_context_mcp": 1,
+        "mcp__claude-in-chrome__computer": 2
       }
     }
   }

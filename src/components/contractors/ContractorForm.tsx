@@ -46,7 +46,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
 
     // Status
     status: contractor?.status || 'pending',
-    isActive: contractor?.isActive !== undefined ? contractor.isActive : false,
+    isActive: contractor?.isActive !== undefined ? contractor.isActive : true, // Default to active for new contractors
     complianceStatus: contractor?.complianceStatus || 'pending',
 
     // Professional
