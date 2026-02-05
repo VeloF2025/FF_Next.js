@@ -47,6 +47,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
       const response = await fetch('/api/contractors-update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           id,
           isActive: false,
@@ -87,6 +88,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
       const response = await fetch('/api/contractors-delete', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ id }),
       });
 
