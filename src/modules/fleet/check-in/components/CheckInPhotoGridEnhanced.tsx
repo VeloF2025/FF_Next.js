@@ -67,44 +67,22 @@ export function CheckInPhotoGridEnhanced({
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) {
-      toast.error('No file selected');
-      return;
-    }
-
-    // Debug: Show file received
-    toast.success(`Photo received: ${Math.round(file.size / 1024)}KB`, { duration: 2000 });
+    if (!file) return;
 
     // Convert to data URL
     const reader = new FileReader();
 
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      if (!dataUrl) {
-        toast.error('Failed to read photo');
-        return;
-      }
-
-      // Debug: Show dataUrl created
-      toast.success('Processing photo...', { duration: 1500 });
+      if (!dataUrl) return;
 
       // Call onPhotoCapture IMMEDIATELY - don't wait for GPS
-      // GPS will be captured separately if needed
+      // GPS blocking was causing photos to not appear on mobile
       onPhotoCapture(type, dataUrl, file, null, null);
-
-      // Try to get GPS in background (for logging purposes only)
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          () => { /* GPS available but we already captured the photo */ },
-          () => { /* GPS failed, that's fine */ },
-          { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
-        );
-      }
     };
 
-    reader.onerror = (error) => {
-      toast.error(`Read error: ${error}`);
-      console.error('Failed to read photo file', error);
+    reader.onerror = () => {
+      toast.error('Failed to read photo');
     };
 
     reader.readAsDataURL(file);
