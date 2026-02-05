@@ -971,6 +971,28 @@ export interface TechnicianLeaderboardEntry {
 }
 
 /**
+ * Installer leaderboard entry (from 1Map data)
+ */
+export interface InstallerLeaderboardEntry {
+  /** Rank position */
+  rank: number;
+  /** Installer name (from 1Map) */
+  installer_name: string;
+  /** Project(s) */
+  projects: string[];
+  /** Total installations */
+  total_installations: number;
+  /** Has WhatsApp submission */
+  has_wa_submission: number;
+  /** WA submission rate (0-100) */
+  wa_submission_rate: number;
+  /** Is activated on OES */
+  is_activated: number;
+  /** Activation rate (0-100) */
+  activation_rate: number;
+}
+
+/**
  * Team comparison metrics
  */
 export interface TeamComparisonEntry {
@@ -1021,8 +1043,10 @@ export interface TeamPerformanceResponse {
   };
   /** Project filter (if any) */
   project: string | null;
-  /** Technician leaderboard */
+  /** Activator leaderboard (WhatsApp submitters) */
   leaderboard: TechnicianLeaderboardEntry[];
+  /** Installer leaderboard (from 1Map) */
+  installerLeaderboard: InstallerLeaderboardEntry[];
   /** Team comparison */
   teams: TeamComparisonEntry[];
   /** Compliance metrics */
@@ -1030,10 +1054,12 @@ export interface TeamPerformanceResponse {
   /** Summary */
   summary: {
     total_technicians: number;
+    total_installers: number;
     total_teams: number;
     avg_first_pass_rate: number;
     avg_serial_compliance: number;
     top_performer: string | null;
+    top_installer: string | null;
   };
 }
 

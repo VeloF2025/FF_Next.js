@@ -842,6 +842,7 @@ import type {
   ProcessingTimeMetrics,
   TeamPerformanceResponse,
   TechnicianLeaderboardEntry,
+  InstallerLeaderboardEntry,
   TeamComparisonEntry,
   ComplianceMetrics,
   OfflineDevicesReportResponse,
@@ -1482,6 +1483,47 @@ export async function getTeamPerformanceReport(
       };
     });
 
+    // Get installer leaderboard from drops (1Map data)
+    const installerResult = await pool.query(
+      `
+      SELECT
+        d.installed_by_name as installer_name,
+        ARRAY_AGG(DISTINCT p.project_name) FILTER (WHERE p.project_name IS NOT NULL) as projects,
+        COUNT(DISTINCT d.drop_number) as total_installations,
+        COUNT(DISTINCT d.drop_number) FILTER (WHERE upr.drop_number IS NOT NULL) as has_wa_submission,
+        COUNT(DISTINCT d.drop_number) FILTER (WHERE oes.drop_number IS NOT NULL) as is_activated
+      FROM drops d
+      LEFT JOIN projects p ON d.project_id = p.id
+      LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
+      LEFT JOIN oes_activations oes ON d.drop_number = oes.drop_number
+      WHERE d.installed_by_name IS NOT NULL
+        AND d.installed_by_name != ''
+        AND d.installed_at >= $1::DATE
+        AND d.installed_at <= $2::DATE
+        AND ($3::TEXT IS NULL OR p.project_name = $3)
+      GROUP BY d.installed_by_name
+      ORDER BY total_installations DESC
+      `,
+      [dateFrom, dateTo, project || null]
+    );
+
+    const installerLeaderboard: InstallerLeaderboardEntry[] = installerResult.rows.map((row, idx) => {
+      const total = parseInt(row.total_installations, 10) || 0;
+      const hasWa = parseInt(row.has_wa_submission, 10) || 0;
+      const activated = parseInt(row.is_activated, 10) || 0;
+
+      return {
+        rank: idx + 1,
+        installer_name: row.installer_name,
+        projects: row.projects || [],
+        total_installations: total,
+        has_wa_submission: hasWa,
+        wa_submission_rate: total > 0 ? Math.round((hasWa / total) * 100) : 0,
+        is_activated: activated,
+        activation_rate: total > 0 ? Math.round((activated / total) * 100) : 0,
+      };
+    });
+
     // Get team comparison from OES
     const teamsResult = await pool.query(
       `
@@ -1588,19 +1630,23 @@ export async function getTeamPerformanceReport(
         ? Math.round(leaderboard.reduce((sum, t) => sum + t.serial_compliance, 0) / leaderboard.length)
         : 0;
     const topPerformer = leaderboard[0]?.user_name || null;
+    const topInstaller = installerLeaderboard[0]?.installer_name || null;
 
     return {
       date_range: { from: dateFrom, to: dateTo },
       project: project || null,
       leaderboard,
+      installerLeaderboard,
       teams,
       compliance,
       summary: {
         total_technicians: leaderboard.length,
+        total_installers: installerLeaderboard.length,
         total_teams: teams.length,
         avg_first_pass_rate: avgFirstPass,
         avg_serial_compliance: avgSerial,
         top_performer: topPerformer,
+        top_installer: topInstaller,
       },
     };
   } catch (error) {
