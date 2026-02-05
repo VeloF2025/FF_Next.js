@@ -114,6 +114,23 @@ export function CheckInForm({
     }
   };
 
+  // Handle check type change with confirmation if photos exist
+  const handleCheckTypeChange = (newType: CheckType) => {
+    // Don't do anything if already on this type
+    if (newType === checkType) return;
+
+    // If there are photos, warn the user
+    const hasPhotos = formState.photos.size > 0;
+    if (hasPhotos) {
+      const confirmed = window.confirm(
+        `Switching to ${newType === 'daily' ? 'Daily' : 'Weekly'} check will clear your captured photos. Continue?`
+      );
+      if (!confirmed) return;
+    }
+
+    setCheckType(newType);
+  };
+
   // Group items by category (only for weekly checks)
   const itemsByCategory = template?.items.reduce((acc, item) => {
     const category = item.category || 'other';
@@ -170,7 +187,7 @@ export function CheckInForm({
         <div className="mt-4 flex gap-2">
           <button
             type="button"
-            onClick={() => setCheckType('daily')}
+            onClick={() => handleCheckTypeChange('daily')}
             className={`flex-1 py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
               checkType === 'daily'
                 ? 'bg-blue-500 text-white'
@@ -182,7 +199,7 @@ export function CheckInForm({
           </button>
           <button
             type="button"
-            onClick={() => setCheckType('weekly')}
+            onClick={() => handleCheckTypeChange('weekly')}
             className={`flex-1 py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
               checkType === 'weekly'
                 ? 'bg-purple-500 text-white'

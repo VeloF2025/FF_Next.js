@@ -61,38 +61,44 @@ export function CheckInPhotoGridEnhanced({
     }
   };
 
-  const handleFileChange = async (
+  const handleFileChange = (
     type: CheckPhotoType,
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Capture GPS coordinates
-    let latitude: number | null = null;
-    let longitude: number | null = null;
-
-    if (navigator.geolocation) {
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 0,
-          });
-        });
-        latitude = position.coords.latitude;
-        longitude = position.coords.longitude;
-      } catch {
-        // GPS not available or denied - continue without coordinates
-      }
-    }
-
-    // Convert to data URL
+    // Convert to data URL FIRST - don't block on GPS
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      onPhotoCapture(type, dataUrl, file, latitude, longitude);
+      if (!dataUrl) return;
+
+      // Capture GPS coordinates in background (non-blocking)
+      // Photo appears immediately, GPS coords added if available
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            // Got GPS - call with coordinates
+            onPhotoCapture(type, dataUrl, file, position.coords.latitude, position.coords.longitude);
+          },
+          () => {
+            // GPS failed or denied - still capture photo without coords
+            onPhotoCapture(type, dataUrl, file, null, null);
+          },
+          {
+            enableHighAccuracy: false, // Faster on mobile
+            timeout: 3000, // Shorter timeout
+            maximumAge: 60000, // Accept cached position up to 1 min old
+          }
+        );
+      } else {
+        // No geolocation support - capture without coords
+        onPhotoCapture(type, dataUrl, file, null, null);
+      }
+    };
+    reader.onerror = () => {
+      console.error('Failed to read photo file');
     };
     reader.readAsDataURL(file);
 

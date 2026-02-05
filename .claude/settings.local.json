@@ -1197,7 +1197,9 @@
       "Bash(do echo \"$f\")",
       "Bash(export DATABASE_URL:*)",
       "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require' npx tsx:*)",
-      "Bash(AUDIT_ENV=development npx tsx:*)"
+      "Bash(AUDIT_ENV=development npx tsx:*)",
+      "Bash(docker ps:*)",
+      "Bash(do echo '=== $dr ===' curl -s http://100.96.203.105:8003/api/record/$dr)"
     ],
     "deny": [],
     "ask": [],

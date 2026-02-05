@@ -321,39 +321,69 @@ export default function VehiclePortalPage() {
     setScanningReceipt(true);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1];
-
-        const response = await fetch(
-          `/api/fleet/vehicles/${verifiedVehicle?.id}/fuel-transactions?action=scan`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ receiptPhotoBase64: base64 }),
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64Part = result.split(',')[1];
+          if (!base64Part) {
+            reject(new Error('Failed to convert file to base64'));
+            return;
           }
-        );
+          resolve(base64Part);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          const results = data.data?.vlmResults?.receipt;
-
-          if (results) {
-            setFuelForm((prev) => ({
-              ...prev,
-              transactionDate: results.date || prev.transactionDate,
-              amountRand: results.amountRand?.toString() || prev.amountRand,
-              litres: results.litres?.toString() || prev.litres,
-              pricePerLitre: results.pricePerLitre?.toString() || prev.pricePerLitre,
-              stationName: results.stationName || prev.stationName,
-            }));
-            toast.success(
-              `Receipt scanned (${Math.round((results.confidence || 0) * 100)}% confidence)`
-            );
-          }
+      const response = await fetch(
+        `/api/fleet/vehicles/${verifiedVehicle?.id}/fuel-transactions?action=scan`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ receiptPhotoBase64: base64 }),
         }
-      };
-      reader.readAsDataURL(file);
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = data.error?.message || data.message || 'Scan failed';
+        toast.error(`Receipt scan error: ${errorMsg}`);
+        return;
+      }
+
+      const results = data.data?.vlmResults?.receipt;
+
+      if (!results) {
+        toast.error('No data extracted from receipt');
+        return;
+      }
+
+      if (results.error) {
+        toast.error(`VLM error: ${results.error}`);
+        return;
+      }
+
+      // Check if any meaningful data was extracted
+      const hasData = results.amountRand || results.litres || results.stationName;
+      if (!hasData) {
+        toast.error('Could not read receipt. Please enter values manually.');
+        return;
+      }
+
+      setFuelForm((prev) => ({
+        ...prev,
+        transactionDate: results.date || prev.transactionDate,
+        amountRand: results.amountRand?.toString() || prev.amountRand,
+        litres: results.litres?.toString() || prev.litres,
+        pricePerLitre: results.pricePerLitre?.toString() || prev.pricePerLitre,
+        stationName: results.stationName || prev.stationName,
+      }));
+      toast.success(
+        `Receipt scanned (${Math.round((results.confidence || 0) * 100)}% confidence)`
+      );
     } catch (err) {
       toast.error('Failed to scan receipt');
     } finally {
@@ -363,20 +393,28 @@ export default function VehiclePortalPage() {
 
   // Upload photo to server
   const uploadPhoto = async (file: File, folder: string): Promise<string | null> => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', folder);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', folder);
 
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
+      const response = await fetch('/api/fleet/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (response.ok) {
       const data = await response.json();
-      return data.data?.url || data.url || null;
+
+      if (!response.ok) {
+        console.error('Upload failed:', data.error?.message);
+        return null;
+      }
+
+      return data.data?.url || null;
+    } catch (error) {
+      console.error('Upload error:', error);
+      return null;
     }
-    return null;
   };
 
   // Submit fuel transaction
