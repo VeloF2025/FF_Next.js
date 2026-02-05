@@ -30,8 +30,8 @@ import { ProjectMaintenanceTab } from './detail/ProjectMaintenanceTab';
 import { ProjectAgreementsTab } from './detail/ProjectAgreementsTab';
 // Wayleaves tab
 import { ProjectWayleavesTab } from './detail/ProjectWayleavesTab';
-// Finance Dashboard
-import { FinanceDashboardTab } from '@/modules/projects/components/finance';
+// Finance Dashboard - Direct import to avoid pulling in server-only dependencies
+import { FinanceDashboardTab } from '@/modules/projects/components/finance/FinanceDashboardTab';
 // Income Tab (lazy load)
 import dynamic from 'next/dynamic';
 const ProjectIncomeTab = dynamic(
