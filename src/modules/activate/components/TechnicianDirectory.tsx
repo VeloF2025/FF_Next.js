@@ -27,6 +27,9 @@ import {
   BarChart3,
   Zap,
   Eye,
+  Pencil,
+  X,
+  Save,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -48,6 +51,7 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
   const [typeFilter, setTypeFilter] = useState<TechnicianType | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTechnician, setEditingTechnician] = useState<TechnicianSummary | null>(null);
 
   const fetchTechnicians = useCallback(async () => {
     setIsLoading(true);
@@ -340,13 +344,24 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewTechnician?.(tech.id)}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingTechnician(tech)}
+                          title="Edit technician"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onViewTechnician?.(tech.id)}
+                          title="View details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -366,7 +381,191 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
         />
       )}
 
-      {/* Add Modal would go here */}
+      {/* Edit Modal */}
+      {editingTechnician && (
+        <EditTechnicianModal
+          technician={editingTechnician}
+          onClose={() => setEditingTechnician(null)}
+          onSave={async (updated) => {
+            await fetchTechnicians();
+            setEditingTechnician(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+interface EditTechnicianModalProps {
+  technician: TechnicianSummary;
+  onClose: () => void;
+  onSave: (technician: TechnicianSummary) => void;
+}
+
+function EditTechnicianModal({ technician, onClose, onSave }: EditTechnicianModalProps) {
+  const [formData, setFormData] = useState({
+    name: technician.name || '',
+    type: technician.type || 'activator',
+    contractor: technician.contractor || '',
+    status: technician.status || 'active',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/technicians', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id: technician.id,
+          name: formData.name || null,
+          type: formData.type,
+          contractor: formData.contractor || null,
+          status: formData.status,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update technician');
+      }
+
+      onSave({ ...technician, ...formData });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-[var(--ff-bg-primary)] rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ff-border-light)]">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            Edit Technician
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {/* Phone (read-only) */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              Phone / WhatsApp ID
+            </label>
+            <div className="px-3 py-2 bg-[var(--ff-bg-tertiary)] rounded-lg text-[var(--ff-text-tertiary)] text-sm">
+              {technician.phone || 'N/A'}
+            </div>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+              This is the identifier from WhatsApp submissions
+            </p>
+          </div>
+
+          {/* Formal Name */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              Formal Name
+            </label>
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Enter the technician's real name"
+            />
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+              Map this phone/ID to a human-readable name
+            </p>
+          </div>
+
+          {/* Type */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              Type
+            </label>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value as TechnicianType })}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+            >
+              <option value="activator">Activator</option>
+              <option value="installer">Installer</option>
+            </select>
+          </div>
+
+          {/* Contractor/Team */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              Contractor / Team
+            </label>
+            <Input
+              value={formData.contractor}
+              onChange={(e) => setFormData({ ...formData, contractor: e.target.value })}
+              placeholder="e.g., ACME Installations"
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              Status
+            </label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+          <Button variant="outline" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Save Changes
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
