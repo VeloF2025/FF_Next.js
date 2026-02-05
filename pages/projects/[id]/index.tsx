@@ -1,12 +1,7 @@
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-
-const ProjectDetail = dynamic(() => import('@/pages/ProjectDetail').then(mod => mod.ProjectDetail || mod.default), {
-  ssr: false,
-  loading: () => <div>Loading project...</div>
-});
+import { ProjectDetail } from '@/pages/ProjectDetail';
 
 // UUID v4 regex for validating project IDs
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
