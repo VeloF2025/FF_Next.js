@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Eye, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Eye, Edit, Trash2, Ban } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import type { Contractor } from '@/types/contractor.core.types';
 import { CONTRACTOR_STATUSES, COMPLIANCE_STATUSES } from '@/types/contractor.core.types';
@@ -22,7 +22,7 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
   const router = useRouter();
   const [contractors, setContractors] = useState(initialContractors);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   // Filter contractors based on search
   const filteredContractors = contractors.filter((c) => {
@@ -36,15 +36,14 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
     );
   });
 
-  const handleDelete = async (id: string, companyName: string) => {
-    if (!confirm(`Suspend contractor "${companyName}"? They will be hidden from the active list.`)) {
+  const handleSuspend = async (id: string, companyName: string) => {
+    if (!confirm(`Suspend contractor "${companyName}"?\n\nThey will be hidden from the active list but can be reactivated later.`)) {
       return;
     }
 
-    setIsDeleting(id);
+    setIsProcessing(id);
 
     try {
-      // Use flat endpoint workaround for Vercel's dynamic route issues
       const response = await fetch('/api/contractors-update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -68,7 +67,45 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
       const message = error instanceof Error ? error.message : 'Failed to suspend contractor';
       notificationService.error(message);
     } finally {
-      setIsDeleting(null);
+      setIsProcessing(null);
+    }
+  };
+
+  const handleDelete = async (id: string, companyName: string) => {
+    if (!confirm(`PERMANENTLY DELETE contractor "${companyName}"?\n\n⚠️ This action cannot be undone!\n\nAll associated documents and onboarding data will also be deleted.`)) {
+      return;
+    }
+
+    // Double confirmation for permanent delete
+    if (!confirm(`Are you absolutely sure you want to delete "${companyName}"?\n\nType reasoning: This is a TEST/DEMO contractor that should be removed.`)) {
+      return;
+    }
+
+    setIsProcessing(id);
+
+    try {
+      const response = await fetch('/api/contractors-delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete contractor');
+      }
+
+      // Remove from local state
+      setContractors(contractors.filter((c) => c.id !== id));
+      notificationService.success(data.message || 'Contractor deleted permanently');
+      router.refresh();
+    } catch (error: unknown) {
+      log.error('Failed to delete contractor', { error, contractorId: id }, 'ContractorsList');
+      const message = error instanceof Error ? error.message : 'Failed to delete contractor';
+      notificationService.error(message);
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -217,10 +254,18 @@ export function ContractorsList({ initialContractors }: ContractorsListProps) {
                         <Edit className="h-4 w-4" />
                       </Link>
                       <button
+                        onClick={() => handleSuspend(contractor.id, contractor.companyName)}
+                        disabled={isProcessing === contractor.id}
+                        className="p-1 text-yellow-400 hover:text-yellow-300 disabled:opacity-50"
+                        title="Suspend (hide from active list)"
+                      >
+                        <Ban className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => handleDelete(contractor.id, contractor.companyName)}
-                        disabled={isDeleting === contractor.id}
+                        disabled={isProcessing === contractor.id}
                         className="p-1 text-red-400 hover:text-red-300 disabled:opacity-50"
-                        title="Delete"
+                        title="Delete permanently"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { neon } from '@neondatabase/serverless';
 import type { Contractor, ContractorFormData, ContractorFilter } from '@/types/contractor.core.types';
 
@@ -168,6 +169,9 @@ export async function POST(req: NextRequest) {
     `;
 
     const mapped = mapDbToContractor(contractor);
+
+    // Revalidate the contractors page cache
+    revalidatePath('/contractors');
 
     return NextResponse.json({ data: mapped }, { status: 201 });
   } catch (error: any) {

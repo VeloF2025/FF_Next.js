@@ -4,6 +4,9 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+
+// Force dynamic rendering - no caching for fresh data on every request
+export const dynamic = 'force-dynamic';
 import type { Contractor } from '@/types/contractor.core.types';
 import { ContractorsList } from '@/components/contractors/ContractorsList';
 

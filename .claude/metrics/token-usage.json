@@ -224,18 +224,22 @@
     "46e59b81-00b6-4d2f-a839-ef192b5bdb2b": {
       "session_id": "46e59b81-00b6-4d2f-a839-ef192b5bdb2b",
       "started_at": "2026-02-05T12:46:14.276Z",
-      "total_input_tokens": 4530,
+      "total_input_tokens": 9040,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.01359,
-      "tool_calls": 69,
+      "total_cost_usd": 0.027119999999999988,
+      "tool_calls": 139,
       "tools_used": {
-        "Grep": 12,
-        "Glob": 10,
-        "Read": 13,
-        "Edit": 7,
-        "Bash": 24,
-        "mcp__claude-in-chrome__tabs_context_mcp": 1,
-        "mcp__claude-in-chrome__computer": 2
+        "Grep": 15,
+        "Glob": 16,
+        "Read": 18,
+        "Edit": 15,
+        "Bash": 31,
+        "mcp__claude-in-chrome__tabs_context_mcp": 2,
+        "mcp__claude-in-chrome__computer": 35,
+        "mcp__claude-in-chrome__navigate": 4,
+        "mcp__claude-in-chrome__read_console_messages": 1,
+        "mcp__claude-in-chrome__read_network_requests": 1,
+        "Write": 1
       }
     }
   }
