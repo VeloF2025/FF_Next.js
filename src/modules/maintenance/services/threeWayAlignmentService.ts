@@ -14,7 +14,7 @@
 
 import { query, queryOne } from '../utils/db';
 import { createLogger } from '@/lib/logger';
-import { FibertimeQContactClient } from './fibertimeQContactClient';
+import { FiberTimeQContactClient } from './fibertimeQContactClient';
 
 const logger = createLogger('maintenance:alignment');
 
@@ -172,7 +172,7 @@ async function getFibreFlowTickets(): Promise<FibreFlowTicketSummary[]> {
  */
 async function getQContactTickets(): Promise<QContactTicketSummary[]> {
   try {
-    const client = new FibertimeQContactClient();
+    const client = new FiberTimeQContactClient();
     const cases = await client.listAllCases(500); // Get up to 500 cases
 
     return cases.map((c: any) => ({
