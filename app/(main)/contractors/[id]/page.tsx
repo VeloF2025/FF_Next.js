@@ -2,6 +2,10 @@
  * Contractor Detail Page - Server Component
  */
 
+// Force dynamic rendering - no caching for fresh data
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { neon } from '@neondatabase/serverless';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
