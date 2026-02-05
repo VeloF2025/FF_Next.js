@@ -92,6 +92,7 @@ export async function getDailyCountsWithBreakdown(
     // Includes pole_no for pole-level breakdown and DR-level details
     // CRITICAL: INNER JOIN to drops - only count DRs that exist in SOW-imported drops table
     // DRs not in drops (like incorrect DR numbers) should NOT be counted
+    // MUST match drops.ts getProjectStats logic: same date field, same filters
     const installedResult = await pool.query(
       `
       SELECT
@@ -104,12 +105,13 @@ export async function getDailyCountsWithBreakdown(
           WHEN upr.feedback_sent = true THEN true
           ELSE false
         END as is_reviewed,
-        COALESCE(upr.submitted_date, upr.created_at::DATE) as installed_at,
+        upr.submitted_date as installed_at,
         upr.qa_decision
       FROM dr_photo_unified_reviews upr
       INNER JOIN drops d ON d.drop_number = upr.drop_number
-      WHERE COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
-        AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+      WHERE upr.submitted_date >= $1::DATE
+        AND upr.submitted_date <= $2::DATE
+        AND (upr.is_oes_only = FALSE OR upr.is_oes_only IS NULL)
         AND ($3::TEXT IS NULL OR upr.project = $3)
       `,
       [dateFrom, dateTo, project || null]
@@ -119,20 +121,22 @@ export async function getDailyCountsWithBreakdown(
     // Uses oes_activations.activation_date (when ONT was activated on OES)
     // Includes pole_no for pole-level breakdown
     // CRITICAL: INNER JOIN to drops - only count DRs that exist in SOW-imported drops table
+    // For project filter: use upr.project if WA submission exists, otherwise use drops->projects
     const activatedResult = await pool.query(
       `
       SELECT DISTINCT
         oes.drop_number,
-        COALESCE(upr.project, 'Unknown') as project,
+        COALESCE(upr.project, p.project_name, 'Unknown') as project,
         COALESCE(d.zone_no, 0) as zone_no,
         COALESCE(d.pon_no, 0) as pon_no,
         d.pole_number as pole_no
       FROM oes_activations oes
       INNER JOIN drops d ON d.drop_number = oes.drop_number
+      LEFT JOIN projects p ON p.id = d.project_id
       LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
       WHERE oes.activation_date >= $1::DATE
         AND oes.activation_date <= $2::DATE
-        AND ($3::TEXT IS NULL OR upr.project = $3 OR upr.project IS NULL)
+        AND ($3::TEXT IS NULL OR upr.project = $3 OR p.project_name = $3)
       `,
       [dateFrom, dateTo, project || null]
     );

@@ -4,10 +4,8 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 interface ClientProject {
   id: string;
@@ -52,6 +50,12 @@ export default async function handler(
 
   if (!id || typeof id !== 'string') {
     return res.status(400).json({ error: 'Client ID is required' });
+  }
+
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    return res.status(400).json({ error: 'Invalid client ID format' });
   }
 
   try {

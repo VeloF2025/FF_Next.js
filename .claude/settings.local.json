@@ -1195,7 +1195,9 @@
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require\" node:*)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require\" node scripts/run-migration-157.js:*)",
       "Bash(do echo \"$f\")",
-      "Bash(export DATABASE_URL:*)"
+      "Bash(export DATABASE_URL:*)",
+      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require' npx tsx:*)",
+      "Bash(AUDIT_ENV=development npx tsx:*)"
     ],
     "deny": [],
     "ask": [],
