@@ -3,10 +3,12 @@
  * Fetches contractors server-side, passes to client components for interactivity
  */
 
-import { neon } from '@neondatabase/serverless';
-
 // Force dynamic rendering - no caching for fresh data on every request
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
+import { neon } from '@neondatabase/serverless';
 import type { Contractor } from '@/types/contractor.core.types';
 import { ContractorsList } from '@/components/contractors/ContractorsList';
 
