@@ -38,8 +38,8 @@ wa-feedback:8092    │  • /send-message         │  • DR submissions      
 | Service | Port | Purpose |
 |---------|------|---------|
 | `whatsapp-bridge` | 8083 | **UNIFIED** - Send + Receive + Groups from DB |
+| `whatsapp-sender` | 8081 | **ACTIVE** - Direct message sending (used for manual acks) |
 | `wa-command-bot` | 8086 | **COMMANDS** - `!status`, `!restart` from admin groups |
-| ~~`whatsapp-sender`~~ | ~~8081~~ | **DISABLED** - Merged into unified bridge |
 
 ```bash
 ssh root@72.61.197.178
@@ -428,6 +428,25 @@ All components use semi-transparent dark-compatible colors:
 - Error boxes: `bg-red-500/10 border border-red-500/30 text-red-400`
 - Phone badges: CSS variables (`--ff-bg-tertiary`, `--ff-text-secondary`)
 
+## Troubleshooting Quick Reference
+
+### Error Code 1033 (Neon Timeout)
+When logs show `[ACK WARN] Acknowledgment API returned 530: error code: 1033`:
+1. **Cause**: Transient Neon PostgreSQL timeout
+2. **Fix**: Restart services: `ssh root@72.61.197.178 "systemctl restart whatsapp-sender whatsapp-bridge"`
+3. **Manual acks**: See `.claude/knowledge-base/wa-monitor/troubleshooting-acks.md`
+
+### WA Sender Endpoint (Port 8081)
+```bash
+curl -s http://72.61.197.178:8081/send-message -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"group_jid":"GROUP@g.us","recipient_jid":"USER@lid","message":"text"}'
+```
+**Required**: `group_jid`, `recipient_jid`, `message`
+
+### WebSocket EOF Errors
+Normal behavior - auto-reconnect handles these. Only worry if constant or messages not delivering.
+
 ## Related Documentation
 - `src/modules/wa-monitor/README.md` - Full module documentation
 - `src/modules/wa-monitor/ISOLATION_GUIDE.md` - Branch and testing strategy
@@ -435,4 +454,5 @@ All components use semi-transparent dark-compatible colors:
 - `src/modules/wa-monitor/TROUBLESHOOTING.md` - Common issues
 - `docs/wa-monitor/WHATSAPP_ARCHITECTURE.md` - Infrastructure details
 - `.claude/agents/wa-agent.md` - WA Agent for troubleshooting
+- `.claude/knowledge-base/wa-monitor/troubleshooting-acks.md` - ACK troubleshooting (error 1033, manual acks)
 - `src/modules/communications/whatsapp/` - WhatsApp Portal admin UI
