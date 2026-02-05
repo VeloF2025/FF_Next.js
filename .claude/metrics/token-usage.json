@@ -245,10 +245,10 @@
     "1eaf4ce1-cbed-44fd-b438-81d36834094c": {
       "session_id": "1eaf4ce1-cbed-44fd-b438-81d36834094c",
       "started_at": "2026-02-05T16:55:35.733Z",
-      "total_input_tokens": 24666,
+      "total_input_tokens": 25312,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.073998,
-      "tool_calls": 154,
+      "total_cost_usd": 0.07593599999999999,
+      "tool_calls": 155,
       "tools_used": {
         "Glob": 14,
         "Read": 35,
@@ -258,7 +258,7 @@
         "AskUserQuestion": 1,
         "TaskCreate": 5,
         "TaskUpdate": 8,
-        "Write": 3,
+        "Write": 4,
         "Edit": 17,
         "TaskList": 1
       }
@@ -266,17 +266,17 @@
     "ac8d81ed-7cc9-4b7d-ad57-6a4967f090fb": {
       "session_id": "ac8d81ed-7cc9-4b7d-ad57-6a4967f090fb",
       "started_at": "2026-02-05T17:24:16.667Z",
-      "total_input_tokens": 9439,
+      "total_input_tokens": 10778,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.028317000000000002,
-      "tool_calls": 133,
+      "total_cost_usd": 0.032334,
+      "tool_calls": 141,
       "tools_used": {
-        "Read": 49,
+        "Read": 51,
         "Glob": 15,
         "Grep": 15,
-        "Bash": 46,
+        "Bash": 50,
         "Write": 2,
-        "Edit": 6
+        "Edit": 8
       }
     }
   }

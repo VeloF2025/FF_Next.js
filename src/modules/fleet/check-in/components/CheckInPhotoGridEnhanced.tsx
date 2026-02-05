@@ -4,6 +4,7 @@
  */
 
 import React, { useRef } from 'react';
+import toast from 'react-hot-toast';
 import { Camera, X, Check, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { CheckPhotoType, VlmAnalysisType } from '../../types/check-in.types';
 
@@ -66,40 +67,46 @@ export function CheckInPhotoGridEnhanced({
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      toast.error('No file selected');
+      return;
+    }
 
-    // Convert to data URL FIRST - don't block on GPS
+    // Debug: Show file received
+    toast.success(`Photo received: ${Math.round(file.size / 1024)}KB`, { duration: 2000 });
+
+    // Convert to data URL
     const reader = new FileReader();
+
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      if (!dataUrl) return;
+      if (!dataUrl) {
+        toast.error('Failed to read photo');
+        return;
+      }
 
-      // Capture GPS coordinates in background (non-blocking)
-      // Photo appears immediately, GPS coords added if available
+      // Debug: Show dataUrl created
+      toast.success('Processing photo...', { duration: 1500 });
+
+      // Call onPhotoCapture IMMEDIATELY - don't wait for GPS
+      // GPS will be captured separately if needed
+      onPhotoCapture(type, dataUrl, file, null, null);
+
+      // Try to get GPS in background (for logging purposes only)
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
-            // Got GPS - call with coordinates
-            onPhotoCapture(type, dataUrl, file, position.coords.latitude, position.coords.longitude);
-          },
-          () => {
-            // GPS failed or denied - still capture photo without coords
-            onPhotoCapture(type, dataUrl, file, null, null);
-          },
-          {
-            enableHighAccuracy: false, // Faster on mobile
-            timeout: 3000, // Shorter timeout
-            maximumAge: 60000, // Accept cached position up to 1 min old
-          }
+          () => { /* GPS available but we already captured the photo */ },
+          () => { /* GPS failed, that's fine */ },
+          { enableHighAccuracy: false, timeout: 3000, maximumAge: 60000 }
         );
-      } else {
-        // No geolocation support - capture without coords
-        onPhotoCapture(type, dataUrl, file, null, null);
       }
     };
-    reader.onerror = () => {
-      console.error('Failed to read photo file');
+
+    reader.onerror = (error) => {
+      toast.error(`Read error: ${error}`);
+      console.error('Failed to read photo file', error);
     };
+
     reader.readAsDataURL(file);
 
     // Reset input for re-capture
