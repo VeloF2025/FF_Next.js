@@ -166,6 +166,9 @@ const result = await extractOntSerialEnhanced(base64Image);
 - `src/modules/activate/services/enhancedBarcodeService.ts`
 - `src/modules/activate/services/barcodeExtractionService.ts`
 
+## Recent Changes (Feb 2026)
+- **Zone/PON Stats Alignment** (2026-02-05) - Fixed zone/PON totals not matching project totals. Root cause: `drops.ts` and `reportingService.ts` used different date filters and missing `is_oes_only` filter. Fix: aligned `getDailyCountsWithBreakdown()` to use `submitted_date` (no COALESCE) and added `is_oes_only` filter. **CRITICAL**: Multiple APIs showing same data MUST use identical query logic.
+
 ## Recent Changes (Jan 2026)
 - **Typo DR Filtering** (2026-01-30) - `drops.ts` filters out invalid/typo DRs using `EXISTS (SELECT 1 FROM drops d WHERE d.drop_number = u.drop_number)` in **4 query locations**: `getPaginatedDrops`, `calculateSummary`, `getProjectStats`, `processOrphanedRecordsInBackground`. The `drops` table (SOW imports) is the canonical source of valid DRs. All 4 must stay in sync.
 - **Self-Healing Photo Fetch** (2026-01-30) - `processOrphanedRecordsInBackground()` in `drops.ts` detects orphaned DRs (photo_count=0, no wa_message_id, <48h old, in drops table) and fetches photos from BOSS API on each page load (max 5). Fixes Go Bridge dropping ~20% of `process-new-dr` calls.
@@ -226,6 +229,15 @@ Locations in `pages/api/activate/drops.ts`:
 2. `calculateSummary()` installed count
 3. `getProjectStats()` per-project counts
 4. `processOrphanedRecordsInBackground()` orphan detection
+
+**Query Alignment (CRITICAL — drops.ts ↔ reportingService.ts):**
+The zone/PON breakdown (`reportingService.getDailyCountsWithBreakdown`) MUST match `drops.ts` `getProjectStats`:
+| Filter | Required Value |
+|--------|----------------|
+| Date field | `submitted_date` (NOT `COALESCE(submitted_date, created_at)`) |
+| OES filter | `(is_oes_only = FALSE OR is_oes_only IS NULL)` |
+| Valid DRs | `INNER JOIN drops` or `EXISTS (SELECT 1 FROM drops)` |
+| Project | Use `COALESCE(upr.project, p.project_name)` for OES-only records |
 
 **Self-Healing Pipeline:**
 `processOrphanedRecordsInBackground()` runs on each page load (fire-and-forget):

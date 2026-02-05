@@ -224,16 +224,16 @@
     "46e59b81-00b6-4d2f-a839-ef192b5bdb2b": {
       "session_id": "46e59b81-00b6-4d2f-a839-ef192b5bdb2b",
       "started_at": "2026-02-05T12:46:14.276Z",
-      "total_input_tokens": 1504,
+      "total_input_tokens": 3188,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.004512,
-      "tool_calls": 14,
+      "total_cost_usd": 0.009564,
+      "tool_calls": 26,
       "tools_used": {
         "Grep": 4,
         "Glob": 1,
-        "Read": 5,
-        "Edit": 2,
-        "Bash": 2
+        "Read": 7,
+        "Edit": 5,
+        "Bash": 9
       }
     }
   }
