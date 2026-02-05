@@ -95,19 +95,11 @@ export const fleetConfig: ModuleNavigationConfig = {
     },
     {
       id: 'check-in-history',
-      label: 'Check-In History',
-      shortLabel: 'History',
+      label: 'Check-Ins',
+      shortLabel: 'Check-Ins',
       icon: ClipboardList,
       path: '/fleet/check-in/history',
       rbacKey: 'fleet.check-in-history',
-    },
-    {
-      id: 'audit',
-      label: 'Check-In Audit',
-      shortLabel: 'Audit',
-      icon: ClipboardList,
-      path: '/fleet/check-in/audit',
-      rbacKey: 'fleet.check-in-audit',
     },
   ],
 };
