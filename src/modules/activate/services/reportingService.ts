@@ -1428,12 +1428,15 @@ export async function getTeamPerformanceReport(
       project,
     });
 
-    // Get leaderboard data
+    // Get leaderboard data (activators from WhatsApp)
+    // Uses wa_contacts to get formal_name if mapped, otherwise falls back to user_name
     const leaderboardResult = await pool.query(
       `
       SELECT
-        qpr.user_name,
+        COALESCE(wc.formal_name, wc.wa_display_name, qpr.user_name) as user_name,
         qpr.sender_phone,
+        wc.team,
+        wc.role,
         ARRAY_AGG(DISTINCT qpr.project) FILTER (WHERE qpr.project IS NOT NULL) as projects,
         COUNT(*) as total_submissions,
         COUNT(*) FILTER (WHERE upr.submission_count = 1) as first_pass_success,
@@ -1442,10 +1445,11 @@ export async function getTeamPerformanceReport(
         COUNT(*) FILTER (WHERE upr.ups_serial_scanned IS NOT NULL AND upr.ups_serial_scanned != '') as ups_scanned
       FROM qa_photo_reviews qpr
       LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+      LEFT JOIN wa_contacts wc ON qpr.sender_phone = wc.sender_phone
       WHERE COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE >= $1::DATE
         AND COALESCE(qpr.whatsapp_message_date, qpr.created_at)::DATE <= $2::DATE
         AND ($3::TEXT IS NULL OR qpr.project = $3)
-      GROUP BY qpr.user_name, qpr.sender_phone
+      GROUP BY COALESCE(wc.formal_name, wc.wa_display_name, qpr.user_name), qpr.sender_phone, wc.team, wc.role
       ORDER BY total_submissions DESC
       `,
       [dateFrom, dateTo, project || null]
@@ -1462,6 +1466,8 @@ export async function getTeamPerformanceReport(
         rank: idx + 1,
         user_name: row.user_name,
         sender_phone: row.sender_phone,
+        team: row.team || null,
+        role: row.role || 'activator',
         projects: row.projects || [],
         total_submissions: total,
         first_pass_success: firstPass,

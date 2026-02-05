@@ -44,126 +44,227 @@ async function handler(
   }
 }
 
-async function handleGet(req: NextApiRequest, res: NextApiResponse) {
-  const { type, status, contractor, project, search, includeStats } = req.query;
+async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+  const { id, type, status, search, includeStats } = req.query;
 
-  let whereClause = 'WHERE 1=1';
-  const params: any[] = [];
+  // Single technician lookup by ID
+  if (id) {
+    const result = await pool.query(
+      `SELECT
+        wc.id,
+        COALESCE(wc.formal_name, wc.wa_display_name, wc.sender_phone) as name,
+        wc.sender_phone as phone,
+        wc.role as type,
+        wc.team as contractor,
+        CASE WHEN wc.is_active THEN 'active' ELSE 'inactive' END as status,
+        wc.projects,
+        wc.notes,
+        wc.staff_id,
+        wc.created_at,
+        wc.updated_at
+      FROM wa_contacts wc
+      WHERE wc.id = $1`,
+      [String(id)]
+    );
+
+    if (result.rows.length === 0) {
+      return apiResponse.notFound(res, 'Technician', String(id));
+    }
+
+    return apiResponse.success(res, result.rows[0]);
+  }
+
+  // Build query for list with optional stats
+  let query = `
+    SELECT
+      wc.id,
+      COALESCE(wc.formal_name, wc.wa_display_name, wc.sender_phone) as name,
+      wc.sender_phone as phone,
+      wc.role as type,
+      wc.team as contractor,
+      CASE WHEN wc.is_active THEN 'active' ELSE 'inactive' END as status
+  `;
+
+  if (includeStats === 'true') {
+    query += `,
+      COALESCE(stats.total_submissions, 0)::INTEGER as total_submissions,
+      COALESCE(stats.first_pass_rate, 0)::INTEGER as first_pass_rate,
+      COALESCE(stats.serial_compliance, 0)::INTEGER as serial_compliance_rate,
+      stats.last_active::TEXT as last_active_date
+    `;
+  }
+
+  query += ` FROM wa_contacts wc`;
+
+  if (includeStats === 'true') {
+    query += `
+      LEFT JOIN (
+        SELECT
+          qpr.sender_phone,
+          COUNT(*) as total_submissions,
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE upr.submission_count = 1) / NULLIF(COUNT(*), 0)
+          ) as first_pass_rate,
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL) / NULLIF(COUNT(*), 0)
+          ) as serial_compliance,
+          MAX(qpr.created_at) as last_active
+        FROM qa_photo_reviews qpr
+        LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+        GROUP BY qpr.sender_phone
+      ) stats ON wc.sender_phone = stats.sender_phone
+    `;
+  }
+
+  const conditions: string[] = [];
+  const params: (string | boolean)[] = [];
   let paramIndex = 1;
 
-  if (type && typeof type === 'string') {
-    whereClause += ` AND t.type = $${paramIndex++}`;
-    params.push(type);
+  if (type && type !== 'all') {
+    conditions.push(`wc.role = $${paramIndex++}`);
+    params.push(String(type));
   }
 
-  if (status && typeof status === 'string') {
-    whereClause += ` AND t.status = $${paramIndex++}`;
-    params.push(status);
+  if (status && status !== 'all') {
+    const isActive = status === 'active';
+    conditions.push(`wc.is_active = $${paramIndex++}`);
+    params.push(isActive);
   }
 
-  if (contractor && typeof contractor === 'string') {
-    whereClause += ` AND t.contractor = $${paramIndex++}`;
-    params.push(contractor);
-  }
-
-  if (project && typeof project === 'string') {
-    whereClause += ` AND $${paramIndex++} = ANY(t.projects)`;
-    params.push(project);
-  }
-
-  if (search && typeof search === 'string') {
-    whereClause += ` AND (t.name ILIKE $${paramIndex} OR t.phone ILIKE $${paramIndex} OR t.contractor ILIKE $${paramIndex})`;
-    params.push(`%${search}%`);
+  if (search) {
+    conditions.push(`(
+      wc.formal_name ILIKE $${paramIndex} OR
+      wc.wa_display_name ILIKE $${paramIndex} OR
+      wc.sender_phone ILIKE $${paramIndex} OR
+      wc.team ILIKE $${paramIndex}
+    )`);
+    params.push(`%${String(search)}%`);
     paramIndex++;
   }
 
-  // If includeStats is true, join with performance data
-  if (includeStats === 'true') {
-    const query = `
-      WITH tech_stats AS (
-        SELECT 
-          COALESCE(t.wa_sender_jid, t.phone) as identifier,
-          COUNT(DISTINCT qpr.drop_number) as total_submissions,
-          COUNT(DISTINCT qpr.drop_number) FILTER (WHERE upr.submission_count = 1) as first_pass,
-          COUNT(DISTINCT qpr.drop_number) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL AND upr.ont_serial_scanned != '') as ont_scanned,
-          MAX(upr.created_at) as last_active
-        FROM technicians t
-        LEFT JOIN qa_photo_reviews qpr ON (
-          qpr.wa_sender_jid = t.wa_sender_jid 
-          OR RIGHT(REGEXP_REPLACE(qpr.sender_phone, '[^0-9]', '', 'g'), 10) = RIGHT(REGEXP_REPLACE(t.phone, '[^0-9]', '', 'g'), 10)
-        )
-        LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
-        GROUP BY COALESCE(t.wa_sender_jid, t.phone)
-      )
-      SELECT 
-        t.*,
-        COALESCE(ts.total_submissions, 0)::int as total_submissions,
-        CASE WHEN ts.total_submissions > 0 
-          THEN ROUND((ts.first_pass::numeric / ts.total_submissions) * 100)
-          ELSE 0 END as first_pass_rate,
-        CASE WHEN ts.total_submissions > 0 
-          THEN ROUND((ts.ont_scanned::numeric / ts.total_submissions) * 100)
-          ELSE 0 END as serial_compliance_rate,
-        ts.last_active::text as last_active_date
-      FROM technicians t
-      LEFT JOIN tech_stats ts ON ts.identifier = COALESCE(t.wa_sender_jid, t.phone)
-      ${whereClause}
-      ORDER BY COALESCE(ts.total_submissions, 0) DESC, t.name
-    `;
-    
-    const result = await pool.query(query, params);
-    
-    const technicians: TechnicianSummary[] = result.rows.map(row => ({
-      id: row.id,
-      name: row.name,
-      phone: row.phone,
-      type: row.type,
-      contractor: row.contractor,
-      status: row.status,
-      totalSubmissions: row.total_submissions || 0,
-      firstPassRate: row.first_pass_rate || 0,
-      serialComplianceRate: row.serial_compliance_rate || 0,
-      lastActiveDate: row.last_active_date,
-    }));
-    
-    return res.status(200).json({ technicians });
+  if (conditions.length > 0) {
+    query += ` WHERE ${conditions.join(' AND ')}`;
   }
 
-  // Simple list without stats
-  const query = `
-    SELECT * FROM technicians t
-    ${whereClause}
-    ORDER BY t.name
-  `;
-  
+  if (includeStats === 'true') {
+    query += ` ORDER BY COALESCE(stats.total_submissions, 0) DESC, name`;
+  } else {
+    query += ` ORDER BY name`;
+  }
+
   const result = await pool.query(query, params);
-  
-  return res.status(200).json({ technicians: result.rows });
+
+  const technicians: TechnicianSummary[] = result.rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    type: row.type as TechnicianType,
+    contractor: row.contractor,
+    status: row.status as TechnicianStatus,
+    totalSubmissions: row.total_submissions ?? 0,
+    firstPassRate: row.first_pass_rate ?? 0,
+    serialComplianceRate: row.serial_compliance_rate ?? 0,
+    lastActiveDate: row.last_active_date,
+  }));
+
+  return apiResponse.success(res, { technicians, total: technicians.length });
 }
 
-async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  const { name, phone, email, type, waSenderJid, waGroupJid, onemapInstallerName, contractor, projects, notes } = req.body;
+async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+  const { name, phone, type, contractor, projects, notes } = req.body;
 
-  if (!name || !type) {
-    return res.status(400).json({ error: 'name and type are required' });
+  if (!phone) {
+    return apiResponse.badRequest(res, 'phone is required');
   }
 
-  if (!['activator', 'installer'].includes(type)) {
-    return res.status(400).json({ error: 'type must be "activator" or "installer"' });
+  // Check if already exists
+  const existing = await pool.query(
+    'SELECT id FROM wa_contacts WHERE sender_phone = $1',
+    [phone]
+  );
+
+  if (existing.rows.length > 0) {
+    return apiResponse.conflict(res, 'Technician with this phone already exists');
   }
 
   const result = await pool.query(
-    `INSERT INTO technicians (
-      name, phone, email, type, wa_sender_jid, wa_group_jid, 
-      onemap_installer_name, contractor, projects, notes, discovered_from
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'manual')
-    RETURNING *`,
-    [name, phone, email, type, waSenderJid, waGroupJid, onemapInstallerName, contractor, projects || [], notes]
+    `INSERT INTO wa_contacts (
+      sender_phone, formal_name, role, team, projects, notes, created_by
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id`,
+    [
+      phone,
+      name || null,
+      type || 'activator',
+      contractor || null,
+      projects || [],
+      notes || null,
+      req.user?.username || 'api',
+    ]
   );
 
-  log.info('TechniciansAPI', `Created technician: ${name}`, { type, phone });
+  log.info('TechniciansAPI', `Created technician: ${name || phone}`, { type, phone });
 
-  return res.status(201).json({ technician: result.rows[0] });
+  return apiResponse.created(res, { id: result.rows[0].id });
+}
+
+async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
+  const { id, name, type, contractor, projects, status, notes } = req.body;
+
+  if (!id) {
+    return apiResponse.badRequest(res, 'id is required');
+  }
+
+  const updates: string[] = [];
+  const values: (string | boolean | string[] | null)[] = [];
+  let paramIndex = 1;
+
+  if (name !== undefined) {
+    updates.push(`formal_name = $${paramIndex++}`);
+    values.push(name);
+  }
+  if (type !== undefined) {
+    updates.push(`role = $${paramIndex++}`);
+    values.push(type);
+  }
+  if (contractor !== undefined) {
+    updates.push(`team = $${paramIndex++}`);
+    values.push(contractor);
+  }
+  if (projects !== undefined) {
+    updates.push(`projects = $${paramIndex++}`);
+    values.push(projects);
+  }
+  if (status !== undefined) {
+    updates.push(`is_active = $${paramIndex++}`);
+    values.push(status === 'active');
+  }
+  if (notes !== undefined) {
+    updates.push(`notes = $${paramIndex++}`);
+    values.push(notes);
+  }
+
+  if (updates.length === 0) {
+    return apiResponse.badRequest(res, 'No fields to update');
+  }
+
+  updates.push(`updated_by = $${paramIndex++}`);
+  values.push(req.user?.username || 'api');
+
+  values.push(id);
+
+  const result = await pool.query(
+    `UPDATE wa_contacts SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id`,
+    values
+  );
+
+  if (result.rows.length === 0) {
+    return apiResponse.notFound(res, 'Technician', id);
+  }
+
+  log.info('TechniciansAPI', `Updated technician: ${id}`, { by: req.user?.username });
+
+  return apiResponse.success(res, { updated: true, id });
 }
 
 export default withAuth(handler);

@@ -63,14 +63,15 @@ CREATE TRIGGER update_wa_contacts_updated_at
 
 -- Auto-populate from unique sender_phone/user_name combinations
 INSERT INTO wa_contacts (sender_phone, wa_display_name, projects, created_by)
-SELECT DISTINCT ON (sender_phone)
+SELECT
   sender_phone,
-  user_name as wa_display_name,
-  ARRAY_AGG(DISTINCT project) OVER (PARTITION BY sender_phone) as projects,
+  MAX(user_name) as wa_display_name,
+  ARRAY_AGG(DISTINCT project) FILTER (WHERE project IS NOT NULL) as projects,
   'migration' as created_by
 FROM qa_photo_reviews
 WHERE sender_phone IS NOT NULL
   AND sender_phone != ''
+GROUP BY sender_phone
 ON CONFLICT (sender_phone) DO NOTHING;
 
 -- Comment

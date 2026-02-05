@@ -938,10 +938,14 @@ export interface QAFunnelResponse {
 export interface TechnicianLeaderboardEntry {
   /** Rank position */
   rank: number;
-  /** User name */
+  /** User name (formal_name from wa_contacts if mapped, otherwise WhatsApp display name) */
   user_name: string | null;
   /** Phone number */
   sender_phone: string | null;
+  /** Team name (from wa_contacts mapping) */
+  team: string | null;
+  /** Role (activator, installer, supervisor - from wa_contacts) */
+  role: string;
   /** Project(s) */
   projects: string[];
   /** Total submissions */
