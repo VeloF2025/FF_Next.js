@@ -285,8 +285,9 @@ export async function reorderCheckItems(
  */
 export async function createCheckRecord(input: CreateCheckRecordInput): Promise<CheckRecord> {
   // Determine if there are critical or minor issues
+  // Also flag as minor issue if VLM confidence is low (photos need manual review)
   const hasCritical = input.responses.some(r => !r.isPassed && r.severity === 'critical');
-  const hasMinor = input.responses.some(r => !r.isPassed && r.severity === 'minor');
+  const hasMinor = input.responses.some(r => !r.isPassed && r.severity === 'minor') || input.hasLowVlmConfidence;
   const checkType = input.checkType || 'daily';
 
   // Insert the record

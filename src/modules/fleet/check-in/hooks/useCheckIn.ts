@@ -479,6 +479,21 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   const hasCriticalFailures = responses.some(r => !r.isPassed && r.severity === 'critical');
   const hasMinorFailures = responses.some(r => !r.isPassed && r.severity === 'minor');
 
+  // Check VLM confidence - low confidence means photos need review
+  const hasLowVlmConfidence = useMemo(() => {
+    const vlmPhotos = requiredPhotos.filter(p => p.vlmType);
+    for (const photoConfig of vlmPhotos) {
+      const result = vlmResults.get(photoConfig.type);
+      // If photo was taken but VLM confidence is below 50%, needs review
+      if (formState.photos.has(photoConfig.type)) {
+        if (!result || result.confidence < 0.5) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [requiredPhotos, vlmResults, formState.photos]);
+
   const canSubmit = validationErrors.length === 0;
 
   // Submit handler
@@ -511,6 +526,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
         odometerReading: formState.odometerReading ? parseInt(formState.odometerReading, 10) : undefined,
         odometerSource,
         responses: Array.from(formState.responses.values()),
+        hasLowVlmConfidence, // Pass VLM confidence flag to mark as needing review
       };
 
       if (!isOnline) {
@@ -548,7 +564,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
           odometerReading: input.odometerReading || null,
           status: 'pending',
           hasCriticalIssues: hasCriticalFailures,
-          hasMinorIssues: hasMinorFailures,
+          hasMinorIssues: hasMinorFailures || hasLowVlmConfidence,
           approvedBy: null,
           approvedAt: null,
           approvalNotes: null,
@@ -695,7 +711,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, requiredPhotos, vehicleId, vehicleRegistration, vlmResults, odometerWasOverridden, odometerVerifiedOverride]);
+  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, hasLowVlmConfidence, requiredPhotos, vehicleId, vehicleRegistration, vlmResults, odometerWasOverridden, odometerVerifiedOverride]);
 
   // Reset form
   const reset = useCallback(() => {

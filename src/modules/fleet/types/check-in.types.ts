@@ -221,6 +221,7 @@ export interface CreateCheckRecordInput {
   fuelLevel?: number; // 0-100 percentage
   responses: CreateCheckResponseInput[];
   offlineId?: string; // For offline sync
+  hasLowVlmConfidence?: boolean; // True if VLM photos have <50% confidence
 }
 
 /**
