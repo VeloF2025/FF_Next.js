@@ -2,16 +2,27 @@
  * Project CRUD Service
  * Handles basic Create, Read, Update, Delete operations for projects
  * Using API routes for browser, Neon for server/build
+ *
+ * NOTE: Server-only imports (Neon) are dynamically loaded to prevent
+ * bundling server code into client-side JavaScript.
  */
 
-import { projectNeonService } from './projectNeonService';
 import { projectApiService } from '../project/projectApiService';
 import type { Project, ProjectFormData, ProjectFilter } from '@/types/project.types';
 import { ProjectStatus } from '@/types/project.types';
 
-// Use API service in browser, Neon service for server/build
+// Check if running in browser
 const isBrowser = typeof window !== 'undefined';
-const baseService = isBrowser ? projectApiService : projectNeonService;
+
+// Lazy-load Neon service only on server to prevent client bundling
+let _neonService: typeof import('./projectNeonService').projectNeonService | null = null;
+async function getNeonService() {
+  if (!_neonService) {
+    const mod = await import('./projectNeonService');
+    _neonService = mod.projectNeonService;
+  }
+  return _neonService;
+}
 
 /**
  * Get all projects with optional filtering
@@ -19,9 +30,9 @@ const baseService = isBrowser ? projectApiService : projectNeonService;
 export async function getAll(filter?: ProjectFilter): Promise<Project[]> {
   if (isBrowser) {
     // API service doesn't support filtering yet, so get all and filter client-side
-    const projects = await baseService.getAll();
+    const projects = await projectApiService.getAll();
     if (!filter) return projects;
-    
+
     return projects.filter(project => {
       if (filter.status && !filter.status.includes(project.status as ProjectStatus)) return false;
       if (filter.clientId && !filter.clientId.includes(project.client_id || '')) return false;
@@ -29,14 +40,19 @@ export async function getAll(filter?: ProjectFilter): Promise<Project[]> {
       return true;
     });
   }
-  return projectNeonService.getAll(filter);
+  const neonService = await getNeonService();
+  return neonService.getAll(filter);
 }
 
 /**
  * Get a single project by ID
  */
 export async function getById(id: string): Promise<Project | null> {
-  return baseService.getById(id);
+  if (isBrowser) {
+    return projectApiService.getById(id);
+  }
+  const neonService = await getNeonService();
+  return neonService.getById(id);
 }
 
 /**
@@ -47,7 +63,8 @@ export async function create(data: ProjectFormData): Promise<string> {
     const project = await projectApiService.create(data as any);
     return project.id || '';
   }
-  return projectNeonService.create(data);
+  const neonService = await getNeonService();
+  return neonService.create(data);
 }
 
 /**
@@ -58,7 +75,8 @@ export async function update(id: string, data: Partial<ProjectFormData>): Promis
     await projectApiService.update(id, data as any);
     return;
   }
-  return projectNeonService.update(id, data);
+  const neonService = await getNeonService();
+  return neonService.update(id, data);
 }
 
 /**
@@ -69,7 +87,8 @@ export async function remove(id: string): Promise<void> {
     await projectApiService.delete(id);
     return;
   }
-  return projectNeonService.remove(id);
+  const neonService = await getNeonService();
+  return neonService.remove(id);
 }
 
 /**
@@ -79,7 +98,8 @@ export async function getByClientId(clientId: string): Promise<Project[]> {
   if (isBrowser) {
     return projectApiService.getProjectsByClient(clientId);
   }
-  return projectNeonService.getAll({ clientId: [clientId] });
+  const neonService = await getNeonService();
+  return neonService.getAll({ clientId: [clientId] });
 }
 
 /**
@@ -89,5 +109,6 @@ export async function getActiveProjects(): Promise<Project[]> {
   if (isBrowser) {
     return projectApiService.getActiveProjects();
   }
-  return projectNeonService.getAll({ status: [ProjectStatus.ACTIVE] });
+  const neonService = await getNeonService();
+  return neonService.getAll({ status: [ProjectStatus.ACTIVE] });
 }
