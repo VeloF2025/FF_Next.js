@@ -97,10 +97,12 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
   query += ` FROM wa_contacts wc`;
 
   if (includeStats === 'true') {
+    // Note: qa_photo_reviews uses user_name as the identifier (sender_phone is often empty)
+    // wa_contacts.sender_phone stores the user_name value from qa_photo_reviews
     query += `
       LEFT JOIN (
         SELECT
-          qpr.sender_phone,
+          qpr.user_name as identifier,
           COUNT(*) as total_submissions,
           ROUND(
             100.0 * COUNT(*) FILTER (WHERE upr.submission_count = 1) / NULLIF(COUNT(*), 0)
@@ -111,8 +113,9 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
           MAX(qpr.created_at) as last_active
         FROM qa_photo_reviews qpr
         LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
-        GROUP BY qpr.sender_phone
-      ) stats ON wc.sender_phone = stats.sender_phone
+        WHERE qpr.user_name IS NOT NULL
+        GROUP BY qpr.user_name
+      ) stats ON wc.sender_phone = stats.identifier
     `;
   }
 

@@ -60,7 +60,9 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
       const response = await fetch(`/api/technicians?${params}`);
       if (!response.ok) throw new Error('Failed to fetch technicians');
       
-      const data = await response.json();
+      const result = await response.json();
+      // API returns { success: true, data: { technicians: [...] } }
+      const data = result.data || result;
       setTechnicians(data.technicians || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -75,7 +77,8 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
       const response = await fetch('/api/technicians/discover?source=all');
       if (!response.ok) throw new Error('Failed to discover technicians');
       
-      const data = await response.json();
+      const result = await response.json();
+      const data = result.data || result;
       setDiscovered(data.discovered || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
