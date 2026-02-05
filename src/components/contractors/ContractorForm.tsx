@@ -64,15 +64,17 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
     setIsSubmitting(true);
 
     try {
+      // Use flat endpoints to avoid Vercel dynamic route issues
       const url = contractor
-        ? `/api/contractors/${contractor.id}`
+        ? '/api/contractors-update'
         : '/api/contractors';
       const method = contractor ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        credentials: 'include',
+        body: JSON.stringify(contractor ? { id: contractor.id, ...formData } : formData),
       });
 
       if (!response.ok) {
