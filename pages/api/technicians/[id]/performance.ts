@@ -41,9 +41,18 @@ async function handler(
   const dateToStr = typeof dateTo === 'string' ? dateTo : today.toISOString().split('T')[0];
 
   try {
-    // Get technician details
+    // Get technician details from wa_contacts table
     const techResult = await pool.query(
-      `SELECT * FROM technicians WHERE id = $1`,
+      `SELECT
+        id,
+        sender_phone,
+        COALESCE(formal_name, wa_display_name, sender_phone) as name,
+        role as type,
+        team,
+        projects,
+        is_active
+      FROM wa_contacts
+      WHERE id = $1`,
       [id]
     );
 
@@ -52,10 +61,10 @@ async function handler(
     }
 
     const tech = techResult.rows[0];
-    const waSenderJid = tech.wa_sender_jid;
-    const phone = tech.phone?.replace(/[^0-9]/g, '');
+    // sender_phone in wa_contacts stores the user_name from qa_photo_reviews
+    const identifier = tech.sender_phone;
 
-    if (!waSenderJid && !phone) {
+    if (!identifier) {
       return res.status(200).json({
         technicianId: tech.id,
         technicianName: tech.name,
@@ -78,23 +87,9 @@ async function handler(
       });
     }
 
-    // Build the WHERE clause to match by wa_sender_jid OR phone
-    const matchConditions = [];
-    const matchParams = [dateFromStr, dateToStr];
-    let paramIdx = 3;
-
-    if (waSenderJid) {
-      matchConditions.push(`qpr.wa_sender_jid = $${paramIdx++}`);
-      matchParams.push(waSenderJid);
-    }
-    if (phone) {
-      matchConditions.push(`RIGHT(REGEXP_REPLACE(qpr.sender_phone, '[^0-9]', '', 'g'), 10) = RIGHT($${paramIdx++}, 10)`);
-      matchParams.push(phone);
-    }
-
-    const matchClause = matchConditions.length > 0 
-      ? `(${matchConditions.join(' OR ')})` 
-      : '1=0';
+    // Match by user_name in qa_photo_reviews (stored as sender_phone in wa_contacts)
+    const matchParams = [dateFromStr, dateToStr, identifier];
+    const matchClause = `qpr.user_name = $3`;
 
     // Get performance summary
     const summaryResult = await pool.query(
