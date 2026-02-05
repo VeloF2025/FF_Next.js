@@ -1,10 +1,11 @@
 /**
  * Technician Detail Page
- * 
+ *
  * Shows detailed performance metrics for a specific technician.
- * 
+ * Styled to match DrSummaryPage patterns.
+ *
  * @author Jarvis
- * @date 2026-02-01
+ * @updated 2026-02-05
  */
 
 import type { NextPage } from 'next';
@@ -13,22 +14,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { activateConfig } from '@/modules/navigation';
-import { Button } from '@/shared/components/ui/Button';
-import { Badge } from '@/shared/components/ui/Badge';
-import {
-  ArrowLeft,
-  RefreshCw,
-  User,
-  Phone,
-  MessageSquare,
-  BarChart3,
-  Target,
-  CheckCircle,
-  XCircle,
-  Calendar,
-  TrendingUp,
-} from 'lucide-react';
-import { TrendChart, GaugeChart } from '@/modules/activate/components/reporting/shared/TrendChart';
 import type { TechnicianPerformance } from '@/types/technician.types';
 
 type TimeRange = '7d' | '30d' | '90d';
@@ -36,8 +21,7 @@ type TimeRange = '7d' | '30d' | '90d';
 const TechnicianDetailPage: NextPage = () => {
   const router = useRouter();
   const { id } = router.query;
-  
-  const [technician, setTechnician] = useState<any>(null);
+
   const [performance, setPerformance] = useState<TechnicianPerformance | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [isLoading, setIsLoading] = useState(true);
@@ -67,24 +51,15 @@ const TechnicianDetailPage: NextPage = () => {
 
   const fetchData = useCallback(async () => {
     if (!id) return;
-    
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // Fetch technician details
-      const techRes = await fetch(`/api/technicians?search=${id}`);
-      if (techRes.ok) {
-        const techData = await techRes.json();
-        const tech = techData.technicians?.find((t: any) => t.id === id);
-        if (tech) setTechnician(tech);
-      }
-
-      // Fetch performance
       const { from, to } = getDateRange();
       const perfRes = await fetch(`/api/technicians/${id}/performance?dateFrom=${from}&dateTo=${to}`);
       if (!perfRes.ok) throw new Error('Failed to fetch performance data');
-      
+
       const perfData = await perfRes.json();
       setPerformance(perfData);
     } catch (err) {
@@ -98,7 +73,55 @@ const TechnicianDetailPage: NextPage = () => {
     fetchData();
   }, [fetchData]);
 
+  const handleBack = () => {
+    router.push('/activate/technicians');
+  };
+
   if (!id) return null;
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <ModulePage config={activateConfig}>
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-400">Loading performance data...</p>
+            </div>
+          </div>
+        </ModulePage>
+      </AppLayout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <AppLayout>
+        <ModulePage config={activateConfig}>
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="text-red-500 text-4xl mb-4">!</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+              <button
+                onClick={handleBack}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                Back to Directory
+              </button>
+            </div>
+          </div>
+        </ModulePage>
+      </AppLayout>
+    );
+  }
+
+  if (!performance) return null;
+
+  const { summary } = performance;
+  const firstPassPercent = summary.firstPassRate;
+  const serialPercent = summary.serialComplianceRate;
 
   return (
     <AppLayout>
@@ -106,281 +129,301 @@ const TechnicianDetailPage: NextPage = () => {
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => router.push('/activate/technicians')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">
-                  {performance?.technicianName || 'Technician'}
-                </h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={performance?.type === 'activator' ? 'success' : 'warning'}>
-                    {performance?.type || 'unknown'}
-                  </Badge>
-                  {technician?.phone && (
-                    <span className="text-sm text-[var(--ff-text-secondary)] flex items-center gap-1">
-                      <Phone className="w-3 h-3" /> {technician.phone}
-                    </span>
-                  )}
-                </div>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {performance.technicianName}
+              </h1>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                performance.type === 'activator'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                  : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+              }`}>
+                {performance.type}
+              </span>
             </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-[var(--ff-bg-secondary)] rounded-lg p-1">
+            <div className="flex items-center gap-2">
+              {/* Time Range Selector */}
+              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 {(['7d', '30d', '90d'] as TimeRange[]).map((range) => (
                   <button
                     key={range}
                     onClick={() => setTimeRange(range)}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                       timeRange === range
-                        ? 'bg-blue-500 text-white'
-                        : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
-                    {range === '7d' ? '7D' : range === '30d' ? '30D' : '90D'}
+                    {range.toUpperCase()}
                   </button>
                 ))}
               </div>
-              <Button variant="outline" onClick={fetchData} disabled={isLoading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+              <button
+                onClick={fetchData}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                🔄 Refresh
+              </button>
             </div>
           </div>
 
-          {/* Loading */}
-          {isLoading && (
-            <div className="ff-card p-8 text-center">
-              <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-              <p className="text-[var(--ff-text-secondary)]">Loading performance data...</p>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              icon="📊"
+              label="Total Submissions"
+              value={summary.totalSubmissions}
+              detail={`${summary.activeDays} active days`}
+            />
+            <StatCard
+              icon="✅"
+              label="First Pass Rate"
+              value={`${summary.firstPassRate}%`}
+              detail={`${summary.firstPassSuccess} / ${summary.totalSubmissions}`}
+              highlight={summary.firstPassRate >= 85 ? 'green' : summary.firstPassRate >= 70 ? 'yellow' : 'red'}
+            />
+            <StatCard
+              icon="🎯"
+              label="Serial Compliance"
+              value={`${summary.serialComplianceRate}%`}
+              detail={`ONT: ${summary.ontScanned} • UPS: ${summary.upsScanned}`}
+              highlight={summary.serialComplianceRate >= 95 ? 'green' : summary.serialComplianceRate >= 80 ? 'yellow' : 'red'}
+            />
+            <StatCard
+              icon="🔄"
+              label="Resubmission Rate"
+              value={`${summary.resubmissionRate}%`}
+              detail={`${summary.resubmissions} resubmissions`}
+              highlight={summary.resubmissionRate <= 10 ? 'green' : summary.resubmissionRate <= 20 ? 'yellow' : 'red'}
+            />
+          </div>
+
+          {/* Performance & Projects Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Performance Gauges */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Performance Scores
+              </h3>
+              <div className="space-y-4">
+                <ProgressBar
+                  label="First Pass Rate"
+                  value={firstPassPercent}
+                  target={85}
+                />
+                <ProgressBar
+                  label="Serial Compliance"
+                  value={serialPercent}
+                  target={95}
+                />
+              </div>
+            </div>
+
+            {/* Projects Worked */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Projects Worked
+              </h3>
+              {summary.projectsWorked.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {summary.projectsWorked.map(project => (
+                    <span
+                      key={project}
+                      className="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-sm"
+                    >
+                      {project}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">No projects recorded</p>
+              )}
+            </div>
+          </div>
+
+          {/* Daily Activity Chart (simplified as table) */}
+          {performance.trend.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Daily Activity ({timeRange === '7d' ? 'Last 7 Days' : timeRange === '30d' ? 'Last 30 Days' : 'Last 90 Days'})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">Date</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Submissions</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">First Pass</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Resubmissions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performance.trend.slice(-10).map((t) => (
+                      <tr key={t.date} className="border-b border-gray-100 dark:border-gray-700/50">
+                        <td className="py-2 text-gray-900 dark:text-white">{t.date}</td>
+                        <td className="py-2 text-center text-gray-900 dark:text-white">{t.submissions}</td>
+                        <td className="py-2 text-center text-green-600 dark:text-green-400">{t.firstPass}</td>
+                        <td className="py-2 text-center text-orange-600 dark:text-orange-400">{t.resubmissions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {/* Error */}
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">
-              {error}
+          {/* Project Breakdown */}
+          {performance.projectBreakdown.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Project Breakdown
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">Project</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Submissions</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">First Pass</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Serial Compliance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performance.projectBreakdown.map((p) => (
+                      <tr key={p.project} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="py-2 text-gray-900 dark:text-white font-medium">{p.project}</td>
+                        <td className="py-2 text-center text-gray-900 dark:text-white">{p.submissions}</td>
+                        <td className="py-2 text-center">
+                          <span className={`font-medium ${
+                            p.firstPassRate >= 85 ? 'text-green-600 dark:text-green-400' :
+                            p.firstPassRate >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-red-600 dark:text-red-400'
+                          }`}>
+                            {p.firstPassRate}%
+                          </span>
+                        </td>
+                        <td className="py-2 text-center">
+                          <span className={`font-medium ${
+                            p.serialComplianceRate >= 95 ? 'text-green-600 dark:text-green-400' :
+                            p.serialComplianceRate >= 80 ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-red-600 dark:text-red-400'
+                          }`}>
+                            {p.serialComplianceRate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {/* Performance Content */}
-          {!isLoading && !error && performance && (
-            <>
-              {/* Summary Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="ff-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <BarChart3 className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Total Submissions</span>
-                  </div>
-                  <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                    {performance.summary.totalSubmissions}
-                  </div>
-                  <div className="text-xs text-[var(--ff-text-tertiary)]">
-                    {performance.summary.activeDays} active days
-                  </div>
-                </div>
-
-                <div className="ff-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-[var(--ff-text-secondary)]">First Pass Rate</span>
-                  </div>
-                  <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                    {performance.summary.firstPassRate}%
-                  </div>
-                  <div className="text-xs text-[var(--ff-text-tertiary)]">
-                    {performance.summary.firstPassSuccess} / {performance.summary.totalSubmissions}
-                  </div>
-                </div>
-
-                <div className="ff-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Serial Compliance</span>
-                  </div>
-                  <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                    {performance.summary.serialComplianceRate}%
-                  </div>
-                  <div className="text-xs text-[var(--ff-text-tertiary)]">
-                    ONT: {performance.summary.ontScanned} • UPS: {performance.summary.upsScanned}
-                  </div>
-                </div>
-
-                <div className="ff-card p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Resubmission Rate</span>
-                  </div>
-                  <div className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                    {performance.summary.resubmissionRate}%
-                  </div>
-                  <div className="text-xs text-[var(--ff-text-tertiary)]">
-                    {performance.summary.resubmissions} resubmissions
-                  </div>
-                </div>
-              </div>
-
-              {/* Gauges */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="ff-card p-6">
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
-                    Performance Scores
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col items-center">
-                      <GaugeChart
-                        value={performance.summary.firstPassRate}
-                        target={85}
-                        label="First Pass"
-                        color="auto"
-                        size="md"
-                      />
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <GaugeChart
-                        value={performance.summary.serialComplianceRate}
-                        target={95}
-                        label="Serial Compliance"
-                        color="auto"
-                        size="md"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Projects Worked */}
-                <div className="ff-card p-6">
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
-                    Projects Worked
-                  </h3>
-                  {performance.summary.projectsWorked.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {performance.summary.projectsWorked.map(project => (
-                        <Badge key={project} variant="secondary" className="text-sm px-3 py-1">
-                          {project}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[var(--ff-text-secondary)]">No projects recorded</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Activity Trend */}
-              {performance.trend.length > 0 && (
-                <div className="ff-card p-6">
-                  <TrendChart
-                    title="Daily Activity"
-                    subtitle={`${timeRange === '7d' ? 'Last 7 days' : timeRange === '30d' ? 'Last 30 days' : 'Last 90 days'}`}
-                    data={performance.trend.map(t => ({
-                      date: t.date,
-                      Submissions: t.submissions,
-                      'First Pass': t.firstPass,
-                      Resubmissions: t.resubmissions,
-                    }))}
-                    series={[
-                      { dataKey: 'Submissions', name: 'Submissions', color: '#3B82F6' },
-                      { dataKey: 'First Pass', name: 'First Pass', color: '#10B981' },
-                      { dataKey: 'Resubmissions', name: 'Resubmissions', color: '#F59E0B' },
-                    ]}
-                    type="bar"
-                    xAxisKey="date"
-                    height={250}
-                  />
-                </div>
-              )}
-
-              {/* Project Breakdown */}
-              {performance.projectBreakdown.length > 0 && (
-                <div className="ff-card p-6">
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
-                    Project Breakdown
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full">
-                      <thead>
-                        <tr className="border-b border-[var(--ff-border-light)]">
-                          <th className="text-left py-2 text-sm font-medium text-[var(--ff-text-secondary)]">
-                            Project
-                          </th>
-                          <th className="text-center py-2 text-sm font-medium text-[var(--ff-text-secondary)]">
-                            Submissions
-                          </th>
-                          <th className="text-center py-2 text-sm font-medium text-[var(--ff-text-secondary)]">
-                            First Pass
-                          </th>
-                          <th className="text-center py-2 text-sm font-medium text-[var(--ff-text-secondary)]">
-                            Serial Compliance
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {performance.projectBreakdown.map((p) => (
-                          <tr
-                            key={p.project}
-                            className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]"
-                          >
-                            <td className="py-3 text-[var(--ff-text-primary)] font-medium">{p.project}</td>
-                            <td className="py-3 text-center text-[var(--ff-text-primary)]">
-                              {p.submissions}
-                            </td>
-                            <td className="py-3 text-center">
-                              <span
-                                className={`font-medium ${
-                                  p.firstPassRate >= 85
-                                    ? 'text-green-500'
-                                    : p.firstPassRate >= 70
-                                      ? 'text-yellow-500'
-                                      : 'text-red-500'
-                                }`}
-                              >
-                                {p.firstPassRate}%
-                              </span>
-                            </td>
-                            <td className="py-3 text-center">
-                              <span
-                                className={`font-medium ${
-                                  p.serialComplianceRate >= 95
-                                    ? 'text-green-500'
-                                    : p.serialComplianceRate >= 80
-                                      ? 'text-yellow-500'
-                                      : 'text-red-500'
-                                }`}
-                              >
-                                {p.serialComplianceRate}%
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* No Data State */}
-              {performance.summary.totalSubmissions === 0 && (
-                <div className="ff-card p-8 text-center">
-                  <BarChart3 className="w-12 h-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
-                    No Submissions Found
-                  </h3>
-                  <p className="text-[var(--ff-text-secondary)]">
-                    No DR submissions found for this technician in the selected time range.
-                  </p>
-                </div>
-              )}
-            </>
+          {/* No Data State */}
+          {summary.totalSubmissions === 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-gray-700 text-center">
+              <div className="text-4xl mb-4">📊</div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                No Submissions Found
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                No DR submissions found for this technician in the selected time range.
+              </p>
+            </div>
           )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={handleBack}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Directory
+            </button>
+          </div>
         </div>
       </ModulePage>
     </AppLayout>
   );
 };
+
+function StatCard({
+  icon,
+  label,
+  value,
+  detail,
+  highlight,
+}: {
+  icon: string;
+  label: string;
+  value: string | number;
+  detail?: string;
+  highlight?: 'green' | 'yellow' | 'red';
+}) {
+  const highlightColor = highlight === 'green'
+    ? 'text-green-600 dark:text-green-400'
+    : highlight === 'yellow'
+      ? 'text-yellow-600 dark:text-yellow-400'
+      : highlight === 'red'
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-gray-900 dark:text-white';
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base">{icon}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+      </div>
+      <div className={`text-2xl font-bold ${highlightColor}`}>{value}</div>
+      {detail && (
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{detail}</div>
+      )}
+    </div>
+  );
+}
+
+function ProgressBar({
+  label,
+  value,
+  target,
+}: {
+  label: string;
+  value: number;
+  target: number;
+}) {
+  const isGood = value >= target;
+  const barColor = isGood
+    ? 'bg-green-500'
+    : value >= target * 0.8
+      ? 'bg-yellow-500'
+      : 'bg-red-500';
+
+  return (
+    <div>
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-gray-600 dark:text-gray-400">{label}</span>
+        <span className={`font-medium ${isGood ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+          {value}%
+        </span>
+      </div>
+      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden relative">
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
+          style={{ width: `${Math.min(value, 100)}%` }}
+        />
+        {/* Target marker */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-gray-400 dark:bg-gray-500"
+          style={{ left: `${target}%` }}
+          title={`Target: ${target}%`}
+        />
+      </div>
+      <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+        Target: {target}%
+      </div>
+    </div>
+  );
+}
 
 export default TechnicianDetailPage;
