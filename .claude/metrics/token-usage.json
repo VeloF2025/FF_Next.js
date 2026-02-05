@@ -209,14 +209,14 @@
     "1fbe01b5-0f92-4c25-a51e-c70e37bd98bf": {
       "session_id": "1fbe01b5-0f92-4c25-a51e-c70e37bd98bf",
       "started_at": "2026-02-05T08:28:01.818Z",
-      "total_input_tokens": 10202,
+      "total_input_tokens": 10415,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.030605999999999994,
-      "tool_calls": 98,
+      "total_cost_usd": 0.03124499999999999,
+      "tool_calls": 104,
       "tools_used": {
-        "Bash": 88,
-        "Glob": 2,
-        "Read": 3,
+        "Bash": 90,
+        "Glob": 3,
+        "Read": 6,
         "Write": 3,
         "Edit": 2
       }
@@ -224,22 +224,42 @@
     "46e59b81-00b6-4d2f-a839-ef192b5bdb2b": {
       "session_id": "46e59b81-00b6-4d2f-a839-ef192b5bdb2b",
       "started_at": "2026-02-05T12:46:14.276Z",
-      "total_input_tokens": 12566,
+      "total_input_tokens": 15338,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.03769799999999998,
-      "tool_calls": 202,
+      "total_cost_usd": 0.046013999999999985,
+      "tool_calls": 211,
       "tools_used": {
         "Grep": 15,
-        "Glob": 21,
-        "Read": 24,
-        "Edit": 21,
-        "Bash": 58,
+        "Glob": 22,
+        "Read": 26,
+        "Edit": 22,
+        "Bash": 61,
         "mcp__claude-in-chrome__tabs_context_mcp": 2,
         "mcp__claude-in-chrome__computer": 52,
         "mcp__claude-in-chrome__navigate": 6,
         "mcp__claude-in-chrome__read_console_messages": 1,
         "mcp__claude-in-chrome__read_network_requests": 1,
-        "Write": 1
+        "Write": 3
+      }
+    },
+    "1eaf4ce1-cbed-44fd-b438-81d36834094c": {
+      "session_id": "1eaf4ce1-cbed-44fd-b438-81d36834094c",
+      "started_at": "2026-02-05T16:55:35.733Z",
+      "total_input_tokens": 6468,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.019403999999999998,
+      "tool_calls": 63,
+      "tools_used": {
+        "Glob": 10,
+        "Read": 19,
+        "Bash": 12,
+        "Grep": 9,
+        "Task": 1,
+        "AskUserQuestion": 1,
+        "TaskCreate": 4,
+        "TaskUpdate": 3,
+        "Write": 2,
+        "Edit": 2
       }
     }
   }

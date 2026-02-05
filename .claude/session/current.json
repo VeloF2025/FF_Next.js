@@ -1,107 +1,87 @@
 {
-  "session_id": "2026-02-04-fleet-photos",
-  "started_at": "2026-02-04T12:00:00Z",
-  "last_updated": "2026-02-05T16:42:44.659Z",
+  "session_id": "2026-02-05-contractors-fix",
+  "started_at": "2026-02-05T15:00:00Z",
+  "last_updated": "2026-02-05T17:03:32.553Z",
   "working_on": {
-    "task": "Fleet Photos & License Disc Fix",
+    "task": "Contractors Module - Caching & CRUD Fixes",
     "status": "completed",
     "progress": [
-      "Added Photos tab to vehicle detail page",
-      "Fixed photo upload using axios instead of fetch for form-data",
-      "Fixed photo URLs to use /storage/ prefix for nginx proxy",
-      "Added /storage/ nginx proxy to dev.fibreflow.app",
-      "Photos now display correctly on vf and dev environments",
-      "Fixed license disc data not showing in vehicle list",
-      "Added license disc JOIN to ALL query branches in vehicles API",
-      "Deployed to dev, vf, and app environments"
+      "Fixed new contractors defaulting to isActive=false (invisible after creation)",
+      "Removed is_active filter from contractors list page query",
+      "Added force-dynamic to all contractor pages (list, detail, edit)",
+      "Created /api/contractors-delete endpoint for permanent deletion",
+      "Split UI actions: Suspend (yellow Ban) vs Delete (red Trash)",
+      "Fixed edit form to use flat endpoint /api/contractors-update",
+      "Added credentials: 'include' to all fetch calls",
+      "Cleaned up test contractors from database"
     ],
-    "last_action": "Fixed license disc JOIN in all 8 query branches of vehicles.ts"
+    "last_action": "Added force-dynamic to contractor detail and edit pages"
   },
   "learnings": {
-    "vf_storage_urls": {
-      "issue": "VF Storage service returns URLs without /storage/ prefix",
-      "storage_returns": "https://vf.fibreflow.app/fleet/check-ins/...",
-      "correct_url": "/storage/fleet/check-ins/...",
-      "solution": "Construct URL from result.path with /storage/ prefix"
+    "server_component_caching": {
+      "problem": "Server Components cache by default, showing stale data",
+      "solution": "Add exports: dynamic='force-dynamic', revalidate=0",
+      "files_affected": "All pages that need fresh data on every request"
     },
-    "form_data_upload": {
-      "issue": "Node.js form-data package doesn't work with native fetch",
-      "error": "Unexpected end of form",
-      "solution": "Use axios which has proper form-data stream support",
-      "code": "axios.post(url, formData, { headers: formData.getHeaders() })"
+    "vercel_dynamic_routes": {
+      "problem": "/api/[id] routes return 405 on Vercel",
+      "solution": "Use flat endpoints: /api/resource-update, /api/resource-delete",
+      "pattern": "Pass ID in request body instead of URL path"
     },
-    "nginx_storage_proxy": {
-      "issue": "Each domain needs /storage/ proxy configured separately",
-      "location": "/etc/nginx/sites-enabled/vf-fibreflow",
-      "config": "location /storage/ { proxy_pass http://localhost:8091/; }"
+    "fetch_credentials": {
+      "problem": "API calls fail silently without auth",
+      "solution": "Always add credentials: 'include' to fetch options"
     },
-    "staging_deployment_paths": {
-      "vf_staging": "/home/louis/apps/fibreflow (user: louis)",
-      "dev": "/home/hein/apps/fibreflow-dev (user: hein)",
-      "production": "/home/velo/fibreflow-production (user: velo)",
-      "note": "Service file specifies User and WorkingDirectory - must match"
-    },
-    "two_photo_tables": {
-      "fleet_check_photos": "Photos captured during check-ins, linked via record_id",
-      "fleet_vehicle_photos": "General vehicle photos (damage, receipts), linked via vehicle_id",
-      "api_combines": "GET /api/fleet/vehicles/[id]/photos returns from both tables"
-    },
-    "vehicles_api_query_branches": {
-      "issue": "Multiple query branches in vehicles.ts need identical field selections",
-      "branches": [
-        "status+type+search",
-        "status+type",
-        "status",
-        "type",
-        "search",
-        "assigned=true",
-        "assigned=false",
-        "default"
-      ],
-      "common_mistake": "Adding a JOIN to one branch but forgetting others",
-      "solution": "When adding new fields (like license disc), update ALL 8 branches"
+    "contractor_linked_records": {
+      "problem": "Delete fails when contractor has linked projects",
+      "check_query": "SELECT COUNT(*) FROM contractor_projects WHERE contractor_id = ?",
+      "solution": "Unlink projects first, or show error to user"
     }
   },
   "bugs_fixed": [
     {
-      "file": "pages/api/fleet/check-in/photos.ts",
-      "issue": "Photo upload fails with 'Unexpected end of form'",
-      "fix": "Changed from fetch to axios for proper form-data handling"
+      "file": "app/(main)/contractors/page.tsx",
+      "issue": "New contractors not showing (filtered by is_active=true, default was false)",
+      "fix": "Removed filter, changed form default to isActive=true"
     },
     {
-      "file": "pages/api/fleet/vehicles/[id]/photos.ts",
-      "issue": "Photos API returning wrong URLs (using storage_service_url)",
-      "fix": "Changed to use file_url or construct from file_path with /storage/ prefix"
+      "file": "app/(main)/contractors/page.tsx",
+      "issue": "Page showing stale data after mutations",
+      "fix": "Added force-dynamic, revalidate=0, fetchCache='force-no-store'"
     },
     {
-      "file": "pages/api/fleet/check-in/photos.ts",
-      "issue": "storageServiceUrl stored without /storage/ prefix",
-      "fix": "Changed to use /storage/${result.path} for consistency"
+      "file": "app/(main)/contractors/[id]/page.tsx",
+      "issue": "Detail page showing cached data",
+      "fix": "Added force-dynamic, revalidate=0"
     },
     {
-      "file": "/etc/nginx/sites-enabled/vf-fibreflow",
-      "issue": "dev.fibreflow.app missing /storage/ proxy",
-      "fix": "Added location /storage/ block to dev server"
+      "file": "app/(main)/contractors/[id]/edit/page.tsx",
+      "issue": "Edit page showing cached data",
+      "fix": "Added force-dynamic, revalidate=0"
     },
     {
-      "file": "pages/api/fleet/vehicles.ts",
-      "issue": "License disc data only returned in 2 of 8 query branches",
-      "fix": "Added LEFT JOIN LATERAL on fleet_license_disc with status='active' to ALL branches"
+      "file": "src/components/contractors/ContractorForm.tsx",
+      "issue": "Edit not persisting - using broken /api/contractors/[id]",
+      "fix": "Changed to /api/contractors-update flat endpoint with credentials"
+    },
+    {
+      "file": "src/components/contractors/ContractorsList.tsx",
+      "issue": "Only suspend available, no permanent delete",
+      "fix": "Added separate Delete button with /api/contractors-delete endpoint"
     }
   ],
   "commits": [
-    "eadf08f7 fix(fleet): correct photo URLs to use /storage/ prefix for nginx proxy",
-    "8d90d70c fix(fleet): use axios for photo upload to fix form-data compatibility",
-    "1db82906 feat(fleet): add Photos tab and enhance vehicle photo display",
-    "f74b5c1d fix(fleet): add license disc data to all vehicle list query branches"
+    "ec4811f0 fix(contractors): add force-dynamic to detail and edit pages",
+    "455ba6cc fix(contractors): use flat update endpoint for edit form",
+    "a0d0ef6e fix(contractors): force no-cache on contractors page",
+    "142216e0 fix(contractors): add credentials to fetch calls for auth",
+    "cdd6b164 fix(contractors): add cache revalidation, suspend/delete separation",
+    "06391c18 fix: show all contractors and default new ones to active"
   ],
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "fleet"
+    "module": "contractors"
   },
-  "next_steps": [
-    "Verify license disc expiry warnings display correctly in browser",
-    "Test photo upload from mobile devices"
-  ]
+  "next_steps": []
 }

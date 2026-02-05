@@ -1,75 +1,46 @@
 /**
  * API Route: /api/technicians
- * 
+ *
  * Technician Directory - List, Create, Update technicians
- * These are field technicians (activators/installers), NOT internal staff.
- * 
- * GET - List technicians with optional filters
+ * Uses wa_contacts table to map WhatsApp phone numbers to formal names.
+ *
+ * GET - List technicians with optional filters and stats
  * POST - Create new technician
- * 
- * @author Jarvis
- * @date 2026-02-01
+ * PUT - Update technician
+ *
+ * @updated 2026-02-05 - Now uses wa_contacts table
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
-import type { Technician, TechnicianSummary, TechnicianFilters } from '@/types/technician.types';
+import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
+import type { TechnicianSummary, TechnicianType, TechnicianStatus } from '@/types/technician.types';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('neon') ? { rejectUnauthorized: false } : undefined,
+  ssl: { rejectUnauthorized: false },
 });
 
-// Ensure technicians table exists
-async function ensureTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS technicians (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      name VARCHAR(255) NOT NULL,
-      phone VARCHAR(50),
-      email VARCHAR(255),
-      type VARCHAR(20) NOT NULL CHECK (type IN ('activator', 'installer')),
-      wa_sender_jid VARCHAR(100),
-      wa_group_jid VARCHAR(100),
-      onemap_installer_name VARCHAR(255),
-      contractor VARCHAR(255),
-      projects TEXT[] DEFAULT '{}',
-      status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'blocked')),
-      notes TEXT,
-      discovered_from VARCHAR(20) CHECK (discovered_from IN ('whatsapp', 'onemap', 'manual')),
-      discovered_at TIMESTAMP WITH TIME ZONE,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_technicians_phone ON technicians(phone);
-    CREATE INDEX IF NOT EXISTS idx_technicians_wa_sender_jid ON technicians(wa_sender_jid);
-    CREATE INDEX IF NOT EXISTS idx_technicians_type ON technicians(type);
-    CREATE INDEX IF NOT EXISTS idx_technicians_status ON technicians(status);
-  `);
-}
-
 async function handler(
-  req: NextApiRequest,
+  req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ) {
   try {
-    await ensureTable();
-
-    if (req.method === 'GET') {
-      return handleGet(req, res);
-    } else if (req.method === 'POST') {
-      return handlePost(req, res);
-    } else {
-      return res.status(405).json({ error: 'Method not allowed' });
+    switch (req.method) {
+      case 'GET':
+        return handleGet(req, res);
+      case 'POST':
+        return handlePost(req, res);
+      case 'PUT':
+        return handlePut(req, res);
+      default:
+        return apiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT']);
     }
   } catch (error) {
     log.error('TechniciansAPI', 'Request failed', { error });
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Internal server error' 
-    });
+    return apiResponse.serverError(res, 'Internal server error');
   }
 }
 
