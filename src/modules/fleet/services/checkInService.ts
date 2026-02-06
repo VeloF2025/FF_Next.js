@@ -344,6 +344,17 @@ export async function createCheckRecord(input: CreateCheckRecordInput): Promise<
     });
   }
 
+  // Record fuel level to history (ensures persistence even if VLM fails)
+  // This captures the final value submitted (whether from VLM auto-fill or manual entry)
+  if (input.fuelLevel !== undefined && input.fuelLevel !== null) {
+    await recordFuelLevel({
+      vehicleId: input.vehicleId,
+      checkRecordId: recordRow.id,
+      fuelLevel: input.fuelLevel,
+      source: input.fuelSource || 'check_in',
+    });
+  }
+
   return rowToCheckRecord(recordRow);
 }
 

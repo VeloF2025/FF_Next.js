@@ -219,6 +219,7 @@ export interface CreateCheckRecordInput {
   odometerReading?: number;
   odometerSource?: OdometerSource; // Track if HITL overrode the value
   fuelLevel?: number; // 0-100 percentage
+  fuelSource?: OdometerSource; // Track if VLM or manual entry (reuses OdometerSource type)
   responses: CreateCheckResponseInput[];
   offlineId?: string; // For offline sync
   hasLowVlmConfidence?: boolean; // True if VLM photos have <50% confidence

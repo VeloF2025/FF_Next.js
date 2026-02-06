@@ -516,6 +516,14 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
         odometerSource = 'vlm';
       }
 
+      // Determine fuel source based on how the value was entered
+      // Priority: vlm (if confidence > 0.5) > check_in (manual entry)
+      let fuelSource: 'check_in' | 'vlm' | 'manual_override' = 'check_in';
+      const fuelVlm = vlmResults.get('fuel_gauge');
+      if (fuelVlm?.extractedNumeric !== null && (fuelVlm?.confidence ?? 0) > 0.5) {
+        fuelSource = 'vlm';
+      }
+
       // Prepare input
       const input: CreateCheckRecordInput = {
         vehicleId: formState.vehicleId,
@@ -525,6 +533,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
         driverName,
         odometerReading: formState.odometerReading ? parseInt(formState.odometerReading, 10) : undefined,
         odometerSource,
+        fuelLevel: formState.fuelLevel ? parseInt(formState.fuelLevel, 10) : undefined,
+        fuelSource,
         responses: Array.from(formState.responses.values()),
         hasLowVlmConfidence, // Pass VLM confidence flag to mark as needing review
       };
@@ -538,6 +548,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
           driverId: input.driverId,
           driverName: input.driverName,
           odometerReading: input.odometerReading || null,
+          fuelLevel: input.fuelLevel || null,
           responses: input.responses,
         });
 
