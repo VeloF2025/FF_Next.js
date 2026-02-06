@@ -153,6 +153,9 @@ export default function VehiclePortalPage() {
   const [receiptPhotoFile, setReceiptPhotoFile] = useState<File | null>(null);
   const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null);
   const [scanningReceipt, setScanningReceipt] = useState(false);
+  const [odometerPhotoFile, setOdometerPhotoFile] = useState<File | null>(null);
+  const [odometerPhotoUrl, setOdometerPhotoUrl] = useState<string | null>(null);
+  const [scanningOdometer, setScanningOdometer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Calibration state
@@ -307,6 +310,8 @@ export default function VehiclePortalPage() {
     });
     setReceiptPhotoFile(null);
     setReceiptPhotoUrl(null);
+    setOdometerPhotoFile(null);
+    setOdometerPhotoUrl(null);
   };
 
   // Handle action selection
@@ -392,6 +397,78 @@ export default function VehiclePortalPage() {
     }
   };
 
+  // Handle odometer scan with VLM
+  const handleOdometerScan = async (file: File) => {
+    setOdometerPhotoFile(file);
+    setOdometerPhotoUrl(URL.createObjectURL(file));
+    setScanningOdometer(true);
+
+    try {
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64Part = result.split(',')[1];
+          if (!base64Part) {
+            reject(new Error('Failed to convert file to base64'));
+            return;
+          }
+          resolve(base64Part);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch(
+        `/api/fleet/vehicles/${verifiedVehicle?.id}/fuel-transactions?action=scan`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ odometerPhotoBase64: base64 }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = data.error?.message || data.message || 'Scan failed';
+        toast.error(`Odometer scan error: ${errorMsg}`);
+        return;
+      }
+
+      const results = data.data?.vlmResults?.odometer;
+
+      if (!results) {
+        toast.error('No data extracted from odometer photo');
+        return;
+      }
+
+      if (results.error) {
+        toast.error(`VLM error: ${results.error}`);
+        return;
+      }
+
+      if (!results.reading) {
+        toast.error('Could not read odometer. Please enter manually.');
+        return;
+      }
+
+      setFuelForm((prev) => ({
+        ...prev,
+        odometerReading: results.reading.toString(),
+      }));
+      toast.success(
+        `Odometer: ${results.reading.toLocaleString()} km (${Math.round((results.confidence || 0) * 100)}% confidence)`
+      );
+    } catch (err) {
+      toast.error('Failed to scan odometer');
+    } finally {
+      setScanningOdometer(false);
+    }
+  };
+
   // Upload photo to server
   const uploadPhoto = async (file: File, folder: string): Promise<string | null> => {
     try {
@@ -452,6 +529,15 @@ export default function VehiclePortalPage() {
         return;
       }
 
+      // Upload odometer photo if provided
+      let uploadedOdometerUrl: string | null = null;
+      if (odometerPhotoFile) {
+        uploadedOdometerUrl = await uploadPhoto(
+          odometerPhotoFile,
+          `fleet/fuel-odometers`
+        );
+      }
+
       // Create transaction
       const response = await fetch(
         `/api/fleet/vehicles/${verifiedVehicle.id}/fuel-transactions`,
@@ -471,6 +557,7 @@ export default function VehiclePortalPage() {
               : undefined,
             stationName: fuelForm.stationName || undefined,
             receiptPhotoUrl: uploadedReceiptUrl,
+            odometerPhotoUrl: uploadedOdometerUrl || undefined,
             source: 'hybrid',
           }),
         }
@@ -989,6 +1076,90 @@ export default function VehiclePortalPage() {
                     />
                     <label
                       htmlFor="receipt-upload"
+                      className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Upload className="w-5 h-5" />
+                      Upload
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Odometer photo section */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <Gauge className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    Odometer Photo
+                  </h3>
+                  <span className="text-xs text-gray-400">(Optional)</span>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Take a photo of your odometer to auto-fill the reading
+                </p>
+
+                {odometerPhotoUrl ? (
+                  <div className="relative">
+                    <img
+                      src={odometerPhotoUrl}
+                      alt="Odometer"
+                      className="w-full h-40 object-cover rounded-lg"
+                    />
+                    {scanningOdometer && (
+                      <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                          <p className="text-sm">Reading odometer...</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setOdometerPhotoFile(null);
+                        setOdometerPhotoUrl(null);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    {fuelForm.odometerReading && (
+                      <div className="absolute bottom-2 left-2 bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium">
+                        {parseInt(fuelForm.odometerReading, 10).toLocaleString()} km
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      id="odometer-camera"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleOdometerScan(file);
+                      }}
+                    />
+                    <label
+                      htmlFor="odometer-camera"
+                      className="flex-1 py-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-5 h-5" />
+                      Camera
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="odometer-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleOdometerScan(file);
+                      }}
+                    />
+                    <label
+                      htmlFor="odometer-upload"
                       className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />
