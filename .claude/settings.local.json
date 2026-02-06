@@ -1199,7 +1199,11 @@
       "Bash(DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require' npx tsx:*)",
       "Bash(AUDIT_ENV=development npx tsx:*)",
       "Bash(docker ps:*)",
-      "Bash(do echo '=== $dr ===' curl -s http://100.96.203.105:8003/api/record/$dr)"
+      "Bash(do echo '=== $dr ===' curl -s http://100.96.203.105:8003/api/record/$dr)",
+      "Bash(sudo apt list:*)",
+      "Bash(sudo snap list:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(sudo -S apt-get install -y libreoffice-writer)"
     ],
     "deny": [],
     "ask": [],

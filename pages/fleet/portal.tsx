@@ -41,6 +41,12 @@ import {
 } from 'lucide-react';
 import { usePortalSession } from '@/modules/fleet/portal';
 import { VehicleCalibrationModal } from '@/modules/fleet/check-in/components/VehicleCalibrationModal';
+import {
+  OfflineBanner,
+  useOnlineStatus,
+  useServiceWorker,
+  offlineStorage,
+} from '@/modules/fleet/offline';
 
 // Types
 interface AssignedDriver {
@@ -110,6 +116,17 @@ export default function VehiclePortalPage() {
     logout,
   } = usePortalSession();
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Offline support hooks
+  const { isOnline } = useOnlineStatus();
+  const { isRegistered: swRegistered } = useServiceWorker();
+
+  // Initialize offline storage on mount
+  useEffect(() => {
+    offlineStorage.init().catch((err) => {
+      console.error('[Portal] Failed to init offline storage:', err);
+    });
+  }, []);
 
   // State
   const [step, setStep] = useState<PortalStep>('capture');
@@ -592,6 +609,9 @@ export default function VehiclePortalPage() {
         <title>Vehicle Portal | FibreFlow</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </Head>
+
+      {/* Offline Status Banner */}
+      <OfflineBanner className="sticky top-0 z-50" />
 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
         {/* Header */}
