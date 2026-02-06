@@ -151,6 +151,21 @@ async function handler(
           ORDER BY oh.recorded_at DESC
           LIMIT 1
         ) as odometer_history,
+        -- Get fuel history
+        (
+          SELECT json_build_object(
+            'fuelLevel', fh.fuel_level,
+            'previousLevel', fh.previous_level,
+            'levelChange', fh.level_change,
+            'vlmConfidence', fh.vlm_confidence,
+            'source', fh.source,
+            'recordedAt', fh.recorded_at
+          )
+          FROM fleet_fuel_history fh
+          WHERE fh.check_record_id = cr.id
+          ORDER BY fh.recorded_at DESC
+          LIMIT 1
+        ) as fuel_history,
         -- Get photos for the check-in
         (
           SELECT json_agg(json_build_object(

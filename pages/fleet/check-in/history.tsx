@@ -24,6 +24,7 @@ import {
   Car,
   User,
   Gauge,
+  Fuel,
   Eye,
   Activity,
   Trash2,
@@ -52,6 +53,15 @@ interface OdometerHistory {
   discrepancyFlag: boolean;
   discrepancyReason: string | null;
   vlmConfidence: number;
+  source: string;
+  recordedAt: string;
+}
+
+interface FuelHistory {
+  fuelLevel: number;
+  previousLevel: number | null;
+  levelChange: number | null;
+  vlmConfidence: number | null;
   source: string;
   recordedAt: string;
 }
@@ -86,6 +96,7 @@ interface CheckRecord {
   created_at: string;
   vlm_results: VlmResult[] | null;
   odometer_history: OdometerHistory | null;
+  fuel_history: FuelHistory | null;
   photos: CheckPhoto[] | null;
 }
 
@@ -491,6 +502,9 @@ export default function CheckInHistoryPage() {
                   Odometer
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">
+                  Fuel
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">
                   Status
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">
@@ -504,14 +518,14 @@ export default function CheckInHistoryPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Loading...
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     No records found
                   </td>
                 </tr>
@@ -579,6 +593,23 @@ export default function CheckInHistoryPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        {record.fuel_history?.fuelLevel !== undefined ? (
+                          <div className="flex items-center gap-2">
+                            <Fuel className="w-4 h-4 text-gray-400" />
+                            <span className="font-mono text-gray-900 dark:text-white">
+                              {record.fuel_history.fuelLevel}%
+                            </span>
+                            {record.fuel_history.levelChange !== null && record.fuel_history.levelChange !== 0 && (
+                              <span className={`text-xs ${record.fuel_history.levelChange > 0 ? 'text-green-500' : 'text-amber-500'}`}>
+                                {record.fuel_history.levelChange > 0 ? '+' : ''}{record.fuel_history.levelChange}%
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">{getStatusBadge(record)}</td>
                       <td className="px-4 py-3">{getApprovalBadge(record.status)}</td>
                       <td className="px-4 py-3">
@@ -616,7 +647,7 @@ export default function CheckInHistoryPage() {
                     {/* Expanded details */}
                     {expandedId === record.id && (
                       <tr className="bg-gray-50 dark:bg-gray-900/50">
-                        <td colSpan={8} className="px-4 py-4">
+                        <td colSpan={9} className="px-4 py-4">
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* Odometer Details */}
                             {record.odometer_history && (
