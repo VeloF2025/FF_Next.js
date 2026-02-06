@@ -342,6 +342,7 @@ export default function VehiclePortalPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ receiptPhotoBase64: base64 }),
         }
       );
@@ -400,6 +401,7 @@ export default function VehiclePortalPage() {
 
       const response = await fetch('/api/fleet/upload', {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
 
@@ -456,6 +458,7 @@ export default function VehiclePortalPage() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             transactionDate: fuelForm.transactionDate,
             amountRand: amount,
