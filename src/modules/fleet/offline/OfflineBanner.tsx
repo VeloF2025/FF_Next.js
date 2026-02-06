@@ -1,69 +1,61 @@
 /**
  * Offline Banner Component
- * Displays connection status and pending sync items for fleet portal
+ * Displays connection status, pending sync items, and sync progress
  */
 
 import React, { useEffect, useState } from 'react';
-import { WifiOff, RefreshCw, Check, AlertTriangle, Cloud, CloudOff } from 'lucide-react';
+import {
+  WifiOff,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  Cloud,
+  CloudOff,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
 import { useOnlineStatus } from './useOnlineStatus';
-import { offlineStorage } from './offlineStorage';
+import { useOfflineSync } from './useOfflineSync';
 
 interface OfflineBannerProps {
-  onSyncRequested?: () => void;
   className?: string;
 }
 
-export function OfflineBanner({ onSyncRequested, className = '' }: OfflineBannerProps) {
+export function OfflineBanner({ className = '' }: OfflineBannerProps) {
   const { isOnline, wasOffline } = useOnlineStatus();
-  const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const {
+    isSyncing,
+    progress,
+    lastSyncResult,
+    pendingCount,
+    fuelCount,
+    checkInCount,
+    triggerSync,
+  } = useOfflineSync();
+
+  const [showSuccess, setShowSuccess] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
 
-  // Check pending items count
+  // Determine if banner should show
   useEffect(() => {
-    const checkPending = async () => {
-      try {
-        const count = await offlineStorage.getPendingCount();
-        setPendingCount(count);
-        setShowBanner(!isOnline || count > 0);
-      } catch (error) {
-        console.error('[OfflineBanner] Error checking pending count:', error);
-      }
-    };
+    setShowBanner(!isOnline || pendingCount > 0 || isSyncing || showSuccess);
+  }, [isOnline, pendingCount, isSyncing, showSuccess]);
 
-    checkPending();
-
-    // Re-check when online status changes
-    const interval = setInterval(checkPending, 5000);
-    return () => clearInterval(interval);
-  }, [isOnline]);
-
-  // Auto-sync when coming back online
+  // Show success message briefly after sync completes
   useEffect(() => {
-    if (wasOffline && isOnline && pendingCount > 0) {
-      handleSync();
+    if (lastSyncResult?.success && lastSyncResult.synced > 0) {
+      setShowSuccess(true);
+      const timer = setTimeout(() => setShowSuccess(false), 4000);
+      return () => clearTimeout(timer);
     }
-  }, [wasOffline, isOnline, pendingCount]);
+  }, [lastSyncResult]);
 
   const handleSync = async () => {
     if (isSyncing || !isOnline) return;
-
-    setIsSyncing(true);
-    try {
-      if (onSyncRequested) {
-        await onSyncRequested();
-      }
-      // Refresh count after sync
-      const count = await offlineStorage.getPendingCount();
-      setPendingCount(count);
-    } catch (error) {
-      console.error('[OfflineBanner] Sync failed:', error);
-    } finally {
-      setIsSyncing(false);
-    }
+    await triggerSync();
   };
 
-  // Don't show banner if online and no pending items
+  // Don't show banner if online, no pending, not syncing, no success message
   if (!showBanner) return null;
 
   // Offline state
@@ -73,7 +65,7 @@ export function OfflineBanner({ onSyncRequested, className = '' }: OfflineBanner
         className={`bg-amber-500/90 backdrop-blur-sm text-white px-4 py-3 flex items-center justify-between ${className}`}
       >
         <div className="flex items-center gap-3">
-          <CloudOff className="w-5 h-5" />
+          <CloudOff className="w-5 h-5 flex-shrink-0" />
           <div>
             <p className="font-medium text-sm">You&apos;re offline</p>
             <p className="text-xs text-amber-100">
@@ -84,10 +76,84 @@ export function OfflineBanner({ onSyncRequested, className = '' }: OfflineBanner
           </div>
         </div>
         {pendingCount > 0 && (
-          <div className="bg-amber-600/50 px-3 py-1 rounded-full">
+          <div className="bg-amber-600/50 px-3 py-1 rounded-full flex-shrink-0">
             <span className="text-sm font-medium">{pendingCount} pending</span>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Syncing in progress
+  if (isSyncing && progress) {
+    const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+    return (
+      <div
+        className={`bg-blue-500/90 backdrop-blur-sm text-white px-4 py-3 ${className}`}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <RefreshCw className="w-5 h-5 animate-spin flex-shrink-0" />
+            <div>
+              <p className="font-medium text-sm">
+                Syncing... {progress.completed}/{progress.total}
+              </p>
+              <p className="text-xs text-blue-100">
+                {progress.current || 'Preparing...'}
+              </p>
+            </div>
+          </div>
+          <span className="text-sm font-bold">{percent}%</span>
+        </div>
+        {/* Progress bar */}
+        <div className="w-full bg-blue-400/30 rounded-full h-1.5">
+          <div
+            className="bg-white h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Sync completed with errors
+  if (lastSyncResult && !lastSyncResult.success && lastSyncResult.failed > 0) {
+    return (
+      <div
+        className={`bg-red-500/90 backdrop-blur-sm text-white px-4 py-3 flex items-center justify-between ${className}`}
+      >
+        <div className="flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-sm">
+              Sync partially failed
+            </p>
+            <p className="text-xs text-red-100">
+              {lastSyncResult.synced} synced, {lastSyncResult.failed} failed
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleSync}
+          className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span className="text-sm font-medium">Retry</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Sync completed successfully
+  if (showSuccess) {
+    return (
+      <div
+        className={`bg-green-500/90 backdrop-blur-sm text-white px-4 py-3 flex items-center gap-3 ${className}`}
+      >
+        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+        <p className="font-medium text-sm">
+          {lastSyncResult?.synced || 0} item{(lastSyncResult?.synced || 0) !== 1 ? 's' : ''} synced successfully!
+        </p>
       </div>
     );
   }
@@ -99,13 +165,15 @@ export function OfflineBanner({ onSyncRequested, className = '' }: OfflineBanner
         className={`bg-blue-500/90 backdrop-blur-sm text-white px-4 py-3 flex items-center justify-between ${className}`}
       >
         <div className="flex items-center gap-3">
-          <Cloud className="w-5 h-5" />
+          <Cloud className="w-5 h-5 flex-shrink-0" />
           <div>
             <p className="font-medium text-sm">
-              {isSyncing ? 'Syncing...' : `${pendingCount} item${pendingCount > 1 ? 's' : ''} pending sync`}
+              {pendingCount} item{pendingCount > 1 ? 's' : ''} pending sync
             </p>
             <p className="text-xs text-blue-100">
-              {isSyncing ? 'Please wait while data is uploaded' : 'Tap sync to upload saved data'}
+              {fuelCount > 0 && `${fuelCount} fuel`}
+              {fuelCount > 0 && checkInCount > 0 && ', '}
+              {checkInCount > 0 && `${checkInCount} check-in${checkInCount > 1 ? 's' : ''}`}
             </p>
           </div>
         </div>
@@ -115,20 +183,20 @@ export function OfflineBanner({ onSyncRequested, className = '' }: OfflineBanner
           className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          <span className="text-sm font-medium">{isSyncing ? 'Syncing' : 'Sync Now'}</span>
+          <span className="text-sm font-medium">Sync Now</span>
         </button>
       </div>
     );
   }
 
-  // Just came back online
+  // Just came back online (wasOffline flag)
   if (wasOffline) {
     return (
       <div
         className={`bg-green-500/90 backdrop-blur-sm text-white px-4 py-3 flex items-center gap-3 ${className}`}
       >
-        <Check className="w-5 h-5" />
-        <p className="font-medium text-sm">Back online - all data synced!</p>
+        <Check className="w-5 h-5 flex-shrink-0" />
+        <p className="font-medium text-sm">Back online!</p>
       </div>
     );
   }
@@ -141,41 +209,34 @@ export function OfflineBanner({ onSyncRequested, className = '' }: OfflineBanner
  */
 export function OfflineIndicator({ className = '' }: { className?: string }) {
   const { isOnline } = useOnlineStatus();
-  const [pendingCount, setPendingCount] = useState(0);
+  const { pendingCount, isSyncing } = useOfflineSync();
 
-  useEffect(() => {
-    const checkPending = async () => {
-      try {
-        const count = await offlineStorage.getPendingCount();
-        setPendingCount(count);
-      } catch {
-        // Ignore errors
-      }
-    };
-    checkPending();
-    const interval = setInterval(checkPending, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (isOnline && pendingCount === 0) return null;
+  if (isOnline && pendingCount === 0 && !isSyncing) return null;
 
   return (
     <div
       className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
-        isOnline
+        !isOnline
+          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : isSyncing
           ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
       } ${className}`}
     >
-      {isOnline ? (
-        <>
-          <Cloud className="w-3 h-3" />
-          <span>{pendingCount}</span>
-        </>
-      ) : (
+      {!isOnline ? (
         <>
           <WifiOff className="w-3 h-3" />
           <span>Offline</span>
+        </>
+      ) : isSyncing ? (
+        <>
+          <RefreshCw className="w-3 h-3 animate-spin" />
+          <span>Syncing</span>
+        </>
+      ) : (
+        <>
+          <Cloud className="w-3 h-3" />
+          <span>{pendingCount}</span>
         </>
       )}
     </div>

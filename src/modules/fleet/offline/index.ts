@@ -37,3 +37,15 @@ export type {
   OfflineCheckInSubmission,
   OfflineSubmitResult,
 } from './offlineSubmit';
+
+// Sync engine
+export {
+  syncOfflineData,
+  hasPendingSync,
+  getSyncStatus,
+  retryFailedItems,
+} from './syncEngine';
+export type { SyncProgress, SyncResult } from './syncEngine';
+
+// Sync hook
+export { useOfflineSync } from './useOfflineSync';
