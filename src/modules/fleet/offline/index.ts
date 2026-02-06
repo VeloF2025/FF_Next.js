@@ -14,3 +14,26 @@ export type {
 export { useOnlineStatus, checkServerReachable } from './useOnlineStatus';
 export { useServiceWorker } from './useServiceWorker';
 export { OfflineBanner, OfflineIndicator } from './OfflineBanner';
+
+// GPS capture
+export {
+  captureGPS,
+  isGeolocationAvailable,
+  watchGPS,
+  stopWatchingGPS,
+  formatCoordinates,
+  calculateDistance,
+} from './gpsCapture';
+export type { GPSCoordinates, GPSCaptureResult } from './gpsCapture';
+
+// Offline submission handlers
+export {
+  saveOfflineFuelTransaction,
+  saveOfflineCheckIn,
+  getPendingSummary,
+} from './offlineSubmit';
+export type {
+  OfflineFuelSubmission,
+  OfflineCheckInSubmission,
+  OfflineSubmitResult,
+} from './offlineSubmit';

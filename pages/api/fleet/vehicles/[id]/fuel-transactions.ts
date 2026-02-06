@@ -99,6 +99,9 @@ interface CreateTransactionRequest {
   receiptPhotoUrl?: string;
   odometerPhotoBase64?: string;
   odometerPhotoUrl?: string;
+  gpsLat?: number;
+  gpsLng?: number;
+  captureTimestamp?: string;
   source?: 'manual' | 'vlm' | 'hybrid';
 }
 
@@ -280,7 +283,10 @@ async function handlePost(
       odometer_photo_url,
       vlm_extracted,
       vlm_verified,
-      source
+      source,
+      gps_lat,
+      gps_lng,
+      capture_timestamp
     ) VALUES (
       ${vehicleId},
       ${body.transactionDate},
@@ -296,7 +302,10 @@ async function handlePost(
       ${body.odometerPhotoUrl || null},
       ${source !== 'manual'},
       ${source === 'manual'},
-      ${source}
+      ${source},
+      ${body.gpsLat || null},
+      ${body.gpsLng || null},
+      ${body.captureTimestamp ? new Date(body.captureTimestamp) : new Date()}
     )
     RETURNING *
   ` as FuelTransactionRow[];

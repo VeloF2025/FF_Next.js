@@ -46,6 +46,8 @@ import {
   useOnlineStatus,
   useServiceWorker,
   offlineStorage,
+  saveOfflineFuelTransaction,
+  captureGPS,
 } from '@/modules/fleet/offline';
 
 // Types
@@ -513,7 +515,7 @@ export default function VehiclePortalPage() {
     }
   };
 
-  // Submit fuel transaction
+  // Submit fuel transaction (handles both online and offline)
   const handleFuelSubmit = async () => {
     if (!verifiedVehicle) return;
 
@@ -535,6 +537,43 @@ export default function VehiclePortalPage() {
 
     setSubmitting(true);
     try {
+      // Check if offline - save locally instead
+      if (!isOnline) {
+        const result = await saveOfflineFuelTransaction({
+          vehicleId: verifiedVehicle.id,
+          vehicleRegistration: verifiedVehicle.registration,
+          transactionDate: fuelForm.transactionDate,
+          amountRand: amount,
+          litres: litres,
+          pricePerLitre: fuelForm.pricePerLitre
+            ? parseFloat(fuelForm.pricePerLitre)
+            : undefined,
+          odometerReading: fuelForm.odometerReading
+            ? parseInt(fuelForm.odometerReading, 10)
+            : undefined,
+          stationName: fuelForm.stationName || undefined,
+          driverName: portalDriver?.name || session?.driverName,
+          receiptPhoto: receiptPhotoFile
+            ? { file: receiptPhotoFile, previewUrl: receiptPhotoUrl || '' }
+            : undefined,
+          odometerPhoto: odometerPhotoFile
+            ? { file: odometerPhotoFile, previewUrl: odometerPhotoUrl || '' }
+            : undefined,
+        });
+
+        if (result.success) {
+          toast.success('Saved offline! Will sync when connected.', {
+            icon: '📱',
+            duration: 4000,
+          });
+          handleReset();
+        } else {
+          toast.error(result.error || 'Failed to save offline');
+        }
+        return;
+      }
+
+      // Online flow - upload and submit to server
       // Upload receipt photo (use flat category - VF Storage doesn't support nested paths)
       const uploadedReceiptUrl = await uploadPhoto(
         receiptPhotoFile,
@@ -554,6 +593,9 @@ export default function VehiclePortalPage() {
           `fleet/fuel-odometers`
         );
       }
+
+      // Capture GPS for the transaction
+      const gpsResult = await captureGPS(5000, true);
 
       // Create transaction
       const response = await fetch(
@@ -575,6 +617,8 @@ export default function VehiclePortalPage() {
             stationName: fuelForm.stationName || undefined,
             receiptPhotoUrl: uploadedReceiptUrl,
             odometerPhotoUrl: uploadedOdometerUrl || undefined,
+            gpsLat: gpsResult.coordinates?.latitude,
+            gpsLng: gpsResult.coordinates?.longitude,
             source: 'hybrid',
           }),
         }
@@ -588,7 +632,43 @@ export default function VehiclePortalPage() {
         toast.error(data.error || 'Failed to save transaction');
       }
     } catch (err) {
-      toast.error('Failed to save transaction');
+      // If online request fails, try saving offline
+      if (!isOnline) {
+        toast.error('Failed to save. Please try again.');
+      } else {
+        // Offer to save offline
+        const result = await saveOfflineFuelTransaction({
+          vehicleId: verifiedVehicle.id,
+          vehicleRegistration: verifiedVehicle.registration,
+          transactionDate: fuelForm.transactionDate,
+          amountRand: amount,
+          litres: litres,
+          pricePerLitre: fuelForm.pricePerLitre
+            ? parseFloat(fuelForm.pricePerLitre)
+            : undefined,
+          odometerReading: fuelForm.odometerReading
+            ? parseInt(fuelForm.odometerReading, 10)
+            : undefined,
+          stationName: fuelForm.stationName || undefined,
+          driverName: portalDriver?.name || session?.driverName,
+          receiptPhoto: receiptPhotoFile
+            ? { file: receiptPhotoFile, previewUrl: receiptPhotoUrl || '' }
+            : undefined,
+          odometerPhoto: odometerPhotoFile
+            ? { file: odometerPhotoFile, previewUrl: odometerPhotoUrl || '' }
+            : undefined,
+        });
+
+        if (result.success) {
+          toast.success('Connection lost. Saved offline for later sync.', {
+            icon: '📱',
+            duration: 4000,
+          });
+          handleReset();
+        } else {
+          toast.error('Failed to save transaction');
+        }
+      }
     } finally {
       setSubmitting(false);
     }
