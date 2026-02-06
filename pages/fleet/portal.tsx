@@ -441,10 +441,10 @@ export default function VehiclePortalPage() {
 
     setSubmitting(true);
     try {
-      // Upload receipt photo
+      // Upload receipt photo (use flat category - VF Storage doesn't support nested paths)
       const uploadedReceiptUrl = await uploadPhoto(
         receiptPhotoFile,
-        `fleet/vehicles/${verifiedVehicle.id}/fuel-receipts`
+        `fleet/fuel-receipts`
       );
 
       if (!uploadedReceiptUrl) {
