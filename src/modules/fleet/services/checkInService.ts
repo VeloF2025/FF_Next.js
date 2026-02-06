@@ -568,6 +568,21 @@ export async function updateCheckRecordStatus(
   return row ? rowToCheckRecord(row) : null;
 }
 
+/**
+ * Delete a check record and all related data (admin only)
+ */
+export async function deleteCheckRecord(recordId: string): Promise<boolean> {
+  // Delete in order: VLM results -> photos -> responses -> odometer history -> fuel history -> record
+  await sql`DELETE FROM fleet_photo_vlm_results WHERE photo_id IN (SELECT id FROM fleet_check_photos WHERE record_id = ${recordId})`;
+  await sql`DELETE FROM fleet_check_photos WHERE record_id = ${recordId}`;
+  await sql`DELETE FROM fleet_check_responses WHERE record_id = ${recordId}`;
+  await sql`DELETE FROM fleet_odometer_history WHERE check_record_id = ${recordId}`;
+  await sql`DELETE FROM fleet_fuel_history WHERE check_record_id = ${recordId}`;
+
+  const result = await sql`DELETE FROM fleet_check_records WHERE id = ${recordId} RETURNING id`;
+  return result.length > 0;
+}
+
 // ============================================================================
 // Photos
 // ============================================================================

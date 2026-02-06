@@ -26,6 +26,7 @@ import {
   Gauge,
   Eye,
   Activity,
+  Trash2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout';
 import toast from 'react-hot-toast';
@@ -198,6 +199,32 @@ export default function CheckInHistoryPage() {
       toast.error('Failed to update status');
     }
   };
+
+  // Handle delete (admin only)
+  const handleDelete = async (id: string, registration: string) => {
+    if (!confirm(`Delete check-in for ${registration}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/fleet/check-in/records/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || 'Failed to delete');
+      }
+
+      toast.success('Check-in deleted');
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    }
+  };
+
+  const isAdmin = currentUser?.role === 'admin';
 
   // Filter records by search term
   const filteredRecords = records.filter((r) => {
@@ -555,24 +582,35 @@ export default function CheckInHistoryPage() {
                       <td className="px-4 py-3">{getStatusBadge(record)}</td>
                       <td className="px-4 py-3">{getApprovalBadge(record.status)}</td>
                       <td className="px-4 py-3">
-                        {record.status === 'pending' && (
-                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          {record.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleApprove(record.id, true)}
+                                className="p-1.5 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                                title="Approve"
+                              >
+                                <ThumbsUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleApprove(record.id, false)}
+                                className="p-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+                                title="Reject"
+                              >
+                                <ThumbsDown className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          {isAdmin && (
                             <button
-                              onClick={() => handleApprove(record.id, true)}
-                              className="p-1.5 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
-                              title="Approve"
+                              onClick={() => handleDelete(record.id, record.registration)}
+                              className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                              title="Delete"
                             >
-                              <ThumbsUp className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleApprove(record.id, false)}
-                              className="p-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
-                              title="Reject"
-                            >
-                              <ThumbsDown className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </td>
                     </tr>
                     {/* Expanded details */}

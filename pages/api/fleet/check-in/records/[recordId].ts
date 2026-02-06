@@ -2,6 +2,7 @@
  * API: Fleet Check-In Record by ID
  * GET /api/fleet/check-in/records/[recordId] - Get record with details
  * PUT /api/fleet/check-in/records/[recordId] - Update status (approve/reject)
+ * DELETE /api/fleet/check-in/records/[recordId] - Delete record (admin only)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -10,7 +11,9 @@ import { withFleetAuth } from '@/lib/auth/middleware';
 import {
   getCheckRecordWithDetails,
   updateCheckRecordStatus,
+  deleteCheckRecord,
 } from '@/modules/fleet/services/checkInService';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { recordId } = req.query;
@@ -46,8 +49,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.success(res, record);
       }
 
+      case 'DELETE': {
+        // Check if user is admin (from auth context)
+        const user = (req as unknown as { user?: { role?: string } }).user;
+        if (!user || user.role !== 'admin') {
+          return apiResponse.error(res, ErrorCode.FORBIDDEN, 'Only admins can delete check-in records');
+        }
+
+        const deleted = await deleteCheckRecord(recordId);
+        if (!deleted) {
+          return apiResponse.notFound(res, 'Check-in record', recordId);
+        }
+
+        log.info('FleetCheckInApi', `Check-in record ${recordId} deleted by admin`);
+        return apiResponse.success(res, { deleted: true });
+      }
+
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT']);
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
     return apiResponse.internalError(res, error);
