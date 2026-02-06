@@ -50,9 +50,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       case 'DELETE': {
-        // Check if user is admin (from auth context)
+        // Check if user is admin or super_admin (from auth context)
         const user = (req as unknown as { user?: { role?: string } }).user;
-        if (!user || user.role !== 'admin') {
+        if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
           return apiResponse.error(res, ErrorCode.FORBIDDEN, 'Only admins can delete check-in records');
         }
 

@@ -31,6 +31,10 @@ async function handler(
   }
 
   try {
+    // Get current user from auth context
+    const user = (req as unknown as { user?: { id?: string; role?: string } }).user;
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
     const {
       vehicleId,
       driverId,
@@ -56,7 +60,11 @@ async function handler(
       params.push(vehicleId as string);
     }
 
-    if (driverId) {
+    // Non-admins can only see their own check-ins
+    if (!isAdmin && user?.id) {
+      filters.push(`cr.driver_id = $${paramIndex++}`);
+      params.push(user.id);
+    } else if (driverId) {
       filters.push(`cr.driver_id = $${paramIndex++}`);
       params.push(driverId as string);
     }

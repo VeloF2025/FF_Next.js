@@ -274,17 +274,20 @@
     "ac8d81ed-7cc9-4b7d-ad57-6a4967f090fb": {
       "session_id": "ac8d81ed-7cc9-4b7d-ad57-6a4967f090fb",
       "started_at": "2026-02-05T17:24:16.667Z",
-      "total_input_tokens": 28813,
+      "total_input_tokens": 30043,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.08643899999999999,
-      "tool_calls": 236,
+      "total_cost_usd": 0.090129,
+      "tool_calls": 249,
       "tools_used": {
-        "Read": 73,
+        "Read": 74,
         "Glob": 18,
-        "Grep": 22,
-        "Bash": 98,
+        "Grep": 23,
+        "Bash": 101,
         "Write": 3,
-        "Edit": 22
+        "Edit": 25,
+        "mcp__claude-in-chrome__tabs_context_mcp": 1,
+        "mcp__claude-in-chrome__navigate": 1,
+        "mcp__claude-in-chrome__computer": 3
       }
     }
   }

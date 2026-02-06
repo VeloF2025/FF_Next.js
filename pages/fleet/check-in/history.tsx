@@ -224,7 +224,7 @@ export default function CheckInHistoryPage() {
     }
   };
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   // Filter records by search term
   const filteredRecords = records.filter((r) => {
