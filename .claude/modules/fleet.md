@@ -106,7 +106,7 @@ First Check-In Flow:
 | Driver Leaderboard | `/fleet/drivers` | Performance ranking |
 
 ## Tab Order (Feb 2026)
-Dashboard → Vehicles → Drivers → GPS Investigation → Locations → Fuel → Maintenance → Analytics → Portal → Check-In Audit
+Dashboard → Vehicles → Drivers → GPS Investigation → Locations → Fuel → Maintenance → Analytics → Portal → Check-Ins
 
 ## Vehicles List Defaults
 - **Default filter**: Active vehicles (not all)
@@ -206,6 +206,45 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) ld ON true
 ```
+
+## Recent Changes (Feb 2026)
+- **Merged Audit into History**: Single "Check-Ins" page at `/fleet/check-in/history`
+- **Admin Delete**: Admins/super_admins can delete check-in records (cascading delete)
+- **Access Control**: Non-admins only see their own check-ins
+- **VLM Confidence Flag**: Low confidence (<50%) marks records as needing review
+- **Weekly Check-Ins Verified**: 4 required photos, 16 checklist items, license plate VLM
+
+## Check-In History Page
+Combined audit and history view at `/fleet/check-in/history`:
+
+| Feature | Description |
+|---------|-------------|
+| VLM Results | Shows extracted values with confidence % |
+| Odometer Discrepancies | Flags anomalies (rollback, excessive km) |
+| Approval Actions | Approve/reject with notes |
+| Admin Delete | Red trash icon, confirmation required |
+| Access Control | Non-admins see only their records |
+
+### Delete Cascade Order
+```
+fleet_photo_vlm_results → fleet_check_photos → fleet_check_responses
+→ fleet_odometer_history → fleet_fuel_history → fleet_check_records
+```
+
+## Daily vs Weekly Check-In
+
+| Aspect | Daily | Weekly |
+|--------|-------|--------|
+| Required Photos | 2 (dashboard, fuel) | 4 (front, rear, dashboard, fuel) |
+| Optional Photos | 0 | 3 (under vehicle, license disk, damage) |
+| VLM Analysis | Odometer, fuel | License plate ×2, odometer, fuel |
+| Checklist Items | 2 | 16 (Safety, Exterior, Interior) |
+| Template | "Daily Quick Check" | "Weekly Pre-Trip Inspection" |
+
+### Weekly Checklist Categories
+- **Safety** (3): Warning Lights⚠️, Lights Working, Horn
+- **Exterior** (9): Tyres⚠️, Lights & Indicators⚠️, Mirrors, Windscreen, Wipers, License Disk, Number Plate, Under Vehicle, Exterior Damage
+- **Interior** (4): Seat Position, Mirrors Position, Door Closure, Seatbelts⚠️
 
 ## Recent Changes (Jan 2026)
 - Added `VehicleCalibrationModal` for first-time setup

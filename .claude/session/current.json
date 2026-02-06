@@ -1,87 +1,84 @@
 {
-  "session_id": "2026-02-05-contractors-fix",
-  "started_at": "2026-02-05T15:00:00Z",
-  "last_updated": "2026-02-06T04:04:00.917Z",
+  "session_id": "2026-02-06-fleet-checkin-improvements",
+  "started_at": "2026-02-06T04:30:00Z",
+  "last_updated": "2026-02-06T05:26:14.943Z",
   "working_on": {
-    "task": "Contractors Module - Caching & CRUD Fixes",
+    "task": "Fleet Check-In - Audit Merge & Weekly Verification",
     "status": "completed",
     "progress": [
-      "Fixed new contractors defaulting to isActive=false (invisible after creation)",
-      "Removed is_active filter from contractors list page query",
-      "Added force-dynamic to all contractor pages (list, detail, edit)",
-      "Created /api/contractors-delete endpoint for permanent deletion",
-      "Split UI actions: Suspend (yellow Ban) vs Delete (red Trash)",
-      "Fixed edit form to use flat endpoint /api/contractors-update",
-      "Added credentials: 'include' to all fetch calls",
-      "Cleaned up test contractors from database"
+      "Fixed 'All Passed' showing incorrectly for low VLM confidence photos",
+      "Merged Check-In Audit page into Check-In History page",
+      "Added admin delete capability for check-in records",
+      "Fixed super_admin role not being recognized for delete permissions",
+      "Added access control so non-admins only see their own check-ins",
+      "Verified weekly check-in photos and process works correctly",
+      "Deployed to dev, staging, and production"
     ],
-    "last_action": "Added force-dynamic to contractor detail and edit pages"
+    "last_action": "Updated knowledge base and documentation"
   },
   "learnings": {
-    "server_component_caching": {
-      "problem": "Server Components cache by default, showing stale data",
-      "solution": "Add exports: dynamic='force-dynamic', revalidate=0",
-      "files_affected": "All pages that need fresh data on every request"
+    "vlm_confidence_validation": {
+      "problem": "Photos with 0% VLM confidence (wrong subjects) showed as 'All Passed'",
+      "solution": "Added hasLowVlmConfidence flag, marks records as hasMinorIssues=true",
+      "threshold": "50% confidence - below this triggers review flag"
     },
-    "vercel_dynamic_routes": {
-      "problem": "/api/[id] routes return 405 on Vercel",
-      "solution": "Use flat endpoints: /api/resource-update, /api/resource-delete",
-      "pattern": "Pass ID in request body instead of URL path"
+    "role_check_pattern": {
+      "problem": "super_admin role not recognized, only admin",
+      "solution": "Always check: user.role === 'admin' || user.role === 'super_admin'",
+      "pattern": "const isAdmin = role === 'admin' || role === 'super_admin'"
     },
-    "fetch_credentials": {
-      "problem": "API calls fail silently without auth",
-      "solution": "Always add credentials: 'include' to fetch options"
+    "cascading_delete": {
+      "problem": "Check-in records have related data in multiple tables",
+      "solution": "Delete in order: vlm_results → photos → responses → odometer → fuel → records",
+      "pattern": "Delete children before parent to avoid FK violations"
     },
-    "contractor_linked_records": {
-      "problem": "Delete fails when contractor has linked projects",
-      "check_query": "SELECT COUNT(*) FROM contractor_projects WHERE contractor_id = ?",
-      "solution": "Unlink projects first, or show error to user"
+    "weekly_vs_daily_checkin": {
+      "daily": "2 required photos (dashboard, fuel), 2 checklist items",
+      "weekly": "4 required photos + 3 optional, 16 checklist items in 3 categories",
+      "vlm_weekly": "License plate verification on front/rear photos"
     }
   },
   "bugs_fixed": [
     {
-      "file": "app/(main)/contractors/page.tsx",
-      "issue": "New contractors not showing (filtered by is_active=true, default was false)",
-      "fix": "Removed filter, changed form default to isActive=true"
+      "file": "src/modules/fleet/check-in/hooks/useCheckIn.ts",
+      "issue": "Low VLM confidence not flagged",
+      "fix": "Added hasLowVlmConfidence computed value passed to createCheckRecord"
     },
     {
-      "file": "app/(main)/contractors/page.tsx",
-      "issue": "Page showing stale data after mutations",
-      "fix": "Added force-dynamic, revalidate=0, fetchCache='force-no-store'"
+      "file": "pages/api/fleet/check-in/records/[recordId].ts",
+      "issue": "super_admin couldn't delete records",
+      "fix": "Changed role check to include both admin and super_admin"
     },
     {
-      "file": "app/(main)/contractors/[id]/page.tsx",
-      "issue": "Detail page showing cached data",
-      "fix": "Added force-dynamic, revalidate=0"
-    },
-    {
-      "file": "app/(main)/contractors/[id]/edit/page.tsx",
-      "issue": "Edit page showing cached data",
-      "fix": "Added force-dynamic, revalidate=0"
-    },
-    {
-      "file": "src/components/contractors/ContractorForm.tsx",
-      "issue": "Edit not persisting - using broken /api/contractors/[id]",
-      "fix": "Changed to /api/contractors-update flat endpoint with credentials"
-    },
-    {
-      "file": "src/components/contractors/ContractorsList.tsx",
-      "issue": "Only suspend available, no permanent delete",
-      "fix": "Added separate Delete button with /api/contractors-delete endpoint"
+      "file": "pages/api/fleet/check-in/audit.ts",
+      "issue": "Non-admins could see all check-ins",
+      "fix": "Added driver_id filter for non-admin users"
     }
   ],
-  "commits": [
-    "ec4811f0 fix(contractors): add force-dynamic to detail and edit pages",
-    "455ba6cc fix(contractors): use flat update endpoint for edit form",
-    "a0d0ef6e fix(contractors): force no-cache on contractors page",
-    "142216e0 fix(contractors): add credentials to fetch calls for auth",
-    "cdd6b164 fix(contractors): add cache revalidation, suspend/delete separation",
-    "06391c18 fix: show all contractors and default new ones to active"
+  "files_changed": [
+    "pages/fleet/check-in/history.tsx - Complete rewrite with audit features",
+    "pages/fleet/check-in/audit.tsx - Deleted (merged into history)",
+    "pages/api/fleet/check-in/records/[recordId].ts - Added DELETE handler",
+    "pages/api/fleet/check-in/audit.ts - Added access control",
+    "src/modules/fleet/services/checkInService.ts - Added deleteCheckRecord",
+    "src/modules/fleet/check-in/hooks/useCheckIn.ts - Added VLM confidence flag",
+    "src/modules/fleet/types/check-in.types.ts - Added hasLowVlmConfidence",
+    "src/modules/navigation/config/modules/fleet.config.ts - Renamed tab to Check-Ins"
   ],
+  "commits": [
+    "7ee06dec fix(fleet): admin role check and access control",
+    "1b77698e feat(fleet): add admin delete for check-in records",
+    "f5407cd4 refactor(fleet): merge check-in audit into history page"
+  ],
+  "deployments": {
+    "dev": "https://dev.fibreflow.app - deployed 2026-02-06",
+    "staging": "https://vf.fibreflow.app - deployed 2026-02-06",
+    "production": "https://app.fibreflow.app - deployed 2026-02-06"
+  },
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "contractors"
+    "module": "fleet"
   },
   "next_steps": []
 }
