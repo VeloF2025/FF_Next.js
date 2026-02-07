@@ -72,7 +72,14 @@ export function getActiveTabByPath(
   }
 
   // Check if path starts with tab path (for nested routes)
-  for (const tab of config.tabs) {
+  // Sort by path length descending to find most specific match first
+  const sortedTabs = [...config.tabs].sort((a, b) => {
+    const aPath = a.path.split('?')[0]?.replace(/\/$/, '') || '';
+    const bPath = b.path.split('?')[0]?.replace(/\/$/, '') || '';
+    return bPath.length - aPath.length;
+  });
+
+  for (const tab of sortedTabs) {
     const tabPath = tab.path.split('?')[0]?.replace(/\/$/, '') || '';
     if (normalizedPath.startsWith(tabPath + '/')) {
       return tab;
