@@ -150,8 +150,10 @@ async function handler(
         return handlePost(req, res, vehicleId);
       case 'PATCH':
         return handlePatch(req, res, vehicleId);
+      case 'DELETE':
+        return handleDelete(req, res, vehicleId);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'Unknown', ['GET', 'POST', 'PATCH']);
+        return apiResponse.methodNotAllowed(res, req.method || 'Unknown', ['GET', 'POST', 'PATCH', 'DELETE']);
     }
   } catch (error) {
     log.error('Fleet fuel transactions API error', { error, vehicleId });
@@ -250,16 +252,23 @@ async function handlePost(
   }
 
   // Get previous transaction for km calculation
-  const previousTx = await sql`
-    SELECT odometer_reading FROM fleet_fuel_transactions
-    WHERE vehicle_id = ${vehicleId} AND odometer_reading IS NOT NULL
-    ORDER BY transaction_date DESC, created_at DESC
-    LIMIT 1
-  ` as Array<{ odometer_reading: number }>;
+  // Find the transaction with the highest odometer reading LESS than the current one
+  let previousOdometer: number | null = null;
 
-  const previousOdometer = previousTx[0]?.odometer_reading ?? null;
+  if (body.odometerReading) {
+    const previousTx = await sql`
+      SELECT odometer_reading FROM fleet_fuel_transactions
+      WHERE vehicle_id = ${vehicleId}
+        AND odometer_reading IS NOT NULL
+        AND odometer_reading < ${body.odometerReading}
+      ORDER BY odometer_reading DESC
+      LIMIT 1
+    ` as Array<{ odometer_reading: number }>;
 
-  // Calculate fuel efficiency
+    previousOdometer = previousTx[0]?.odometer_reading ?? null;
+  }
+
+  // Calculate fuel efficiency (only if we have both current and previous odometer)
   let kmSinceLastFill: number | null = null;
   let litresPer100km: number | null = null;
 
@@ -472,24 +481,30 @@ async function handlePatch(
   let kmSinceLastFill = current.km_since_last_fill;
   let litresPer100km = current.litres_per_100km ? parseFloat(current.litres_per_100km) : null;
 
-  if (odometerReading !== current.odometer_reading) {
-    // Get previous transaction's odometer
+  if (odometerReading !== current.odometer_reading && odometerReading) {
+    // Find the transaction with the highest odometer reading LESS than the new one
+    // Exclude the current transaction being edited
     const previousTx = await sql`
       SELECT odometer_reading FROM fleet_fuel_transactions
       WHERE vehicle_id = ${vehicleId}
         AND odometer_reading IS NOT NULL
-        AND transaction_date < ${transactionDate}
-      ORDER BY transaction_date DESC, created_at DESC
+        AND odometer_reading < ${odometerReading}
+        AND id != ${body.transactionId}
+      ORDER BY odometer_reading DESC
       LIMIT 1
     ` as Array<{ odometer_reading: number }>;
 
     const previousOdometer = previousTx[0]?.odometer_reading ?? null;
 
-    if (odometerReading && previousOdometer) {
+    if (previousOdometer) {
       kmSinceLastFill = odometerReading - previousOdometer;
       if (kmSinceLastFill > 0 && litres > 0) {
         litresPer100km = (litres / kmSinceLastFill) * 100;
       }
+    } else {
+      // No previous odometer - this is the first reading
+      kmSinceLastFill = null;
+      litresPer100km = null;
     }
   }
 
@@ -526,6 +541,51 @@ async function handlePatch(
   });
 
   return apiResponse.success(res, { transaction });
+}
+
+/**
+ * Handle DELETE request for deleting a fuel transaction (admin only)
+ */
+async function handleDelete(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  vehicleId: string
+) {
+  // Check if user is admin or super_admin
+  const user = (req as unknown as { user?: { role?: string } }).user;
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+    return apiResponse.error(res, ErrorCode.FORBIDDEN, 'Only admins can delete fuel transactions');
+  }
+
+  const { transactionId } = req.body;
+
+  if (!transactionId) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Transaction ID is required');
+  }
+
+  // Verify transaction exists and belongs to this vehicle
+  const existingTx = await sql`
+    SELECT id FROM fleet_fuel_transactions
+    WHERE id = ${transactionId} AND vehicle_id = ${vehicleId}
+  `;
+
+  if (existingTx.length === 0) {
+    return apiResponse.notFound(res, 'Fuel transaction', transactionId);
+  }
+
+  // Delete the transaction
+  await sql`
+    DELETE FROM fleet_fuel_transactions
+    WHERE id = ${transactionId}
+  `;
+
+  log.info('Deleted fuel transaction', {
+    vehicleId,
+    transactionId,
+    deletedBy: user.role,
+  });
+
+  return apiResponse.success(res, { deleted: true, transactionId });
 }
 
 export default withFleetAuth(handler);
