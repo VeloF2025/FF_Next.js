@@ -177,12 +177,17 @@ export default function VehiclePortalPage() {
   const [odometerPhotoFile, setOdometerPhotoFile] = useState<File | null>(null);
   const [odometerPhotoUrl, setOdometerPhotoUrl] = useState<string | null>(null);
   const [scanningOdometer, setScanningOdometer] = useState(false);
+  const [fuelGaugePhotoFile, setFuelGaugePhotoFile] = useState<File | null>(null);
+  const [fuelGaugePhotoUrl, setFuelGaugePhotoUrl] = useState<string | null>(null);
+  const [scanningFuelGauge, setScanningFuelGauge] = useState(false);
 
   // File input refs for reliable mobile camera access
   const receiptCameraRef = useRef<HTMLInputElement>(null);
   const receiptUploadRef = useRef<HTMLInputElement>(null);
   const odometerCameraRef = useRef<HTMLInputElement>(null);
   const odometerUploadRef = useRef<HTMLInputElement>(null);
+  const fuelGaugeCameraRef = useRef<HTMLInputElement>(null);
+  const fuelGaugeUploadRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Calibration state
@@ -496,6 +501,78 @@ export default function VehiclePortalPage() {
       toast.error('Failed to scan odometer');
     } finally {
       setScanningOdometer(false);
+    }
+  };
+
+  // Handle fuel gauge scan with VLM
+  const handleFuelGaugeScan = async (file: File) => {
+    setFuelGaugePhotoFile(file);
+    setFuelGaugePhotoUrl(URL.createObjectURL(file));
+    setScanningFuelGauge(true);
+
+    try {
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          const base64Part = result.split(',')[1];
+          if (!base64Part) {
+            reject(new Error('Failed to convert file to base64'));
+            return;
+          }
+          resolve(base64Part);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch(
+        `/api/fleet/vehicles/${verifiedVehicle?.id}/fuel-transactions?action=scan`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ fuelGaugePhotoBase64: base64 }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = data.error?.message || data.message || 'Scan failed';
+        toast.error(`Fuel gauge scan error: ${errorMsg}`);
+        return;
+      }
+
+      const results = data.data?.vlmResults?.fuelGauge;
+
+      if (!results) {
+        toast.error('No data extracted from fuel gauge photo');
+        return;
+      }
+
+      if (results.error) {
+        toast.error(`VLM error: ${results.error}`);
+        return;
+      }
+
+      if (results.level === null || results.level === undefined) {
+        toast.error('Could not read fuel gauge. Please enter manually.');
+        return;
+      }
+
+      setFuelForm((prev) => ({
+        ...prev,
+        fuelLevelAfter: results.level.toString(),
+      }));
+      toast.success(
+        `Fuel level: ${results.level}% (${Math.round((results.confidence || 0) * 100)}% confidence)`
+      );
+    } catch (err) {
+      toast.error('Failed to scan fuel gauge');
+    } finally {
+      setScanningFuelGauge(false);
     }
   };
 
@@ -1290,6 +1367,94 @@ export default function VehiclePortalPage() {
                     <button
                       type="button"
                       onClick={() => odometerUploadRef.current?.click()}
+                      className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Upload className="w-5 h-5" />
+                      Upload
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Fuel gauge photo section */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <Fuel className="w-5 h-5 text-orange-600" />
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    Fuel Gauge Photo
+                  </h3>
+                  <span className="text-xs text-gray-400">(Optional)</span>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Take a photo of your dashboard fuel gauge to auto-fill the tank level
+                </p>
+
+                {fuelGaugePhotoUrl ? (
+                  <div className="relative">
+                    <img
+                      src={fuelGaugePhotoUrl}
+                      alt="Fuel Gauge"
+                      className="w-full h-40 object-cover rounded-lg"
+                    />
+                    {scanningFuelGauge && (
+                      <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                          <p className="text-sm">Reading fuel gauge...</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setFuelGaugePhotoFile(null);
+                        setFuelGaugePhotoUrl(null);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    {fuelForm.fuelLevelAfter && (
+                      <div className="absolute bottom-2 left-2 bg-orange-600 text-white px-3 py-1 rounded-lg text-sm font-medium">
+                        {fuelForm.fuelLevelAfter}%
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <input
+                      ref={fuelGaugeCameraRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="absolute opacity-0 w-0 h-0"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFuelGaugeScan(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fuelGaugeCameraRef.current?.click()}
+                      className="flex-1 py-3 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-5 h-5" />
+                      Camera
+                    </button>
+                    <input
+                      ref={fuelGaugeUploadRef}
+                      type="file"
+                      accept="image/*"
+                      className="absolute opacity-0 w-0 h-0"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFuelGaugeScan(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fuelGaugeUploadRef.current?.click()}
                       className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />

@@ -12,6 +12,7 @@ import { log } from '@/lib/logger';
 import {
   extractFuelReceipt,
   extractOdometerReading,
+  extractFuelLevel,
 } from '@/modules/fleet/services/fleetVlmService';
 
 // Increase body size limit for base64 encoded images (mobile photos can be 3-5MB)
@@ -118,6 +119,7 @@ interface CreateTransactionRequest {
 interface VlmScanRequest {
   receiptPhotoBase64?: string;
   odometerPhotoBase64?: string;
+  fuelGaugePhotoBase64?: string;
 }
 
 interface UpdateTransactionRequest {
@@ -422,11 +424,11 @@ async function handleVlmScan(
 ) {
   const body = req.body as VlmScanRequest;
 
-  if (!body.receiptPhotoBase64 && !body.odometerPhotoBase64) {
+  if (!body.receiptPhotoBase64 && !body.odometerPhotoBase64 && !body.fuelGaugePhotoBase64) {
     return apiResponse.error(
       res,
       ErrorCode.BAD_REQUEST,
-      'At least one photo (receipt or odometer) is required for scanning'
+      'At least one photo (receipt, odometer, or fuel gauge) is required for scanning'
     );
   }
 
@@ -446,6 +448,12 @@ async function handleVlmScan(
       reading: number | null;
       confidence: number;
       rawText: string;
+      error?: string;
+    };
+    fuelGauge?: {
+      level: number | null;
+      confidence: number;
+      description: string;
       error?: string;
     };
   } = {};
@@ -485,12 +493,29 @@ async function handleVlmScan(
     }
   }
 
+  // Process fuel gauge photo
+  if (body.fuelGaugePhotoBase64) {
+    try {
+      const fuelGaugeResult = await extractFuelLevel(body.fuelGaugePhotoBase64);
+      results.fuelGauge = fuelGaugeResult;
+    } catch (error) {
+      results.fuelGauge = {
+        level: null,
+        confidence: 0,
+        description: '',
+        error: error instanceof Error ? error.message : 'VLM extraction failed',
+      };
+    }
+  }
+
   log.info('VLM scan completed', {
     vehicleId,
     hasReceipt: !!body.receiptPhotoBase64,
     hasOdometer: !!body.odometerPhotoBase64,
+    hasFuelGauge: !!body.fuelGaugePhotoBase64,
     receiptConfidence: results.receipt?.confidence ?? null,
     odometerConfidence: results.odometer?.confidence ?? null,
+    fuelGaugeConfidence: results.fuelGauge?.confidence ?? null,
   });
 
   return apiResponse.success(res, {
