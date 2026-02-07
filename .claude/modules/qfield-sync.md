@@ -188,3 +188,99 @@ Coordinates outside these bounds are filtered out:
 - **DR numbers not showing:** Check labeling uses `Pole Nr` field
 - **Dots outside SA:** SA bounds filter should catch these; check raw GPS data
 - **Run `/Qfield` skill** for full management commands
+
+---
+
+## Photo Resizer (Feb 2026)
+
+### Problem
+Users taking photos with native iOS/Android cameras produce 10-20MB images. QFieldCloud's Django memory limit (2.5MB) causes sync failures when these large photos are uploaded.
+
+**QFieldCloud Limits:**
+- nginx: `client_max_body_size 10G` (accepts large uploads)
+- Django: `DATA_UPLOAD_MAX_MEMORY_SIZE: 2621440` (2.5MB memory limit)
+- QField app "Maximum Picture Size" setting only works for photos taken IN QField, not gallery imports
+
+### Solution: Server-Side Resize
+Automated cron job resizes photos after upload using boto3 + PIL inside the qfieldcloud-app-1 container.
+
+### Files
+| File | Purpose |
+|------|---------|
+| `/opt/qfield-sync/resize_photos_boto.py` | Main resize script (boto3 + PIL) |
+| `/opt/qfield-sync/qfield-photo-resize.sh` | Interactive wrapper |
+| `/opt/qfield-sync/qfield-photo-resize-cron.sh` | Silent cron wrapper |
+| `/opt/qfield-sync/photo-resize.log` | Activity log |
+| `/opt/qfield-sync/photo_backups/` | Backup metadata JSONs |
+
+### Configuration
+```python
+MAX_DIMENSION = 2048      # Max width/height
+JPEG_QUALITY = 85         # Compression quality
+MIN_SIZE_MB = 3           # Cron threshold (5MB for manual)
+BUCKET = 'qfieldcloud-prod'
+BACKUP_BUCKET = 'qfieldcloud-backups'
+```
+
+### MinIO Versioned Files
+MinIO stores files with version suffixes: `filename.JPG/vXXXXXXXX-XXXXX`
+
+The script uses regex to detect image files:
+```python
+IMAGE_PATTERN = re.compile(r'\.(jpg|jpeg|png|heic)/v[0-9]+-[a-f0-9]+$|\.(jpg|jpeg|png|heic)$', re.IGNORECASE)
+```
+
+### Cron Schedule
+Runs every 2 hours during working hours (6am-8pm):
+```
+0 6,8,10,12,14,16,18,20 * * * /opt/qfield-sync/qfield-photo-resize-cron.sh
+```
+
+### Commands
+
+**Interactive (on Velocity):**
+```bash
+# Preview (always do first)
+/opt/qfield-sync/qfield-photo-resize.sh --dry-run
+
+# Backup only (no resize)
+/opt/qfield-sync/qfield-photo-resize.sh --backup-only
+
+# Full resize (backup + resize)
+/opt/qfield-sync/qfield-photo-resize.sh
+
+# With options
+/opt/qfield-sync/qfield-photo-resize.sh --max-size 5 --limit 10
+
+# List backups
+/opt/qfield-sync/qfield-photo-resize.sh --list-backups
+
+# Rollback
+/opt/qfield-sync/qfield-photo-resize.sh --rollback BACKUP_ID
+```
+
+**Check logs:**
+```bash
+tail -50 /opt/qfield-sync/photo-resize.log
+```
+
+### Results (Initial Run Feb 2026)
+- **407 files** processed
+- **~1,731MB → ~238MB** (saved ~1.5GB)
+- 84-97% reduction per file
+
+### Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| 0 files found | Regex not matching version suffix | Verify `IMAGE_PATTERN` includes `/v[0-9]+-` |
+| mc not found | Host mc is Midnight Commander | Use boto3 inside container instead |
+| Permission denied | Wrong log path | Use `/opt/qfield-sync/` not `/var/log/` |
+| Container not found | Wrong container name | Use `qfieldcloud-app-1` (has boto3+PIL) |
+
+### Safety Features
+1. **Backup before resize**: All originals copied to `qfieldcloud-backups` bucket
+2. **Rollback capability**: Restore from any backup ID
+3. **Dry-run mode**: Preview without changes
+4. **JSON logs**: Full audit trail in `/opt/qfield-sync/photo_backups/`
+5. **Silent cron**: Only logs when work is done

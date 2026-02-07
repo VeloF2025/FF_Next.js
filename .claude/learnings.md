@@ -4170,3 +4170,52 @@ When auditing UI, check if module predates the dark theme standardization. Look 
 
 These are strong indicators that dark theme variables were not applied.
 
+---
+
+## 2026-02-07: Claude Code Agent Teams Enabled
+
+**What — Multi-agent coordination for complex tasks:**
+Claude Code Agent Teams is an experimental feature that coordinates multiple Claude Code instances working together. One session acts as team lead, others work independently with their own context windows, and they can communicate directly with each other.
+
+**Setup — Three components configured:**
+1. `~/.claude/settings.json` — Added `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"` env var, `teammateMode: "auto"`, and two quality gate hooks
+2. `~/.claude/hooks/teammate-idle-quality-gate.mjs` — Enforces tests/lint/type-check pass before teammates go idle (exit 2 to keep working)
+3. `~/.claude/hooks/task-completed-verification.mjs` — Verifies deliverables and acceptance criteria before marking tasks complete (exit 2 to prevent completion)
+
+**Key Pattern — Opus-as-Orchestrator:**
+```bash
+claude --model opus  # Start with Opus as team lead
+# Then Sonnet/Haiku as teammates for execution
+```
+- Opus coordinates (5% tokens) with superior strategic thinking
+- Sonnet/Haiku execute (95% tokens) for cost efficiency
+
+**When to Use Agent Teams (vs Subagents):**
+| Use Teams | Use Subagents |
+|-----------|---------------|
+| Teammates need to communicate with each other | Only results matter, report back to caller |
+| Complex work requiring discussion/debate | Focused tasks, single deliverable |
+| Research with competing hypotheses | Quick parallel lookups |
+| Cross-layer features (frontend + backend + tests) | Independent subtasks |
+
+**When NOT to Use:**
+- Sequential tasks with dependencies
+- Same-file edits (causes overwrites)
+- Simple bugs or routine work
+- Low-priority issues (token cost is 5x+)
+
+**Critical Gotchas:**
+1. `/resume` and `/rewind` do NOT restore in-process teammates — clean up team before ending session
+2. No file-level locking — assign explicit file ownership per teammate to prevent overwrites
+3. Use `Shift+Tab` for delegate mode if lead starts implementing instead of coordinating
+4. Quality hooks exit 0 on errors (don't block) — only exit 2 to reject and send feedback
+
+**Keyboard Shortcuts (in-process mode):**
+- `Shift+Up/Down` — Select teammate
+- `Enter` — View teammate session
+- `Escape` — Interrupt teammate
+- `Ctrl+T` — Toggle task list
+- `Shift+Tab` — Toggle delegate mode
+
+**Rollback:** `cp ~/.claude/.settings.backup.json ~/.claude/settings.json`
+
