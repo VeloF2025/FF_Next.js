@@ -166,7 +166,80 @@ const result = await extractOntSerialEnhanced(base64Image);
 - `src/modules/activate/services/enhancedBarcodeService.ts`
 - `src/modules/activate/services/barcodeExtractionService.ts`
 
+## Technician Directory & Performance (Feb 2026)
+
+### Overview
+Technicians are field workers who either submit DR photos (activators) or perform installations (installers). They are stored in `wa_contacts` with `role` = 'activator' or 'installer'.
+
+### Data Sources by Role
+| Role | Primary Table | Identifier | Quality Source |
+|------|---------------|------------|----------------|
+| **Activator** | `qa_photo_reviews` | `user_name` (phone) | `dr_photo_unified_reviews` |
+| **Installer** | `drops` | `installed_by_name` | `dr_photo_unified_reviews` |
+
+### Activator Metrics
+| Metric | Source | Formula |
+|--------|--------|---------|
+| Total Submissions | `qa_photo_reviews` | `COUNT(DISTINCT drop_number)` |
+| First Pass Rate | `submission_count = 1` | `first_pass / total * 100` |
+| Serial Compliance | `ont_serial_scanned IS NOT NULL` | `ont_scanned / total * 100` |
+| Resubmission Rate | `submission_count > 1` | `resubmissions / total * 100` |
+
+### Installer Metrics
+| Metric | Source | Formula |
+|--------|--------|---------|
+| Total Installations | `drops` | `COUNT(DISTINCT drop_number)` |
+| QA Pass Rate | `qa_decision = 'PASS'` | `passed / total * 100` |
+| Rework Rate | `qa_decision = 'REWORK_NEEDED'` | `rework / total * 100` |
+| Steps Compliance | 10-step checklist | `AVG(steps_passed) / 10 * 100` |
+| Signal Quality | `vlm_power_meter_dbm` | `AVG(dbm)`, valid range: -18 to -24 |
+| Signal In Range | `dbm BETWEEN -24 AND -18` | `in_range / total * 100` |
+
+### 10-Step Checklist Columns
+```sql
+step_01_house_photo, step_02_cable_from_pole, step_03_entry_outside,
+step_04_entry_inside, step_05_wall, step_06_ont_back,
+step_07_power_meter, step_08_final_installation, step_09_green_lights,
+step_10_signature
+```
+
+### API Endpoints
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/technicians` | GET paginated list with summary stats |
+| `/api/technicians/[id]` | GET technician details |
+| `/api/technicians/[id]/performance` | GET performance metrics with date range |
+
+### Pages
+| Page | Path | Purpose |
+|------|------|---------|
+| Directory | `/activate/technicians` | Technician list with filters |
+| Detail | `/activate/technicians/[id]` | Performance dashboard with Recent DRs |
+
+### Recent DRs Feature
+Both activator and installer detail pages show a "Recent DRs" table with:
+- DR Number, Project, Date, QA Status
+- Activators: Submissions count column (green=1, orange>1)
+- "View DR" link to `/activate/qa-centre/[dropNumber]`
+
+### Time Range Filters
+Preset options: 7D, 30D, 90D, All, Custom (date pickers)
+
+### Files
+```
+pages/activate/technicians/index.tsx    # Directory page
+pages/activate/technicians/[id].tsx     # Detail page with performance
+pages/api/technicians/index.ts          # List API
+pages/api/technicians/[id]/index.ts     # Detail API
+pages/api/technicians/[id]/performance.ts # Performance metrics API
+src/types/technician.types.ts           # TypeScript types
+```
+
 ## Recent Changes (Feb 2026)
+- **Technician Recent DRs** (2026-02-07) - Added Recent DRs list to activator/installer detail pages with "View DR" links to QA Centre. Activators show submission count column, installers show QA decision status.
+- **Installer Signal Quality** (2026-02-07) - Added dB signal quality metrics (avg dBm, % in valid range -18 to -24) for installers using `vlm_power_meter_dbm` from unified reviews.
+- **Time Range Filters** (2026-02-07) - Added 7D/30D/90D/All/Custom date range filters to technician detail pages.
+- **Navigation Tab Fix** (2026-02-07) - Fixed tab highlighting for nested routes by sorting tabs by path length (longest first) before matching.
 - **Zone/PON Stats Alignment** (2026-02-05) - Fixed zone/PON totals not matching project totals. Root cause: `drops.ts` and `reportingService.ts` used different date filters and missing `is_oes_only` filter. Fix: aligned `getDailyCountsWithBreakdown()` to use `submitted_date` (no COALESCE) and added `is_oes_only` filter. **CRITICAL**: Multiple APIs showing same data MUST use identical query logic.
 
 ## Recent Changes (Jan 2026)

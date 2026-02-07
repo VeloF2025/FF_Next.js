@@ -1,146 +1,139 @@
 {
-  "session_id": "2026-02-07-fleet-fuel-transactions",
+  "session_id": "2026-02-07-technician-stats",
   "started_at": "2026-02-07T06:00:00Z",
-  "last_updated": "2026-02-07T12:03:32.543Z",
+  "last_updated": "2026-02-07T12:46:38.099Z",
   "working_on": {
-    "task": "Fleet Fuel Transaction Enhancements",
+    "task": "Technician Stats & Recent DRs Feature",
     "status": "completed",
     "progress": [
-      "Fixed mobile receipt photo scanning (increased body size limit to 10MB)",
-      "Fixed price/L calculation to always calculate from amount/litres",
-      "Added admin delete capability for fuel transactions",
-      "Fixed L/100km calculation to use odometer-based lookup",
-      "Added delete button UI for admin/super_admin users",
-      "Added auto-recalculate L/100km after transaction deletion",
-      "Fixed stats API to use fleet_odometer_history as single source of truth",
-      "Added fuel transaction odometer sync to fleet_odometer_history",
-      "Added Tank Level After (%) field to portal fuel form",
-      "Added Fuel Gauge Photo scanning with VLM to portal",
-      "Added fuel level sync to fleet_fuel_history when submitting fuel transaction",
-      "Fixed source badge display to show 'Fuel' for fuel_transaction entries",
-      "Deployed all changes to dev, staging, and production"
+      "Fixed installer performance API step column names (10 steps, not 12)",
+      "Fixed navigation tab highlighting for nested routes",
+      "Added dB signal quality metrics for installers",
+      "Added time range filters (7D, 30D, 90D, All, Custom)",
+      "Added Recent DRs list with links to QA Centre",
+      "Verified all stats against database for both installers and activators",
+      "Deployed to dev, staging, and production",
+      "Updated activate.md KB with technician documentation"
     ],
-    "last_action": "Deployed fuel gauge photo scanning and tank level sync to all environments"
+    "last_action": "Updated KB and session learnings"
   },
   "learnings": {
-    "mobile_photo_upload": {
-      "problem": "Receipt photos from mobile (3-5MB) exceeded Next.js default 1MB body limit",
-      "solution": "Add export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }",
-      "pattern": "Always increase body size limit for endpoints accepting base64 images"
+    "installer_vs_activator_data_sources": {
+      "problem": "Installers and activators have different data sources and metrics",
+      "solution": "Activators: qa_photo_reviews (submissions), Installers: drops (installations)",
+      "pattern": "Use role-based conditional queries: if (tech.type === 'installer') return getInstallerPerformance(...)"
     },
-    "price_per_litre_calculation": {
-      "problem": "VLM-extracted price/L may not match due to receipt rounding",
-      "solution": "Always calculate price/L from amount/litres for accuracy",
-      "pattern": "const pricePerLitre = amountRand / litres; // Never trust VLM for derived values"
+    "step_column_names": {
+      "problem": "Migration file had 12 steps but actual table only has 10",
+      "solution": "Actual columns: step_01_house_photo through step_10_signature",
+      "pattern": "Always check qa-review-history.ts or DB schema for actual column names before using"
     },
-    "fuel_efficiency_calculation": {
-      "problem": "L/100km was using date-based previous lookup, could be wrong order",
-      "solution": "Use odometer-based lookup: find highest odometer < current odometer",
-      "pattern": "WHERE odometer_reading < ${currentOdometer} ORDER BY odometer_reading DESC LIMIT 1"
+    "navigation_tab_highlighting": {
+      "problem": "Dashboard tab highlighted instead of Technicians when on detail page",
+      "root_cause": "Tab matching iterated in order, /activate matched before /activate/technicians",
+      "solution": "Sort tabs by path length (longest first) before matching",
+      "pattern": "const sortedTabs = [...tabs].sort((a, b) => b.path.length - a.path.length)"
     },
-    "recalculate_on_delete": {
-      "problem": "Deleting transactions leaves stale L/100km values on remaining entries",
-      "solution": "After delete, recalculate all entries: first entry = null, subsequent = (litres/km_diff)*100",
-      "pattern": "ORDER BY odometer_reading ASC, first entry NULL, loop through rest calculating from previous"
+    "signal_quality_valid_range": {
+      "problem": "Need to show what percentage of dB readings are in valid range",
+      "solution": "Valid dBm range is -18 to -24 dBm",
+      "pattern": "COUNT(*) FILTER (WHERE vlm_power_meter_dbm BETWEEN -24 AND -18)"
     },
-    "odometer_stats_consistency": {
-      "problem": "Distance Travelled card showed different 'Latest' km than Odometer Tracking section",
-      "root_cause": "Stats API used fleet_check_records (with bad data) while Odometer Tracking used fleet_odometer_history",
-      "solution": "Changed stats API to use fleet_odometer_history as single source of truth",
-      "pattern": "SELECT MAX(reading) as latest_reading FROM fleet_odometer_history WHERE vehicle_id = $1"
+    "recent_drs_by_role": {
+      "problem": "Activators and installers need different DR queries",
+      "solution": "Activators: JOIN qa_photo_reviews, Installers: JOIN drops",
+      "pattern": "Activators show submission_count column, installers show qa_decision"
     },
-    "fuel_transaction_odometer_sync": {
-      "problem": "Fuel transaction odometer readings not reflected in odometer history stats",
-      "solution": "When fuel transaction is created with odometer, also insert into fleet_odometer_history",
-      "pattern": "INSERT INTO fleet_odometer_history (vehicle_id, reading, source, ...) VALUES (..., 'fuel_transaction', ...)"
+    "stats_verification_process": {
+      "problem": "Need to verify UI stats match database",
+      "solution": "Use browser screenshot + DB query comparison",
+      "pattern": "Screenshot browser → Query same data from DB → Compare each metric"
     },
-    "fuel_level_sync": {
-      "problem": "Fuel level from fill-ups not reflected in Fuel Level History on Odometer tab",
-      "solution": "When fuel transaction is created with fuelLevelAfter, also insert into fleet_fuel_history",
-      "pattern": "INSERT INTO fleet_fuel_history (vehicle_id, fuel_level, source, ...) VALUES (..., 'fuel_transaction', ...)"
-    },
-    "portal_vs_detail_page_forms": {
-      "problem": "Portal form (/fleet/portal) was missing fields that vehicle detail page modal had",
-      "solution": "Keep both forms in sync - any field added to one must be added to the other",
-      "pattern": "Portal is for mobile drivers, detail page is for admins - both need same capabilities"
-    },
-    "source_badge_display": {
-      "problem": "Source display logic only handled 'vlm', everything else showed 'Manual'",
-      "solution": "Add explicit handling for 'fuel_transaction' source to show 'Fuel' badge",
-      "pattern": "reading.source === 'fuel_transaction' ? 'Fuel' : reading.source === 'vlm' ? 'VLM' : 'Manual'"
+    "ten_step_checklist": {
+      "columns": [
+        "step_01_house_photo",
+        "step_02_cable_from_pole",
+        "step_03_entry_outside",
+        "step_04_entry_inside",
+        "step_05_wall",
+        "step_06_ont_back",
+        "step_07_power_meter",
+        "step_08_final_installation",
+        "step_09_green_lights",
+        "step_10_signature"
+      ],
+      "formula": "AVG(steps_passed) / 10.0 * 100 = avg_steps_compliance %"
     }
   },
   "features_added": [
     {
-      "feature": "Fuel Gauge Photo Scanning",
+      "feature": "Recent DRs List",
       "files": [
-        "pages/fleet/portal.tsx - Added photo section, refs, handler function",
-        "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Added fuelGaugePhotoBase64 scanning"
+        "pages/api/technicians/[id]/performance.ts - Added recentDRs query for both types",
+        "pages/activate/technicians/[id].tsx - Added RecentDRsList component"
       ],
-      "description": "Drivers can take photo of dashboard fuel gauge, VLM extracts percentage"
+      "description": "Shows up to 50 DRs worked on with View DR links to /activate/qa-centre/[dropNumber]"
     },
     {
-      "feature": "Tank Level Sync to History",
+      "feature": "Signal Quality Metrics",
       "files": [
-        "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Added fuelLevelAfter sync to fleet_fuel_history"
+        "pages/api/technicians/[id]/performance.ts - Added dB metrics query",
+        "pages/activate/technicians/[id].tsx - Added Signal Quality stat card",
+        "src/types/technician.types.ts - Added avgDbReading, dbInRangeCount, dbInRangeRate"
       ],
-      "description": "When fuel transaction includes tank level, it syncs to fuel history for tracking"
+      "description": "Shows avg dBm and % in valid range (-18 to -24) for installers"
     },
     {
-      "feature": "Fuel Source Badge",
+      "feature": "Time Range Filters",
       "files": [
-        "pages/fleet/vehicles/[id].tsx - Added 'Fuel' badge display for fuel_transaction source"
+        "pages/activate/technicians/[id].tsx - Added TimeRangeSelector component"
       ],
-      "description": "Reading History and Fuel Level History show green 'Fuel' badge for fuel transaction entries"
+      "description": "7D, 30D, 90D, All presets plus Custom date picker with from/to inputs"
     }
   ],
   "bugs_fixed": [
     {
-      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
-      "issue": "Mobile receipt photos failed to upload (body too large)",
-      "fix": "Added sizeLimit: '10mb' to bodyParser config"
+      "file": "pages/api/technicians/[id]/performance.ts",
+      "issue": "Step columns step_08_ont_barcode, step_11, step_12 don't exist",
+      "fix": "Changed to correct 10-step columns ending with step_08_final_installation, step_09_green_lights, step_10_signature"
     },
     {
-      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
-      "issue": "Price/L showed VLM value instead of calculated value",
-      "fix": "Changed to always calculate: pricePerLitre = amountRand / litres"
-    },
-    {
-      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
-      "issue": "L/100km calculation used date-based previous odometer",
-      "fix": "Changed to odometer-based lookup for correct sequence"
-    },
-    {
-      "file": "pages/api/fleet/vehicles/[id]/stats.ts",
-      "issue": "Stats showed wrong 'Latest' km from bad check_records data",
-      "fix": "Changed to use fleet_odometer_history as single source of truth"
-    },
-    {
-      "file": "pages/fleet/vehicles/[id].tsx",
-      "issue": "Source badge showed 'Manual' for fuel_transaction entries",
-      "fix": "Added explicit handling to show 'Fuel' with green badge"
+      "file": "src/modules/navigation/config/registry.ts",
+      "issue": "Wrong tab highlighted on technician detail page (/activate instead of /activate/technicians)",
+      "fix": "Sort tabs by path length descending before matching to find most specific match first"
     }
   ],
   "files_changed": [
-    "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Body size, price calc, L/100km calc, DELETE, odometer sync, fuel level sync, fuel gauge scanning",
-    "pages/fleet/vehicles/[id].tsx - Delete button, source badge display for 'Fuel'",
-    "pages/api/fleet/vehicles/[id]/stats.ts - Use fleet_odometer_history for stats",
-    "pages/fleet/portal.tsx - Added fuelLevelAfter field, Fuel Gauge Photo section with VLM scanning",
-    "src/modules/fleet/offline/offlineStorage.ts - Added fuelLevelAfter to PendingFuelTransaction",
-    "src/modules/fleet/offline/offlineSubmit.ts - Added fuelLevelAfter to submission interface"
+    "pages/api/technicians/[id]/performance.ts - Fixed step columns, added dB metrics, added recentDRs queries",
+    "pages/activate/technicians/[id].tsx - Added TimeRangeSelector, Signal Quality card, RecentDRsList component",
+    "src/modules/navigation/config/registry.ts - Fixed tab matching by sorting by path length",
+    "src/types/technician.types.ts - Added dB metrics and recentDRs to InstallerPerformance and ActivatorPerformance"
   ],
-  "commits": [
-    "1fe55a7f fix(fleet): improve receipt scan error logging for debugging",
-    "cd7f0150 fix(fleet): increase body size limit for receipt photo scanning",
-    "5ac7fce2 fix(fleet): always calculate price/L from amount/litres",
-    "d4559f8b feat(fleet): add admin delete for fuel transactions, fix L/100km calc",
-    "add794b8 feat(fleet): add delete button for fuel transactions (admin only)",
-    "ca3e4cac feat(fleet): recalculate L/100km after fuel transaction delete",
-    "cf39adac fix(fleet): use odometer history as single source of truth for stats",
-    "d2986151 feat(fleet): add tank level field to portal fuel fill-up form",
-    "7172ee8a feat(fleet): add fuel gauge photo scanning to portal",
-    "3c732141 fix(fleet): show 'Fuel' source badge for fuel_transaction entries"
-  ],
+  "verification": {
+    "installer_bella": {
+      "id": "47be3fa5-581a-4bf5-834b-8edd879909d6",
+      "name": "Bella",
+      "metrics_verified": {
+        "total_installations": "79 ✅",
+        "qa_pass_rate": "3% (2/79) ✅",
+        "rework_rate": "0% ✅",
+        "steps_compliance": "44% ✅",
+        "signal_quality": "-18 dBm, 90% in range ✅",
+        "active_days": "2 ✅"
+      }
+    },
+    "activator_katkoopedi": {
+      "id": "c716537c-b752-4973-b64e-7b4a49ec1529",
+      "name": "katkoopedi",
+      "metrics_verified": {
+        "total_submissions": "175 ✅",
+        "first_pass_rate": "100% ✅",
+        "serial_compliance": "96% (ONT: 168, UPS: 168) ✅",
+        "resubmission_rate": "0% ✅",
+        "active_days": "18 ✅"
+      }
+    }
+  },
   "deployments": {
     "dev": "https://dev.fibreflow.app - deployed 2026-02-07",
     "staging": "https://vf.fibreflow.app - deployed 2026-02-07",
@@ -149,7 +142,7 @@
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "fleet"
+    "module": "activate/technicians"
   },
   "next_steps": []
 }
