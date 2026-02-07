@@ -60,6 +60,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const queue = queueResult.rows[0] || { pending: 0, completed: 0, processing: 0, errors: 0, total: 0 };
 
+    // Get live mismatch type counts from completed queue items
+    const liveCountsResult = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE mismatch_type = 'match')::int AS queue_matches,
+         COUNT(*) FILTER (WHERE mismatch_type LIKE 'note4%')::int AS queue_mismatches,
+         COUNT(*) FILTER (WHERE mismatch_type = 'note2_not_on_1map')::int AS queue_not_found,
+         COUNT(*) FILTER (WHERE mismatch_type = 'note4_ups_swap')::int AS queue_swaps
+       FROM olt_onemap_lookup_queue
+       WHERE oes_batch_id = $1 AND status = 'completed'`,
+      [run.oes_batch_id]
+    );
+    const live = liveCountsResult.rows[0] || { queue_matches: 0, queue_mismatches: 0, queue_not_found: 0, queue_swaps: 0 };
+
+    // Combine cache-phase counts with live queue counts
+    const totalMatches = (run.matches || 0) + live.queue_matches;
+    const totalMismatches = (run.mismatches_note4 || 0) + live.queue_mismatches;
+    const totalNotFound = (run.mismatches_note2 || 0) + live.queue_not_found;
+    const totalSwaps = (run.ups_swaps || 0) + live.queue_swaps;
+
     return apiResponse.success(res, {
       hasRun: true,
       run: {
@@ -68,10 +87,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         totalOesRows: run.total_oes_rows,
         cacheHits: run.cache_hits,
         cacheMisses: run.cache_misses,
-        matches: run.matches,
-        mismatchesNote2: run.mismatches_note2,
-        mismatchesNote4: run.mismatches_note4,
-        upsSwaps: run.ups_swaps,
+        matches: totalMatches,
+        mismatchesNote2: totalNotFound,
+        mismatchesNote4: totalMismatches,
+        upsSwaps: totalSwaps,
         duplicatesSkipped: run.duplicates_skipped,
         apiLookupsQueued: run.api_lookups_queued,
         status: run.status,
