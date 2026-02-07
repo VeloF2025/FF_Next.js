@@ -74,9 +74,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const live = liveCountsResult.rows[0] || { queue_matches: 0, queue_mismatches: 0, queue_not_found: 0, queue_swaps: 0 };
 
     // Combine cache-phase counts with live queue counts
+    // Note: cache mismatches_note2 are just "queued for API lookup", NOT confirmed not-found
+    // Only queue results with note2_not_on_1map are confirmed not-found
     const totalMatches = (run.matches || 0) + live.queue_matches;
     const totalMismatches = (run.mismatches_note4 || 0) + live.queue_mismatches;
-    const totalNotFound = (run.mismatches_note2 || 0) + live.queue_not_found;
+    const totalNotFound = live.queue_not_found;
     const totalSwaps = (run.ups_swaps || 0) + live.queue_swaps;
 
     return apiResponse.success(res, {
