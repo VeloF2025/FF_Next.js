@@ -13,6 +13,27 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+
+// Allowed MIME types and their magic bytes for validation
+const ALLOWED_TYPES: Record<string, number[][]> = {
+  'image/jpeg': [[0xFF, 0xD8, 0xFF]],
+  'image/png': [[0x89, 0x50, 0x4E, 0x47]],
+  'image/gif': [[0x47, 0x49, 0x46, 0x38]],
+  'image/webp': [[0x52, 0x49, 0x46, 0x46]], // RIFF header
+  'application/pdf': [[0x25, 0x50, 0x44, 0x46]], // %PDF
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [[0x50, 0x4B, 0x03, 0x04]], // ZIP (xlsx)
+  'text/csv': [], // No magic bytes for CSV
+};
+
+function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
+  const signatures = ALLOWED_TYPES[mimeType];
+  if (!signatures) return false; // MIME type not allowed
+  if (signatures.length === 0) return true; // No magic bytes to check (e.g., CSV)
+  return signatures.some(sig =>
+    sig.every((byte, i) => buffer.length > i && buffer[i] === byte)
+  );
+}
+
 export const config = {
   api: {
     bodyParser: false,
@@ -76,6 +97,16 @@ async function handler(
 
     // Read file buffer
     const buffer = await fs.promises.readFile(file.filepath);
+
+    // Validate file type via magic bytes
+    const mimeType = file.mimetype || '';
+    if (!validateMagicBytes(buffer, mimeType)) {
+      await fs.promises.unlink(file.filepath).catch(() => {});
+      return res.status(400).json({
+        success: false,
+        error: `File type not allowed or content does not match declared type: ${mimeType}`,
+      });
+    }
 
     // Upload to VF Storage
     const filename = file.originalFilename || `file_${Date.now()}`;

@@ -128,7 +128,7 @@ export default async function handler(
     }
 
     // Set appropriate HTTP status code
-    const statusCode = health.status === 'healthy' ? 200 : 
+    const statusCode = health.status === 'healthy' ? 200 :
                        health.status === 'degraded' ? 200 : 503;
 
     // Set cache headers (don't cache health checks)
@@ -136,7 +136,12 @@ export default async function handler(
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    return res.status(statusCode).json(health);
+    // Strip internal details from public response - only expose status and checks
+    return res.status(statusCode).json({
+      status: health.status,
+      timestamp: health.timestamp,
+      checks: health.checks,
+    } as HealthCheck);
   } catch (error) {
     // Critical failure
     health.status = 'unhealthy';

@@ -28,39 +28,76 @@ import type {
 } from './types';
 
 // ============================================
+// ALLOWLISTS FOR DYNAMIC IDENTIFIERS
+// ============================================
+
+const VALID_TABLES = new Set([
+  'clients', 'projects', 'staff', 'contractors', 'boqs', 'rfqs',
+  'purchase_orders', 'suppliers', 'sow_poles', 'sow_drops', 'sow_fibre',
+  'documents', 'audit_log', 'kpi_metrics', 'project_analytics',
+  'client_analytics', 'staff_performance',
+]);
+
+const VALID_ORDER_COLUMNS = new Set([
+  'created_at', 'updated_at', 'company_name', 'last_name', 'first_name',
+  'name', 'status', 'pole_number', 'drop_number', 'section_id',
+  'recorded_date', 'timestamp', 'uploaded_at', 'period_start',
+]);
+
+const VALID_DIRECTIONS = new Set(['ASC', 'DESC']);
+
+function assertValidTable(table: string): void {
+  if (!VALID_TABLES.has(table)) {
+    throw new Error(`Invalid table name: ${table}`);
+  }
+}
+
+function safeOrderBy(col: string): string {
+  return VALID_ORDER_COLUMNS.has(col) ? col : 'created_at';
+}
+
+function safeDirection(dir: string): 'ASC' | 'DESC' {
+  const upper = dir.toUpperCase();
+  return VALID_DIRECTIONS.has(upper) ? upper as 'ASC' | 'DESC' : 'DESC';
+}
+
+// ============================================
 // GENERIC HELPERS
 // ============================================
 
 export async function getById<T>(table: string, id: string): Promise<SingleResult<T>> {
+  assertValidTable(table);
   const result = await sql`
-    SELECT * FROM ${sql(table)} 
-    WHERE id = ${id} 
+    SELECT * FROM ${sql(table)}
+    WHERE id = ${id}
     LIMIT 1
   `;
   return result[0] as T || null;
 }
 
 export async function deleteById(table: string, id: string): Promise<boolean> {
+  assertValidTable(table);
   const result = await sql`
-    DELETE FROM ${sql(table)} 
+    DELETE FROM ${sql(table)}
     WHERE id = ${id}
   `;
   return result.count > 0;
 }
 
 export async function count(table: string, filters?: FilterOptions): Promise<number> {
+  assertValidTable(table);
   let query = `SELECT COUNT(*) as count FROM ${table}`;
-  
+
   if (filters && Object.keys(filters).length > 0) {
     const conditions = Object.entries(filters)
       .filter(([_, value]) => value !== undefined && value !== null)
       .map(([key, _], index) => `${key} = $${index + 1}`);
-    
+
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
   }
-  
+
   const values = filters ? Object.values(filters).filter(v => v !== undefined && v !== null) : [];
   const result = await sql(query, values);
   return result[0]?.count || 0;
@@ -73,9 +110,9 @@ export async function count(table: string, filters?: FilterOptions): Promise<num
 export async function getClients(options?: QueryOptions): Promise<QueryResult<Client>> {
   const limit = options?.limit || 100;
   const offset = options?.offset || 0;
-  const orderBy = options?.orderBy || 'created_at';
-  const orderDirection = options?.orderDirection || 'DESC';
-  
+  const orderBy = safeOrderBy(options?.orderBy || 'created_at');
+  const orderDirection = safeDirection(options?.orderDirection || 'DESC');
+
   return await sql`
     SELECT * FROM clients
     ORDER BY ${sql(orderBy)} ${sql(orderDirection)}
@@ -116,16 +153,18 @@ export async function createClient(client: Partial<Client>): Promise<Client> {
 
 export async function updateClient(id: string, updates: Partial<Client>): Promise<SingleResult<Client>> {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
-  const setClause = fields.map((field, i) => `${field} = $${i + 2}`).join(', ');
-  const values = [id, ...fields.map(f => updates[f as keyof Client])];
-  
+  if (fields.length === 0) return null;
+  const safeFields = fields.filter(f => /^[a-z_][a-z0-9_]*$/.test(f));
+  const setClause = safeFields.map((field, i) => `"${field}" = $${i + 2}`).join(', ');
+  const values = [id, ...safeFields.map(f => updates[f as keyof Client])];
+
   const query = `
-    UPDATE clients 
+    UPDATE clients
     SET ${setClause}, updated_at = NOW()
     WHERE id = $1
     RETURNING *
   `;
-  
+
   const result = await sql(query, values);
   return result[0] as Client || null;
 }
@@ -185,16 +224,18 @@ export async function createProject(project: Partial<Project>): Promise<Project>
 
 export async function updateProject(id: string, updates: Partial<Project>): Promise<SingleResult<Project>> {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
-  const setClause = fields.map((field, i) => `${field} = $${i + 2}`).join(', ');
-  const values = [id, ...fields.map(f => updates[f as keyof Project])];
-  
+  if (fields.length === 0) return null;
+  const safeFields = fields.filter(f => /^[a-z_][a-z0-9_]*$/.test(f));
+  const setClause = safeFields.map((field, i) => `"${field}" = $${i + 2}`).join(', ');
+  const values = [id, ...safeFields.map(f => updates[f as keyof Project])];
+
   const query = `
-    UPDATE projects 
+    UPDATE projects
     SET ${setClause}, updated_at = NOW()
     WHERE id = $1
     RETURNING *
   `;
-  
+
   const result = await sql(query, values);
   return result[0] as Project || null;
 }
@@ -538,40 +579,45 @@ export async function getPaginated<T>(
   orderBy: string = 'created_at',
   orderDirection: 'ASC' | 'DESC' = 'DESC'
 ): Promise<PaginatedResult<T>> {
+  assertValidTable(table);
+  const safeOrder = safeOrderBy(orderBy);
+  const safeDir = safeDirection(orderDirection);
   const offset = (page - 1) * pageSize;
-  
+
   let whereClause = '';
   let values: any[] = [];
   let paramIndex = 1;
-  
+
   if (filters && Object.keys(filters).length > 0) {
     const conditions = Object.entries(filters)
-      .filter(([_, value]) => value !== undefined && value !== null)
+      .filter(([key, value]) => value !== undefined && value !== null && /^[a-z_][a-z0-9_]*$/.test(key))
       .map(([key, _]) => {
-        return `${key} = $${paramIndex++}`;
+        return `"${key}" = $${paramIndex++}`;
       });
-    
+
     if (conditions.length > 0) {
       whereClause = `WHERE ${conditions.join(' AND ')}`;
-      values = Object.values(filters).filter(v => v !== undefined && v !== null);
+      values = Object.entries(filters)
+        .filter(([key, v]) => v !== undefined && v !== null && /^[a-z_][a-z0-9_]*$/.test(key))
+        .map(([_, v]) => v);
     }
   }
-  
+
   const countQuery = `SELECT COUNT(*) as total FROM ${table} ${whereClause}`;
   const countResult = await sql(countQuery, values);
   const total = countResult[0]?.total || 0;
-  
+
   values.push(pageSize, offset);
   const dataQuery = `
     SELECT * FROM ${table}
     ${whereClause}
-    ORDER BY ${orderBy} ${orderDirection}
+    ORDER BY ${safeOrder} ${safeDir}
     LIMIT $${paramIndex++}
     OFFSET $${paramIndex}
   `;
-  
+
   const data = await sql(dataQuery, values) as T[];
-  
+
   return {
     data,
     total,
