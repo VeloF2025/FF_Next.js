@@ -14,6 +14,15 @@ import {
   extractOdometerReading,
 } from '@/modules/fleet/services/fleetVlmService';
 
+// Increase body size limit for base64 encoded images (mobile photos can be 3-5MB)
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 const sql = neon(process.env.DATABASE_URL!);
 
 // Database row type
