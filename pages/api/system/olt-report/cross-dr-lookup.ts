@@ -37,8 +37,9 @@ export const config = {
 type SwapScenario = 'clean_swap' | 'fix_a_only' | 'fix_a_flag_b' | 'fix_a_b_missing';
 
 interface SwapLookupResult {
-  drA: { drNumber: string; oesSerial: string; oneMapSerial: string };
-  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; foundOn1Map: boolean };
+  drA: { drNumber: string; oesSerial: string; oneMapSerial: string; oneMapUps: string | null };
+  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; oneMapUps: string | null; foundOn1Map: boolean };
+  upsTransfer: { needed: boolean; serial: string | null; from: string; to: string } | null;
   scenario: SwapScenario;
   recommendation: string;
   canAutoSwap: boolean;
@@ -77,10 +78,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
     const drBOesSerial = drBOesLookup.rows[0]?.serial_number || null;
 
-    // Search DR B on 1Map
-    const searchResult = await oneMapApi.searchDR(belongsToDr);
-    const drBFoundOn1Map = searchResult.success && searchResult.records.length > 0;
-    const drBOneMapSerial = drBFoundOn1Map ? searchResult.records[0].ph_ont : null;
+    // Search both DRs on 1Map (DR A for UPS info, DR B for full state)
+    const [drASearch, drBSearch] = await Promise.all([
+      oneMapApi.searchDR(drNumber),
+      oneMapApi.searchDR(belongsToDr),
+    ]);
+
+    const drAFoundOn1Map = drASearch.success && drASearch.records.length > 0;
+    // Find the record with the wrong serial to get its UPS (DR may have multiple prop records)
+    const drAWrongRecord = drAFoundOn1Map
+      ? drASearch.records.find(r => r.ph_ont?.toUpperCase() === wrongSerial.toUpperCase()) || drASearch.records[0]
+      : null;
+    const drAOneMapUps = drAWrongRecord?.br_ser || null;
+
+    const drBFoundOn1Map = drBSearch.success && drBSearch.records.length > 0;
+    const drBFirstRecord = drBFoundOn1Map ? drBSearch.records[0] : null;
+    const drBOneMapSerial = drBFirstRecord?.ph_ont || null;
+    const drBOneMapUps = drBFirstRecord?.br_ser || null;
+
+    // Detect UPS transfer: DR A has a UPS serial that likely belongs to DR B (DR B's UPS is empty)
+    const upsTransferNeeded = !!(drAOneMapUps && drBFoundOn1Map && !drBOneMapUps);
 
     // Classify scenario
     let scenario: SwapScenario;
@@ -109,18 +126,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       canAutoSwap = true;
     }
 
+    // Append UPS transfer info to recommendation
+    if (upsTransferNeeded) {
+      recommendation += ` UPS serial ${drAOneMapUps} on DR A will be transferred to DR B (currently empty).`;
+    }
+
     const result: SwapLookupResult = {
       drA: {
         drNumber,
         oesSerial: drAOesSerial,
         oneMapSerial: wrongSerial,
+        oneMapUps: drAOneMapUps,
       },
       drB: {
         drNumber: belongsToDr,
         oesSerial: drBOesSerial,
         oneMapSerial: drBOneMapSerial,
+        oneMapUps: drBOneMapUps,
         foundOn1Map: drBFoundOn1Map,
       },
+      upsTransfer: upsTransferNeeded ? {
+        needed: true,
+        serial: drAOneMapUps,
+        from: drNumber,
+        to: belongsToDr,
+      } : null,
       scenario,
       recommendation,
       canAutoSwap,
