@@ -1809,6 +1809,8 @@ function OdometerTab({
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
                         reading.source === 'vlm'
                           ? 'bg-purple-100 text-purple-700'
+                          : reading.source === 'fuel_transaction'
+                          ? 'bg-green-100 text-green-700'
                           : 'bg-gray-100 text-gray-700'
                       }`}>
                         {reading.source === 'vlm' ? (
@@ -1820,6 +1822,11 @@ function OdometerTab({
                                 ({Math.round(reading.vlmConfidence * 100)}%)
                               </span>
                             )}
+                          </>
+                        ) : reading.source === 'fuel_transaction' ? (
+                          <>
+                            <Fuel className="w-3 h-3" />
+                            Fuel
                           </>
                         ) : (
                           'Manual'
@@ -1954,6 +1961,8 @@ function OdometerTab({
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
                           reading.source === 'vlm'
                             ? 'bg-purple-100 text-purple-700'
+                            : reading.source === 'fuel_transaction'
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-700'
                         }`}>
                           {reading.source === 'vlm' ? (
@@ -1965,6 +1974,11 @@ function OdometerTab({
                                   ({Math.round(reading.vlmConfidence * 100)}%)
                                 </span>
                               )}
+                            </>
+                          ) : reading.source === 'fuel_transaction' ? (
+                            <>
+                              <Fuel className="w-3 h-3" />
+                              Fuel
                             </>
                           ) : (
                             'Manual'
