@@ -36,13 +36,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Build WHERE clause based on status
     let whereClause = '';
-    const params: string[] = [];
+    const params: (string | number)[] = [];
 
     if (status === 'pending') {
-      // Pending = only 'pending' status with OLT serial (DR exists in 1Map, can be auto-fixed)
       whereClause = "WHERE r.fix_status = 'pending' AND r.olt_serial IS NOT NULL";
     } else if (status === 'needs_investigation') {
-      // Needs investigation: not_found (DR not in 1Map), empty_serial, needs_reinvestigation, or no OLT serial
       whereClause = "WHERE r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial') OR r.olt_serial IS NULL";
     } else if (status === 'fixed') {
       whereClause = "WHERE r.fix_status = 'fixed'";
@@ -53,9 +51,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
     // 'all' = no WHERE clause
 
-    // Optional source filter (auto or manual)
-    if (source === 'auto' || source === 'manual') {
-      const sourceCondition = `r.detection_source = '${source}'`;
+    // Optional source filter - parameterized to prevent SQL injection
+    const validSources = ['auto', 'manual'];
+    if (source && validSources.includes(source)) {
+      params.push(source);
+      const sourceCondition = `r.detection_source = $${params.length}`;
       whereClause = whereClause
         ? `${whereClause} AND ${sourceCondition}`
         : `WHERE ${sourceCondition}`;
@@ -66,10 +66,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       SELECT COUNT(*)::int as total
       FROM olt_mismatch_records r
       ${whereClause}
-    `);
+    `, params);
     const total = countResult.rows[0]?.total || 0;
 
     // Get records with import info
+    const limitIdx = params.length + 1;
+    const offsetIdx = params.length + 2;
     const result = await pool.query(`
       SELECT
         r.id,
@@ -96,8 +98,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       ${whereClause}
       ORDER BY r.created_at DESC
-      LIMIT $1 OFFSET $2
-    `, [pageSize, offset]);
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `, [...params, pageSize, offset]);
 
     return apiResponse.success(res, {
       records: result.rows,

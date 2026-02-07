@@ -34,6 +34,7 @@ import {
   Database,
   ChevronDown,
   ChevronRight,
+  ArrowLeftRight,
 } from 'lucide-react';
 import type { OltTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
@@ -91,6 +92,14 @@ interface InvestigationContext {
   wrongRecords: number;
   swappedRecords: number;
   message: string;
+}
+
+interface SwapLookupResult {
+  drA: { drNumber: string; oesSerial: string; oneMapSerial: string };
+  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; foundOn1Map: boolean };
+  scenario: 'clean_swap' | 'fix_a_only' | 'fix_a_flag_b' | 'fix_a_b_missing';
+  recommendation: string;
+  canAutoSwap: boolean;
 }
 
 interface ImportRecord {
@@ -194,6 +203,11 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       return next;
     });
   };
+
+  // Cross-DR swap state
+  const [swapLookups, setSwapLookups] = useState<Record<string, SwapLookupResult>>({});
+  const [swapLoading, setSwapLoading] = useState<Set<string>>(new Set());
+  const [swapErrors, setSwapErrors] = useState<Record<string, string>>({});
 
   // Projects state
   const [projects, setProjects] = useState<
@@ -712,6 +726,84 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       setError('Escalate failed');
     } finally {
       setEscalating(false);
+    }
+  };
+
+  // Handle cross-DR lookup
+  const handleSwapLookup = async (record: OltRecord) => {
+    if (!record.investigation_context) return;
+    let ctx: InvestigationContext;
+    try { ctx = JSON.parse(record.investigation_context); } catch { return; }
+
+    setSwapLoading(prev => new Set(prev).add(record.id));
+    setSwapErrors(prev => { const n = { ...prev }; delete n[record.id]; return n; });
+
+    try {
+      const res = await fetch('/api/system/olt-report/cross-dr-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordId: record.id,
+          drNumber: record.drop_number,
+          wrongSerial: ctx.wrongSerial,
+          belongsToDr: ctx.belongsToDr,
+        }),
+      });
+      const data = await res.json();
+      const result = data.data || data;
+      if (result.drA) {
+        setSwapLookups(prev => ({ ...prev, [record.id]: result }));
+      } else {
+        setSwapErrors(prev => ({ ...prev, [record.id]: result.error || 'Lookup failed' }));
+      }
+    } catch {
+      setSwapErrors(prev => ({ ...prev, [record.id]: 'Network error' }));
+    } finally {
+      setSwapLoading(prev => { const n = new Set(prev); n.delete(record.id); return n; });
+    }
+  };
+
+  // Handle cross-DR swap fix
+  const handleSwapFix = async (record: OltRecord, lookup: SwapLookupResult, fixBothDrs: boolean) => {
+    const scenario = fixBothDrs ? lookup.scenario : 'fix_a_only';
+
+    setSwapLoading(prev => new Set(prev).add(`fix-${record.id}`));
+    setSwapErrors(prev => { const n = { ...prev }; delete n[record.id]; return n; });
+
+    try {
+      const res = await fetch('/api/system/olt-report/swap-fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recordId: record.id,
+          drANumber: lookup.drA.drNumber,
+          drACorrectSerial: lookup.drA.oesSerial,
+          drAWrongSerial: lookup.drA.oneMapSerial,
+          drBNumber: lookup.drB.drNumber,
+          drBCorrectSerial: lookup.drB.oesSerial,
+          drBWrongSerial: lookup.drB.oneMapSerial,
+          scenario,
+        }),
+      });
+      const data = await res.json();
+      const result = data.data || data;
+      if (result.success) {
+        toast.success(
+          scenario === 'clean_swap'
+            ? `Swapped serials on both ${lookup.drA.drNumber} and ${lookup.drB.drNumber}`
+            : `Fixed ${lookup.drA.drNumber}` + (scenario === 'fix_a_flag_b' ? ` and flagged ${lookup.drB.drNumber}` : '')
+        );
+        // Clean up state and refresh
+        setSwapLookups(prev => { const n = { ...prev }; delete n[record.id]; return n; });
+        fetchRecords('needs_investigation');
+        fetchStats();
+      } else {
+        setSwapErrors(prev => ({ ...prev, [record.id]: result.error || 'Swap fix failed' }));
+      }
+    } catch {
+      setSwapErrors(prev => ({ ...prev, [record.id]: 'Network error' }));
+    } finally {
+      setSwapLoading(prev => { const n = new Set(prev); n.delete(`fix-${record.id}`); return n; });
     }
   };
 
@@ -1449,14 +1541,103 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                       <span className="text-orange-400">Swapped: {ctx.swappedRecords}</span>
                                     )}
                                   </div>
+                                  {/* Cross-DR Swap Panel */}
                                   <div className="mt-1 pt-2 border-t border-purple-500/10">
-                                    <p className="text-xs font-medium text-[var(--ff-text-primary)] mb-1">Resolution Options:</p>
-                                    <ul className="list-disc list-inside space-y-0.5 text-xs text-[var(--ff-text-secondary)]">
-                                      <li>Check if <span className="font-mono text-[var(--ff-accent)]">{ctx.belongsToDr}</span> has correct photos and activation data</li>
-                                      <li>Verify if equipment was physically moved between drops</li>
-                                      <li>Contact {ctx.belongsToTeam} team to confirm which DR has the equipment</li>
-                                      <li>Update both DRs in 1Map once confirmed</li>
-                                    </ul>
+                                    {!swapLookups[record.id] ? (
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleSwapLookup(record); }}
+                                          disabled={swapLoading.has(record.id)}
+                                          className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50"
+                                        >
+                                          {swapLoading.has(record.id) ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                          ) : (
+                                            <Search className="w-3 h-3" />
+                                          )}
+                                          Check Other DR
+                                        </button>
+                                        {swapErrors[record.id] && (
+                                          <span className="text-[10px] text-red-400">{swapErrors[record.id]}</span>
+                                        )}
+                                      </div>
+                                    ) : (() => {
+                                      const lookup = swapLookups[record.id];
+                                      const isFixing = swapLoading.has(`fix-${record.id}`);
+                                      const scenarioLabels: Record<string, { label: string; color: string }> = {
+                                        clean_swap: { label: 'Clean Swap', color: 'text-green-400' },
+                                        fix_a_only: { label: 'Fix DR A Only', color: 'text-blue-400' },
+                                        fix_a_flag_b: { label: 'Fix A + Flag B', color: 'text-amber-400' },
+                                        fix_a_b_missing: { label: 'Fix A (B Missing)', color: 'text-amber-400' },
+                                      };
+                                      const sc = scenarioLabels[lookup.scenario] || { label: lookup.scenario, color: 'text-gray-400' };
+                                      return (
+                                        <div className="space-y-2">
+                                          {/* Comparison card */}
+                                          <div className="grid grid-cols-2 gap-3 bg-[var(--ff-bg-primary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
+                                            <div>
+                                              <p className="text-[10px] font-semibold text-[var(--ff-text-secondary)] uppercase mb-1">DR A ({lookup.drA.drNumber})</p>
+                                              <p className="text-xs text-[var(--ff-text-secondary)]">
+                                                OES: <span className="font-mono text-green-400">{lookup.drA.oesSerial}</span>
+                                              </p>
+                                              <p className="text-xs text-[var(--ff-text-secondary)]">
+                                                1Map: <span className="font-mono text-red-400">{lookup.drA.oneMapSerial}</span> <XCircle className="w-3 h-3 inline text-red-400" />
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <p className="text-[10px] font-semibold text-[var(--ff-text-secondary)] uppercase mb-1">DR B ({lookup.drB.drNumber})</p>
+                                              <p className="text-xs text-[var(--ff-text-secondary)]">
+                                                OES: <span className="font-mono text-green-400">{lookup.drB.oesSerial || 'N/A'}</span>
+                                              </p>
+                                              <p className="text-xs text-[var(--ff-text-secondary)]">
+                                                1Map: {lookup.drB.foundOn1Map ? (
+                                                  <>
+                                                    <span className={`font-mono ${lookup.drB.oneMapSerial?.toUpperCase() === lookup.drB.oesSerial?.toUpperCase() ? 'text-green-400' : 'text-red-400'}`}>
+                                                      {lookup.drB.oneMapSerial}
+                                                    </span>
+                                                    {lookup.drB.oneMapSerial?.toUpperCase() === lookup.drB.oesSerial?.toUpperCase()
+                                                      ? <CheckCircle className="w-3 h-3 inline text-green-400 ml-0.5" />
+                                                      : <XCircle className="w-3 h-3 inline text-red-400 ml-0.5" />}
+                                                  </>
+                                                ) : (
+                                                  <span className="text-gray-500 italic">Not on 1Map</span>
+                                                )}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          {/* Scenario + actions */}
+                                          <div className="flex items-center justify-between">
+                                            <span className={`text-xs font-medium ${sc.color}`}>
+                                              Scenario: {sc.label}
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                              {swapErrors[record.id] && (
+                                                <span className="text-[10px] text-red-400">{swapErrors[record.id]}</span>
+                                              )}
+                                              {lookup.scenario === 'clean_swap' && (
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); handleSwapFix(record, lookup, true); }}
+                                                  disabled={isFixing}
+                                                  className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:opacity-50"
+                                                >
+                                                  {isFixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowLeftRight className="w-3 h-3" />}
+                                                  Swap Both DRs
+                                                </button>
+                                              )}
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); handleSwapFix(record, lookup, false); }}
+                                                disabled={isFixing}
+                                                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+                                              >
+                                                {isFixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                                                Fix DR A Only
+                                              </button>
+                                            </div>
+                                          </div>
+                                          <p className="text-[10px] text-[var(--ff-text-tertiary)] leading-relaxed">{lookup.recommendation}</p>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               )}

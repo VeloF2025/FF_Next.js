@@ -12,7 +12,10 @@ import { apiResponse } from '@/lib/apiResponse';
 // Mock dependencies
 vi.mock('@/services/contractor/neonContractorService');
 vi.mock('@/lib/apiResponse');
-vi.mock('@/lib/logger');
+vi.mock('@/lib/logger', () => ({
+  log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
+  createLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
+}));
 
 describe('Team API - Individual Team Operations', () => {
   let req: Partial<NextApiRequest>;

@@ -80,7 +80,7 @@ export class QuickWorkflowTestValidator {
       const missingMocks = requiredMocks.filter(mock => !mockFile[mock]);
       
       if (missingMocks.length > 0) {
-        log.info(`     Missing mocks: ${missingMocks.join(', ', undefined, 'quick-test-runner');}`);
+        log.info(`     Missing mocks: ${missingMocks.join(', ')}`, undefined, 'quick-test-runner');
         return false;
       }
 
@@ -116,7 +116,7 @@ export class QuickWorkflowTestValidator {
     const missingDirs = expectedDirs.filter(dir => !actualDirs.includes(dir));
     
     if (missingDirs.length > 0) {
-      log.info(`     Missing directories: ${missingDirs.join(', ', undefined, 'quick-test-runner');}`);
+      log.info(`     Missing directories: ${missingDirs.join(', ')}`, undefined, 'quick-test-runner');
       return false;
     }
 

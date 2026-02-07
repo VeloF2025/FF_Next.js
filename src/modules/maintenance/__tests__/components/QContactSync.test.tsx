@@ -35,6 +35,17 @@ vi.mock('../../hooks/useQContactSync', () => ({
     error: null,
     refetch: mockRefetch,
   })),
+  useQContactSyncLog: vi.fn(() => ({
+    syncLogs: [],
+    total: 0,
+    byDirection: undefined,
+    byStatus: undefined,
+    successRate: 0,
+    isLoading: true,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
   useQContactSyncLogs: vi.fn(() => ({
     logs: [],
     total: 0,

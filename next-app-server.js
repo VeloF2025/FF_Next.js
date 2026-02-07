@@ -47,7 +47,9 @@ app.use((req, res) => {
   }
 
   // Get the scripts for the current page from the build manifest
-  const pagePath = req.path === '/' ? '/' : req.path;
+  // Sanitize path to prevent XSS via crafted URLs
+  const rawPath = req.path === '/' ? '/' : req.path;
+  const pagePath = rawPath.replace(/[<>"'&]/g, '');
   const pageScripts = buildManifest.pages ? buildManifest.pages[pagePath] || [] : [];
   const rootScripts = buildManifest.rootMainFiles || [];
 

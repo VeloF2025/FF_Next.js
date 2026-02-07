@@ -30,7 +30,8 @@ let connection: NeonQueryFunction<false, false> | null = null;
  * @throws {Error} If DATABASE_URL is not set
  */
 function getDatabaseUrl(): string {
-  const databaseUrl = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_URL;
+  // Server-only: never use NEXT_PUBLIC_ prefix (leaks credentials to client bundle)
+  const databaseUrl = process.env.DATABASE_URL;
 
   if (!databaseUrl) {
     const error = new Error('DATABASE_URL environment variable is required');

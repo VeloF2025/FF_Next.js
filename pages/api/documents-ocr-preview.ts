@@ -679,7 +679,7 @@ async function handler(
 
       // First pass: resize without rotation and upload to get URL for orientation detection
       const originalPath = filePathForOcr;
-      let tempResizedPath = await resizeImageForVlm(filePathForOcr, 0); // No rotation yet
+      const tempResizedPath = await resizeImageForVlm(filePathForOcr, 0); // No rotation yet
       if (tempResizedPath !== originalPath) {
         tempFilePaths.push(tempResizedPath);
       }

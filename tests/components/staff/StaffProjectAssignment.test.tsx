@@ -10,6 +10,7 @@ import { StaffProjectAssignment } from '../../../src/components/staff/StaffProje
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
+  log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

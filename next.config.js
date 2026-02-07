@@ -210,19 +210,16 @@ const nextConfig = {
     ];
   },
 
-  // Proxy /poles to Poles Sync Module on port 3001
-  async rewrites() {
-    return [
-      {
-        source: '/poles',
-        destination: 'http://localhost:3001/',
-      },
-      {
-        source: '/poles/:path*',
-        destination: 'http://localhost:3001/:path*',
-      },
-    ];
-  },
+  // DISABLED: Legacy neon/api/server.ts proxy - zero-auth CRUD server
+  // The Neon API server has no authentication and should not be proxied.
+  // SOW imports now use proper Next.js API routes with withAuth.
+  // If you need this, add auth to neon/api/server.ts first.
+  // async rewrites() {
+  //   return [
+  //     { source: '/poles', destination: 'http://localhost:3001/' },
+  //     { source: '/poles/:path*', destination: 'http://localhost:3001/:path*' },
+  //   ];
+  // },
 
   // Fix file watching issues
   webpack: (config, { dev, isServer }) => {

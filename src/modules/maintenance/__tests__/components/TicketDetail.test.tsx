@@ -22,6 +22,8 @@ import type { Ticket } from '../../types/ticket';
 global.fetch = vi.fn();
 
 // Mock Clerk
+vi.mock('@clerk/nextjs', async () => {
+  const actual = await vi.importActual('@clerk/nextjs');
   return {
     ...actual,
     useUser: () => ({

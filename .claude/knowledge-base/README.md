@@ -10,6 +10,10 @@ knowledge-base/
 │   └── filter-aware-exports.md
 ├── rbac/                 # Role-Based Access Control
 │   └── access-control-system.md
+├── dev-environment/      # Development tooling and setup
+│   ├── docker-healthcheck-patterns.md
+│   ├── vscode-memory.md
+│   └── agent-teams.md
 ├── api-patterns/         # API design patterns (future)
 └── architecture/         # System architecture decisions (future)
 ```

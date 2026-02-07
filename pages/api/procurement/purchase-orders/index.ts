@@ -64,8 +64,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const total = parseInt(countResult[0]?.total || '0', 10);
 
     // Get paginated results
-    const validSortColumns = ['created_at', 'po_number', 'total', 'delivery_date'];
-    const sortColumn = validSortColumns.includes(sortBy as string) ? sortBy : 'created_at';
+    // Sort column validated against allowlist (can't parameterize ORDER BY columns)
+    const validSortColumns = ['created_at', 'po_number', 'total', 'delivery_date'] as const;
+    const sortColumn = validSortColumns.includes(sortBy as typeof validSortColumns[number]) ? sortBy : 'created_at';
     const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
 
     const dataQuery = `

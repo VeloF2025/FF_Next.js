@@ -287,4 +287,4 @@ export const config = {
     },
 }
 
-export default withAuth(handler);;
+export default withAuth(handler);

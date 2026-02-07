@@ -26,6 +26,7 @@ vi.mock('../../services/dashboardService', () => ({
 
 // Mock the logger
 vi.mock('@/lib/logger', () => ({
+  log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: vi.fn(() => ({
     info: vi.fn(),
     error: vi.fn(),

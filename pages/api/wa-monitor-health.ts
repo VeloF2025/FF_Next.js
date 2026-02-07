@@ -13,14 +13,15 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { withAuth } from '@/lib/auth';
 
 const execAsync = promisify(exec);
 const sql = neon(process.env.DATABASE_URL || '');
 
-// VPS SSH credentials
-const VPS_HOST = '72.60.17.245';
-const VPS_USER = 'root';
-const VPS_PASS = 'VeloF@2025@@';
+// VPS SSH credentials - must be set in env, no hardcoded secrets
+const VPS_HOST = process.env.WA_VPS_HOST || '72.61.197.178';
+const VPS_USER = process.env.WA_VPS_USER || 'root';
+const VPS_PASS = process.env.WA_VPS_PASS;
 
 interface HealthCheck {
   status: 'up' | 'down' | 'degraded' | 'stale';
@@ -54,7 +55,7 @@ interface HealthResponse {
   };
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<HealthResponse | { error: string }>
 ) {
@@ -109,6 +110,20 @@ export default async function handler(
 // ==================== VPS SERVICE CHECKS ====================
 
 async function checkVPSServices() {
+  if (!VPS_PASS) {
+    const noCredCheck: HealthCheck = {
+      status: 'down',
+      details: { message: 'WA_VPS_PASS env var not set' },
+      error: 'VPS credentials not configured',
+    };
+    return {
+      whatsapp_bridge: noCredCheck,
+      drop_monitor_prod: noCredCheck,
+      drop_monitor_dev: noCredCheck,
+      log_activity: noCredCheck,
+    };
+  }
+
   const sshCmd = (cmd: string) =>
     `sshpass -p '${VPS_PASS}' ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no ${VPS_USER}@${VPS_HOST} "${cmd}"`;
 
@@ -417,3 +432,5 @@ async function checkAPIEndpoint(name: string, url: string): Promise<HealthCheck>
     };
   }
 }
+
+export default withAuth(handler);

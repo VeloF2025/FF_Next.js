@@ -40,11 +40,10 @@ export default withAuth(withErrorHandler(async (
   if (req.method === 'GET') {
     try {
       // Query stock_items table (Odoo synced data)
-      let stockData;
       let movements = [];
 
       // Get all stock items from Odoo sync
-      stockData = await sql`
+      const stockData = await sql`
         SELECT
           id,
           item_code,

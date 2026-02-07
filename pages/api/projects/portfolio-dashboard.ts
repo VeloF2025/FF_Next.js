@@ -21,6 +21,7 @@ import { neon } from '@neondatabase/serverless';
 import { safeQuery, safeArrayQuery } from '@/lib/safe-query';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 // Create a new connection for each request
 const getSql = () => neon(process.env.DATABASE_URL!);
@@ -81,7 +82,7 @@ function calculateBudgetHealth(utilization: number): 'healthy' | 'warning' | 'cr
   return 'healthy';
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -371,3 +372,5 @@ export default async function handler(
     return apiResponse.internalError(res, error as Error);
   }
 }
+
+export default withAuth(handler);

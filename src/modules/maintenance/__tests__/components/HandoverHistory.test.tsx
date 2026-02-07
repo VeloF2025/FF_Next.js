@@ -22,6 +22,7 @@ import { HandoverType, OwnerType } from '../../types/handover';
 import type { TicketHandoverHistory } from '../../types/handover';
 
 // Mock Clerk auth
+vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id', fullName: 'Test User' },
     isLoaded: true,

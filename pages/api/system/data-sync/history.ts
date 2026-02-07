@@ -62,6 +62,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
     const typeFilter = (req.query.type as string) || 'all';
 
+    // Validate typeFilter against allowlist to prevent SQL injection
+    if (typeFilter !== 'all' && !VALID_TYPES.includes(typeFilter as SyncOperationType)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid type filter. Valid types: all, ${VALID_TYPES.join(', ')}`,
+      });
+    }
+
     // Auto-complete stale QField syncs (running > 10 min = likely finished but callback failed)
     await autoCompleteStaleOperations();
 

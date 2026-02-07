@@ -20,6 +20,7 @@ import type { RepeatFaultEscalation, EscalationStatus, EscalationScopeType } fro
 vi.mock('../../services/escalationService');
 vi.mock('../../utils/faultPatternDetector');
 vi.mock('@/lib/logger', () => ({
+  log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

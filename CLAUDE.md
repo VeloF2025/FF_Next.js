@@ -29,13 +29,10 @@ src/
 | **Production** | `production` | `ep-dry-night-a9qyh4sj` |
 | **Development** | `hein-dev` | `ep-aged-poetry-a9bbd8e9` |
 
-**Connection Strings:**
+**Connection Strings:** See `.claude/credentials.local.md` (gitignored, never committed)
 ```bash
-# PRODUCTION
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
-
-# DEVELOPMENT
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require'
+# PRODUCTION - endpoint: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
+# DEVELOPMENT - endpoint: ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech
 ```
 
 **Two Drop Tables - DO NOT CONFUSE:**
@@ -102,19 +99,11 @@ Run `ls .claude/modules/` for full list (40+ modules).
 | VPS Backup | backup.fibreflow.app | 3005 | `fibreflow-backup.service` |
 | Local | localhost:3004 | 3004 | manual |
 
-**Server Access:**
+**Server Access & Deploy Commands:** See `.claude/credentials.local.md`
 ```bash
-ssh velo@100.96.203.105  # Velocity - Password: velo2026
+ssh velo@100.96.203.105  # Velocity
 ssh root@72.61.197.178   # VPS (WhatsApp services)
-```
-
-**Deploy Commands:**
-```bash
-# Dev
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
-
-# Production
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+# Full deploy commands with credentials in .claude/credentials.local.md
 ```
 
 **Full details:** `docs/INFRASTRUCTURE.md`

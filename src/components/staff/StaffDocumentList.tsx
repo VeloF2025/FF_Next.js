@@ -362,7 +362,7 @@ export function StaffDocumentList({ staffId, isAdmin = false, onVerify, onOcrApp
       const query = searchQuery.toLowerCase();
       return (
         doc.documentName.toLowerCase().includes(query) ||
-        DOCUMENT_TYPE_LABELS[doc.documentType].toLowerCase().includes(query) ||
+        DOCUMENT_TYPE_LABELS[doc.documentType]?.toLowerCase().includes(query) ||
         doc.documentNumber?.toLowerCase().includes(query)
       );
     }

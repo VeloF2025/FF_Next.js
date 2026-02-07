@@ -35,6 +35,7 @@ function createWrapper() {
 }
 
 // Mock Clerk auth
+vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id', fullName: 'Test User' },
     isLoaded: true,

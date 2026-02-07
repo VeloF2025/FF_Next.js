@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 interface ClientProject {
   id: string;
@@ -38,7 +39,7 @@ interface ClientProjectsSummary {
   outstandingBalance: number;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -137,9 +138,11 @@ export default async function handler(
       data: { id, error: error instanceof Error ? error.message : 'Unknown error' } 
     }, 'ClientProjectsAPI');
 
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Failed to fetch client projects',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }
+
+export default withAuth(handler);

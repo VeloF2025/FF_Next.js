@@ -5,7 +5,7 @@
 ## Velocity Server
 
 **Server:** 100.96.203.105 (Tailscale) / 192.168.1.150 (LAN)
-**Access:** `ssh velo@100.96.203.105` (password: velo2026)
+**Access:** `ssh velo@100.96.203.105` (use SSH key or stored credentials)
 **Specs:** RTX 5090 GPU, 128GB RAM, Ubuntu Server
 
 ---
@@ -30,24 +30,24 @@ All environments connect to the **production Neon database**:
 Host: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
 Database: neondb
 User: neondb_owner
-Password: npg_MIUZXrg1tEY0
+Password: <set in .env - never commit credentials>
 ```
 
-**Connection String:**
+**Connection String:** Set `DATABASE_URL` in `.env.local` or environment variables.
 ```bash
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+# Format: postgresql://neondb_owner:<PASSWORD>@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
 ```
 
 ### Deployment Commands
 
 **Deploy to Staging (vf.fibreflow.app):**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
+ssh velo@100.96.203.105 "sudo bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
 ```
 
 **Deploy to Production (app.fibreflow.app):**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin master && npm run build && sudo systemctl restart fibreflow-production.service"
 ```
 
 ---
@@ -235,20 +235,20 @@ location /storage/ {
 ### Check Service Status
 ```bash
 ssh velo@100.96.203.105
-echo 'velo2026' | sudo -S systemctl status fibreflow.service
-echo 'velo2026' | sudo -S systemctl status fibreflow-production.service
+sudo systemctl status fibreflow.service
+sudo systemctl status fibreflow-production.service
 ```
 
 ### View Logs
 ```bash
-echo 'velo2026' | sudo -S journalctl -u fibreflow.service -f
-echo 'velo2026' | sudo -S journalctl -u fibreflow-production.service -f
+sudo journalctl -u fibreflow.service -f
+sudo journalctl -u fibreflow-production.service -f
 ```
 
 ### Restart Services
 ```bash
-echo 'velo2026' | sudo -S systemctl restart fibreflow.service          # Staging
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service  # Production
+sudo systemctl restart fibreflow.service          # Staging
+sudo systemctl restart fibreflow-production.service  # Production
 ```
 
 ### Check Ports

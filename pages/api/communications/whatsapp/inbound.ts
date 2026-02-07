@@ -19,8 +19,11 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-// Shared secret for Bridge authentication (simple security)
-const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET || 'fibreflow-bridge-2026';
+// Shared secret for Bridge authentication - must be set in env, no fallback
+const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
+if (!BRIDGE_SECRET) {
+  log.error('WA_BRIDGE_SECRET environment variable is required but not set');
+}
 
 interface InboundMessageRequest {
   secret: string;

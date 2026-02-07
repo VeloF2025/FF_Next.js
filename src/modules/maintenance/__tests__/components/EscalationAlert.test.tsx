@@ -19,6 +19,7 @@ import type { RepeatFaultAlert, RepeatFaultEscalation } from '../../types/escala
 import { EscalationScopeType, EscalationStatus, EscalationType } from '../../types/escalation';
 
 // Mock Clerk auth
+vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id' },
     isLoaded: true,

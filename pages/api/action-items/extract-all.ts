@@ -42,7 +42,7 @@ async function handler(
 
     let extracted = 0;
     let skipped = 0;
-    let errors: Array<{ meeting_id: number; title: string; error: string }> = [];
+    const errors: Array<{ meeting_id: number; title: string; error: string }> = [];
 
     for (const meeting of meetings) {
       try {

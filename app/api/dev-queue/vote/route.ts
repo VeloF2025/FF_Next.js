@@ -26,7 +26,6 @@ export async function POST(req: NextRequest) {
     `;
 
     let voted: boolean;
-    let votes: number;
 
     if (existingVote) {
       // Remove vote
@@ -65,7 +64,7 @@ export async function POST(req: NextRequest) {
       SELECT votes FROM wishlist_items WHERE id = ${itemId}
     `;
 
-    votes = item?.votes || 0;
+    const votes = item?.votes || 0;
 
     return NextResponse.json({
       success: true,

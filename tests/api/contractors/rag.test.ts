@@ -21,6 +21,7 @@ vi.mock('@/lib/logger', () => ({
   log: {
     error: vi.fn(),
   },
+  createLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
 }));
 
 // Helper to create mock request/response

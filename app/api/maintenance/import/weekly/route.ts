@@ -162,7 +162,6 @@ export async function POST(req: NextRequest) {
     });
 
     // Auto-detect best sheet (same logic as parse endpoint)
-    let sheetName: string | undefined;
     const workbook = XLSX.read(buffer!, { type: 'buffer' });
 
     const scoredSheets = workbook.SheetNames.map((name) => {
@@ -191,7 +190,7 @@ export async function POST(req: NextRequest) {
       return { name, rows, score };
     });
 
-    sheetName = scoredSheets.sort((a, b) => b.score - a.score)[0]?.name;
+    const sheetName = scoredSheets.sort((a, b) => b.score - a.score)[0]?.name;
 
     logger.info('Auto-detected sheet', {
       selectedSheet: sheetName,

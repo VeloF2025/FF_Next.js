@@ -11,6 +11,7 @@ import type { ComplianceStatus } from '../../../src/types/staff-document.types';
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
+  log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),

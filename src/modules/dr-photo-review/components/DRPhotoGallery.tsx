@@ -76,7 +76,6 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                             }`}
                     >
                         {/* Photo */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={step.url}
                             alt={step.step_label}
@@ -167,7 +166,6 @@ export function DRPhotoGallery({ steps, drNumber, isLoading }: DRPhotoGalleryPro
                         className="relative max-w-5xl max-h-[90vh] w-full h-full flex flex-col items-center justify-center p-8"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={steps[selectedIndex].url}
                             alt={steps[selectedIndex].step_label}

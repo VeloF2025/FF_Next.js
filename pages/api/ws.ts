@@ -10,6 +10,7 @@ import { Socket } from 'net';
 import { neon } from '@neondatabase/serverless';
 import pg from 'pg';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
 const { Pool } = pg;
 
@@ -35,7 +36,7 @@ const sql = neon(process.env.DATABASE_URL || '');
 // Keep track of active subscriptions
 const subscriptions = new Map<string, Set<string>>();
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: ExtendedNextApiResponse
 ) {
@@ -199,3 +200,5 @@ export default async function handler(
 
   res.socket.end();
 }
+
+export default withAuth(handler as any);

@@ -206,10 +206,10 @@ export class WorkflowTestRunner {
       const thresholds = this.coverageThresholds.overall;
       
       log.info('\n📈 Coverage Summary:', undefined, 'test-coverage-runner');
-      log.info(`Lines: ${overall.lines.pct.toFixed(1, undefined, 'test-coverage-runner');}% (threshold: ${thresholds.lines}%)`);
-      log.info(`Statements: ${overall.statements.pct.toFixed(1, undefined, 'test-coverage-runner');}% (threshold: ${thresholds.statements}%)`);
-      log.info(`Functions: ${overall.functions.pct.toFixed(1, undefined, 'test-coverage-runner');}% (threshold: ${thresholds.functions}%)`);
-      log.info(`Branches: ${overall.branches.pct.toFixed(1, undefined, 'test-coverage-runner');}% (threshold: ${thresholds.branches}%)`);
+      log.info(`Lines: ${overall.lines.pct.toFixed(1)}% (threshold: ${thresholds.lines}%)`, undefined, 'test-coverage-runner');
+      log.info(`Statements: ${overall.statements.pct.toFixed(1)}% (threshold: ${thresholds.statements}%)`, undefined, 'test-coverage-runner');
+      log.info(`Functions: ${overall.functions.pct.toFixed(1)}% (threshold: ${thresholds.functions}%)`, undefined, 'test-coverage-runner');
+      log.info(`Branches: ${overall.branches.pct.toFixed(1)}% (threshold: ${thresholds.branches}%)`, undefined, 'test-coverage-runner');
       
       // Check if coverage meets thresholds
       const failures: string[] = [];
@@ -232,7 +232,7 @@ export class WorkflowTestRunner {
       
       if (failures.length > 0) {
         log.error('\n❌ Coverage thresholds not met:', undefined, 'test-coverage-runner');
-        failures.forEach(failure => log.error(`  • ${failure}`, undefined, 'test-coverage-runner'););
+        failures.forEach(failure => log.error(`  • ${failure}`, undefined, 'test-coverage-runner'));
         throw new Error('Coverage thresholds not met');
       }
       
@@ -292,10 +292,10 @@ export class WorkflowTestRunner {
         branches: moduleCoverage.branches / fileCount
       };
       
-      log.info(`  Lines: ${avgCoverage.lines.toFixed(1, undefined, 'test-coverage-runner');}%`);
-      log.info(`  Statements: ${avgCoverage.statements.toFixed(1, undefined, 'test-coverage-runner');}%`);
-      log.info(`  Functions: ${avgCoverage.functions.toFixed(1, undefined, 'test-coverage-runner');}%`);
-      log.info(`  Branches: ${avgCoverage.branches.toFixed(1, undefined, 'test-coverage-runner');}%`);
+      log.info(`  Lines: ${avgCoverage.lines.toFixed(1)}%`, undefined, 'test-coverage-runner');
+      log.info(`  Statements: ${avgCoverage.statements.toFixed(1)}%`, undefined, 'test-coverage-runner');
+      log.info(`  Functions: ${avgCoverage.functions.toFixed(1)}%`, undefined, 'test-coverage-runner');
+      log.info(`  Branches: ${avgCoverage.branches.toFixed(1)}%`, undefined, 'test-coverage-runner');
       
       // Check against expected coverage
       const expected = suite.expectedCoverage;
@@ -315,7 +315,7 @@ export class WorkflowTestRunner {
       }
       
       if (warnings.length > 0) {
-        log.info(`  ⚠️ Below expected: ${warnings.join(', ', undefined, 'test-coverage-runner');}`);
+        log.info(`  ⚠️ Below expected: ${warnings.join(', ')}`, undefined, 'test-coverage-runner');
       } else {
         log.info(`  ✅ Meets expected coverage`, undefined, 'test-coverage-runner');
       }

@@ -59,8 +59,8 @@ export async function GET(req: NextRequest) {
     }
     // Multiple filters (build dynamic query)
     else {
-      let conditions = [];
-      let params: any = {};
+      const conditions = [];
+      const params: any = {};
 
       if (filters.searchTerm) {
         const searchTerm = `%${filters.searchTerm}%`;

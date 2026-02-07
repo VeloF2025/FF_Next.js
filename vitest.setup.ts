@@ -1,3 +1,4 @@
+import React from 'react';
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
@@ -10,4 +11,59 @@ vi.mock('@neondatabase/serverless', () => ({
     const sqlFunction = vi.fn().mockResolvedValue([]);
     return sqlFunction;
   }),
+}));
+
+// Mock AuthContext to prevent "useAuth must be used within an AuthProvider" errors
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: 'test-user', email: 'test@test.com', displayName: 'Test User' },
+    loading: false,
+    error: null,
+    isAuthenticated: true,
+    currentUser: {
+      id: 'test-user',
+      email: 'test@test.com',
+      displayName: 'Test User',
+      role: 'admin',
+      permissions: [],
+    },
+    signInWithEmail: vi.fn(),
+    signInWithGoogle: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+    resetPassword: vi.fn(),
+    signInWithEmailEnhanced: vi.fn(),
+    signInWithGoogleEnhanced: vi.fn(),
+    registerWithEmail: vi.fn(),
+    resetPasswordEnhanced: vi.fn(),
+    changePassword: vi.fn(),
+    sendEmailVerification: vi.fn(),
+    updateProfile: vi.fn(),
+    hasPermission: vi.fn(() => true),
+    hasAnyPermission: vi.fn(() => true),
+    hasAllPermissions: vi.fn(() => true),
+    hasRole: vi.fn(() => true),
+    hasAnyRole: vi.fn(() => true),
+    clearError: vi.fn(),
+    refreshUser: vi.fn(),
+  })),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Mock @/lib/logger to prevent "No log export" errors
+vi.mock('@/lib/logger', () => ({
+  log: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    getLogs: vi.fn(() => []),
+    clearLogs: vi.fn(),
+  },
+  createLogger: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
 }));

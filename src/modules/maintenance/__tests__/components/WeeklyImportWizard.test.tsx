@@ -21,6 +21,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WeeklyImportWizard } from '../../components/WeeklyImport/WeeklyImportWizard';
 
 // Mock Clerk auth
+vi.mock('@clerk/nextjs', () => ({
   useUser: vi.fn(() => ({
     user: { id: 'test-user-id', fullName: 'Test User' },
     isLoaded: true,

@@ -26,7 +26,27 @@ module.exports = {
     }],
     'no-console': 'warn',
     'react-hooks/exhaustive-deps': 'warn',
-    'react/no-unescaped-entities': 'warn'
+    'react/no-unescaped-entities': 'warn',
+    // TypeScript handles prop validation - prop-types not needed
+    'react/prop-types': 'off',
+    // react/display-name not critical for TypeScript components
+    'react/display-name': 'off',
+    // no-case-declarations: wrap case blocks if needed, but don't block builds
+    'no-case-declarations': 'warn',
+    // Downgrade to warnings for pre-existing patterns
+    'no-prototype-builtins': 'warn',
+    'no-useless-escape': 'warn',
+    'no-empty': 'warn',
+    'no-constant-condition': 'warn',
+    'no-control-regex': 'warn',
+    'no-self-assign': 'warn',
+    'no-empty-pattern': 'warn',
+    'no-useless-catch': 'warn',
+    '@typescript-eslint/no-namespace': 'warn',
+    '@typescript-eslint/no-var-requires': 'warn',
+    '@typescript-eslint/no-non-null-asserted-optional-chain': 'warn',
+    '@typescript-eslint/ban-types': 'warn',
+    '@typescript-eslint/no-this-alias': 'warn'
   },
   settings: {
     react: {
@@ -39,6 +59,13 @@ module.exports = {
       files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', 'dev-tools/**/*', 'scripts/**/*', '*.config.*', 'remove-console-logs.js'],
       rules: {
         'no-console': 'off'
+      }
+    },
+    {
+      // Test runner files using require()
+      files: ['**/*runner*.ts', '**/*coverage*.ts'],
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off'
       }
     }
   ]

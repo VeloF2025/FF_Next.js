@@ -63,7 +63,6 @@ export function PhotoGallery({ photos, dr_number }: PhotoGalleryProps) {
             aria-label={`View ${photo.stepLabel} - ${photo.filename}`}
             type="button"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photo.url}
               alt={photo.stepLabel}
@@ -145,7 +144,6 @@ export function PhotoGallery({ photos, dr_number }: PhotoGalleryProps) {
           >
             <div className="relative w-full h-full flex items-center justify-center">
               {photos[selectedPhotoIndex] && (
-                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={photos[selectedPhotoIndex].url}
                   alt={photos[selectedPhotoIndex].stepLabel}

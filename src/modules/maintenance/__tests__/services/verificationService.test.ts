@@ -15,6 +15,7 @@ import { TOTAL_VERIFICATION_STEPS, VERIFICATION_STEP_TEMPLATES } from '../../con
 // Mock dependencies
 vi.mock('../../utils/db');
 vi.mock('@/lib/logger', () => ({
+  log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogs: vi.fn(() => []), clearLogs: vi.fn() },
   createLogger: () => ({
     info: vi.fn(),
     debug: vi.fn(),

@@ -572,7 +572,7 @@ async function handler(
           const dropNumbersChunk = chunk.map(r => r.drop_number);
 
           // Pre-fetch existing serials for swap detection
-          let existingSerials: Map<string, { oes_serial: string | null; ont_serial_scanned: string | null }> = new Map();
+          const existingSerials: Map<string, { oes_serial: string | null; ont_serial_scanned: string | null }> = new Map();
           try {
             const existingResult = await pool.query(
               `SELECT drop_number, oes_serial, ont_serial_scanned

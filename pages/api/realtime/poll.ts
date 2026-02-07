@@ -5,13 +5,14 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 // Store last check timestamp per client
 const lastChecked = new Map<string, Date>();
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -91,9 +92,11 @@ export default async function handler(
     
   } catch (error: any) {
     console.error('Polling error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch changes',
-      message: error.message 
+      message: error.message
     });
   }
 }
+
+export default withAuth(handler);
