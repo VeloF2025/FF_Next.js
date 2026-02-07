@@ -1203,7 +1203,10 @@
       "Bash(sudo apt list:*)",
       "Bash(sudo snap list:*)",
       "Bash(sudo apt-get install:*)",
-      "Bash(sudo -S apt-get install -y libreoffice-writer)"
+      "Bash(sudo -S apt-get install -y libreoffice-writer)",
+      "Bash(set:*)",
+      "Bash(git hash-object:*)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": [],

@@ -1,79 +1,112 @@
 {
-  "session_id": "2026-02-06-fleet-checkin-improvements",
-  "started_at": "2026-02-06T04:30:00Z",
-  "last_updated": "2026-02-06T07:53:47.076Z",
+  "session_id": "2026-02-07-fleet-fuel-transactions",
+  "started_at": "2026-02-07T06:00:00Z",
+  "last_updated": "2026-02-07T10:32:12.679Z",
   "working_on": {
-    "task": "Fleet Check-In - Audit Merge & Weekly Verification",
-    "status": "completed",
+    "task": "Fleet Stats & Odometer Consistency Fix",
+    "status": "in_progress",
     "progress": [
-      "Fixed 'All Passed' showing incorrectly for low VLM confidence photos",
-      "Merged Check-In Audit page into Check-In History page",
-      "Added admin delete capability for check-in records",
-      "Fixed super_admin role not being recognized for delete permissions",
-      "Added access control so non-admins only see their own check-ins",
-      "Verified weekly check-in photos and process works correctly",
-      "Deployed to dev, staging, and production"
+      "Fixed mobile receipt photo scanning (increased body size limit to 10MB)",
+      "Fixed price/L calculation to always calculate from amount/litres",
+      "Added admin delete capability for fuel transactions",
+      "Fixed L/100km calculation to use odometer-based lookup",
+      "Added delete button UI for admin/super_admin users",
+      "Added auto-recalculate L/100km after transaction deletion",
+      "Deployed fuel transaction fixes to all environments",
+      "Fixed stats API to use fleet_odometer_history as single source of truth",
+      "Added fuel transaction odometer sync to fleet_odometer_history",
+      "Identified bad data point (197,484 km from Jan 23) causing inflated stats"
     ],
-    "last_action": "Updated knowledge base and documentation"
+    "last_action": "Fixed stats API - deployed to staging and production, needs user to test authenticated"
   },
   "learnings": {
-    "vlm_confidence_validation": {
-      "problem": "Photos with 0% VLM confidence (wrong subjects) showed as 'All Passed'",
-      "solution": "Added hasLowVlmConfidence flag, marks records as hasMinorIssues=true",
-      "threshold": "50% confidence - below this triggers review flag"
+    "mobile_photo_upload": {
+      "problem": "Receipt photos from mobile (3-5MB) exceeded Next.js default 1MB body limit",
+      "solution": "Add export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }",
+      "pattern": "Always increase body size limit for endpoints accepting base64 images"
     },
-    "role_check_pattern": {
-      "problem": "super_admin role not recognized, only admin",
-      "solution": "Always check: user.role === 'admin' || user.role === 'super_admin'",
-      "pattern": "const isAdmin = role === 'admin' || role === 'super_admin'"
+    "price_per_litre_calculation": {
+      "problem": "VLM-extracted price/L may not match due to receipt rounding",
+      "solution": "Always calculate price/L from amount/litres for accuracy",
+      "pattern": "const pricePerLitre = amountRand / litres; // Never trust VLM for derived values"
     },
-    "cascading_delete": {
-      "problem": "Check-in records have related data in multiple tables",
-      "solution": "Delete in order: vlm_results → photos → responses → odometer → fuel → records",
-      "pattern": "Delete children before parent to avoid FK violations"
+    "fuel_efficiency_calculation": {
+      "problem": "L/100km was using date-based previous lookup, could be wrong order",
+      "solution": "Use odometer-based lookup: find highest odometer < current odometer",
+      "pattern": "WHERE odometer_reading < ${currentOdometer} ORDER BY odometer_reading DESC LIMIT 1"
     },
-    "weekly_vs_daily_checkin": {
-      "daily": "2 required photos (dashboard, fuel), 2 checklist items",
-      "weekly": "4 required photos + 3 optional, 16 checklist items in 3 categories",
-      "vlm_weekly": "License plate verification on front/rear photos"
+    "recalculate_on_delete": {
+      "problem": "Deleting transactions leaves stale L/100km values on remaining entries",
+      "solution": "After delete, recalculate all entries: first entry = null, subsequent = (litres/km_diff)*100",
+      "pattern": "ORDER BY odometer_reading ASC, first entry NULL, loop through rest calculating from previous"
+    },
+    "admin_delete_pattern": {
+      "problem": "Need to restrict delete to admin/super_admin only",
+      "solution": "Check user.role in API handler before allowing delete",
+      "pattern": "const user = (req as unknown as { user?: { role?: string } }).user; if (user?.role !== 'admin' && user?.role !== 'super_admin') return forbidden;"
+    },
+    "odometer_stats_consistency": {
+      "problem": "Distance Travelled card showed different 'Latest' km than Odometer Tracking section",
+      "root_cause": "Stats API used fleet_check_records (with bad data 197,484 km) while Odometer Tracking used fleet_odometer_history (correct 167,686 km)",
+      "solution": "Changed stats API to use fleet_odometer_history as single source of truth",
+      "pattern": "SELECT MAX(reading) as latest_reading FROM fleet_odometer_history WHERE vehicle_id = $1"
+    },
+    "fuel_transaction_odometer_sync": {
+      "problem": "Fuel transaction odometer readings not reflected in odometer history stats",
+      "solution": "When fuel transaction is created with odometer, also insert into fleet_odometer_history",
+      "pattern": "INSERT INTO fleet_odometer_history (vehicle_id, reading, source, ...) VALUES (..., 'fuel_transaction', ...)"
     }
   },
   "bugs_fixed": [
     {
-      "file": "src/modules/fleet/check-in/hooks/useCheckIn.ts",
-      "issue": "Low VLM confidence not flagged",
-      "fix": "Added hasLowVlmConfidence computed value passed to createCheckRecord"
+      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
+      "issue": "Mobile receipt photos failed to upload (body too large)",
+      "fix": "Added sizeLimit: '10mb' to bodyParser config"
     },
     {
-      "file": "pages/api/fleet/check-in/records/[recordId].ts",
-      "issue": "super_admin couldn't delete records",
-      "fix": "Changed role check to include both admin and super_admin"
+      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
+      "issue": "Price/L showed VLM value instead of calculated value",
+      "fix": "Changed to always calculate: pricePerLitre = amountRand / litres"
     },
     {
-      "file": "pages/api/fleet/check-in/audit.ts",
-      "issue": "Non-admins could see all check-ins",
-      "fix": "Added driver_id filter for non-admin users"
+      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
+      "issue": "L/100km calculation used date-based previous odometer",
+      "fix": "Changed to odometer-based lookup for correct sequence"
+    },
+    {
+      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
+      "issue": "Deleting transactions left stale L/100km values",
+      "fix": "Added recalculateFuelEfficiency() called after every delete"
+    },
+    {
+      "file": "pages/api/fleet/vehicles/[id]/stats.ts",
+      "issue": "Stats showed wrong 'Latest' km (197,484) from bad check_records data",
+      "fix": "Changed to use fleet_odometer_history as single source of truth (167,686 km correct)"
+    },
+    {
+      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
+      "issue": "Fuel transaction odometer readings not reflected in stats",
+      "fix": "Added sync to fleet_odometer_history when fuel transaction is created"
     }
   ],
   "files_changed": [
-    "pages/fleet/check-in/history.tsx - Complete rewrite with audit features",
-    "pages/fleet/check-in/audit.tsx - Deleted (merged into history)",
-    "pages/api/fleet/check-in/records/[recordId].ts - Added DELETE handler",
-    "pages/api/fleet/check-in/audit.ts - Added access control",
-    "src/modules/fleet/services/checkInService.ts - Added deleteCheckRecord",
-    "src/modules/fleet/check-in/hooks/useCheckIn.ts - Added VLM confidence flag",
-    "src/modules/fleet/types/check-in.types.ts - Added hasLowVlmConfidence",
-    "src/modules/navigation/config/modules/fleet.config.ts - Renamed tab to Check-Ins"
+    "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Body size limit, price/L calc, L/100km calc, DELETE handler, recalculate function, odometer history sync",
+    "pages/fleet/vehicles/[id].tsx - Added delete button for admin users in FuelSpendTab",
+    "pages/api/fleet/vehicles/[id]/stats.ts - Changed to use fleet_odometer_history for consistent stats"
   ],
   "commits": [
-    "7ee06dec fix(fleet): admin role check and access control",
-    "1b77698e feat(fleet): add admin delete for check-in records",
-    "f5407cd4 refactor(fleet): merge check-in audit into history page"
+    "1fe55a7f fix(fleet): improve receipt scan error logging for debugging",
+    "cd7f0150 fix(fleet): increase body size limit for receipt photo scanning",
+    "5ac7fce2 fix(fleet): always calculate price/L from amount/litres",
+    "d4559f8b feat(fleet): add admin delete for fuel transactions, fix L/100km calc",
+    "add794b8 feat(fleet): add delete button for fuel transactions (admin only)",
+    "ca3e4cac feat(fleet): recalculate L/100km after fuel transaction delete",
+    "cf39adac fix(fleet): use odometer history as single source of truth for stats"
   ],
   "deployments": {
-    "dev": "https://dev.fibreflow.app - deployed 2026-02-06",
-    "staging": "https://vf.fibreflow.app - deployed 2026-02-06",
-    "production": "https://app.fibreflow.app - deployed 2026-02-06"
+    "dev": "https://dev.fibreflow.app - deployed 2026-02-07",
+    "staging": "https://vf.fibreflow.app - deployed 2026-02-07",
+    "production": "https://app.fibreflow.app - deployed 2026-02-07"
   },
   "context": {
     "project": "FibreFlow",

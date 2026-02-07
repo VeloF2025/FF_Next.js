@@ -198,16 +198,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
     const remaining = remainingResult.rows[0]?.remaining || 0;
 
-    // If more items, self-invoke to continue processing
+    // If more items, continue processing via service (no HTTP self-invoke)
     if (remaining > 0) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || '3005'}`;
-      fetch(`${baseUrl}/api/system/olt-report/process-lookup-queue`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId }),
-      }).catch(err => {
-        log.warn('OltQueueProcessor', 'Failed to self-invoke for remaining items', err);
-      });
+      import('@/modules/data-sync/services/oltQueueProcessorService')
+        .then(({ processLookupQueue }) => processLookupQueue(runId))
+        .catch(err => log.warn('OltQueueProcessor', 'Service continuation failed', err));
     } else if (runId) {
       // Queue fully processed - mark run complete
       await client.query(

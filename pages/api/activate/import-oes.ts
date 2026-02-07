@@ -806,23 +806,16 @@ async function handler(
       }
 
       // === OLT AUTO-DETECT (Fire-and-forget) ===
-      // Compare OES serials against 1Map cache to auto-detect mismatches
+      // Compare OES serials against 1Map cache, then queue API lookups
       let oltAutoDetectTriggered = false;
       try {
         const { runAutoDetect } = await import('@/modules/data-sync/services/oltAutoDetectService');
+        const { processLookupQueue } = await import('@/modules/data-sync/services/oltQueueProcessorService');
         runAutoDetect(batchId)
-          .then((result) => {
+          .then(async (result) => {
             log.info('OESImport', 'OLT auto-detect completed', result);
-            // If cache misses, trigger queue processor via HTTP (runs in same process)
             if (result.apiLookupsQueued > 0) {
-              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || '3005'}`;
-              fetch(`${baseUrl}/api/system/olt-report/process-lookup-queue`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ runId: result.runId }),
-              }).catch(err => {
-                log.warn('OESImport', 'OLT queue processor trigger failed (non-blocking)', err);
-              });
+              await processLookupQueue(result.runId);
             }
           })
           .catch((err: unknown) => {
