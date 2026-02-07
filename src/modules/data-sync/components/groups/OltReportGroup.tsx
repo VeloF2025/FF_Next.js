@@ -32,6 +32,8 @@ import {
   Lock,
   Zap,
   Database,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import type { OltTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
@@ -182,6 +184,16 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     successCount: number;
     failCount: number;
   } | null>(null);
+
+  // Track expanded investigation context cards
+  const [expandedContexts, setExpandedContexts] = useState<Set<string>>(new Set());
+  const toggleContext = (id: string) => {
+    setExpandedContexts(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   // Projects state
   const [projects, setProjects] = useState<
@@ -1389,50 +1401,65 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                         </div>
                       </td>
                     </tr>
-                    {/* Investigation context row - shown below the record on Investigate tab */}
+                    {/* Investigation context row - collapsible, shown below the record on Investigate tab */}
                     {currentTab === 'investigate' && record.investigation_context && (() => {
                       try {
                         const ctx: InvestigationContext = JSON.parse(record.investigation_context);
+                        const isExpanded = expandedContexts.has(record.id);
                         return (
                           <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
-                            <td colSpan={5} className="py-2 px-4">
-                              <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3 text-xs space-y-2">
-                                <div className="flex items-center gap-2">
+                            <td colSpan={5} className="py-1.5 px-4">
+                              <button
+                                onClick={() => toggleContext(record.id)}
+                                className="w-full bg-purple-500/5 border border-purple-500/20 rounded-lg text-xs text-left hover:bg-purple-500/10 transition-colors"
+                              >
+                                <div className="flex items-center gap-2 px-3 py-2">
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                                  )}
                                   <AlertTriangle className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-                                  <span className="font-semibold text-purple-300">
-                                    Cross-DR Conflict Detected
+                                  <span className="font-semibold text-purple-300">Cross-DR Conflict</span>
+                                  <span className="text-[var(--ff-text-secondary)]">
+                                    — ONT <span className="font-mono text-red-400">{ctx.wrongSerial}</span> belongs to <span className="font-mono text-[var(--ff-accent)]">{ctx.belongsToDr}</span> ({ctx.belongsToTeam})
                                   </span>
                                 </div>
-                                <p className="text-[var(--ff-text-secondary)] leading-relaxed">
-                                  The ONT serial <span className="font-mono text-red-400">{ctx.wrongSerial}</span> currently on 1Map
-                                  belongs to <a
-                                    href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${ctx.belongsToDr}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-mono text-[var(--ff-accent)] hover:underline"
-                                  >{ctx.belongsToDr}</a> ({ctx.belongsToTeam}).
-                                  {ctx.wrongUps && (
-                                    <> UPS: <span className="font-mono text-orange-400">{ctx.wrongUps}</span>.</>
-                                  )}
-                                </p>
-                                <div className="flex gap-4 text-[var(--ff-text-tertiary)]">
-                                  <span>1Map records: {ctx.totalPropRecords}</span>
-                                  <span className="text-green-400">Correct: {ctx.correctRecords}</span>
-                                  <span className="text-red-400">Wrong: {ctx.wrongRecords}</span>
-                                  {ctx.swappedRecords > 0 && (
-                                    <span className="text-orange-400">Swapped: {ctx.swappedRecords}</span>
-                                  )}
+                              </button>
+                              {isExpanded && (
+                                <div className="bg-purple-500/5 border border-t-0 border-purple-500/20 rounded-b-lg px-3 py-2.5 -mt-1 space-y-2">
+                                  <p className="text-xs text-[var(--ff-text-secondary)] leading-relaxed">
+                                    The ONT serial <span className="font-mono text-red-400">{ctx.wrongSerial}</span> currently on 1Map
+                                    belongs to <a
+                                      href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${ctx.belongsToDr}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono text-[var(--ff-accent)] hover:underline"
+                                      onClick={e => e.stopPropagation()}
+                                    >{ctx.belongsToDr}</a> ({ctx.belongsToTeam}).
+                                    {ctx.wrongUps && (
+                                      <> UPS: <span className="font-mono text-orange-400">{ctx.wrongUps}</span>.</>
+                                    )}
+                                  </p>
+                                  <div className="flex gap-4 text-xs text-[var(--ff-text-tertiary)]">
+                                    <span>1Map records: {ctx.totalPropRecords}</span>
+                                    <span className="text-green-400">Correct: {ctx.correctRecords}</span>
+                                    <span className="text-red-400">Wrong: {ctx.wrongRecords}</span>
+                                    {ctx.swappedRecords > 0 && (
+                                      <span className="text-orange-400">Swapped: {ctx.swappedRecords}</span>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 pt-2 border-t border-purple-500/10">
+                                    <p className="text-xs font-medium text-[var(--ff-text-primary)] mb-1">Resolution Options:</p>
+                                    <ul className="list-disc list-inside space-y-0.5 text-xs text-[var(--ff-text-secondary)]">
+                                      <li>Check if <span className="font-mono text-[var(--ff-accent)]">{ctx.belongsToDr}</span> has correct photos and activation data</li>
+                                      <li>Verify if equipment was physically moved between drops</li>
+                                      <li>Contact {ctx.belongsToTeam} team to confirm which DR has the equipment</li>
+                                      <li>Update both DRs in 1Map once confirmed</li>
+                                    </ul>
+                                  </div>
                                 </div>
-                                <div className="mt-1 pt-2 border-t border-purple-500/10">
-                                  <p className="font-medium text-[var(--ff-text-primary)] mb-1">Resolution Options:</p>
-                                  <ul className="list-disc list-inside space-y-0.5 text-[var(--ff-text-secondary)]">
-                                    <li>Check if <span className="font-mono text-[var(--ff-accent)]">{ctx.belongsToDr}</span> has correct photos and activation data</li>
-                                    <li>Verify if equipment was physically moved between drops</li>
-                                    <li>Contact {ctx.belongsToTeam} team to confirm which DR has the equipment</li>
-                                    <li>Update both DRs in 1Map once confirmed</li>
-                                  </ul>
-                                </div>
-                              </div>
+                              )}
                             </td>
                           </tr>
                         );
