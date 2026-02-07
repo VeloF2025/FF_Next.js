@@ -56,6 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     drBCorrectSerial,
     drBWrongSerial,
     scenario,
+    upsTransfer,
   } = req.body as {
     recordId: string;
     drANumber: string;
@@ -65,6 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     drBCorrectSerial: string | null;
     drBWrongSerial: string | null;
     scenario: SwapScenario;
+    upsTransfer?: { needed: boolean; serial: string | null; from: string; to: string } | null;
   };
 
   if (!recordId || !drANumber || !drACorrectSerial || !drBNumber || !scenario) {
@@ -243,12 +245,71 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
     }
 
+    // Step 3: Handle UPS transfer (DR A has a UPS serial that belongs to DR B)
+    let upsTransferResult = null;
+    if (upsTransfer?.needed && upsTransfer.serial) {
+      try {
+        // Search DR B to get its prop_id, then update br_ser
+        const drBSearchResult = await oneMapApi.searchDR(drBNumber);
+        if (drBSearchResult.success && drBSearchResult.records.length > 0) {
+          // Find the best target record: one with ONT but no UPS, or first record without UPS
+          const drBRecord = drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
+            || drBSearchResult.records.find(r => !r.br_ser)
+            || drBSearchResult.records[0];
+          const drBHasUps = drBSearchResult.records.some(r => r.br_ser);
+          if (!drBHasUps) {
+            // No record on DR B has a UPS — transfer it
+            const currentOnt = drBRecord.ph_ont || drBCorrectSerial || '';
+            const upsResult = await oneMapApi.updateOntAndUpsSerial(
+              drBRecord.prop_id,
+              currentOnt,
+              upsTransfer.serial
+            );
+            if (upsResult.success) {
+              upsTransferResult = { success: true, serial: upsTransfer.serial, to: drBNumber };
+
+              await logActivity(
+                drBNumber,
+                'SERIAL_UPDATE',
+                {
+                  details: `UPS TRANSFER: UPS serial ${upsTransfer.serial} transferred from ${drANumber} (was on wrong DR)`,
+                  source: 'olt_report',
+                  fix_type: 'ups_transfer',
+                  fromDr: drANumber,
+                },
+                userId || 'system'
+              );
+
+              await client.query(
+                `INSERT INTO serial_change_history
+                 (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
+                 VALUES ($1, 'ups_serial', $2, $3, 'cross_dr_swap', 'ups_transfer', $4, $5)`,
+                [
+                  drBNumber,
+                  null,
+                  upsTransfer.serial,
+                  userId || 'system',
+                  JSON.stringify({ fromDr: drANumber, source: 'olt_report' }),
+                ]
+              );
+            } else {
+              upsTransferResult = { success: false, error: upsResult.error };
+            }
+          }
+        }
+      } catch (upsErr) {
+        log.error('SwapFix', 'UPS transfer failed (non-fatal)', { error: upsErr, drB: drBNumber });
+        upsTransferResult = { success: false, error: 'UPS transfer failed' };
+      }
+    }
+
     log.info('SwapFix', 'Cross-DR swap completed', {
       drA: drANumber,
       drB: drBNumber,
       scenario,
       drASuccess: drAResult.success,
       drBSuccess: drBFixResult?.success ?? null,
+      upsTransfer: upsTransferResult,
     });
 
     return apiResponse.success(res, {
@@ -261,6 +322,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         flagged: scenario === 'fix_a_flag_b',
         error: drBFixResult && !drBFixResult.success ? drBFixResult.error : undefined,
       },
+      upsTransfer: upsTransferResult,
     });
   } catch (error) {
     log.error('SwapFix', 'Swap fix failed', { error, drA: drANumber, drB: drBNumber });

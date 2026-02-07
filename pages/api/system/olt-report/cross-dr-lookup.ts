@@ -85,16 +85,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     ]);
 
     const drAFoundOn1Map = drASearch.success && drASearch.records.length > 0;
-    // Find the record with the wrong serial to get its UPS (DR may have multiple prop records)
-    const drAWrongRecord = drAFoundOn1Map
-      ? drASearch.records.find(r => r.ph_ont?.toUpperCase() === wrongSerial.toUpperCase()) || drASearch.records[0]
+    // Find UPS from ANY of DR A's prop records (may have multiple, UPS could be on any)
+    const drAOneMapUps = drAFoundOn1Map
+      ? drASearch.records.find(r => r.br_ser)?.br_ser || null
       : null;
-    const drAOneMapUps = drAWrongRecord?.br_ser || null;
 
     const drBFoundOn1Map = drBSearch.success && drBSearch.records.length > 0;
-    const drBFirstRecord = drBFoundOn1Map ? drBSearch.records[0] : null;
-    const drBOneMapSerial = drBFirstRecord?.ph_ont || null;
-    const drBOneMapUps = drBFirstRecord?.br_ser || null;
+    const drBOneMapSerial = drBFoundOn1Map
+      ? (drBSearch.records.find(r => r.ph_ont)?.ph_ont || drBSearch.records[0].ph_ont)
+      : null;
+    const drBOneMapUps = drBFoundOn1Map
+      ? drBSearch.records.find(r => r.br_ser)?.br_ser || null
+      : null;
 
     // Detect UPS transfer: DR A has a UPS serial that likely belongs to DR B (DR B's UPS is empty)
     const upsTransferNeeded = !!(drAOneMapUps && drBFoundOn1Map && !drBOneMapUps);
