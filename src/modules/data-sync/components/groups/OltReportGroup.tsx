@@ -768,6 +768,44 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         </div>
       </div>
 
+      {/* Background Process Status Banner - visible on ALL tabs */}
+      {autoDetectStatus?.hasRun && autoDetectStatus.run && (
+        autoDetectStatus.run.status === 'running' || autoDetectStatus.run.status === 'processing_queue'
+      ) && (
+        <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+              <span className="text-sm font-medium text-purple-300">
+                OLT Mismatch Check Running
+              </span>
+              {autoDetectStatus.queue && autoDetectStatus.queue.total > 0 && (
+                <span className="text-sm text-[var(--ff-text-secondary)]">
+                  {autoDetectStatus.queue.completed}/{autoDetectStatus.queue.total} checked
+                  <span className="ml-1 text-[var(--ff-text-tertiary)]">
+                    ({Math.round((autoDetectStatus.queue.completed / autoDetectStatus.queue.total) * 100)}%)
+                  </span>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-[var(--ff-text-secondary)]">
+              <span>{autoDetectStatus.run.matches} matches</span>
+              {(autoDetectStatus.run.mismatchesNote4 > 0) && (
+                <span className="text-amber-400">{autoDetectStatus.run.mismatchesNote4} mismatches</span>
+              )}
+            </div>
+          </div>
+          {autoDetectStatus.queue && autoDetectStatus.queue.total > 0 && (
+            <div className="mt-2 h-1.5 bg-purple-500/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                style={{ width: `${(autoDetectStatus.queue.completed / autoDetectStatus.queue.total) * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Tab Navigation - Only show tabs user has permission for */}
       <div className="border-b border-[var(--ff-border-light)]">
         <nav className="flex gap-1" aria-label="OLT Report Tabs">

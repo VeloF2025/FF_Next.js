@@ -109,15 +109,21 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       [totalOesRows, runId]
     );
 
-    // Load previously verified DR+serial combos (skip re-checking)
-    const prevVerified = await client.query(
-      `SELECT drop_number, UPPER(oes_serial) as oes_serial, mismatch_type
-       FROM olt_onemap_lookup_queue
-       WHERE status = 'completed'`
+    // Load ALL existing DR+serial combos from queue (skip re-queuing)
+    // Includes completed (already verified), pending, and processing items
+    const prevQueued = await client.query(
+      `SELECT drop_number, UPPER(oes_serial) as oes_serial, status, mismatch_type
+       FROM olt_onemap_lookup_queue`
     );
     const verifiedMap = new Map<string, string>();
-    for (const pv of prevVerified.rows) {
-      verifiedMap.set(`${pv.drop_number}|${pv.oes_serial}`, pv.mismatch_type);
+    for (const pv of prevQueued.rows) {
+      const key = `${pv.drop_number}|${pv.oes_serial}`;
+      // Completed items have a known mismatch_type; pending/processing are 'queued'
+      if (pv.status === 'completed') {
+        verifiedMap.set(key, pv.mismatch_type || 'unknown');
+      } else if (!verifiedMap.has(key)) {
+        verifiedMap.set(key, 'queued');
+      }
     }
 
     let cacheHits = 0;
@@ -151,11 +157,12 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       const oesSerial = row.oes_serial.trim().toUpperCase();
       const oneMapSerial = row.onemap_serial?.trim().toUpperCase() || null;
 
-      // Skip if already verified with same serial in a previous run
+      // Skip if already in queue (pending/processing) or verified (completed)
       const verifyKey = `${row.drop_number}|${oesSerial}`;
       if (verifiedMap.has(verifyKey)) {
         const prevType = verifiedMap.get(verifyKey)!;
         if (prevType === 'match') matches++;
+        // 'queued' = still pending in queue from a previous run, skip re-queuing
         alreadyVerified++;
         continue;
       }
