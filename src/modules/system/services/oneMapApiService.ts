@@ -669,6 +669,64 @@ class OneMapApiService {
       alreadyCorrectCount,
     };
   }
+  /**
+   * Update a record's status field on 1Map
+   */
+  async updateRecordStatus(
+    propId: string,
+    newStatus: string
+  ): Promise<{ success: boolean; propId: string; oldStatus?: string; newStatus: string; error?: string }> {
+    try {
+      if (!(await this.ensureSession())) {
+        return { success: false, propId, newStatus, error: 'Authentication failed' };
+      }
+
+      const formData = new URLSearchParams({
+        action: 'update',
+        layerid: LAYER_ID,
+        sort: 'prop_id',
+        templateExpression: '',
+        start: '0',
+        limit: '50',
+        bottom: '0',
+        left: '0',
+        right: '0',
+        top: '0',
+        selfilter: 'null',
+        ungeocoded: 'false',
+        items: JSON.stringify({ prop_id: propId, status: newStatus }),
+      });
+
+      const response = await fetchWithTimeout(`${BASE_URL}/api/apps/app/attributes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Cookie: `connect.sid=${this.sessionCookie}`,
+        },
+        body: formData.toString(),
+      });
+
+      const text = await response.text();
+      const success = response.ok && text.includes('"success":true');
+
+      if (!success) {
+        log.error('OneMapAPI', 'Status update failed', { propId, newStatus, response: text });
+        return { success: false, propId, newStatus, error: 'API returned failure' };
+      }
+
+      log.info('OneMapAPI', 'Record status updated', { propId, newStatus });
+      return { success: true, propId, newStatus };
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      log.error('OneMapAPI', isTimeout ? 'Status update timed out' : 'Status update failed', { propId, error });
+      return {
+        success: false,
+        propId,
+        newStatus,
+        error: isTimeout ? '1Map API timeout' : (error instanceof Error ? error.message : 'Unknown error'),
+      };
+    }
+  }
 }
 
 // Export singleton instance

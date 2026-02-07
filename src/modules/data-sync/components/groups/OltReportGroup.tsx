@@ -534,6 +534,21 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
   };
 
+  // Parse investigation context to detect status mismatches
+  const getInvestigationContext = (record: OltRecord) => {
+    if (!record.investigation_context) return null;
+    try {
+      return typeof record.investigation_context === 'string'
+        ? JSON.parse(record.investigation_context)
+        : record.investigation_context;
+    } catch { return null; }
+  };
+
+  const isStatusMismatch = (record: OltRecord) => {
+    const ctx = getInvestigationContext(record);
+    return ctx?.reason === 'status_mismatch';
+  };
+
   // Handle fix
   const handleFix = async (record: OltRecord) => {
     if (!record.olt_serial) return;
@@ -543,14 +558,22 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     setFixErrors((prev) => { const n = { ...prev }; delete n[record.id]; return n; });
 
     try {
-      const res = await fetch('/api/system/olt-report/fix-1map', {
+      // Route status mismatches to fix-status API
+      const ctx = getInvestigationContext(record);
+      const isStatusFix = ctx?.reason === 'status_mismatch' && ctx?.propId;
+
+      const endpoint = isStatusFix
+        ? '/api/system/olt-report/fix-status'
+        : '/api/system/olt-report/fix-1map';
+
+      const body = isStatusFix
+        ? { propId: ctx.propId, drNumber: record.drop_number }
+        : { drNumber: record.drop_number, correctSerial: record.olt_serial, wrongSerial: record.wrong_onemap_serial };
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          drNumber: record.drop_number,
-          correctSerial: record.olt_serial,
-          wrongSerial: record.wrong_onemap_serial,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -594,14 +617,36 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     setBulkFixResult(null);
     setError(null);
 
+    // Separate status mismatches from serial mismatches
+    const statusRecords = selectedRecords.filter(r => isStatusMismatch(r));
+    const serialRecords = selectedRecords.filter(r => !isStatusMismatch(r));
+
     const BATCH_SIZE = 5;
     let totalSuccess = 0;
     let totalFail = 0;
     const allErrors: Record<string, string> = {};
 
     try {
-      for (let i = 0; i < selectedRecords.length; i += BATCH_SIZE) {
-        const batch = selectedRecords.slice(i, i + BATCH_SIZE);
+      // Fix status mismatches one by one
+      for (const rec of statusRecords) {
+        setBulkFixResult({ total: selectedRecords.length, successCount: totalSuccess, failCount: totalFail });
+        const ctx = getInvestigationContext(rec);
+        try {
+          const r = await fetch('/api/system/olt-report/fix-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ propId: ctx?.propId, drNumber: rec.drop_number }),
+          });
+          const d = await r.json();
+          const result = d.data || d;
+          if (result.success) totalSuccess++;
+          else { totalFail++; allErrors[rec.id] = result.error || 'Status fix failed'; }
+        } catch { totalFail++; allErrors[rec.id] = 'Network error'; }
+      }
+
+      // Fix serial mismatches in bulk batches
+      for (let i = 0; i < serialRecords.length; i += BATCH_SIZE) {
+        const batch = serialRecords.slice(i, i + BATCH_SIZE);
 
         // Update progress display
         setBulkFixResult({
@@ -795,25 +840,24 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           ? `Swapped serials on both ${lookup.drA.drNumber} and ${lookup.drB.drNumber}`
           : `Fixed ${lookup.drA.drNumber}` + (scenario === 'fix_a_flag_b' ? ` and flagged ${lookup.drB.drNumber}` : '');
         if (result.upsTransfer?.success) {
-          msg += ` | UPS ${result.upsTransfer.serial} transferred to ${lookup.drB.drNumber}`;
+          msg += ` | UPS transferred to ${lookup.drB.drNumber}`;
+        }
+        if (result.photoCopy?.success) {
+          msg += ` | ${result.photoCopy.count} photos copied to ${lookup.drB.drNumber}`;
         }
         toast.success(msg);
 
-        // Re-sync photos from 1Map for affected DRs (fire-and-forget)
-        const drsToSync = [lookup.drA.drNumber];
-        if (scenario === 'clean_swap' || lookup.upsTransfer?.needed) drsToSync.push(lookup.drB.drNumber);
-        for (const dr of drsToSync) {
-          fetch('/api/activate/fetch-photos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dropNumber: dr, force: true }),
-          }).then(r => r.json()).then(d => {
-            const photoResult = d.data || d;
-            if (photoResult.count > 0) {
-              toast.success(`${dr}: ${photoResult.count} photos synced from 1Map`);
-            }
-          }).catch(() => { /* non-fatal */ });
-        }
+        // Re-sync DR A's photos from 1Map (DR B's photos are copied server-side)
+        fetch('/api/activate/fetch-photos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dropNumber: lookup.drA.drNumber, force: true }),
+        }).then(r => r.json()).then(d => {
+          const photoResult = d.data || d;
+          if (photoResult.count > 0) {
+            toast.success(`${lookup.drA.drNumber}: ${photoResult.count} photos refreshed`);
+          }
+        }).catch(() => { /* non-fatal */ });
 
         // Clean up state and refresh
         setSwapLookups(prev => { const n = { ...prev }; delete n[record.id]; return n; });
@@ -1438,8 +1482,10 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                       <td className="py-3 px-4 text-green-400 font-mono">
                         {record.olt_serial || '-'}
                       </td>
-                      <td className="py-3 px-4 text-red-400 font-mono">
-                        {record.wrong_onemap_serial || record.onemap_serial || '-'}
+                      <td className={`py-3 px-4 font-mono ${isStatusMismatch(record) ? 'text-green-400' : 'text-red-400'}`}>
+                        {isStatusMismatch(record)
+                          ? <span title="Serial matches OES">{record.olt_serial} <CheckCircle className="w-3 h-3 inline" /></span>
+                          : (record.wrong_onemap_serial || record.onemap_serial || '-')}
                       </td>
                       <td className="py-3 px-4">
                         <span
@@ -1460,6 +1506,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                             UPS Swap
                           </span>
                         )}
+                        {isStatusMismatch(record) && (() => {
+                          const ctx = getInvestigationContext(record);
+                          return (
+                            <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400" title={ctx?.message}>
+                              Status: {ctx?.currentStatus || 'wrong'}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -1484,7 +1538,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                 ) : (
                                   <Wrench className="w-3 h-3" />
                                 )}
-                                Fix
+                                {isStatusMismatch(record) ? 'Fix Status' : 'Fix'}
                               </button>
                               {fixErrors[record.id] && (
                                 <span className="text-[10px] text-red-400 max-w-[160px] text-right leading-tight">

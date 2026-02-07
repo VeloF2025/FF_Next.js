@@ -208,6 +208,26 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
   else if (wrongCount > 0) { mismatchType = 'note4_wrong_serial'; }
   else if (emptyCount > 0 && correctCount === 0) { mismatchType = 'note4_empty_barcode'; }
 
+  // Status mismatch check: serial is correct but status is wrong
+  const INSTALLED_STATUS = 'Home Installation: Installed';
+  let statusMismatchContext: string | null = null;
+  if (mismatchType === 'match' && correctCount > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wrongStatusRecord = records.find((r: any) =>
+      r.ph_ont?.trim().toUpperCase() === oesSerial && r.status !== INSTALLED_STATUS
+    );
+    if (wrongStatusRecord) {
+      mismatchType = 'status_mismatch';
+      statusMismatchContext = JSON.stringify({
+        reason: 'status_mismatch',
+        propId: wrongStatusRecord.prop_id,
+        currentStatus: wrongStatusRecord.status || 'unknown',
+        expectedStatus: INSTALLED_STATUS,
+        message: `Status is "${wrongStatusRecord.status || 'unknown'}" but should be "${INSTALLED_STATUS}"`,
+      });
+    }
+  }
+
   const bestRecord = records.find(r => r.ph_ont) || records[0];
   await client.query(
     `UPDATE olt_onemap_lookup_queue
@@ -217,7 +237,7 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
     [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
   );
 
-  let investigationContext: string | null = null;
+  let investigationContext: string | null = statusMismatchContext;
   if ((wrongCount > 0 || swapCount > 0) && firstWrongSerial) {
     const ownerLookup = await client.query(
       `SELECT drop_number, serial_number, team, status
@@ -251,7 +271,7 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
     await insertMismatchIfNew(client, {
       importId, dropNumber: item.drop_number,
       oltSerial: item.oes_serial,
-      wrongOneMapSerial: firstWrongSerial || bestRecord.ph_ont,
+      wrongOneMapSerial: mismatchType === 'status_mismatch' ? null : (firstWrongSerial || bestRecord.ph_ont),
       fixStatus, hasUpsSwap,
       oesBatchId: item.oes_batch_id, oesSource: 'api',
       investigationContext,
@@ -276,8 +296,12 @@ async function insertMismatchIfNew(
     investigationContext?: string | null;
   }
 ): Promise<void> {
+  const isNewStatusMismatch = data.investigationContext
+    ? (() => { try { return JSON.parse(data.investigationContext!).reason === 'status_mismatch'; } catch { return false; } })()
+    : false;
+
   const existing = await client.query(
-    `SELECT id, fix_status, olt_serial
+    `SELECT id, fix_status, olt_serial, investigation_context
      FROM olt_mismatch_records
      WHERE drop_number = $1
      ORDER BY created_at DESC LIMIT 1`,
@@ -286,11 +310,24 @@ async function insertMismatchIfNew(
 
   if (existing.rows.length > 0) {
     const ex = existing.rows[0];
+    const exContext = ex.investigation_context
+      ? (typeof ex.investigation_context === 'string' ? (() => { try { return JSON.parse(ex.investigation_context); } catch { return null; } })() : ex.investigation_context)
+      : null;
+    const isExistingStatusMismatch = exContext?.reason === 'status_mismatch';
+
     if (ex.fix_status === 'fixed' && ex.olt_serial?.toUpperCase() === data.oltSerial.toUpperCase()) {
-      return; // Already fixed with same serial
-    }
-    if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
+      // If existing was a serial fix and new issue is a status mismatch, allow creation
+      if (isNewStatusMismatch && !isExistingStatusMismatch) {
+        // Fall through to INSERT - serial was fixed, now status needs fixing
+      } else {
+        return; // Already fixed with same serial (or same status mismatch already fixed)
+      }
+    } else if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
         || ex.fix_status === 'not_found') {
+      // Don't overwrite a pending serial fix with a status mismatch
+      if (isNewStatusMismatch && !isExistingStatusMismatch) {
+        return; // Serial fix takes priority, don't overwrite
+      }
       // Update existing pending
       await client.query(
         `UPDATE olt_mismatch_records

@@ -36,9 +36,15 @@ export const config = {
 
 type SwapScenario = 'clean_swap' | 'fix_a_only' | 'fix_a_flag_b' | 'fix_a_b_missing';
 
+interface PropStatus {
+  propId: string;
+  status: string | null;
+  needsFix: boolean; // true if status is not "Home Installation: Installed"
+}
+
 interface SwapLookupResult {
-  drA: { drNumber: string; oesSerial: string; oneMapSerial: string; oneMapUps: string | null };
-  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; oneMapUps: string | null; foundOn1Map: boolean };
+  drA: { drNumber: string; oesSerial: string; oneMapSerial: string; oneMapUps: string | null; propStatus: PropStatus | null };
+  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; oneMapUps: string | null; foundOn1Map: boolean; propStatus: PropStatus | null };
   upsTransfer: { needed: boolean; serial: string | null; from: string; to: string } | null;
   scenario: SwapScenario;
   recommendation: string;
@@ -84,10 +90,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       oneMapApi.searchDR(belongsToDr),
     ]);
 
+    const INSTALLED_STATUS = 'Home Installation: Installed';
     const drAFoundOn1Map = drASearch.success && drASearch.records.length > 0;
     // Find UPS from ANY of DR A's prop records (may have multiple, UPS could be on any)
     const drAOneMapUps = drAFoundOn1Map
       ? drASearch.records.find(r => r.br_ser)?.br_ser || null
+      : null;
+
+    // Find the prop record with the wrong serial (DR A) — this is the one we'll fix
+    const drAWrongRecord = drAFoundOn1Map
+      ? drASearch.records.find(r => r.ph_ont?.toUpperCase() === wrongSerial.toUpperCase())
+      : null;
+    const drAPropStatus: PropStatus | null = drAWrongRecord
+      ? { propId: drAWrongRecord.prop_id, status: drAWrongRecord.status, needsFix: drAWrongRecord.status !== INSTALLED_STATUS }
       : null;
 
     const drBFoundOn1Map = drBSearch.success && drBSearch.records.length > 0;
@@ -96,6 +111,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       : null;
     const drBOneMapUps = drBFoundOn1Map
       ? drBSearch.records.find(r => r.br_ser)?.br_ser || null
+      : null;
+
+    // Find DR B's installed record status
+    const drBInstalledRecord = drBFoundOn1Map
+      ? drBSearch.records.find(r => r.ph_ont?.toUpperCase() === drBOesSerial?.toUpperCase()) || drBSearch.records[0]
+      : null;
+    const drBPropStatus: PropStatus | null = drBInstalledRecord
+      ? { propId: drBInstalledRecord.prop_id, status: drBInstalledRecord.status, needsFix: drBInstalledRecord.status !== INSTALLED_STATUS }
       : null;
 
     // Detect UPS transfer: DR A has a UPS serial that likely belongs to DR B (DR B's UPS is empty)
@@ -141,6 +164,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         oesSerial: drAOesSerial,
         oneMapSerial: wrongSerial,
         oneMapUps: drAOneMapUps,
+        propStatus: drAPropStatus,
       },
       drB: {
         drNumber: belongsToDr,
@@ -148,6 +172,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         oneMapSerial: drBOneMapSerial,
         oneMapUps: drBOneMapUps,
         foundOn1Map: drBFoundOn1Map,
+        propStatus: drBPropStatus,
       },
       upsTransfer: upsTransferNeeded ? {
         needed: true,

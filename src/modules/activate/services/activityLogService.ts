@@ -54,7 +54,8 @@ export type ActivityEventType =
   | 'SERIAL_VERIFIED'
   | 'INVESTIGATE'
   | 'MANUAL_SERIAL_EDIT'
-  | 'SERIAL_VERIFICATION_COMPUTED';
+  | 'SERIAL_VERIFICATION_COMPUTED'
+  | 'STATUS_UPDATE';
 
 /**
  * Serial change source types
@@ -255,6 +256,11 @@ const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: string; i
   SERIAL_VERIFICATION_COMPUTED: {
     title: 'Serial Verification Updated',
     icon: '🔒',
+    iconColor: 'text-blue-500',
+  },
+  STATUS_UPDATE: {
+    title: '1Map Status Updated',
+    icon: '🔄',
     iconColor: 'text-blue-500',
   },
 };
