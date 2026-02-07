@@ -35,9 +35,20 @@ async function handler(
 ) {
   const { id } = req.query;
 
-  // Enable CORS
+  // Enable CORS with origin allowlist
+  const allowedOrigins = [
+    'https://app.fibreflow.app',
+    'https://vf.fibreflow.app',
+    'https://dev.fibreflow.app',
+    'http://localhost:3004',
+    'http://localhost:3005',
+    'http://localhost:3006',
+  ];
+  const origin = req.headers.origin || '';
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
   

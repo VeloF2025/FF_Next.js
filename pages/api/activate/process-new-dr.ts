@@ -19,8 +19,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
-// NOTE: No withAuth - this endpoint is called by Go WhatsApp Bridge without credentials
+// Webhook auth: verified via shared bridge secret (not withAuth - called by Go WhatsApp Bridge)
 import { log } from '@/lib/logger';
+
+const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
 import {
   categorizePhotos,
   PhotoInput,
@@ -1014,6 +1016,16 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
+  // Verify bridge secret to prevent unauthorized access
+  if (!BRIDGE_SECRET) {
+    log.error('[process-new-dr] WA_BRIDGE_SECRET env var not set');
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server configuration error');
+  }
+  const secret = req.body?.secret || req.headers['x-bridge-secret'];
+  if (secret !== BRIDGE_SECRET) {
+    return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Invalid bridge secret');
+  }
+
   if (req.method === 'POST') {
     return handlePost(req, res);
   } else {
@@ -1021,5 +1033,5 @@ async function handler(
   }
 }
 
-// Public endpoint - called by Go WhatsApp Bridge
+// Webhook endpoint - authenticated via bridge secret
 export default handler;

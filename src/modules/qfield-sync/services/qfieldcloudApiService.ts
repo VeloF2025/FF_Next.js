@@ -7,17 +7,20 @@ import https from 'https';
 import { Pool } from 'pg';
 import { log } from '@/lib/logger';
 
-// QFieldCloud API Configuration
+// QFieldCloud API Configuration - credentials from environment variables only
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
-const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || 'Y0x05qOAhdHfxPgZAZ5FzM8LgOSDlne1OTEyRoO7zQjoxYbhtpTKDHJlsrZ4Q0jJ7I6JMzA3uMn01Q2vMLxB2ox6L6DT4zYxzHj8';
+const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN;
+if (!QFIELD_API_TOKEN) {
+  log.error('QFIELD_API_TOKEN environment variable is required but not set');
+}
 
 // QFieldCloud Database Direct Access (for faster queries)
 const qfieldPool = new Pool({
-  host: '100.96.203.105',
-  port: 5433,
-  database: 'qfieldcloud_db',
-  user: 'qfieldcloud_db_admin',
-  password: 'c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753',
+  host: process.env.QFIELD_DB_HOST || '100.96.203.105',
+  port: parseInt(process.env.QFIELD_DB_PORT || '5433'),
+  database: process.env.QFIELD_DB_NAME || 'qfieldcloud_db',
+  user: process.env.QFIELD_DB_USER || 'qfieldcloud_db_admin',
+  password: process.env.QFIELD_DB_PASSWORD,
   ssl: false,
   connectionTimeoutMillis: 5000,
 });

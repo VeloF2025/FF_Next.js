@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
-const sql = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon(process.env.DATABASE_URL!);
 
 type SOWListResponse = {
   success: boolean;
@@ -177,7 +177,12 @@ async function getSOWData(
   }
 ) {
   const { projectId, status, search, limit, offset, sortBy, sortOrder } = params;
-  
+
+  // Validate sortBy against allowlist to prevent SQL injection
+  const validSortColumns = ['created_at', 'updated_at', 'pole_number', 'drop_number', 'cable_id', 'status', 'location', 'address', 'start_location', 'end_location'];
+  const safeSortBy = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
+  const safeSortOrder = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
   const whereConditions = [];
   const queryParams = [];
   
@@ -216,7 +221,7 @@ async function getSOWData(
     FROM ${table} s
     LEFT JOIN projects p ON s.project_id = p.id
     ${whereClause}
-    ORDER BY s.${sortBy} ${sortOrder}
+    ORDER BY s.${safeSortBy} ${safeSortOrder}
   `;
   
   if (limit !== undefined && offset !== undefined) {

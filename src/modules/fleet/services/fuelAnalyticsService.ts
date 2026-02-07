@@ -56,16 +56,28 @@ export async function getFuelTransactions(options: {
   const { vehicleId, startDate, endDate, limit = 50, offset = 0 } = options;
 
   try {
-    // Build where clauses
+    // Build parameterized where clauses
     const conditions: string[] = [];
-    if (vehicleId) conditions.push(`ft.vehicle_id = '${vehicleId}'`);
-    if (startDate) conditions.push(`ft.transaction_date >= '${startDate}'::date`);
-    if (endDate) conditions.push(`ft.transaction_date <= '${endDate}'::date`);
+    const params: (string | number)[] = [];
+    if (vehicleId) {
+      params.push(vehicleId);
+      conditions.push(`ft.vehicle_id = $${params.length}`);
+    }
+    if (startDate) {
+      params.push(startDate);
+      conditions.push(`ft.transaction_date >= $${params.length}::date`);
+    }
+    if (endDate) {
+      params.push(endDate);
+      conditions.push(`ft.transaction_date <= $${params.length}::date`);
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const rows = await sql`
-      SELECT
+    const limitIdx = params.length + 1;
+    const offsetIdx = params.length + 2;
+    const rows = await sql.unsafe(
+      `SELECT
         ft.*,
         fv.registration,
         fv.make,
@@ -74,17 +86,19 @@ export async function getFuelTransactions(options: {
       FROM fleet_fuel_transactions ft
       JOIN fleet_vehicles fv ON ft.vehicle_id = fv.id
       LEFT JOIN staff s ON fv.assigned_driver_id = s.id
-      ${sql.unsafe(whereClause)}
+      ${whereClause}
       ORDER BY ft.transaction_date DESC, ft.created_at DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `;
+      LIMIT $${limitIdx}
+      OFFSET $${offsetIdx}`,
+      [...params, limit, offset]
+    );
 
-    const countResult = await sql`
-      SELECT COUNT(*) as total
+    const countResult = await sql.unsafe(
+      `SELECT COUNT(*) as total
       FROM fleet_fuel_transactions ft
-      ${sql.unsafe(whereClause)}
-    `;
+      ${whereClause}`,
+      params
+    );
 
     return {
       transactions: (rows as FuelTransactionRow[]).map(rowToFuelTransaction),
@@ -351,22 +365,36 @@ export async function getFuelEfficiencyTrends(
         break;
     }
 
-    const vehicleFilter = vehicleId ? `AND ft.vehicle_id = '${vehicleId}'` : '';
+    const startDateStr = startDate.toISOString().split('T')[0];
 
-    const rows = await sql`
-      SELECT
-        DATE_TRUNC(${groupBy}, ft.transaction_date) as date,
-        AVG(ft.litres_per_100km) as avg_efficiency,
-        SUM(ft.litres) as total_litres,
-        SUM(ft.amount_rand) as total_cost,
-        COUNT(*) as transaction_count
-      FROM fleet_fuel_transactions ft
-      WHERE ft.transaction_date >= ${startDate.toISOString().split('T')[0]}::date
-        ${sql.unsafe(vehicleFilter)}
-        AND ft.litres_per_100km IS NOT NULL
-      GROUP BY DATE_TRUNC(${groupBy}, ft.transaction_date)
-      ORDER BY date ASC
-    `;
+    const rows = vehicleId
+      ? await sql`
+          SELECT
+            DATE_TRUNC(${groupBy}, ft.transaction_date) as date,
+            AVG(ft.litres_per_100km) as avg_efficiency,
+            SUM(ft.litres) as total_litres,
+            SUM(ft.amount_rand) as total_cost,
+            COUNT(*) as transaction_count
+          FROM fleet_fuel_transactions ft
+          WHERE ft.transaction_date >= ${startDateStr}::date
+            AND ft.vehicle_id = ${vehicleId}
+            AND ft.litres_per_100km IS NOT NULL
+          GROUP BY DATE_TRUNC(${groupBy}, ft.transaction_date)
+          ORDER BY date ASC
+        `
+      : await sql`
+          SELECT
+            DATE_TRUNC(${groupBy}, ft.transaction_date) as date,
+            AVG(ft.litres_per_100km) as avg_efficiency,
+            SUM(ft.litres) as total_litres,
+            SUM(ft.amount_rand) as total_cost,
+            COUNT(*) as transaction_count
+          FROM fleet_fuel_transactions ft
+          WHERE ft.transaction_date >= ${startDateStr}::date
+            AND ft.litres_per_100km IS NOT NULL
+          GROUP BY DATE_TRUNC(${groupBy}, ft.transaction_date)
+          ORDER BY date ASC
+        `;
 
     return rows.map((row: Record<string, unknown>) => ({
       date: String(row.date),
@@ -480,15 +508,23 @@ export async function runAnomalyDetection(options: {
 
   try {
     // Get vehicles to check
-    const vehicleFilter = vehicleId ? `AND fv.id = '${vehicleId}'` : '';
-    const vehicles = await sql`
-      SELECT DISTINCT fv.id, fv.registration
-      FROM fleet_vehicles fv
-      JOIN fleet_fuel_transactions ft ON fv.id = ft.vehicle_id
-      WHERE fv.status = 'active'
-        ${sql.unsafe(vehicleFilter)}
-        AND ft.transaction_date >= ${startDate.toISOString().split('T')[0]}::date
-    `;
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const vehicles = vehicleId
+      ? await sql`
+          SELECT DISTINCT fv.id, fv.registration
+          FROM fleet_vehicles fv
+          JOIN fleet_fuel_transactions ft ON fv.id = ft.vehicle_id
+          WHERE fv.status = 'active'
+            AND fv.id = ${vehicleId}
+            AND ft.transaction_date >= ${startDateStr}::date
+        `
+      : await sql`
+          SELECT DISTINCT fv.id, fv.registration
+          FROM fleet_vehicles fv
+          JOIN fleet_fuel_transactions ft ON fv.id = ft.vehicle_id
+          WHERE fv.status = 'active'
+            AND ft.transaction_date >= ${startDateStr}::date
+        `;
 
     vehiclesChecked = vehicles.length;
 
@@ -671,17 +707,36 @@ export async function getFuelAnomalies(options: {
   const { vehicleId, status, severity, startDate, endDate, limit = 50, offset = 0 } = options;
 
   try {
+    // Build parameterized where clauses
     const conditions: string[] = [];
-    if (vehicleId) conditions.push(`fa.vehicle_id = '${vehicleId}'`);
-    if (status) conditions.push(`fa.status = '${status}'`);
-    if (severity) conditions.push(`fa.severity = '${severity}'`);
-    if (startDate) conditions.push(`fa.detected_at >= '${startDate}'::date`);
-    if (endDate) conditions.push(`fa.detected_at <= '${endDate}'::date`);
+    const params: (string | number)[] = [];
+    if (vehicleId) {
+      params.push(vehicleId);
+      conditions.push(`fa.vehicle_id = $${params.length}`);
+    }
+    if (status) {
+      params.push(status);
+      conditions.push(`fa.status = $${params.length}`);
+    }
+    if (severity) {
+      params.push(severity);
+      conditions.push(`fa.severity = $${params.length}`);
+    }
+    if (startDate) {
+      params.push(startDate);
+      conditions.push(`fa.detected_at >= $${params.length}::date`);
+    }
+    if (endDate) {
+      params.push(endDate);
+      conditions.push(`fa.detected_at <= $${params.length}::date`);
+    }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const rows = await sql`
-      SELECT
+    const limitIdx = params.length + 1;
+    const offsetIdx = params.length + 2;
+    const rows = await sql.unsafe(
+      `SELECT
         fa.*,
         fv.registration,
         fv.make,
@@ -690,17 +745,19 @@ export async function getFuelAnomalies(options: {
       FROM fleet_fuel_anomalies fa
       JOIN fleet_vehicles fv ON fa.vehicle_id = fv.id
       LEFT JOIN staff s ON fv.assigned_driver_id = s.id
-      ${sql.unsafe(whereClause)}
+      ${whereClause}
       ORDER BY fa.detected_at DESC
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `;
+      LIMIT $${limitIdx}
+      OFFSET $${offsetIdx}`,
+      [...params, limit, offset]
+    );
 
-    const countResult = await sql`
-      SELECT COUNT(*) as total
+    const countResult = await sql.unsafe(
+      `SELECT COUNT(*) as total
       FROM fleet_fuel_anomalies fa
-      ${sql.unsafe(whereClause)}
-    `;
+      ${whereClause}`,
+      params
+    );
 
     return {
       anomalies: (rows as FuelAnomalyRow[]).map(rowToFuelAnomaly),

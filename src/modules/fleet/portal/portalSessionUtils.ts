@@ -7,12 +7,16 @@
 import type { NextApiRequest } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { parse } from 'cookie';
+import crypto from 'crypto';
 import type { PortalSession } from './types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 // Cookie name must match plate-auth.ts
 export const PORTAL_SESSION_COOKIE = 'ff_portal_session';
+
+// HMAC signing secret for portal session tokens
+const PORTAL_SESSION_SECRET = process.env.PORTAL_SESSION_SECRET;
 
 /**
  * Extract portal session from request cookies
@@ -28,9 +32,27 @@ export function getPortalSessionFromCookie(
       return null;
     }
 
-    // Decode base64 session data
+    // Verify HMAC signature before trusting token data
+    const dotIndex = sessionToken.lastIndexOf('.');
+    if (dotIndex === -1 || !PORTAL_SESSION_SECRET) {
+      return null;
+    }
+
+    const payload = sessionToken.substring(0, dotIndex);
+    const signature = sessionToken.substring(dotIndex + 1);
+
+    const expectedSignature = crypto
+      .createHmac('sha256', PORTAL_SESSION_SECRET)
+      .update(payload)
+      .digest('hex');
+
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+      return null;
+    }
+
+    // Signature valid - decode payload
     const sessionData = JSON.parse(
-      Buffer.from(sessionToken, 'base64').toString('utf-8')
+      Buffer.from(payload, 'base64').toString('utf-8')
     ) as PortalSession;
 
     return sessionData;

@@ -31,6 +31,9 @@ export const PORTAL_SESSION_COOKIE = 'ff_portal_session';
 // Portal session duration (8 hours - typical shift)
 const PORTAL_SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
+// HMAC signing secret for portal session tokens
+const PORTAL_SESSION_SECRET = process.env.PORTAL_SESSION_SECRET;
+
 // Max image dimensions for VLM
 const MAX_IMAGE_WIDTH = 1024;
 const MAX_IMAGE_HEIGHT = 768;
@@ -287,8 +290,14 @@ export default async function handler(
       expiresAt: expiresAt.toISOString(),
     };
 
-    // Encode session as base64 for cookie (signed with session ID in DB for verification)
-    const sessionToken = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    // Encode session as base64 and sign with HMAC to prevent token forgery
+    const payload = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+    if (!PORTAL_SESSION_SECRET) {
+      log.error('[portal-auth] PORTAL_SESSION_SECRET env var not set - cannot sign session token');
+      return apiResponse.internalError(res, new Error('Server configuration error'));
+    }
+    const signature = crypto.createHmac('sha256', PORTAL_SESSION_SECRET).update(payload).digest('hex');
+    const sessionToken = `${payload}.${signature}`;
 
     res.setHeader(
       'Set-Cookie',

@@ -26,7 +26,7 @@ const pool = new Pool({
 
 // QFieldCloud Configuration
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
-const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN || '2VbfhkUAfPHw7s7zAtMsyRTFF0xU00JtQRKyF3vzTxZtRODF4FLbzEc91f7PRhCIQvc48WLkC3TowKruYgFHIgm9ewk1VGb0JIQp';
+const QFIELD_API_TOKEN = process.env.QFIELD_API_TOKEN;
 
 // Fallback project ID if no default is set in DB
 const FALLBACK_PROJECT_ID = 'ad3b1035-ddb3-42a3-8077-175f9400b38a';
