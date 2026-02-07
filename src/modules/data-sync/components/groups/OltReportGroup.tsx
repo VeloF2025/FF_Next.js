@@ -29,6 +29,8 @@ import {
   CheckSquare,
   Square,
   Lock,
+  Zap,
+  Database,
 } from 'lucide-react';
 import type { OltTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
@@ -205,6 +207,32 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const [reportLoading, setReportLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Auto-detect status state
+  const [autoDetectStatus, setAutoDetectStatus] = useState<{
+    hasRun: boolean;
+    run?: {
+      id: number;
+      totalOesRows: number;
+      cacheHits: number;
+      cacheMisses: number;
+      matches: number;
+      mismatchesNote2: number;
+      mismatchesNote4: number;
+      upsSwaps: number;
+      duplicatesSkipped: number;
+      apiLookupsQueued: number;
+      status: string;
+      startedAt: string;
+      completedAt: string | null;
+    };
+    queue?: {
+      pending: number;
+      completed: number;
+      errors: number;
+      total: number;
+    };
+  } | null>(null);
+
   // Sync URL with active tab on mount
   useEffect(() => {
     if (!activeTab) {
@@ -346,6 +374,29 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       setExporting(false);
     }
   };
+
+  // Fetch auto-detect status
+  const fetchAutoDetectStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/system/olt-report/auto-detect-status');
+      if (res.ok) {
+        const data = await res.json();
+        setAutoDetectStatus(data.data || data);
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  // Poll auto-detect status when on import tab and a run is active
+  useEffect(() => {
+    if (currentTab !== 'import') return;
+    fetchAutoDetectStatus();
+    const isRunning = autoDetectStatus?.run?.status === 'running' || autoDetectStatus?.run?.status === 'processing_queue';
+    if (!isRunning) return;
+    const interval = setInterval(fetchAutoDetectStatus, 5000);
+    return () => clearInterval(interval);
+  }, [currentTab, autoDetectStatus?.run?.status, fetchAutoDetectStatus]);
 
   // Load data based on current tab
   useEffect(() => {
@@ -904,6 +955,115 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               </div>
             )}
           </div>
+
+          {/* Auto-Detection Status */}
+          {autoDetectStatus?.hasRun && autoDetectStatus.run && (
+            <div className="border-t border-[var(--ff-border-light)]">
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">
+                      Auto-Detection Status
+                    </h3>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">
+                      Last run: {new Date(autoDetectStatus.run.startedAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    autoDetectStatus.run.status === 'completed'
+                      ? 'bg-green-500/20 text-green-400'
+                      : autoDetectStatus.run.status === 'running' || autoDetectStatus.run.status === 'processing_queue'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-red-500/20 text-red-400'
+                  }`}>
+                    {autoDetectStatus.run.status === 'processing_queue' ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Processing Queue
+                      </span>
+                    ) : autoDetectStatus.run.status === 'running' ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Running
+                      </span>
+                    ) : (
+                      autoDetectStatus.run.status
+                    )}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
+                    <p className="text-lg font-bold text-[var(--ff-text-primary)]">
+                      {autoDetectStatus.run.totalOesRows}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">OES Rows</p>
+                  </div>
+                  <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
+                    <p className="text-lg font-bold text-green-400">
+                      {autoDetectStatus.run.matches}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">Matches</p>
+                  </div>
+                  <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
+                    <p className="text-lg font-bold text-amber-400">
+                      {autoDetectStatus.run.mismatchesNote4}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">Wrong Serial</p>
+                  </div>
+                  <div className="bg-[var(--ff-bg-primary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
+                    <p className="text-lg font-bold text-red-400">
+                      {autoDetectStatus.run.mismatchesNote2}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">Not on 1Map</p>
+                  </div>
+                </div>
+
+                {/* Cache & Queue details */}
+                <div className="mt-3 flex flex-wrap gap-4 text-xs text-[var(--ff-text-secondary)]">
+                  <span className="flex items-center gap-1">
+                    <Database className="w-3 h-3" />
+                    Cache: {autoDetectStatus.run.cacheHits} hits / {autoDetectStatus.run.cacheMisses} misses
+                  </span>
+                  {autoDetectStatus.run.upsSwaps > 0 && (
+                    <span className="text-orange-400">
+                      UPS swaps: {autoDetectStatus.run.upsSwaps}
+                    </span>
+                  )}
+                  {autoDetectStatus.run.duplicatesSkipped > 0 && (
+                    <span>Duplicates skipped: {autoDetectStatus.run.duplicatesSkipped}</span>
+                  )}
+                </div>
+
+                {/* Queue progress bar */}
+                {autoDetectStatus.queue && autoDetectStatus.queue.total > 0 && (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-xs text-[var(--ff-text-secondary)] mb-1">
+                      <span>API Lookups: {autoDetectStatus.queue.completed}/{autoDetectStatus.queue.total}</span>
+                      {autoDetectStatus.queue.pending > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          {autoDetectStatus.queue.pending} remaining
+                        </span>
+                      )}
+                      {autoDetectStatus.queue.errors > 0 && (
+                        <span className="text-red-400">{autoDetectStatus.queue.errors} errors</span>
+                      )}
+                    </div>
+                    <div className="h-1.5 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                        style={{ width: `${autoDetectStatus.queue.total > 0 ? (autoDetectStatus.queue.completed / autoDetectStatus.queue.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

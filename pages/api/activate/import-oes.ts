@@ -805,6 +805,33 @@ async function handler(
         }
       }
 
+      // === OLT AUTO-DETECT (Fire-and-forget) ===
+      // Compare OES serials against 1Map cache to auto-detect mismatches
+      let oltAutoDetectTriggered = false;
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+        fetch(`${baseUrl}/api/system/olt-report/auto-detect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oesBatchId: batchId }),
+        })
+        .then(async (response) => {
+          if (response.ok) {
+            const result = await response.json();
+            log.info('OESImport', 'OLT auto-detect completed', result.data || result);
+          } else {
+            log.warn('OESImport', `OLT auto-detect returned ${response.status}`);
+          }
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          log.warn('OESImport', 'OLT auto-detect failed (non-blocking)', msg);
+        });
+        oltAutoDetectTriggered = true;
+      } catch (error) {
+        log.error('OESImport', 'Failed to trigger OLT auto-detect', error);
+      }
+
       // === SERIAL VERIFICATION RECOMPUTATION (Fire-and-forget) ===
       // OES is the source of truth for serial numbers. When OES data changes,
       // recompute 4-way verification badges for all affected DRs.
@@ -845,6 +872,7 @@ async function handler(
             ? 'QField sync triggered (running in background - check Data Sync page for status)'
             : 'QField sync not triggered',
         },
+        oltAutoDetectTriggered,
       });
     }
 

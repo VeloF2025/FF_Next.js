@@ -93,6 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         m.fix_result,
         m.fix_old_value,
         m.fix_attempted_at,
+        m.detection_source,
         m.created_at,
         i.filename as import_filename,
         i.project,
@@ -175,7 +176,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       };
 
       const csvRows = [
-        ['DR Number', 'ONT Serial (Correct)', '1Map Serial (Wrong)', 'Status', 'Old Value', 'Fixed At', 'Import File', 'Project', 'Imported At', 'Fixed By'].join(','),
+        ['DR Number', 'ONT Serial (Correct)', '1Map Serial (Wrong)', 'Status', 'Old Value', 'Fixed At', 'Source', 'Import File', 'Project', 'Imported At', 'Fixed By'].join(','),
         ...filteredRecords.map(r => [
           escapeCSV(r.drop_number),
           escapeCSV(r.olt_serial),
@@ -183,6 +184,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           escapeCSV(r.fix_status),
           escapeCSV(r.fix_old_value),
           escapeCSV(formatDate(r.fix_attempted_at)),
+          escapeCSV(r.detection_source || 'manual'),
           escapeCSV(r.import_filename),
           escapeCSV(r.project),
           escapeCSV(formatDate(r.imported_at)),

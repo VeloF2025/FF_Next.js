@@ -309,8 +309,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             // Insert new record with needs_reinvestigation status
             await client.query(
               `INSERT INTO olt_mismatch_records
-                (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status, has_ups_swap)
-               VALUES ($1, $2, $3, $4, $5, 'needs_reinvestigation', $6)`,
+                (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status, has_ups_swap, detection_source)
+               VALUES ($1, $2, $3, $4, $5, 'needs_reinvestigation', $6, 'manual')`,
               [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, mismatch.hasUpsSwap]
             );
 
@@ -370,8 +370,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       await client.query(
         `INSERT INTO olt_mismatch_records
-          (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status, has_ups_swap)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          (import_id, drop_number, olt_serial, wrong_onemap_serial, row_index, fix_status, has_ups_swap, detection_source)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'manual')`,
         [importId, mismatch.drNumber, mismatch.oltSerial, mismatch.wrongOneMapSerial, mismatch.rowIndex, fixStatus, mismatch.hasUpsSwap]
       );
 

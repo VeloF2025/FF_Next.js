@@ -29,6 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const status = String(req.query.status || 'pending');
+    const source = req.query.source ? String(req.query.source) : null;
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
     const offset = (page - 1) * pageSize;
@@ -52,6 +53,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
     // 'all' = no WHERE clause
 
+    // Optional source filter (auto or manual)
+    if (source === 'auto' || source === 'manual') {
+      const sourceCondition = `r.detection_source = '${source}'`;
+      whereClause = whereClause
+        ? `${whereClause} AND ${sourceCondition}`
+        : `WHERE ${sourceCondition}`;
+    }
+
     // Get total count
     const countResult = await pool.query(`
       SELECT COUNT(*)::int as total
@@ -73,6 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.fix_result,
         r.fix_old_value,
         r.has_ups_swap,
+        r.detection_source,
         r.resolution_type,
         r.resolution_notes,
         r.escalated_at,
