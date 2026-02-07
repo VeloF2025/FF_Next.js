@@ -112,7 +112,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       FROM qfield_photo_validations v
       ${whereClause}
     `;
-    const countResult = await sql(countQuery, params);
+    const countResult = await sql.query(countQuery, params);
     const total = parseInt(countResult[0]?.total || '0', 10);
 
     // Get validations with feature context
@@ -180,7 +180,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       LIMIT ${limit} OFFSET ${offset}
     `;
 
-    const validations = await sql(dataQuery, params);
+    const validations = await sql.query(dataQuery, params);
 
     return apiResponse.paginated(res, validations, {
       page: pageNum,
