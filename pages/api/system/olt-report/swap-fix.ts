@@ -268,6 +268,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             if (upsResult.success) {
               upsTransferResult = { success: true, serial: upsTransfer.serial, to: drBNumber };
 
+              // Clear UPS from DR A (it now belongs to DR B)
+              const drASearchForUps = await oneMapApi.searchDR(drANumber);
+              if (drASearchForUps.success) {
+                const drAUpsRecord = drASearchForUps.records.find(r => r.br_ser?.toUpperCase() === upsTransfer.serial.toUpperCase());
+                if (drAUpsRecord) {
+                  await oneMapApi.updateOntAndUpsSerial(
+                    drAUpsRecord.prop_id,
+                    drAUpsRecord.ph_ont || drACorrectSerial,
+                    '' // Clear UPS
+                  );
+                }
+              }
+
               await logActivity(
                 drBNumber,
                 'SERIAL_UPDATE',
@@ -280,6 +293,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 userId || 'system'
               );
 
+              // Record UPS addition on DR B
               await client.query(
                 `INSERT INTO serial_change_history
                  (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
@@ -290,6 +304,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                   upsTransfer.serial,
                   userId || 'system',
                   JSON.stringify({ fromDr: drANumber, source: 'olt_report' }),
+                ]
+              );
+
+              // Record UPS removal from DR A
+              await client.query(
+                `INSERT INTO serial_change_history
+                 (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
+                 VALUES ($1, 'ups_serial', $2, $3, 'cross_dr_swap', 'ups_transfer', $4, $5)`,
+                [
+                  drANumber,
+                  upsTransfer.serial,
+                  null,
+                  userId || 'system',
+                  JSON.stringify({ toDr: drBNumber, source: 'olt_report' }),
                 ]
               );
             } else {

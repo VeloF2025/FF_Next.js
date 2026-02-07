@@ -377,8 +377,8 @@ class OneMapApiService {
         ph_ont: newOntSerial,
       };
 
-      if (newUpsSerial) {
-        updatePayload.br_ser = newUpsSerial; // 1Map uses br_ser for UPS serial
+      if (newUpsSerial !== undefined && newUpsSerial !== null) {
+        updatePayload.br_ser = newUpsSerial; // 1Map uses br_ser for UPS serial (empty string = clear)
       }
 
       const formData = new URLSearchParams({
