@@ -18,8 +18,8 @@ const pool = new Pool({
 });
 
 const BATCH_SIZE = 50;
-const CONCURRENCY = 5;
-const STAGGER_MS = 50;
+const CONCURRENCY = 3;
+const STAGGER_MS = 150;
 
 function isUpsSerial(serial: string | null): boolean {
   return !!serial && serial.toUpperCase().startsWith('GU18');
@@ -39,6 +39,13 @@ export async function processLookupQueue(runId?: number): Promise<void> {
     const client = await pool.connect();
 
     try {
+      // Reset errored items with retries remaining back to pending
+      await client.query(
+        `UPDATE olt_onemap_lookup_queue
+         SET status = 'pending'
+         WHERE status = 'error' AND attempts < 3`
+      );
+
       const queueResult = await client.query(
         `SELECT id, drop_number, oes_serial, oes_batch_id, team
          FROM olt_onemap_lookup_queue
