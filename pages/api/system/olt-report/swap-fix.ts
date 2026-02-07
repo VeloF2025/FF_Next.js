@@ -249,81 +249,97 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let upsTransferResult = null;
     if (upsTransfer?.needed && upsTransfer.serial) {
       try {
-        // Search DR B to get its prop_id, then update br_ser
+        let drBSetSuccess = false;
+        let drAClearSuccess = false;
+
+        // Part A: Set UPS on DR B (skip if DR B already has it)
         const drBSearchResult = await oneMapApi.searchDR(drBNumber);
         if (drBSearchResult.success && drBSearchResult.records.length > 0) {
-          // Find the best target record: one with ONT but no UPS, or first record without UPS
-          const drBRecord = drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
-            || drBSearchResult.records.find(r => !r.br_ser)
-            || drBSearchResult.records[0];
-          const drBHasUps = drBSearchResult.records.some(r => r.br_ser);
-          if (!drBHasUps) {
-            // No record on DR B has a UPS — transfer it
+          const drBHasThisUps = drBSearchResult.records.some(
+            r => r.br_ser?.toUpperCase() === upsTransfer.serial.toUpperCase()
+          );
+          if (drBHasThisUps) {
+            drBSetSuccess = true; // Already there
+          } else if (!drBSearchResult.records.some(r => r.br_ser)) {
+            // DR B has no UPS — set it
+            const drBRecord = drBSearchResult.records.find(r => r.ph_ont && !r.br_ser)
+              || drBSearchResult.records[0];
             const currentOnt = drBRecord.ph_ont || drBCorrectSerial || '';
             const upsResult = await oneMapApi.updateOntAndUpsSerial(
               drBRecord.prop_id,
               currentOnt,
               upsTransfer.serial
             );
-            if (upsResult.success) {
-              upsTransferResult = { success: true, serial: upsTransfer.serial, to: drBNumber };
+            drBSetSuccess = upsResult.success;
+          }
+        }
 
-              // Clear UPS from DR A (it now belongs to DR B)
-              const drASearchForUps = await oneMapApi.searchDR(drANumber);
-              if (drASearchForUps.success) {
-                const drAUpsRecord = drASearchForUps.records.find(r => r.br_ser?.toUpperCase() === upsTransfer.serial.toUpperCase());
-                if (drAUpsRecord) {
-                  await oneMapApi.updateOntAndUpsSerial(
-                    drAUpsRecord.prop_id,
-                    drAUpsRecord.ph_ont || drACorrectSerial,
-                    '' // Clear UPS
-                  );
-                }
-              }
-
-              await logActivity(
-                drBNumber,
-                'SERIAL_UPDATE',
-                {
-                  details: `UPS TRANSFER: UPS serial ${upsTransfer.serial} transferred from ${drANumber} (was on wrong DR)`,
-                  source: 'olt_report',
-                  fix_type: 'ups_transfer',
-                  fromDr: drANumber,
-                },
-                userId || 'system'
+        // Part B: Clear UPS from DR A (always attempt if DR B has it)
+        if (drBSetSuccess) {
+          const drASearchForUps = await oneMapApi.searchDR(drANumber);
+          if (drASearchForUps.success) {
+            const drAUpsRecord = drASearchForUps.records.find(
+              r => r.br_ser?.toUpperCase() === upsTransfer.serial.toUpperCase()
+            );
+            if (drAUpsRecord) {
+              const clearResult = await oneMapApi.updateOntAndUpsSerial(
+                drAUpsRecord.prop_id,
+                drAUpsRecord.ph_ont || drACorrectSerial,
+                '' // Clear UPS
               );
-
-              // Record UPS addition on DR B
-              await client.query(
-                `INSERT INTO serial_change_history
-                 (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
-                 VALUES ($1, 'ups_serial', $2, $3, 'cross_dr_swap', 'ups_transfer', $4, $5)`,
-                [
-                  drBNumber,
-                  null,
-                  upsTransfer.serial,
-                  userId || 'system',
-                  JSON.stringify({ fromDr: drANumber, source: 'olt_report' }),
-                ]
-              );
-
-              // Record UPS removal from DR A
-              await client.query(
-                `INSERT INTO serial_change_history
-                 (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
-                 VALUES ($1, 'ups_serial', $2, $3, 'cross_dr_swap', 'ups_transfer', $4, $5)`,
-                [
-                  drANumber,
-                  upsTransfer.serial,
-                  null,
-                  userId || 'system',
-                  JSON.stringify({ toDr: drBNumber, source: 'olt_report' }),
-                ]
-              );
+              drAClearSuccess = clearResult.success;
             } else {
-              upsTransferResult = { success: false, error: upsResult.error };
+              drAClearSuccess = true; // Already cleared
             }
           }
+        }
+
+        if (drBSetSuccess) {
+          upsTransferResult = { success: true, serial: upsTransfer.serial, to: drBNumber, cleared: drAClearSuccess };
+
+          await logActivity(
+            drBNumber,
+            'SERIAL_UPDATE',
+            {
+              details: `UPS TRANSFER: UPS serial ${upsTransfer.serial} transferred from ${drANumber} (was on wrong DR)`,
+              source: 'olt_report',
+              fix_type: 'ups_transfer',
+              fromDr: drANumber,
+            },
+            userId || 'system'
+          );
+
+          // Record UPS addition on DR B
+          await client.query(
+            `INSERT INTO serial_change_history
+             (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
+             VALUES ($1, 'ups_serial', $2, $3, 'cross_dr_swap', 'ups_transfer', $4, $5)
+             ON CONFLICT DO NOTHING`,
+            [
+              drBNumber,
+              null,
+              upsTransfer.serial,
+              userId || 'system',
+              JSON.stringify({ fromDr: drANumber, source: 'olt_report' }),
+            ]
+          );
+
+          // Record UPS removal from DR A
+          await client.query(
+            `INSERT INTO serial_change_history
+             (drop_number, change_type, old_value, new_value, change_source, change_reason, actor, metadata)
+             VALUES ($1, 'ups_serial', $2, $3, 'cross_dr_swap', 'ups_transfer', $4, $5)
+             ON CONFLICT DO NOTHING`,
+            [
+              drANumber,
+              upsTransfer.serial,
+              null,
+              userId || 'system',
+              JSON.stringify({ toDr: drBNumber, source: 'olt_report' }),
+            ]
+          );
+        } else {
+          upsTransferResult = { success: false, error: 'Failed to set UPS on DR B' };
         }
       } catch (upsErr) {
         log.error('SwapFix', 'UPS transfer failed (non-fatal)', { error: upsErr, drB: drBNumber });
