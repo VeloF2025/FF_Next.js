@@ -754,7 +754,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       if (result.drA) {
         setSwapLookups(prev => ({ ...prev, [record.id]: result }));
       } else {
-        setSwapErrors(prev => ({ ...prev, [record.id]: result.error || 'Lookup failed' }));
+        const errMsg = typeof result.error === 'string' ? result.error : result.error?.message || 'Lookup failed';
+        setSwapErrors(prev => ({ ...prev, [record.id]: errMsg }));
       }
     } catch {
       setSwapErrors(prev => ({ ...prev, [record.id]: 'Network error' }));
@@ -798,7 +799,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         fetchRecords('needs_investigation');
         fetchStats();
       } else {
-        setSwapErrors(prev => ({ ...prev, [record.id]: result.error || 'Swap fix failed' }));
+        const errMsg = typeof result.error === 'string' ? result.error : result.error?.message || 'Swap fix failed';
+        setSwapErrors(prev => ({ ...prev, [record.id]: errMsg }));
       }
     } catch {
       setSwapErrors(prev => ({ ...prev, [record.id]: 'Network error' }));
