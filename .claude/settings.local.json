@@ -1206,7 +1206,9 @@
       "Bash(sudo -S apt-get install -y libreoffice-writer)",
       "Bash(set:*)",
       "Bash(git hash-object:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(PGPASSWORD='npg_MIUZXrg1tEY0' /usr/bin/psql:*)",
+      "WebFetch(domain:docs.qfield.org)"
     ],
     "deny": [],
     "ask": [],

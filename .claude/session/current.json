@@ -1,10 +1,10 @@
 {
   "session_id": "2026-02-07-fleet-fuel-transactions",
   "started_at": "2026-02-07T06:00:00Z",
-  "last_updated": "2026-02-07T10:58:12.239Z",
+  "last_updated": "2026-02-07T12:03:32.543Z",
   "working_on": {
-    "task": "Fleet Stats & Odometer Consistency Fix",
-    "status": "in_progress",
+    "task": "Fleet Fuel Transaction Enhancements",
+    "status": "completed",
     "progress": [
       "Fixed mobile receipt photo scanning (increased body size limit to 10MB)",
       "Fixed price/L calculation to always calculate from amount/litres",
@@ -12,12 +12,15 @@
       "Fixed L/100km calculation to use odometer-based lookup",
       "Added delete button UI for admin/super_admin users",
       "Added auto-recalculate L/100km after transaction deletion",
-      "Deployed fuel transaction fixes to all environments",
       "Fixed stats API to use fleet_odometer_history as single source of truth",
       "Added fuel transaction odometer sync to fleet_odometer_history",
-      "Identified bad data point (197,484 km from Jan 23) causing inflated stats"
+      "Added Tank Level After (%) field to portal fuel form",
+      "Added Fuel Gauge Photo scanning with VLM to portal",
+      "Added fuel level sync to fleet_fuel_history when submitting fuel transaction",
+      "Fixed source badge display to show 'Fuel' for fuel_transaction entries",
+      "Deployed all changes to dev, staging, and production"
     ],
-    "last_action": "Fixed stats API - deployed to staging and production, needs user to test authenticated"
+    "last_action": "Deployed fuel gauge photo scanning and tank level sync to all environments"
   },
   "learnings": {
     "mobile_photo_upload": {
@@ -40,14 +43,9 @@
       "solution": "After delete, recalculate all entries: first entry = null, subsequent = (litres/km_diff)*100",
       "pattern": "ORDER BY odometer_reading ASC, first entry NULL, loop through rest calculating from previous"
     },
-    "admin_delete_pattern": {
-      "problem": "Need to restrict delete to admin/super_admin only",
-      "solution": "Check user.role in API handler before allowing delete",
-      "pattern": "const user = (req as unknown as { user?: { role?: string } }).user; if (user?.role !== 'admin' && user?.role !== 'super_admin') return forbidden;"
-    },
     "odometer_stats_consistency": {
       "problem": "Distance Travelled card showed different 'Latest' km than Odometer Tracking section",
-      "root_cause": "Stats API used fleet_check_records (with bad data 197,484 km) while Odometer Tracking used fleet_odometer_history (correct 167,686 km)",
+      "root_cause": "Stats API used fleet_check_records (with bad data) while Odometer Tracking used fleet_odometer_history",
       "solution": "Changed stats API to use fleet_odometer_history as single source of truth",
       "pattern": "SELECT MAX(reading) as latest_reading FROM fleet_odometer_history WHERE vehicle_id = $1"
     },
@@ -55,8 +53,47 @@
       "problem": "Fuel transaction odometer readings not reflected in odometer history stats",
       "solution": "When fuel transaction is created with odometer, also insert into fleet_odometer_history",
       "pattern": "INSERT INTO fleet_odometer_history (vehicle_id, reading, source, ...) VALUES (..., 'fuel_transaction', ...)"
+    },
+    "fuel_level_sync": {
+      "problem": "Fuel level from fill-ups not reflected in Fuel Level History on Odometer tab",
+      "solution": "When fuel transaction is created with fuelLevelAfter, also insert into fleet_fuel_history",
+      "pattern": "INSERT INTO fleet_fuel_history (vehicle_id, fuel_level, source, ...) VALUES (..., 'fuel_transaction', ...)"
+    },
+    "portal_vs_detail_page_forms": {
+      "problem": "Portal form (/fleet/portal) was missing fields that vehicle detail page modal had",
+      "solution": "Keep both forms in sync - any field added to one must be added to the other",
+      "pattern": "Portal is for mobile drivers, detail page is for admins - both need same capabilities"
+    },
+    "source_badge_display": {
+      "problem": "Source display logic only handled 'vlm', everything else showed 'Manual'",
+      "solution": "Add explicit handling for 'fuel_transaction' source to show 'Fuel' badge",
+      "pattern": "reading.source === 'fuel_transaction' ? 'Fuel' : reading.source === 'vlm' ? 'VLM' : 'Manual'"
     }
   },
+  "features_added": [
+    {
+      "feature": "Fuel Gauge Photo Scanning",
+      "files": [
+        "pages/fleet/portal.tsx - Added photo section, refs, handler function",
+        "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Added fuelGaugePhotoBase64 scanning"
+      ],
+      "description": "Drivers can take photo of dashboard fuel gauge, VLM extracts percentage"
+    },
+    {
+      "feature": "Tank Level Sync to History",
+      "files": [
+        "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Added fuelLevelAfter sync to fleet_fuel_history"
+      ],
+      "description": "When fuel transaction includes tank level, it syncs to fuel history for tracking"
+    },
+    {
+      "feature": "Fuel Source Badge",
+      "files": [
+        "pages/fleet/vehicles/[id].tsx - Added 'Fuel' badge display for fuel_transaction source"
+      ],
+      "description": "Reading History and Fuel Level History show green 'Fuel' badge for fuel transaction entries"
+    }
+  ],
   "bugs_fixed": [
     {
       "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
@@ -74,25 +111,23 @@
       "fix": "Changed to odometer-based lookup for correct sequence"
     },
     {
-      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
-      "issue": "Deleting transactions left stale L/100km values",
-      "fix": "Added recalculateFuelEfficiency() called after every delete"
-    },
-    {
       "file": "pages/api/fleet/vehicles/[id]/stats.ts",
-      "issue": "Stats showed wrong 'Latest' km (197,484) from bad check_records data",
-      "fix": "Changed to use fleet_odometer_history as single source of truth (167,686 km correct)"
+      "issue": "Stats showed wrong 'Latest' km from bad check_records data",
+      "fix": "Changed to use fleet_odometer_history as single source of truth"
     },
     {
-      "file": "pages/api/fleet/vehicles/[id]/fuel-transactions.ts",
-      "issue": "Fuel transaction odometer readings not reflected in stats",
-      "fix": "Added sync to fleet_odometer_history when fuel transaction is created"
+      "file": "pages/fleet/vehicles/[id].tsx",
+      "issue": "Source badge showed 'Manual' for fuel_transaction entries",
+      "fix": "Added explicit handling to show 'Fuel' with green badge"
     }
   ],
   "files_changed": [
-    "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Body size limit, price/L calc, L/100km calc, DELETE handler, recalculate function, odometer history sync",
-    "pages/fleet/vehicles/[id].tsx - Added delete button for admin users in FuelSpendTab",
-    "pages/api/fleet/vehicles/[id]/stats.ts - Changed to use fleet_odometer_history for consistent stats"
+    "pages/api/fleet/vehicles/[id]/fuel-transactions.ts - Body size, price calc, L/100km calc, DELETE, odometer sync, fuel level sync, fuel gauge scanning",
+    "pages/fleet/vehicles/[id].tsx - Delete button, source badge display for 'Fuel'",
+    "pages/api/fleet/vehicles/[id]/stats.ts - Use fleet_odometer_history for stats",
+    "pages/fleet/portal.tsx - Added fuelLevelAfter field, Fuel Gauge Photo section with VLM scanning",
+    "src/modules/fleet/offline/offlineStorage.ts - Added fuelLevelAfter to PendingFuelTransaction",
+    "src/modules/fleet/offline/offlineSubmit.ts - Added fuelLevelAfter to submission interface"
   ],
   "commits": [
     "1fe55a7f fix(fleet): improve receipt scan error logging for debugging",
@@ -101,7 +136,10 @@
     "d4559f8b feat(fleet): add admin delete for fuel transactions, fix L/100km calc",
     "add794b8 feat(fleet): add delete button for fuel transactions (admin only)",
     "ca3e4cac feat(fleet): recalculate L/100km after fuel transaction delete",
-    "cf39adac fix(fleet): use odometer history as single source of truth for stats"
+    "cf39adac fix(fleet): use odometer history as single source of truth for stats",
+    "d2986151 feat(fleet): add tank level field to portal fuel fill-up form",
+    "7172ee8a feat(fleet): add fuel gauge photo scanning to portal",
+    "3c732141 fix(fleet): show 'Fuel' source badge for fuel_transaction entries"
   ],
   "deployments": {
     "dev": "https://dev.fibreflow.app - deployed 2026-02-07",
