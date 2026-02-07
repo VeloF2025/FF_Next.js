@@ -112,6 +112,7 @@ interface CreateTransactionRequest {
   gpsLng?: number;
   captureTimestamp?: string;
   source?: 'manual' | 'vlm' | 'hybrid';
+  fuelLevelAfter?: number; // Tank level after fill-up (0-100%)
 }
 
 interface VlmScanRequest {
@@ -363,6 +364,34 @@ async function handlePost(
     } catch (syncError) {
       // Log but don't fail the request - fuel transaction is primary
       log.warn('Failed to sync odometer to history', { error: syncError, vehicleId });
+    }
+  }
+
+  // Sync fuel level to fleet_fuel_history if provided
+  if (body.fuelLevelAfter !== undefined && body.fuelLevelAfter !== null) {
+    try {
+      // Get previous fuel level
+      const prevLevel = await sql`
+        SELECT fuel_level FROM fleet_fuel_history
+        WHERE vehicle_id = ${vehicleId}
+        ORDER BY recorded_at DESC
+        LIMIT 1
+      ` as Array<{ fuel_level: number }>;
+
+      const previousLevel = prevLevel[0]?.fuel_level ?? null;
+      const levelChange = previousLevel !== null ? body.fuelLevelAfter - previousLevel : null;
+
+      await sql`
+        INSERT INTO fleet_fuel_history (
+          vehicle_id, fuel_level, previous_level, level_change, source, recorded_at
+        ) VALUES (
+          ${vehicleId}, ${body.fuelLevelAfter}, ${previousLevel}, ${levelChange}, 'fuel_transaction', NOW()
+        )
+      `;
+      log.info('Synced fuel transaction level to history', { vehicleId, fuelLevel: body.fuelLevelAfter });
+    } catch (syncError) {
+      // Log but don't fail the request - fuel transaction is primary
+      log.warn('Failed to sync fuel level to history', { error: syncError, vehicleId });
     }
   }
 

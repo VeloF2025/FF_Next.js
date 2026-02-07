@@ -2088,6 +2088,7 @@ function FuelSpendTab({
     pricePerLitre: '',
     odometerReading: '',
     stationName: '',
+    fuelLevelAfter: '',
   });
   const [vlmResults, setVlmResults] = useState<{
     receipt?: {
@@ -2226,6 +2227,7 @@ function FuelSpendTab({
           stationName: formData.stationName || undefined,
           receiptPhotoUrl: uploadedReceiptUrl || undefined,
           source: vlmResults ? 'hybrid' : 'manual',
+          fuelLevelAfter: formData.fuelLevelAfter ? parseInt(formData.fuelLevelAfter, 10) : undefined,
         }),
       });
 
@@ -2256,6 +2258,7 @@ function FuelSpendTab({
       pricePerLitre: '',
       odometerReading: '',
       stationName: '',
+      fuelLevelAfter: '',
     });
     setVlmResults(null);
     setReceiptPhotoUrl(null);
@@ -2271,6 +2274,7 @@ function FuelSpendTab({
       pricePerLitre: tx.pricePerLitre?.toString() || '',
       odometerReading: tx.odometerReading?.toString() || '',
       stationName: tx.stationName || '',
+      fuelLevelAfter: '', // Not stored on transactions, only used for initial creation
     });
     setReceiptPhotoUrl(tx.receiptPhotoUrl);
     setShowEditModal(true);
@@ -2659,15 +2663,30 @@ function FuelSpendTab({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Station Name</label>
-                  <input
-                    type="text"
-                    placeholder="Shell, BP, Engen..."
-                    value={formData.stationName}
-                    onChange={(e) => setFormData({ ...formData, stationName: e.target.value })}
-                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Station Name</label>
+                    <input
+                      type="text"
+                      placeholder="Shell, BP, Engen..."
+                      value={formData.stationName}
+                      onChange={(e) => setFormData({ ...formData, stationName: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Tank Level After (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      placeholder="100"
+                      value={formData.fuelLevelAfter}
+                      onChange={(e) => setFormData({ ...formData, fuelLevelAfter: e.target.value })}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)]"
+                    />
+                    <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Optional - updates fuel gauge</p>
+                  </div>
                 </div>
 
                 {/* Receipt Upload for Manual Entries */}
