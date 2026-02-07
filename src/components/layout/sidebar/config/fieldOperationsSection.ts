@@ -2,7 +2,7 @@
  * Field Operations section configuration
  */
 
-import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck } from 'lucide-react';
+import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck, CheckSquare } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const fieldOperationsSection: NavSection = {
@@ -65,6 +65,14 @@ export const fieldOperationsSection: NavSection = {
       shortLabel: 'Photos',
       permissions: [],
       rbacKey: 'activate',
+    },
+    {
+      to: '/qfield/qa',
+      icon: CheckSquare,
+      label: 'QField QA',
+      shortLabel: 'QF QA',
+      permissions: [],
+      rbacKey: 'field',
     },
   ]
 };
